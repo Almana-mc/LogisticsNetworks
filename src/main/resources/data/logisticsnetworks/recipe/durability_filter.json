@@ -1,0 +1,22 @@
+{
+    "type": "minecraft:crafting_shapeless",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "ingredients": [
+        {
+            "item": "logisticsnetworks:small_filter"
+        },
+        {
+            "tag": "c:tools"
+        }
+    ],
+    "result": {
+        "id": "logisticsnetworks:durability_filter",
+        "count": 1
+    }
+}

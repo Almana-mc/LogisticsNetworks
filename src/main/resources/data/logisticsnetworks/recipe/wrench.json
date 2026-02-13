@@ -1,0 +1,33 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "T T",
+        "BGB",
+        "PPP"
+    ],
+    "key": {
+        "T": {
+            "item": "minecraft:redstone_torch"
+        },
+        "B": {
+            "item": "minecraft:stone_button"
+        },
+        "G": {
+            "tag": "c:glass_panes"
+        },
+        "P": {
+            "item": "minecraft:polished_blackstone"
+        }
+    },
+    "result": {
+        "id": "logisticsnetworks:wrench",
+        "count": 1
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "type": "minecraft:crafting_shapeless",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "ingredients": [
+        {
+            "item": "logisticsnetworks:small_filter"
+        },
+        {
+            "item": "minecraft:bowl"
+        }
+    ],
+    "result": {
+        "id": "logisticsnetworks:amount_filter",
+        "count": 1
+    }
+}

@@ -1,0 +1,33 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "DHD",
+        "CSC",
+        "DHD"
+    ],
+    "key": {
+        "D": {
+            "item": "minecraft:diamond"
+        },
+        "H": {
+            "item": "minecraft:hopper"
+        },
+        "C": {
+            "item": "minecraft:chest"
+        },
+        "S": {
+            "item": "minecraft:smooth_stone"
+        }
+    },
+    "result": {
+        "id": "logisticsnetworks:diamond_upgrade",
+        "count": 1
+    }
+}

@@ -1,0 +1,25 @@
+{
+    "type": "minecraft:crafting_shapeless",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "ingredients": [
+        {
+            "item": "logisticsnetworks:small_filter"
+        },
+        {
+            "item": "minecraft:name_tag"
+        },
+        {
+            "item": "minecraft:paper"
+        }
+    ],
+    "result": {
+        "id": "logisticsnetworks:nbt_filter",
+        "count": 1
+    }
+}

@@ -1,0 +1,15 @@
+
+# Gradle
+.gradle/
+build/
+
+# IDE folders
+.idea/
+.vscode/
+bin/
+
+# Minecraft Run Stuff
+run/
+
+# Personal Planning
+planning/

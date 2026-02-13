@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "logisticsnetworks:iron_upgrade",
+    "logisticsnetworks:gold_upgrade",
+    "logisticsnetworks:diamond_upgrade",
+    "logisticsnetworks:netherite_upgrade",
+    "logisticsnetworks:dimensional_upgrade"
+  ]
+}
