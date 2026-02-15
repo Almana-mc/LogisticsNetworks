@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.network;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.*;
+import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -15,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -112,6 +114,27 @@ public class ServerPayloadHandler {
             LogisticsNodeEntity node = getNode(context, payload.entityId());
             if (node != null)
                 node.setRenderVisible(!node.isRenderVisible());
+        });
+    }
+
+    public static void handleCycleWrenchMode(CycleWrenchModePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+
+            InteractionHand hand = payload.handOrdinal() == InteractionHand.OFF_HAND.ordinal()
+                    ? InteractionHand.OFF_HAND
+                    : InteractionHand.MAIN_HAND;
+
+            ItemStack heldStack = player.getItemInHand(hand);
+            if (!(heldStack.getItem() instanceof WrenchItem)) {
+                return;
+            }
+
+            WrenchItem.Mode mode = WrenchItem.cycleMode(heldStack, payload.forward());
+            player.getInventory().setChanged();
+            player.displayClientMessage(WrenchItem.getModeChangedMessage(mode), true);
         });
     }
 

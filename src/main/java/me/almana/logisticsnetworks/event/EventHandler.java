@@ -100,6 +100,7 @@ public class EventHandler {
                 if (Config.dropNodeItem) {
                     node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
                 }
+                node.dropFilters();
                 node.dropUpgrades();
                 node.discard();
             }

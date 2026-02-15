@@ -2,7 +2,9 @@ package me.almana.logisticsnetworks.registration;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.item.*;
+import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import net.minecraft.core.registries.Registries;
@@ -13,6 +15,8 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -30,6 +34,8 @@ public class Registration {
                         .create(Registries.CREATIVE_MODE_TAB, Logisticsnetworks.MOD_ID);
         public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU,
                         Logisticsnetworks.MOD_ID);
+        public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS = DeferredRegister
+                        .create(Registries.RECIPE_SERIALIZER, Logisticsnetworks.MOD_ID);
 
         // Some ugly shit I have done here....
         public static final DeferredHolder<EntityType<?>, EntityType<LogisticsNodeEntity>> LOGISTICS_NODE = ENTITIES
@@ -86,6 +92,13 @@ public class Registration {
         public static final DeferredHolder<MenuType<?>, MenuType<FilterMenu>> FILTER_MENU = MENUS.register(
                         "filter_menu",
                         () -> IMenuTypeExtension.create(FilterMenu::new));
+        public static final DeferredHolder<MenuType<?>, MenuType<ClipboardMenu>> CLIPBOARD_MENU = MENUS.register(
+                        "clipboard_menu",
+                        () -> IMenuTypeExtension.create(ClipboardMenu::new));
+
+        public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
+                        .register("filter_copy_clear",
+                                        () -> new SimpleCraftingRecipeSerializer<>(FilterCopyClearRecipe::new));
 
         public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = CREATIVE_TABS.register(
                         "logistics_tab",
@@ -103,6 +116,7 @@ public class Registration {
                 ENTITIES.register(modEventBus);
                 ITEMS.register(modEventBus);
                 MENUS.register(modEventBus);
+                RECIPE_SERIALIZERS.register(modEventBus);
                 CREATIVE_TABS.register(modEventBus);
         }
 }

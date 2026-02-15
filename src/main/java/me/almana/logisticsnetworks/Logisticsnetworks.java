@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks;
 
 import me.almana.logisticsnetworks.network.AssignNetworkPayload;
 import me.almana.logisticsnetworks.network.ClientPayloadHandler;
+import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
 import me.almana.logisticsnetworks.network.ModifyFilterModPayload;
 import me.almana.logisticsnetworks.network.ModifyFilterNbtPayload;
 import me.almana.logisticsnetworks.network.ModifyFilterTagPayload;
@@ -70,6 +71,8 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleSetDurabilityFilterValue);
                 registrar.playToServer(ToggleNodeVisibilityPayload.TYPE, ToggleNodeVisibilityPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleToggleVisibility);
+                registrar.playToServer(CycleWrenchModePayload.TYPE, CycleWrenchModePayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleCycleWrenchMode);
 
                 // Server -> Client
                 registrar.playToClient(SyncNetworkListPayload.TYPE, SyncNetworkListPayload.STREAM_CODEC,

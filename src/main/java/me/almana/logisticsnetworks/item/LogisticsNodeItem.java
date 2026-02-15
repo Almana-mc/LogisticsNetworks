@@ -1,15 +1,18 @@
 package me.almana.logisticsnetworks.item;
 
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -82,10 +85,42 @@ public class LogisticsNodeItem extends Item {
         node.setValid(true);
 
         if (level.addFreshEntity(node)) {
+            tryAutoPasteFromOffhandWrench(context, node);
             level.playSound(null, pos, SoundEvents.METAL_PLACE, SoundSource.BLOCKS, 1.0f, 1.0f);
             context.getItemInHand().shrink(1);
             return InteractionResult.CONSUME;
         }
         return InteractionResult.FAIL;
+    }
+
+    private void tryAutoPasteFromOffhandWrench(UseOnContext context, LogisticsNodeEntity node) {
+        Player player = context.getPlayer();
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return;
+        }
+
+        ItemStack offhand = serverPlayer.getOffhandItem();
+        if (!(offhand.getItem() instanceof WrenchItem)) {
+            return;
+        }
+
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(offhand, serverPlayer.registryAccess());
+        if (clipboard == null || clipboard.isEffectivelyEmpty()) {
+            return;
+        }
+
+        NodeClipboardConfig.PasteResult result = clipboard.applyToNode(serverPlayer, node, offhand);
+        switch (result) {
+            case SUCCESS -> {
+            }
+            case MISSING_ITEMS -> serverPlayer.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.clipboard.paste.missing_items"), true);
+            case INVENTORY_FULL -> serverPlayer.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.clipboard.paste.no_space"), true);
+            case INCOMPATIBLE_TARGET -> serverPlayer.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.clipboard.paste.incompatible"), true);
+            case CLIPBOARD_INVALID -> serverPlayer.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.clipboard.invalid"), true);
+        }
     }
 }

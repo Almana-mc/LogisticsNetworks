@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.client;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.client.model.NodeModel;
+import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -23,6 +24,7 @@ public class ClientEventHandler {
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(Registration.NODE_MENU.get(), NodeScreen::new);
         event.register(Registration.FILTER_MENU.get(), FilterScreen::new);
+        event.register(Registration.CLIPBOARD_MENU.get(), ClipboardScreen::new);
     }
 
     @SubscribeEvent

@@ -17,6 +17,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.*;
@@ -80,7 +81,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         super(menu, inventory, title);
         this.imageWidth = GUI_WIDTH;
         this.imageHeight = GUI_HEIGHT;
-        this.inventoryLabelY = INV_Y - 10;
+        this.inventoryLabelY = 10_000;
+        this.titleLabelY = 10_000;
     }
 
     @Override
@@ -263,7 +265,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (node == null)
             return;
 
-        String netName = getNetworkName(node.getNetworkId());
+        String netName = clipToWidth(getNetworkName(node.getNetworkId()), GUI_WIDTH - 120);
         g.drawCenteredString(font, netName, leftPos + GUI_WIDTH / 2, topPos + 6, COLOR_ACCENT);
 
         boolean isVisible = node.isRenderVisible();
@@ -289,6 +291,19 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 .map(SyncNetworkListPayload.NetworkEntry::name)
                 .findFirst()
                 .orElse("Network " + netId.toString().substring(0, 8));
+    }
+
+    private String clipToWidth(String text, int maxWidth) {
+        if (text == null)
+            return "";
+        if (font.width(text) <= maxWidth)
+            return text;
+
+        String value = text;
+        while (value.length() > 3 && font.width(value + "...") > maxWidth) {
+            value = value.substring(0, value.length() - 1);
+        }
+        return value + "...";
     }
 
     private void drawChannelTabs(GuiGraphics g, LogisticsNodeEntity node, int y) {
@@ -411,6 +426,10 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             stopNumericEdit(true);
         }
 
+        if (isHoveringMenuSlot(mx, my)) {
+            return super.mouseClicked(mx, my, btn);
+        }
+
         if (currentPage == Page.NETWORK_SELECT) {
             if (handleNetworkPageClick(mx, my))
                 return true;
@@ -422,7 +441,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     }
 
     private boolean handleNetworkPageClick(double mx, double my) {
-        if (isHovering(leftPos + GUI_WIDTH / 2 - 45, topPos + 54, 90, 16, mx, my)) {
+        if (isHoveringAbs(leftPos + GUI_WIDTH / 2 - 45, topPos + 54, 90, 16, mx, my)) {
             String name = networkNameField.getValue().trim();
             if (name.isEmpty())
                 name = "Unnamed";
@@ -434,7 +453,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, networkList.size());
         for (int i = networkScrollOffset; i < endIdx; i++) {
             int y = listY + (i - networkScrollOffset) * 20;
-            if (isHovering(leftPos + 14, y, GUI_WIDTH - 28, 17, mx, my)) {
+            if (isHoveringAbs(leftPos + 14, y, GUI_WIDTH - 28, 17, mx, my)) {
                 sendNetworkAssign(Optional.of(networkList.get(i).id()), "");
                 return true;
             }
@@ -447,21 +466,21 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (node == null)
             return false;
 
-        if (isHovering(leftPos + 8, topPos + 4, font.width(node.isRenderVisible() ? "Visible" : "Hidden") + 10, 12, mx,
+        if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(node.isRenderVisible() ? "Visible" : "Hidden") + 10, 12, mx,
                 my)) {
             node.setRenderVisible(!node.isRenderVisible());
             PacketDistributor.sendToServer(new ToggleNodeVisibilityPayload(node.getId()));
             return true;
         }
 
-        if (isHovering(leftPos + GUI_WIDTH - 50, topPos + 4, 42, 12, mx, my)) {
+        if (isHoveringAbs(leftPos + GUI_WIDTH - 50, topPos + 4, 42, 12, mx, my)) {
             currentPage = Page.NETWORK_SELECT;
             rebuildPageLayout();
             return true;
         }
 
         for (int i = 0; i < 9; i++) {
-            if (isHovering(leftPos + 10 + i * 26, topPos + 20, 24, 14, mx, my)) {
+            if (isHoveringAbs(leftPos + 10 + i * 26, topPos + 20, 24, 14, mx, my)) {
                 selectedChannel = i;
                 getMenu().setSelectedChannel(i);
                 PacketDistributor.sendToServer(new SelectNodeChannelPayload(node.getId(), i));
@@ -484,7 +503,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         for (int row = 0; row < 9; row++) {
             int y = startY + row * rowH;
-            if (isHovering(startX, y, w, rowH, mx, my)) {
+            if (isHoveringAbs(startX, y, w, rowH, mx, my)) {
                 if (isSettingDisabled(ch, row))
                     return true;
 
@@ -512,7 +531,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         String modeLabel = ch.getFilterMode() == FilterMode.MATCH_ALL ? "All" : "Any";
         int modeBtnW = font.width(modeLabel) + 8;
 
-        if (isHovering(modeBtnX, modeBtnY, modeBtnW, 10, mx, my)) {
+        if (isHoveringAbs(modeBtnX, modeBtnY, modeBtnW, 10, mx, my)) {
             ch.setFilterMode(cycleEnum(ch.getFilterMode(), (btn == 0) ? 1 : -1));
             commitChannelUpdate(node, ch);
             return true;
@@ -642,8 +661,17 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
     }
 
-    protected boolean isHovering(int x, int y, int w, int h, double mx, double my) {
+    private boolean isHoveringAbs(int x, int y, int w, int h, double mx, double my) {
         return mx >= x && mx <= x + w && my >= y && my <= y + h;
+    }
+
+    private boolean isHoveringMenuSlot(double mx, double my) {
+        for (Slot slot : menu.slots) {
+            if (isHovering(slot.x, slot.y, 16, 16, mx, my)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
