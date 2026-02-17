@@ -1,0 +1,12 @@
+{
+  "name": "Side Configuration",
+  "icon": "logisticsnetworks:logistics_node",
+  "category": "logisticsnetworks:channels",
+  "sortnum": 4,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will cover side configuration.$(br2)Each channel reads or writes from a specific face of the attached block: up, down, north, south, east, or west. This matters for machines that have different slots on different sides."
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Items",
+  "description": "All the items in LogisticsNetworks: the node, the wrench, and how to use them.",
+  "icon": "logisticsnetworks:wrench",
+  "sortnum": 1
+}

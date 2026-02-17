@@ -1,0 +1,12 @@
+{
+  "name": "Logistics Node",
+  "icon": "logisticsnetworks:logistics_node",
+  "category": "logisticsnetworks:items",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will cover the Logistics Node item.$(br2)Nodes are the core of the mod. Right-click any compatible container to attach a node to it. Only one node per block. The node is an invisible entity that sits on the block and handles all the logistics."
+    }
+  ]
+}

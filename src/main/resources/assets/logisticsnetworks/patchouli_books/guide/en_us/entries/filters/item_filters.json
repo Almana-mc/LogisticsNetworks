@@ -1,0 +1,22 @@
+{
+  "name": "Item Filters",
+  "icon": "logisticsnetworks:small_filter",
+  "category": "logisticsnetworks:filters",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The basic filters. They come in three sizes: Small (9 slots), Medium (18 slots), and Big (27 slots). Right-click a filter item to open it and drag items or fluids into the slots.$(br2)Each filter can be set to $(l)whitelist$() (only allow these) or $(l)blacklist$() (block these). Works for both items and fluids."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "On Export vs Import",
+      "text": "Filters work on both sides of a transfer.$(br2)$(l)On an export channel:$() The filter controls what gets pulled out. Only items matching the filter will leave the source container.$(br2)$(l)On an import channel:$() The filter controls what gets accepted in. The destination will only take items that pass its filter.$(br2)Both filters are checked during a transfer. An item has to pass the export filter AND the import filter to move."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Copying Filters",
+      "text": "You can duplicate filter configs through crafting. Put one configured filter and one or more blank filters of the same type in the crafting grid. All blanks get the same config.$(br2)Put a single configured filter alone in the grid to clear it."
+    }
+  ]
+}

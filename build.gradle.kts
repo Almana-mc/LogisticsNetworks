@@ -87,6 +87,9 @@ dependencies {
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
     runtimeOnly("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
+    
+    compileOnly("vazkii.patchouli:Patchouli:1.21.1-92-NEOFORGE:api")
+    runtimeOnly("vazkii.patchouli:Patchouli:1.21.1-92-NEOFORGE")
 }
 
 val generateModMetadata by tasks.registering(ProcessResources::class) {

@@ -1,0 +1,12 @@
+{
+  "name": "Distribution Modes",
+  "icon": "logisticsnetworks:logistics_node",
+  "category": "logisticsnetworks:channels",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will cover the four distribution modes for export channels.$(br2)Priority, Nearest First, Farthest First, and Round Robin. These control which import node gets the resources when there are multiple options."
+    }
+  ]
+}

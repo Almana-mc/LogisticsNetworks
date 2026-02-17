@@ -1,0 +1,12 @@
+{
+  "name": "Your First Network",
+  "icon": "logisticsnetworks:logistics_node",
+  "category": "logisticsnetworks:getting_started",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will walk you through setting up your first network step by step.$(br2)You'll need: two chests, two logistics nodes, and a wrench."
+    }
+  ]
+}

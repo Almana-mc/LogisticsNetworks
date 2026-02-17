@@ -1,0 +1,12 @@
+{
+  "name": "Channel Basics",
+  "icon": "logisticsnetworks:logistics_node",
+  "category": "logisticsnetworks:channels",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will explain channels.$(br2)Each node has 9 channels (0-8). A channel can handle items, fluids, or energy. Channels on the same number talk to each other across the network: one exports, the others import."
+    }
+  ]
+}

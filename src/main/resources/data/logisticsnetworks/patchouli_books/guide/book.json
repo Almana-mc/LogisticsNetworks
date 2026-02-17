@@ -1,0 +1,12 @@
+{
+  "name": "LogisticsNetworks Guide",
+  "landing_text": "A guide to setting up and using LogisticsNetworks. Place nodes on containers, group them into networks, and move items, fluids, and energy between them automatically.$(br2)This book is a work in progress.",
+  "use_resource_pack": true,
+  "version": "1",
+  "creative_tab": "logisticsnetworks:logistics_tab",
+  "model": "patchouli:book_brown",
+  "show_progress": false,
+  "macros": {
+    "$(wip)": "$(l)$(#e03c31)WIP$()"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "NBT Filter",
+  "icon": "logisticsnetworks:nbt_filter",
+  "category": "logisticsnetworks:filters",
+  "sortnum": 4,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Matches items or fluids by a specific NBT/component path and value. When you open the filter, it scans the held item's components and shows a dropdown of available paths.$(br2)Set it to whitelist or blacklist, and pick items or fluids as the target type. Fluid NBT uses paths starting with fluid.components."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "On Export vs Import",
+      "text": "$(l)On an export channel:$() Only pulls out items/fluids whose NBT data matches the configured path and value.$(br2)$(l)On an import channel:$() Only accepts items/fluids with matching NBT data.$(br2)Both sides are checked. Useful for sorting enchanted items, potions, or any items that differ only by their data."
+    }
+  ]
+}

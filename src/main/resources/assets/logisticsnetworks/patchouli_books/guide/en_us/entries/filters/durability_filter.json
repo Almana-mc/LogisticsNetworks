@@ -1,0 +1,17 @@
+{
+  "name": "Durability Filter",
+  "icon": "logisticsnetworks:durability_filter",
+  "category": "logisticsnetworks:filters",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Matches damageable items by remaining durability points. Set an operator (<=, =, or >=) and a raw durability value from 0 to 100.$(br2)This is durability points, not a percentage. A diamond pickaxe has 1561 total, so >= 50 means at least 50 points left.$(br2)Only works with items that can be damaged (tools, armor, etc). This filter is a hard gate: if it's present and doesn't match, the item is blocked regardless of other filters."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "On Export vs Import",
+      "text": "$(l)On an export channel:$() Only pulls out items whose durability matches the condition. For example, >= 50 means only export tools with at least 50 durability left.$(br2)$(l)On an import channel:$() Only accepts items whose durability matches. Good for sorting damaged tools into a repair chest.$(br2)Both sides are checked. The item must pass the durability check on both the export and import channels."
+    }
+  ]
+}

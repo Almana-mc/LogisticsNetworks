@@ -1,0 +1,17 @@
+{
+  "name": "Amount Filter",
+  "icon": "logisticsnetworks:amount_filter",
+  "category": "logisticsnetworks:filters",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Sets a numeric threshold between 0 and 10,000. Unlike other filters, the amount filter doesn't decide $(o)what$() moves. It decides $(o)how much$() can move. It works differently depending on which side it's on."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "On Export vs Import",
+      "text": "$(l)On an export channel:$() Acts as a minimum-retain rule. The source keeps at least this many items. If a chest has 100 cobblestone and the amount is 64, only 36 can be exported.$(br2)$(l)On an import channel:$() Acts as a maximum-fill rule. The destination accepts items until it has this many. If set to 64, the import stops once the target holds 64 of that item.$(br2)You can use both at once. The export says \"keep at least X\" and the import says \"fill up to Y\"."
+    }
+  ]
+}

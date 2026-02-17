@@ -1,0 +1,12 @@
+{
+  "name": "What is LogisticsNetworks?",
+  "icon": "logisticsnetworks:logistics_node",
+  "category": "logisticsnetworks:getting_started",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will explain what LogisticsNetworks is and what it can do.$(br2)Short version: place nodes on containers, group them into a network, and items, fluids, and energy move between them automatically. No pipes, no cables, no physical connections needed."
+    }
+  ]
+}

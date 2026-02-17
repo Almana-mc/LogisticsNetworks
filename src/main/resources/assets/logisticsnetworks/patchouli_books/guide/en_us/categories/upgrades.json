@@ -1,0 +1,6 @@
+{
+  "name": "Upgrades",
+  "description": "Upgrades increase how much a node can move per operation and how often it runs. There are also dimensional upgrades for cross-dimension transfers.",
+  "icon": "logisticsnetworks:diamond_upgrade",
+  "sortnum": 5
+}

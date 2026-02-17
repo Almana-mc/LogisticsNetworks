@@ -1,0 +1,12 @@
+{
+  "name": "Wrench",
+  "icon": "logisticsnetworks:wrench",
+  "category": "logisticsnetworks:items",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will cover the Wrench.$(br2)The wrench has two modes: Wrench Mode (blue) for opening node GUIs and removing nodes, and Copy-Paste Mode (green) for cloning configurations between nodes. Scroll wheel to switch modes."
+    }
+  ]
+}

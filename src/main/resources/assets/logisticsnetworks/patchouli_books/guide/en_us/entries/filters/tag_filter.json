@@ -1,0 +1,17 @@
+{
+  "name": "Tag Filter",
+  "icon": "logisticsnetworks:tag_filter",
+  "category": "logisticsnetworks:filters",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Matches items or fluids by their resource tags (like minecraft:logs or c:ores/iron). You can type a tag with or without the # prefix.$(br2)Set it to whitelist or blacklist, and pick whether it targets items or fluids."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "On Export vs Import",
+      "text": "$(l)On an export channel:$() Only items/fluids with the matching tag get pulled out of the source.$(br2)$(l)On an import channel:$() The destination only accepts items/fluids with the matching tag.$(br2)Both sides are checked. An item needs to pass the export tag filter AND the import tag filter to transfer."
+    }
+  ]
+}

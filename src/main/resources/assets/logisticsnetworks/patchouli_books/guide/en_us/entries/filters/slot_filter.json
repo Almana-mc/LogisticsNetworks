@@ -1,0 +1,17 @@
+{
+  "name": "Slot Filter",
+  "icon": "logisticsnetworks:slot_filter",
+  "category": "logisticsnetworks:filters",
+  "sortnum": 6,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Restricts which inventory slots a channel can access. Enter slot numbers using range notation like 0-8, 18, 27-35. Slot numbers go from 0 to 53.$(br2)Set it to whitelist (only use these slots) or blacklist (use all slots except these). Only affects item transfers, not fluids."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "On Export vs Import",
+      "text": "$(l)On an export channel:$() Controls which slots in the source container get read. Items in other slots are ignored, even if they match other filters.$(br2)$(l)On an import channel:$() Controls which slots in the destination container get written to. Items will only be placed into the allowed slots.$(br2)Both sides work independently. You can restrict the source to read from the top row and the destination to write to the bottom row."
+    }
+  ]
+}

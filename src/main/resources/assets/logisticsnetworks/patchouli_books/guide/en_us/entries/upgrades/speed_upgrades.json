@@ -1,0 +1,17 @@
+{
+  "name": "Speed Upgrades",
+  "icon": "logisticsnetworks:diamond_upgrade",
+  "category": "logisticsnetworks:upgrades",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will cover the four speed upgrade tiers.$(br2)Iron, Gold, Diamond, and Netherite. Each tier increases the max batch size and lowers the minimum tick delay. Only the highest tier in a node takes effect, they don't stack."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Upgrade Stats",
+      "text": "$(wip)$(br2)$(l)Default (no upgrade):$() 8 items, 500 mb, 2,000 RF, 20 tick delay$(br2)$(l)Iron:$() 16 items, 1,000 mb, 10,000 RF, 10 tick delay$(br2)$(l)Gold:$() 32 items, 5,000 mb, 50,000 RF, 5 tick delay$(br2)$(l)Diamond:$() 64 items, 20,000 mb, 250,000 RF, 1 tick delay$(br2)$(l)Netherite:$() 10,000 items, 1,000,000 mb, unlimited RF, 1 tick delay"
+    }
+  ]
+}

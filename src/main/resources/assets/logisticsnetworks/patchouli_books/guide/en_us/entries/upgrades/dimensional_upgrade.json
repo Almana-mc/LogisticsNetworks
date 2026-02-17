@@ -1,0 +1,12 @@
+{
+  "name": "Dimensional Upgrade",
+  "icon": "logisticsnetworks:dimensional_upgrade",
+  "category": "logisticsnetworks:upgrades",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will cover the Dimensional Upgrade.$(br2)Normally, nodes can only transfer to other nodes in the same dimension. With a dimensional upgrade in both the source and destination node, transfers work across dimensions (like Overworld to Nether)."
+    }
+  ]
+}

@@ -566,7 +566,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         DurabilityFilterData.Operator op = menu.getDurabilityOperator();
         drawButton(g, cx - 50, cy, 20, 12, op.symbol(), mx, my, true);
-        g.drawString(font, String.valueOf(menu.getDurabilityPercent()) + "%", cx - 20, cy + 2, COL_ACCENT, false);
+        g.drawString(font, String.valueOf(menu.getDurabilityValue()), cx - 20, cy + 2, COL_ACCENT, false);
 
         int btnY = cy + 20;
         drawAmountButton(g, cx - 70, btnY, "-64", mx, my);
@@ -937,7 +937,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (menu.isAmountMode()) {
                 sendAmountUpdate(menu.getAmount() + delta);
             } else {
-                sendDurabilityUpdate(menu.getDurabilityPercent() + delta);
+                sendDurabilityUpdate(menu.getDurabilityValue() + delta);
             }
             return true;
         }

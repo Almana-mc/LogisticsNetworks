@@ -1,0 +1,12 @@
+{
+  "name": "Creating Networks",
+  "icon": "logisticsnetworks:logistics_node",
+  "category": "logisticsnetworks:networks",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will explain how to create and join networks.$(br2)Networks are logical groups, not physical. Nodes in the same network can transfer resources regardless of distance. Open a node with the wrench, type a name, and hit Create."
+    }
+  ]
+}

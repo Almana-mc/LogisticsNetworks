@@ -1,0 +1,17 @@
+{
+  "name": "Mod Filter",
+  "icon": "logisticsnetworks:mod_filter",
+  "category": "logisticsnetworks:filters",
+  "sortnum": 5,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Matches items or fluids from a specific mod. Type a mod ID directly, or paste an item ID and the mod namespace gets extracted automatically. You can add multiple mod IDs to one filter.$(br2)Set it to whitelist or blacklist, and pick items or fluids as the target type."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "On Export vs Import",
+      "text": "$(l)On an export channel:$() Only pulls out items/fluids from the listed mods.$(br2)$(l)On an import channel:$() Only accepts items/fluids from the listed mods.$(br2)Both sides are checked. Handy for sorting all items from one mod into a dedicated storage area."
+    }
+  ]
+}

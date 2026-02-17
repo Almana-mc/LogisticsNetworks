@@ -1,0 +1,12 @@
+{
+  "name": "Managing Networks",
+  "icon": "logisticsnetworks:logistics_node",
+  "category": "logisticsnetworks:networks",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will cover managing your networks.$(br2)You can reassign nodes to different networks at any time. When the last node leaves a network, it gets cleaned up automatically. Networks persist across server restarts."
+    }
+  ]
+}

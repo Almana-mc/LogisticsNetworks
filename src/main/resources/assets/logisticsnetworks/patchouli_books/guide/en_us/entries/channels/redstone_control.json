@@ -1,0 +1,12 @@
+{
+  "name": "Redstone Control",
+  "icon": "minecraft:redstone",
+  "category": "logisticsnetworks:channels",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will cover redstone control for channels.$(br2)Export channels can be set to Always On, Always Off, High (active with redstone signal), or Low (active without signal). Import channels are always on."
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Filters",
+  "description": "Filters let you control exactly what a channel will or won't move. There are filters for items, tags, amounts, durability, NBT, mods, and inventory slots.",
+  "icon": "logisticsnetworks:small_filter",
+  "sortnum": 4
+}

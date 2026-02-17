@@ -1,0 +1,6 @@
+{
+  "name": "Channels",
+  "description": "Each node has 9 channels. Channels control what gets moved, where it goes, and how fast. This section covers all channel settings.",
+  "icon": "logisticsnetworks:logistics_node",
+  "sortnum": 3
+}

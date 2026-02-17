@@ -182,7 +182,7 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     // Durability Mode
-    public int getDurabilityPercent() {
+    public int getDurabilityValue() {
         return data.get(0);
     }
 

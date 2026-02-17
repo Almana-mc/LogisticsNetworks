@@ -1,0 +1,12 @@
+{
+  "name": "Import & Export",
+  "icon": "logisticsnetworks:logistics_node",
+  "category": "logisticsnetworks:channels",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(wip)$(br2)This page will cover import and export modes.$(br2)Export channels pull resources from the attached container. Import channels accept incoming resources. The channel number must match: an export on channel 2 only sends to imports on channel 2."
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Networks",
+  "description": "How to create and manage logistics networks. Networks are named groups of nodes that share resources.",
+  "icon": "logisticsnetworks:logistics_node",
+  "sortnum": 2
+}
