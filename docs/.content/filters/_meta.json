@@ -1,0 +1,11 @@
+{
+    "small_filter": "Small Filter",
+    "medium_filter": "Medium Filter",
+    "big_filter": "Big Filter",
+    "tag_filter": "Tag Filter",
+    "amount_filter": "Amount Filter",
+    "durability_filter": "Durability Filter",
+    "nbt_filter": "NBT Filter",
+    "mod_filter": "Mod Filter",
+    "slot_filter": "Slot Filter"
+}
