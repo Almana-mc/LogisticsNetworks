@@ -38,11 +38,11 @@ java {
 }
 
 neoForge {
-    version.set(neo_version)
+    version = neo_version
 
     parchment {
-        mappingsVersion.set(parchment_mappings_version)
-        minecraftVersion.set(parchment_minecraft_version)
+        mappingsVersion = parchment_mappings_version
+        minecraftVersion = parchment_minecraft_version
     }
 
     runs {
