@@ -37,6 +37,7 @@ import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Locale;
 
 public class WrenchItem extends Item {
 
@@ -429,8 +430,10 @@ public class WrenchItem extends Item {
             }
             player.sendSystemMessage(Component.translatable("message.logisticsnetworks.clipboard.preview.channel",
                     channel,
-                    clipboard.getChannelMode(channel).name(),
-                    clipboard.getChannelType(channel).name(),
+                    Component.translatable("gui.logisticsnetworks.channel_mode."
+                            + clipboard.getChannelMode(channel).name().toLowerCase(Locale.ROOT)).getString(),
+                    Component.translatable("gui.logisticsnetworks.channel_type."
+                            + clipboard.getChannelType(channel).name().toLowerCase(Locale.ROOT)).getString(),
                     channelFilters));
             shown++;
         }

@@ -7,6 +7,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 
+import java.util.Locale;
+
 public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
 
     private static final int GUI_WIDTH = 256;
@@ -41,7 +43,8 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
         graphics.renderOutline(leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, COLOR_BORDER);
 
         graphics.drawCenteredString(font, EDITOR_TITLE, leftPos + GUI_WIDTH / 2, topPos + 8, COLOR_ACCENT);
-        drawButton(graphics, leftPos + GUI_WIDTH - 56, topPos + 6, 46, 12, "Clear", mouseX, mouseY);
+        drawButton(graphics, leftPos + GUI_WIDTH - 56, topPos + 6, 46, 12,
+                tr("gui.logisticsnetworks.clipboard.clear"), mouseX, mouseY);
 
         renderChannelTabs(graphics, mouseX, mouseY);
         renderSettingsPanel(graphics, mouseX, mouseY);
@@ -78,26 +81,38 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
         graphics.fill(panelX, panelY, panelX + panelW, panelY + rowH * 10 + 4, COLOR_PANEL);
         graphics.renderOutline(panelX, panelY, panelW, rowH * 10 + 4, COLOR_BORDER);
 
-        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 0, panelW - 4, "Enabled",
-                menu.isChannelEnabled() ? "Yes" : "No", mouseX, mouseY);
-        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 1, panelW - 4, "Mode", menu.getChannelMode().name(), mouseX,
+        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 0, panelW - 4,
+                tr("gui.logisticsnetworks.node.setting.status"),
+                menu.isChannelEnabled() ? tr("gui.logisticsnetworks.node.value.enabled")
+                        : tr("gui.logisticsnetworks.node.value.disabled"),
+                mouseX, mouseY);
+        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 1, panelW - 4, tr("gui.logisticsnetworks.node.setting.mode"),
+                getChannelModeLabel(menu.getChannelMode()), mouseX,
                 mouseY);
-        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 2, panelW - 4, "Type", menu.getChannelType().name(), mouseX,
+        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 2, panelW - 4, tr("gui.logisticsnetworks.node.setting.type"),
+                getChannelTypeLabel(menu.getChannelType()), mouseX,
                 mouseY);
-        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 3, panelW - 4, "Direction",
-                menu.getDirection().getName().toUpperCase(), mouseX, mouseY);
-        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 4, panelW - 4, "Redstone", menu.getRedstoneMode().name(),
+        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 3, panelW - 4, tr("gui.logisticsnetworks.node.setting.side"),
+                getDirectionLabel(menu.getDirection().getName()), mouseX, mouseY);
+        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 4, panelW - 4,
+                tr("gui.logisticsnetworks.node.setting.redstone"),
+                getRedstoneModeLabel(menu.getRedstoneMode()),
                 mouseX, mouseY);
-        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 5, panelW - 4, "Distribution",
-                menu.getDistributionMode().name(), mouseX, mouseY);
-        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 6, panelW - 4, "Filter Mode", menu.getFilterMode().name(),
+        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 5, panelW - 4,
+                tr("gui.logisticsnetworks.node.setting.distribution"),
+                getDistributionModeLabel(menu.getDistributionMode()), mouseX, mouseY);
+        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 6, panelW - 4,
+                tr("gui.logisticsnetworks.node.setting.filter_mode"),
+                getFilterModeLabel(menu.getFilterMode()),
                 mouseX, mouseY);
-        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 7, panelW - 4, "Priority", String.valueOf(menu.getPriority()),
+        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 7, panelW - 4,
+                tr("gui.logisticsnetworks.node.setting.priority"), String.valueOf(menu.getPriority()),
                 mouseX, mouseY);
-        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 8, panelW - 4, "Batch", String.valueOf(menu.getBatch()),
+        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 8, panelW - 4, tr("gui.logisticsnetworks.node.setting.batch"),
+                String.valueOf(menu.getBatch()),
                 mouseX, mouseY);
-        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 9, panelW - 4, "Delay", menu.getDelay() + "t", mouseX,
-                mouseY);
+        drawRow(graphics, panelX + 2, panelY + 2 + rowH * 9, panelW - 4, tr("gui.logisticsnetworks.node.setting.delay"),
+                tr("gui.logisticsnetworks.node.value.tick_delay", menu.getDelay()), mouseX, mouseY);
     }
 
     private void drawRow(GuiGraphics graphics, int x, int y, int width, String label, String value, int mouseX,
@@ -112,12 +127,14 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
     private void renderVisualSections(GuiGraphics graphics) {
         int filterX = leftPos + 170;
         int filterY = topPos + 52;
-        graphics.drawString(font, "Filters", filterX, topPos + 40, COLOR_DIM, false);
+        graphics.drawString(font, Component.translatable("gui.logisticsnetworks.node.filters"), filterX, topPos + 40,
+                COLOR_DIM, false);
         drawSlotGrid(graphics, filterX, filterY, 3, 3);
 
         int upgradeX = leftPos + 170;
         int upgradeY = topPos + 130;
-        graphics.drawString(font, "Upgrades", upgradeX, topPos + 118, COLOR_DIM, false);
+        graphics.drawString(font, Component.translatable("gui.logisticsnetworks.node.upgrades"), upgradeX,
+                topPos + 118, COLOR_DIM, false);
         drawSlotGrid(graphics, upgradeX, upgradeY, 2, 2);
 
         graphics.drawString(font, VISUAL_SLOTS_HINT, leftPos + 10, topPos + 182, COLOR_DIM, false);
@@ -260,5 +277,35 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
             }
         }
         return false;
+    }
+
+    private String tr(String key, Object... args) {
+        return Component.translatable(key, args).getString();
+    }
+
+    private String getChannelModeLabel(me.almana.logisticsnetworks.data.ChannelMode mode) {
+        return tr("gui.logisticsnetworks.channel_mode." + mode.name().toLowerCase(Locale.ROOT));
+    }
+
+    private String getChannelTypeLabel(me.almana.logisticsnetworks.data.ChannelType type) {
+        return tr("gui.logisticsnetworks.channel_type." + type.name().toLowerCase(Locale.ROOT));
+    }
+
+    private String getRedstoneModeLabel(me.almana.logisticsnetworks.data.RedstoneMode mode) {
+        return tr("gui.logisticsnetworks.redstone_mode." + mode.name().toLowerCase(Locale.ROOT));
+    }
+
+    private String getDistributionModeLabel(me.almana.logisticsnetworks.data.DistributionMode mode) {
+        return tr("gui.logisticsnetworks.distribution_mode." + mode.name().toLowerCase(Locale.ROOT));
+    }
+
+    private String getDirectionLabel(String directionName) {
+        return tr("gui.logisticsnetworks.direction." + directionName.toLowerCase(Locale.ROOT));
+    }
+
+    private String getFilterModeLabel(me.almana.logisticsnetworks.data.FilterMode mode) {
+        return tr(mode == me.almana.logisticsnetworks.data.FilterMode.MATCH_ALL
+                ? "gui.logisticsnetworks.filter_mode.match_all"
+                : "gui.logisticsnetworks.filter_mode.match_any");
     }
 }

@@ -21,7 +21,7 @@ val jei_version: String by project
 val parchment_minecraft_version: String by project
 val parchment_mappings_version: String by project
 
-version = mod_version
+version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
 
 repositories {

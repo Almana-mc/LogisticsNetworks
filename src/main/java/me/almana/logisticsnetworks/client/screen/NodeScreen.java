@@ -111,7 +111,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             int y = topPos + 32;
             networkNameField = new EditBox(this.font, cx - 75, y, 150, 16, Component.empty());
             networkNameField.setMaxLength(32);
-            networkNameField.setHint(Component.literal("Enter network name..."));
+            networkNameField.setHint(Component.translatable("gui.logisticsnetworks.node.network_name_hint"));
             networkNameField.setBordered(true);
             addRenderableWidget(networkNameField);
         }
@@ -187,7 +187,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         // Inventory Separator
         int sepY = topPos + INV_Y - 14;
         g.fill(leftPos + 4, sepY, leftPos + GUI_WIDTH - 4, sepY + 1, COLOR_BORDER);
-        g.drawString(font, "Inventory", leftPos + INV_X, topPos + INV_Y - 11, COLOR_DARK_GRAY, false);
+        g.drawString(font, Component.translatable("gui.logisticsnetworks.node.inventory"), leftPos + INV_X,
+                topPos + INV_Y - 11, COLOR_DARK_GRAY, false);
 
         renderPlayerSlots(g);
     }
@@ -216,18 +217,22 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private void renderNetworkSelectionPage(GuiGraphics g, int mx, int my) {
         int cx = leftPos + GUI_WIDTH / 2;
-        g.drawCenteredString(font, "Select or Create Network", cx, topPos + 8, COLOR_ACCENT);
+        g.drawCenteredString(font, Component.translatable("gui.logisticsnetworks.select_network"), cx, topPos + 8,
+                COLOR_ACCENT);
 
-        drawButton(g, cx - 45, topPos + 54, 90, 16, "Create", mx, my);
+        drawButton(g, cx - 45, topPos + 54, 90, 16,
+                tr("gui.logisticsnetworks.create_network"), mx, my);
 
         g.fill(leftPos + 12, topPos + 76, leftPos + GUI_WIDTH - 12, topPos + 77, COLOR_BORDER);
-        g.drawString(font, "Existing Networks", leftPos + 14, topPos + 82, COLOR_DARK_GRAY, false);
+        g.drawString(font, Component.translatable("gui.logisticsnetworks.node.existing_networks"), leftPos + 14,
+                topPos + 82, COLOR_DARK_GRAY, false);
 
         int listY = topPos + 95;
         int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, networkList.size());
 
         if (networkList.isEmpty()) {
-            g.drawCenteredString(font, "No networks yet", cx, listY + 15, COLOR_DARK_GRAY);
+            g.drawCenteredString(font, Component.translatable("gui.logisticsnetworks.no_networks"), cx, listY + 15,
+                    COLOR_DARK_GRAY);
         } else {
             for (int i = networkScrollOffset; i < endIdx; i++) {
                 SyncNetworkListPayload.NetworkEntry entry = networkList.get(i);
@@ -237,7 +242,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
 
         if (networkList.size() > NETWORKS_PER_PAGE) {
-            String pageInfo = String.format("%d-%d / %d", networkScrollOffset + 1, endIdx, networkList.size());
+            String pageInfo = tr("gui.logisticsnetworks.node.page_info", networkScrollOffset + 1, endIdx,
+                    networkList.size());
             g.drawCenteredString(font, pageInfo, cx, topPos + 138, COLOR_DARK_GRAY);
         }
     }
@@ -256,7 +262,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         g.renderOutline(x, y, w, 17, hovered ? COLOR_ACCENT : COLOR_BORDER);
         g.drawString(font, entry.name(), x + 5, y + 4, hovered ? COLOR_WHITE : COLOR_GRAY, false);
 
-        String info = entry.nodeCount() + " nodes";
+        String info = tr("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
         g.drawString(font, info, x + w - font.width(info) - 5, y + 4, COLOR_DARK_GRAY, false);
     }
 
@@ -269,9 +275,10 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         g.drawCenteredString(font, netName, leftPos + GUI_WIDTH / 2, topPos + 6, COLOR_ACCENT);
 
         boolean isVisible = node.isRenderVisible();
-        drawButton(g, leftPos + 8, topPos + 4, font.width(isVisible ? "Visible" : "Hidden") + 10, 12,
-                isVisible ? "Visible" : "Hidden", mx, my);
-        drawButton(g, leftPos + GUI_WIDTH - 50, topPos + 4, 42, 12, "Change", mx, my);
+        String visibilityLabel = getVisibilityLabel(isVisible);
+        drawButton(g, leftPos + 8, topPos + 4, font.width(visibilityLabel) + 10, 12, visibilityLabel, mx, my);
+        drawButton(g, leftPos + GUI_WIDTH - 50, topPos + 4, 42, 12,
+                tr("gui.logisticsnetworks.node.change_network"), mx, my);
 
         drawChannelTabs(g, node, topPos + 20);
 
@@ -285,12 +292,12 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private String getNetworkName(UUID netId) {
         if (netId == null)
-            return "No Network";
+            return tr("gui.logisticsnetworks.node.network.none");
         return networkList.stream()
                 .filter(e -> e.id().equals(netId))
                 .map(SyncNetworkListPayload.NetworkEntry::name)
                 .findFirst()
-                .orElse("Network " + netId.toString().substring(0, 8));
+                .orElse(tr("gui.logisticsnetworks.node.network.fallback", netId.toString().substring(0, 8)));
     }
 
     private String clipToWidth(String text, int maxWidth) {
@@ -343,32 +350,42 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         int rx = x + 2;
         int ry = y + 2;
 
-        drawSettingRow(g, rx, ry, rowW, "Status", ch.isEnabled() ? "ENABLED" : "DISABLED",
+        drawSettingRow(g, rx, ry, rowW, tr("gui.logisticsnetworks.node.setting.status"),
+                ch.isEnabled() ? tr("gui.logisticsnetworks.node.value.enabled")
+                        : tr("gui.logisticsnetworks.node.value.disabled"),
                 ch.isEnabled() ? COLOR_ACCENT : 0xFFCC3333, mx, my, true);
-        drawSettingRow(g, rx, ry + rowH, rowW, "Mode", ch.getMode().name(),
+        drawSettingRow(g, rx, ry + rowH, rowW, tr("gui.logisticsnetworks.node.setting.mode"),
+                getChannelModeLabel(ch.getMode()),
                 ch.getMode() == ChannelMode.EXPORT ? COLOR_EXPORT : COLOR_IMPORT, mx, my, true);
-        drawSettingRow(g, rx, ry + rowH * 2, rowW, "Type", ch.getType().name(), COLOR_WHITE, mx, my, true);
-        drawSettingRow(g, rx, ry + rowH * 3, rowW, "Side", ch.getIoDirection().getName().toUpperCase(), COLOR_WHITE, mx,
-                my, true);
-        drawSettingRow(g, rx, ry + rowH * 4, rowW, "Redstone", formatEnumName(ch.getRedstoneMode().name()), 0xFFFF5555,
+        drawSettingRow(g, rx, ry + rowH * 2, rowW, tr("gui.logisticsnetworks.node.setting.type"),
+                getChannelTypeLabel(ch.getType()), COLOR_WHITE, mx, my, true);
+        drawSettingRow(g, rx, ry + rowH * 3, rowW, tr("gui.logisticsnetworks.node.setting.side"),
+                getDirectionLabel(ch.getIoDirection().getName()), COLOR_WHITE, mx, my, true);
+        drawSettingRow(g, rx, ry + rowH * 4, rowW, tr("gui.logisticsnetworks.node.setting.redstone"),
+                getRedstoneModeLabel(ch.getRedstoneMode()), 0xFFFF5555,
                 mx, my, !isSettingDisabled(ch, 4));
-        drawSettingRow(g, rx, ry + rowH * 5, rowW, "Distrib.", formatEnumName(ch.getDistributionMode().name()),
+        drawSettingRow(g, rx, ry + rowH * 5, rowW, tr("gui.logisticsnetworks.node.setting.distribution"),
+                getDistributionModeLabel(ch.getDistributionMode()),
                 0xFFBB88FF, mx, my, !isSettingDisabled(ch, 5));
-        drawSettingRow(g, rx, ry + rowH * 6, rowW, "Priority", editingRow == 6 ? "" : String.valueOf(ch.getPriority()),
+        drawSettingRow(g, rx, ry + rowH * 6, rowW, tr("gui.logisticsnetworks.node.setting.priority"),
+                editingRow == 6 ? "" : String.valueOf(ch.getPriority()),
                 0xFFFFDD44, mx, my, true);
-        drawSettingRow(g, rx, ry + rowH * 7, rowW, "Batch", editingRow == 7 ? "" : formatBatchDisplay(ch), COLOR_WHITE,
+        drawSettingRow(g, rx, ry + rowH * 7, rowW, tr("gui.logisticsnetworks.node.setting.batch"),
+                editingRow == 7 ? "" : formatBatchDisplay(ch), COLOR_WHITE,
                 mx, my, !isSettingDisabled(ch, 7));
-        drawSettingRow(g, rx, ry + rowH * 8, rowW, "Delay", editingRow == 8 ? "" : ch.getTickDelay() + "t", COLOR_WHITE,
+        drawSettingRow(g, rx, ry + rowH * 8, rowW, tr("gui.logisticsnetworks.node.setting.delay"),
+                editingRow == 8 ? "" : tr("gui.logisticsnetworks.node.value.tick_delay", ch.getTickDelay()),
+                COLOR_WHITE,
                 mx, my, !isSettingDisabled(ch, 8));
     }
 
     private void drawFilterGrid(GuiGraphics g, ChannelData ch, int x, int y, int mx, int my) {
+        String filtersLabel = tr("gui.logisticsnetworks.node.filters");
+        g.drawString(font, filtersLabel, x, y, COLOR_DARK_GRAY, false);
 
-        g.drawString(font, "Filters", x, y, COLOR_DARK_GRAY, false);
-
-        String modeLabel = ch.getFilterMode() == FilterMode.MATCH_ALL ? "All" : "Any";
+        String modeLabel = getFilterModeLabel(ch.getFilterMode());
         int btnW = font.width(modeLabel) + 8;
-        int btnX = x + font.width("Filters") + 4;
+        int btnX = x + font.width(filtersLabel) + 4;
         drawButton(g, btnX, y - 1, btnW, 10, modeLabel, mx, my);
 
         // Grid Filters
@@ -376,7 +393,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         drawSlotGrid(g, x, gridY, 3, 3, mx, my);
 
         int upgY = gridY + 3 * 19 + 2;
-        g.drawString(font, "Upgrades", x, upgY, COLOR_DARK_GRAY, false);
+        g.drawString(font, Component.translatable("gui.logisticsnetworks.node.upgrades"), x, upgY, COLOR_DARK_GRAY,
+                false);
 
         // Grid Upgrades
         drawSlotGrid(g, x, upgY + 10, 2, 2, mx, my);
@@ -402,22 +420,11 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         g.drawString(font, value, x + w - font.width(value) - 4, y + 4, enabled ? color : COLOR_DISABLED_TXT, false);
     }
 
-    private String formatEnumName(String name) {
-        String[] parts = name.split("_");
-        StringBuilder sb = new StringBuilder();
-        for (String p : parts) {
-            if (!sb.isEmpty())
-                sb.append(' ');
-            sb.append(p.charAt(0)).append(p.substring(1).toLowerCase());
-        }
-        return sb.toString();
-    }
-
     private String formatBatchDisplay(ChannelData ch) {
         if (ch.getType() == ChannelType.FLUID)
-            return ch.getBatchSize() + "mb";
+            return tr("gui.logisticsnetworks.node.value.batch.fluid", ch.getBatchSize());
         if (ch.getType() == ChannelType.ENERGY)
-            return ch.getBatchSize() + " RF/t";
+            return tr("gui.logisticsnetworks.node.value.batch.energy", ch.getBatchSize());
         return String.valueOf(ch.getBatchSize());
     }
 
@@ -452,7 +459,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (isHoveringAbs(leftPos + GUI_WIDTH / 2 - 45, topPos + 54, 90, 16, mx, my)) {
             String name = networkNameField.getValue().trim();
             if (name.isEmpty())
-                name = "Unnamed";
+                name = tr("gui.logisticsnetworks.node.network.unnamed");
             sendNetworkAssign(Optional.empty(), name);
             return true;
         }
@@ -474,8 +481,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (node == null)
             return false;
 
-        if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(node.isRenderVisible() ? "Visible" : "Hidden") + 10, 12, mx,
-                my)) {
+        String visibilityLabel = getVisibilityLabel(node.isRenderVisible());
+        if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(visibilityLabel) + 10, 12, mx, my)) {
             node.setRenderVisible(!node.isRenderVisible());
             PacketDistributor.sendToServer(new ToggleNodeVisibilityPayload(node.getId()));
             return true;
@@ -534,9 +541,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             }
         }
 
-        int modeBtnX = leftPos + 168 + font.width("Filters") + 4;
+        int modeBtnX = leftPos + 168 + font.width(tr("gui.logisticsnetworks.node.filters")) + 4;
         int modeBtnY = topPos + 38 - 1;
-        String modeLabel = ch.getFilterMode() == FilterMode.MATCH_ALL ? "All" : "Any";
+        String modeLabel = getFilterModeLabel(ch.getFilterMode());
         int modeBtnW = font.width(modeLabel) + 8;
 
         if (isHoveringAbs(modeBtnX, modeBtnY, modeBtnW, 10, mx, my)) {
@@ -732,5 +739,41 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
         this.networkList = new ArrayList<>(networks);
+    }
+
+    private String tr(String key, Object... args) {
+        return Component.translatable(key, args).getString();
+    }
+
+    private String getVisibilityLabel(boolean visible) {
+        return tr(visible
+                ? "gui.logisticsnetworks.node.visibility.visible"
+                : "gui.logisticsnetworks.node.visibility.hidden");
+    }
+
+    private String getChannelModeLabel(ChannelMode mode) {
+        return tr("gui.logisticsnetworks.channel_mode." + mode.name().toLowerCase(Locale.ROOT));
+    }
+
+    private String getChannelTypeLabel(ChannelType type) {
+        return tr("gui.logisticsnetworks.channel_type." + type.name().toLowerCase(Locale.ROOT));
+    }
+
+    private String getRedstoneModeLabel(me.almana.logisticsnetworks.data.RedstoneMode mode) {
+        return tr("gui.logisticsnetworks.redstone_mode." + mode.name().toLowerCase(Locale.ROOT));
+    }
+
+    private String getDistributionModeLabel(me.almana.logisticsnetworks.data.DistributionMode mode) {
+        return tr("gui.logisticsnetworks.distribution_mode." + mode.name().toLowerCase(Locale.ROOT));
+    }
+
+    private String getDirectionLabel(String directionName) {
+        return tr("gui.logisticsnetworks.direction." + directionName.toLowerCase(Locale.ROOT));
+    }
+
+    private String getFilterModeLabel(FilterMode mode) {
+        return tr(mode == FilterMode.MATCH_ALL
+                ? "gui.logisticsnetworks.filter_mode.match_all"
+                : "gui.logisticsnetworks.filter_mode.match_any");
     }
 }

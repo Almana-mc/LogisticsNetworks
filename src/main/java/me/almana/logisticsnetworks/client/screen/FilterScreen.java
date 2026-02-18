@@ -111,9 +111,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (menu.isTagMode() || menu.isModMode()) {
             manualInputBox.setVisible(true);
-            manualInputBox.setHint(Component.literal(menu.isTagMode()
-                    ? "Enter tag (e.g. forge:ores)..."
-                    : "Enter mod ID (e.g. minecraft)..."));
+            manualInputBox.setHint(Component.translatable(menu.isTagMode()
+                    ? "gui.logisticsnetworks.filter.tag.input_full_hint"
+                    : "gui.logisticsnetworks.filter.mod.input_full_hint"));
             manualInputBox.setX(getSelectorInputX());
             manualInputBox.setY(getSelectorInputY());
             manualInputBox.setWidth(getSelectorInputWidth());
@@ -201,9 +201,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 if (isFluid) {
                     FluidStack fs = FluidUtil.getFluidContained(extractor).orElse(FluidStack.EMPTY);
                     if (!fs.isEmpty())
-                        cachedNbtEntries = NbtFilterData.extractEntries(fs, provider);
+                        cachedNbtEntries.addAll(NbtFilterData.extractEntries(fs, provider));
                 } else {
-                    cachedNbtEntries = NbtFilterData.extractEntries(extractor, provider);
+                    cachedNbtEntries.addAll(NbtFilterData.extractEntries(extractor, provider));
                 }
             }
         }
@@ -212,7 +212,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         super.render(g, mx, my, pt);
-        renderTooltip(g, mx, my);
 
         if (menu.isTagMode())
             renderTagTooltip(g, mx, my);
@@ -271,27 +270,28 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private void renderTagMode(GuiGraphics g, int mx, int my) {
         renderDropdownMode(g, mx, my, cachedTags,
                 menu.getSelectedTag(),
-                "Enter tag (e.g. forge:ores)...");
+                Component.translatable("gui.logisticsnetworks.filter.tag.input_full_hint"));
     }
 
     private void renderModMode(GuiGraphics g, int mx, int my) {
         renderDropdownMode(g, mx, my, cachedMods,
                 menu.getSelectedMod(),
-                "Enter mod ID (e.g. minecraft)...");
+                Component.translatable("gui.logisticsnetworks.filter.mod.input_full_hint"));
     }
 
     private void renderDropdownMode(GuiGraphics g, int mx, int my, List<String> items, String current,
-            String hint) {
+            Component hint) {
         int x = getSelectorInputX();
         int y = getSelectorInputY();
         int w = getSelectorInputWidth();
         int arrowX = getSelectorArrowX();
 
         renderExtractorSlotTarget(g, mx, my);
-        g.drawString(font, "Selected: " + (current == null ? "None" : current), leftPos + 8, topPos + 22, COL_GRAY,
-                false);
+        String displayValue = current == null ? tr("gui.logisticsnetworks.filter.none") : current;
+        g.drawString(font, Component.translatable("gui.logisticsnetworks.filter.selector.selected", displayValue),
+                leftPos + 8, topPos + 22, COL_GRAY, false);
 
-        manualInputBox.setHint(Component.literal(hint));
+        manualInputBox.setHint(hint);
 
         boolean hoveringDropdown = isHovering(x, y, w, 14, mx, my);
         g.renderOutline(x, y, w, 14, (hoveringDropdown || isDropdownOpen) ? COL_WHITE : COL_BORDER);
@@ -352,7 +352,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         // Path Selector
         String path = menu.getSelectedNbtPath();
-        String displayPath = path == null ? "Select Path..." : path;
+        String displayPath = path == null ? tr("gui.logisticsnetworks.filter.nbt.select_path") : path;
 
         drawButton(g, x, y, w, 14, scrollText(displayPath, w - 16, 0), mx, my, true);
         g.drawCenteredString(font, isDropdownOpen ? "^" : "v", arrowX + 6, y + 3, COL_GRAY);
@@ -364,7 +364,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int valY = y + 25;
             g.drawString(font, Component.translatable("gui.logisticsnetworks.filter.nbt.value"), x, valY, COL_GRAY, false);
             String val = menu.getSelectedNbtValue();
-            g.drawString(font, scrollText(val != null ? val : "None", w, 50), x, valY + 10, COL_ACCENT, false);
+            g.drawString(font, scrollText(val != null ? val : tr("gui.logisticsnetworks.filter.nbt.value.none"), w, 50),
+                    x, valY + 10, COL_ACCENT, false);
         }
     }
 
@@ -435,25 +436,25 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 : "gui.logisticsnetworks.filter.slot.info.import.title";
         g.drawString(font, Component.translatable(titleKey), x + pad, y + pad, COL_WHITE, false);
 
-        String line1 = Component.translatable(slotInfoPage == 0
+        Component line1 = Component.translatable(slotInfoPage == 0
                 ? "gui.logisticsnetworks.filter.slot.info.export.p1"
-                : "gui.logisticsnetworks.filter.slot.info.import.p1").getString();
-        String line2 = Component.translatable(slotInfoPage == 0
+                : "gui.logisticsnetworks.filter.slot.info.import.p1");
+        Component line2 = Component.translatable(slotInfoPage == 0
                 ? "gui.logisticsnetworks.filter.slot.info.export.p2"
-                : "gui.logisticsnetworks.filter.slot.info.import.p2").getString();
+                : "gui.logisticsnetworks.filter.slot.info.import.p2");
 
         int navY = y + h - 16;
         int textY = y + pad + 11;
         int textW = w - pad * 2;
         int maxTextBottom = navY - 2;
-        for (var part : font.split(Component.literal(line1), textW)) {
+        for (var part : font.split(line1, textW)) {
             if (textY + 8 > maxTextBottom) {
                 break;
             }
             g.drawString(font, part, x + pad, textY, COL_GRAY, false);
             textY += 9;
         }
-        for (var part : font.split(Component.literal(line2), textW)) {
+        for (var part : font.split(line2, textW)) {
             if (textY + 8 > maxTextBottom) {
                 break;
             }
@@ -534,9 +535,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int textY = y + pad + 11;
         int textW = w - pad * 2;
         int maxTextBottom = navY - 2;
-        textY = drawWrappedInfoLine(g, Component.translatable(line1Key).getString(), x + pad, textY, textW, maxTextBottom);
-        textY = drawWrappedInfoLine(g, Component.translatable(line2Key).getString(), x + pad, textY, textW, maxTextBottom);
-        drawWrappedInfoLine(g, Component.translatable(line3Key).getString(), x + pad, textY, textW, maxTextBottom);
+        textY = drawWrappedInfoLine(g, Component.translatable(line1Key), x + pad, textY, textW, maxTextBottom);
+        textY = drawWrappedInfoLine(g, Component.translatable(line2Key), x + pad, textY, textW, maxTextBottom);
+        drawWrappedInfoLine(g, Component.translatable(line3Key), x + pad, textY, textW, maxTextBottom);
 
         int prevX = x + w - 40;
         int nextX = x + w - 22;
@@ -546,9 +547,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         g.pose().popPose();
     }
 
-    private int drawWrappedInfoLine(GuiGraphics g, String line, int x, int y, int width, int maxBottom) {
+    private int drawWrappedInfoLine(GuiGraphics g, Component line, int x, int y, int width, int maxBottom) {
         int nextY = y;
-        for (var part : font.split(Component.literal(line), width)) {
+        for (var part : font.split(line, width)) {
             if (nextY + 8 > maxBottom) {
                 break;
             }
@@ -562,7 +563,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int cx = leftPos + GUI_WIDTH / 2;
         int cy = topPos + 40;
 
-        g.drawCenteredString(font, "Durability Limit", cx, topPos + 20, COL_WHITE);
+        g.drawCenteredString(font, Component.translatable("gui.logisticsnetworks.filter.durability.limit"), cx,
+                topPos + 20, COL_WHITE);
 
         DurabilityFilterData.Operator op = menu.getDurabilityOperator();
         drawButton(g, cx - 50, cy, 20, 12, op.symbol(), mx, my, true);
@@ -1061,22 +1063,24 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private void renderTagTooltip(GuiGraphics g, int mx, int my) {
         if (isHovering(getSelectorArrowX(), getSelectorInputY(), 12, 14, mx, my)) {
-            g.renderTooltip(font, Component.literal("Select from Extractor Item"), mx, my);
+            g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.tag.select_from_item"), mx, my);
             return;
         }
         var extractor = getExtractorRect();
-        if (extractor != null && isHovering(extractor[0], extractor[1], 18, 18, mx, my)) {
+        if (extractor != null && menu.getExtractorItem().isEmpty()
+                && isHovering(extractor[0], extractor[1], 18, 18, mx, my)) {
             g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.selector_hint"), mx, my);
         }
     }
 
     private void renderModTooltip(GuiGraphics g, int mx, int my) {
         if (isHovering(getSelectorArrowX(), getSelectorInputY(), 12, 14, mx, my)) {
-            g.renderTooltip(font, Component.literal("Select from Extractor Item"), mx, my);
+            g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.mod.select_from_item"), mx, my);
             return;
         }
         var extractor = getExtractorRect();
-        if (extractor != null && isHovering(extractor[0], extractor[1], 18, 18, mx, my)) {
+        if (extractor != null && menu.getExtractorItem().isEmpty()
+                && isHovering(extractor[0], extractor[1], 18, 18, mx, my)) {
             g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.selector_hint"), mx, my);
         }
     }
@@ -1207,5 +1211,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (isHovering(x, y, 18, 18, mx, my)) {
             g.fill(x, y, x + 18, y + 18, COL_HOVER);
         }
+    }
+
+    private String tr(String key, Object... args) {
+        return Component.translatable(key, args).getString();
     }
 }
