@@ -196,6 +196,16 @@ public final class ModFilterData {
         return false;
     }
 
+    public static boolean containsMod(ItemStack stack, String chemicalId) {
+        if (chemicalId == null || chemicalId.isEmpty())
+            return false;
+        if (getTargetType(stack) != FilterTargetType.CHEMICALS)
+            return false;
+
+        ResourceLocation id = ResourceLocation.tryParse(chemicalId);
+        return checkModMatch(stack, id);
+    }
+
     private static String normalizeModId(String modId) {
         if (modId == null)
             return null;

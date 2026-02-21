@@ -32,6 +32,7 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_ATTACHED_POS = "AttachedPos";
     private static final String KEY_VALID = "Valid";
     private static final String KEY_NETWORK_ID = "NetworkId";
+    private static final String KEY_NETWORK_NAME = "NetworkName";
     private static final String KEY_VISIBLE = "RenderVisible";
     private static final String KEY_CHANNELS = "Channels";
     private static final String KEY_UPGRADES = "Upgrades";
@@ -45,6 +46,8 @@ public class LogisticsNodeEntity extends Entity {
             EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Optional<UUID>> NETWORK_ID = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<String> NETWORK_NAME = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> RENDER_VISIBLE = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
 
@@ -78,6 +81,7 @@ public class LogisticsNodeEntity extends Entity {
         builder.define(ATTACHED_POS, BlockPos.ZERO);
         builder.define(VALID, false);
         builder.define(NETWORK_ID, Optional.empty());
+        builder.define(NETWORK_NAME, "");
         builder.define(RENDER_VISIBLE, true);
     }
 
@@ -90,6 +94,9 @@ public class LogisticsNodeEntity extends Entity {
 
         if (compound.contains(KEY_NETWORK_ID)) {
             setNetworkId(compound.getUUID(KEY_NETWORK_ID));
+        }
+        if (compound.contains(KEY_NETWORK_NAME, Tag.TAG_STRING)) {
+            setNetworkName(compound.getString(KEY_NETWORK_NAME));
         }
         if (compound.contains(KEY_VISIBLE)) {
             setRenderVisible(compound.getBoolean(KEY_VISIBLE));
@@ -129,6 +136,10 @@ public class LogisticsNodeEntity extends Entity {
         UUID netId = getNetworkId();
         if (netId != null) {
             compound.putUUID(KEY_NETWORK_ID, netId);
+        }
+        String networkName = getNetworkName();
+        if (!networkName.isBlank()) {
+            compound.putString(KEY_NETWORK_NAME, networkName);
         }
         compound.putBoolean(KEY_VISIBLE, isRenderVisible());
 
@@ -190,6 +201,17 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setNetworkId(@Nullable UUID networkId) {
         this.entityData.set(NETWORK_ID, Optional.ofNullable(networkId));
+        if (networkId == null) {
+            setNetworkName("");
+        }
+    }
+
+    public String getNetworkName() {
+        return this.entityData.get(NETWORK_NAME);
+    }
+
+    public void setNetworkName(@Nullable String networkName) {
+        this.entityData.set(NETWORK_NAME, networkName == null ? "" : networkName);
     }
 
     public boolean isRenderVisible() {
@@ -274,4 +296,5 @@ public class LogisticsNodeEntity extends Entity {
             }
         }
     }
+
 }

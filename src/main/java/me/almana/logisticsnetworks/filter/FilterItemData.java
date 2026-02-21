@@ -17,10 +17,12 @@ public final class FilterItemData {
 
     private static final String KEY_ROOT = "ln_filter";
     private static final String KEY_IS_BLACKLIST = "blacklist";
+    private static final String KEY_TARGET_TYPE = "target";
     private static final String KEY_ITEMS = "items";
     private static final String KEY_SLOT = "slot";
     private static final String KEY_ITEM_TAG = "item";
     private static final String KEY_FLUID_ID = "fluid";
+    private static final String KEY_CHEMICAL_ID = "chemical";
 
     private FilterItemData() {
     }
@@ -51,6 +53,25 @@ public final class FilterItemData {
                 root.putBoolean(KEY_IS_BLACKLIST, true);
             } else {
                 root.remove(KEY_IS_BLACKLIST);
+            }
+        });
+    }
+
+    public static FilterTargetType getTargetType(ItemStack stack) {
+        if (!isFilterItem(stack))
+            return FilterTargetType.ITEMS;
+        return FilterTargetType.fromOrdinal(getRoot(stack).getInt(KEY_TARGET_TYPE));
+    }
+
+    public static void setTargetType(ItemStack stack, FilterTargetType type) {
+        if (!isFilterItem(stack))
+            return;
+        FilterTargetType target = type == null ? FilterTargetType.ITEMS : type;
+        updateRoot(stack, root -> {
+            if (target == FilterTargetType.ITEMS) {
+                root.remove(KEY_TARGET_TYPE);
+            } else {
+                root.putInt(KEY_TARGET_TYPE, target.ordinal());
             }
         });
     }
@@ -247,6 +268,67 @@ public final class FilterItemData {
             }
         }
         return false;
+    }
+
+    @Nullable
+    public static String getChemicalEntry(ItemStack stack, int slot) {
+        if (!isFilterItem(stack))
+            return null;
+
+        CompoundTag root = getRoot(stack);
+        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+
+        for (Tag t : list) {
+            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
+                if (entry.contains(KEY_CHEMICAL_ID, Tag.TAG_STRING)) {
+                    return entry.getString(KEY_CHEMICAL_ID);
+                }
+            }
+        }
+        return null;
+    }
+
+    public static void setChemicalEntry(ItemStack stack, int slot, String chemicalId) {
+        if (!isFilterItem(stack))
+            return;
+        if (slot < 0 || slot >= getCapacity(stack))
+            return;
+
+        updateRoot(stack, root -> {
+            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+            removeFromList(list, slot);
+
+            if (chemicalId != null && !chemicalId.isEmpty()) {
+                CompoundTag entry = new CompoundTag();
+                entry.putInt(KEY_SLOT, slot);
+                entry.putString(KEY_CHEMICAL_ID, chemicalId);
+                list.add(entry);
+            }
+
+            if (list.isEmpty()) {
+                root.remove(KEY_ITEMS);
+            } else {
+                root.put(KEY_ITEMS, list);
+            }
+        });
+    }
+
+    public static boolean containsChemical(ItemStack filter, String chemicalId) {
+        if (!isFilterItem(filter) || chemicalId == null || chemicalId.isEmpty())
+            return false;
+
+        int cap = getCapacity(filter);
+        for (int i = 0; i < cap; i++) {
+            String entry = getChemicalEntry(filter, i);
+            if (entry != null && entry.equals(chemicalId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasAnyChemicalEntries(ItemStack stack) {
+        return hasEntryType(stack, KEY_CHEMICAL_ID);
     }
 
     private static void removeFromList(ListTag list, int slot) {

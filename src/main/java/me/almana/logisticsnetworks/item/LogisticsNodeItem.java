@@ -2,10 +2,13 @@ package me.almana.logisticsnetworks.item;
 
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -17,6 +20,7 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.neoforged.neoforge.capabilities.Capabilities;
 
 import java.util.List;
 
@@ -48,6 +52,15 @@ public class LogisticsNodeItem extends Item {
             return InteractionResult.FAIL;
         }
 
+        // Check that the block has at least one storage capability
+        if (!hasAnyStorageCapability(level, clickedPos)) {
+            if (player != null) {
+                player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.no_storage_capability"), true);
+            }
+            return InteractionResult.FAIL;
+        }
+
         // Verify valid attachment (no existing node)
         if (hasNodeAttached(level, clickedPos)) {
             if (player != null) {
@@ -59,6 +72,26 @@ public class LogisticsNodeItem extends Item {
 
         // Place new node
         return placeNode(level, clickedPos, context);
+    }
+
+    private boolean hasAnyStorageCapability(Level level, BlockPos pos) {
+        if (!(level instanceof ServerLevel serverLevel))
+            return false;
+
+        Direction[] directions = { null,
+                Direction.DOWN, Direction.UP, Direction.NORTH,
+                Direction.SOUTH, Direction.WEST, Direction.EAST };
+
+        for (Direction dir : directions) {
+            if (serverLevel.getCapability(Capabilities.ItemHandler.BLOCK, pos, dir) != null)
+                return true;
+            if (serverLevel.getCapability(Capabilities.FluidHandler.BLOCK, pos, dir) != null)
+                return true;
+            if (serverLevel.getCapability(Capabilities.EnergyStorage.BLOCK, pos, dir) != null)
+                return true;
+        }
+
+        return MekanismCompat.hasChemicalStorage(serverLevel, pos);
     }
 
     private boolean isBlacklisted(BlockState state) {

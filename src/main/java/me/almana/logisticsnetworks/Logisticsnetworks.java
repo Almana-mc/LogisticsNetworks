@@ -13,6 +13,7 @@ import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
 import me.almana.logisticsnetworks.network.SetDurabilityFilterValuePayload;
 import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
+import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterPayload;
 import me.almana.logisticsnetworks.network.SetNodeUpgradeItemPayload;
 import me.almana.logisticsnetworks.network.SetSlotFilterSlotsPayload;
@@ -65,6 +66,9 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleSetAmountFilterValue);
                 registrar.playToServer(SetFilterFluidEntryPayload.TYPE, SetFilterFluidEntryPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterFluidEntry);
+                registrar.playToServer(SetFilterChemicalEntryPayload.TYPE, SetFilterChemicalEntryPayload.STREAM_CODEC,
+                                (payload, context) -> ServerPayloadHandler.handleSetFilterChemicalEntry(payload,
+                                                context));
                 registrar.playToServer(SetFilterItemEntryPayload.TYPE, SetFilterItemEntryPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterItemEntry);
                 registrar.playToServer(SetDurabilityFilterValuePayload.TYPE,

@@ -5,12 +5,17 @@ import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -21,12 +26,16 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
-
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.items.IItemHandler;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,8 +51,18 @@ public class EventHandler {
 
         UUID networkId = node.getNetworkId();
         if (networkId != null) {
-            NetworkRegistry.get(serverLevel).markNetworkDirty(networkId);
+            NetworkRegistry registry = NetworkRegistry.get(serverLevel);
+            LogisticsNetwork network = registry.getNetwork(networkId);
+            if (network != null) {
+                node.setNetworkName(network.getName());
+                registry.markNetworkDirty(networkId);
+            } else {
+                node.setNetworkName("Network-" + networkId.toString().substring(0, 6));
+            }
+        } else {
+            node.setNetworkName("");
         }
+
     }
 
     @SubscribeEvent
@@ -107,6 +126,35 @@ public class EventHandler {
         }
     }
 
+    private static List<String> getBlacklistedResourceIds(ServerLevel level, BlockPos pos) {
+        List<String> ids = new ArrayList<>();
+
+        IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
+        if (itemHandler != null) {
+            for (int slot = 0; slot < itemHandler.getSlots(); slot++) {
+                ItemStack stack = itemHandler.getStackInSlot(slot);
+                if (!stack.isEmpty() && stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
+                    String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+                    if (!ids.contains(id)) ids.add(id);
+                }
+            }
+        }
+
+        IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null);
+        if (fluidHandler != null) {
+            for (int tank = 0; tank < fluidHandler.getTanks(); tank++) {
+                FluidStack fluid = fluidHandler.getFluidInTank(tank);
+                if (!fluid.isEmpty() && fluid.getFluid().builtInRegistryHolder().is(ModTags.RESOURCE_BLACKLIST_FLUIDS)) {
+                    String id = BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString();
+                    if (!ids.contains(id)) ids.add(id);
+                }
+            }
+        }
+
+        ids.addAll(MekanismCompat.getBlacklistedChemicalNames(level, pos));
+        return ids;
+    }
+
     @SubscribeEvent
     public static void onPlayerContainerClose(PlayerContainerEvent.Close event) {
         if (!(event.getEntity().level() instanceof ServerLevel level))
@@ -120,6 +168,16 @@ public class EventHandler {
                         && NodeUpgradeData.needsDimensionalUpgradeWarning(node, network, level.getServer())) {
                     player.sendSystemMessage(
                             Component.translatable("gui.logisticsnetworks.dimensional_upgrade_warning"));
+                }
+
+                BlockPos attachedPos = node.getAttachedPos();
+                List<String> blacklisted = getBlacklistedResourceIds(level, attachedPos);
+                if (!blacklisted.isEmpty()) {
+                    MutableComponent msg = Component.translatable("gui.logisticsnetworks.blacklisted_resource_warning")
+                            .withStyle(ChatFormatting.RED);
+                    msg.append(Component.literal(" [" + String.join(", ", blacklisted) + "]")
+                            .withStyle(ChatFormatting.YELLOW));
+                    player.sendSystemMessage(msg);
                 }
             }
         }
@@ -142,4 +200,5 @@ public class EventHandler {
             }
         }
     }
+
 }

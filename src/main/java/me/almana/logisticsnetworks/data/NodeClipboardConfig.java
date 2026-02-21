@@ -41,6 +41,7 @@ public final class NodeClipboardConfig {
     private static final String KEY_DISTRIBUTION = "distribution";
     private static final String KEY_FILTER_MODE = "filter_mode";
     private static final String KEY_PRIORITY = "priority";
+    private static final String KEY_VISIBLE = "renderVisible";
 
     private static final String KEY_CHANNEL = "channel";
     private static final String KEY_SLOT = "slot";
@@ -54,6 +55,7 @@ public final class NodeClipboardConfig {
     private UUID networkId;
     @Nullable
     private String networkName;
+    private boolean renderVisible;
 
     public enum PasteResult {
         SUCCESS,
@@ -89,6 +91,7 @@ public final class NodeClipboardConfig {
         this.upgradeItems = upgradeItems;
         this.networkId = networkId;
         this.networkName = networkName;
+        this.renderVisible = true;
     }
 
     public static NodeClipboardConfig createEmpty() {
@@ -377,7 +380,7 @@ public final class NodeClipboardConfig {
         ItemStack[][] filters = new ItemStack[LogisticsNodeEntity.CHANNEL_COUNT][ChannelData.FILTER_SIZE];
         ItemStack[] upgrades = new ItemStack[LogisticsNodeEntity.UPGRADE_SLOT_COUNT];
         UUID networkId = node.getNetworkId();
-        String networkName = null;
+        String networkName = node.getNetworkName();
 
         for (int channelIndex = 0; channelIndex < LogisticsNodeEntity.CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = node.getChannel(channelIndex);
@@ -420,7 +423,8 @@ public final class NodeClipboardConfig {
             upgrades[slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
         }
 
-        if (networkId != null && node.level() instanceof ServerLevel serverLevel) {
+        if ((networkName == null || networkName.isBlank()) && networkId != null
+                && node.level() instanceof ServerLevel serverLevel) {
             LogisticsNetwork network = NetworkRegistry.get(serverLevel).getNetwork(networkId);
             if (network != null) {
                 networkName = network.getName();
@@ -429,7 +433,9 @@ public final class NodeClipboardConfig {
             }
         }
 
-        return new NodeClipboardConfig(channels, filters, upgrades, networkId, networkName);
+        NodeClipboardConfig result = new NodeClipboardConfig(channels, filters, upgrades, networkId, networkName);
+        result.renderVisible = node.isRenderVisible();
+        return result;
     }
 
     public CompoundTag save(HolderLookup.Provider provider) {
@@ -460,6 +466,7 @@ public final class NodeClipboardConfig {
             channelsTag.add(channelTag);
         }
         root.put(KEY_CHANNELS, channelsTag);
+        root.putBoolean(KEY_VISIBLE, renderVisible);
 
         ListTag filtersTag = new ListTag();
         for (int channelIndex = 0; channelIndex < filterItems.length; channelIndex++) {
@@ -602,6 +609,9 @@ public final class NodeClipboardConfig {
         }
 
         NodeClipboardConfig config = new NodeClipboardConfig(channels, filters, upgrades, networkId, networkName);
+        if (root.contains(KEY_VISIBLE, Tag.TAG_BYTE)) {
+            config.renderVisible = root.getBoolean(KEY_VISIBLE);
+        }
         return config.isStructurallyValid() ? config : null;
     }
 
@@ -699,6 +709,7 @@ public final class NodeClipboardConfig {
                 registry.removeNodeFromNetwork(currentNetworkId, node.getUUID());
                 node.setNetworkId(null);
             }
+            node.setNetworkName("");
             return;
         }
 
@@ -713,6 +724,7 @@ public final class NodeClipboardConfig {
         }
 
         node.setNetworkId(targetNetworkId);
+        node.setNetworkName(targetNetwork.getName());
         registry.addNodeToNetwork(targetNetworkId, node.getUUID());
     }
 
@@ -764,7 +776,8 @@ public final class NodeClipboardConfig {
                     continue;
                 }
 
-                if (channelData != null && ItemStack.isSameItemSameComponents(required, channelData.getFilterItem(slot))) {
+                if (channelData != null
+                        && ItemStack.isSameItemSameComponents(required, channelData.getFilterItem(slot))) {
                     continue;
                 }
                 addRequirement(requirements, required);
@@ -1027,6 +1040,8 @@ public final class NodeClipboardConfig {
                 node.setUpgradeItem(slot, expected.copyWithCount(1));
             }
         }
+
+        node.setRenderVisible(renderVisible);
     }
 
     private static ChannelConfig defaultChannelConfig() {

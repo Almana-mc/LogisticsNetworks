@@ -5,6 +5,7 @@
     "logisticsnetworks:gold_upgrade",
     "logisticsnetworks:diamond_upgrade",
     "logisticsnetworks:netherite_upgrade",
-    "logisticsnetworks:dimensional_upgrade"
+    "logisticsnetworks:dimensional_upgrade",
+    "logisticsnetworks:mekanism_chemical_upgrade"
   ]
 }

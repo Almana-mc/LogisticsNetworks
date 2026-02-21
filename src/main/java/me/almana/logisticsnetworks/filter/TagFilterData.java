@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.filter;
 
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.TagFilterItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -200,6 +201,27 @@ public final class TagFilterData {
 
         Set<String> tagSet = new HashSet<>(filterTags);
         return candidate.getTags().map(tag -> tag.location().toString()).anyMatch(tagSet::contains);
+    }
+
+    public static boolean containsTag(ItemStack filterStack, String chemicalId) {
+        if (!isTagFilterItem(filterStack) || chemicalId == null || chemicalId.isEmpty()) {
+            return false;
+        }
+        if (getTargetType(filterStack) != FilterTargetType.CHEMICALS) {
+            return false;
+        }
+
+        List<String> filterTags = getTagFilters(filterStack);
+        if (filterTags.isEmpty()) {
+            return false;
+        }
+
+        for (String tag : filterTags) {
+            if (MekanismCompat.chemicalHasTag(chemicalId, tag)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String normalizeTag(String tagValue) {

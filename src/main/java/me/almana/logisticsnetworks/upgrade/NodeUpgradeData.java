@@ -83,6 +83,14 @@ public final class NodeUpgradeData {
         };
     }
 
+    public static int getChemicalOperationCap(LogisticsNodeEntity node) {
+        return getFluidOperationCapMb(getUpgradeTier(node));
+    }
+
+    public static int getChemicalOperationCap(int tier) {
+        return getFluidOperationCapMb(tier);
+    }
+
     public static int getMinTickDelay(LogisticsNodeEntity node) {
         return getMinTickDelay(getUpgradeTier(node));
     }
@@ -100,6 +108,15 @@ public final class NodeUpgradeData {
     public static boolean hasDimensionalUpgrade(LogisticsNodeEntity node) {
         for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
             if (node.getUpgradeItem(i).is(Registration.DIMENSIONAL_UPGRADE.get())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasMekanismChemicalUpgrade(LogisticsNodeEntity node) {
+        for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
+            if (node.getUpgradeItem(i).is(Registration.MEKANISM_CHEMICAL_UPGRADE.get())) {
                 return true;
             }
         }

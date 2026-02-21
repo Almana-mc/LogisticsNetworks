@@ -13,6 +13,7 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.gui.Font;
 import org.joml.Matrix4f;
@@ -49,6 +50,20 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         super.render(entity, yaw, partialTick, poseStack, buffer, light);
     }
 
+    @Override
+    protected boolean shouldShowName(LogisticsNodeEntity entity) {
+        var mc = Minecraft.getInstance();
+        return mc.player != null && mc.player.isHolding(Registration.WRENCH.get());
+    }
+
+    @Override
+    protected void renderNameTag(LogisticsNodeEntity entity, Component displayName, PoseStack poseStack,
+            MultiBufferSource buffer, int packedLight, float partialTick) {
+        String networkName = entity.getNetworkName();
+        String label = (networkName == null || networkName.isBlank()) ? "No Network" : networkName;
+        super.renderNameTag(entity, Component.literal(label), poseStack, buffer, packedLight, partialTick);
+    }
+
     private void renderModel(LogisticsNodeEntity entity, PoseStack poseStack, MultiBufferSource buffer, int light,
             boolean isVisible) {
         poseStack.pushPose();
@@ -70,12 +85,11 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
             int light) {
         renderHighlightBox(poseStack, buffer);
 
-        // Still need to make this work
-        renderLabel(entity, "No Network assigned", poseStack, buffer, light);
-
         if (Config.debugMode) {
-            // Neither does this work just yet
+            poseStack.pushPose();
+            poseStack.translate(0.0, -0.75, 0.0);
             renderDebugInfo(entity, poseStack, buffer, light);
+            poseStack.popPose();
         }
     }
 
@@ -153,9 +167,13 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
         var font = this.getFont();
         float x = (float) (-font.width(text) / 2);
+        int fullbright = 15728880;
 
-        font.drawInBatch(text, x, 0, 0xFFFFFFFF, true, poseStack.last().pose(), buffer, Font.DisplayMode.NORMAL, 0,
-                light);
+        // Two-pass rendering like vanilla nametags: SEE_THROUGH for visibility behind geometry, NORMAL for solid text
+        font.drawInBatch(text, x, 0, 0x20FFFFFF, false, poseStack.last().pose(), buffer,
+                Font.DisplayMode.SEE_THROUGH, 0x40000000, fullbright);
+        font.drawInBatch(text, x, 0, 0xFFFFFFFF, false, poseStack.last().pose(), buffer,
+                Font.DisplayMode.NORMAL, 0, fullbright);
 
         poseStack.popPose();
     }

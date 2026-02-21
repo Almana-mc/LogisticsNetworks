@@ -7,6 +7,8 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.AmountFilterData;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.filter.SlotFilterData;
+import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
@@ -88,12 +90,13 @@ public class TransferEngine {
         Map<Integer, List<ImportTarget>> itemImports = new HashMap<>();
         Map<Integer, List<ImportTarget>> fluidImports = new HashMap<>();
         Map<Integer, List<ImportTarget>> energyImports = new HashMap<>();
+        Map<Integer, List<ImportTarget>> chemicalImports = new HashMap<>();
 
-        populateImportCaches(sortedNodes, signalCache, itemImports, fluidImports, energyImports);
+        populateImportCaches(sortedNodes, signalCache, itemImports, fluidImports, energyImports, chemicalImports);
 
         boolean anyActivePotential = false;
         for (LogisticsNodeEntity sourceNode : sortedNodes) {
-            if (processNode(sourceNode, itemImports, fluidImports, energyImports,
+            if (processNode(sourceNode, itemImports, fluidImports, energyImports, chemicalImports,
                     signalCache, dimensionalCache, tierCache)) {
                 anyActivePotential = true;
             }
@@ -138,7 +141,8 @@ public class TransferEngine {
     private static void populateImportCaches(List<LogisticsNodeEntity> nodes, Map<UUID, Integer> signalCache,
             Map<Integer, List<ImportTarget>> itemImports,
             Map<Integer, List<ImportTarget>> fluidImports,
-            Map<Integer, List<ImportTarget>> energyImports) {
+            Map<Integer, List<ImportTarget>> energyImports,
+            Map<Integer, List<ImportTarget>> chemicalImports) {
         for (LogisticsNodeEntity node : nodes) {
             int signal = signalCache.getOrDefault(node.getUUID(), 0);
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
@@ -152,6 +156,12 @@ public class TransferEngine {
                                     .add(new ImportTarget(node, ch, i));
                             case ENERGY -> energyImports.computeIfAbsent(i, k -> new ArrayList<>())
                                     .add(new ImportTarget(node, ch, i));
+                            case CHEMICAL -> {
+                                if (NodeUpgradeData.hasMekanismChemicalUpgrade(node)) {
+                                    chemicalImports.computeIfAbsent(i, k -> new ArrayList<>())
+                                            .add(new ImportTarget(node, ch, i));
+                                }
+                            }
                         }
                     }
                 }
@@ -163,6 +173,7 @@ public class TransferEngine {
             Map<Integer, List<ImportTarget>> itemImports,
             Map<Integer, List<ImportTarget>> fluidImports,
             Map<Integer, List<ImportTarget>> energyImports,
+            Map<Integer, List<ImportTarget>> chemicalImports,
             Map<UUID, Integer> signalCache,
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache) {
@@ -178,7 +189,9 @@ public class TransferEngine {
 
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
             ChannelData channel = sourceNode.getChannel(i);
-            if (channel == null || !channel.isEnabled() || channel.getMode() != ChannelMode.EXPORT)
+            if (channel == null || !channel.isEnabled())
+                continue;
+            if (channel.getMode() != ChannelMode.EXPORT)
                 continue;
             if (!isRedstoneActive(channel.getRedstoneMode(), redstoneSignal))
                 continue;
@@ -186,6 +199,7 @@ public class TransferEngine {
             List<ImportTarget> targets = switch (channel.getType()) {
                 case FLUID -> fluidImports.get(i);
                 case ENERGY -> energyImports.get(i);
+                case CHEMICAL -> chemicalImports.get(i);
                 default -> itemImports.get(i);
             };
 
@@ -208,6 +222,8 @@ public class TransferEngine {
                     transferFluids(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
                 case ENERGY ->
                     transferEnergy(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
+                case CHEMICAL ->
+                    transferChemicals(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
                 default ->
                     transferItems(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
             };
@@ -224,16 +240,18 @@ public class TransferEngine {
     private static boolean isOnCooldown(LogisticsNodeEntity node, ChannelData channel, int index, int tier,
             long gameTime) {
         long lastRun = node.getLastExecution(index);
-        int configuredDelay = channel.getType() == ChannelType.ENERGY ? 1
-                : Math.max(channel.getTickDelay(), NodeUpgradeData.getMinTickDelay(tier));
-        int effectiveDelay = Math.max(configuredDelay, (int) node.getBackoffTicks(index));
-        return (gameTime - lastRun) < effectiveDelay;
+        long tickDelay = channel.getTickDelay();
+        float backoff = node.getBackoffTicks(index);
+        long effectiveDelay = tickDelay + (long) backoff;
+
+        return gameTime - lastRun < effectiveDelay;
     }
 
     private static int getBatchLimit(ChannelType type, int tier) {
         return switch (type) {
             case FLUID -> NodeUpgradeData.getFluidOperationCapMb(tier);
             case ENERGY -> NodeUpgradeData.getEnergyOperationCap(tier);
+            case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(tier);
             default -> NodeUpgradeData.getItemOperationCap(tier);
         };
     }
@@ -241,7 +259,8 @@ public class TransferEngine {
     private static void updateBackoff(LogisticsNodeEntity node, ChannelData channel, int index, boolean success,
             long gameTime, int tier, int targetCount) {
         node.setLastExecution(index, gameTime);
-        int configuredDelay = channel.getType() == ChannelType.ENERGY ? 1
+        boolean isInstantType = channel.getType() == ChannelType.ENERGY;
+        int configuredDelay = isInstantType ? 1
                 : Math.max(channel.getTickDelay(), NodeUpgradeData.getMinTickDelay(tier));
 
         if (success) {
@@ -253,7 +272,7 @@ public class TransferEngine {
                 node.advanceRoundRobin(index, targetCount);
             }
         } else {
-            float maxBackoff = channel.getType() == ChannelType.ENERGY ? BACKOFF_MAX_TICKS_ENERGY : BACKOFF_MAX_TICKS;
+            float maxBackoff = isInstantType ? BACKOFF_MAX_TICKS_ENERGY : BACKOFF_MAX_TICKS;
             float curBackoff = Math.max(node.getBackoffTicks(index), configuredDelay);
             node.setBackoffTicks(index, Math.min(maxBackoff, curBackoff * BACKOFF_MULTIPLIER));
         }
@@ -450,6 +469,61 @@ public class TransferEngine {
         return remaining < batchLimitRF ? 1 : 0;
     }
 
+    private static int transferChemicals(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
+            ChannelData exportChannel, List<ImportTarget> targets, int batchLimit,
+            Map<UUID, Boolean> dimensionalCache) {
+
+        if (!MekanismCompat.isLoaded()) {
+            if (Config.debugMode)
+                LOGGER.debug("[Chemical] Mekanism not loaded, skipping");
+            return -1;
+        }
+
+        if (!NodeUpgradeData.hasMekanismChemicalUpgrade(sourceNode)) {
+            if (Config.debugMode)
+                LOGGER.debug("[Chemical] No chemical upgrade on source node, skipping");
+            return -1;
+        }
+
+        BlockPos sourcePos = sourceNode.getAttachedPos();
+        if (!sourceLevel.isLoaded(sourcePos))
+            return -1;
+
+        boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
+        boolean anyReachable = false;
+
+        for (ImportTarget target : targets) {
+            if (target.node().getUUID().equals(sourceNode.getUUID()))
+                continue;
+            if (!target.node().isValidNode())
+                continue;
+            if (!canReach(sourceNode, target.node(), sourceDimensional, dimensionalCache))
+                continue;
+
+            anyReachable = true;
+            ServerLevel targetLevel = (ServerLevel) target.node().level();
+            BlockPos targetPos = target.node().getAttachedPos();
+            if (!targetLevel.isLoaded(targetPos))
+                continue;
+
+            long moved = ChemicalTransferHelper.transferBetween(
+                    sourceLevel, sourcePos, exportChannel.getIoDirection(),
+                    targetLevel, targetPos, target.channel().getIoDirection(),
+                    batchLimit,
+                    exportChannel.getFilterItems(), exportChannel.getFilterMode(),
+                    target.channel().getFilterItems(), target.channel().getFilterMode());
+            if (Config.debugMode)
+                LOGGER.debug("[Chemical] Transfer {} -> {}: moved={}, batch={}",
+                        sourcePos, targetPos, moved, batchLimit);
+            if (moved > 0)
+                return 1;
+        }
+
+        if (Config.debugMode && !anyReachable)
+            LOGGER.debug("[Chemical] No reachable targets for {}", sourcePos);
+        return anyReachable ? 0 : -1;
+    }
+
     private static boolean canReach(LogisticsNodeEntity source, LogisticsNodeEntity target, boolean sourceDim,
             Map<UUID, Boolean> dimCache) {
         if (source.level().dimension().equals(target.level().dimension()))
@@ -510,7 +584,8 @@ public class TransferEngine {
                         : null;
 
                 if (provider != null) {
-                    if (!FilterLogic.matchesItem(exportFilters, exportFilterMode, extracted, provider, candidateComponents))
+                    if (!FilterLogic.matchesItem(exportFilters, exportFilterMode, extracted, provider,
+                            candidateComponents))
                         break;
                 }
 
@@ -849,29 +924,6 @@ public class TransferEngine {
         return allowed == Integer.MAX_VALUE ? candidate.getCount() : Math.max(0, allowed);
     }
 
-    private static int getAllowedTransferByAmountConstraints(IItemHandler source, IItemHandler target,
-            ItemStack candidate, AmountConstraints constraints) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (constraints.hasExportThreshold) {
-            int sourceCount = countMatchingItems(source, candidate);
-            int exportCap = sourceCount - constraints.exportThreshold;
-            if (exportCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, exportCap);
-        }
-
-        if (constraints.hasImportThreshold) {
-            int targetCount = countMatchingItems(target, candidate);
-            int importCap = constraints.importThreshold - targetCount;
-            if (importCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, importCap);
-        }
-
-        return allowed == Integer.MAX_VALUE ? candidate.getCount() : Math.max(0, allowed);
-    }
-
     private static int getAllowedTransferByFluidAmountConstraints(IFluidHandler source, IFluidHandler target,
             FluidStack candidate, AmountConstraints constraints) {
         int allowed = Integer.MAX_VALUE;
@@ -893,17 +945,6 @@ public class TransferEngine {
         }
 
         return allowed == Integer.MAX_VALUE ? candidate.getAmount() : Math.max(0, allowed);
-    }
-
-    private static int countMatchingItems(IItemHandler handler, ItemStack candidate) {
-        int count = 0;
-        for (int i = 0; i < handler.getSlots(); i++) {
-            ItemStack stack = handler.getStackInSlot(i);
-            if (!stack.isEmpty() && ItemStack.isSameItem(stack, candidate)) {
-                count += stack.getCount();
-            }
-        }
-        return count;
     }
 
     private static int countMatchingFluid(IFluidHandler handler, FluidStack candidate) {

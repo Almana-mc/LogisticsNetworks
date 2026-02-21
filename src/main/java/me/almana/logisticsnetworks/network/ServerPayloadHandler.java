@@ -21,6 +21,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 
 public class ServerPayloadHandler {
 
@@ -88,6 +89,7 @@ public class ServerPayloadHandler {
                 return;
 
             node.setNetworkId(targetNetwork.getId());
+            node.setNetworkName(targetNetwork.getName());
             registry.addNodeToNetwork(targetNetwork.getId(), node.getUUID());
 
             if (NodeUpgradeData.needsDimensionalUpgradeWarning(node, targetNetwork, player.getServer())) {
@@ -172,6 +174,7 @@ public class ServerPayloadHandler {
                 return;
 
             node.setUpgradeItem(payload.upgradeSlot(), payload.upgradeItem());
+
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 ChannelData channel = node.getChannel(i);
                 if (channel != null)
@@ -290,6 +293,16 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleSetFilterChemicalEntry(SetFilterChemicalEntryPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
+                if (payload.chemicalId() != null && !payload.chemicalId().isBlank()) {
+                    menu.setChemicalFilterEntry((Player) context.player(), payload.slot(), payload.chemicalId());
+                }
+            }
+        });
+    }
+
     public static void handleSetFilterItemEntry(SetFilterItemEntryPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
@@ -362,6 +375,7 @@ public class ServerPayloadHandler {
         return switch (type) {
             case FLUID -> NodeUpgradeData.getFluidOperationCapMb(node);
             case ENERGY -> NodeUpgradeData.getEnergyOperationCap(node);
+            case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(node);
             default -> NodeUpgradeData.getItemOperationCap(node);
         };
     }

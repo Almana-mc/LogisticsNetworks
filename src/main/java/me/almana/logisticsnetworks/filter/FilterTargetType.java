@@ -2,10 +2,12 @@ package me.almana.logisticsnetworks.filter;
 
 public enum FilterTargetType {
     ITEMS,
-    FLUIDS;
+    FLUIDS,
+    CHEMICALS;
 
     public FilterTargetType next() {
-        return this == ITEMS ? FLUIDS : ITEMS;
+        FilterTargetType[] values = values();
+        return values[(ordinal() + 1) % values.length];
     }
 
     public static FilterTargetType fromOrdinal(int ordinal) {

@@ -20,6 +20,7 @@ val mod_description: String by project
 val jei_version: String by project
 val parchment_minecraft_version: String by project
 val parchment_mappings_version: String by project
+val mekanism_version: String by project
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -27,6 +28,7 @@ group = mod_group_id
 repositories {
     mavenLocal()
     maven("https://maven.blamejared.com")
+    maven("https://modmaven.dev/")
 }
 
 base {
@@ -90,6 +92,8 @@ dependencies {
     
     compileOnly("vazkii.patchouli:Patchouli:1.21.1-92-NEOFORGE:api")
     runtimeOnly("vazkii.patchouli:Patchouli:1.21.1-92-NEOFORGE")
+
+    compileOnly("mekanism:Mekanism:${mekanism_version}")
 }
 
 val generateModMetadata by tasks.registering(ProcessResources::class) {

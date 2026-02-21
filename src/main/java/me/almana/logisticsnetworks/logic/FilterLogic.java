@@ -161,6 +161,67 @@ public final class FilterLogic {
         return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
     }
 
+    public static boolean matchesChemical(ItemStack[] filters, FilterMode filterMode, String chemicalId) {
+        if (filters == null || filters.length == 0)
+            return true;
+        if (chemicalId == null || chemicalId.isEmpty())
+            return false;
+
+        boolean matchAll = filterMode == FilterMode.MATCH_ALL;
+        boolean hasConfiguredFilter = false;
+
+        boolean anyWhitelistMatched = false;
+        boolean allWhitelistsMatched = true;
+        boolean hasWhitelist = false;
+
+        for (ItemStack filter : filters) {
+            if (filter.isEmpty())
+                continue;
+
+            boolean isFilter = false;
+            boolean matched = false;
+            boolean isBlacklist = false;
+
+            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyChemicalEntries(filter)) {
+                isFilter = true;
+                matched = FilterItemData.containsChemical(filter, chemicalId);
+                isBlacklist = FilterItemData.isBlacklist(filter);
+            } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
+                    && TagFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
+                isFilter = true;
+                matched = TagFilterData.containsTag(filter, chemicalId);
+                isBlacklist = TagFilterData.isBlacklist(filter);
+            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
+                    && ModFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
+                isFilter = true;
+                matched = ModFilterData.containsMod(filter, chemicalId);
+                isBlacklist = ModFilterData.isBlacklist(filter);
+            }
+
+            if (isFilter) {
+                hasConfiguredFilter = true;
+                if (isBlacklist) {
+                    if (matched)
+                        return false;
+                } else {
+                    hasWhitelist = true;
+                    if (matched) {
+                        anyWhitelistMatched = true;
+                    } else {
+                        allWhitelistsMatched = false;
+                    }
+                }
+            }
+        }
+
+        if (!hasConfiguredFilter)
+            return true;
+        if (!hasWhitelist)
+            return true;
+
+        return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
+    }
+
     public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters) {
         if (filters == null)
             return false;

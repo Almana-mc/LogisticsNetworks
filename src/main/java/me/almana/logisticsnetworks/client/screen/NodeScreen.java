@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.AssignNetworkPayload;
@@ -33,7 +34,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private static final int GUI_HEIGHT = 256;
     private static final int INV_X = 47;
     private static final int INV_Y = 176;
-    private static final int NETWORKS_PER_PAGE = 4;
+    private static final int NETWORKS_PER_PAGE = 3;
     private static final int BATCH_MIN = 1;
     private static final int BATCH_MAX = 1_000_000;
     private static final int DELAY_MIN = 1;
@@ -147,6 +148,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             int batchCap = switch (ch.getType()) {
                 case FLUID -> NodeUpgradeData.getFluidOperationCapMb(node);
                 case ENERGY -> NodeUpgradeData.getEnergyOperationCap(node);
+                case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(node);
                 default -> NodeUpgradeData.getItemOperationCap(node);
             };
 
@@ -242,9 +244,10 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
 
         if (networkList.size() > NETWORKS_PER_PAGE) {
+            int pageInfoY = listY + NETWORKS_PER_PAGE * 20 + 4;
             String pageInfo = tr("gui.logisticsnetworks.node.page_info", networkScrollOffset + 1, endIdx,
                     networkList.size());
-            g.drawCenteredString(font, pageInfo, cx, topPos + 138, COLOR_DARK_GRAY);
+            g.drawCenteredString(font, pageInfo, cx, pageInfoY, COLOR_DARK_GRAY);
         }
     }
 
@@ -356,7 +359,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 ch.isEnabled() ? COLOR_ACCENT : 0xFFCC3333, mx, my, true);
         drawSettingRow(g, rx, ry + rowH, rowW, tr("gui.logisticsnetworks.node.setting.mode"),
                 getChannelModeLabel(ch.getMode()),
-                ch.getMode() == ChannelMode.EXPORT ? COLOR_EXPORT : COLOR_IMPORT, mx, my, true);
+                getModeColor(ch.getMode()), mx, my, true);
         drawSettingRow(g, rx, ry + rowH * 2, rowW, tr("gui.logisticsnetworks.node.setting.type"),
                 getChannelTypeLabel(ch.getType()), COLOR_WHITE, mx, my, true);
         drawSettingRow(g, rx, ry + rowH * 3, rowW, tr("gui.logisticsnetworks.node.setting.side"),
@@ -371,12 +374,11 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 editingRow == 6 ? "" : String.valueOf(ch.getPriority()),
                 0xFFFFDD44, mx, my, true);
         drawSettingRow(g, rx, ry + rowH * 7, rowW, tr("gui.logisticsnetworks.node.setting.batch"),
-                editingRow == 7 ? "" : formatBatchDisplay(ch), COLOR_WHITE,
-                mx, my, !isSettingDisabled(ch, 7));
+                editingRow == 7 ? "" : formatBatchDisplay(ch),
+                COLOR_WHITE, mx, my, !isSettingDisabled(ch, 7));
         drawSettingRow(g, rx, ry + rowH * 8, rowW, tr("gui.logisticsnetworks.node.setting.delay"),
                 editingRow == 8 ? "" : tr("gui.logisticsnetworks.node.value.tick_delay", ch.getTickDelay()),
-                COLOR_WHITE,
-                mx, my, !isSettingDisabled(ch, 8));
+                COLOR_WHITE, mx, my, !isSettingDisabled(ch, 8));
     }
 
     private void drawFilterGrid(GuiGraphics g, ChannelData ch, int x, int y, int mx, int my) {
@@ -425,6 +427,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             return tr("gui.logisticsnetworks.node.value.batch.fluid", ch.getBatchSize());
         if (ch.getType() == ChannelType.ENERGY)
             return tr("gui.logisticsnetworks.node.value.batch.energy", ch.getBatchSize());
+        if (ch.getType() == ChannelType.CHEMICAL)
+            return tr("gui.logisticsnetworks.node.value.batch.chemical", ch.getBatchSize());
         return String.valueOf(ch.getBatchSize());
     }
 
@@ -432,7 +436,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (ch.getMode() == ChannelMode.IMPORT) {
             return row == 5 || row == 7 || row == 8;
         }
-        return ch.getType() == ChannelType.ENERGY && row == 8;
+        return (ch.getType() == ChannelType.ENERGY) && row == 8;
     }
 
     @Override
@@ -558,10 +562,10 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private void cycleSetting(ChannelData ch, int row, int dir) {
         switch (row) {
             case 0 -> ch.setEnabled(!ch.isEnabled());
-            case 1 -> ch.setMode(cycleEnum(ch.getMode(), dir));
+            case 1 -> ch.setMode(cycleModeForNode(ch.getMode(), dir));
             case 2 -> {
                 ChannelType oldT = ch.getType();
-                ch.setType(cycleEnum(ch.getType(), dir));
+                ch.setType(cycleChannelType(ch.getType(), dir));
                 resetDefaultsForTypeChange(ch, oldT, ch.getType());
             }
             case 3 -> ch.setIoDirection(cycleEnum(ch.getIoDirection(), dir));
@@ -573,6 +577,32 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
     }
 
+    private ChannelType cycleChannelType(ChannelType current, int dir) {
+        LogisticsNodeEntity node = getMenu().getNode();
+        ChannelType[] values = ChannelType.values();
+        int len = values.length;
+        int index = current.ordinal();
+        for (int i = 0; i < len; i++) {
+            index = (index + dir + len) % len;
+            ChannelType candidate = values[index];
+            if (candidate == ChannelType.CHEMICAL) {
+                if (!MekanismCompat.isLoaded())
+                    continue;
+                if (node == null || !NodeUpgradeData.hasMekanismChemicalUpgrade(node))
+                    continue;
+            }
+            return candidate;
+        }
+        return current;
+    }
+
+    private ChannelMode cycleModeForNode(ChannelMode current, int dir) {
+        ChannelMode[] values = ChannelMode.values();
+        int len = values.length;
+        int index = (current.ordinal() + dir + len) % len;
+        return values[index];
+    }
+
     private <T extends Enum<T>> T cycleEnum(T current, int dir) {
         T[] values = current.getDeclaringClass().getEnumConstants();
         int index = (current.ordinal() + dir + values.length) % values.length;
@@ -582,9 +612,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private void resetDefaultsForTypeChange(ChannelData ch, ChannelType oldT, ChannelType newT) {
         if (oldT == newT)
             return;
-        if (newT == ChannelType.FLUID)
+        if (newT == ChannelType.FLUID || newT == ChannelType.CHEMICAL) {
             ch.setBatchSize(100);
-        else if (newT == ChannelType.ENERGY) {
+        } else if (newT == ChannelType.ENERGY) {
             ch.setBatchSize(2000);
             ch.setTickDelay(1);
         } else if (oldT == ChannelType.ENERGY) {
@@ -753,6 +783,10 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private String getChannelModeLabel(ChannelMode mode) {
         return tr("gui.logisticsnetworks.channel_mode." + mode.name().toLowerCase(Locale.ROOT));
+    }
+
+    private int getModeColor(ChannelMode mode) {
+        return mode == ChannelMode.EXPORT ? COLOR_EXPORT : COLOR_IMPORT;
     }
 
     private String getChannelTypeLabel(ChannelType type) {

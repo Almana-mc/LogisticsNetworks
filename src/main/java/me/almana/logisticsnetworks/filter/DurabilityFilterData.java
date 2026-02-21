@@ -13,6 +13,8 @@ public final class DurabilityFilterData {
     private static final String ROOT_KEY = "ln_durability_filter";
     private static final String KEY_VALUE = "value";
     private static final String KEY_OPERATOR = "operator";
+    private static final String KEY_IS_BLACKLIST = "blacklist";
+    private static final String KEY_TARGET_TYPE = "target";
 
     private static final int DEFAULT_VALUE = 0;
     private static final int MIN_VALUE = 0;
@@ -64,6 +66,48 @@ public final class DurabilityFilterData {
 
     public static boolean isDurabilityFilterItem(ItemStack stack) {
         return !stack.isEmpty() && stack.getItem() instanceof DurabilityFilterItem;
+    }
+
+    public static boolean isBlacklist(ItemStack stack) {
+        if (!isDurabilityFilterItem(stack))
+            return false;
+        return getRootTag(stack).getBoolean(KEY_IS_BLACKLIST);
+    }
+
+    public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
+        if (!isDurabilityFilterItem(stack))
+            return;
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            if (isBlacklist) {
+                root.putBoolean(KEY_IS_BLACKLIST, true);
+            } else {
+                root.remove(KEY_IS_BLACKLIST);
+            }
+            writeRoot(customTag, root);
+        });
+    }
+
+    public static FilterTargetType getTargetType(ItemStack stack) {
+        if (!isDurabilityFilterItem(stack))
+            return FilterTargetType.ITEMS;
+        CompoundTag root = getRootTag(stack);
+        return FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE));
+    }
+
+    public static void setTargetType(ItemStack stack, FilterTargetType type) {
+        if (!isDurabilityFilterItem(stack))
+            return;
+        FilterTargetType target = type == null ? FilterTargetType.ITEMS : type;
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            if (target == FilterTargetType.ITEMS) {
+                root.remove(KEY_TARGET_TYPE);
+            } else {
+                root.putInt(KEY_TARGET_TYPE, target.ordinal());
+            }
+            writeRoot(customTag, root);
+        });
     }
 
     public static int getValue(ItemStack stack) {

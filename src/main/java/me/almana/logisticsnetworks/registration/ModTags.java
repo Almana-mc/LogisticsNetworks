@@ -13,7 +13,7 @@ public final class ModTags {
 
     public static final TagKey<Item> FILTERS = itemTag("filters");
     public static final TagKey<Item> UPGRADES = itemTag("upgrades");
-    public static final TagKey<Item> RESOURCE_BLACKLIST_ITEMS = itemTag("resource_blacklist");
+    public static final TagKey<Item> RESOURCE_BLACKLIST_ITEMS = itemTag("blacklist/item");
 
     public static final TagKey<Block> NODE_COMPATIBILITY_BLACKLIST_BLOCKS = blockTag("compatibility_blacklist");
     public static final TagKey<Block> NODE_BLACKLIST_BLOCKS = blockTag("blacklist");
@@ -22,7 +22,7 @@ public final class ModTags {
             "compatibility_blacklist");
     public static final TagKey<BlockEntityType<?>> NODE_BLACKLIST_BLOCK_ENTITIES = blockEntityTag("blacklist");
 
-    public static final TagKey<Fluid> RESOURCE_BLACKLIST_FLUIDS = fluidTag("resource_blacklist");
+    public static final TagKey<Fluid> RESOURCE_BLACKLIST_FLUIDS = fluidTag("blacklist/fluid");
 
     private ModTags() {
     }

@@ -1,7 +1,18 @@
 package me.almana.logisticsnetworks.registration;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
-import me.almana.logisticsnetworks.item.*;
+import me.almana.logisticsnetworks.item.AmountFilterItem;
+import me.almana.logisticsnetworks.item.BaseFilterItem;
+import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
+import me.almana.logisticsnetworks.item.DurabilityFilterItem;
+import me.almana.logisticsnetworks.item.LogisticsNodeItem;
+import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
+import me.almana.logisticsnetworks.item.ModFilterItem;
+import me.almana.logisticsnetworks.item.NbtFilterItem;
+import me.almana.logisticsnetworks.item.NodeUpgradeItem;
+import me.almana.logisticsnetworks.item.SlotFilterItem;
+import me.almana.logisticsnetworks.item.TagFilterItem;
+import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
@@ -88,6 +99,11 @@ public class Registration {
         public static final DeferredHolder<Item, DimensionalUpgradeItem> DIMENSIONAL_UPGRADE = ITEMS.register(
                         "dimensional_upgrade",
                         () -> new DimensionalUpgradeItem(new Item.Properties()));
+
+        public static final DeferredHolder<Item, MekanismChemicalUpgradeItem> MEKANISM_CHEMICAL_UPGRADE = ITEMS
+                        .register(
+                                        "mekanism_chemical_upgrade",
+                                        () -> new MekanismChemicalUpgradeItem(new Item.Properties()));
 
         public static final DeferredHolder<MenuType<?>, MenuType<NodeMenu>> NODE_MENU = MENUS.register("node_menu",
                         () -> IMenuTypeExtension.create(NodeMenu::new));
