@@ -1,0 +1,12 @@
+{
+    "name": "Ars Source Upgrade",
+    "icon": "logisticsnetworks:ars_source_upgrade",
+    "category": "logisticsnetworks:upgrades",
+    "sortnum": 2,
+    "pages": [
+        {
+            "type": "patchouli:text",
+            "text": "This upgrade lets the node move source It gives access to the source channel Put it in the node to use it"
+        }
+    ]
+}

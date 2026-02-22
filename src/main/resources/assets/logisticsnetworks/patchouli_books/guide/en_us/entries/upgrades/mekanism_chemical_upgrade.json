@@ -1,0 +1,12 @@
+{
+    "name": "Mekanism Chemical Upgrade",
+    "icon": "logisticsnetworks:mekanism_chemical_upgrade",
+    "category": "logisticsnetworks:upgrades",
+    "sortnum": 3,
+    "pages": [
+        {
+            "type": "patchouli:text",
+            "text": "This upgrade lets the node move chemicals It gives access to the chemical channel Put it in the node to use it"
+        }
+    ]
+}
