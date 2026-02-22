@@ -33,7 +33,7 @@ public class NodeUpgradeItem extends Item {
                 addStatTooltip(tooltip, "fluids", String.format("%,d", fluidCapMb));
                 addStatTooltip(tooltip, "chemicals", String.format("%,d", fluidCapMb));
                 addStatTooltip(tooltip, "energy", formatCap(energyCap));
-                addStatTooltip(tooltip, "heat", formatCap(energyCap));
+                addStatTooltip(tooltip, "source", String.format("%,d", fluidCapMb));
                 addStatTooltip(tooltip, "delay", String.valueOf(minDelay));
         }
 
