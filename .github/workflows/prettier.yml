@@ -1,0 +1,45 @@
+name: Prettier Autofix
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+jobs:
+  prettier:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run Prettier
+        run: npx prettier --write "**/*.{java,json,yml,yaml,properties}"
+        continue-on-error: false
+
+      - name: Commit changes
+        if: github.event_name == 'push'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: prettier formatting"
+
+      - name: Check for formatting changes
+        if: github.event_name == 'pull_request'
+        run: |
+          if git diff --exit-code
+          then
+            echo "::notice::All files are properly formatted."
+          else
+            echo "::notice::Some files are correctly formatted and others are not. You may want to run prettier locally. This will also get auto fixed on commit."
+          fi

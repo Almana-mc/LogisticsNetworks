@@ -1,0 +1,25 @@
+name: Feature Request
+description: Tell us what new thing you want to add
+title: "[Feature] "
+labels:
+  - "enhancement"
+body:
+  - type: markdown
+    attributes:
+      value: "This can help you and other players."
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your Idea
+      description: Explain your new idea here. Keep it simple.
+      placeholder: Tell us your idea
+    validations:
+      required: true
+  - type: textarea
+    id: importance
+    attributes:
+      label: Why it matters
+      description: "Tell us why we need this in the game. And that is why it matters."
+      placeholder: Explain why we need this
+    validations:
+      required: true
