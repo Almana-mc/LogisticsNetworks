@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
 import me.almana.logisticsnetworks.item.DurabilityFilterItem;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
+import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
 import me.almana.logisticsnetworks.item.ModFilterItem;
 import me.almana.logisticsnetworks.item.NbtFilterItem;
@@ -104,6 +105,11 @@ public class Registration {
                         .register(
                                         "mekanism_chemical_upgrade",
                                         () -> new MekanismChemicalUpgradeItem(new Item.Properties()));
+
+        public static final DeferredHolder<Item, ArsSourceUpgradeItem> ARS_SOURCE_UPGRADE = ITEMS
+                        .register(
+                                        "ars_source_upgrade",
+                                        () -> new ArsSourceUpgradeItem(new Item.Properties()));
 
         public static final DeferredHolder<MenuType<?>, MenuType<NodeMenu>> NODE_MENU = MENUS.register("node_menu",
                         () -> IMenuTypeExtension.create(NodeMenu::new));

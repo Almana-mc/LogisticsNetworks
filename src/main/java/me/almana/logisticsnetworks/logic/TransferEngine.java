@@ -7,6 +7,8 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.AmountFilterData;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.filter.SlotFilterData;
+import me.almana.logisticsnetworks.integration.ars.ArsCompat;
+import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -91,13 +93,15 @@ public class TransferEngine {
         Map<Integer, List<ImportTarget>> fluidImports = new HashMap<>();
         Map<Integer, List<ImportTarget>> energyImports = new HashMap<>();
         Map<Integer, List<ImportTarget>> chemicalImports = new HashMap<>();
+        Map<Integer, List<ImportTarget>> sourceImports = new HashMap<>();
 
-        populateImportCaches(sortedNodes, signalCache, itemImports, fluidImports, energyImports, chemicalImports);
+        populateImportCaches(sortedNodes, signalCache, itemImports, fluidImports, energyImports, chemicalImports,
+                sourceImports);
 
         boolean anyActivePotential = false;
         for (LogisticsNodeEntity sourceNode : sortedNodes) {
             if (processNode(sourceNode, itemImports, fluidImports, energyImports, chemicalImports,
-                    signalCache, dimensionalCache, tierCache)) {
+                    sourceImports, signalCache, dimensionalCache, tierCache)) {
                 anyActivePotential = true;
             }
         }
@@ -142,7 +146,8 @@ public class TransferEngine {
             Map<Integer, List<ImportTarget>> itemImports,
             Map<Integer, List<ImportTarget>> fluidImports,
             Map<Integer, List<ImportTarget>> energyImports,
-            Map<Integer, List<ImportTarget>> chemicalImports) {
+            Map<Integer, List<ImportTarget>> chemicalImports,
+            Map<Integer, List<ImportTarget>> sourceImports) {
         for (LogisticsNodeEntity node : nodes) {
             int signal = signalCache.getOrDefault(node.getUUID(), 0);
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
@@ -162,6 +167,12 @@ public class TransferEngine {
                                             .add(new ImportTarget(node, ch, i));
                                 }
                             }
+                            case SOURCE -> {
+                                if (NodeUpgradeData.hasArsSourceUpgrade(node)) {
+                                    sourceImports.computeIfAbsent(i, k -> new ArrayList<>())
+                                            .add(new ImportTarget(node, ch, i));
+                                }
+                            }
                         }
                     }
                 }
@@ -174,6 +185,7 @@ public class TransferEngine {
             Map<Integer, List<ImportTarget>> fluidImports,
             Map<Integer, List<ImportTarget>> energyImports,
             Map<Integer, List<ImportTarget>> chemicalImports,
+            Map<Integer, List<ImportTarget>> sourceImports,
             Map<UUID, Integer> signalCache,
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache) {
@@ -200,6 +212,7 @@ public class TransferEngine {
                 case FLUID -> fluidImports.get(i);
                 case ENERGY -> energyImports.get(i);
                 case CHEMICAL -> chemicalImports.get(i);
+                case SOURCE -> sourceImports.get(i);
                 default -> itemImports.get(i);
             };
 
@@ -224,6 +237,8 @@ public class TransferEngine {
                     transferEnergy(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
                 case CHEMICAL ->
                     transferChemicals(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
+                case SOURCE ->
+                    transferSource(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
                 default ->
                     transferItems(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
             };
@@ -252,6 +267,7 @@ public class TransferEngine {
             case FLUID -> NodeUpgradeData.getFluidOperationCapMb(tier);
             case ENERGY -> NodeUpgradeData.getEnergyOperationCap(tier);
             case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(tier);
+            case SOURCE -> NodeUpgradeData.getSourceOperationCap(tier);
             default -> NodeUpgradeData.getItemOperationCap(tier);
         };
     }
@@ -522,6 +538,60 @@ public class TransferEngine {
         if (Config.debugMode && !anyReachable)
             LOGGER.debug("[Chemical] No reachable targets for {}", sourcePos);
         return anyReachable ? 0 : -1;
+    }
+
+    private static int transferSource(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
+            ChannelData exportChannel, List<ImportTarget> targets, int batchLimit,
+            Map<UUID, Boolean> dimensionalCache) {
+
+        if (!ArsCompat.isLoaded()) {
+            if (Config.debugMode)
+                LOGGER.debug("[Source] Ars Nouveau not loaded, skipping");
+            return -1;
+        }
+
+        if (!NodeUpgradeData.hasArsSourceUpgrade(sourceNode)) {
+            if (Config.debugMode)
+                LOGGER.debug("[Source] No source upgrade on source node, skipping");
+            return -1;
+        }
+
+        BlockPos sourcePos = sourceNode.getAttachedPos();
+        if (!sourceLevel.isLoaded(sourcePos))
+            return -1;
+
+        boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
+        int remaining = batchLimit;
+        boolean anyReachable = false;
+
+        for (ImportTarget target : targets) {
+            if (remaining <= 0)
+                break;
+            if (target.node().getUUID().equals(sourceNode.getUUID()))
+                continue;
+            if (!target.node().isValidNode())
+                continue;
+            if (!canReach(sourceNode, target.node(), sourceDimensional, dimensionalCache))
+                continue;
+
+            anyReachable = true;
+            ServerLevel targetLevel = (ServerLevel) target.node().level();
+            BlockPos targetPos = target.node().getAttachedPos();
+            if (!targetLevel.isLoaded(targetPos))
+                continue;
+
+            int moved = SourceTransferHelper.transferBetween(
+                    sourceLevel, sourcePos, targetLevel, targetPos, remaining);
+            if (Config.debugMode)
+                LOGGER.debug("[Source] Transfer {} -> {}: moved={}, batch={}",
+                        sourcePos, targetPos, moved, batchLimit);
+            if (moved > 0)
+                remaining -= moved;
+        }
+
+        if (!anyReachable)
+            return -1;
+        return remaining < batchLimit ? 1 : 0;
     }
 
     private static boolean canReach(LogisticsNodeEntity source, LogisticsNodeEntity target, boolean sourceDim,

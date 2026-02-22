@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -149,6 +150,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 case FLUID -> NodeUpgradeData.getFluidOperationCapMb(node);
                 case ENERGY -> NodeUpgradeData.getEnergyOperationCap(node);
                 case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(node);
+                case SOURCE -> NodeUpgradeData.getSourceOperationCap(node);
                 default -> NodeUpgradeData.getItemOperationCap(node);
             };
 
@@ -429,6 +431,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             return tr("gui.logisticsnetworks.node.value.batch.energy", ch.getBatchSize());
         if (ch.getType() == ChannelType.CHEMICAL)
             return tr("gui.logisticsnetworks.node.value.batch.chemical", ch.getBatchSize());
+        if (ch.getType() == ChannelType.SOURCE)
+            return tr("gui.logisticsnetworks.node.value.batch.source", ch.getBatchSize());
         return String.valueOf(ch.getBatchSize());
     }
 
@@ -591,6 +595,12 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 if (node == null || !NodeUpgradeData.hasMekanismChemicalUpgrade(node))
                     continue;
             }
+            if (candidate == ChannelType.SOURCE) {
+                if (!ArsCompat.isLoaded())
+                    continue;
+                if (node == null || !NodeUpgradeData.hasArsSourceUpgrade(node))
+                    continue;
+            }
             return candidate;
         }
         return current;
@@ -612,7 +622,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private void resetDefaultsForTypeChange(ChannelData ch, ChannelType oldT, ChannelType newT) {
         if (oldT == newT)
             return;
-        if (newT == ChannelType.FLUID || newT == ChannelType.CHEMICAL) {
+        if (newT == ChannelType.FLUID || newT == ChannelType.CHEMICAL || newT == ChannelType.SOURCE) {
             ch.setBatchSize(100);
         } else if (newT == ChannelType.ENERGY) {
             ch.setBatchSize(2000);

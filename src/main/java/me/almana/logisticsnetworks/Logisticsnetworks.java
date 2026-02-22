@@ -25,6 +25,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 @Mod(Logisticsnetworks.MOD_ID)
@@ -37,7 +38,8 @@ public class Logisticsnetworks {
                 modBus.addListener(this::registerPayloads);
 
                 ModLoadingContext.get().getActiveContainer()
-                                .registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+                                .registerConfig(ModConfig.Type.COMMON, Config.SPEC, "logistics-network/common.toml");
+                UpgradeLimitsConfig.load();
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {

@@ -14,30 +14,6 @@ import java.util.UUID;
 
 public final class NodeUpgradeData {
 
-    // Future will be part of configuration, loaded once per startup
-    private static final int NO_UPGRADE_ITEM_CAP = 8;
-    private static final int IRON_ITEM_CAP = 16;
-    private static final int GOLD_ITEM_CAP = 32;
-    private static final int DIAMOND_ITEM_CAP = 64;
-    private static final int NETHERITE_ITEM_CAP = 10_000;
-
-    private static final int NO_UPGRADE_ENERGY_CAP = 2_000;
-    private static final int IRON_ENERGY_CAP = 10_000;
-    private static final int GOLD_ENERGY_CAP = 50_000;
-    private static final int DIAMOND_ENERGY_CAP = 250_000;
-    private static final int NETHERITE_ENERGY_CAP = Integer.MAX_VALUE;
-
-    private static final int NO_UPGRADE_FLUID_CAP_MB = 500;
-    private static final int IRON_FLUID_CAP_MB = 1_000;
-    private static final int GOLD_FLUID_CAP_MB = 5_000;
-    private static final int DIAMOND_FLUID_CAP_MB = 20_000;
-    private static final int NETHERITE_FLUID_CAP_MB = 1_000_000;
-
-    private static final int NO_UPGRADE_MIN_DELAY = 20;
-    private static final int IRON_MIN_DELAY = 10;
-    private static final int GOLD_MIN_DELAY = 5;
-    private static final int DIAMOND_MIN_DELAY = 1;
-
     private NodeUpgradeData() {
     }
 
@@ -46,13 +22,7 @@ public final class NodeUpgradeData {
     }
 
     public static int getItemOperationCap(int tier) {
-        return switch (tier) {
-            case 1 -> IRON_ITEM_CAP;
-            case 2 -> GOLD_ITEM_CAP;
-            case 3 -> DIAMOND_ITEM_CAP;
-            case 4 -> NETHERITE_ITEM_CAP;
-            default -> NO_UPGRADE_ITEM_CAP;
-        };
+        return UpgradeLimitsConfig.get(tier).itemBatch();
     }
 
     public static int getEnergyOperationCap(LogisticsNodeEntity node) {
@@ -60,13 +30,7 @@ public final class NodeUpgradeData {
     }
 
     public static int getEnergyOperationCap(int tier) {
-        return switch (tier) {
-            case 1 -> IRON_ENERGY_CAP;
-            case 2 -> GOLD_ENERGY_CAP;
-            case 3 -> DIAMOND_ENERGY_CAP;
-            case 4 -> NETHERITE_ENERGY_CAP;
-            default -> NO_UPGRADE_ENERGY_CAP;
-        };
+        return UpgradeLimitsConfig.get(tier).energyBatch();
     }
 
     public static int getFluidOperationCapMb(LogisticsNodeEntity node) {
@@ -74,21 +38,23 @@ public final class NodeUpgradeData {
     }
 
     public static int getFluidOperationCapMb(int tier) {
-        return switch (tier) {
-            case 1 -> IRON_FLUID_CAP_MB;
-            case 2 -> GOLD_FLUID_CAP_MB;
-            case 3 -> DIAMOND_FLUID_CAP_MB;
-            case 4 -> NETHERITE_FLUID_CAP_MB;
-            default -> NO_UPGRADE_FLUID_CAP_MB;
-        };
+        return UpgradeLimitsConfig.get(tier).fluidBatch();
     }
 
     public static int getChemicalOperationCap(LogisticsNodeEntity node) {
-        return getFluidOperationCapMb(getUpgradeTier(node));
+        return getChemicalOperationCap(getUpgradeTier(node));
     }
 
     public static int getChemicalOperationCap(int tier) {
-        return getFluidOperationCapMb(tier);
+        return UpgradeLimitsConfig.get(tier).chemicalBatch();
+    }
+
+    public static int getSourceOperationCap(LogisticsNodeEntity node) {
+        return getSourceOperationCap(getUpgradeTier(node));
+    }
+
+    public static int getSourceOperationCap(int tier) {
+        return UpgradeLimitsConfig.get(tier).sourceBatch();
     }
 
     public static int getMinTickDelay(LogisticsNodeEntity node) {
@@ -96,13 +62,7 @@ public final class NodeUpgradeData {
     }
 
     public static int getMinTickDelay(int tier) {
-        return switch (tier) {
-            case 1 -> IRON_MIN_DELAY;
-            case 2 -> GOLD_MIN_DELAY;
-            case 3 -> DIAMOND_MIN_DELAY;
-            case 4 -> DIAMOND_MIN_DELAY;
-            default -> NO_UPGRADE_MIN_DELAY;
-        };
+        return UpgradeLimitsConfig.get(tier).minTicks();
     }
 
     public static boolean hasDimensionalUpgrade(LogisticsNodeEntity node) {
@@ -117,6 +77,15 @@ public final class NodeUpgradeData {
     public static boolean hasMekanismChemicalUpgrade(LogisticsNodeEntity node) {
         for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
             if (node.getUpgradeItem(i).is(Registration.MEKANISM_CHEMICAL_UPGRADE.get())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasArsSourceUpgrade(LogisticsNodeEntity node) {
+        for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
+            if (node.getUpgradeItem(i).is(Registration.ARS_SOURCE_UPGRADE.get())) {
                 return true;
             }
         }

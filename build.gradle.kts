@@ -21,6 +21,7 @@ val jei_version: String by project
 val parchment_minecraft_version: String by project
 val parchment_mappings_version: String by project
 val mekanism_version: String by project
+val ars_nouveau_version: String by project
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -94,6 +95,8 @@ dependencies {
     runtimeOnly("vazkii.patchouli:Patchouli:1.21.1-92-NEOFORGE")
 
     compileOnly("mekanism:Mekanism:${mekanism_version}")
+
+    compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
 }
 
 val generateModMetadata by tasks.registering(ProcessResources::class) {

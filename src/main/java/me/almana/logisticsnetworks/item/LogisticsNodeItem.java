@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.item;
 
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -91,7 +92,10 @@ public class LogisticsNodeItem extends Item {
                 return true;
         }
 
-        return MekanismCompat.hasChemicalStorage(serverLevel, pos);
+        if (MekanismCompat.hasChemicalStorage(serverLevel, pos))
+            return true;
+
+        return ArsCompat.hasSourceStorage(serverLevel, pos);
     }
 
     private boolean isBlacklisted(BlockState state) {

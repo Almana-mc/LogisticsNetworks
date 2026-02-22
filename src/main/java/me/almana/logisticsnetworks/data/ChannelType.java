@@ -4,5 +4,6 @@ public enum ChannelType {
     ITEM,
     FLUID,
     ENERGY,
-    CHEMICAL
+    CHEMICAL,
+    SOURCE
 }

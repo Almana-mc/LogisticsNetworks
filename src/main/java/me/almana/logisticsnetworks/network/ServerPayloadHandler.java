@@ -376,6 +376,7 @@ public class ServerPayloadHandler {
             case FLUID -> NodeUpgradeData.getFluidOperationCapMb(node);
             case ENERGY -> NodeUpgradeData.getEnergyOperationCap(node);
             case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(node);
+            case SOURCE -> NodeUpgradeData.getSourceOperationCap(node);
             default -> NodeUpgradeData.getItemOperationCap(node);
         };
     }

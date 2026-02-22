@@ -191,5 +191,10 @@
   "gui.logisticsnetworks.channel_type.heat": "Heat",
   "gui.logisticsnetworks.node.value.batch.heat": "%s heat",
   "tooltip.logisticsnetworks.upgrade.heat": "Heat/batch: %s",
-  "gui.logisticsnetworks.filter.target.chemicals": "Chemicals"
+  "gui.logisticsnetworks.filter.target.chemicals": "Chemicals",
+  "item.logisticsnetworks.ars_source_upgrade": "Ars Source Upgrade",
+  "tooltip.logisticsnetworks.ars_source_upgrade": "Unlocks Source channel transfer",
+  "gui.logisticsnetworks.channel_type.source": "Source",
+  "gui.logisticsnetworks.node.value.batch.source": "%s Source",
+  "tooltip.logisticsnetworks.upgrade.source": "Source/batch: %s"
 }
