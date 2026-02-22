@@ -1,0 +1,41 @@
+name: Bug Report
+description: Tell us about a bug you found
+title: "[Bug] "
+labels:
+  - "bug"
+body:
+  - type: markdown
+    attributes:
+      value: "Here is the thing. We need details to fix bugs. So here is what happened is what you tell us."
+  - type: input
+    id: mod_version
+    attributes:
+      label: Mod version
+      description: What version of the mod are you using
+      placeholder: Tell us the mod version
+    validations:
+      required: true
+  - type: input
+    id: game_version
+    attributes:
+      label: Game version
+      description: What version of the game are you using
+      placeholder: Tell us the game version
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: The Steps
+      description: Tell us what to do to see the error.
+      placeholder: "1. Open the game\n2. Do the action\n3. See the error"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: "Tell us what should happen. This might work for you if you check your logs. Add photos if you have them."
+      placeholder: Tell us what you see
+    validations:
+      required: true
