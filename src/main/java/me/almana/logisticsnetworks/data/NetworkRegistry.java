@@ -99,6 +99,7 @@ public class NetworkRegistry extends SavedData {
     public void markNetworkDirty(UUID networkId) {
         if (networks.containsKey(networkId)) {
             dirtyNetworks.add(networkId);
+            networks.get(networkId).markCacheDirty();
         }
     }
 

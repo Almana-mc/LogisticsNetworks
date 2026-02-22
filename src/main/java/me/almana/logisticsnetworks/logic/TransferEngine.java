@@ -3,6 +3,8 @@ package me.almana.logisticsnetworks.logic;
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.*;
+import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.data.NodeRef;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.AmountFilterData;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
@@ -57,6 +59,12 @@ public class TransferEngine {
         if (network == null || server == null)
             return false;
 
+        NetworkRegistry registry = NetworkRegistry.get((ServerLevel) server.overworld());
+        if (network.isCacheDirty()) {
+            network.rebuildCache(registry);
+            network.clearCacheDirty();
+        }
+
         Set<UUID> nodeUuids = network.getNodeUuids();
         if (nodeUuids.isEmpty())
             return false;
@@ -70,6 +78,7 @@ public class TransferEngine {
         List<LogisticsNodeEntity> sortedNodes = new ArrayList<>(sortedUuids.size());
         Map<UUID, Boolean> dimensionalCache = new HashMap<>(sortedUuids.size());
         Map<UUID, Integer> tierCache = new HashMap<>(sortedUuids.size());
+        Map<UUID, LogisticsNodeEntity> nodeCache = new HashMap<>(sortedUuids.size());
 
         for (UUID nodeId : sortedUuids) {
             LogisticsNodeEntity node = findNode(server, nodeId);
@@ -77,6 +86,7 @@ public class TransferEngine {
                 sortedNodes.add(node);
                 dimensionalCache.put(node.getUUID(), NodeUpgradeData.hasDimensionalUpgrade(node));
                 tierCache.put(node.getUUID(), NodeUpgradeData.getUpgradeTier(node));
+                nodeCache.put(node.getUUID(), node);
             } else if (Config.debugMode) {
                 LOGGER.debug("Node {} missing from world, skipping.", nodeId);
             }
@@ -89,14 +99,11 @@ public class TransferEngine {
         if (signalCache.isEmpty())
             return false;
 
-        Map<Integer, List<ImportTarget>> itemImports = new HashMap<>();
-        Map<Integer, List<ImportTarget>> fluidImports = new HashMap<>();
-        Map<Integer, List<ImportTarget>> energyImports = new HashMap<>();
-        Map<Integer, List<ImportTarget>> chemicalImports = new HashMap<>();
-        Map<Integer, List<ImportTarget>> sourceImports = new HashMap<>();
-
-        populateImportCaches(sortedNodes, signalCache, itemImports, fluidImports, energyImports, chemicalImports,
-                sourceImports);
+        List<ImportTarget>[] itemImports = resolveCache(network.getItemImports(), nodeCache);
+        List<ImportTarget>[] fluidImports = resolveCache(network.getFluidImports(), nodeCache);
+        List<ImportTarget>[] energyImports = resolveCache(network.getEnergyImports(), nodeCache);
+        List<ImportTarget>[] chemicalImports = resolveCache(network.getChemicalImports(), nodeCache);
+        List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache);
 
         boolean anyActivePotential = false;
         for (LogisticsNodeEntity sourceNode : sortedNodes) {
@@ -142,50 +149,33 @@ public class TransferEngine {
         return hasAnyExporter ? signalCache : Collections.emptyMap();
     }
 
-    private static void populateImportCaches(List<LogisticsNodeEntity> nodes, Map<UUID, Integer> signalCache,
-            Map<Integer, List<ImportTarget>> itemImports,
-            Map<Integer, List<ImportTarget>> fluidImports,
-            Map<Integer, List<ImportTarget>> energyImports,
-            Map<Integer, List<ImportTarget>> chemicalImports,
-            Map<Integer, List<ImportTarget>> sourceImports) {
-        for (LogisticsNodeEntity node : nodes) {
-            int signal = signalCache.getOrDefault(node.getUUID(), 0);
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                ChannelData ch = node.getChannel(i);
-                if (ch != null && ch.isEnabled() && ch.getMode() == ChannelMode.IMPORT) {
-                    if (isRedstoneActive(ch.getRedstoneMode(), signal)) {
-                        switch (ch.getType()) {
-                            case ITEM -> itemImports.computeIfAbsent(i, k -> new ArrayList<>())
-                                    .add(new ImportTarget(node, ch, i));
-                            case FLUID -> fluidImports.computeIfAbsent(i, k -> new ArrayList<>())
-                                    .add(new ImportTarget(node, ch, i));
-                            case ENERGY -> energyImports.computeIfAbsent(i, k -> new ArrayList<>())
-                                    .add(new ImportTarget(node, ch, i));
-                            case CHEMICAL -> {
-                                if (NodeUpgradeData.hasMekanismChemicalUpgrade(node)) {
-                                    chemicalImports.computeIfAbsent(i, k -> new ArrayList<>())
-                                            .add(new ImportTarget(node, ch, i));
-                                }
-                            }
-                            case SOURCE -> {
-                                if (NodeUpgradeData.hasArsSourceUpgrade(node)) {
-                                    sourceImports.computeIfAbsent(i, k -> new ArrayList<>())
-                                            .add(new ImportTarget(node, ch, i));
-                                }
-                            }
-                        }
-                    }
+    @SuppressWarnings("unchecked")
+    private static List<ImportTarget>[] resolveCache(List<NodeRef>[] cache,
+            Map<UUID, LogisticsNodeEntity> nodeCache) {
+        List<ImportTarget>[] resolved = new List[9];
+        for (int i = 0; i < 9; i++) {
+            List<NodeRef> cachedNodes = cache[i];
+            List<ImportTarget> targets = new ArrayList<>(cachedNodes.size());
+            for (NodeRef ref : cachedNodes) {
+                LogisticsNodeEntity node = nodeCache.get(ref.nodeId());
+                if (node == null)
+                    continue;
+                ChannelData cd = node.getChannel(i);
+                if (cd != null) {
+                    targets.add(new ImportTarget(node, cd, i));
                 }
             }
+            resolved[i] = targets;
         }
+        return resolved;
     }
 
     private static boolean processNode(LogisticsNodeEntity sourceNode,
-            Map<Integer, List<ImportTarget>> itemImports,
-            Map<Integer, List<ImportTarget>> fluidImports,
-            Map<Integer, List<ImportTarget>> energyImports,
-            Map<Integer, List<ImportTarget>> chemicalImports,
-            Map<Integer, List<ImportTarget>> sourceImports,
+            List<ImportTarget>[] itemImports,
+            List<ImportTarget>[] fluidImports,
+            List<ImportTarget>[] energyImports,
+            List<ImportTarget>[] chemicalImports,
+            List<ImportTarget>[] sourceImports,
             Map<UUID, Integer> signalCache,
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache) {
@@ -209,11 +199,11 @@ public class TransferEngine {
                 continue;
 
             List<ImportTarget> targets = switch (channel.getType()) {
-                case FLUID -> fluidImports.get(i);
-                case ENERGY -> energyImports.get(i);
-                case CHEMICAL -> chemicalImports.get(i);
-                case SOURCE -> sourceImports.get(i);
-                default -> itemImports.get(i);
+                case FLUID -> fluidImports[i];
+                case ENERGY -> energyImports[i];
+                case CHEMICAL -> chemicalImports[i];
+                case SOURCE -> sourceImports[i];
+                default -> itemImports[i];
             };
 
             if (targets == null || targets.isEmpty())
@@ -255,9 +245,11 @@ public class TransferEngine {
     private static boolean isOnCooldown(LogisticsNodeEntity node, ChannelData channel, int index, int tier,
             long gameTime) {
         long lastRun = node.getLastExecution(index);
-        long tickDelay = channel.getTickDelay();
+        boolean isInstantType = channel.getType() == ChannelType.ENERGY;
+        long configuredDelay = isInstantType ? 1
+                : Math.max(channel.getTickDelay(), NodeUpgradeData.getMinTickDelay(tier));
         float backoff = node.getBackoffTicks(index);
-        long effectiveDelay = tickDelay + (long) backoff;
+        long effectiveDelay = Math.max(configuredDelay, (long) backoff);
 
         return gameTime - lastRun < effectiveDelay;
     }
@@ -290,7 +282,16 @@ public class TransferEngine {
         } else {
             float maxBackoff = isInstantType ? BACKOFF_MAX_TICKS_ENERGY : BACKOFF_MAX_TICKS;
             float curBackoff = Math.max(node.getBackoffTicks(index), configuredDelay);
-            node.setBackoffTicks(index, Math.min(maxBackoff, curBackoff * BACKOFF_MULTIPLIER));
+            if (curBackoff <= configuredDelay) {
+                // First failure: Set backoff such that it doesn't incur an extra integer tick
+                // of delay now,
+                // but the NEXT failure (multiplied by BACKOFF_MULTIPLIER) will cross the +1
+                // threshold.
+                float nextThreshold = (configuredDelay + 1.05f) / BACKOFF_MULTIPLIER;
+                node.setBackoffTicks(index, Math.min(maxBackoff, Math.max(configuredDelay + 0.1f, nextThreshold)));
+            } else {
+                node.setBackoffTicks(index, Math.min(maxBackoff, curBackoff * BACKOFF_MULTIPLIER));
+            }
         }
     }
 
