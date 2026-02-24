@@ -58,6 +58,11 @@ public final class FilterLogic {
                     matched = NbtFilterData.matchesSelection(filter, path, candidateNbt);
                     isBlacklist = NbtFilterData.isBlacklist(filter);
                 }
+            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
+                    && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
+                isFilter = true;
+                matched = NameFilterData.containsName(filter, candidate);
+                isBlacklist = NameFilterData.isBlacklist(filter);
             } else if (DurabilityFilterData.isDurabilityFilterItem(filter)) {
                 isFilter = true;
                 if (!DurabilityFilterData.matches(filter, candidate)) {
@@ -135,6 +140,11 @@ public final class FilterLogic {
                     matched = NbtFilterData.matchesSelection(filter, candidate, provider);
                     isBlacklist = NbtFilterData.isBlacklist(filter);
                 }
+            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
+                    && NameFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
+                isFilter = true;
+                matched = NameFilterData.containsName(filter, candidate);
+                isBlacklist = NameFilterData.isBlacklist(filter);
             }
 
             if (isFilter) {
@@ -196,6 +206,11 @@ public final class FilterLogic {
                 isFilter = true;
                 matched = ModFilterData.containsMod(filter, chemicalId);
                 isBlacklist = ModFilterData.isBlacklist(filter);
+            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
+                    && NameFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
+                isFilter = true;
+                matched = NameFilterData.containsName(filter, chemicalId);
+                isBlacklist = NameFilterData.isBlacklist(filter);
             }
 
             if (isFilter) {

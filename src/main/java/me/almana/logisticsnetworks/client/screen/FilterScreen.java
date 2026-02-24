@@ -125,6 +125,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (!manualInputBox.isFocused() && !manualInputBox.getValue().equals(getCurrentTargetValue())) {
                 manualInputBox.setValue(getCurrentTargetValue());
             }
+        } else if (menu.isNameMode()) {
+            manualInputBox.setVisible(true);
+            manualInputBox.setHint(Component.translatable("gui.logisticsnetworks.filter.name.input_hint"));
+            if (!manualInputBox.isFocused() && !manualInputBox.getValue().equals(getCurrentTargetValue())) {
+                manualInputBox.setValue(getCurrentTargetValue());
+            }
         } else if (menu.isSlotMode()) {
             manualInputBox.setVisible(true);
             manualInputBox.setHint(Component.translatable("gui.logisticsnetworks.filter.slot.input_hint"));
@@ -160,6 +166,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return Objects.requireNonNullElse(menu.getSelectedTag(), "");
         if (menu.isModMode())
             return Objects.requireNonNullElse(menu.getSelectedMod(), "");
+        if (menu.isNameMode())
+            return Objects.requireNonNullElse(menu.getNameFilter(), "");
         if (menu.isSlotMode())
             return Objects.requireNonNullElse(menu.getSlotExpression(), "");
         return "";
@@ -275,6 +283,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             renderAmountMode(g, mx, my);
         else if (menu.isDurabilityMode())
             renderDurabilityMode(g, mx, my);
+        else if (menu.isNameMode())
+            renderNameMode(g, mx, my);
         else
             renderStandardFilterGrid(g, mx, my);
 
@@ -824,6 +834,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             handled = handleAmountClick(mx, my, btn);
         else if (menu.isDurabilityMode())
             handled = handleDurabilityClick(mx, my, btn);
+        else if (menu.isNameMode())
+            handled = handleNameClick(mx, my, btn);
         else
             handled = handleModeControlClick(mx, my, true);
 
@@ -1190,6 +1202,51 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         PacketDistributor.sendToServer(new SetSlotFilterSlotsPayload(expression == null ? "" : expression));
     }
 
+    private void sendNameUpdate(String name) {
+        PacketDistributor.sendToServer(new SetNameFilterPayload(name == null ? "" : name));
+    }
+
+    private void renderNameMode(GuiGraphics g, int mx, int my) {
+        int contentX = leftPos + 8;
+        int contentW = imageWidth - 16;
+        int inputY = topPos + 34;
+        int activeY = topPos + 52;
+        int hintY = topPos + 62;
+
+        renderModeControls(g, mx, my, true);
+
+        manualInputBox.setX(contentX);
+        manualInputBox.setY(inputY);
+        manualInputBox.setWidth(contentW);
+
+        String value = menu.getNameFilter();
+        String display = value.isEmpty()
+                ? Component.translatable("gui.logisticsnetworks.filter.name.none").getString()
+                : value;
+        String activeLine = Component.translatable("gui.logisticsnetworks.filter.name.active", display).getString();
+        g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, COL_ACCENT, false);
+
+        String hintLine = Component.translatable("gui.logisticsnetworks.filter.name.input_hint").getString();
+        g.drawString(font, font.plainSubstrByWidth(hintLine, contentW), contentX, hintY, COL_GRAY, false);
+    }
+
+    private boolean handleNameClick(double mx, double my, int btn) {
+        int contentX = leftPos + 8;
+        int inputY = topPos + 34;
+        int contentW = imageWidth - 16;
+
+        if (handleModeControlClick(mx, my, true))
+            return true;
+
+        if (btn == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
+            manualInputBox.setValue("");
+            sendNameUpdate("");
+            return true;
+        }
+
+        return false;
+    }
+
     private void flushManualInputToServer() {
         if (flushedTextOnClose || manualInputBox == null || !manualInputBox.isVisible()) {
             return;
@@ -1216,6 +1273,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             } else {
                 sendModUpdate(val);
             }
+        } else if (menu.isNameMode()) {
+            sendNameUpdate(val);
         } else if (menu.isSlotMode()) {
             sendSlotUpdate(val);
         }
@@ -1352,7 +1411,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     public boolean supportsGhostIngredientTargets() {
         return !menu.isTagMode() && !menu.isModMode() && !menu.isNbtMode() && !menu.isAmountMode()
-                && !menu.isDurabilityMode() && !menu.isSlotMode();
+                && !menu.isDurabilityMode() && !menu.isSlotMode() && !menu.isNameMode();
     }
 
     public int getGhostFilterSlotCount() {

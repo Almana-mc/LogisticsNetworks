@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.item.LogisticsNodeItem;
 import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
 import me.almana.logisticsnetworks.item.ModFilterItem;
+import me.almana.logisticsnetworks.item.NameFilterItem;
 import me.almana.logisticsnetworks.item.NbtFilterItem;
 import me.almana.logisticsnetworks.item.NodeUpgradeItem;
 import me.almana.logisticsnetworks.item.SlotFilterItem;
@@ -86,6 +87,8 @@ public class Registration {
                         () -> new ModFilterItem(new Item.Properties()));
         public static final DeferredHolder<Item, SlotFilterItem> SLOT_FILTER = ITEMS.register("slot_filter",
                         () -> new SlotFilterItem(new Item.Properties()));
+        public static final DeferredHolder<Item, NameFilterItem> NAME_FILTER = ITEMS.register("name_filter",
+                        () -> new NameFilterItem(new Item.Properties()));
 
         public static final DeferredHolder<Item, NodeUpgradeItem> IRON_UPGRADE = ITEMS.register("iron_upgrade",
                         () -> new NodeUpgradeItem(new Item.Properties(), 16, 1_000, 10_000, 10));

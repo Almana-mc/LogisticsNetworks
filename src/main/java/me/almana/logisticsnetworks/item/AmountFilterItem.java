@@ -37,6 +37,7 @@ public class AmountFilterItem extends Item {
                         buf.writeBoolean(false);
                         buf.writeBoolean(false);
                         buf.writeBoolean(false);
+                        buf.writeBoolean(false);
                     });
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());

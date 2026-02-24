@@ -16,6 +16,7 @@ import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterPayload;
 import me.almana.logisticsnetworks.network.SetNodeUpgradeItemPayload;
+import me.almana.logisticsnetworks.network.SetNameFilterPayload;
 import me.almana.logisticsnetworks.network.SetSlotFilterSlotsPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
@@ -78,6 +79,8 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleSetDurabilityFilterValue);
                 registrar.playToServer(SetSlotFilterSlotsPayload.TYPE, SetSlotFilterSlotsPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetSlotFilterSlots);
+                registrar.playToServer(SetNameFilterPayload.TYPE, SetNameFilterPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetNameFilter);
                 registrar.playToServer(ToggleNodeVisibilityPayload.TYPE, ToggleNodeVisibilityPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleToggleVisibility);
                 registrar.playToServer(CycleWrenchModePayload.TYPE, CycleWrenchModePayload.STREAM_CODEC,

@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.item;
 
-import me.almana.logisticsnetworks.filter.SlotFilterData;
+import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -16,9 +16,9 @@ import net.minecraft.world.level.Level;
 
 import java.util.List;
 
-public class SlotFilterItem extends Item {
+public class NameFilterItem extends Item {
 
-    public SlotFilterItem(Properties properties) {
+    public NameFilterItem(Properties properties) {
         super(properties);
     }
 
@@ -31,13 +31,13 @@ public class SlotFilterItem extends Item {
                     stack.getHoverName()), buf -> {
                         buf.writeVarInt(hand.ordinal());
                         buf.writeVarInt(0);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(true);
-                        buf.writeBoolean(false);
+                        buf.writeBoolean(false); // tag
+                        buf.writeBoolean(false); // amount
+                        buf.writeBoolean(false); // nbt
+                        buf.writeBoolean(false); // durability
+                        buf.writeBoolean(false); // mod
+                        buf.writeBoolean(false); // slot
+                        buf.writeBoolean(true);  // name
                     });
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
@@ -45,13 +45,13 @@ public class SlotFilterItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        boolean blacklist = SlotFilterData.isBlacklist(stack);
-        String slots = SlotFilterData.getSlotExpression(stack);
-        if (slots.isBlank()) {
-            slots = Component.translatable("tooltip.logisticsnetworks.filter.slot.none").getString();
-        }
+        boolean blacklist = NameFilterData.isBlacklist(stack);
+        String name = NameFilterData.getNameFilter(stack);
+        String selected = name.isEmpty()
+                ? Component.translatable("tooltip.logisticsnetworks.filter.name.none").getString()
+                : name;
 
-        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.slot.desc")
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.name.desc")
                 .withStyle(ChatFormatting.GRAY));
 
         tooltip.add(Component.translatable(
@@ -59,8 +59,9 @@ public class SlotFilterItem extends Item {
                         : "tooltip.logisticsnetworks.filter.mode.whitelist")
                 .withStyle(ChatFormatting.GRAY));
 
-        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.slot.value", slots)
-                .withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.translatable(
+                "tooltip.logisticsnetworks.filter.name",
+                selected).withStyle(ChatFormatting.DARK_GRAY));
 
         tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.open_hint")
                 .withStyle(ChatFormatting.DARK_GRAY));

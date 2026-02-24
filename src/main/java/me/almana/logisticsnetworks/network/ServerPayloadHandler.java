@@ -324,9 +324,17 @@ public class ServerPayloadHandler {
         }
     }
 
+    public static void handleSetNameFilter(SetNameFilterPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof FilterMenu menu && menu.isNameMode()) {
+                menu.setNameExpression((Player) context.player(), payload.name());
+            }
+        });
+    }
+
     private static boolean isSpecialMode(FilterMenu menu) {
         return menu.isTagMode() || menu.isAmountMode() || menu.isNbtMode() || menu.isDurabilityMode()
-                || menu.isModMode() || menu.isSlotMode();
+                || menu.isModMode() || menu.isSlotMode() || menu.isNameMode();
     }
 
     private static ItemStack findOpenFilterStack(Player player, java.util.function.Predicate<ItemStack> matcher) {

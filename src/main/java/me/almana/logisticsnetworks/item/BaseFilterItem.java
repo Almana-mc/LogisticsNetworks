@@ -53,6 +53,7 @@ public class BaseFilterItem extends Item {
             buf.writeBoolean(false);
         }
         buf.writeBoolean(false);
+        buf.writeBoolean(false);
     }
 
     @Override
