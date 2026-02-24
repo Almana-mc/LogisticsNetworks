@@ -73,6 +73,11 @@ public class EventHandler {
         if (!(stack.getItem() instanceof WrenchItem))
             return;
 
+        if (WrenchItem.getMode(stack) == WrenchItem.Mode.MASS_PLACEMENT) {
+            event.setUseBlock(TriState.FALSE);
+            return;
+        }
+
         Level level = event.getLevel();
         BlockPos pos = event.getPos();
 

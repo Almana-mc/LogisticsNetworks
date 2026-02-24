@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.client.model.NodeModel;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
+import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.neoforged.api.distmarker.Dist;
@@ -25,6 +26,7 @@ public class ClientEventHandler {
         event.register(Registration.NODE_MENU.get(), NodeScreen::new);
         event.register(Registration.FILTER_MENU.get(), FilterScreen::new);
         event.register(Registration.CLIPBOARD_MENU.get(), ClipboardScreen::new);
+        event.register(Registration.MASS_PLACEMENT_MENU.get(), MassPlacementScreen::new);
     }
 
     @SubscribeEvent

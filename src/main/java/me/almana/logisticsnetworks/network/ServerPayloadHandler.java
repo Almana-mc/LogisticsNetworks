@@ -140,6 +140,38 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleMassSelectConnected(MassSelectConnectedPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+
+            InteractionHand hand = payload.handOrdinal() == InteractionHand.OFF_HAND.ordinal()
+                    ? InteractionHand.OFF_HAND
+                    : InteractionHand.MAIN_HAND;
+
+            if (WrenchItem.handleConnectedSelection(player, hand, payload.pos())) {
+                player.getInventory().setChanged();
+            }
+        });
+    }
+
+    public static void handleCopyPasteConnected(CopyPasteConnectedPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+
+            InteractionHand hand = payload.handOrdinal() == InteractionHand.OFF_HAND.ordinal()
+                    ? InteractionHand.OFF_HAND
+                    : InteractionHand.MAIN_HAND;
+
+            if (WrenchItem.handleConnectedPaste(player, hand, payload.pos())) {
+                player.getInventory().setChanged();
+            }
+        });
+    }
+
     public static void handleSetFilter(SetFilterPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getNode(context, payload.entityId());

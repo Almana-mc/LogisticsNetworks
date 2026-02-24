@@ -19,6 +19,7 @@ import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
+import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -122,6 +123,10 @@ public class Registration {
         public static final DeferredHolder<MenuType<?>, MenuType<ClipboardMenu>> CLIPBOARD_MENU = MENUS.register(
                         "clipboard_menu",
                         () -> IMenuTypeExtension.create(ClipboardMenu::new));
+        public static final DeferredHolder<MenuType<?>, MenuType<MassPlacementMenu>> MASS_PLACEMENT_MENU = MENUS
+                        .register(
+                                        "mass_placement_menu",
+                                        () -> IMenuTypeExtension.create(MassPlacementMenu::new));
 
         public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",

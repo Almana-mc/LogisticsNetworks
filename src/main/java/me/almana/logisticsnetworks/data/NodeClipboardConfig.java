@@ -652,6 +652,24 @@ public final class NodeClipboardConfig {
         return PasteResult.SUCCESS;
     }
 
+    public PasteResult applyToNodeWithoutInventory(LogisticsNodeEntity node) {
+        if (node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT) {
+            return PasteResult.CLIPBOARD_INVALID;
+        }
+
+        if (!isStructurallyValid()) {
+            return PasteResult.CLIPBOARD_INVALID;
+        }
+
+        if (!hasCompatibleStructure(node)) {
+            return PasteResult.INCOMPATIBLE_TARGET;
+        }
+
+        applyToNode(node);
+        applyNetworkToNode(node);
+        return PasteResult.SUCCESS;
+    }
+
     private boolean hasCompatibleStructure(LogisticsNodeEntity node) {
         for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
             if (node.getChannel(channel) == null) {
@@ -667,7 +685,7 @@ public final class NodeClipboardConfig {
         for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
             ItemStack expected = upgradeItems[slot];
             ItemStack current = node.getUpgradeItem(slot);
-            if (shouldReplaceSlot(expected, current)) {
+            if (shouldReturnReplacedItem(expected, current)) {
                 returnedItems.add(current.copy());
             }
         }
@@ -680,7 +698,7 @@ public final class NodeClipboardConfig {
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                 ItemStack expected = filterItems[channel][slot];
                 ItemStack current = channelData.getFilterItem(slot);
-                if (shouldReplaceSlot(expected, current)) {
+                if (shouldReturnReplacedItem(expected, current)) {
                     returnedItems.add(current.copy());
                 }
             }
@@ -689,11 +707,15 @@ public final class NodeClipboardConfig {
         return returnedItems;
     }
 
-    private static boolean shouldReplaceSlot(ItemStack expected, ItemStack current) {
+    private static boolean shouldReturnReplacedItem(ItemStack expected, ItemStack current) {
         if (current.isEmpty()) {
             return false;
         }
-        return expected.isEmpty() || !ItemStack.isSameItemSameComponents(expected, current);
+        if (expected.isEmpty()) {
+            return true;
+        }
+        // Same base item can be reconfigured in place without consuming or returning another item.
+        return !ItemStack.isSameItem(expected, current);
     }
 
     private void applyNetworkToNode(LogisticsNodeEntity node) {
@@ -762,7 +784,7 @@ public final class NodeClipboardConfig {
                 continue;
             }
 
-            if (node != null && ItemStack.isSameItemSameComponents(required, node.getUpgradeItem(slot))) {
+            if (node != null && ItemStack.isSameItem(required, node.getUpgradeItem(slot))) {
                 continue;
             }
             addRequirement(requirements, required);
@@ -777,7 +799,7 @@ public final class NodeClipboardConfig {
                 }
 
                 if (channelData != null
-                        && ItemStack.isSameItemSameComponents(required, channelData.getFilterItem(slot))) {
+                        && ItemStack.isSameItem(required, channelData.getFilterItem(slot))) {
                     continue;
                 }
                 addRequirement(requirements, required);
@@ -790,7 +812,7 @@ public final class NodeClipboardConfig {
     private static void addRequirement(List<Requirement> requirements, ItemStack stack) {
         for (int i = 0; i < requirements.size(); i++) {
             Requirement requirement = requirements.get(i);
-            if (ItemStack.isSameItemSameComponents(requirement.stack(), stack)) {
+            if (ItemStack.isSameItem(requirement.stack(), stack)) {
                 requirements.set(i, new Requirement(requirement.stack(), requirement.count() + 1));
                 return;
             }
@@ -828,7 +850,7 @@ public final class NodeClipboardConfig {
             if (stack.isEmpty()) {
                 continue;
             }
-            if (ItemStack.isSameItemSameComponents(stack, pattern)) {
+            if (ItemStack.isSameItem(stack, pattern)) {
                 total += stack.getCount();
             }
         }
@@ -847,7 +869,7 @@ public final class NodeClipboardConfig {
                 if (stack.isEmpty()) {
                     continue;
                 }
-                if (!ItemStack.isSameItemSameComponents(stack, requirement.stack())) {
+                if (!ItemStack.isSameItem(stack, requirement.stack())) {
                     continue;
                 }
 
@@ -889,7 +911,7 @@ public final class NodeClipboardConfig {
                     continue;
                 }
                 ItemStack stack = slots[slot];
-                if (stack.isEmpty() || !ItemStack.isSameItemSameComponents(stack, requirement.stack())) {
+                if (stack.isEmpty() || !ItemStack.isSameItem(stack, requirement.stack())) {
                     continue;
                 }
                 int consumed = Math.min(remaining, stack.getCount());

@@ -1,11 +1,16 @@
 package me.almana.logisticsnetworks.client;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
+import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -38,6 +43,42 @@ public class WrenchInputHandler {
         }
 
         PacketDistributor.sendToServer(new CycleWrenchModePayload(hand.ordinal(), event.getScrollDeltaY() > 0.0D));
+        event.setCanceled(true);
+    }
+
+    @SubscribeEvent
+    public static void onInteractionKeyMappingTriggered(InputEvent.InteractionKeyMappingTriggered event) {
+        if (!event.isUseItem() || !Screen.hasControlDown()) {
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        Player player = minecraft.player;
+        if (player == null || minecraft.level == null || minecraft.hitResult == null) {
+            return;
+        }
+
+        InteractionHand hand = event.getHand();
+        if (!(player.getItemInHand(hand).getItem() instanceof WrenchItem)) {
+            return;
+        }
+
+        WrenchItem.Mode mode = WrenchItem.getMode(player.getItemInHand(hand));
+        if (mode != WrenchItem.Mode.MASS_PLACEMENT && mode != WrenchItem.Mode.COPY_PASTE) {
+            return;
+        }
+
+        if (!(minecraft.hitResult instanceof BlockHitResult blockHitResult)
+                || blockHitResult.getType() != HitResult.Type.BLOCK) {
+            return;
+        }
+
+        if (mode == WrenchItem.Mode.MASS_PLACEMENT) {
+            PacketDistributor.sendToServer(new MassSelectConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
+        } else {
+            PacketDistributor.sendToServer(new CopyPasteConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
+        }
+        event.setSwingHand(false);
         event.setCanceled(true);
     }
 
