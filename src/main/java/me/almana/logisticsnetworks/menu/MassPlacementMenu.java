@@ -160,9 +160,10 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         int upgradesRequired = clipboardPresent && clipboardValid ? clipboard.getTotalUpgradeCount() * nodeCount : 0;
         int filtersRequired = clipboardPresent && clipboardValid ? clipboard.getTotalFilterCount() * nodeCount : 0;
 
+        boolean creative = player.isCreative();
         int protectedSlot = findProtectedSlot(player.getInventory(), wrenchStack);
         List<Requirement> requirements = buildRequirements(nodeCount, clipboardPresent && clipboardValid ? clipboard : null);
-        boolean hasItems = hasInventoryRequirements(player.getInventory(), requirements, protectedSlot);
+        boolean hasItems = creative || hasInventoryRequirements(player.getInventory(), requirements, protectedSlot);
         boolean canPlace = selectedCount > 0 && selectedCount == nodeCount && clipboardValid && hasItems;
 
         data.set(DATA_SELECTED, selectedCount);
@@ -212,16 +213,20 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         }
 
         int nodeCount = validTargets.size();
-        int protectedSlot = findProtectedSlot(player.getInventory(), wrenchStack);
-        List<Requirement> requirements = buildRequirements(nodeCount, clipboardPresent ? clipboard : null);
+        boolean creative = player.isCreative();
 
-        if (!hasInventoryRequirements(player.getInventory(), requirements, protectedSlot)) {
-            player.displayClientMessage(
-                    Component.translatable("message.logisticsnetworks.mass_placement.missing_items"), true);
-            return false;
+        if (!creative) {
+            int protectedSlot = findProtectedSlot(player.getInventory(), wrenchStack);
+            List<Requirement> requirements = buildRequirements(nodeCount, clipboardPresent ? clipboard : null);
+
+            if (!hasInventoryRequirements(player.getInventory(), requirements, protectedSlot)) {
+                player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.mass_placement.missing_items"), true);
+                return false;
+            }
+
+            consumeInventoryRequirements(player.getInventory(), requirements, protectedSlot);
         }
-
-        consumeInventoryRequirements(player.getInventory(), requirements, protectedSlot);
 
         int placedCount = 0;
         List<WrenchItem.MassSelectionTarget> placedTargets = new ArrayList<>();
@@ -254,9 +259,10 @@ public class MassPlacementMenu extends AbstractContainerMenu {
     }
 
     private List<WrenchItem.MassSelectionTarget> getValidTargets(List<WrenchItem.MassSelectionTarget> selected) {
+        boolean creative = player.isCreative();
         List<WrenchItem.MassSelectionTarget> validTargets = new ArrayList<>();
         for (WrenchItem.MassSelectionTarget target : selected) {
-            NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(player.level(), target.pos());
+            NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(player.level(), target.pos(), creative);
             if (validation == NodePlacementHelper.ValidationResult.OK) {
                 validTargets.add(target);
             }

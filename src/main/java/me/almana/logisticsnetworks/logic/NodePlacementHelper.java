@@ -29,6 +29,10 @@ public final class NodePlacementHelper {
     }
 
     public static ValidationResult validatePlacement(Level level, BlockPos pos) {
+        return validatePlacement(level, pos, false);
+    }
+
+    public static ValidationResult validatePlacement(Level level, BlockPos pos, boolean creative) {
         if (level.isEmptyBlock(pos)) {
             return ValidationResult.AIR;
         }
@@ -42,7 +46,7 @@ public final class NodePlacementHelper {
             return ValidationResult.NODE_ALREADY_EXISTS;
         }
 
-        if (!hasAnyStorageCapability(level, pos)) {
+        if (!creative && !hasAnyStorageCapability(level, pos)) {
             return ValidationResult.NO_STORAGE_CAPABILITY;
         }
 
