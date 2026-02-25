@@ -61,6 +61,8 @@ public class LogisticsNodeEntity extends Entity {
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
         this.noCulling = true;
+        this.setNoGravity(true);
+        this.noPhysics = true;
 
         for (int i = 0; i < CHANNEL_COUNT; i++) {
             this.channels[i] = new ChannelData();
@@ -163,6 +165,36 @@ public class LogisticsNodeEntity extends Entity {
         if (!upgradesTag.isEmpty()) {
             compound.put(KEY_UPGRADES, upgradesTag);
         }
+    }
+
+    @Override
+    public void tick() {
+        // Enforce position at attached block center to prevent drift from any source
+        BlockPos attached = getAttachedPos();
+        if (!attached.equals(BlockPos.ZERO)) {
+            Vec3 target = Vec3.atCenterOf(attached);
+            if (distanceToSqr(target) > 0.001) {
+                setPos(target);
+            }
+        }
+    }
+
+    @Override
+    public boolean isPushable() {
+        return false;
+    }
+
+    @Override
+    public void push(double x, double y, double z) {
+    }
+
+    @Override
+    public void push(Entity entity) {
+    }
+
+    @Override
+    public boolean canBeCollidedWith() {
+        return false;
     }
 
     @Override
