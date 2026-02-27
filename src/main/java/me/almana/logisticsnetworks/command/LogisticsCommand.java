@@ -1,38 +1,68 @@
 package me.almana.logisticsnetworks.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 
 public class LogisticsCommand {
 
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_NETWORKS = (context, builder) -> {
+        CommandSourceStack source = context.getSource();
+        ServerLevel level = source.getLevel();
+        NetworkRegistry registry = NetworkRegistry.get(level);
+
+        Collection<LogisticsNetwork> networks;
+        if (source.hasPermission(2)) {
+            networks = registry.getAllNetworks().values();
+        } else if (source.getEntity() instanceof ServerPlayer player) {
+            networks = registry.getNetworksForPlayer(player.getUUID());
+        } else {
+            networks = List.of();
+        }
+
+        List<String> names = new ArrayList<>();
+        for (LogisticsNetwork net : networks) {
+            names.add(net.getName());
+        }
+        return SharedSuggestionProvider.suggest(names, builder);
+    };
+
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         LiteralArgumentBuilder<CommandSourceStack> lnCommand = Commands.literal("logisticsnetworks")
-                .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("removeNodes")
+                        .requires(source -> source.hasPermission(2))
                         .executes(context -> removeNodes(context.getSource())))
-                .then(Commands.literal("cullNetworks")
-                        .executes(context -> cullNetworks(context.getSource())));
+                .then(Commands.literal("cullNetwork")
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .suggests(SUGGEST_NETWORKS)
+                                .executes(context -> cullNetwork(context))));
 
         LiteralArgumentBuilder<CommandSourceStack> lnAlias = Commands.literal("ln")
-                .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("removeNodes")
+                        .requires(source -> source.hasPermission(2))
                         .executes(context -> removeNodes(context.getSource())))
-                .then(Commands.literal("cullNetworks")
-                        .executes(context -> cullNetworks(context.getSource())));
+                .then(Commands.literal("cullNetwork")
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .suggests(SUGGEST_NETWORKS)
+                                .executes(context -> cullNetwork(context))));
 
         dispatcher.register(lnCommand);
         dispatcher.register(lnAlias);
@@ -62,45 +92,60 @@ public class LogisticsCommand {
         return count;
     }
 
-    private static int cullNetworks(CommandSourceStack source) {
+    private static int cullNetwork(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        String name = StringArgumentType.getString(context, "name");
         ServerLevel level = source.getLevel();
         NetworkRegistry registry = NetworkRegistry.get(level);
 
-        int culledNodes = 0;
-        int culledNetworks = 0;
-
+        // Find network by name
+        LogisticsNetwork target = null;
         for (LogisticsNetwork network : registry.getAllNetworks().values()) {
-            Set<UUID> nodesToRemove = new HashSet<>();
-            for (UUID nodeId : network.getNodeUuids()) {
-                if (level.getEntity(nodeId) == null) {
-                    nodesToRemove.add(nodeId);
-                }
-            }
-
-            for (UUID nodeId : nodesToRemove) {
-                // removeNodeFromNetwork actually deletes the network if the node count reaches
-                // 0 internally in NetworkRegistry
-                registry.removeNodeFromNetwork(network.getId(), nodeId);
-                culledNodes++;
-            }
-
-            if (network.getNodeUuids().isEmpty()) {
-                // If it was already empty before we even tried to remove nodes, or became empty
-                // registry might have already deleted it, but we can double check:
-                if (registry.getNetwork(network.getId()) != null) {
-                    registry.deleteNetwork(network.getId());
-                }
-                culledNetworks++;
+            if (network.getName().equals(name)) {
+                target = network;
+                break;
             }
         }
 
-        final int finalCulledNodes = culledNodes;
-        final int finalCulledNetworks = culledNetworks;
+        if (target == null) {
+            source.sendFailure(Component.literal("No network found with name: " + name));
+            return 0;
+        }
+
+        // Check ownership: must own the network or be op
+        if (!source.hasPermission(2) && source.getEntity() instanceof ServerPlayer player) {
+            if (target.getOwnerUuid() != null && !target.getOwnerUuid().equals(player.getUUID())) {
+                source.sendFailure(Component.literal("You do not own this network."));
+                return 0;
+            }
+        }
+
+        // Remove all node entities belonging to this network
+        int removedNodes = 0;
+        List<UUID> nodeIds = new ArrayList<>(target.getNodeUuids());
+        for (UUID nodeId : nodeIds) {
+            for (ServerLevel serverLevel : source.getServer().getAllLevels()) {
+                Entity entity = serverLevel.getEntity(nodeId);
+                if (entity instanceof LogisticsNodeEntity node) {
+                    node.setNetworkId(null);
+                    node.dropFilters();
+                    node.dropUpgrades();
+                    node.discard();
+                    removedNodes++;
+                    break;
+                }
+            }
+        }
+
+        // Delete the network
+        registry.deleteNetwork(target.getId());
+
+        final int finalRemoved = removedNodes;
+        final String networkName = name;
         source.sendSuccess(
-                () -> Component.literal("Culled " + finalCulledNodes + " missing nodes and " + finalCulledNetworks
-                        + " empty networks."),
+                () -> Component.literal("Removed network \"" + networkName + "\" and " + finalRemoved + " nodes."),
                 true);
 
-        return finalCulledNodes + finalCulledNetworks;
+        return 1;
     }
 }

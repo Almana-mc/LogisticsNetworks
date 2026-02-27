@@ -735,7 +735,7 @@ public final class NodeClipboardConfig {
             return;
         }
 
-        LogisticsNetwork targetNetwork = resolveTargetNetwork(registry);
+        LogisticsNetwork targetNetwork = resolveTargetNetwork(registry, node.getOwnerUUID());
         if (targetNetwork == null) {
             return;
         }
@@ -751,7 +751,7 @@ public final class NodeClipboardConfig {
     }
 
     @Nullable
-    private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry) {
+    private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry, UUID ownerUuid) {
         if (networkId != null) {
             LogisticsNetwork byId = registry.getNetwork(networkId);
             if (byId != null) {
@@ -765,11 +765,11 @@ public final class NodeClipboardConfig {
                     return candidate;
                 }
             }
-            return registry.createNetwork(networkName);
+            return registry.createNetwork(networkName, ownerUuid);
         }
 
         if (networkId != null) {
-            return registry.createNetwork("Network-" + networkId.toString().substring(0, 6));
+            return registry.createNetwork("Network-" + networkId.toString().substring(0, 6), ownerUuid);
         }
 
         return null;

@@ -12,8 +12,10 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -49,6 +51,7 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_CHANNEL_PREFIX = "Channel";
     private static final String KEY_SLOT = "Slot";
     private static final String KEY_ITEM = "Item";
+    private static final String KEY_OWNER_UUID = "OwnerUUID";
 
     private static final EntityDataAccessor<BlockPos> ATTACHED_POS = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -60,6 +63,8 @@ public class LogisticsNodeEntity extends Entity {
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> RENDER_VISIBLE = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Optional<UUID>> OWNER_UUID = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
 
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
@@ -94,6 +99,7 @@ public class LogisticsNodeEntity extends Entity {
         builder.define(NETWORK_ID, Optional.empty());
         builder.define(NETWORK_NAME, "");
         builder.define(RENDER_VISIBLE, true);
+        builder.define(OWNER_UUID, Optional.empty());
     }
 
     @Override
@@ -111,6 +117,9 @@ public class LogisticsNodeEntity extends Entity {
         }
         if (compound.contains(KEY_VISIBLE)) {
             setRenderVisible(compound.getBoolean(KEY_VISIBLE));
+        }
+        if (compound.contains(KEY_OWNER_UUID)) {
+            setOwnerUUID(compound.getUUID(KEY_OWNER_UUID));
         }
 
         HolderLookup.Provider provider = this.registryAccess();
@@ -153,6 +162,11 @@ public class LogisticsNodeEntity extends Entity {
             compound.putString(KEY_NETWORK_NAME, networkName);
         }
         compound.putBoolean(KEY_VISIBLE, isRenderVisible());
+
+        UUID owner = getOwnerUUID();
+        if (owner != null) {
+            compound.putUUID(KEY_OWNER_UUID, owner);
+        }
 
         HolderLookup.Provider provider = registryAccess();
 
@@ -282,6 +296,23 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setRenderVisible(boolean visible) {
         this.entityData.set(RENDER_VISIBLE, visible);
+    }
+
+    @Nullable
+    public UUID getOwnerUUID() {
+        return this.entityData.get(OWNER_UUID).orElse(null);
+    }
+
+    public void setOwnerUUID(@Nullable UUID ownerUuid) {
+        this.entityData.set(OWNER_UUID, Optional.ofNullable(ownerUuid));
+    }
+
+    public boolean isOwnedBy(Player player) {
+        UUID owner = getOwnerUUID();
+        if (owner == null) return true;
+        if (owner.equals(player.getUUID())) return true;
+        if (player instanceof ServerPlayer sp && sp.hasPermissions(2)) return true;
+        return false;
     }
 
     @Nullable

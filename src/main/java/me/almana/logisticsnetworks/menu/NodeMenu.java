@@ -21,6 +21,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class NodeMenu extends AbstractContainerMenu {
@@ -146,9 +147,15 @@ public class NodeMenu extends AbstractContainerMenu {
         if (!(player.level() instanceof ServerLevel level))
             return;
 
-        var networks = NetworkRegistry.get(level).getAllNetworks().values();
-        List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
+        NetworkRegistry registry = NetworkRegistry.get(level);
+        Collection<LogisticsNetwork> networks;
+        if (player.hasPermissions(2)) {
+            networks = registry.getAllNetworks().values();
+        } else {
+            networks = registry.getNetworksForPlayer(player.getUUID());
+        }
 
+        List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {
             entries.add(new SyncNetworkListPayload.NetworkEntry(net.getId(), net.getName(), net.getNodeUuids().size()));
         }

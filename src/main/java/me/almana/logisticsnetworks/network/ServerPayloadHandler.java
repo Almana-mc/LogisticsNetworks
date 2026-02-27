@@ -84,9 +84,14 @@ public class ServerPayloadHandler {
                 registry.removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
             }
 
-            LogisticsNetwork targetNetwork = resolveNetwork(registry, payload);
+            LogisticsNetwork targetNetwork = resolveNetwork(registry, payload, player);
             if (targetNetwork == null)
                 return;
+
+            // Claim unowned networks on first selection
+            if (targetNetwork.getOwnerUuid() == null) {
+                targetNetwork.setOwnerUuid(player.getUUID());
+            }
 
             node.setNetworkId(targetNetwork.getId());
             node.setNetworkName(targetNetwork.getName());
@@ -102,12 +107,22 @@ public class ServerPayloadHandler {
         });
     }
 
-    private static LogisticsNetwork resolveNetwork(NetworkRegistry registry, AssignNetworkPayload payload) {
+    private static LogisticsNetwork resolveNetwork(NetworkRegistry registry, AssignNetworkPayload payload,
+            ServerPlayer player) {
         if (payload.networkId().isPresent()) {
-            return registry.getNetwork(payload.networkId().get());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId().get());
+            if (network == null)
+                return null;
+            // Verify the player owns this network (or it's unowned, or player is op)
+            if (network.getOwnerUuid() != null
+                    && !network.getOwnerUuid().equals(player.getUUID())
+                    && !player.hasPermissions(2)) {
+                return null;
+            }
+            return network;
         } else {
             String name = payload.newNetworkName().trim();
-            return registry.createNetwork(name.isEmpty() ? "Unnamed" : name);
+            return registry.createNetwork(name.isEmpty() ? "Unnamed" : name, player.getUUID());
         }
     }
 

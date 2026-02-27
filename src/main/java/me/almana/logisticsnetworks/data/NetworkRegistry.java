@@ -67,18 +67,30 @@ public class NetworkRegistry extends SavedData {
     }
 
     public LogisticsNetwork createNetwork() {
-        return createNetwork(null);
+        return createNetwork(null, null);
     }
 
-    public LogisticsNetwork createNetwork(@org.jetbrains.annotations.Nullable String name) {
+    public LogisticsNetwork createNetwork(@org.jetbrains.annotations.Nullable String name,
+            @org.jetbrains.annotations.Nullable UUID ownerUuid) {
         UUID id = UUID.randomUUID();
         LogisticsNetwork network = new LogisticsNetwork(id);
         if (name != null && !name.isBlank()) {
             network.setName(name);
         }
+        network.setOwnerUuid(ownerUuid);
         networks.put(id, network);
         setDirty();
         return network;
+    }
+
+    public List<LogisticsNetwork> getNetworksForPlayer(UUID playerUuid) {
+        List<LogisticsNetwork> result = new ArrayList<>();
+        for (LogisticsNetwork network : networks.values()) {
+            if (network.getOwnerUuid() == null || network.getOwnerUuid().equals(playerUuid)) {
+                result.add(network);
+            }
+        }
+        return result;
     }
 
     public void deleteNetwork(UUID id) {

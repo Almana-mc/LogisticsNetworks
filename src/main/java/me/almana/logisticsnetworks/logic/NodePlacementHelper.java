@@ -14,6 +14,7 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.capabilities.Capabilities;
 
 import java.util.List;
+import java.util.UUID;
 
 public final class NodePlacementHelper {
 
@@ -92,6 +93,10 @@ public final class NodePlacementHelper {
     }
 
     public static LogisticsNodeEntity placeNode(Level level, BlockPos pos) {
+        return placeNode(level, pos, null);
+    }
+
+    public static LogisticsNodeEntity placeNode(Level level, BlockPos pos, UUID ownerUuid) {
         LogisticsNodeEntity node = Registration.LOGISTICS_NODE.get().create(level);
         if (node == null) {
             return null;
@@ -99,6 +104,7 @@ public final class NodePlacementHelper {
         node.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
         node.setAttachedPos(pos);
         node.setValid(true);
+        node.setOwnerUUID(ownerUuid);
 
         if (!level.addFreshEntity(node)) {
             return null;

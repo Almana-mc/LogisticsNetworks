@@ -506,6 +506,16 @@ public class WrenchItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
+        if (!node.isOwnedBy(player)) {
+            player.displayClientMessage(Component.translatable("message.logisticsnetworks.not_owner"), true);
+            return InteractionResult.FAIL;
+        }
+
+        // Claim unowned nodes on first interaction
+        if (node.getOwnerUUID() == null) {
+            node.setOwnerUUID(player.getUUID());
+        }
+
         if (player.isShiftKeyDown()) {
             return removeNode(level, node, player);
         }

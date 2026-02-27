@@ -158,6 +158,7 @@
   "message.logisticsnetworks.block_blacklisted": "This block is blacklisted",
   "message.logisticsnetworks.no_storage_capability": "This block has no storage capability",
   "message.logisticsnetworks.node_already_exists": "A node is already attached here",
+  "message.logisticsnetworks.not_owner": "You do not own this node",
   "message.logisticsnetworks.node_removed": "Node removed",
   "message.logisticsnetworks.clipboard.copied": "Configuration copied to wrench clipboard",
   "message.logisticsnetworks.clipboard.empty": "Clipboard is empty",

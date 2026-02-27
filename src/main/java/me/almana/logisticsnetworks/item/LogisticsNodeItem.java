@@ -53,7 +53,8 @@ public class LogisticsNodeItem extends Item {
     }
 
     private InteractionResult placeNode(Level level, BlockPos pos, UseOnContext context) {
-        LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, pos);
+        Player player = context.getPlayer();
+        LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, pos, player != null ? player.getUUID() : null);
         if (node == null)
             return InteractionResult.FAIL;
 
