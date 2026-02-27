@@ -641,40 +641,43 @@ public class TransferEngine {
             }
         }
 
-        for (int slot = 0; slot < source.getSlots() && remaining > 0; slot++) {
-            if (sourceAllowedSlots != null && (slot >= sourceAllowedSlots.length || !sourceAllowedSlots[slot])) {
-                continue;
-            }
-            boolean[] blockedTargets = new boolean[targets.size()];
-            int openTargets = targets.size();
+        boolean movedAny;
+        boolean[] openTargets = new boolean[targets.size()];
+        Arrays.fill(openTargets, true);
+        int openTargetCount = targets.size();
 
-            while (remaining > 0) {
-                ItemStack extracted = source.extractItem(slot, remaining, true);
-                if (extracted.isEmpty())
-                    break;
-                if (extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS))
-                    break;
+        while (remaining > 0 && openTargetCount > 0) {
+            movedAny = false;
 
-                CompoundTag candidateComponents = (provider != null && hasNbtFilter)
-                        ? NbtFilterData.getSerializedComponents(extracted, provider)
-                        : null;
-
-                if (provider != null) {
-                    if (!FilterLogic.matchesItem(exportFilters, exportFilterMode, extracted, provider,
-                            candidateComponents))
-                        break;
+            for (int targetIndex = 0; targetIndex < targets.size() && remaining > 0; targetIndex++) {
+                if (!openTargets[targetIndex]) {
+                    continue;
                 }
 
-                int slotRemaining = Math.min(extracted.getCount(), remaining);
-                boolean movedFromSlot = false;
+                ItemTransferTarget target = targets.get(targetIndex);
+                boolean movedForTarget = false;
 
-                for (int targetIndex = 0; targetIndex < targets.size(); targetIndex++) {
-                    if (blockedTargets[targetIndex]) {
+                for (int slot = 0; slot < source.getSlots() && remaining > 0; slot++) {
+                    if (sourceAllowedSlots != null
+                            && (slot >= sourceAllowedSlots.length || !sourceAllowedSlots[slot])) {
                         continue;
                     }
-                    ItemTransferTarget target = targets.get(targetIndex);
-                    if (remaining <= 0 || slotRemaining <= 0)
-                        break;
+
+                    ItemStack extracted = source.extractItem(slot, remaining, true);
+                    if (extracted.isEmpty() || extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
+                        continue;
+                    }
+
+                    CompoundTag candidateComponents = (provider != null && hasNbtFilter)
+                            ? NbtFilterData.getSerializedComponents(extracted, provider)
+                            : null;
+
+                    if (provider != null) {
+                        if (!FilterLogic.matchesItem(exportFilters, exportFilterMode, extracted, provider,
+                                candidateComponents)) {
+                            continue;
+                        }
+                    }
 
                     if (provider != null && !FilterLogic.matchesItem(target.importFilters(), target.importFilterMode(),
                             extracted, provider, candidateComponents)) {
@@ -685,7 +688,8 @@ public class TransferEngine {
                     if (!anyAmountConstraints
                             || (!target.constraints().hasExportThreshold && !target.constraints().hasImportThreshold
                                     && !target.constraints().hasPerEntryAmounts)) {
-                        allowedByAmount = extracted.getCount();
+                        allowedByAmount = extracted.getCount(); // extracted.getCount() is bounded by 'remaining'
+                                                                // already
                     } else {
                         allowedByAmount = getAllowedTransferCached(extracted, target.constraints(),
                                 sourceItemCounts, targetItemCounts.get(targetIndex));
@@ -698,49 +702,59 @@ public class TransferEngine {
                             }
                         }
                     }
-                    if (allowedByAmount <= 0)
+                    if (allowedByAmount <= 0) {
                         continue;
+                    }
 
-                    int allowed = Math.min(slotRemaining, allowedByAmount);
-                    if (allowed <= 0)
+                    int allowed = Math.min(extracted.getCount(), allowedByAmount);
+                    if (allowed <= 0) {
                         continue;
+                    }
 
                     ItemStack toMove = source.extractItem(slot, allowed, false);
-                    if (toMove.isEmpty())
-                        break;
+                    if (toMove.isEmpty()) {
+                        continue;
+                    }
 
                     ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, false,
                             target.allowedSlots());
                     int moved = toMove.getCount() - uninserted.getCount();
+
                     if (!uninserted.isEmpty()) {
                         source.insertItem(slot, uninserted, false);
                     }
-                    if (moved <= 0) {
-                        blockedTargets[targetIndex] = true;
-                        openTargets--;
-                        continue;
-                    }
 
-                    movedFromSlot = true;
-                    remaining -= moved;
-                    slotRemaining -= moved;
+                    if (moved > 0) {
+                        movedAny = true;
+                        movedForTarget = true;
+                        remaining -= moved;
 
-                    // Update amount constraint caches incrementally
-                    if (anyAmountConstraints) {
-                        Item movedItem = extracted.getItem();
-                        if (sourceItemCounts != null) {
-                            sourceItemCounts.merge(movedItem, -moved, Integer::sum);
+                        if (anyAmountConstraints) {
+                            Item movedItem = extracted.getItem();
+                            if (sourceItemCounts != null) {
+                                sourceItemCounts.merge(movedItem, -moved, Integer::sum);
+                            }
+                            Map<Item, Integer> tgtCache = targetItemCounts.get(targetIndex);
+                            if (tgtCache != null) {
+                                tgtCache.merge(movedItem, moved, Integer::sum);
+                            }
                         }
-                        Map<Item, Integer> tgtCache = targetItemCounts.get(targetIndex);
-                        if (tgtCache != null) {
-                            tgtCache.merge(movedItem, moved, Integer::sum);
-                        }
+
+                        // We successfully transferred an item to this target.
+                        // Break out of the slot loop to allow the next target in the Round Robin queue
+                        // to get a turn.
+                        break;
                     }
                 }
 
-                if (!movedFromSlot || openTargets <= 0) {
-                    break;
+                if (!movedForTarget) {
+                    openTargets[targetIndex] = false;
+                    openTargetCount--;
                 }
+            }
+
+            if (!movedAny) {
+                break;
             }
         }
         return limit - remaining;
@@ -760,7 +774,6 @@ public class TransferEngine {
 
         ItemStack remaining = stack.copy();
 
-        // First pass: merge into matching non-empty stacks.
         for (int slot = 0; slot < handler.getSlots() && !remaining.isEmpty(); slot++) {
             if (slot >= allowedSlots.length || !allowedSlots[slot]) {
                 continue;
@@ -775,7 +788,6 @@ public class TransferEngine {
             remaining = handler.insertItem(slot, remaining, simulate);
         }
 
-        // Second pass: fill empty slots.
         for (int slot = 0; slot < handler.getSlots() && !remaining.isEmpty(); slot++) {
             if (slot >= allowedSlots.length || !allowedSlots[slot]) {
                 continue;
