@@ -21,6 +21,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import java.util.UUID;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 
 public class ServerPayloadHandler {
@@ -80,13 +81,27 @@ public class ServerPayloadHandler {
                 return;
 
             NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
-            if (node.getNetworkId() != null) {
-                registry.removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
-            }
 
+            // Resolve target first, before removing from old network
+            // (removing may delete the old network if it becomes empty)
             LogisticsNetwork targetNetwork = resolveNetwork(registry, payload, player);
             if (targetNetwork == null)
                 return;
+
+            UUID oldNetworkId = node.getNetworkId();
+            // Skip remove+add if already on the same network
+            if (oldNetworkId != null && oldNetworkId.equals(targetNetwork.getId())) {
+                // Just update the name in case it changed
+                node.setNetworkName(targetNetwork.getName());
+                if (player.containerMenu instanceof NodeMenu menu) {
+                    menu.sendNetworkListToClient(player);
+                }
+                return;
+            }
+
+            if (oldNetworkId != null) {
+                registry.removeNodeFromNetwork(oldNetworkId, node.getUUID());
+            }
 
             // Claim unowned networks on first selection
             if (targetNetwork.getOwnerUuid() == null) {
@@ -124,6 +139,48 @@ public class ServerPayloadHandler {
             String name = payload.newNetworkName().trim();
             return registry.createNetwork(name.isEmpty() ? "Unnamed" : name, player.getUUID());
         }
+    }
+
+    public static void handleRenameNetwork(RenameNetworkPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+
+            String newName = payload.newName().trim();
+            if (newName.isEmpty() || newName.length() > 32)
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null)
+                return;
+
+            // Ownership check: must own the network (or it's unowned) or be op
+            if (network.getOwnerUuid() != null
+                    && !network.getOwnerUuid().equals(player.getUUID())
+                    && !player.hasPermissions(2)) {
+                return;
+            }
+
+            network.setName(newName);
+            registry.setDirty();
+
+            // Update network name on all nodes in this network
+            for (java.util.UUID nodeId : network.getNodeUuids()) {
+                for (ServerLevel level : player.getServer().getAllLevels()) {
+                    Entity entity = level.getEntity(nodeId);
+                    if (entity instanceof LogisticsNodeEntity node) {
+                        node.setNetworkName(newName);
+                        break;
+                    }
+                }
+            }
+
+            // Resend the network list to the player
+            if (player.containerMenu instanceof NodeMenu menu) {
+                menu.sendNetworkListToClient(player);
+            }
+        });
     }
 
     public static void handleToggleVisibility(ToggleNodeVisibilityPayload payload, IPayloadContext context) {

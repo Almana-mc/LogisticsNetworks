@@ -37,6 +37,7 @@
   "gui.logisticsnetworks.select_network": "Select or Create Network",
   "gui.logisticsnetworks.create_network": "Create Network",
   "gui.logisticsnetworks.no_networks": "No networks yet",
+  "gui.logisticsnetworks.rename": "Rename",
   "gui.logisticsnetworks.no_node": "No node found on this block",
   "gui.logisticsnetworks.node_removed": "Node removed",
   "gui.logisticsnetworks.dimensional_upgrade_warning": "This network has nodes in different dimensions. A Dimensional Upgrade is required on both nodes for inter-dimensional transfers.",

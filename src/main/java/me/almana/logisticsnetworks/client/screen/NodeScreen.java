@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.AssignNetworkPayload;
+import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
@@ -79,6 +80,10 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private List<SyncNetworkListPayload.NetworkEntry> networkList = new ArrayList<>();
     private int networkScrollOffset = 0;
 
+    // Rename state
+    private UUID renamingNetworkId = null;
+    private EditBox renameEditBox = null;
+
     public NodeScreen(NodeMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
         this.imageWidth = GUI_WIDTH;
@@ -107,6 +112,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private void rebuildPageLayout() {
         stopNumericEdit(false);
+        stopRenameEdit(false);
         clearWidgets();
         if (currentPage == Page.NETWORK_SELECT) {
             int cx = leftPos + GUI_WIDTH / 2;
@@ -262,13 +268,32 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private void drawNetworkListEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, int x, int y, int w,
             int mx, int my) {
-        boolean hovered = mx >= x && mx <= x + w && my >= y && my <= y + 17;
-        g.fill(x, y, x + w, y + 17, hovered ? COLOR_BTN_HOVER : COLOR_PANEL);
-        g.renderOutline(x, y, w, 17, hovered ? COLOR_ACCENT : COLOR_BORDER);
-        g.drawString(font, entry.name(), x + 5, y + 4, hovered ? COLOR_WHITE : COLOR_GRAY, false);
+        boolean isRenaming = entry.id().equals(renamingNetworkId);
+        int renameBtnW = font.width(tr("gui.logisticsnetworks.rename")) + 14;
+        int renameBtnX = x + w - renameBtnW;
+
+        if (isRenaming && renameEditBox != null) {
+            g.fill(x, y, x + w, y + 17, COLOR_PANEL);
+            g.renderOutline(x, y, w, 17, COLOR_ACCENT);
+            return;
+        }
+
+        boolean hoveredRow = mx >= x && mx <= x + w && my >= y && my <= y + 17;
+        boolean hoveredRename = mx >= renameBtnX && mx <= renameBtnX + renameBtnW && my >= y && my <= y + 17;
+
+        g.fill(x, y, x + w, y + 17, hoveredRow ? COLOR_BTN_HOVER : COLOR_PANEL);
+        g.renderOutline(x, y, w, 17, hoveredRow ? COLOR_ACCENT : COLOR_BORDER);
+        g.drawString(font, entry.name(), x + 5, y + 4, hoveredRow ? COLOR_WHITE : COLOR_GRAY, false);
 
         String info = tr("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
-        g.drawString(font, info, x + w - font.width(info) - 5, y + 4, COLOR_DARK_GRAY, false);
+        int infoX = renameBtnX - font.width(info) - 4;
+        g.drawString(font, info, infoX, y + 4, COLOR_DARK_GRAY, false);
+
+        // Rename button
+        g.fill(renameBtnX, y, renameBtnX + renameBtnW, y + 17, hoveredRename ? COLOR_BTN_HOVER : COLOR_BTN_BG);
+        g.renderOutline(renameBtnX, y, renameBtnW, 17, hoveredRename ? COLOR_ACCENT : COLOR_BTN_BORDER);
+        g.drawCenteredString(font, tr("gui.logisticsnetworks.rename"), renameBtnX + renameBtnW / 2, y + 4,
+                hoveredRename ? COLOR_WHITE : COLOR_GRAY);
     }
 
     private void renderChannelConfigPage(GuiGraphics g, int mx, int my) {
@@ -298,11 +323,21 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private String getNetworkName(UUID netId) {
         if (netId == null)
             return tr("gui.logisticsnetworks.node.network.none");
-        return networkList.stream()
+        String listName = networkList.stream()
                 .filter(e -> e.id().equals(netId))
                 .map(SyncNetworkListPayload.NetworkEntry::name)
                 .findFirst()
-                .orElse(tr("gui.logisticsnetworks.node.network.fallback", netId.toString().substring(0, 8)));
+                .orElse(null);
+        if (listName != null)
+            return listName;
+        // Fallback to entity synced name
+        LogisticsNodeEntity node = getMenu().getNode();
+        if (node != null) {
+            String syncedName = node.getNetworkName();
+            if (syncedName != null && !syncedName.isBlank())
+                return syncedName;
+        }
+        return tr("gui.logisticsnetworks.node.network.fallback", netId.toString().substring(0, 8));
     }
 
     private String clipToWidth(String text, int maxWidth) {
@@ -464,6 +499,11 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     }
 
     private boolean handleNetworkPageClick(double mx, double my) {
+        // Cancel rename if clicking outside the rename edit box
+        if (renamingNetworkId != null && renameEditBox != null && !renameEditBox.isMouseOver(mx, my)) {
+            stopRenameEdit(false);
+        }
+
         if (isHoveringAbs(leftPos + GUI_WIDTH / 2 - 45, topPos + 54, 90, 16, mx, my)) {
             String name = networkNameField.getValue().trim();
             if (name.isEmpty())
@@ -473,15 +513,56 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
 
         int listY = topPos + 95;
+        int entryW = GUI_WIDTH - 28;
         int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, networkList.size());
         for (int i = networkScrollOffset; i < endIdx; i++) {
+            SyncNetworkListPayload.NetworkEntry entry = networkList.get(i);
             int y = listY + (i - networkScrollOffset) * 20;
-            if (isHoveringAbs(leftPos + 14, y, GUI_WIDTH - 28, 17, mx, my)) {
-                sendNetworkAssign(Optional.of(networkList.get(i).id()), "");
+            int renameBtnW = font.width(tr("gui.logisticsnetworks.rename")) + 14;
+            int renameBtnX = leftPos + 14 + entryW - renameBtnW;
+
+            // Check rename button click
+            if (isHoveringAbs(renameBtnX, y, renameBtnW, 17, mx, my)) {
+                startRenameEdit(entry, leftPos + 14 + 3, y + 1, entryW - 6);
+                return true;
+            }
+
+            // Check row click (select network) - only if not in the rename button area
+            if (isHoveringAbs(leftPos + 14, y, entryW, 17, mx, my)) {
+                sendNetworkAssign(Optional.of(entry.id()), "");
                 return true;
             }
         }
         return false;
+    }
+
+    private void startRenameEdit(SyncNetworkListPayload.NetworkEntry entry, int x, int y, int w) {
+        stopRenameEdit(false);
+        renamingNetworkId = entry.id();
+        renameEditBox = new EditBox(font, x, y, w, 15, Component.empty());
+        renameEditBox.setMaxLength(32);
+        renameEditBox.setValue(entry.name());
+        renameEditBox.setBordered(false);
+        renameEditBox.setTextColor(COLOR_WHITE);
+        renameEditBox.setFocused(true);
+        addRenderableWidget(renameEditBox);
+        setFocused(renameEditBox);
+    }
+
+    private void stopRenameEdit(boolean commit) {
+        if (renamingNetworkId == null || renameEditBox == null)
+            return;
+
+        if (commit) {
+            String newName = renameEditBox.getValue().trim();
+            if (!newName.isEmpty()) {
+                PacketDistributor.sendToServer(new RenameNetworkPayload(renamingNetworkId, newName));
+            }
+        }
+
+        removeWidget(renameEditBox);
+        renameEditBox = null;
+        renamingNetworkId = null;
     }
 
     private boolean handleChannelPageClick(double mx, double my, int btn) {
@@ -716,6 +797,15 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
     }
 
+    @Override
+    protected boolean isHovering(int x, int y, int w, int h, double mx, double my) {
+        if (currentPage == Page.NETWORK_SELECT) {
+            // Only allow hover on player inventory slots (below the GUI area)
+            if (y < INV_Y) return false;
+        }
+        return super.isHovering(x, y, w, h, mx, my);
+    }
+
     private boolean isHoveringAbs(int x, int y, int w, int h, double mx, double my) {
         return mx >= x && mx <= x + w && my >= y && my <= y + h;
     }
@@ -732,9 +822,21 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (key == 256) {
+            if (renamingNetworkId != null) {
+                stopRenameEdit(false);
+                return true;
+            }
             return super.keyPressed(key, scan, modifiers);
         }
 
+        if (renamingNetworkId != null && renameEditBox != null) {
+            if (key == 257 || key == 335) {
+                stopRenameEdit(true);
+            } else {
+                renameEditBox.keyPressed(key, scan, modifiers);
+            }
+            return true;
+        }
         if (editingRow != -1) {
             if (key == 257 || key == 335)
                 stopNumericEdit(true);
@@ -754,6 +856,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     @Override
     public boolean charTyped(char ch, int modifiers) {
+        if (renamingNetworkId != null && renameEditBox != null) {
+            return renameEditBox.charTyped(ch, modifiers);
+        }
         if (editingRow != -1 && numericEditBox != null) {
             if (Character.isDigit(ch) || ch == '-')
                 return numericEditBox.charTyped(ch, modifiers);
