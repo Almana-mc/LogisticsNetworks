@@ -23,6 +23,11 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 
+import me.almana.logisticsnetworks.Config;
+import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.registration.Registration;
+import net.minecraft.server.level.ServerLevel;
+
 public class LogisticsNodeEntity extends Entity {
 
     public static final int UPGRADE_SLOT_COUNT = 4;
@@ -174,6 +179,22 @@ public class LogisticsNodeEntity extends Entity {
             Vec3 target = Vec3.atCenterOf(attached);
             if (distanceToSqr(target) > 0.001) {
                 setPos(target);
+            }
+
+            if (!this.level().isClientSide() && this.tickCount % 20 == 0) {
+                if (this.level().isEmptyBlock(attached)) {
+                    if (this.getNetworkId() != null && this.level() instanceof ServerLevel serverLevel) {
+                        NetworkRegistry.get(serverLevel)
+                                .removeNodeFromNetwork(this.getNetworkId(), this.getUUID());
+                    }
+                    if (Config.dropNodeItem) {
+                        this.spawnAtLocation(
+                                Registration.LOGISTICS_NODE_ITEM.get());
+                    }
+                    this.dropFilters();
+                    this.dropUpgrades();
+                    this.discard();
+                }
             }
         }
     }
