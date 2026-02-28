@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.Direction;
@@ -480,6 +481,14 @@ public class ServerPayloadHandler {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && menu.isNameMode()) {
                 menu.setNameExpression((Player) context.player(), payload.name());
+            }
+        });
+    }
+
+    public static void handleApplyPattern(ApplyPatternPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof PatternSetterMenu menu) {
+                menu.applyPattern(payload.useOutputs(), payload.multiplier(), context.player().level().registryAccess());
             }
         });
     }

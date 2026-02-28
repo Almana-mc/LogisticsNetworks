@@ -234,5 +234,12 @@
   "gui.logisticsnetworks.node.value.batch.source": "%s Source",
   "tooltip.logisticsnetworks.upgrade.source": "Source/batch: %s",
   "jade.logisticsnetworks.node_attached": "Logistics Node Attached",
-  "config.jade.plugin_logisticsnetworks.node_attached": "Node Attached Hint"
+  "config.jade.plugin_logisticsnetworks.node_attached": "Node Attached Hint",
+  "item.logisticsnetworks.pattern_setter": "Pattern Setter",
+  "gui.logisticsnetworks.pattern_setter.title": "Pattern Setter",
+  "gui.logisticsnetworks.pattern_setter.input": "Input",
+  "gui.logisticsnetworks.pattern_setter.output": "Output",
+  "gui.logisticsnetworks.pattern_setter.pattern_label": "Pattern:",
+  "gui.logisticsnetworks.pattern_setter.filter_label": "Filter:",
+  "gui.logisticsnetworks.pattern_setter.applied": "Applied!"
 }

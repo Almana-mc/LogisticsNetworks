@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.item.DurabilityFilterItem;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
 import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
+import me.almana.logisticsnetworks.item.PatternSetterItem;
 import me.almana.logisticsnetworks.item.ModFilterItem;
 import me.almana.logisticsnetworks.item.NameFilterItem;
 import me.almana.logisticsnetworks.item.NbtFilterItem;
@@ -21,6 +22,7 @@ import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
@@ -115,6 +117,11 @@ public class Registration {
                                         "ars_source_upgrade",
                                         () -> new ArsSourceUpgradeItem(new Item.Properties()));
 
+        public static final DeferredHolder<Item, PatternSetterItem> PATTERN_SETTER = ITEMS
+                        .register(
+                                        "pattern_setter",
+                                        () -> new PatternSetterItem(new Item.Properties()));
+
         public static final DeferredHolder<MenuType<?>, MenuType<NodeMenu>> NODE_MENU = MENUS.register("node_menu",
                         () -> IMenuTypeExtension.create(NodeMenu::new));
         public static final DeferredHolder<MenuType<?>, MenuType<FilterMenu>> FILTER_MENU = MENUS.register(
@@ -127,6 +134,10 @@ public class Registration {
                         .register(
                                         "mass_placement_menu",
                                         () -> IMenuTypeExtension.create(MassPlacementMenu::new));
+        public static final DeferredHolder<MenuType<?>, MenuType<PatternSetterMenu>> PATTERN_SETTER_MENU = MENUS
+                        .register(
+                                        "pattern_setter_menu",
+                                        () -> IMenuTypeExtension.create(PatternSetterMenu::new));
 
         public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",

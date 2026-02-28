@@ -23,12 +23,14 @@ val parchment_minecraft_version: String by project
 val parchment_mappings_version: String by project
 val mekanism_version: String by project
 val ars_nouveau_version: String by project
+val ae2_version: String by project
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
 
 repositories {
     mavenLocal()
+    mavenCentral()
     maven("https://maven.blamejared.com")
     maven("https://modmaven.dev/")
     maven("https://api.modrinth.com/maven")
@@ -96,6 +98,8 @@ dependencies {
     compileOnly("mekanism:Mekanism:${mekanism_version}")
 
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
+
+    compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
 
     compileOnly("maven.modrinth:jade:${jade_version}")
     runtimeOnly("maven.modrinth:jade:${jade_version}")

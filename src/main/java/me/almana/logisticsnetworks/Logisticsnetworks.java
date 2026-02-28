@@ -22,6 +22,7 @@ import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterPayload;
 import me.almana.logisticsnetworks.network.SetNodeUpgradeItemPayload;
+import me.almana.logisticsnetworks.network.ApplyPatternPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.SetNameFilterPayload;
 import me.almana.logisticsnetworks.network.SetSlotFilterSlotsPayload;
@@ -110,6 +111,8 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleCopyPasteConnected);
                 registrar.playToServer(RenameNetworkPayload.TYPE, RenameNetworkPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleRenameNetwork);
+                registrar.playToServer(ApplyPatternPayload.TYPE, ApplyPatternPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleApplyPattern);
 
                 // Server -> Client
                 registrar.playToClient(SyncNetworkListPayload.TYPE, SyncNetworkListPayload.STREAM_CODEC,
