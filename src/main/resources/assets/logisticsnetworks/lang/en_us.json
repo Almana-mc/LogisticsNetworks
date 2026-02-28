@@ -42,6 +42,7 @@
   "gui.logisticsnetworks.node_removed": "Node removed",
   "gui.logisticsnetworks.dimensional_upgrade_warning": "This network has nodes in different dimensions. A Dimensional Upgrade is required on both nodes for inter-dimensional transfers.",
   "gui.logisticsnetworks.blacklisted_resource_warning": "Warning: The attached block contains blacklisted resources that will not be transferred.",
+  "gui.logisticsnetworks.filter_warning": "Warning: Filter configuration issues detected:",
   "gui.logisticsnetworks.node.network_name_hint": "Enter network name...",
   "gui.logisticsnetworks.node.inventory": "Inventory",
   "gui.logisticsnetworks.node.existing_networks": "Existing Networks",

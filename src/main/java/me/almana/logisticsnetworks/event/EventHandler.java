@@ -2,9 +2,11 @@ package me.almana.logisticsnetworks.event;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -138,6 +140,24 @@ public class EventHandler {
         }
     }
 
+    private static List<String> getFilterWarnings(LogisticsNodeEntity node) {
+        List<String> warnings = new ArrayList<>();
+        ChannelData[] channels = node.getChannels();
+        for (int ch = 0; ch < channels.length; ch++) {
+            ChannelData channel = channels[ch];
+            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
+                ItemStack filterStack = channel.getFilterItem(slot);
+                if (filterStack.isEmpty())
+                    continue;
+                List<String> itemWarnings = FilterItemData.getWarnings(filterStack);
+                for (String w : itemWarnings) {
+                    warnings.add("Channel " + (ch + 1) + ", Filter " + (slot + 1) + ": " + w);
+                }
+            }
+        }
+        return warnings;
+    }
+
     private static List<String> getBlacklistedResourceIds(ServerLevel level, BlockPos pos) {
         List<String> ids = new ArrayList<>();
 
@@ -193,6 +213,17 @@ public class EventHandler {
                     msg.append(Component.literal(" [" + String.join(", ", blacklisted) + "]")
                             .withStyle(ChatFormatting.YELLOW));
                     player.sendSystemMessage(msg);
+                }
+
+                // Check filter items for invalid NBT or empty tags
+                List<String> filterWarnings = getFilterWarnings(node);
+                if (!filterWarnings.isEmpty()) {
+                    player.sendSystemMessage(Component.translatable("gui.logisticsnetworks.filter_warning")
+                            .withStyle(ChatFormatting.RED));
+                    for (String warning : filterWarnings) {
+                        player.sendSystemMessage(Component.literal("  " + warning)
+                                .withStyle(ChatFormatting.YELLOW));
+                    }
                 }
             }
         }

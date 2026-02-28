@@ -382,10 +382,10 @@ public final class FilterItemData {
             ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
             removeFromList(list, slot);
 
-            if (tag != null && !tag.isEmpty()) {
+            if (tag != null && !tag.isBlank()) {
                 CompoundTag entry = new CompoundTag();
                 entry.putInt(KEY_SLOT, slot);
-                entry.putString(KEY_TAG, tag);
+                entry.putString(KEY_TAG, tag.trim());
                 if (existingAmount > 0) {
                     entry.putInt(KEY_AMOUNT, existingAmount);
                 }
@@ -884,6 +884,30 @@ public final class FilterItemData {
             }
         }
         return 0;
+    }
+
+    /**
+     * Returns a list of warning messages for misconfigured filter entries.
+     * Checks for: invalid/unparseable NBT raw SNBT, and empty tag references.
+     */
+    public static java.util.List<String> getWarnings(ItemStack stack) {
+        java.util.List<String> warnings = new java.util.ArrayList<>();
+        if (!isFilterItem(stack))
+            return warnings;
+
+        int cap = getCapacity(stack);
+        for (int i = 0; i < cap; i++) {
+            // Check for invalid raw SNBT
+            String raw = getEntryNbtRaw(stack, i);
+            if (raw != null) {
+                try {
+                    net.minecraft.nbt.TagParser.parseTag(raw);
+                } catch (Exception e) {
+                    warnings.add("Slot " + (i + 1) + ": invalid NBT (" + e.getMessage() + ")");
+                }
+            }
+        }
+        return warnings;
     }
 
     private static void removeFromList(ListTag list, int slot) {
