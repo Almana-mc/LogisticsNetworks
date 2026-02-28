@@ -3,7 +3,10 @@ package me.almana.logisticsnetworks.client.screen;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.RedstoneMode;
+
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -802,7 +805,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     protected boolean isHovering(int x, int y, int w, int h, double mx, double my) {
         if (currentPage == Page.NETWORK_SELECT) {
             // Only allow hover on player inventory slots (below the GUI area)
-            if (y < INV_Y) return false;
+            if (y < INV_Y)
+                return false;
         }
         return super.isHovering(x, y, w, h, mx, my);
     }
@@ -909,11 +913,11 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         return tr("gui.logisticsnetworks.channel_type." + type.name().toLowerCase(Locale.ROOT));
     }
 
-    private String getRedstoneModeLabel(me.almana.logisticsnetworks.data.RedstoneMode mode) {
+    private String getRedstoneModeLabel(RedstoneMode mode) {
         return tr("gui.logisticsnetworks.redstone_mode." + mode.name().toLowerCase(Locale.ROOT));
     }
 
-    private String getDistributionModeLabel(me.almana.logisticsnetworks.data.DistributionMode mode) {
+    private String getDistributionModeLabel(DistributionMode mode) {
         return tr("gui.logisticsnetworks.distribution_mode." + mode.name().toLowerCase(Locale.ROOT));
     }
 

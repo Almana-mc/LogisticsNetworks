@@ -12,6 +12,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.function.Consumer;
+import net.minecraft.nbt.TagParser;
 import org.jetbrains.annotations.Nullable;
 
 public final class FilterItemData {
@@ -750,7 +754,7 @@ public final class FilterItemData {
         String raw = getEntryNbtRaw(filter, slot);
         if (raw != null) {
             try {
-                CompoundTag expected = net.minecraft.nbt.TagParser.parseTag(raw);
+                CompoundTag expected = TagParser.parseTag(raw);
                 return compoundContains(components, expected);
             } catch (Exception e) {
                 return false;
@@ -890,8 +894,8 @@ public final class FilterItemData {
      * Returns a list of warning messages for misconfigured filter entries.
      * Checks for: invalid/unparseable NBT raw SNBT, and empty tag references.
      */
-    public static java.util.List<String> getWarnings(ItemStack stack) {
-        java.util.List<String> warnings = new java.util.ArrayList<>();
+    public static List<String> getWarnings(ItemStack stack) {
+        List<String> warnings = new ArrayList<>();
         if (!isFilterItem(stack))
             return warnings;
 
@@ -901,7 +905,7 @@ public final class FilterItemData {
             String raw = getEntryNbtRaw(stack, i);
             if (raw != null) {
                 try {
-                    net.minecraft.nbt.TagParser.parseTag(raw);
+                    TagParser.parseTag(raw);
                 } catch (Exception e) {
                     warnings.add("Slot " + (i + 1) + ": invalid NBT (" + e.getMessage() + ")");
                 }
@@ -919,7 +923,7 @@ public final class FilterItemData {
         return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
     }
 
-    private static void updateRoot(ItemStack stack, java.util.function.Consumer<CompoundTag> modifier) {
+    private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
             CompoundTag root = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
                     ? customTag.getCompound(KEY_ROOT)

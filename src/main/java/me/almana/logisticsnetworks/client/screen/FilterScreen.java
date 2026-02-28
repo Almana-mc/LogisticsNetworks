@@ -33,6 +33,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
@@ -377,7 +378,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 String tag = menu.getEntryTag(i);
                 if (tag != null) {
                     // cycle items from tag
-                    TagKey<net.minecraft.world.item.Item> tagKey = TagKey.create(
+                    TagKey<Item> tagKey = TagKey.create(
                             Registries.ITEM, ResourceLocation.parse(tag));
                     var holders = BuiltInRegistries.ITEM.getTag(tagKey);
                     if (holders.isPresent()) {

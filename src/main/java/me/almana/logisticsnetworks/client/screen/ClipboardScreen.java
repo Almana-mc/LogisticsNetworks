@@ -1,6 +1,11 @@
 package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
+import me.almana.logisticsnetworks.data.ChannelMode;
+import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.DistributionMode;
+import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.RedstoneMode;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
@@ -283,19 +288,19 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
         return Component.translatable(key, args).getString();
     }
 
-    private String getChannelModeLabel(me.almana.logisticsnetworks.data.ChannelMode mode) {
+    private String getChannelModeLabel(ChannelMode mode) {
         return tr("gui.logisticsnetworks.channel_mode." + mode.name().toLowerCase(Locale.ROOT));
     }
 
-    private String getChannelTypeLabel(me.almana.logisticsnetworks.data.ChannelType type) {
+    private String getChannelTypeLabel(ChannelType type) {
         return tr("gui.logisticsnetworks.channel_type." + type.name().toLowerCase(Locale.ROOT));
     }
 
-    private String getRedstoneModeLabel(me.almana.logisticsnetworks.data.RedstoneMode mode) {
+    private String getRedstoneModeLabel(RedstoneMode mode) {
         return tr("gui.logisticsnetworks.redstone_mode." + mode.name().toLowerCase(Locale.ROOT));
     }
 
-    private String getDistributionModeLabel(me.almana.logisticsnetworks.data.DistributionMode mode) {
+    private String getDistributionModeLabel(DistributionMode mode) {
         return tr("gui.logisticsnetworks.distribution_mode." + mode.name().toLowerCase(Locale.ROOT));
     }
 
@@ -303,8 +308,8 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
         return tr("gui.logisticsnetworks.direction." + directionName.toLowerCase(Locale.ROOT));
     }
 
-    private String getFilterModeLabel(me.almana.logisticsnetworks.data.FilterMode mode) {
-        return tr(mode == me.almana.logisticsnetworks.data.FilterMode.MATCH_ALL
+    private String getFilterModeLabel(FilterMode mode) {
+        return tr(mode == FilterMode.MATCH_ALL
                 ? "gui.logisticsnetworks.filter_mode.match_all"
                 : "gui.logisticsnetworks.filter_mode.match_any");
     }

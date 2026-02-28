@@ -10,6 +10,7 @@ import net.minecraft.world.item.component.CustomData;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
+import java.util.function.Consumer;
 
 public final class SlotFilterData {
 
@@ -217,7 +218,7 @@ public final class SlotFilterData {
         return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
     }
 
-    private static void updateRoot(ItemStack stack, java.util.function.Consumer<CompoundTag> modifier) {
+    private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
             CompoundTag root = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
                     ? customTag.getCompound(KEY_ROOT)

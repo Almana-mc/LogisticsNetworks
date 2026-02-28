@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import mekanism.api.chemical.ChemicalStack;
 import mezz.jei.api.ingredients.IIngredientType;
 
@@ -144,9 +145,9 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
         if (!screen.acceptsItemSelectorGhostIngredient() || chemStack == null || chemStack.isEmpty()) {
             return List.of();
         }
-        String id = me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper.getChemicalId(chemStack);
+        String id = ChemicalTransferHelper.getChemicalId(chemStack);
         List<String> tags = chemStack.getTags().map(t -> t.location().toString()).toList();
-        net.minecraft.network.chat.Component name = me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper
+        net.minecraft.network.chat.Component name = ChemicalTransferHelper
                 .getChemicalTextComponent(id);
         return List.of(new FilterTarget<>(screen.getSelectorGhostArea(),
                 ignored -> screen.setSelectorGhostChemical(id, tags, name)));

@@ -14,6 +14,7 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
 import org.slf4j.Logger;
 
 import java.util.*;
+import org.jetbrains.annotations.Nullable;
 
 public class NetworkRegistry extends SavedData {
 
@@ -70,8 +71,8 @@ public class NetworkRegistry extends SavedData {
         return createNetwork(null, null);
     }
 
-    public LogisticsNetwork createNetwork(@org.jetbrains.annotations.Nullable String name,
-            @org.jetbrains.annotations.Nullable UUID ownerUuid) {
+    public LogisticsNetwork createNetwork(@Nullable String name,
+            @Nullable UUID ownerUuid) {
         UUID id = UUID.randomUUID();
         LogisticsNetwork network = new LogisticsNetwork(id);
         if (name != null && !name.isBlank()) {

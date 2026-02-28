@@ -12,9 +12,10 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 public final class NbtFilterData {
 
@@ -375,7 +376,7 @@ public final class NbtFilterData {
         return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
     }
 
-    private static void updateRoot(ItemStack stack, java.util.function.Consumer<CompoundTag> modifier) {
+    private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
             CompoundTag root = customTag.getCompound(KEY_ROOT);
             CompoundTag workingRoot = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)

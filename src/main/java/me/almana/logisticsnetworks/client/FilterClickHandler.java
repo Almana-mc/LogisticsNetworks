@@ -11,6 +11,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraft.world.entity.player.Inventory;
 
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
 public class FilterClickHandler {
@@ -44,6 +45,6 @@ public class FilterClickHandler {
     }
 
     private static boolean isPlayerInventorySlot(AbstractContainerScreen<?> screen, Slot slot) {
-        return slot.container instanceof net.minecraft.world.entity.player.Inventory;
+        return slot.container instanceof Inventory;
     }
 }
