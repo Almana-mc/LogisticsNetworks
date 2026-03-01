@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.data.*;
+import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.item.*;
@@ -130,9 +131,10 @@ public class ServerPayloadHandler {
             LogisticsNetwork network = registry.getNetwork(payload.networkId().get());
             if (network == null)
                 return null;
-            // Verify the player owns this network (or it's unowned, or player is op)
+            // Verify the player owns this network (or it's unowned, teammate, or op)
             if (network.getOwnerUuid() != null
                     && !network.getOwnerUuid().equals(player.getUUID())
+                    && !(FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
                     && !player.hasPermissions(2)) {
                 return null;
             }
@@ -157,9 +159,10 @@ public class ServerPayloadHandler {
             if (network == null)
                 return;
 
-            // Ownership check: must own the network (or it's unowned) or be op
+            // Ownership check: must own the network (or it's unowned, teammate, or op)
             if (network.getOwnerUuid() != null
                     && !network.getOwnerUuid().equals(player.getUUID())
+                    && !(FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
                     && !player.hasPermissions(2)) {
                 return;
             }

@@ -24,6 +24,7 @@ val parchment_mappings_version: String by project
 val mekanism_version: String by project
 val ars_nouveau_version: String by project
 val ae2_version: String by project
+val ftb_teams_version: String by project
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -34,6 +35,7 @@ repositories {
     maven("https://maven.blamejared.com")
     maven("https://modmaven.dev/")
     maven("https://api.modrinth.com/maven")
+    maven("https://maven.ftb.dev/releases")
 }
 
 base {
@@ -100,6 +102,10 @@ dependencies {
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
 
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+
+    compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftb_teams_version}") {
+        isTransitive = false
+    }
 
     compileOnly("maven.modrinth:jade:${jade_version}")
     runtimeOnly("maven.modrinth:jade:${jade_version}")

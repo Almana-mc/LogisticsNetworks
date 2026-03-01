@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -85,9 +86,13 @@ public class NetworkRegistry extends SavedData {
     }
 
     public List<LogisticsNetwork> getNetworksForPlayer(UUID playerUuid) {
+        Set<UUID> teammateIds = FTBTeamsCompat.isLoaded()
+                ? FTBTeamsCompat.getTeammateIds(playerUuid)
+                : Collections.emptySet();
         List<LogisticsNetwork> result = new ArrayList<>();
         for (LogisticsNetwork network : networks.values()) {
-            if (network.getOwnerUuid() == null || network.getOwnerUuid().equals(playerUuid)) {
+            UUID owner = network.getOwnerUuid();
+            if (owner == null || owner.equals(playerUuid) || teammateIds.contains(owner)) {
                 result.add(network);
             }
         }

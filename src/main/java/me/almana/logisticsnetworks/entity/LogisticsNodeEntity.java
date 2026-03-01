@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.entity;
 
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -311,6 +312,7 @@ public class LogisticsNodeEntity extends Entity {
         UUID owner = getOwnerUUID();
         if (owner == null) return true;
         if (owner.equals(player.getUUID())) return true;
+        if (FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(owner, player.getUUID())) return true;
         if (player instanceof ServerPlayer sp && sp.hasPermissions(2)) return true;
         return false;
     }
