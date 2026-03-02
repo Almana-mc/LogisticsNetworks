@@ -153,3 +153,13 @@ idea {
         isDownloadJavadoc = true
     }
 }
+
+tasks.register<Copy>("copyJar") {
+    from(tasks.named("jar"))
+    into("C:/Users/Kanishq/curseforge/minecraft/Instances/Test/mods")
+}
+
+tasks.named("build") {
+    finalizedBy("copyJar")
+}
+
