@@ -1,6 +1,8 @@
 {
   "itemGroup.logisticsnetworks": "Logistics Networks",
   "block.logisticsnetworks.computer": "Computer",
+  "container.logisticsnetworks.computer": "Network Manager",
+  "gui.logisticsnetworks.computer.no_networks": "No networks available",
   "item.logisticsnetworks.logistics_node": "Logistics Node",
   "item.logisticsnetworks.wrench": "Wrench",
   "item.logisticsnetworks.small_filter": "Small Filter",

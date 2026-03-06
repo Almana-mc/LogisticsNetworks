@@ -20,6 +20,7 @@ import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
+import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -148,6 +149,9 @@ public class Registration {
                         .register(
                                         "pattern_setter_menu",
                                         () -> IMenuTypeExtension.create(PatternSetterMenu::new));
+        public static final DeferredHolder<MenuType<?>, MenuType<ComputerMenu>> COMPUTER_MENU = MENUS.register(
+                        "computer_menu",
+                        () -> IMenuTypeExtension.create(ComputerMenu::new));
 
         public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
