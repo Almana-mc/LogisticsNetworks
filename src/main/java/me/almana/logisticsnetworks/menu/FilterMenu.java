@@ -417,6 +417,12 @@ public class FilterMenu extends AbstractContainerMenu {
         return slot >= 0 && slot < slotCount && isTagSlot[slot];
     }
 
+    private boolean isSlotOccupied(int slot) {
+        return isFluidSlot[slot] || isChemicalSlot[slot] || isTagSlot[slot]
+                || !filterInventory.getItem(slot).isEmpty()
+                || FilterItemData.isNbtOnlySlot(getOpenedStack(), slot);
+    }
+
     public void setEntryTag(Player player, int slot, String tag) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
@@ -925,9 +931,10 @@ public class FilterMenu extends AbstractContainerMenu {
                 FluidStack fluid = getFluidFromItem(held);
                 if (!fluid.isEmpty()) {
                     for (int i = 0; i < slotCount; i++) {
+                        if (isSlotOccupied(i))
+                            continue;
                         FluidStack existing = FilterItemData.getFluidEntry(getOpenedStack(), i);
-                        if (existing.isEmpty() && !isFluidSlot[i] && !isChemicalSlot[i]
-                                && filterInventory.getItem(i).isEmpty()) {
+                        if (existing.isEmpty()) {
                             if (setFluidFilterEntry(player, i, fluid))
                                 break;
                         }
@@ -940,9 +947,10 @@ public class FilterMenu extends AbstractContainerMenu {
                 String chemId = MekanismCompat.getChemicalIdFromItem(held);
                 if (chemId != null) {
                     for (int i = 0; i < slotCount; i++) {
+                        if (isSlotOccupied(i))
+                            continue;
                         String existing = FilterItemData.getChemicalEntry(getOpenedStack(), i);
-                        if (existing == null && !isFluidSlot[i] && !isChemicalSlot[i]
-                                && filterInventory.getItem(i).isEmpty()) {
+                        if (existing == null) {
                             if (setChemicalFilterEntry(player, i, chemId))
                                 break;
                         }
@@ -953,10 +961,10 @@ public class FilterMenu extends AbstractContainerMenu {
 
             if (!held.is(ModTags.FILTERS)) {
                 for (int i = 0; i < slotCount; i++) {
-                    if (!isFluidSlot[i] && !isChemicalSlot[i] && filterInventory.getItem(i).isEmpty()) {
-                        if (setItemFilterEntry(player, i, held))
-                            break;
-                    }
+                    if (isSlotOccupied(i))
+                        continue;
+                    if (setItemFilterEntry(player, i, held))
+                        break;
                 }
             }
         }

@@ -51,6 +51,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     // Control Constants
     private static final int LIST_ROW_H = 12;
     private static final int DROPDOWN_ROWS = 6;
+    private static final int SUBMODE_SCROLLBAR_W = 6;
+    private static final int SUBMODE_SCROLLBAR_GAP = 2;
 
     // Colors
     private static final int COL_BG = 0xFF1A1A1A;
@@ -89,6 +91,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private List<String> cachedTags = new ArrayList<>();
     private List<String> cachedMods = new ArrayList<>();
     private List<NbtFilterData.NbtEntry> cachedNbtEntries = new ArrayList<>();
+    private ItemStack lastExtractorItem = ItemStack.EMPTY;
+    private FilterTargetType lastTargetType = null;
 
     // Animation
     private int textTick = 0;
@@ -213,25 +217,38 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         boolean isChemical = menu.getTargetType() == FilterTargetType.CHEMICALS;
 
         if (menu.isTagMode()) {
-            cachedTags.clear();
-            if (!extractor.isEmpty()) {
-                if (isFluid) {
-                    FluidStack fs = FluidUtil.getFluidContained(extractor).orElse(FluidStack.EMPTY);
-                    if (!fs.isEmpty()) {
-                        fs.getTags().forEach(t -> cachedTags.add(t.location().toString()));
+            FilterTargetType currentTarget = menu.getTargetType();
+            if (!ItemStack.isSameItemSameComponents(extractor, lastExtractorItem)
+                    || currentTarget != lastTargetType) {
+                lastExtractorItem = extractor.copy();
+                lastTargetType = currentTarget;
+                cachedTags.clear();
+                if (!extractor.isEmpty()) {
+                    if (isFluid) {
+                        FluidStack fs = FluidUtil.getFluidContained(extractor).orElse(FluidStack.EMPTY);
+                        if (!fs.isEmpty()) {
+                            fs.getTags().forEach(t -> cachedTags.add(t.location().toString()));
+                        }
+                    } else if (isChemical && MekanismCompat.isLoaded()) {
+                        List<String> chemTags = MekanismCompat.getChemicalTagsFromItem(extractor);
+                        if (chemTags != null) {
+                            cachedTags.addAll(chemTags);
+                        }
+                    } else {
+                        var item = extractor.getItem();
+                        BuiltInRegistries.ITEM.getTagNames().forEach(tagKey -> {
+                            var holders = BuiltInRegistries.ITEM.getTag(tagKey);
+                            if (holders.isPresent()
+                                    && holders.get().stream().anyMatch(h -> h.value() == item)) {
+                                cachedTags.add(tagKey.location().toString());
+                            }
+                        });
                     }
-                } else if (isChemical && MekanismCompat.isLoaded()) {
-                    List<String> chemTags = MekanismCompat.getChemicalTagsFromItem(extractor);
-                    if (chemTags != null) {
-                        cachedTags.addAll(chemTags);
-                    }
-                } else {
-                    extractor.getTags().forEach(t -> cachedTags.add(t.location().toString()));
+                } else if (selectorGhostChemicalTags != null) {
+                    cachedTags.addAll(selectorGhostChemicalTags);
                 }
-            } else if (selectorGhostChemicalTags != null) {
-                cachedTags.addAll(selectorGhostChemicalTags);
+                Collections.sort(cachedTags);
             }
-            Collections.sort(cachedTags);
         } else if (menu.isModMode()) {
             cachedMods.clear();
             if (!extractor.isEmpty()) {
@@ -528,6 +545,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int my) {
         int visibleRows = Math.min(items.size(), DROPDOWN_ROWS);
         int listH = visibleRows * LIST_ROW_H;
+
+        // Clamp scroll offset
+        int maxScroll = Math.max(0, items.size() - DROPDOWN_ROWS);
+        listScrollOffset = Math.max(0, Math.min(listScrollOffset, maxScroll));
 
         // Background
         g.pose().pushPose();
@@ -1888,6 +1909,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             this.cachedTags.clear();
             this.cachedMods.clear();
             this.cachedNbtEntries.clear();
+            this.lastExtractorItem = ItemStack.EMPTY;
+            this.lastTargetType = null;
         }
     }
 
@@ -1948,7 +1971,14 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         ItemStack slotItem = getSlotItemForSubMode(slot);
         if (!slotItem.isEmpty()) {
-            slotItem.getTags().forEach(t -> cachedSlotTags.add(t.location().toString()));
+            var item = slotItem.getItem();
+            BuiltInRegistries.ITEM.getTagNames().forEach(tagKey -> {
+                var holders = BuiltInRegistries.ITEM.getTag(tagKey);
+                if (holders.isPresent()
+                        && holders.get().stream().anyMatch(h -> h.value() == item)) {
+                    cachedSlotTags.add(tagKey.location().toString());
+                }
+            });
         }
         Collections.sort(cachedSlotTags);
 
@@ -2008,11 +2038,28 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return ItemStack.EMPTY;
     }
 
+    private int getTagSubModeVisibleRows() {
+        int panelY = topPos + 20;
+        int panelH = menu.getPlayerInventoryY() - 24;
+        int listY = panelY + 48;
+        int listBottom = panelY + panelH - 4;
+        return Math.max(1, (listBottom - listY) / LIST_ROW_H);
+    }
+
+    private int getTagSubModeMaxScroll() {
+        return Math.max(0, cachedSlotTags.size() - getTagSubModeVisibleRows());
+    }
+
+    private void clampTagSubModeScrollOffset() {
+        subModeScrollOffset = Math.max(0, Math.min(subModeScrollOffset, getTagSubModeMaxScroll()));
+    }
+
     private void renderTagSubMode(GuiGraphics g, int mx, int my) {
         int panelX = leftPos + 4;
         int panelY = topPos + 20;
         int panelW = imageWidth - 8;
         int panelH = menu.getPlayerInventoryY() - 24;
+        clampTagSubModeScrollOffset();
 
         g.pose().pushPose();
         g.pose().translate(0, 0, 400);
@@ -2050,30 +2097,58 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         drawButton(g, doneX, inputY, doneW, 14, "Done", mx, my, true);
 
         int listY = inputY + 18;
-        int maxVisibleRows = 3;
+        int maxVisibleRows = getTagSubModeVisibleRows();
         int visibleRows = Math.min(maxVisibleRows, cachedSlotTags.size());
+        int listH = maxVisibleRows * LIST_ROW_H;
+        boolean scrollable = cachedSlotTags.size() > maxVisibleRows;
+        int listX = panelX + 4;
+        int listW = panelW - 8;
+        int rowW = scrollable ? listW - SUBMODE_SCROLLBAR_W - SUBMODE_SCROLLBAR_GAP : listW;
         int startIdx = subModeScrollOffset;
-        int endIdx = Math.min(startIdx + visibleRows, cachedSlotTags.size());
+        int endIdx = Math.min(startIdx + maxVisibleRows, cachedSlotTags.size());
+
+        g.fill(listX, listY, listX + listW, listY + listH, 0x40000000);
+        g.renderOutline(listX, listY, listW, listH, COL_BORDER);
 
         for (int i = startIdx; i < endIdx; i++) {
             int rowY = listY + (i - startIdx) * LIST_ROW_H;
             String tag = cachedSlotTags.get(i);
             boolean selected = Objects.equals(tag, current);
-            boolean hovered = mx >= panelX + 4 && mx <= panelX + panelW - 4
+            boolean hovered = mx >= listX && mx < listX + rowW
                     && my >= rowY && my < rowY + LIST_ROW_H;
 
             if (selected)
-                g.fill(panelX + 4, rowY, panelX + panelW - 4, rowY + LIST_ROW_H, COL_SELECTED);
+                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_SELECTED);
             else if (hovered)
-                g.fill(panelX + 4, rowY, panelX + panelW - 4, rowY + LIST_ROW_H, COL_HOVER);
+                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_HOVER);
 
-            String text = scrollText(tag, panelW - 12, i);
-            g.drawString(font, text, panelX + 6, rowY + 2,
+            String text = scrollText(tag, rowW - 6, i);
+            g.drawString(font, text, listX + 3, rowY + 2,
                     selected ? COL_ACCENT : COL_WHITE, false);
         }
 
+        if (scrollable) {
+            int maxScroll = getTagSubModeMaxScroll();
+            int scrollbarX = listX + rowW + SUBMODE_SCROLLBAR_GAP;
+            int thumbH = Math.max(8, (listH * maxVisibleRows) / cachedSlotTags.size());
+            int thumbTravel = Math.max(0, listH - thumbH);
+            int thumbY = maxScroll <= 0 ? listY : listY + (subModeScrollOffset * thumbTravel) / maxScroll;
+
+            g.fill(scrollbarX, listY, scrollbarX + SUBMODE_SCROLLBAR_W, listY + listH, COL_BTN_BG);
+            g.renderOutline(scrollbarX, listY, SUBMODE_SCROLLBAR_W, listH, COL_BTN_BORDER);
+            g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, COL_ACCENT);
+
+            if (subModeScrollOffset > 0) {
+                g.fill(scrollbarX + 1, listY + 1, scrollbarX + SUBMODE_SCROLLBAR_W - 1, listY + 2, COL_WHITE);
+            }
+            if (subModeScrollOffset < maxScroll) {
+                g.fill(scrollbarX + 1, listY + listH - 2, scrollbarX + SUBMODE_SCROLLBAR_W - 1,
+                        listY + listH - 1, COL_WHITE);
+            }
+        }
+
         if (cachedSlotTags.isEmpty()) {
-            g.drawString(font, "No tags available", panelX + 6, listY + 2, COL_GRAY, false);
+            g.drawString(font, "No tags available", listX + 3, listY + 2, COL_GRAY, false);
         }
 
         g.pose().popPose();
@@ -2116,14 +2191,35 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
 
         int listY = inputY + 18;
-        int maxVisibleRows = 3;
+        int maxVisibleRows = getTagSubModeVisibleRows();
         int visibleRows = Math.min(maxVisibleRows, cachedSlotTags.size());
+        int listH = maxVisibleRows * LIST_ROW_H;
+        boolean scrollable = cachedSlotTags.size() > maxVisibleRows;
+        int listX = panelX + 4;
+        int listW = panelW - 8;
+        int rowW = scrollable ? listW - SUBMODE_SCROLLBAR_W - SUBMODE_SCROLLBAR_GAP : listW;
         int startIdx = subModeScrollOffset;
-        int endIdx = Math.min(startIdx + visibleRows, cachedSlotTags.size());
+        int endIdx = Math.min(startIdx + maxVisibleRows, cachedSlotTags.size());
+
+        if (scrollable) {
+            int scrollbarX = listX + rowW + SUBMODE_SCROLLBAR_GAP;
+            if (isHovering(scrollbarX, listY, SUBMODE_SCROLLBAR_W, listH, (int) mx, (int) my)) {
+                int maxScroll = getTagSubModeMaxScroll();
+                int thumbH = Math.max(8, (listH * maxVisibleRows) / cachedSlotTags.size());
+                int thumbTravel = Math.max(0, listH - thumbH);
+                int thumbY = maxScroll <= 0 ? listY : listY + (subModeScrollOffset * thumbTravel) / maxScroll;
+                if (my < thumbY) {
+                    subModeScrollOffset = Math.max(0, subModeScrollOffset - 1);
+                } else if (my >= thumbY + thumbH) {
+                    subModeScrollOffset = Math.min(maxScroll, subModeScrollOffset + 1);
+                }
+                return true;
+            }
+        }
 
         for (int i = startIdx; i < endIdx; i++) {
             int rowY = listY + (i - startIdx) * LIST_ROW_H;
-            if (mx >= panelX + 4 && mx <= panelX + panelW - 4
+            if (mx >= listX && mx < listX + rowW
                     && my >= rowY && my < rowY + LIST_ROW_H) {
                 String tag = cachedSlotTags.get(i);
                 PacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, tag));
