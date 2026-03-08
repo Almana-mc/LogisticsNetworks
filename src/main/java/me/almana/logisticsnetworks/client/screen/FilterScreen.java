@@ -11,7 +11,9 @@ import me.almana.logisticsnetworks.filter.NameMatchScope;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.filter.SlotFilterData;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.MultiLineEditBox;
+import net.minecraft.util.Mth;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.tags.TagKey;
@@ -134,9 +136,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         tagInputBox.setBordered(true);
         tagInputBox.setTextColor(COL_WHITE);
 
-        nbtInputBox = new MultiLineEditBox(
+        nbtInputBox = new ThemedMultiLineEditBox(
                 font, leftPos + 12, topPos + 50, 100, 45, Component.empty(), Component.empty());
-        nbtInputBox.setCharacterLimit(512);
+        nbtInputBox.setCharacterLimit(2048);
         nbtInputBox.active = false;
     }
 
@@ -1030,7 +1032,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 handled = handleTagSubModeClick(mx, my, btn);
                 if (!handled) {
                     // click outside = close
-                    tagEditSlot = -1;
+                    closeTagSubMode();
                     return true;
                 }
                 return true;
@@ -1038,7 +1040,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (nbtEditSlot >= 0) {
                 handled = handleNbtSubModeClick(mx, my, btn);
                 if (!handled) {
-                    nbtEditSlot = -1;
+                    closeNbtSubMode();
                     return true;
                 }
                 return true;
@@ -1270,6 +1272,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (isHovering(x, y, w, h, (int) mx, (int) my)) {
                 return true;
             }
+
+            // Click outside info panel = close it
+            amountInfoOpen = false;
+            return true;
         }
 
         boolean isMb = menu.getTargetType() == FilterTargetType.FLUIDS
@@ -1341,6 +1347,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (isHovering(x, y, w, h, (int) mx, (int) my)) {
                 return true;
             }
+
+            // Click outside info panel = close it
+            slotInfoOpen = false;
+            return true;
         }
 
         if (btn == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
@@ -1679,6 +1689,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
+        if (nbtEditSlot >= 0 && nbtInputBox != null) {
+            return nbtInputBox.mouseScrolled(mx, my, sx, sy);
+        }
+
         if (subModeDropdownOpen) {
             if (sy > 0 && subModeScrollOffset > 0)
                 subModeScrollOffset--;
@@ -1996,7 +2010,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         nbtEditSlot = slot;
         tagEditSlot = -1;
         subModeScrollOffset = 0;
-        subModeDropdownOpen = true;
 
         int panelX = leftPos + 4;
         int panelY = topPos + 20;
@@ -2007,9 +2020,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int inputW = panelW - 8;
         int inputH = panelH - 30 - 20;
 
-        nbtInputBox = new MultiLineEditBox(
+        nbtInputBox = new ThemedMultiLineEditBox(
                 font, inputX, inputY, inputW, inputH, Component.empty(), Component.empty());
-        nbtInputBox.setCharacterLimit(512);
+        nbtInputBox.setCharacterLimit(2048);
 
         String existing = FilterItemData.getEntryNbtRaw(menu.getOpenedStack(), slot);
         if (existing != null) {
@@ -2279,14 +2292,19 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int inputH = panelH - 30 - 20;
         nbtInputBox.render(g, mx, my, 0);
 
-        int sbX = panelX + 4 + inputW - 8;
-        g.fill(sbX, inputY + 1, sbX + 8, inputY + inputH - 1, 0xFF000000);
-        g.fill(sbX + 7, inputY, sbX + 8, inputY + inputH, 0xFFFFFFFF);
-
         int doneW = 50;
         int doneX = panelX + (panelW - doneW) / 2;
         int doneY = inputY + inputH + 4;
         drawButton(g, doneX, doneY, doneW, 14, "Done", mx, my, true);
+
+        // Character counter shown when near the limit
+        int len = nbtInputBox.getValue().length();
+        if (len >= 1800) {
+            String counter = len + "/2048";
+            int counterColor = len >= 2000 ? 0xFFFF5555 : COL_GRAY;
+            int counterX = panelX + panelW - 4 - font.width(counter);
+            g.drawString(font, counter, counterX, doneY + 3, counterColor, false);
+        }
 
         g.pose().popPose();
     }
@@ -2349,6 +2367,42 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (nbtInputBox != null) {
             nbtInputBox.active = false;
             nbtInputBox.setFocused(false);
+        }
+    }
+
+    private static class ThemedMultiLineEditBox extends MultiLineEditBox {
+        ThemedMultiLineEditBox(Font font, int x, int y, int w, int h,
+                               Component message, Component placeholder) {
+            super(font, x, y, w, h, message, placeholder);
+        }
+
+        @Override
+        protected void renderDecorations(GuiGraphics graphics) {
+            // Suppress built-in character counter
+        }
+
+        @Override
+        public void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+            super.renderWidget(g, mouseX, mouseY, partialTick);
+            if (scrollbarVisible()) {
+                int sbX = getX() + width - 8;
+                int sbY = getY();
+                int sbH = height;
+
+                // Dark track
+                g.fill(sbX, sbY, sbX + 8, sbY + sbH, 0xFF111111);
+
+                int maxScroll = getMaxScrollAmount();
+                if (maxScroll > 0) {
+                    int totalH = sbH + maxScroll;
+                    int thumbH = Mth.clamp((int) ((float) (sbH * sbH) / (float) totalH), 32, sbH);
+                    int thumbY = (int) (scrollAmount() * (sbH - thumbH) / maxScroll) + sbY;
+                    thumbY = Math.max(thumbY, sbY);
+
+                    g.fill(sbX, thumbY, sbX + 8, thumbY + thumbH, 0xFF3A3A3A);
+                    g.fill(sbX, thumbY, sbX + 7, thumbY + thumbH - 1, 0xFF4A4A4A);
+                }
+            }
         }
     }
 }
