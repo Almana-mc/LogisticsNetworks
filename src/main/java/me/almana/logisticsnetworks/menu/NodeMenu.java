@@ -140,7 +140,8 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     /**
-     * Toggle filter and upgrade slot activity to hide them on the network selection page.
+     * Toggle filter and upgrade slot activity to hide them on the network selection
+     * page.
      */
     public void setNodeSlotsVisible(boolean visible) {
         this.nodeSlotsActive = visible;
@@ -193,17 +194,29 @@ public class NodeMenu extends AbstractContainerMenu {
                 return ItemStack.EMPTY;
             }
         } else {
+            int targetStart;
+            int targetEnd;
             if (fromStack.is(ModTags.FILTERS)) {
-                if (!moveItemStackTo(fromStack, 0, FILTER_SLOTS, false)) {
-                    return ItemStack.EMPTY;
-                }
+                targetStart = 0;
+                targetEnd = FILTER_SLOTS;
             } else if (fromStack.is(ModTags.UPGRADES)) {
-                if (!moveItemStackTo(fromStack, FILTER_SLOTS, nodeSlotCount, false)) {
-                    return ItemStack.EMPTY;
-                }
+                targetStart = FILTER_SLOTS;
+                targetEnd = nodeSlotCount;
             } else {
                 return ItemStack.EMPTY;
             }
+
+            ItemStack single = fromStack.copyWithCount(1);
+            if (!moveItemStackTo(single, targetStart, targetEnd, false)) {
+                return ItemStack.EMPTY;
+            }
+            fromStack.shrink(1);
+            if (fromStack.isEmpty()) {
+                fromSlot.set(ItemStack.EMPTY);
+            } else {
+                fromSlot.setChanged();
+            }
+            return ItemStack.EMPTY;
         }
 
         if (fromStack.isEmpty()) {
@@ -331,7 +344,18 @@ public class NodeMenu extends AbstractContainerMenu {
 
         @Override
         public boolean mayPlace(ItemStack stack) {
-            return !stack.isEmpty() && stack.is(ModTags.UPGRADES);
+            if (stack.isEmpty() || !stack.is(ModTags.UPGRADES)) {
+                return false;
+            }
+            for (int i = 0; i < UPGRADE_SLOTS; i++) {
+                if (i == getContainerSlot())
+                    continue;
+                ItemStack existing = upgradeContainer.getItem(i);
+                if (!existing.isEmpty() && ItemStack.isSameItem(existing, stack)) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
