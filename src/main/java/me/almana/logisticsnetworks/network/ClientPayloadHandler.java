@@ -2,7 +2,10 @@ package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
+import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public class ClientPayloadHandler {
@@ -38,6 +41,21 @@ public class ClientPayloadHandler {
             var screen = Minecraft.getInstance().screen;
             if (screen instanceof NodeScreen nodeScreen) {
                 nodeScreen.receiveNetworkLabels(payload.labels());
+            }
+        });
+    }
+
+    public static void handleSyncChannelData(SyncChannelDataPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var player = Minecraft.getInstance().player;
+            if (player == null || payload.channelData() == null)
+                return;
+            Entity entity = player.level().getEntity(payload.entityId());
+            if (entity instanceof LogisticsNodeEntity node) {
+                ChannelData channel = node.getChannel(payload.channelIndex());
+                if (channel != null) {
+                    channel.load(payload.channelData(), player.level().registryAccess());
+                }
             }
         });
     }

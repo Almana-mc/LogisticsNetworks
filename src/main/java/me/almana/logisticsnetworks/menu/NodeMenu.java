@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -230,6 +231,9 @@ public class NodeMenu extends AbstractContainerMenu {
             if (node != null) {
                 node.getChannel(selectedChannel).setFilterItem(slot, stack.copyWithCount(1));
                 markDirty();
+                if (node.level() instanceof ServerLevel) {
+                    ServerPayloadHandler.propagateToLabelGroup(node, selectedChannel);
+                }
             }
         }
     }

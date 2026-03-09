@@ -14,6 +14,7 @@ import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -34,8 +35,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 
 public class ServerPayloadHandler {
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -266,6 +271,8 @@ public class ServerPayloadHandler {
             ChannelData channel = node.getChannel(payload.channelIndex());
             if (channel != null) {
                 channel.setFilterItem(payload.filterSlot(), payload.filterItem().copyWithCount(1));
+                propagateToLabelGroup(node, payload.channelIndex());
+                markNetworkDirty(node);
             }
         });
     }
@@ -655,9 +662,11 @@ public class ServerPayloadHandler {
                 return;
 
             String label = payload.label().trim();
-            if (label.length() > 32)
-                label = label.substring(0, 32);
+            if (label.length() > 48)
+                label = label.substring(0, 48);
 
+            LOGGER.debug("[LabelSync] Setting label '{}' on node {} (networkId={})",
+                    label, node.getUUID(), node.getNetworkId());
             node.setNodeLabel(label);
 
             // If label is non-empty and other nodes in the network have this label,
@@ -667,6 +676,8 @@ public class ServerPayloadHandler {
                 NetworkRegistry registry = NetworkRegistry.get(level);
                 LogisticsNetwork network = registry.getNetwork(node.getNetworkId());
                 if (network != null) {
+                    LOGGER.debug("[LabelSync] Searching {} nodes in network for label '{}'",
+                            network.getNodeUuids().size(), label);
                     for (UUID otherId : network.getNodeUuids()) {
                         if (otherId.equals(node.getUUID()))
                             continue;
@@ -674,6 +685,7 @@ public class ServerPayloadHandler {
                             Entity entity = sl.getEntity(otherId);
                             if (entity instanceof LogisticsNodeEntity other
                                     && label.equals(other.getNodeLabel())) {
+                                LOGGER.debug("[LabelSync] Found matching node {}, copying all channels", otherId);
                                 // Copy all channels from the existing labeled node
                                 for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                                     ChannelData src = other.getChannel(i);
@@ -681,6 +693,7 @@ public class ServerPayloadHandler {
                                     if (src != null && dst != null) {
                                         dst.copyFrom(src);
                                         clampChannelToUpgradeLimits(node, dst);
+                                        sendChannelSyncToViewers(node, i, dst);
                                     }
                                 }
                                 markNetworkDirty(node);
@@ -688,6 +701,7 @@ public class ServerPayloadHandler {
                             }
                         }
                     }
+                    LOGGER.debug("[LabelSync] No matching labeled node found in network");
                 }
             }
         });
@@ -722,10 +736,12 @@ public class ServerPayloadHandler {
         });
     }
 
-    private static void propagateToLabelGroup(LogisticsNodeEntity sourceNode, int channelIndex) {
+    public static void propagateToLabelGroup(LogisticsNodeEntity sourceNode, int channelIndex) {
         String label = sourceNode.getNodeLabel();
-        if (label.isEmpty() || sourceNode.getNetworkId() == null)
+        if (label.isEmpty() || sourceNode.getNetworkId() == null) {
+            LOGGER.debug("[LabelSync] Skipping propagation: label='{}', networkId={}", label, sourceNode.getNetworkId());
             return;
+        }
         if (!(sourceNode.level() instanceof ServerLevel level))
             return;
 
@@ -735,9 +751,15 @@ public class ServerPayloadHandler {
 
         NetworkRegistry registry = NetworkRegistry.get(level);
         LogisticsNetwork network = registry.getNetwork(sourceNode.getNetworkId());
-        if (network == null)
+        if (network == null) {
+            LOGGER.debug("[LabelSync] Network not found for id={}", sourceNode.getNetworkId());
             return;
+        }
 
+        LOGGER.debug("[LabelSync] Propagating channel {} from node {} (label='{}') to {} network nodes",
+                channelIndex, sourceNode.getUUID(), label, network.getNodeUuids().size());
+
+        int updated = 0;
         for (UUID otherId : network.getNodeUuids()) {
             if (otherId.equals(sourceNode.getUUID()))
                 continue;
@@ -749,9 +771,28 @@ public class ServerPayloadHandler {
                     if (dst != null) {
                         dst.copyFrom(sourceChannel);
                         clampChannelToUpgradeLimits(other, dst);
+                        updated++;
+                        LOGGER.debug("[LabelSync] Updated node {} (label='{}')", otherId, other.getNodeLabel());
+                        // Notify any player who has this node's menu open
+                        sendChannelSyncToViewers(other, channelIndex, dst);
                     }
                     break;
                 }
+            }
+        }
+        LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated);
+    }
+
+    private static void sendChannelSyncToViewers(LogisticsNodeEntity node, int channelIndex, ChannelData channel) {
+        if (!(node.level() instanceof ServerLevel level))
+            return;
+        CompoundTag tag = channel.save(level.registryAccess());
+        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+            if (player.containerMenu instanceof NodeMenu menu
+                    && menu.getNode() != null
+                    && menu.getNode().getUUID().equals(node.getUUID())) {
+                PacketDistributor.sendToPlayer(player,
+                        new SyncChannelDataPayload(node.getId(), channelIndex, tag));
             }
         }
     }

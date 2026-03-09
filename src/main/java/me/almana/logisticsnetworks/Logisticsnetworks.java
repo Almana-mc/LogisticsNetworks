@@ -31,6 +31,7 @@ import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
 import me.almana.logisticsnetworks.network.SetNameFilterPayload;
 import me.almana.logisticsnetworks.network.SetSlotFilterSlotsPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
+import me.almana.logisticsnetworks.network.SyncChannelDataPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
@@ -135,5 +136,7 @@ public class Logisticsnetworks {
                                 ClientPayloadHandler::handleSyncNetworkNodes);
                 registrar.playToClient(SyncNetworkLabelsPayload.TYPE, SyncNetworkLabelsPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkLabels);
+                registrar.playToClient(SyncChannelDataPayload.TYPE, SyncChannelDataPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncChannelData);
         }
 }
