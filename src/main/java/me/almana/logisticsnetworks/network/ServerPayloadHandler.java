@@ -623,12 +623,7 @@ public class ServerPayloadHandler {
             if (network == null)
                 return;
 
-            // Ownership check
-            if (network.getOwnerUuid() != null
-                    && !network.getOwnerUuid().equals(player.getUUID())
-                    && !(FTBTeamsCompat.isLoaded()
-                            && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
-                    && !player.hasPermissions(2)) {
+            if (!canAccessNetwork(player, network)) {
                 return;
             }
 
@@ -638,13 +633,14 @@ public class ServerPayloadHandler {
                     Entity entity = level.getEntity(nodeId);
                     if (entity instanceof LogisticsNodeEntity node) {
                         BlockPos attachedPos = node.getAttachedPos();
-                        String blockName = "Unknown";
+                        String blockName = "unknown";
                         if (level.isLoaded(attachedPos)) {
                             BlockState state = level.getBlockState(attachedPos);
-                            blockName = state.getBlock().getName().getString();
+                            blockName = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                         }
                         nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
-                                nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel()));
+                                nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
+                                level.dimension().location(), node.isRenderVisible(), node.isHighlighted()));
                         break;
                     }
                 }
@@ -703,6 +699,98 @@ public class ServerPayloadHandler {
                     }
                     LOGGER.debug("[LabelSync] No matching labeled node found in network");
                 }
+            }
+        });
+    }
+
+    public static void handleSetNetworkNodesVisibility(SetNetworkNodesVisibilityPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+            if (!(player.containerMenu instanceof ComputerMenu))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null)
+                return;
+
+            if (!canAccessNetwork(player, network)) {
+                return;
+            }
+
+            for (UUID nodeId : network.getNodeUuids()) {
+                for (ServerLevel level : player.getServer().getAllLevels()) {
+                    Entity entity = level.getEntity(nodeId);
+                    if (entity instanceof LogisticsNodeEntity node) {
+                        node.setRenderVisible(payload.visible());
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    public static void handleToggleNetworkNodeHighlight(ToggleNetworkNodeHighlightPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+            if (!(player.containerMenu instanceof ComputerMenu))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network) || !network.getNodeUuids().contains(payload.nodeId())) {
+                return;
+            }
+
+            LogisticsNodeEntity node = findNode(player, payload.nodeId());
+            if (node != null) {
+                node.setHighlighted(!node.isHighlighted());
+            }
+        });
+    }
+
+    public static void handleToggleNetworkLabelHighlight(ToggleNetworkLabelHighlightPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+            if (!(player.containerMenu instanceof ComputerMenu))
+                return;
+
+            String label = payload.label().trim();
+            if (label.isEmpty()) {
+                return;
+            }
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network)) {
+                return;
+            }
+
+            List<LogisticsNodeEntity> labeledNodes = new ArrayList<>();
+            for (UUID nodeId : network.getNodeUuids()) {
+                LogisticsNodeEntity node = findNode(player, nodeId);
+                if (node != null && label.equals(node.getNodeLabel())) {
+                    labeledNodes.add(node);
+                }
+            }
+
+            if (labeledNodes.isEmpty()) {
+                return;
+            }
+
+            boolean makeVisible = false;
+            for (LogisticsNodeEntity node : labeledNodes) {
+                if (!node.isHighlighted()) {
+                    makeVisible = true;
+                    break;
+                }
+            }
+
+            for (LogisticsNodeEntity node : labeledNodes) {
+                node.setHighlighted(makeVisible);
             }
         });
     }
@@ -781,6 +869,24 @@ public class ServerPayloadHandler {
             }
         }
         LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated);
+    }
+
+    private static boolean canAccessNetwork(ServerPlayer player, LogisticsNetwork network) {
+        return network.getOwnerUuid() == null
+                || network.getOwnerUuid().equals(player.getUUID())
+                || (FTBTeamsCompat.isLoaded()
+                        && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
+                || player.hasPermissions(2);
+    }
+
+    private static LogisticsNodeEntity findNode(ServerPlayer player, UUID nodeId) {
+        for (ServerLevel level : player.getServer().getAllLevels()) {
+            Entity entity = level.getEntity(nodeId);
+            if (entity instanceof LogisticsNodeEntity node) {
+                return node;
+            }
+        }
+        return null;
     }
 
     private static void sendChannelSyncToViewers(LogisticsNodeEntity node, int channelIndex, ChannelData channel) {

@@ -54,6 +54,7 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_ITEM = "Item";
     private static final String KEY_OWNER_UUID = "OwnerUUID";
     private static final String KEY_NODE_LABEL = "NodeLabel";
+    private static final String KEY_HIGHLIGHTED = "Highlighted";
 
     private static final EntityDataAccessor<BlockPos> ATTACHED_POS = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -69,6 +70,8 @@ public class LogisticsNodeEntity extends Entity {
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
     private static final EntityDataAccessor<String> NODE_LABEL = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Boolean> HIGHLIGHTED = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
 
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
@@ -107,6 +110,7 @@ public class LogisticsNodeEntity extends Entity {
         builder.define(RENDER_VISIBLE, true);
         builder.define(OWNER_UUID, Optional.empty());
         builder.define(NODE_LABEL, "");
+        builder.define(HIGHLIGHTED, false);
     }
 
     @Override
@@ -130,6 +134,9 @@ public class LogisticsNodeEntity extends Entity {
         }
         if (compound.contains(KEY_NODE_LABEL, Tag.TAG_STRING)) {
             setNodeLabel(compound.getString(KEY_NODE_LABEL));
+        }
+        if (compound.contains(KEY_HIGHLIGHTED)) {
+            setHighlighted(compound.getBoolean(KEY_HIGHLIGHTED));
         }
 
         HolderLookup.Provider provider = this.registryAccess();
@@ -181,6 +188,7 @@ public class LogisticsNodeEntity extends Entity {
         if (!label.isEmpty()) {
             compound.putString(KEY_NODE_LABEL, label);
         }
+        compound.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
 
         HolderLookup.Provider provider = registryAccess();
 
@@ -310,6 +318,14 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setRenderVisible(boolean visible) {
         this.entityData.set(RENDER_VISIBLE, visible);
+    }
+
+    public boolean isHighlighted() {
+        return this.entityData.get(HIGHLIGHTED);
+    }
+
+    public void setHighlighted(boolean highlighted) {
+        this.entityData.set(HIGHLIGHTED, highlighted);
     }
 
     @Nullable

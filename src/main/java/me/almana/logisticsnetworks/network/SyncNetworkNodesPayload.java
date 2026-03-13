@@ -15,7 +15,8 @@ public record SyncNetworkNodesPayload(
         UUID networkId,
         List<NodeInfo> nodes) implements CustomPacketPayload {
 
-    public record NodeInfo(UUID nodeId, BlockPos nodePos, BlockPos attachedPos, String blockName, String nodeLabel) {
+    public record NodeInfo(UUID nodeId, BlockPos nodePos, BlockPos attachedPos, String blockName, String nodeLabel,
+            ResourceLocation dimension, boolean visible, boolean highlighted) {
     }
 
     public static final CustomPacketPayload.Type<SyncNetworkNodesPayload> TYPE = new CustomPacketPayload.Type<>(
@@ -34,7 +35,10 @@ public record SyncNetworkNodesPayload(
             BlockPos attachedPos = buf.readBlockPos();
             String blockName = buf.readUtf(128);
             String nodeLabel = buf.readUtf(64);
-            nodes.add(new NodeInfo(nodeId, nodePos, attachedPos, blockName, nodeLabel));
+            ResourceLocation dimension = buf.readResourceLocation();
+            boolean visible = buf.readBoolean();
+            boolean highlighted = buf.readBoolean();
+            nodes.add(new NodeInfo(nodeId, nodePos, attachedPos, blockName, nodeLabel, dimension, visible, highlighted));
         }
         return new SyncNetworkNodesPayload(networkId, nodes);
     }
@@ -43,11 +47,14 @@ public record SyncNetworkNodesPayload(
         buf.writeUUID(payload.networkId);
         buf.writeVarInt(payload.nodes.size());
         for (NodeInfo node : payload.nodes) {
-            buf.writeUUID(node.nodeId);
-            buf.writeBlockPos(node.nodePos);
-            buf.writeBlockPos(node.attachedPos);
-            buf.writeUtf(node.blockName, 128);
-            buf.writeUtf(node.nodeLabel, 64);
+            buf.writeUUID(node.nodeId());
+            buf.writeBlockPos(node.nodePos());
+            buf.writeBlockPos(node.attachedPos());
+            buf.writeUtf(node.blockName(), 128);
+            buf.writeUtf(node.nodeLabel(), 64);
+            buf.writeResourceLocation(node.dimension());
+            buf.writeBoolean(node.visible());
+            buf.writeBoolean(node.highlighted());
         }
     }
 

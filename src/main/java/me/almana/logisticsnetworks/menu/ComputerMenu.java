@@ -22,8 +22,8 @@ import java.util.List;
 
 public class ComputerMenu extends AbstractContainerMenu {
 
-    private static final int WRENCH_SLOT_X = 292;
-    private static final int WRENCH_SLOT_Y = 8;
+    private static final int WRENCH_SLOT_X = 291;
+    private static final int WRENCH_SLOT_Y = 9;
 
     private final BlockPos computerPos;
     private ItemStack wrenchStack = ItemStack.EMPTY;
@@ -34,6 +34,7 @@ public class ComputerMenu extends AbstractContainerMenu {
         super(Registration.COMPUTER_MENU.get(), containerId);
         this.computerPos = computerPos;
         this.wrenchContainer = new WrenchSlotContainer();
+        loadPlayerWrench(playerInv);
 
         layoutSlots();
 
@@ -50,12 +51,31 @@ public class ComputerMenu extends AbstractContainerMenu {
         layoutSlots();
     }
 
+    private void loadPlayerWrench(Inventory playerInv) {
+        for (int slot = 0; slot < playerInv.getContainerSize(); slot++) {
+            ItemStack stack = playerInv.getItem(slot);
+            if (!(stack.getItem() instanceof WrenchItem)) {
+                continue;
+            }
+
+            wrenchStack = stack.copyWithCount(1);
+            stack.shrink(1);
+            playerInv.setChanged();
+            return;
+        }
+    }
+
     private void layoutSlots() {
         // Single wrench slot on the right side
         addSlot(new Slot(wrenchContainer, 0, WRENCH_SLOT_X, WRENCH_SLOT_Y) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return stack.getItem() instanceof WrenchItem;
+            }
+
+            @Override
+            public boolean mayPickup(Player player) {
+                return false;
             }
 
             @Override
@@ -70,7 +90,6 @@ public class ComputerMenu extends AbstractContainerMenu {
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        // Always show only player's own networks (no op override)
         List<LogisticsNetwork> networks = registry.getNetworksForPlayer(player.getUUID());
 
         System.out.println("[ComputerMenu] Player " + player.getName().getString() + " UUID: " + player.getUUID());
@@ -78,12 +97,12 @@ public class ComputerMenu extends AbstractContainerMenu {
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>();
         for (LogisticsNetwork net : networks) {
-            System.out.println("[ComputerMenu]   Network: " + net.getName() + " (ID: " + net.getId() + ", Nodes: " + net.getNodeUuids().size() + ", Owner: " + net.getOwnerUuid() + ")");
+            System.out.println("[ComputerMenu]   Network: " + net.getName() + " (ID: " + net.getId() + ", Nodes: "
+                    + net.getNodeUuids().size() + ", Owner: " + net.getOwnerUuid() + ")");
             entries.add(new SyncNetworkListPayload.NetworkEntry(
                     net.getId(),
                     net.getName(),
-                    net.getNodeUuids().size()
-            ));
+                    net.getNodeUuids().size()));
         }
 
         System.out.println("[ComputerMenu] Sending " + entries.size() + " network entries to client");
@@ -99,25 +118,22 @@ public class ComputerMenu extends AbstractContainerMenu {
         ItemStack fromStack = fromSlot.getItem();
         ItemStack copy = fromStack.copy();
 
-        // Slot 0 is the wrench slot
         if (index == 0) {
-            // Moving from wrench slot to player inventory (not implemented since no player inv)
             return ItemStack.EMPTY;
         } else {
-            // This shouldn't happen since we have no player inventory slots
             return ItemStack.EMPTY;
         }
     }
 
     @Override
     public boolean stillValid(Player player) {
-        return player.distanceToSqr(computerPos.getX() + 0.5, computerPos.getY() + 0.5, computerPos.getZ() + 0.5) < 64.0;
+        return player.distanceToSqr(computerPos.getX() + 0.5, computerPos.getY() + 0.5,
+                computerPos.getZ() + 0.5) < 64.0;
     }
 
     @Override
     public void removed(Player player) {
         super.removed(player);
-        // Return wrench to player when GUI closes
         if (!wrenchStack.isEmpty() && !player.level().isClientSide) {
             player.getInventory().placeItemBackInInventory(wrenchStack);
             wrenchStack = ItemStack.EMPTY;
@@ -128,7 +144,6 @@ public class ComputerMenu extends AbstractContainerMenu {
         return computerPos;
     }
 
-    // Proxy container for wrench slot
     private class WrenchSlotContainer implements Container {
         @Override
         public int getContainerSize() {

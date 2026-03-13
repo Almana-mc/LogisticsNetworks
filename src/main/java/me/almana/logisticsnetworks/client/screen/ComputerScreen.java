@@ -2,15 +2,31 @@ package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
+import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
+import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
+import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
@@ -20,66 +36,83 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         NODE_MAP
     }
 
-    // Constants
     private static final int GUI_WIDTH = 320;
     private static final int GUI_HEIGHT = 240;
-    private static final int NETWORKS_PER_PAGE = 8;
-    private static final int NETWORK_ENTRY_HEIGHT = 24;
-    private static final int NETWORK_LIST_X = 8;
-    private static final int NETWORK_LIST_Y = 30;
-    private static final int NETWORK_LIST_WIDTH = 120;
-    private static final int DIVIDER_X = 132;
+    private static final int NETWORKS_PER_PAGE = 5;
+    private static final int NETWORK_ENTRY_HEIGHT = 30;
+    private static final int NETWORK_LIST_X = 12;
+    private static final int NETWORK_LIST_Y = 68;
+    private static final int NETWORK_LIST_WIDTH = 116;
     private static final int DETAIL_PANEL_X = 136;
-    private static final int DETAIL_PANEL_Y = 30;
-    private static final int DETAIL_PANEL_WIDTH = 176;
-    private static final int DETAIL_PANEL_HEIGHT = 190;
+    private static final int DETAIL_PANEL_Y = 38;
+    private static final int DETAIL_PANEL_WIDTH = 172;
+    private static final int DETAIL_PANEL_HEIGHT = 194;
+    private static final int OPTION_BTN_HEIGHT = 34;
+    private static final int OPTION_BTN_GAP = 12;
+    private static final int NODE_ENTRY_HEIGHT = 22;
+    private static final int NODES_PER_PAGE = 7;
+    private static final int VIS_BTN_W = 54;
+    private static final int VIS_BTN_H = 14;
+    private static final int VIS_BTN_GAP = 6;
+    private static final int HIGHLIGHT_BTN_W = 16;
+    private static final int HIGHLIGHT_BTN_H = 12;
+    private static final int NODE_ROW_SIDE_PAD = 8;
+    private static final int NODE_TEXT_GAP = 8;
+    private static final int VIS_BTN_Y = 38;
+    private static final int BACK_BTN_X = 10;
+    private static final int BACK_BTN_Y = 38;
+    private static final int BACK_BTN_W = 52;
+    private static final int BACK_BTN_H = 14;
+    private static final int PANEL_HEADER_HEIGHT = 14;
 
-    // Button dimensions for the 2 options
-    private static final int OPTION_BTN_WIDTH = 150;
-    private static final int OPTION_BTN_HEIGHT = 30;
-    private static final int OPTION_BTN_GAP = 16;
+    private static final int COLOR_FRAME = 0xE0181E1A;
+    private static final int COLOR_FRAME_EDGE = 0xFF73806F;
+    private static final int COLOR_FRAME_INNER = 0xC0080E0B;
+    private static final int COLOR_SCREEN = 0xD00C130F;
+    private static final int COLOR_PANEL = 0xF0101713;
+    private static final int COLOR_PANEL_ALT = 0xFF152019;
+    private static final int COLOR_PANEL_HEADER = 0xFF1C2B22;
+    private static final int COLOR_BORDER = 0xFF4D6654;
+    private static final int COLOR_BORDER_BRIGHT = 0xFF96D9A9;
+    private static final int COLOR_ROW = 0xFF14201A;
+    private static final int COLOR_ROW_HOVER = 0xFF192920;
+    private static final int COLOR_ROW_SELECTED = 0xFF23382B;
+    private static final int COLOR_TEXT = 0xFFD8F7DD;
+    private static final int COLOR_TEXT_SECONDARY = 0xFF88B693;
+    private static final int COLOR_TEXT_MUTED = 0xFF587263;
+    private static final int COLOR_ACCENT = 0xFF80F2A3;
+    private static final int COLOR_ACCENT_DARK = 0xFF315D3B;
+    private static final int COLOR_WARNING = 0xFFE4CA7D;
+    private static final int COLOR_SCANLINE = 0x1200FF88;
+    private static final int COLOR_BADGE_BG = 0xFF17221A;
+    private static final int COLOR_BADGE_TEXT = 0xFFA4FDBB;
+    private static final int COLOR_GRAPH = 0xFF6EE896;
+    private static final int COLOR_GRAPH_GRID = 0xFF213529;
+    private static final int COLOR_HIGHLIGHT_BG = 0xFF1B2640;
+    private static final int COLOR_HIGHLIGHT_HOVER = 0xFF25355B;
+    private static final int COLOR_HIGHLIGHT_BORDER = 0xFF72A7FF;
+    private static final int COLOR_LAMP_OFF = 0xFF5F7568;
+    private static final int COLOR_LAMP_OFF_GLOW = 0xFF37443D;
+    private static final int COLOR_LAMP_ON = 0xFF72A7FF;
+    private static final int COLOR_LAMP_ON_GLOW = 0xFFBED6FF;
+    private static final int COLOR_LAMP_BASE = 0xFF8FA39C;
 
-    // Node map constants
-    private static final int NODE_ENTRY_HEIGHT = 18;
-    private static final int NODES_PER_PAGE = 10;
-    private static final int GROUP_HEADER_HEIGHT = 20;
-
-    // Colors
-    private static final int COLOR_BG = 0xC0101010;
-    private static final int COLOR_PANEL = 0xFF2B2B2B;
-    private static final int COLOR_HOVER = 0xFF3B3B3B;
-    private static final int COLOR_BORDER = 0xFF8B8B8B;
-    private static final int COLOR_TEXT = 0xFFFFFFFF;
-    private static final int COLOR_TEXT_SECONDARY = 0xFFAAAAAA;
-    private static final int COLOR_SLOT_BG = 0xFF1A1A1A;
-    private static final int COLOR_BTN = 0xFF383838;
-    private static final int COLOR_BTN_HOVER = 0xFF484848;
-    private static final int COLOR_BTN_BORDER = 0xFF5A5A5A;
-    private static final int COLOR_BTN_BORDER_HOVER = 0xFF7A9ABB;
-    private static final int COLOR_BTN_TOP_EDGE = 0xFF4A4A4A;
-    private static final int COLOR_BACK_BTN = 0xFF3A3A3A;
-    private static final int COLOR_BACK_BTN_HOVER = 0xFF4A4A4A;
-    private static final int COLOR_GROUP_HEADER = 0xFF333344;
-    private static final int COLOR_ACCENT_TEXT = 0xFF7A9ABB;
-
-    // State
     private Page currentPage = Page.NETWORK_LIST;
     private List<SyncNetworkListPayload.NetworkEntry> networkList = new ArrayList<>();
     private int networkScrollOffset = 0;
     private UUID selectedNetworkId = null;
     private String selectedNetworkName = "";
 
-    // Node map state
     private List<SyncNetworkNodesPayload.NodeInfo> nodeInfoList = new ArrayList<>();
-    private int groupMode = 0; // 0=None, 1=Block, 2=Label
-    private static final int GROUP_MODE_COUNT = 3;
     private int nodeMapScrollOffset = 0;
+    private final Set<String> collapsedGroups = new HashSet<>();
 
     public ComputerScreen(ComputerMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         this.imageWidth = GUI_WIDTH;
         this.imageHeight = GUI_HEIGHT;
-        this.inventoryLabelY = 10000; // Hide player inventory label
+        this.titleLabelY = 10000;
+        this.inventoryLabelY = 10000;
     }
 
     @Override
@@ -89,9 +122,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     @Override
     protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
-        // Main background
-        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, COLOR_BG);
-        g.renderOutline(leftPos, topPos, imageWidth, imageHeight, COLOR_BORDER);
+        renderComputerShell(g);
 
         switch (currentPage) {
             case NETWORK_LIST -> renderNetworkListPage(g, mouseX, mouseY);
@@ -100,42 +131,74 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         }
     }
 
-    // ==================== NETWORK LIST PAGE ====================
+    private void renderComputerShell(GuiGraphics g) {
+        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, COLOR_FRAME);
+        g.renderOutline(leftPos, topPos, imageWidth, imageHeight, COLOR_FRAME_EDGE);
+
+        g.fill(leftPos + 3, topPos + 3, leftPos + imageWidth - 3, topPos + imageHeight - 3, COLOR_FRAME_INNER);
+        g.renderOutline(leftPos + 3, topPos + 3, imageWidth - 6, imageHeight - 6, COLOR_BORDER);
+
+        g.fill(leftPos + 6, topPos + 6, leftPos + imageWidth - 6, topPos + imageHeight - 6, COLOR_SCREEN);
+        g.fill(leftPos + 6, topPos + 6, leftPos + imageWidth - 6, topPos + 24, COLOR_PANEL_HEADER);
+        g.fill(leftPos + 6, topPos + 24, leftPos + imageWidth - 6, topPos + 25, COLOR_BORDER);
+
+        String shellTitle = trimText(title.getString().toUpperCase(Locale.ROOT), imageWidth - 96);
+        g.drawString(font, shellTitle, leftPos + 12, topPos + 11, COLOR_ACCENT);
+        renderStatusBadge(g, leftPos + imageWidth - 110, topPos + 10, 62, 10,
+                line("gui.logisticsnetworks.computer.status.online"));
+        renderScanlines(g, leftPos + 7, topPos + 25, imageWidth - 14, imageHeight - 32);
+    }
 
     private void renderNetworkListPage(GuiGraphics g, int mouseX, int mouseY) {
-        // Wrench slot background (top right)
-        int slotX = leftPos + 292 - 1;
-        int slotY = topPos + 8 - 1;
-        g.fill(slotX, slotY, slotX + 18, slotY + 18, COLOR_SLOT_BG);
-        g.renderOutline(slotX, slotY, 18, 18, COLOR_BORDER);
+        int listPanelX = leftPos + NETWORK_LIST_X - 4;
+        int listPanelY = topPos + DETAIL_PANEL_Y;
+        int listPanelW = NETWORK_LIST_WIDTH + 8;
+        int listPanelH = DETAIL_PANEL_HEIGHT;
 
-        // Network list
+        renderTerminalPanel(g, listPanelX, listPanelY, listPanelW, listPanelH,
+                line("gui.logisticsnetworks.computer.network_directory"));
+        renderTerminalPanel(g, leftPos + DETAIL_PANEL_X, topPos + DETAIL_PANEL_Y,
+                DETAIL_PANEL_WIDTH, DETAIL_PANEL_HEIGHT,
+                line("gui.logisticsnetworks.computer.active_session"));
+        renderDriveBay(g);
         renderNetworkList(g, mouseX, mouseY);
 
-        // Vertical divider line
-        int dividerX = leftPos + DIVIDER_X;
-        g.fill(dividerX, topPos + NETWORK_LIST_Y, dividerX + 1, topPos + imageHeight - 10, COLOR_BORDER);
-
-        // Detail panel with 2 option buttons
-        if (selectedNetworkId != null) {
-            renderOptionButtons(g, mouseX, mouseY);
+        if (selectedNetworkId == null) {
+            renderIdleSession(g, leftPos + DETAIL_PANEL_X, topPos + DETAIL_PANEL_Y);
+        } else {
+            renderSelectedSession(g, mouseX, mouseY);
         }
+    }
+
+    private void renderDriveBay(GuiGraphics g) {
+        Slot slot = menu.slots.get(0);
+        int bayX = leftPos + slot.x - 4;
+        int bayY = topPos + slot.y - 4;
+        g.fill(bayX, bayY, bayX + 24, bayY + 24, COLOR_PANEL_ALT);
+        g.renderOutline(bayX, bayY, 24, 24, COLOR_BORDER);
+        g.fill(bayX + 1, bayY + 1, bayX + 23, bayY + 23, COLOR_FRAME_INNER);
+        g.renderOutline(bayX + 3, bayY + 3, 18, 18, COLOR_ACCENT_DARK);
+        g.fill(bayX + 3, bayY + 3, bayX + 21, bayY + 4, COLOR_BORDER);
+        g.fill(bayX + 3, bayY + 20, bayX + 21, bayY + 21, COLOR_ACCENT_DARK);
     }
 
     private void renderNetworkList(GuiGraphics g, int mouseX, int mouseY) {
         int startX = leftPos + NETWORK_LIST_X;
         int startY = topPos + NETWORK_LIST_Y;
-
-        // Network list header
-        g.drawString(font, "Your Networks:", startX, startY - 12, COLOR_TEXT);
+        int summaryY = topPos + DETAIL_PANEL_Y + PANEL_HEADER_HEIGHT + 6;
+        String summary = networkList.isEmpty()
+                ? line("gui.logisticsnetworks.computer.no_signal")
+                : line("gui.logisticsnetworks.computer.mounted", networkList.size());
+        g.drawString(font, summary, startX, summaryY, COLOR_TEXT_SECONDARY);
 
         if (networkList.isEmpty()) {
-            Component noNetworks = Component.translatable("gui.logisticsnetworks.computer.no_networks");
-            g.drawString(font, noNetworks, startX + 4, startY + 10, COLOR_TEXT_SECONDARY);
+            g.drawString(font, label("gui.logisticsnetworks.computer.no_networks_online"), startX + 4, startY + 10,
+                    COLOR_TEXT_MUTED);
+            g.drawString(font, label("gui.logisticsnetworks.computer.insert_wrench"), startX + 4, startY + 22,
+                    COLOR_TEXT_MUTED);
             return;
         }
 
-        // Render visible networks
         int maxScroll = Math.max(0, networkList.size() - NETWORKS_PER_PAGE);
         networkScrollOffset = Math.max(0, Math.min(networkScrollOffset, maxScroll));
 
@@ -144,378 +207,431 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             SyncNetworkListPayload.NetworkEntry entry = networkList.get(index);
             int entryX = startX;
             int entryY = startY + (i * NETWORK_ENTRY_HEIGHT);
-
             boolean hovered = isHovering(NETWORK_LIST_X, NETWORK_LIST_Y + (i * NETWORK_ENTRY_HEIGHT),
                     NETWORK_LIST_WIDTH, NETWORK_ENTRY_HEIGHT - 2, mouseX, mouseY);
-
             renderNetworkEntry(g, entry, entryX, entryY, NETWORK_LIST_WIDTH, hovered);
         }
 
-        // Pagination info
         if (networkList.size() > NETWORKS_PER_PAGE) {
-            int currentPage = (networkScrollOffset / NETWORKS_PER_PAGE) + 1;
-            int totalPages = (int) Math.ceil((double) networkList.size() / NETWORKS_PER_PAGE);
-            String pageInfo = "Page " + currentPage + "/" + totalPages;
-            int pageInfoX = leftPos + (imageWidth / 2) - (font.width(pageInfo) / 2);
-            g.drawString(font, pageInfo, pageInfoX, topPos + imageHeight - 15, COLOR_TEXT_SECONDARY);
+            int first = networkScrollOffset + 1;
+            int last = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, networkList.size());
+            String pageInfo = line("gui.logisticsnetworks.node.page_info", first, last, networkList.size());
+            int pageInfoX = leftPos + NETWORK_LIST_X + NETWORK_LIST_WIDTH - font.width(pageInfo);
+            g.drawString(font, pageInfo, pageInfoX,
+                    topPos + DETAIL_PANEL_Y + DETAIL_PANEL_HEIGHT - 11, COLOR_TEXT_MUTED);
         }
     }
 
     private void renderNetworkEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry,
-                                     int x, int y, int width, boolean hovered) {
+            int x, int y, int width, boolean hovered) {
         boolean selected = entry.id().equals(selectedNetworkId);
-        int bgColor = selected ? 0xFF4A4A4A : (hovered ? COLOR_HOVER : COLOR_PANEL);
-        g.fill(x, y, x + width, y + NETWORK_ENTRY_HEIGHT, bgColor);
-        g.renderOutline(x, y, width, NETWORK_ENTRY_HEIGHT, selected ? 0xFFFFFFFF : COLOR_BORDER);
+        int entryHeight = NETWORK_ENTRY_HEIGHT - 2;
+        int bgColor = selected ? COLOR_ROW_SELECTED : (hovered ? COLOR_ROW_HOVER : COLOR_ROW);
+        int borderColor = selected ? COLOR_BORDER_BRIGHT : (hovered ? COLOR_ACCENT_DARK : COLOR_BORDER);
 
-        String name = entry.name();
-        if (font.width(name) > width - 8) {
-            name = font.plainSubstrByWidth(name, width - 13) + "...";
-        }
-        g.drawString(font, name, x + 4, y + 4, COLOR_TEXT);
+        g.fill(x, y, x + width, y + entryHeight, bgColor);
+        g.renderOutline(x, y, width, entryHeight, borderColor);
+        g.fill(x + 1, y + 1, x + 3, y + entryHeight - 1, borderColor);
 
-        String nodeCount = String.valueOf(entry.nodeCount());
-        g.drawString(font, nodeCount, x + 4, y + 13, COLOR_TEXT_SECONDARY);
+        String prefix = selected ? "> " : (hovered ? "+ " : "- ");
+        String name = trimText(prefix + entry.name(), width - 12);
+        String nodeCount = line("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
+
+        g.drawString(font, name, x + 7, y + 6, selected ? COLOR_ACCENT : COLOR_TEXT);
+        g.drawString(font, trimText(nodeCount, width - 12), x + 7, y + 18, COLOR_TEXT_SECONDARY);
+    }
+
+    private void renderIdleSession(GuiGraphics g, int panelX, int panelY) {
+        int textX = panelX + 12;
+        int lineY = panelY + 24;
+
+        g.drawString(font, label("gui.logisticsnetworks.computer.no_network_mounted"), textX, lineY, COLOR_WARNING);
+        g.drawString(font, label("gui.logisticsnetworks.computer.select_directory"), textX, lineY + 16,
+                COLOR_TEXT_SECONDARY);
+        g.drawString(font, label("gui.logisticsnetworks.computer.open_workstation"), textX, lineY + 28,
+                COLOR_TEXT_SECONDARY);
+        renderStatusBadge(g, textX, lineY + 50, 48, 10, line("gui.logisticsnetworks.computer.status.idle"));
+        renderStatusBadge(g, textX + 56, lineY + 50, 58, 10, line("gui.logisticsnetworks.computer.status.ready"));
+        g.drawString(font, label("gui.logisticsnetworks.computer.hint.dir"), textX, lineY + 76, COLOR_TEXT_MUTED);
+        g.drawString(font, label("gui.logisticsnetworks.computer.hint.tab"), textX, lineY + 88, COLOR_TEXT_MUTED);
+        g.drawString(font, label("gui.logisticsnetworks.computer.hint.run"), textX, lineY + 100, COLOR_TEXT_MUTED);
+    }
+
+    private void renderSelectedSession(GuiGraphics g, int mouseX, int mouseY) {
+        int panelX = leftPos + DETAIL_PANEL_X;
+        int panelY = topPos + DETAIL_PANEL_Y;
+        int textX = panelX + 12;
+        SyncNetworkListPayload.NetworkEntry selectedEntry = getSelectedNetworkEntry();
+
+        g.drawString(font, label("gui.logisticsnetworks.computer.network"), textX, panelY + 24, COLOR_TEXT_SECONDARY);
+        g.drawString(font, trimText(selectedNetworkName, DETAIL_PANEL_WIDTH - 24), textX, panelY + 38, COLOR_TEXT);
+        String nodeCount = selectedEntry == null
+                ? line("gui.logisticsnetworks.computer.nodes_unknown")
+                : line("gui.logisticsnetworks.computer.nodes_badge", selectedEntry.nodeCount());
+        renderStatusBadge(g, textX, panelY + 56, 58, 10, nodeCount);
+        renderStatusBadge(g, textX + 66, panelY + 56, 54, 10, line("gui.logisticsnetworks.computer.status.synced"));
+        g.drawString(font, label("gui.logisticsnetworks.computer.choose_subsystem"), textX, panelY + 82,
+                COLOR_TEXT_SECONDARY);
+        g.drawString(font, label("gui.logisticsnetworks.computer.inspect_network"), textX, panelY + 94,
+                COLOR_TEXT_SECONDARY);
+        renderOptionButtons(g, mouseX, mouseY);
     }
 
     private void renderOptionButtons(GuiGraphics g, int mouseX, int mouseY) {
         int panelX = leftPos + DETAIL_PANEL_X;
         int panelY = topPos + DETAIL_PANEL_Y;
+        int buttonX = panelX + 12;
+        int buttonWidth = DETAIL_PANEL_WIDTH - 24;
+        int button1Y = panelY + 112;
+        int button2Y = button1Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
 
-        // Background
-        g.fill(panelX, panelY, panelX + DETAIL_PANEL_WIDTH, panelY + DETAIL_PANEL_HEIGHT, COLOR_PANEL);
-        g.renderOutline(panelX, panelY, DETAIL_PANEL_WIDTH, DETAIL_PANEL_HEIGHT, COLOR_BORDER);
+        boolean button1Hovered = mouseX >= buttonX && mouseX < buttonX + buttonWidth
+                && mouseY >= button1Y && mouseY < button1Y + OPTION_BTN_HEIGHT;
+        boolean button2Hovered = mouseX >= buttonX && mouseX < buttonX + buttonWidth
+                && mouseY >= button2Y && mouseY < button2Y + OPTION_BTN_HEIGHT;
 
-        // Network name header
-        String header = selectedNetworkName;
-        if (font.width(header) > DETAIL_PANEL_WIDTH - 16) {
-            header = font.plainSubstrByWidth(header, DETAIL_PANEL_WIDTH - 21) + "...";
-        }
-        int headerX = panelX + (DETAIL_PANEL_WIDTH / 2) - (font.width(header) / 2);
-        g.drawString(font, header, headerX, panelY + 12, COLOR_TEXT);
-
-        // Center the buttons vertically in the remaining space
-        int buttonsAreaY = panelY + 35;
-        int totalButtonsHeight = (OPTION_BTN_HEIGHT * 2) + OPTION_BTN_GAP;
-        int startBtnY = buttonsAreaY + ((DETAIL_PANEL_HEIGHT - 45) - totalButtonsHeight) / 2;
-
-        int btnX = panelX + (DETAIL_PANEL_WIDTH - OPTION_BTN_WIDTH) / 2;
-
-        // Button 1: I/O Graph
-        int btn1Y = startBtnY;
-        boolean btn1Hovered = mouseX >= btnX && mouseX < btnX + OPTION_BTN_WIDTH
-                && mouseY >= btn1Y && mouseY < btn1Y + OPTION_BTN_HEIGHT;
-        renderOptionButton(g, btnX, btn1Y, "I/O Graph", btn1Hovered);
-
-        // Button 2: Node Map
-        int btn2Y = startBtnY + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
-        boolean btn2Hovered = mouseX >= btnX && mouseX < btnX + OPTION_BTN_WIDTH
-                && mouseY >= btn2Y && mouseY < btn2Y + OPTION_BTN_HEIGHT;
-        renderOptionButton(g, btnX, btn2Y, "Node Map", btn2Hovered);
+        renderCommandCard(g, buttonX, button1Y, buttonWidth, OPTION_BTN_HEIGHT,
+                line("gui.logisticsnetworks.computer.open_io_monitor"),
+                line("gui.logisticsnetworks.computer.throughput_timeline"), button1Hovered);
+        renderCommandCard(g, buttonX, button2Y, buttonWidth, OPTION_BTN_HEIGHT,
+                line("gui.logisticsnetworks.computer.open_node_table"),
+                line("gui.logisticsnetworks.computer.device_topology"), button2Hovered);
     }
 
-    private void renderOptionButton(GuiGraphics g, int x, int y, String label, boolean hovered) {
-        int bgColor = hovered ? COLOR_BTN_HOVER : COLOR_BTN;
-        int borderColor = hovered ? COLOR_BTN_BORDER_HOVER : COLOR_BTN_BORDER;
+    private void renderCommandCard(GuiGraphics g, int x, int y, int w, int h,
+            String label, String detail, boolean hovered) {
+        int bgColor = hovered ? COLOR_ROW_SELECTED : COLOR_PANEL_ALT;
+        int borderColor = hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER;
 
-        // Button body
-        g.fill(x, y, x + OPTION_BTN_WIDTH, y + OPTION_BTN_HEIGHT, bgColor);
-        // Top highlight edge (subtle bevel)
-        g.fill(x + 1, y + 1, x + OPTION_BTN_WIDTH - 1, y + 2, COLOR_BTN_TOP_EDGE);
-        // Border
-        g.renderOutline(x, y, OPTION_BTN_WIDTH, OPTION_BTN_HEIGHT, borderColor);
-
-        int textColor = hovered ? COLOR_TEXT : COLOR_TEXT_SECONDARY;
-        int textX = x + (OPTION_BTN_WIDTH / 2) - (font.width(label) / 2);
-        int textY = y + (OPTION_BTN_HEIGHT / 2) - (font.lineHeight / 2);
-        g.drawString(font, label, textX, textY, textColor);
+        g.fill(x, y, x + w, y + h, bgColor);
+        g.renderOutline(x, y, w, h, borderColor);
+        g.fill(x + 1, y + 1, x + w - 1, y + 9, hovered ? COLOR_ACCENT_DARK : COLOR_PANEL_HEADER);
+        g.drawString(font, label, x + 8, y + 6, hovered ? COLOR_ACCENT : COLOR_TEXT);
+        g.drawString(font, detail, x + 8, y + 20, COLOR_TEXT_SECONDARY);
     }
-
-    // ==================== ITEM I/O GRAPH PAGE ====================
 
     private void renderItemIOGraphPage(GuiGraphics g, int mouseX, int mouseY) {
-        // Title bar
-        String title = "I/O Graph - " + selectedNetworkName;
-        if (font.width(title) > imageWidth - 80) {
-            title = font.plainSubstrByWidth(title, imageWidth - 85) + "...";
-        }
-        int titleX = leftPos + (imageWidth / 2) - (font.width(title) / 2);
-        g.drawString(font, title, titleX, topPos + 8, COLOR_TEXT);
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int contentW = imageWidth - 20;
+        int contentH = imageHeight - 44;
 
-        // Back button
+        renderTerminalPanel(g, contentX, contentY, contentW, contentH, "");
+        renderItemIOPreview(g, contentX, contentY, contentW, contentH);
         renderBackButton(g, mouseX, mouseY);
-
-        // Content area
-        int contentX = leftPos + 8;
-        int contentY = topPos + 28;
-        int contentW = imageWidth - 16;
-        int contentH = imageHeight - 38;
-
-        g.fill(contentX, contentY, contentX + contentW, contentY + contentH, COLOR_PANEL);
-        g.renderOutline(contentX, contentY, contentW, contentH, COLOR_BORDER);
-
-        // Placeholder
-        String placeholder = "I/O tracking coming soon";
-        int phX = contentX + (contentW / 2) - (font.width(placeholder) / 2);
-        int phY = contentY + (contentH / 2) - (font.lineHeight / 2);
-        g.drawString(font, placeholder, phX, phY, COLOR_TEXT_SECONDARY);
+        g.drawString(font, trimText(line("gui.logisticsnetworks.computer.io_monitor_title", selectedNetworkName),
+                        contentW - 88),
+                contentX + 64, contentY + 4, COLOR_ACCENT);
     }
 
-    // ==================== NODE MAP PAGE ====================
+    private void renderItemIOPreview(GuiGraphics g, int contentX, int contentY, int contentW, int contentH) {
+        int graphX = contentX + 10;
+        int graphY = contentY + 26;
+        int graphW = contentW - 20;
+        int graphH = 86;
+
+        g.fill(graphX, graphY, graphX + graphW, graphY + graphH, COLOR_PANEL_ALT);
+        g.renderOutline(graphX, graphY, graphW, graphH, COLOR_BORDER);
+
+        for (int x = graphX + 12; x < graphX + graphW; x += 18) {
+            g.fill(x, graphY + 4, x + 1, graphY + graphH - 4, COLOR_GRAPH_GRID);
+        }
+        for (int y = graphY + 8; y < graphY + graphH; y += 14) {
+            g.fill(graphX + 4, y, graphX + graphW - 4, y + 1, COLOR_GRAPH_GRID);
+        }
+
+        int[] bars = { 14, 28, 20, 44, 52, 34, 40, 66, 50, 32, 58, 47 };
+        int barX = graphX + 12;
+        for (int height : bars) {
+            int top = graphY + graphH - 8 - height;
+            g.fill(barX, top, barX + 10, graphY + graphH - 8, COLOR_GRAPH);
+            g.fill(barX, top, barX + 10, top + 2, COLOR_ACCENT);
+            barX += 18;
+        }
+
+        g.drawString(font, label("gui.logisticsnetworks.computer.telemetry_buffer"), graphX + 8, graphY + 6,
+                COLOR_TEXT_SECONDARY);
+
+        int statY = graphY + graphH + 12;
+        renderMetricBlock(g, graphX, statY, 86, 32,
+                line("gui.logisticsnetworks.computer.metric.input"),
+                line("gui.logisticsnetworks.computer.metric.stable"));
+        renderMetricBlock(g, graphX + 96, statY, 86, 32,
+                line("gui.logisticsnetworks.computer.metric.output"),
+                line("gui.logisticsnetworks.computer.metric.standby"));
+        renderMetricBlock(g, graphX + 192, statY, 86, 32,
+                line("gui.logisticsnetworks.computer.metric.cache"),
+                line("gui.logisticsnetworks.computer.metric.empty"));
+        g.drawString(font, label("gui.logisticsnetworks.computer.live_capture_pending"), graphX, statY + 50,
+                COLOR_TEXT_MUTED);
+        g.drawString(font, label("gui.logisticsnetworks.computer.monitor_ready"), graphX, statY + 62,
+                COLOR_TEXT_MUTED);
+    }
+
+    private void renderMetricBlock(GuiGraphics g, int x, int y, int w, int h, String label, String value) {
+        g.fill(x, y, x + w, y + h, COLOR_PANEL_ALT);
+        g.renderOutline(x, y, w, h, COLOR_BORDER);
+        g.drawString(font, label, x + 6, y + 6, COLOR_TEXT_SECONDARY);
+        g.drawString(font, value.toUpperCase(Locale.ROOT), x + 6, y + 18, COLOR_ACCENT);
+    }
 
     private void renderNodeMapPage(GuiGraphics g, int mouseX, int mouseY) {
-        // Title bar
-        String title = "Node Map - " + selectedNetworkName;
-        if (font.width(title) > imageWidth - 120) {
-            title = font.plainSubstrByWidth(title, imageWidth - 125) + "...";
-        }
-        int titleX = leftPos + (imageWidth / 2) - (font.width(title) / 2);
-        g.drawString(font, title, titleX, topPos + 8, COLOR_TEXT);
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int contentW = imageWidth - 20;
+        int contentH = imageHeight - 44;
 
-        // Back button
-        renderBackButton(g, mouseX, mouseY);
-
-        // Group toggle button
-        renderGroupToggle(g, mouseX, mouseY);
-
-        // Content area
-        int contentX = leftPos + 8;
-        int contentY = topPos + 28;
-        int contentW = imageWidth - 16;
-        int contentH = imageHeight - 38;
-
-        g.fill(contentX, contentY, contentX + contentW, contentY + contentH, COLOR_PANEL);
-        g.renderOutline(contentX, contentY, contentW, contentH, COLOR_BORDER);
+        renderTerminalPanel(g, contentX, contentY, contentW, contentH, "");
 
         if (nodeInfoList.isEmpty()) {
-            String noNodes = "No nodes in this network";
-            int nnX = contentX + (contentW / 2) - (font.width(noNodes) / 2);
-            int nnY = contentY + (contentH / 2) - (font.lineHeight / 2);
-            g.drawString(font, noNodes, nnX, nnY, COLOR_TEXT_SECONDARY);
+            g.drawString(font, label("gui.logisticsnetworks.computer.no_nodes"), contentX + 12, contentY + 28,
+                    COLOR_TEXT_MUTED);
+            g.drawString(font, label("gui.logisticsnetworks.computer.attach_device"), contentX + 12, contentY + 40,
+                    COLOR_TEXT_MUTED);
+            renderBackButton(g, mouseX, mouseY);
+            renderVisibilityButtons(g, mouseX, mouseY);
+            g.drawString(font, trimText(line("gui.logisticsnetworks.computer.node_table_title", selectedNetworkName),
+                            contentW - 156),
+                    contentX + 64, contentY + 4, COLOR_ACCENT);
             return;
         }
 
-        if (groupMode > 0) {
-            renderGroupedNodeMap(g, contentX, contentY, contentW, contentH, mouseX, mouseY);
-        } else {
-            renderFlatNodeMap(g, contentX, contentY, contentW, contentH, mouseX, mouseY);
-        }
+        renderGroupedNodeMap(g, contentX, contentY, contentW, contentH, mouseX, mouseY);
+        renderBackButton(g, mouseX, mouseY);
+        renderVisibilityButtons(g, mouseX, mouseY);
+        g.drawString(font, trimText(line("gui.logisticsnetworks.computer.node_table_title", selectedNetworkName),
+                        contentW - 156),
+                contentX + 64, contentY + 4, COLOR_ACCENT);
     }
 
-    private void renderFlatNodeMap(GuiGraphics g, int contentX, int contentY,
-                                    int contentW, int contentH, int mouseX, int mouseY) {
-        int maxScroll = Math.max(0, nodeInfoList.size() - NODES_PER_PAGE);
-        nodeMapScrollOffset = Math.max(0, Math.min(nodeMapScrollOffset, maxScroll));
+    private void renderVisibilityButtons(GuiGraphics g, int mouseX, int mouseY) {
+        int hideX = leftPos + imageWidth - 12 - VIS_BTN_W;
+        int showX = hideX - VIS_BTN_W - VIS_BTN_GAP;
+        int buttonY = topPos + VIS_BTN_Y;
 
-        int listY = contentY + 6;
-        for (int i = 0; i < NODES_PER_PAGE && (i + nodeMapScrollOffset) < nodeInfoList.size(); i++) {
-            int index = i + nodeMapScrollOffset;
-            SyncNetworkNodesPayload.NodeInfo info = nodeInfoList.get(index);
-            int entryY = listY + (i * NODE_ENTRY_HEIGHT);
+        boolean showHovered = mouseX >= showX && mouseX < showX + VIS_BTN_W
+                && mouseY >= buttonY && mouseY < buttonY + VIS_BTN_H;
+        boolean hideHovered = mouseX >= hideX && mouseX < hideX + VIS_BTN_W
+                && mouseY >= buttonY && mouseY < buttonY + VIS_BTN_H;
 
-            boolean hovered = mouseX >= contentX + 4 && mouseX < contentX + contentW - 4
-                    && mouseY >= entryY && mouseY < entryY + NODE_ENTRY_HEIGHT - 2;
-            int bgColor = hovered ? COLOR_HOVER : 0xFF1F1F1F;
-            g.fill(contentX + 4, entryY, contentX + contentW - 4, entryY + NODE_ENTRY_HEIGHT - 2, bgColor);
+        renderHeaderButton(g, showX, buttonY, VIS_BTN_W, VIS_BTN_H,
+                line("gui.logisticsnetworks.computer.show"), showHovered);
+        renderHeaderButton(g, hideX, buttonY, VIS_BTN_W, VIS_BTN_H,
+                line("gui.logisticsnetworks.computer.hide"), hideHovered);
+    }
 
-            // Block name + optional label
-            String blockName = info.blockName();
-            if (!info.nodeLabel().isEmpty()) {
-                blockName = blockName + " [" + info.nodeLabel() + "]";
-            }
-            if (font.width(blockName) > contentW - 100) {
-                blockName = font.plainSubstrByWidth(blockName, contentW - 105) + "...";
-            }
-            g.drawString(font, blockName, contentX + 8, entryY + 2, COLOR_TEXT);
+    private void renderHeaderButton(GuiGraphics g, int x, int y, int w, int h, String label, boolean hovered) {
+        int bgColor = hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG;
+        int borderColor = hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER;
 
-            // Position
-            String posStr = "(" + info.attachedPos().getX() + ", " + info.attachedPos().getY()
-                    + ", " + info.attachedPos().getZ() + ")";
-            int posX = contentX + contentW - font.width(posStr) - 8;
-            g.drawString(font, posStr, posX, entryY + 2, COLOR_TEXT_SECONDARY);
+        g.fill(x, y, x + w, y + h, bgColor);
+        g.renderOutline(x, y, w, h, borderColor);
+
+        int textX = x + (w / 2) - (font.width(label) / 2);
+        int textY = y + (h / 2) - (font.lineHeight / 2);
+        g.drawString(font, label, textX, textY, hovered ? COLOR_ACCENT : COLOR_TEXT_SECONDARY);
+    }
+
+    private void renderToggleButton(GuiGraphics g, int x, int y, int w, int h, boolean hovered, boolean active) {
+        int bgColor = active ? (hovered ? COLOR_HIGHLIGHT_HOVER : COLOR_HIGHLIGHT_BG)
+                : (hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG);
+        int borderColor = active ? COLOR_HIGHLIGHT_BORDER : (hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER);
+
+        g.fill(x, y, x + w, y + h, bgColor);
+        g.renderOutline(x, y, w, h, borderColor);
+        renderLampIcon(g, x, y, w, h, active);
+    }
+
+    private void renderLampIcon(GuiGraphics g, int x, int y, int w, int h, boolean active) {
+        int centerX = x + (w / 2);
+        int bulbLeft = centerX - 3;
+        int bulbTop = y + 2;
+        int bulbRight = bulbLeft + 6;
+        int bulbBottom = bulbTop + 5;
+        int baseLeft = centerX - 2;
+        int baseRight = baseLeft + 4;
+        int baseTop = bulbBottom;
+        int baseBottom = baseTop + 3;
+        int glowColor = active ? COLOR_LAMP_ON_GLOW : COLOR_LAMP_OFF_GLOW;
+        int bulbColor = active ? COLOR_LAMP_ON : COLOR_LAMP_OFF;
+
+        g.fill(bulbLeft - 1, bulbTop - 1, bulbRight + 1, bulbBottom + 1, glowColor);
+        g.fill(bulbLeft, bulbTop, bulbRight, bulbBottom, bulbColor);
+        g.fill(baseLeft, baseTop, baseRight, baseBottom, COLOR_LAMP_BASE);
+        g.fill(centerX - 1, baseBottom, centerX + 1, baseBottom + 1, COLOR_LAMP_BASE);
+    }
+
+    private boolean handleVisibilityButtonClick(double mouseX, double mouseY) {
+        int hideX = leftPos + imageWidth - 12 - VIS_BTN_W;
+        int showX = hideX - VIS_BTN_W - VIS_BTN_GAP;
+        int buttonY = topPos + VIS_BTN_Y;
+
+        if (selectedNetworkId == null) {
+            return false;
         }
 
-        // Scroll indicator
-        if (nodeInfoList.size() > NODES_PER_PAGE) {
-            String scrollInfo = (nodeMapScrollOffset + 1) + "-"
-                    + Math.min(nodeMapScrollOffset + NODES_PER_PAGE, nodeInfoList.size())
-                    + " of " + nodeInfoList.size();
-            int scrollX = contentX + contentW - font.width(scrollInfo) - 8;
-            g.drawString(font, scrollInfo, scrollX, contentY + contentH - 14, COLOR_TEXT_SECONDARY);
+        if (mouseX >= showX && mouseX < showX + VIS_BTN_W
+                && mouseY >= buttonY && mouseY < buttonY + VIS_BTN_H) {
+            PacketDistributor.sendToServer(new SetNetworkNodesVisibilityPayload(selectedNetworkId, true));
+            setAllNodeVisibility(true);
+            return true;
         }
+        if (mouseX >= hideX && mouseX < hideX + VIS_BTN_W
+                && mouseY >= buttonY && mouseY < buttonY + VIS_BTN_H) {
+            PacketDistributor.sendToServer(new SetNetworkNodesVisibilityPayload(selectedNetworkId, false));
+            setAllNodeVisibility(false);
+            return true;
+        }
+        return false;
     }
 
     private void renderGroupedNodeMap(GuiGraphics g, int contentX, int contentY,
-                                       int contentW, int contentH, int mouseX, int mouseY) {
-        // Group nodes by block name or label depending on mode
-        Map<String, List<SyncNetworkNodesPayload.NodeInfo>> groups = new LinkedHashMap<>();
-        if (groupMode == 2) {
-            // Group by label
-            for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
-                String key = info.nodeLabel().isEmpty() ? "Unlabeled" : info.nodeLabel();
-                groups.computeIfAbsent(key, k -> new ArrayList<>()).add(info);
-            }
-        } else {
-            // Group by block name
-            for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
-                groups.computeIfAbsent(info.blockName(), k -> new ArrayList<>()).add(info);
-            }
-        }
-
-        // Build flat render list with headers and entries
-        List<RenderEntry> renderEntries = new ArrayList<>();
-        for (Map.Entry<String, List<SyncNetworkNodesPayload.NodeInfo>> group : groups.entrySet()) {
-            renderEntries.add(new RenderEntry(group.getKey(), group.getValue().size()));
-            for (SyncNetworkNodesPayload.NodeInfo info : group.getValue()) {
-                renderEntries.add(new RenderEntry(info));
-            }
-        }
+            int contentW, int contentH, int mouseX, int mouseY) {
+        List<RenderEntry> renderEntries = buildNodeRenderEntries();
 
         int maxScroll = Math.max(0, renderEntries.size() - NODES_PER_PAGE);
         nodeMapScrollOffset = Math.max(0, Math.min(nodeMapScrollOffset, maxScroll));
 
-        int listY = contentY + 6;
+        int headerX = contentX + 8;
+        int headerY = contentY + 22;
+        int headerW = contentW - 16;
+        g.fill(headerX, headerY, headerX + headerW, headerY + 14, COLOR_PANEL_ALT);
+        g.renderOutline(headerX, headerY, headerW, 14, COLOR_BORDER);
+        g.drawString(font, label("gui.logisticsnetworks.computer.device"), headerX + 8, headerY + 3,
+                COLOR_TEXT_SECONDARY);
+        g.drawString(font, label("gui.logisticsnetworks.computer.location"), headerX + headerW - 72, headerY + 3,
+                COLOR_TEXT_SECONDARY);
+
+        int listY = contentY + 40;
         for (int i = 0; i < NODES_PER_PAGE && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
             int index = i + nodeMapScrollOffset;
             RenderEntry entry = renderEntries.get(index);
             int entryY = listY + (i * NODE_ENTRY_HEIGHT);
+            int buttonX = headerX + headerW - NODE_ROW_SIDE_PAD - HIGHLIGHT_BTN_W;
+            int buttonY = entryY + ((NODE_ENTRY_HEIGHT - HIGHLIGHT_BTN_H - 2) / 2);
+            boolean buttonHovered = mouseX >= buttonX && mouseX < buttonX + HIGHLIGHT_BTN_W
+                    && mouseY >= buttonY && mouseY < buttonY + HIGHLIGHT_BTN_H;
 
             if (entry.isHeader) {
-                // Group header
-                g.fill(contentX + 4, entryY, contentX + contentW - 4, entryY + NODE_ENTRY_HEIGHT - 2,
-                        COLOR_GROUP_HEADER);
-                String headerText = entry.headerName + " (" + entry.headerCount + ")";
-                g.drawString(font, headerText, contentX + 8, entryY + 2, COLOR_ACCENT_TEXT);
-            } else {
-                // Node entry
-                boolean hovered = mouseX >= contentX + 4 && mouseX < contentX + contentW - 4
-                        && mouseY >= entryY && mouseY < entryY + NODE_ENTRY_HEIGHT - 2;
-                int bgColor = hovered ? COLOR_HOVER : 0xFF1F1F1F;
-                g.fill(contentX + 4, entryY, contentX + contentW - 4, entryY + NODE_ENTRY_HEIGHT - 2, bgColor);
+                String marker = collapsedGroups.contains(entry.headerName) ? "[+]" : "[-]";
+                String countText = line("gui.logisticsnetworks.computer.devices_badge", entry.headerCount);
+                boolean active = isGroupHighlighted(entry.headerName);
+                int countX = buttonX - NODE_TEXT_GAP - font.width(countText);
+                String headerText = marker + " "
+                        + trimText(entry.headerName, Math.max(0, countX - NODE_TEXT_GAP - (headerX + NODE_ROW_SIDE_PAD)));
 
-                // Show block name (for label grouping) or position (for block grouping)
-                if (groupMode == 2) {
-                    // Label grouping: show block name + position
-                    String blockName = entry.nodeInfo.blockName();
-                    g.drawString(font, "  " + blockName, contentX + 12, entryY + 2, COLOR_TEXT);
-                    String posStr = "(" + entry.nodeInfo.attachedPos().getX() + ", "
-                            + entry.nodeInfo.attachedPos().getY() + ", "
-                            + entry.nodeInfo.attachedPos().getZ() + ")";
-                    int posX = contentX + contentW - font.width(posStr) - 8;
-                    g.drawString(font, posStr, posX, entryY + 2, COLOR_TEXT_SECONDARY);
-                } else {
-                    // Block grouping: show indented position
-                    String posStr = "  (" + entry.nodeInfo.attachedPos().getX() + ", "
-                            + entry.nodeInfo.attachedPos().getY() + ", "
-                            + entry.nodeInfo.attachedPos().getZ() + ")";
-                    g.drawString(font, posStr, contentX + 12, entryY + 2, COLOR_TEXT_SECONDARY);
+                g.fill(headerX, entryY, headerX + headerW, entryY + NODE_ENTRY_HEIGHT - 2, COLOR_PANEL_ALT);
+                g.renderOutline(headerX, entryY, headerW, NODE_ENTRY_HEIGHT - 2, COLOR_ACCENT_DARK);
+                g.drawString(font, headerText, headerX + NODE_ROW_SIDE_PAD, entryY + 7, COLOR_ACCENT);
+                g.drawString(font, countText, countX, entryY + 7, COLOR_TEXT_SECONDARY);
+                renderToggleButton(g, buttonX, buttonY, HIGHLIGHT_BTN_W, HIGHLIGHT_BTN_H, buttonHovered, active);
+                continue;
+            }
+
+            boolean hovered = mouseX >= headerX && mouseX < headerX + headerW
+                    && mouseY >= entryY && mouseY < entryY + NODE_ENTRY_HEIGHT - 2;
+            int bgColor = hovered ? COLOR_ROW_HOVER : COLOR_ROW;
+            int borderColor = hovered ? COLOR_ACCENT_DARK : COLOR_BORDER;
+            g.fill(headerX, entryY, headerX + headerW, entryY + NODE_ENTRY_HEIGHT - 2, bgColor);
+            g.renderOutline(headerX, entryY, headerW, NODE_ENTRY_HEIGHT - 2, borderColor);
+
+            boolean active = entry.nodeInfo.highlighted();
+            int textX = headerX + (entry.isGrouped ? 16 : NODE_ROW_SIDE_PAD);
+            ItemStack renderStack = ItemStack.EMPTY;
+            ResourceLocation blockId = ResourceLocation.tryParse(entry.nodeInfo.blockName());
+            if (blockId != null) {
+                Item item = BuiltInRegistries.ITEM.get(blockId);
+                if (item != Items.AIR) {
+                    renderStack = new ItemStack(item);
                 }
             }
+
+            if (!renderStack.isEmpty()) {
+                g.renderItem(renderStack, textX, entryY + 2);
+                textX += 20;
+            }
+
+            String positionText = trimText(formatPosition(entry.nodeInfo), 72);
+            int positionX = buttonX - NODE_TEXT_GAP - font.width(positionText);
+            String blockLabel = trimText(resolveBlockLabel(entry.nodeInfo.blockName()),
+                    Math.max(0, positionX - NODE_TEXT_GAP - textX));
+
+            g.drawString(font, blockLabel, textX, entryY + 7, COLOR_TEXT);
+            g.drawString(font, positionText, positionX, entryY + 7, COLOR_TEXT_SECONDARY);
+            renderToggleButton(g, buttonX, buttonY, HIGHLIGHT_BTN_W, HIGHLIGHT_BTN_H, buttonHovered, active);
         }
 
-        // Scroll indicator
         if (renderEntries.size() > NODES_PER_PAGE) {
             String scrollInfo = (nodeMapScrollOffset + 1) + "-"
                     + Math.min(nodeMapScrollOffset + NODES_PER_PAGE, renderEntries.size())
-                    + " of " + renderEntries.size();
-            int scrollX = contentX + contentW - font.width(scrollInfo) - 8;
-            g.drawString(font, scrollInfo, scrollX, contentY + contentH - 14, COLOR_TEXT_SECONDARY);
+                    + " / " + renderEntries.size();
+            g.drawString(font, scrollInfo, contentX + contentW - 12 - font.width(scrollInfo),
+                    contentY + contentH - 14, COLOR_TEXT_MUTED);
         }
     }
 
-    // Helper for grouped node map rendering
-    private static class RenderEntry {
-        final boolean isHeader;
-        final String headerName;
-        final int headerCount;
-        final SyncNetworkNodesPayload.NodeInfo nodeInfo;
-
-        RenderEntry(String headerName, int count) {
-            this.isHeader = true;
-            this.headerName = headerName;
-            this.headerCount = count;
-            this.nodeInfo = null;
-        }
-
-        RenderEntry(SyncNetworkNodesPayload.NodeInfo nodeInfo) {
-            this.isHeader = false;
-            this.headerName = null;
-            this.headerCount = 0;
-            this.nodeInfo = nodeInfo;
-        }
+    private void renderTerminalPanel(GuiGraphics g, int x, int y, int w, int h, String label) {
+        g.fill(x, y, x + w, y + h, COLOR_PANEL);
+        g.renderOutline(x, y, w, h, COLOR_BORDER);
+        g.fill(x + 1, y + 1, x + w - 1, y + PANEL_HEADER_HEIGHT, COLOR_PANEL_HEADER);
+        g.fill(x + 1, y + PANEL_HEADER_HEIGHT, x + w - 1, y + PANEL_HEADER_HEIGHT + 1, COLOR_BORDER);
+        g.drawString(font, trimText(label.toUpperCase(Locale.ROOT), w - 12), x + 6, y + 4, COLOR_ACCENT);
+        renderScanlines(g, x + 1, y + PANEL_HEADER_HEIGHT + 1, w - 2, h - PANEL_HEADER_HEIGHT - 2);
     }
 
-    // ==================== SHARED UI ELEMENTS ====================
+    private void renderStatusBadge(GuiGraphics g, int x, int y, int w, int h, String label) {
+        g.fill(x, y, x + w, y + h, COLOR_BADGE_BG);
+        g.renderOutline(x, y, w, h, COLOR_ACCENT_DARK);
+        int textX = x + (w / 2) - (font.width(label) / 2);
+        int textY = y + (h / 2) - (font.lineHeight / 2);
+        g.drawString(font, label, textX, textY, COLOR_BADGE_TEXT);
+    }
 
-    private static final int BACK_BTN_X = 4;
-    private static final int BACK_BTN_Y = 5;
-    private static final int BACK_BTN_W = 40;
-    private static final int BACK_BTN_H = 16;
+    private void renderScanlines(GuiGraphics g, int x, int y, int w, int h) {
+        for (int row = y; row < y + h; row += 4) {
+            g.fill(x, row, x + w, row + 1, COLOR_SCANLINE);
+        }
+    }
 
     private void renderBackButton(GuiGraphics g, int mouseX, int mouseY) {
-        int bx = leftPos + BACK_BTN_X;
-        int by = topPos + BACK_BTN_Y;
-        boolean hovered = mouseX >= bx && mouseX < bx + BACK_BTN_W
-                && mouseY >= by && mouseY < by + BACK_BTN_H;
-        int bgColor = hovered ? COLOR_BACK_BTN_HOVER : COLOR_BACK_BTN;
-        g.fill(bx, by, bx + BACK_BTN_W, by + BACK_BTN_H, bgColor);
-        g.renderOutline(bx, by, BACK_BTN_W, BACK_BTN_H, COLOR_BORDER);
+        int buttonX = leftPos + BACK_BTN_X;
+        int buttonY = topPos + BACK_BTN_Y;
+        boolean hovered = mouseX >= buttonX && mouseX < buttonX + BACK_BTN_W
+                && mouseY >= buttonY && mouseY < buttonY + BACK_BTN_H;
 
-        String label = "< Back";
-        int lx = bx + (BACK_BTN_W / 2) - (font.width(label) / 2);
-        int ly = by + (BACK_BTN_H / 2) - (font.lineHeight / 2);
-        g.drawString(font, label, lx, ly, COLOR_TEXT);
+        int bgColor = hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG;
+        int borderColor = hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER;
+        g.fill(buttonX, buttonY, buttonX + BACK_BTN_W, buttonY + BACK_BTN_H, bgColor);
+        g.renderOutline(buttonX, buttonY, BACK_BTN_W, BACK_BTN_H, borderColor);
+
+        String label = line("gui.logisticsnetworks.computer.exit");
+        int textX = buttonX + (BACK_BTN_W / 2) - (font.width(label) / 2);
+        int textY = buttonY + (BACK_BTN_H / 2) - (font.lineHeight / 2);
+        g.drawString(font, label, textX, textY, hovered ? COLOR_ACCENT : COLOR_TEXT_SECONDARY);
     }
 
     private boolean isBackButtonClicked(double mouseX, double mouseY) {
-        int bx = leftPos + BACK_BTN_X;
-        int by = topPos + BACK_BTN_Y;
-        return mouseX >= bx && mouseX < bx + BACK_BTN_W
-                && mouseY >= by && mouseY < by + BACK_BTN_H;
+        int buttonX = leftPos + BACK_BTN_X;
+        int buttonY = topPos + BACK_BTN_Y;
+        return mouseX >= buttonX && mouseX < buttonX + BACK_BTN_W
+                && mouseY >= buttonY && mouseY < buttonY + BACK_BTN_H;
     }
-
-    private static final int GROUP_BTN_W = 90;
-    private static final int GROUP_BTN_H = 14;
-
-    private void renderGroupToggle(GuiGraphics g, int mouseX, int mouseY) {
-        String label = switch (groupMode) {
-            case 1 -> "Group: Block";
-            case 2 -> "Group: Label";
-            default -> "Group: None";
-        };
-        int bx = leftPos + imageWidth - GROUP_BTN_W - 8;
-        int by = topPos + 6;
-        boolean hovered = mouseX >= bx && mouseX < bx + GROUP_BTN_W
-                && mouseY >= by && mouseY < by + GROUP_BTN_H;
-        int bgColor = groupMode > 0 ? COLOR_BTN_HOVER : (hovered ? COLOR_BACK_BTN_HOVER : COLOR_BACK_BTN);
-        g.fill(bx, by, bx + GROUP_BTN_W, by + GROUP_BTN_H, bgColor);
-        g.renderOutline(bx, by, GROUP_BTN_W, GROUP_BTN_H, COLOR_BORDER);
-
-        int lx = bx + (GROUP_BTN_W / 2) - (font.width(label) / 2);
-        int ly = by + (GROUP_BTN_H / 2) - (font.lineHeight / 2);
-        g.drawString(font, label, lx, ly, COLOR_TEXT);
-    }
-
-    private boolean isGroupToggleClicked(double mouseX, double mouseY) {
-        int bx = leftPos + imageWidth - GROUP_BTN_W - 8;
-        int by = topPos + 6;
-        return mouseX >= bx && mouseX < bx + GROUP_BTN_W
-                && mouseY >= by && mouseY < by + GROUP_BTN_H;
-    }
-
-    // ==================== INPUT HANDLING ====================
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
-        this.renderTooltip(g, mouseX, mouseY);
+        renderHighlightTooltip(g, mouseX, mouseY);
+        renderTooltip(g, mouseX, mouseY);
+    }
+
+    @Override
+    protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         switch (currentPage) {
             case NETWORK_LIST -> {
-                // Scroll network list
                 if (networkList.size() > NETWORKS_PER_PAGE) {
                     networkScrollOffset -= (int) scrollY;
                     int maxScroll = Math.max(0, networkList.size() - NETWORKS_PER_PAGE);
@@ -525,31 +641,17 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             }
             case NODE_MAP -> {
                 if (!nodeInfoList.isEmpty()) {
-                    int totalEntries;
-                    if (groupMode == 1) {
-                        Set<String> blockNames = new LinkedHashSet<>();
-                        for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
-                            blockNames.add(info.blockName());
-                        }
-                        totalEntries = nodeInfoList.size() + blockNames.size();
-                    } else if (groupMode == 2) {
-                        Set<String> labels = new LinkedHashSet<>();
-                        for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
-                            labels.add(info.nodeLabel().isEmpty() ? "Unlabeled" : info.nodeLabel());
-                        }
-                        totalEntries = nodeInfoList.size() + labels.size();
-                    } else {
-                        totalEntries = nodeInfoList.size();
-                    }
-                    if (totalEntries > NODES_PER_PAGE) {
+                    List<RenderEntry> renderEntries = buildNodeRenderEntries();
+                    if (renderEntries.size() > NODES_PER_PAGE) {
                         nodeMapScrollOffset -= (int) scrollY;
-                        int maxScroll = Math.max(0, totalEntries - NODES_PER_PAGE);
+                        int maxScroll = Math.max(0, renderEntries.size() - NODES_PER_PAGE);
                         nodeMapScrollOffset = Math.max(0, Math.min(nodeMapScrollOffset, maxScroll));
                         return true;
                     }
                 }
             }
-            default -> {}
+            default -> {
+            }
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
@@ -559,8 +661,12 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         if (button == 0) {
             switch (currentPage) {
                 case NETWORK_LIST -> {
-                    if (handleNetworkListClick(mouseX, mouseY)) return true;
-                    if (selectedNetworkId != null && handleOptionButtonClick(mouseX, mouseY)) return true;
+                    if (handleNetworkListClick(mouseX, mouseY)) {
+                        return true;
+                    }
+                    if (selectedNetworkId != null && handleOptionButtonClick(mouseX, mouseY)) {
+                        return true;
+                    }
                 }
                 case ITEM_IO_GRAPH -> {
                     if (isBackButtonClicked(mouseX, mouseY)) {
@@ -575,9 +681,10 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                         nodeMapScrollOffset = 0;
                         return true;
                     }
-                    if (isGroupToggleClicked(mouseX, mouseY)) {
-                        groupMode = (groupMode + 1) % GROUP_MODE_COUNT;
-                        nodeMapScrollOffset = 0;
+                    if (handleVisibilityButtonClick(mouseX, mouseY)) {
+                        return true;
+                    }
+                    if (handleNodeMapClick(mouseX, mouseY)) {
                         return true;
                     }
                 }
@@ -605,31 +712,75 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         return false;
     }
 
+    private boolean handleNodeMapClick(double mouseX, double mouseY) {
+        if (selectedNetworkId == null) {
+            return false;
+        }
+
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int contentW = imageWidth - 20;
+        int headerX = contentX + 8;
+        int headerW = contentW - 16;
+        int listY = contentY + 40;
+        List<RenderEntry> renderEntries = buildNodeRenderEntries();
+
+        for (int i = 0; i < NODES_PER_PAGE && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
+            int index = i + nodeMapScrollOffset;
+            RenderEntry entry = renderEntries.get(index);
+            int entryY = listY + (i * NODE_ENTRY_HEIGHT);
+            int buttonX = headerX + headerW - NODE_ROW_SIDE_PAD - HIGHLIGHT_BTN_W;
+            int buttonY = entryY + ((NODE_ENTRY_HEIGHT - HIGHLIGHT_BTN_H - 2) / 2);
+            boolean buttonClicked = mouseX >= buttonX && mouseX < buttonX + HIGHLIGHT_BTN_W
+                    && mouseY >= buttonY && mouseY < buttonY + HIGHLIGHT_BTN_H;
+
+            if (entry.isHeader) {
+                if (buttonClicked) {
+                    PacketDistributor.sendToServer(new ToggleNetworkLabelHighlightPayload(selectedNetworkId, entry.headerName));
+                    toggleGroupHighlight(entry.headerName);
+                    return true;
+                }
+                if (mouseX >= headerX && mouseX < headerX + headerW
+                        && mouseY >= entryY && mouseY < entryY + NODE_ENTRY_HEIGHT - 2) {
+                    if (collapsedGroups.contains(entry.headerName)) {
+                        collapsedGroups.remove(entry.headerName);
+                    } else {
+                        collapsedGroups.add(entry.headerName);
+                    }
+                    return true;
+                }
+                continue;
+            }
+
+            if (buttonClicked) {
+                PacketDistributor.sendToServer(
+                        new ToggleNetworkNodeHighlightPayload(selectedNetworkId, entry.nodeInfo.nodeId()));
+                toggleNodeHighlight(entry.nodeInfo.nodeId());
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private boolean handleOptionButtonClick(double mouseX, double mouseY) {
         int panelX = leftPos + DETAIL_PANEL_X;
         int panelY = topPos + DETAIL_PANEL_Y;
+        int buttonX = panelX + 12;
+        int buttonWidth = DETAIL_PANEL_WIDTH - 24;
+        int button1Y = panelY + 112;
+        int button2Y = button1Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
 
-        int buttonsAreaY = panelY + 35;
-        int totalButtonsHeight = (OPTION_BTN_HEIGHT * 2) + OPTION_BTN_GAP;
-        int startBtnY = buttonsAreaY + ((DETAIL_PANEL_HEIGHT - 45) - totalButtonsHeight) / 2;
-        int btnX = panelX + (DETAIL_PANEL_WIDTH - OPTION_BTN_WIDTH) / 2;
-
-        // Button 1: Item I/O Graph
-        int btn1Y = startBtnY;
-        if (mouseX >= btnX && mouseX < btnX + OPTION_BTN_WIDTH
-                && mouseY >= btn1Y && mouseY < btn1Y + OPTION_BTN_HEIGHT) {
+        if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
+                && mouseY >= button1Y && mouseY < button1Y + OPTION_BTN_HEIGHT) {
             currentPage = Page.ITEM_IO_GRAPH;
             return true;
         }
 
-        // Button 2: Node Map
-        int btn2Y = startBtnY + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
-        if (mouseX >= btnX && mouseX < btnX + OPTION_BTN_WIDTH
-                && mouseY >= btn2Y && mouseY < btn2Y + OPTION_BTN_HEIGHT) {
+        if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
+                && mouseY >= button2Y && mouseY < button2Y + OPTION_BTN_HEIGHT) {
             currentPage = Page.NODE_MAP;
             nodeMapScrollOffset = 0;
-            groupMode = 0;
-            // Request node data from server
             PacketDistributor.sendToServer(new RequestNetworkNodesPayload(selectedNetworkId));
             return true;
         }
@@ -637,7 +788,202 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         return false;
     }
 
-    // ==================== DATA RECEIVERS ====================
+    private List<RenderEntry> buildNodeRenderEntries() {
+        Map<String, List<SyncNetworkNodesPayload.NodeInfo>> groups = new LinkedHashMap<>();
+        List<SyncNetworkNodesPayload.NodeInfo> unlabeled = new ArrayList<>();
+
+        for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
+            if (info.nodeLabel().isEmpty()) {
+                unlabeled.add(info);
+            } else {
+                groups.computeIfAbsent(info.nodeLabel(), key -> new ArrayList<>()).add(info);
+            }
+        }
+
+        List<RenderEntry> renderEntries = new ArrayList<>();
+        for (Map.Entry<String, List<SyncNetworkNodesPayload.NodeInfo>> group : groups.entrySet()) {
+            renderEntries.add(new RenderEntry(group.getKey(), group.getValue().size()));
+            if (!collapsedGroups.contains(group.getKey())) {
+                for (SyncNetworkNodesPayload.NodeInfo info : group.getValue()) {
+                    renderEntries.add(new RenderEntry(info, true));
+                }
+            }
+        }
+        for (SyncNetworkNodesPayload.NodeInfo info : unlabeled) {
+            renderEntries.add(new RenderEntry(info, false));
+        }
+
+        return renderEntries;
+    }
+
+    private void renderHighlightTooltip(GuiGraphics g, int mouseX, int mouseY) {
+        if (currentPage != Page.NODE_MAP || selectedNetworkId == null) {
+            return;
+        }
+
+        HighlightButtonArea area = findHighlightButton((int) mouseX, (int) mouseY);
+        if (area != null) {
+            g.renderTooltip(font, label("gui.logisticsnetworks.computer.highlight_tooltip"), (int) mouseX,
+                    (int) mouseY);
+        }
+    }
+
+    private HighlightButtonArea findHighlightButton(int mouseX, int mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int contentW = imageWidth - 20;
+        int headerX = contentX + 8;
+        int headerW = contentW - 16;
+        int listY = contentY + 40;
+        List<RenderEntry> renderEntries = buildNodeRenderEntries();
+
+        for (int i = 0; i < NODES_PER_PAGE && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
+            int index = i + nodeMapScrollOffset;
+            RenderEntry entry = renderEntries.get(index);
+            int entryY = listY + (i * NODE_ENTRY_HEIGHT);
+            int buttonX = headerX + headerW - NODE_ROW_SIDE_PAD - HIGHLIGHT_BTN_W;
+            int buttonY = entryY + ((NODE_ENTRY_HEIGHT - HIGHLIGHT_BTN_H - 2) / 2);
+            if (mouseX >= buttonX && mouseX < buttonX + HIGHLIGHT_BTN_W
+                    && mouseY >= buttonY && mouseY < buttonY + HIGHLIGHT_BTN_H) {
+                return new HighlightButtonArea(entry.isHeader, entry.headerName,
+                        entry.isHeader ? null : entry.nodeInfo.nodeId());
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isGroupHighlighted(String label) {
+        boolean found = false;
+        for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
+            if (!label.equals(info.nodeLabel())) {
+                continue;
+            }
+            found = true;
+            if (!info.highlighted()) {
+                return false;
+            }
+        }
+        return found;
+    }
+
+    private void setAllNodeVisibility(boolean visible) {
+        List<SyncNetworkNodesPayload.NodeInfo> updated = new ArrayList<>(nodeInfoList.size());
+        for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
+            updated.add(withVisibility(info, visible));
+        }
+        nodeInfoList = updated;
+    }
+
+    private void toggleGroupHighlight(String label) {
+        boolean makeVisible = false;
+        for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
+            if (label.equals(info.nodeLabel()) && !info.highlighted()) {
+                makeVisible = true;
+                break;
+            }
+        }
+        setGroupHighlight(label, makeVisible);
+    }
+
+    private void setGroupHighlight(String label, boolean highlighted) {
+        List<SyncNetworkNodesPayload.NodeInfo> updated = new ArrayList<>(nodeInfoList.size());
+        for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
+            updated.add(label.equals(info.nodeLabel()) ? withHighlight(info, highlighted) : info);
+        }
+        nodeInfoList = updated;
+    }
+
+    private void toggleNodeHighlight(UUID nodeId) {
+        List<SyncNetworkNodesPayload.NodeInfo> updated = new ArrayList<>(nodeInfoList.size());
+        for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
+            updated.add(info.nodeId().equals(nodeId) ? withHighlight(info, !info.highlighted()) : info);
+        }
+        nodeInfoList = updated;
+    }
+
+    private SyncNetworkNodesPayload.NodeInfo withVisibility(SyncNetworkNodesPayload.NodeInfo info, boolean visible) {
+        return new SyncNetworkNodesPayload.NodeInfo(
+                info.nodeId(),
+                info.nodePos(),
+                info.attachedPos(),
+                info.blockName(),
+                info.nodeLabel(),
+                info.dimension(),
+                visible,
+                info.highlighted());
+    }
+
+    private SyncNetworkNodesPayload.NodeInfo withHighlight(SyncNetworkNodesPayload.NodeInfo info, boolean highlighted) {
+        return new SyncNetworkNodesPayload.NodeInfo(
+                info.nodeId(),
+                info.nodePos(),
+                info.attachedPos(),
+                info.blockName(),
+                info.nodeLabel(),
+                info.dimension(),
+                info.visible(),
+                highlighted);
+    }
+
+    private SyncNetworkListPayload.NetworkEntry getSelectedNetworkEntry() {
+        if (selectedNetworkId == null) {
+            return null;
+        }
+        for (SyncNetworkListPayload.NetworkEntry entry : networkList) {
+            if (entry.id().equals(selectedNetworkId)) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    private Component label(String key, Object... args) {
+        return Component.translatable(key, args);
+    }
+
+    private String line(String key, Object... args) {
+        return label(key, args).getString();
+    }
+
+    private String trimText(String text, int maxWidth) {
+        if (maxWidth <= 0) {
+            return "";
+        }
+        if (font.width(text) <= maxWidth) {
+            return text;
+        }
+        return font.plainSubstrByWidth(text, Math.max(0, maxWidth - 6)) + "...";
+    }
+
+    private String resolveBlockLabel(String blockName) {
+        ResourceLocation blockId = ResourceLocation.tryParse(blockName);
+        if (blockId != null) {
+            Item item = BuiltInRegistries.ITEM.get(blockId);
+            if (item != Items.AIR) {
+                return item.getDefaultInstance().getHoverName().getString();
+            }
+        }
+
+        return blockName;
+    }
+
+    private String formatPosition(SyncNetworkNodesPayload.NodeInfo nodeInfo) {
+        String dimension = nodeInfo.dimension().getPath();
+        if (dimension.equals("overworld")) {
+            dimension = line("gui.logisticsnetworks.computer.dimension.overworld");
+        } else if (dimension.equals("the_nether")) {
+            dimension = line("gui.logisticsnetworks.computer.dimension.nether");
+        } else if (dimension.equals("the_end")) {
+            dimension = line("gui.logisticsnetworks.computer.dimension.end");
+        } else {
+            dimension = trimText(dimension.toUpperCase(Locale.ROOT), 10);
+        }
+        return line("gui.logisticsnetworks.computer.position", dimension,
+                nodeInfo.attachedPos().getX(),
+                nodeInfo.attachedPos().getY(),
+                nodeInfo.attachedPos().getZ());
+    }
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
         System.out.println("[ComputerScreen] Received network list with " + networks.size() + " entries");
@@ -655,5 +1001,32 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             this.nodeInfoList = new ArrayList<>(nodes);
             this.nodeMapScrollOffset = 0;
         }
+    }
+
+    private static class RenderEntry {
+        final boolean isHeader;
+        final String headerName;
+        final int headerCount;
+        final SyncNetworkNodesPayload.NodeInfo nodeInfo;
+        final boolean isGrouped;
+
+        RenderEntry(String headerName, int count) {
+            this.isHeader = true;
+            this.headerName = headerName;
+            this.headerCount = count;
+            this.nodeInfo = null;
+            this.isGrouped = false;
+        }
+
+        RenderEntry(SyncNetworkNodesPayload.NodeInfo nodeInfo, boolean isGrouped) {
+            this.isHeader = false;
+            this.headerName = null;
+            this.headerCount = 0;
+            this.nodeInfo = nodeInfo;
+            this.isGrouped = isGrouped;
+        }
+    }
+
+    private record HighlightButtonArea(boolean header, String label, UUID nodeId) {
     }
 }

@@ -26,6 +26,7 @@ import me.almana.logisticsnetworks.network.ApplyPatternPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
+import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
 import me.almana.logisticsnetworks.network.SetNameFilterPayload;
@@ -35,6 +36,8 @@ import me.almana.logisticsnetworks.network.SyncChannelDataPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
+import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
+import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.neoforged.bus.api.IEventBus;
@@ -128,6 +131,15 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleSetNodeLabel);
                 registrar.playToServer(RequestNetworkLabelsPayload.TYPE, RequestNetworkLabelsPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleRequestNetworkLabels);
+                registrar.playToServer(SetNetworkNodesVisibilityPayload.TYPE,
+                                SetNetworkNodesVisibilityPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetNetworkNodesVisibility);
+                registrar.playToServer(ToggleNetworkNodeHighlightPayload.TYPE,
+                                ToggleNetworkNodeHighlightPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleToggleNetworkNodeHighlight);
+                registrar.playToServer(ToggleNetworkLabelHighlightPayload.TYPE,
+                                ToggleNetworkLabelHighlightPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleToggleNetworkLabelHighlight);
 
                 // Server -> Client
                 registrar.playToClient(SyncNetworkListPayload.TYPE, SyncNetworkListPayload.STREAM_CODEC,
