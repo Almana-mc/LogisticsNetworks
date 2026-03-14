@@ -29,7 +29,6 @@ public class ComputerMenu extends AbstractContainerMenu {
     private ItemStack wrenchStack = ItemStack.EMPTY;
     private final Container wrenchContainer;
 
-    // Server-side constructor
     public ComputerMenu(int containerId, Inventory playerInv, BlockPos computerPos) {
         super(Registration.COMPUTER_MENU.get(), containerId);
         this.computerPos = computerPos;
@@ -37,12 +36,8 @@ public class ComputerMenu extends AbstractContainerMenu {
         loadPlayerWrench(playerInv);
 
         layoutSlots();
-
-        // Don't request network list here - timing issue
-        // Will be called after menu is fully opened
     }
 
-    // Client-side constructor
     public ComputerMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
         super(Registration.COMPUTER_MENU.get(), containerId);
         this.computerPos = buf.readBlockPos();

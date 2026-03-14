@@ -21,9 +21,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -99,16 +102,12 @@ public class ServerPayloadHandler {
 
             NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
 
-            // Resolve target first, before removing from old network
-            // (removing may delete the old network if it becomes empty)
             LogisticsNetwork targetNetwork = resolveNetwork(registry, payload, player);
             if (targetNetwork == null)
                 return;
 
             UUID oldNetworkId = node.getNetworkId();
-            // Skip remove+add if already on the same network
             if (oldNetworkId != null && oldNetworkId.equals(targetNetwork.getId())) {
-                // Just update the name in case it changed
                 node.setNetworkName(targetNetwork.getName());
                 if (player.containerMenu instanceof NodeMenu menu) {
                     menu.sendNetworkListToClient(player);
@@ -120,7 +119,6 @@ public class ServerPayloadHandler {
                 registry.removeNodeFromNetwork(oldNetworkId, node.getUUID());
             }
 
-            // Claim unowned networks on first selection
             if (targetNetwork.getOwnerUuid() == null) {
                 targetNetwork.setOwnerUuid(player.getUUID());
             }
@@ -145,10 +143,10 @@ public class ServerPayloadHandler {
             LogisticsNetwork network = registry.getNetwork(payload.networkId().get());
             if (network == null)
                 return null;
-            // Verify the player owns this network (or it's unowned, teammate, or op)
             if (network.getOwnerUuid() != null
                     && !network.getOwnerUuid().equals(player.getUUID())
-                    && !(FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
+                    && !(FTBTeamsCompat.isLoaded()
+                            && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
                     && !player.hasPermissions(2)) {
                 return null;
             }
@@ -173,10 +171,10 @@ public class ServerPayloadHandler {
             if (network == null)
                 return;
 
-            // Ownership check: must own the network (or it's unowned, teammate, or op)
             if (network.getOwnerUuid() != null
                     && !network.getOwnerUuid().equals(player.getUUID())
-                    && !(FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
+                    && !(FTBTeamsCompat.isLoaded()
+                            && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
                     && !player.hasPermissions(2)) {
                 return;
             }
@@ -184,7 +182,6 @@ public class ServerPayloadHandler {
             network.setName(newName);
             registry.setDirty();
 
-            // Update network name on all nodes in this network
             for (java.util.UUID nodeId : network.getNodeUuids()) {
                 for (ServerLevel level : player.getServer().getAllLevels()) {
                     Entity entity = level.getEntity(nodeId);
@@ -195,7 +192,6 @@ public class ServerPayloadHandler {
                 }
             }
 
-            // Resend the network list to the player
             if (player.containerMenu instanceof NodeMenu menu) {
                 menu.sendNetworkListToClient(player);
             }
@@ -549,7 +545,8 @@ public class ServerPayloadHandler {
     public static void handleApplyPattern(ApplyPatternPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof PatternSetterMenu menu) {
-                menu.applyPattern(payload.useOutputs(), payload.multiplier(), context.player().level().registryAccess());
+                menu.applyPattern(payload.useOutputs(), payload.multiplier(),
+                        context.player().level().registryAccess());
             }
         });
     }
@@ -665,8 +662,6 @@ public class ServerPayloadHandler {
                     label, node.getUUID(), node.getNetworkId());
             node.setNodeLabel(label);
 
-            // If label is non-empty and other nodes in the network have this label,
-            // copy their config onto this node
             if (!label.isEmpty() && node.getNetworkId() != null
                     && node.level() instanceof ServerLevel level) {
                 NetworkRegistry registry = NetworkRegistry.get(level);
@@ -703,7 +698,8 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleSetNetworkNodesVisibility(SetNetworkNodesVisibilityPayload payload, IPayloadContext context) {
+    public static void handleSetNetworkNodesVisibility(SetNetworkNodesVisibilityPayload payload,
+            IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player))
                 return;
@@ -731,7 +727,8 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleToggleNetworkNodeHighlight(ToggleNetworkNodeHighlightPayload payload, IPayloadContext context) {
+    public static void handleToggleNetworkNodeHighlight(ToggleNetworkNodeHighlightPayload payload,
+            IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player))
                 return;
@@ -740,7 +737,8 @@ public class ServerPayloadHandler {
 
             NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
             LogisticsNetwork network = registry.getNetwork(payload.networkId());
-            if (network == null || !canAccessNetwork(player, network) || !network.getNodeUuids().contains(payload.nodeId())) {
+            if (network == null || !canAccessNetwork(player, network)
+                    || !network.getNodeUuids().contains(payload.nodeId())) {
                 return;
             }
 
@@ -751,7 +749,8 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleToggleNetworkLabelHighlight(ToggleNetworkLabelHighlightPayload payload, IPayloadContext context) {
+    public static void handleToggleNetworkLabelHighlight(ToggleNetworkLabelHighlightPayload payload,
+            IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player))
                 return;
@@ -795,6 +794,51 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleRequestOpenNodeSettings(RequestOpenNodeSettingsPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+            if (!(player.containerMenu instanceof ComputerMenu))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network))
+                return;
+
+            if (!network.getNodeUuids().contains(payload.nodeId()))
+                return;
+
+            LogisticsNodeEntity node = findNode(player, payload.nodeId());
+            if (node == null)
+                return;
+
+            player.openMenu(new MenuProvider() {
+                @Override
+                public Component getDisplayName() {
+                    return Component.translatable("gui.logisticsnetworks.node_config");
+                }
+
+                @Override
+                public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
+                    return new NodeMenu(containerId, playerInv, node);
+                }
+            }, buf -> {
+                buf.writeVarInt(node.getId());
+                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                    buf.writeNbt(node.getChannel(i).save(player.level().registryAccess()));
+                }
+                for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
+                    buf.writeNbt(node.getUpgradeItem(i).saveOptional(player.level().registryAccess()));
+                }
+            });
+
+            if (player.containerMenu instanceof NodeMenu menu) {
+                menu.sendNetworkListToClient(player);
+            }
+        });
+    }
+
     public static void handleRequestNetworkLabels(RequestNetworkLabelsPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player))
@@ -827,7 +871,8 @@ public class ServerPayloadHandler {
     public static void propagateToLabelGroup(LogisticsNodeEntity sourceNode, int channelIndex) {
         String label = sourceNode.getNodeLabel();
         if (label.isEmpty() || sourceNode.getNetworkId() == null) {
-            LOGGER.debug("[LabelSync] Skipping propagation: label='{}', networkId={}", label, sourceNode.getNetworkId());
+            LOGGER.debug("[LabelSync] Skipping propagation: label='{}', networkId={}", label,
+                    sourceNode.getNetworkId());
             return;
         }
         if (!(sourceNode.level() instanceof ServerLevel level))

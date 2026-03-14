@@ -42,6 +42,7 @@
   "gui.logisticsnetworks.computer.no_nodes": "No nodes in this network.",
   "gui.logisticsnetworks.computer.attach_device": "Attach a device to populate the table.",
   "gui.logisticsnetworks.computer.highlight_tooltip": "Highlight",
+  "gui.logisticsnetworks.computer.settings_tooltip": "Settings",
   "gui.logisticsnetworks.computer.show": "SHOW",
   "gui.logisticsnetworks.computer.hide": "HIDE",
   "gui.logisticsnetworks.computer.device": "DEVICE",

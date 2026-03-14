@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
+import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
 import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
@@ -56,6 +57,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private static final int VIS_BTN_GAP = 6;
     private static final int HIGHLIGHT_BTN_W = 16;
     private static final int HIGHLIGHT_BTN_H = 12;
+    private static final int SETTINGS_BTN_W = 16;
+    private static final int SETTINGS_BTN_H = 12;
+    private static final int SETTINGS_BTN_GAP = 4;
     private static final int NODE_ROW_SIDE_PAD = 8;
     private static final int NODE_TEXT_GAP = 8;
     private static final int VIS_BTN_Y = 38;
@@ -461,6 +465,28 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         g.fill(centerX - 1, baseBottom, centerX + 1, baseBottom + 1, COLOR_LAMP_BASE);
     }
 
+    private void renderSettingsButton(GuiGraphics g, int x, int y, int w, int h, boolean hovered) {
+        int bgColor = hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG;
+        int borderColor = hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER;
+        g.fill(x, y, x + w, y + h, bgColor);
+        g.renderOutline(x, y, w, h, borderColor);
+        renderGearIcon(g, x, y, w, h, hovered);
+    }
+
+    private void renderGearIcon(GuiGraphics g, int x, int y, int w, int h, boolean hovered) {
+        int cx = x + (w / 2);
+        int cy = y + (h / 2);
+        int color = hovered ? COLOR_ACCENT : COLOR_TEXT_SECONDARY;
+        int hole = hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG;
+
+        g.fill(cx - 2, cy - 2, cx + 2, cy + 2, color);
+        g.fill(cx - 1, cy - 4, cx + 1, cy - 2, color);
+        g.fill(cx - 1, cy + 2, cx + 1, cy + 4, color);
+        g.fill(cx - 4, cy - 1, cx - 2, cy + 1, color);
+        g.fill(cx + 2, cy - 1, cx + 4, cy + 1, color);
+        g.fill(cx - 1, cy - 1, cx + 1, cy + 1, hole);
+    }
+
     private boolean handleVisibilityButtonClick(double mouseX, double mouseY) {
         int hideX = leftPos + imageWidth - 12 - VIS_BTN_W;
         int showX = hideX - VIS_BTN_W - VIS_BTN_GAP;
@@ -513,10 +539,14 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                     && mouseY >= buttonY && mouseY < buttonY + HIGHLIGHT_BTN_H;
 
             if (entry.isHeader) {
+                int settingsX = buttonX - SETTINGS_BTN_GAP - SETTINGS_BTN_W;
+                boolean settingsHovered = mouseX >= settingsX && mouseX < settingsX + SETTINGS_BTN_W
+                        && mouseY >= buttonY && mouseY < buttonY + SETTINGS_BTN_H;
+
                 String marker = collapsedGroups.contains(entry.headerName) ? "[+]" : "[-]";
                 String countText = line("gui.logisticsnetworks.computer.devices_badge", entry.headerCount);
                 boolean active = isGroupHighlighted(entry.headerName);
-                int countX = buttonX - NODE_TEXT_GAP - font.width(countText);
+                int countX = settingsX - NODE_TEXT_GAP - font.width(countText);
                 String headerText = marker + " "
                         + trimText(entry.headerName, Math.max(0, countX - NODE_TEXT_GAP - (headerX + NODE_ROW_SIDE_PAD)));
 
@@ -524,6 +554,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 g.renderOutline(headerX, entryY, headerW, NODE_ENTRY_HEIGHT - 2, COLOR_ACCENT_DARK);
                 g.drawString(font, headerText, headerX + NODE_ROW_SIDE_PAD, entryY + 7, COLOR_ACCENT);
                 g.drawString(font, countText, countX, entryY + 7, COLOR_TEXT_SECONDARY);
+                renderSettingsButton(g, settingsX, buttonY, SETTINGS_BTN_W, SETTINGS_BTN_H, settingsHovered);
                 renderToggleButton(g, buttonX, buttonY, HIGHLIGHT_BTN_W, HIGHLIGHT_BTN_H, buttonHovered, active);
                 continue;
             }
@@ -535,8 +566,23 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             g.fill(headerX, entryY, headerX + headerW, entryY + NODE_ENTRY_HEIGHT - 2, bgColor);
             g.renderOutline(headerX, entryY, headerW, NODE_ENTRY_HEIGHT - 2, borderColor);
 
+            if (entry.isGrouped) {
+                g.fill(headerX + 1, entryY + 1, headerX + 3, entryY + NODE_ENTRY_HEIGHT - 3, COLOR_ACCENT_DARK);
+            }
+
             boolean active = entry.nodeInfo.highlighted();
             int textX = headerX + (entry.isGrouped ? 16 : NODE_ROW_SIDE_PAD);
+
+            int rightAnchor = buttonX;
+            boolean settingsHovered = false;
+            if (!entry.isGrouped) {
+                int settingsX = buttonX - SETTINGS_BTN_GAP - SETTINGS_BTN_W;
+                settingsHovered = mouseX >= settingsX && mouseX < settingsX + SETTINGS_BTN_W
+                        && mouseY >= buttonY && mouseY < buttonY + SETTINGS_BTN_H;
+                renderSettingsButton(g, settingsX, buttonY, SETTINGS_BTN_W, SETTINGS_BTN_H, settingsHovered);
+                rightAnchor = settingsX;
+            }
+
             ItemStack renderStack = ItemStack.EMPTY;
             ResourceLocation blockId = ResourceLocation.tryParse(entry.nodeInfo.blockName());
             if (blockId != null) {
@@ -552,7 +598,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             }
 
             String positionText = trimText(formatPosition(entry.nodeInfo), 72);
-            int positionX = buttonX - NODE_TEXT_GAP - font.width(positionText);
+            int positionX = rightAnchor - NODE_TEXT_GAP - font.width(positionText);
             String blockLabel = trimText(resolveBlockLabel(entry.nodeInfo.blockName()),
                     Math.max(0, positionX - NODE_TEXT_GAP - textX));
 
@@ -735,6 +781,13 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                     && mouseY >= buttonY && mouseY < buttonY + HIGHLIGHT_BTN_H;
 
             if (entry.isHeader) {
+                int settingsX = buttonX - SETTINGS_BTN_GAP - SETTINGS_BTN_W;
+                boolean settingsClicked = mouseX >= settingsX && mouseX < settingsX + SETTINGS_BTN_W
+                        && mouseY >= buttonY && mouseY < buttonY + SETTINGS_BTN_H;
+                if (settingsClicked) {
+                    openFirstNodeInLabel(entry.headerName);
+                    return true;
+                }
                 if (buttonClicked) {
                     PacketDistributor.sendToServer(new ToggleNetworkLabelHighlightPayload(selectedNetworkId, entry.headerName));
                     toggleGroupHighlight(entry.headerName);
@@ -752,6 +805,17 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 continue;
             }
 
+            if (!entry.isGrouped) {
+                int settingsX = buttonX - SETTINGS_BTN_GAP - SETTINGS_BTN_W;
+                boolean settingsClicked = mouseX >= settingsX && mouseX < settingsX + SETTINGS_BTN_W
+                        && mouseY >= buttonY && mouseY < buttonY + SETTINGS_BTN_H;
+                if (settingsClicked) {
+                    PacketDistributor.sendToServer(
+                            new RequestOpenNodeSettingsPayload(selectedNetworkId, entry.nodeInfo.nodeId()));
+                    return true;
+                }
+            }
+
             if (buttonClicked) {
                 PacketDistributor.sendToServer(
                         new ToggleNetworkNodeHighlightPayload(selectedNetworkId, entry.nodeInfo.nodeId()));
@@ -761,6 +825,16 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         }
 
         return false;
+    }
+
+    private void openFirstNodeInLabel(String labelName) {
+        for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
+            if (labelName.equals(info.nodeLabel())) {
+                PacketDistributor.sendToServer(
+                        new RequestOpenNodeSettingsPayload(selectedNetworkId, info.nodeId()));
+                return;
+            }
+        }
     }
 
     private boolean handleOptionButtonClick(double mouseX, double mouseY) {
@@ -821,11 +895,42 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             return;
         }
 
+        if (isSettingsButtonHovered(mouseX, mouseY)) {
+            g.renderTooltip(font, label("gui.logisticsnetworks.computer.settings_tooltip"), mouseX, mouseY);
+            return;
+        }
+
         HighlightButtonArea area = findHighlightButton((int) mouseX, (int) mouseY);
         if (area != null) {
             g.renderTooltip(font, label("gui.logisticsnetworks.computer.highlight_tooltip"), (int) mouseX,
                     (int) mouseY);
         }
+    }
+
+    private boolean isSettingsButtonHovered(int mouseX, int mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int contentW = imageWidth - 20;
+        int headerX = contentX + 8;
+        int headerW = contentW - 16;
+        int listY = contentY + 40;
+        List<RenderEntry> renderEntries = buildNodeRenderEntries();
+
+        for (int i = 0; i < NODES_PER_PAGE && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
+            int index = i + nodeMapScrollOffset;
+            RenderEntry entry = renderEntries.get(index);
+            int entryY = listY + (i * NODE_ENTRY_HEIGHT);
+            int highlightX = headerX + headerW - NODE_ROW_SIDE_PAD - HIGHLIGHT_BTN_W;
+            int buttonY = entryY + ((NODE_ENTRY_HEIGHT - HIGHLIGHT_BTN_H - 2) / 2);
+            int settingsX = highlightX - SETTINGS_BTN_GAP - SETTINGS_BTN_W;
+
+            boolean hasSettings = entry.isHeader || !entry.isGrouped;
+            if (hasSettings && mouseX >= settingsX && mouseX < settingsX + SETTINGS_BTN_W
+                    && mouseY >= buttonY && mouseY < buttonY + SETTINGS_BTN_H) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private HighlightButtonArea findHighlightButton(int mouseX, int mouseY) {

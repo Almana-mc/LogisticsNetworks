@@ -26,6 +26,7 @@ import me.almana.logisticsnetworks.network.ApplyPatternPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
+import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
 import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
@@ -140,6 +141,9 @@ public class Logisticsnetworks {
                 registrar.playToServer(ToggleNetworkLabelHighlightPayload.TYPE,
                                 ToggleNetworkLabelHighlightPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleToggleNetworkLabelHighlight);
+                registrar.playToServer(RequestOpenNodeSettingsPayload.TYPE,
+                                RequestOpenNodeSettingsPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleRequestOpenNodeSettings);
 
                 // Server -> Client
                 registrar.playToClient(SyncNetworkListPayload.TYPE, SyncNetworkListPayload.STREAM_CODEC,
