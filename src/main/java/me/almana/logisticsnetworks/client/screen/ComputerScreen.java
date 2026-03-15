@@ -24,6 +24,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.network.PacketDistributor;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -35,6 +37,8 @@ import java.util.Set;
 import java.util.UUID;
 
 public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private enum Page {
         NETWORK_LIST,
@@ -1294,14 +1298,14 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
-        System.out.println("[ComputerScreen] Received network list with " + networks.size() + " entries");
+        LOGGER.debug("Received network list with {} entries", networks.size());
         for (SyncNetworkListPayload.NetworkEntry entry : networks) {
-            System.out.println("[ComputerScreen]   - " + entry.name() + " (" + entry.nodeCount() + " nodes)");
+            LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
         }
         this.networkList = new ArrayList<>(networks);
         this.networkScrollOffset = Math.min(this.networkScrollOffset,
                 Math.max(0, networkList.size() - NETWORKS_PER_PAGE));
-        System.out.println("[ComputerScreen] Network list updated, now have " + this.networkList.size() + " networks");
+        LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());
     }
 
     public void receiveNetworkNodes(UUID networkId, List<SyncNetworkNodesPayload.NodeInfo> nodes) {

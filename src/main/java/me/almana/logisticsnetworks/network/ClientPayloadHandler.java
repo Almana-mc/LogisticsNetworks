@@ -4,25 +4,29 @@ import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public class ClientPayloadHandler {
 
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     public static void handleSyncNetworkList(SyncNetworkListPayload payload, IPayloadContext context) {
-        System.out.println("[ClientPayloadHandler] Received SyncNetworkListPayload with " + payload.networks().size() + " networks");
+        LOGGER.debug("Received SyncNetworkListPayload with {} networks", payload.networks().size());
         context.enqueueWork(() -> {
             var screen = Minecraft.getInstance().screen;
-            System.out.println("[ClientPayloadHandler] Current screen: " + (screen != null ? screen.getClass().getSimpleName() : "null"));
+            LOGGER.debug("Current screen: {}", screen != null ? screen.getClass().getSimpleName() : "null");
             if (screen instanceof NodeScreen nodeScreen) {
-                System.out.println("[ClientPayloadHandler] Passing to NodeScreen");
+                LOGGER.debug("Passing to NodeScreen");
                 nodeScreen.receiveNetworkList(payload.networks());
             } else if (screen instanceof ComputerScreen computerScreen) {
-                System.out.println("[ClientPayloadHandler] Passing to ComputerScreen");
+                LOGGER.debug("Passing to ComputerScreen");
                 computerScreen.receiveNetworkList(payload.networks());
             } else {
-                System.out.println("[ClientPayloadHandler] Screen is not NodeScreen or ComputerScreen, ignoring");
+                LOGGER.debug("Screen is not NodeScreen or ComputerScreen, ignoring");
             }
         });
     }

@@ -16,11 +16,15 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class ComputerMenu extends AbstractContainerMenu {
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final int WRENCH_SLOT_X = 291;
     private static final int WRENCH_SLOT_Y = 9;
@@ -93,20 +97,20 @@ public class ComputerMenu extends AbstractContainerMenu {
         NetworkRegistry registry = NetworkRegistry.get(level);
         List<LogisticsNetwork> networks = registry.getNetworksForPlayer(player.getUUID());
 
-        System.out.println("[ComputerMenu] Player " + player.getName().getString() + " UUID: " + player.getUUID());
-        System.out.println("[ComputerMenu] Found " + networks.size() + " networks for player");
+        LOGGER.debug("Player {} UUID: {}", player.getName().getString(), player.getUUID());
+        LOGGER.debug("Found {} networks for player", networks.size());
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>();
         for (LogisticsNetwork net : networks) {
-            System.out.println("[ComputerMenu]   Network: " + net.getName() + " (ID: " + net.getId() + ", Nodes: "
-                    + net.getNodeUuids().size() + ", Owner: " + net.getOwnerUuid() + ")");
+            LOGGER.debug("  Network: {} (ID: {}, Nodes: {}, Owner: {})",
+                    net.getName(), net.getId(), net.getNodeUuids().size(), net.getOwnerUuid());
             entries.add(new SyncNetworkListPayload.NetworkEntry(
                     net.getId(),
                     net.getName(),
                     net.getNodeUuids().size()));
         }
 
-        System.out.println("[ComputerMenu] Sending " + entries.size() + " network entries to client");
+        LOGGER.debug("Sending {} network entries to client", entries.size());
         PacketDistributor.sendToPlayer(player, new SyncNetworkListPayload(entries));
     }
 
