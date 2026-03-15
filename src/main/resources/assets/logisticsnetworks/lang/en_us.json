@@ -311,6 +311,10 @@
   "gui.logisticsnetworks.pattern_setter.applied": "Applied!",
   "gui.logisticsnetworks.node.label.set": "Set Label",
   "gui.logisticsnetworks.node.label.clear": "Clear Label",
+  "key.categories.logisticsnetworks": "Logistics Networks",
+  "key.logisticsnetworks.toggle_wrench_hud": "Toggle Wrench HUD",
+  "message.logisticsnetworks.wrench_hud.enabled": "Wrench HUD enabled (press %s to hide)",
+  "message.logisticsnetworks.wrench_hud.disabled": "Wrench HUD disabled (press %s to show)",
   "advancement.logisticsnetworks.root.title": "Logistics Networks",
   "advancement.logisticsnetworks.root.description": "Hold 'G' over items for guide"
 }
