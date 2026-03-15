@@ -4,23 +4,29 @@ navigation:
   position: 0
 ---
 
-# Logistics Networks Guide
+# Logistics Networks
 
-Welcome to the Logistics Networks guide. This mod adds a flexible item, fluid, energy, chemical, and source transfer system using nodes and networks.
+Logistics Networks is an item, fluid, energy, and chemical transfer mod built around nodes and channels.
 
-You can open this guide in-game with:
+## Core Concepts
 
-`/give @s guideme:guide[guideme:guide_id="logisticsnetworks:guide"]`
+- **Nodes** are small entities placed on blocks with storage capabilities (chests, tanks, machines, etc.)
+- **Networks** are logical groups of nodes that share resources
+- **Channels** define what a node does — each node has 9 configurable channels
+- **Filters** control exactly what gets transferred
 
 ## Getting Started
 
-1. **Networks** - Create a network to group your nodes.
-2. **Nodes** - Place nodes on blocks with inventories or tanks.
-3. **Wrench** - Use the wrench to configure nodes, copy settings, and place nodes in bulk.
-4. **Channels** - Set up channels with modes, types, and distribution rules.
-5. **Node Details** - Full reference for every setting in the node GUI.
-6. **Upgrades** - Speed tiers and special upgrades.
-7. **Filters** - Control what resources move and where.
-8. **Pattern Setter** - Write AE2 pattern contents into filters.
+1. Craft a [Wrench](wrench.md) and a [Logistics Node](nodes.md)
+2. Place the node on any block with an inventory, tank, or energy storage
+3. Right-click the node with the wrench to open configuration
+4. Assign the node to a network (or create a new one)
+5. Configure channels to import or export resources
 
-<SubPages icons={true} />
+## Guides
+
+- [Nodes](nodes.md) — Placing, configuring, and labeling nodes
+- [Channels](channels.md) — Import/export, types, batching, and delay
+- [Filters](filters.md) — Controlling what gets transferred
+- [Computer](computer.md) — Network monitoring and telemetry
+- [Upgrades](upgrades.md) — Performance tiers and special upgrades

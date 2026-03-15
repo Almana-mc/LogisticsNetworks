@@ -3,59 +3,26 @@ item_ids: [logisticsnetworks:iron_upgrade, logisticsnetworks:gold_upgrade, logis
 navigation:
   title: Upgrades
   parent: index.md
-  position: 6
+  position: 5
 ---
 
 # Upgrades
 
-Nodes have 4 upgrade slots shared across all channels. The highest speed tier installed on a node determines the caps for that node.
+Upgrades improve node performance or unlock new capabilities. Each node has upgrade slots where upgrade items can be inserted.
 
-## Tier Limits
+## Performance Upgrades
 
-Default values from `config/logistics-network/upgrades.json`:
+Performance upgrades increase batch sizes and reduce minimum tick delay:
 
-1. **None**: min delay 20, item 8, fluid 500, energy 2000, chemical 500, source 500
-2. **Iron**: min delay 10, item 16, fluid 1000, energy 10000, chemical 1000, source 1000
-3. **Gold**: min delay 5, item 32, fluid 5000, energy 50000, chemical 5000, source 5000
-4. **Diamond**: min delay 1, item 64, fluid 20000, energy 250000, chemical 20000, source 20000
-5. **Netherite**: min delay 1, item 10000, fluid 1000000, energy unlimited, chemical 1000000, source 1000000
+- **Iron Upgrade** — Base tier improvement
+- **Gold Upgrade** — Mid tier
+- **Diamond Upgrade** — High tier
+- **Netherite Upgrade** — Maximum performance
 
-These values can be changed in the config file.
-
-## Speed Upgrades
-
-### Iron Upgrade
-
-<RecipeFor id="logisticsnetworks:iron_upgrade" />
-
-### Gold Upgrade
-
-<RecipeFor id="logisticsnetworks:gold_upgrade" />
-
-### Diamond Upgrade
-
-<RecipeFor id="logisticsnetworks:diamond_upgrade" />
-
-### Netherite Upgrade
-
-<RecipeFor id="logisticsnetworks:netherite_upgrade" />
+Higher tiers allow larger batch transfers (more items, mB, or RF per operation) and shorter delays between operations.
 
 ## Special Upgrades
 
-### Dimensional Upgrade
-
-Allows cross-dimension transfers. Both the source and target nodes must have this upgrade installed.
-
-<RecipeFor id="logisticsnetworks:dimensional_upgrade" />
-
-### Mekanism Chemical Upgrade
-
-Unlocks the Chemical channel type on the node. Only works when Mekanism is installed.
-
-<RecipeFor id="logisticsnetworks:mekanism_chemical_upgrade" />
-
-### Ars Source Upgrade
-
-Unlocks the Source channel type on the node. Only works when Ars Nouveau is installed.
-
-<RecipeFor id="logisticsnetworks:ars_source_upgrade" />
+- **Dimensional Upgrade** — Required on both source and destination nodes for cross-dimension transfers. Without this upgrade, nodes in different dimensions cannot exchange resources.
+- **Mekanism Chemical Upgrade** — Unlocks the Chemical channel type for transferring Mekanism chemicals. Requires Mekanism to be installed.
+- **Ars Source Upgrade** — Unlocks the Source channel type for transferring Ars Nouveau source. Requires Ars Nouveau to be installed.
