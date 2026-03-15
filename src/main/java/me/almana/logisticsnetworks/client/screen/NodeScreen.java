@@ -103,7 +103,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private static final int LABEL_PICKER_MAX_VISIBLE = 5;
 
     private int getLabelPickerWidth() {
-        int maxW = font.width("Clear Label") + 24;
+        int maxW = font.width(tr("gui.logisticsnetworks.node.label.clear")) + 24;
         if (labelEditBox != null) {
             maxW = Math.max(maxW, font.width(labelEditBox.getValue()) + 24);
         }
@@ -351,7 +351,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         // Label button centered above settings panel
         String nodeLabel = node.getNodeLabel();
-        String labelDisplay = nodeLabel.isEmpty() ? "Set Label" : nodeLabel;
+        String labelDisplay = nodeLabel.isEmpty() ? tr("gui.logisticsnetworks.node.label.set") : nodeLabel;
         int labelW = font.width(labelDisplay) + 8;
         int labelX = leftPos + 10 + (148 - labelW) / 2;
         int labelY = topPos + 33;
@@ -422,7 +422,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         // Clear button
         int clearY = listY + listH + 2;
-        String clearLabel = "Clear Label";
+        String clearLabel = tr("gui.logisticsnetworks.node.label.clear");
         int clearW = font.width(clearLabel) + 8;
         int clearX = pickerX + (pickerW - clearW) / 2;
         boolean clearHovered = mx >= clearX && mx < clearX + clearW
@@ -775,7 +775,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         // Check clear button
         int clearY = listY + listH + 2;
-        String clearLabel = "Clear Label";
+        String clearLabel = tr("gui.logisticsnetworks.node.label.clear");
         int clearW = font.width(clearLabel) + 8;
         int clearX = pickerX + (pickerW - clearW) / 2;
         if (mx >= clearX && mx < clearX + clearW && my >= clearY && my < clearY + 12) {
@@ -820,7 +820,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         // Label button click
         String nodeLabel = node.getNodeLabel();
-        String labelDisplay = nodeLabel.isEmpty() ? "Set Label" : nodeLabel;
+        String labelDisplay = nodeLabel.isEmpty() ? tr("gui.logisticsnetworks.node.label.set") : nodeLabel;
         int labelW = font.width(labelDisplay) + 8;
         int labelX = leftPos + 10 + (148 - labelW) / 2;
         int labelY = topPos + 33;

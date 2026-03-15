@@ -24,4 +24,4 @@ Each node has 9 channels. A channel defines one transfer operation — what type
 
 ## How Transfers Work
 
-The transfer engine processes each network sequentially. Export channels pull resources from their attached block and push them to matching import channels on the same network. Channels are processed by priority, and each operation respects the configured batch size and delay.
+The transfer engine processes each network sequentially. Export channels are processed in order and pull resources from their attached block, pushing them to matching import channels on the same network. When an export channel finds multiple matching imports, priority determines the order in which imports receive resources. Each operation respects the configured batch size and delay.

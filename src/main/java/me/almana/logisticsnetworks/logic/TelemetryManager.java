@@ -23,7 +23,7 @@ public class TelemetryManager {
     public static final int HISTORY_SIZE = 120;
     private static final int SYNC_INTERVAL = 20;
 
-    record ViewerTarget(UUID networkId, int channelIndex, int typeOrdinal) {}
+    record ViewerTarget(UUID networkId, int channelIndex) {}
     record WatchKey(UUID networkId, int channelIndex) {}
 
     private final Map<ServerPlayer, ViewerTarget> viewerTargets = new HashMap<>();
@@ -32,11 +32,11 @@ public class TelemetryManager {
     private final Map<WatchKey, Integer> historyIndices = new HashMap<>();
     private int tickCounter;
 
-    public void subscribe(UUID networkId, int channelIndex, int typeOrdinal,
+    public void subscribe(UUID networkId, int channelIndex,
             ServerPlayer player, NetworkRegistry registry, MinecraftServer server) {
         unsubscribe(player);
 
-        ViewerTarget target = new ViewerTarget(networkId, channelIndex, typeOrdinal);
+        ViewerTarget target = new ViewerTarget(networkId, channelIndex);
         viewerTargets.put(player, target);
         rebuildActiveNetworks();
 
@@ -45,7 +45,7 @@ public class TelemetryManager {
         historyIndices.putIfAbsent(key, 0);
 
         drainNetwork(networkId, registry, server);
-        sendToPlayer(player, target);
+        sendToPlayer(player, target, registry, server);
     }
 
     public void unsubscribe(ServerPlayer player) {
@@ -67,6 +67,7 @@ public class TelemetryManager {
     public void tick(NetworkRegistry registry, MinecraftServer server) {
         if (viewerTargets.isEmpty()) return;
 
+        int sizeBefore = viewerTargets.size();
         viewerTargets.keySet().removeIf(p -> p.isRemoved() || !(p.containerMenu instanceof ComputerMenu));
         if (viewerTargets.isEmpty()) {
             activeNetworks.clear();
@@ -75,6 +76,9 @@ public class TelemetryManager {
             return;
         }
         rebuildActiveNetworks();
+        if (viewerTargets.size() < sizeBefore) {
+            cleanupUnwatchedHistories();
+        }
 
         tickCounter++;
         if (tickCounter < SYNC_INTERVAL) return;
@@ -85,7 +89,7 @@ public class TelemetryManager {
         }
 
         for (Map.Entry<ServerPlayer, ViewerTarget> entry : viewerTargets.entrySet()) {
-            sendToPlayer(entry.getKey(), entry.getValue());
+            sendToPlayer(entry.getKey(), entry.getValue(), registry, server);
         }
     }
 
@@ -117,14 +121,27 @@ public class TelemetryManager {
         }
     }
 
-    private void sendToPlayer(ServerPlayer player, ViewerTarget target) {
+    private void sendToPlayer(ServerPlayer player, ViewerTarget target, NetworkRegistry registry, MinecraftServer server) {
         WatchKey key = new WatchKey(target.networkId(), target.channelIndex());
         long[] history = histories.get(key);
         if (history == null) return;
 
+        int typeOrdinal = resolveChannelType(target.networkId(), target.channelIndex(), registry, server);
         PacketDistributor.sendToPlayer(player, new SyncTelemetryPayload(
                 target.networkId(), target.channelIndex(),
-                target.typeOrdinal(), history.clone(), historyIndices.getOrDefault(key, 0)));
+                typeOrdinal, history.clone(), historyIndices.getOrDefault(key, 0)));
+    }
+
+    private int resolveChannelType(UUID networkId, int channelIndex, NetworkRegistry registry, MinecraftServer server) {
+        LogisticsNetwork network = registry.getNetwork(networkId);
+        if (network == null) return 0;
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(server, nodeId);
+            if (node == null) continue;
+            ChannelData channel = node.getChannel(channelIndex);
+            if (channel != null && channel.isEnabled()) return channel.getType().ordinal();
+        }
+        return 0;
     }
 
     private void rebuildActiveNetworks() {

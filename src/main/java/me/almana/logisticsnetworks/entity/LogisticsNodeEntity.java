@@ -351,7 +351,11 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     public void setNodeLabel(@Nullable String label) {
-        this.entityData.set(NODE_LABEL, label == null ? "" : label);
+        String sanitized = label == null ? "" : label.trim();
+        if (sanitized.length() > 48) {
+            sanitized = sanitized.substring(0, 48);
+        }
+        this.entityData.set(NODE_LABEL, sanitized);
     }
 
     @Nullable

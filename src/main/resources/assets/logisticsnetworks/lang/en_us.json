@@ -309,6 +309,8 @@
   "gui.logisticsnetworks.pattern_setter.pattern_label": "Pattern:",
   "gui.logisticsnetworks.pattern_setter.filter_label": "Filter:",
   "gui.logisticsnetworks.pattern_setter.applied": "Applied!",
+  "gui.logisticsnetworks.node.label.set": "Set Label",
+  "gui.logisticsnetworks.node.label.clear": "Clear Label",
   "advancement.logisticsnetworks.root.title": "Logistics Networks",
   "advancement.logisticsnetworks.root.description": "Hold 'G' over items for guide"
 }

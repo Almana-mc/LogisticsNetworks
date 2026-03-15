@@ -468,9 +468,12 @@ public class TransferEngine {
             return -1;
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
+        int remaining = batchLimitMb;
         boolean anyReachable = false;
 
         for (ImportTarget target : targets) {
+            if (remaining <= 0)
+                break;
             if (target.node.getUUID().equals(sourceNode.getUUID()))
                 continue;
             if (!target.node.isValidNode())
@@ -489,15 +492,17 @@ public class TransferEngine {
             if (targetHandler == null)
                 continue;
 
-            int filled = executeFluidMove(sourceHandler, targetHandler, batchLimitMb,
+            int filled = executeFluidMove(sourceHandler, targetHandler, remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel.getFilterItems(), target.channel.getFilterMode(),
                     sourceLevel.registryAccess());
-            if (filled > 0) {
-                return filled;
-            }
+            if (filled > 0)
+                remaining -= filled;
         }
-        return anyReachable ? 0 : -1;
+
+        if (!anyReachable)
+            return -1;
+        return batchLimitMb - remaining;
     }
 
     private static int transferEnergy(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -568,9 +573,12 @@ public class TransferEngine {
             return -1;
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
+        int remaining = batchLimit;
         boolean anyReachable = false;
 
         for (ImportTarget target : targets) {
+            if (remaining <= 0)
+                break;
             if (target.node().getUUID().equals(sourceNode.getUUID()))
                 continue;
             if (!target.node().isValidNode())
@@ -587,19 +595,21 @@ public class TransferEngine {
             long moved = ChemicalTransferHelper.transferBetween(
                     sourceLevel, sourcePos, exportChannel.getIoDirection(),
                     targetLevel, targetPos, target.channel().getIoDirection(),
-                    batchLimit,
+                    remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel().getFilterItems(), target.channel().getFilterMode());
             if (Config.debugMode)
                 LOGGER.debug("[Chemical] Transfer {} -> {}: moved={}, batch={}",
-                        sourcePos, targetPos, moved, batchLimit);
+                        sourcePos, targetPos, moved, remaining);
             if (moved > 0)
-                return (int) moved;
+                remaining -= (int) moved;
         }
 
         if (Config.debugMode && !anyReachable)
             LOGGER.debug("[Chemical] No reachable targets for {}", sourcePos);
-        return anyReachable ? 0 : -1;
+        if (!anyReachable)
+            return -1;
+        return batchLimit - remaining;
     }
 
     private static int transferSource(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
