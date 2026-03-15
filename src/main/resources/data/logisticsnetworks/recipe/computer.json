@@ -1,0 +1,30 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "III",
+        "IGI",
+        "ICI"
+    ],
+    "key": {
+        "I": {
+            "item": "minecraft:iron_ingot"
+        },
+        "G": {
+            "item": "minecraft:glass"
+        },
+        "C": {
+            "item": "minecraft:comparator"
+        }
+    },
+    "result": {
+        "id": "logisticsnetworks:computer",
+        "count": 1
+    }
+}
