@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.client;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.client.model.NodeModel;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
+import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
@@ -29,6 +30,7 @@ public class ClientEventHandler {
         event.register(Registration.CLIPBOARD_MENU.get(), ClipboardScreen::new);
         event.register(Registration.MASS_PLACEMENT_MENU.get(), MassPlacementScreen::new);
         event.register(Registration.PATTERN_SETTER_MENU.get(), PatternSetterScreen::new);
+        event.register(Registration.COMPUTER_MENU.get(), ComputerScreen::new);
     }
 
     @SubscribeEvent

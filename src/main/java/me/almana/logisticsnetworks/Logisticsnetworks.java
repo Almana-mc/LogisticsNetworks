@@ -24,11 +24,25 @@ import me.almana.logisticsnetworks.network.SetFilterPayload;
 import me.almana.logisticsnetworks.network.SetNodeUpgradeItemPayload;
 import me.almana.logisticsnetworks.network.ApplyPatternPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
+import me.almana.logisticsnetworks.network.RequestChannelListPayload;
+import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
+import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
+import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
+import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
+import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
 import me.almana.logisticsnetworks.network.SetNameFilterPayload;
 import me.almana.logisticsnetworks.network.SetSlotFilterSlotsPayload;
+import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
+import me.almana.logisticsnetworks.network.SyncChannelDataPayload;
+import me.almana.logisticsnetworks.network.SyncChannelListPayload;
+import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
+import me.almana.logisticsnetworks.network.SyncNetworkLabelsPayload;
+import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
+import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
+import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.neoforged.bus.api.IEventBus;
@@ -116,9 +130,43 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleRenameNetwork);
                 registrar.playToServer(ApplyPatternPayload.TYPE, ApplyPatternPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleApplyPattern);
+                registrar.playToServer(RequestNetworkNodesPayload.TYPE, RequestNetworkNodesPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleRequestNetworkNodes);
+                registrar.playToServer(SetNodeLabelPayload.TYPE, SetNodeLabelPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetNodeLabel);
+                registrar.playToServer(RequestNetworkLabelsPayload.TYPE, RequestNetworkLabelsPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleRequestNetworkLabels);
+                registrar.playToServer(SetNetworkNodesVisibilityPayload.TYPE,
+                                SetNetworkNodesVisibilityPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetNetworkNodesVisibility);
+                registrar.playToServer(ToggleNetworkNodeHighlightPayload.TYPE,
+                                ToggleNetworkNodeHighlightPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleToggleNetworkNodeHighlight);
+                registrar.playToServer(ToggleNetworkLabelHighlightPayload.TYPE,
+                                ToggleNetworkLabelHighlightPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleToggleNetworkLabelHighlight);
+                registrar.playToServer(RequestOpenNodeSettingsPayload.TYPE,
+                                RequestOpenNodeSettingsPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleRequestOpenNodeSettings);
+                registrar.playToServer(SubscribeTelemetryPayload.TYPE,
+                                SubscribeTelemetryPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSubscribeTelemetry);
+                registrar.playToServer(RequestChannelListPayload.TYPE,
+                                RequestChannelListPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleRequestChannelList);
 
                 // Server -> Client
                 registrar.playToClient(SyncNetworkListPayload.TYPE, SyncNetworkListPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkList);
+                registrar.playToClient(SyncNetworkNodesPayload.TYPE, SyncNetworkNodesPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncNetworkNodes);
+                registrar.playToClient(SyncNetworkLabelsPayload.TYPE, SyncNetworkLabelsPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncNetworkLabels);
+                registrar.playToClient(SyncChannelDataPayload.TYPE, SyncChannelDataPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncChannelData);
+                registrar.playToClient(SyncTelemetryPayload.TYPE, SyncTelemetryPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncTelemetry);
+                registrar.playToClient(SyncChannelListPayload.TYPE, SyncChannelListPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncChannelList);
         }
 }

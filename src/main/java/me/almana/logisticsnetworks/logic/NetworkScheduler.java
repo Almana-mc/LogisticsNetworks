@@ -19,5 +19,6 @@ public class NetworkScheduler {
             return;
 
         registry.processDirtyNetworks(event.getServer());
+        registry.getTelemetryManager().tick(registry, event.getServer());
     }
 }

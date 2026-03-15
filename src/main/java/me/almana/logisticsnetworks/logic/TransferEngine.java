@@ -152,10 +152,12 @@ public class TransferEngine {
         List<ImportTarget>[] chemicalImports = resolveCache(network.getChemicalImports(), nodeCache);
         List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache);
 
+        boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
+
         boolean anyActivePotential = false;
         for (LogisticsNodeEntity sourceNode : sortedNodes) {
             if (processNode(sourceNode, itemImports, fluidImports, energyImports, chemicalImports,
-                    sourceImports, signalCache, dimensionalCache, tierCache)) {
+                    sourceImports, signalCache, dimensionalCache, tierCache, telemetryActive)) {
                 anyActivePotential = true;
             }
         }
@@ -225,7 +227,8 @@ public class TransferEngine {
             List<ImportTarget>[] sourceImports,
             Map<UUID, Integer> signalCache,
             Map<UUID, Boolean> dimensionalCache,
-            Map<UUID, Integer> tierCache) {
+            Map<UUID, Integer> tierCache,
+            boolean telemetryActive) {
 
         if (!sourceNode.isValidNode())
             return false;
@@ -282,6 +285,10 @@ public class TransferEngine {
 
             if (result < 0)
                 continue;
+
+            if (telemetryActive && result > 0) {
+                channel.getTelemetry().record(result);
+            }
 
             updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier, targets.size());
         }
@@ -446,7 +453,7 @@ public class TransferEngine {
                     sourceAllowedSlots,
                     sourceLevel.registryAccess());
         }
-        return moved > 0 ? 1 : 0;
+        return moved;
     }
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -462,9 +469,12 @@ public class TransferEngine {
             return -1;
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
+        int remaining = batchLimitMb;
         boolean anyReachable = false;
 
         for (ImportTarget target : targets) {
+            if (remaining <= 0)
+                break;
             if (target.node.getUUID().equals(sourceNode.getUUID()))
                 continue;
             if (!target.node.isValidNode())
@@ -483,14 +493,17 @@ public class TransferEngine {
             if (targetHandler == null)
                 continue;
 
-            if (executeFluidMove(sourceHandler, targetHandler, batchLimitMb,
+            int filled = executeFluidMove(sourceHandler, targetHandler, remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel.getFilterItems(), target.channel.getFilterMode(),
-                    sourceLevel.registryAccess())) {
-                return 1;
-            }
+                    sourceLevel.registryAccess());
+            if (filled > 0)
+                remaining -= filled;
         }
-        return anyReachable ? 0 : -1;
+
+        if (!anyReachable)
+            return -1;
+        return batchLimitMb - remaining;
     }
 
     private static int transferEnergy(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -537,7 +550,7 @@ public class TransferEngine {
 
         if (!anyReachable)
             return -1;
-        return remaining < batchLimitRF ? 1 : 0;
+        return batchLimitRF - remaining;
     }
 
     private static int transferChemicals(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -561,9 +574,12 @@ public class TransferEngine {
             return -1;
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
+        int remaining = batchLimit;
         boolean anyReachable = false;
 
         for (ImportTarget target : targets) {
+            if (remaining <= 0)
+                break;
             if (target.node().getUUID().equals(sourceNode.getUUID()))
                 continue;
             if (!target.node().isValidNode())
@@ -580,19 +596,21 @@ public class TransferEngine {
             long moved = ChemicalTransferHelper.transferBetween(
                     sourceLevel, sourcePos, exportChannel.getIoDirection(),
                     targetLevel, targetPos, target.channel().getIoDirection(),
-                    batchLimit,
+                    remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel().getFilterItems(), target.channel().getFilterMode());
             if (Config.debugMode)
                 LOGGER.debug("[Chemical] Transfer {} -> {}: moved={}, batch={}",
-                        sourcePos, targetPos, moved, batchLimit);
+                        sourcePos, targetPos, moved, remaining);
             if (moved > 0)
-                return 1;
+                remaining -= (int) moved;
         }
 
         if (Config.debugMode && !anyReachable)
             LOGGER.debug("[Chemical] No reachable targets for {}", sourcePos);
-        return anyReachable ? 0 : -1;
+        if (!anyReachable)
+            return -1;
+        return batchLimit - remaining;
     }
 
     private static int transferSource(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -646,7 +664,7 @@ public class TransferEngine {
 
         if (!anyReachable)
             return -1;
-        return remaining < batchLimit ? 1 : 0;
+        return batchLimit - remaining;
     }
 
     private static boolean canReach(LogisticsNodeEntity source, LogisticsNodeEntity target, boolean sourceDim,
@@ -1100,13 +1118,12 @@ public class TransferEngine {
         return remaining;
     }
 
-    private static boolean executeFluidMove(IFluidHandler source, IFluidHandler target, int limitMb,
+    private static int executeFluidMove(IFluidHandler source, IFluidHandler target, int limitMb,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
             HolderLookup.Provider provider) {
 
         int remaining = limitMb;
-        boolean movedAny = false;
         AmountConstraints amountConstraints = collectAmountConstraints(exportFilters, importFilters);
 
         for (int tank = 0; tank < source.getTanks() && remaining > 0; tank++) {
@@ -1161,10 +1178,9 @@ public class TransferEngine {
 
             if (filled > 0) {
                 remaining -= filled;
-                movedAny = true;
             }
         }
-        return movedAny;
+        return limitMb - remaining;
     }
 
     private static int executeEnergyMove(IEnergyStorage source, IEnergyStorage target, int limitRF) {

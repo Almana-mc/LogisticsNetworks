@@ -42,6 +42,7 @@ public final class NodeClipboardConfig {
     private static final String KEY_FILTER_MODE = "filter_mode";
     private static final String KEY_PRIORITY = "priority";
     private static final String KEY_VISIBLE = "renderVisible";
+    private static final String KEY_NODE_LABEL = "node_label";
 
     private static final String KEY_CHANNEL = "channel";
     private static final String KEY_SLOT = "slot";
@@ -56,6 +57,7 @@ public final class NodeClipboardConfig {
     @Nullable
     private String networkName;
     private boolean renderVisible;
+    private String nodeLabel = "";
 
     public enum PasteResult {
         SUCCESS,
@@ -129,6 +131,7 @@ public final class NodeClipboardConfig {
         Arrays.fill(upgradeItems, ItemStack.EMPTY);
         networkId = null;
         networkName = null;
+        nodeLabel = "";
     }
 
     public boolean isChannelEnabled(int channel) {
@@ -296,6 +299,9 @@ public final class NodeClipboardConfig {
         if (networkId != null || (networkName != null && !networkName.isBlank())) {
             return false;
         }
+        if (!nodeLabel.isEmpty()) {
+            return false;
+        }
 
         ChannelConfig defaults = defaultChannelConfig();
         for (int channel = 0; channel < channels.length; channel++) {
@@ -435,6 +441,7 @@ public final class NodeClipboardConfig {
 
         NodeClipboardConfig result = new NodeClipboardConfig(channels, filters, upgrades, networkId, networkName);
         result.renderVisible = node.isRenderVisible();
+        result.nodeLabel = node.getNodeLabel();
         return result;
     }
 
@@ -467,6 +474,9 @@ public final class NodeClipboardConfig {
         }
         root.put(KEY_CHANNELS, channelsTag);
         root.putBoolean(KEY_VISIBLE, renderVisible);
+        if (!nodeLabel.isEmpty()) {
+            root.putString(KEY_NODE_LABEL, nodeLabel);
+        }
 
         ListTag filtersTag = new ListTag();
         for (int channelIndex = 0; channelIndex < filterItems.length; channelIndex++) {
@@ -611,6 +621,9 @@ public final class NodeClipboardConfig {
         NodeClipboardConfig config = new NodeClipboardConfig(channels, filters, upgrades, networkId, networkName);
         if (root.contains(KEY_VISIBLE, Tag.TAG_BYTE)) {
             config.renderVisible = root.getBoolean(KEY_VISIBLE);
+        }
+        if (root.contains(KEY_NODE_LABEL, Tag.TAG_STRING)) {
+            config.nodeLabel = root.getString(KEY_NODE_LABEL);
         }
         return config.isStructurallyValid() ? config : null;
     }
@@ -1064,6 +1077,7 @@ public final class NodeClipboardConfig {
         }
 
         node.setRenderVisible(renderVisible);
+        node.setNodeLabel(nodeLabel);
     }
 
     private static ChannelConfig defaultChannelConfig() {

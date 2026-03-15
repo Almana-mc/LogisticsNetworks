@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.registration;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.item.AmountFilterItem;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
@@ -19,6 +20,7 @@ import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
+import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -28,11 +30,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
+import net.minecraft.world.level.block.Block;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -43,6 +47,8 @@ import java.util.function.Supplier;
 public class Registration {
 
         public static final DeferredRegister<EntityType<?>> ENTITIES = DeferredRegister.create(Registries.ENTITY_TYPE,
+                        Logisticsnetworks.MOD_ID);
+        public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(Registries.BLOCK,
                         Logisticsnetworks.MOD_ID);
         public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Registries.ITEM,
                         Logisticsnetworks.MOD_ID);
@@ -67,6 +73,11 @@ public class Registration {
         public static final DeferredHolder<Item, LogisticsNodeItem> LOGISTICS_NODE_ITEM = ITEMS.register(
                         "logistics_node",
                         () -> new LogisticsNodeItem(new Item.Properties()));
+
+        public static final DeferredHolder<Block, ComputerBlock> COMPUTER_BLOCK = BLOCKS.register("computer",
+                        () -> new ComputerBlock());
+        public static final DeferredHolder<Item, BlockItem> COMPUTER_ITEM = ITEMS.register("computer",
+                        () -> new BlockItem(COMPUTER_BLOCK.get(), new Item.Properties()));
 
         public static final DeferredHolder<Item, WrenchItem> WRENCH = ITEMS.register("wrench",
                         () -> new WrenchItem(new Item.Properties().stacksTo(1)));
@@ -138,6 +149,9 @@ public class Registration {
                         .register(
                                         "pattern_setter_menu",
                                         () -> IMenuTypeExtension.create(PatternSetterMenu::new));
+        public static final DeferredHolder<MenuType<?>, MenuType<ComputerMenu>> COMPUTER_MENU = MENUS.register(
+                        "computer_menu",
+                        () -> IMenuTypeExtension.create(ComputerMenu::new));
 
         public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
@@ -157,6 +171,7 @@ public class Registration {
 
         public static void init(IEventBus modEventBus) {
                 ENTITIES.register(modEventBus);
+                BLOCKS.register(modEventBus);
                 ITEMS.register(modEventBus);
                 MENUS.register(modEventBus);
                 RECIPE_SERIALIZERS.register(modEventBus);
