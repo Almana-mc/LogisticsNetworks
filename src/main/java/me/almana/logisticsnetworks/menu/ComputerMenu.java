@@ -28,6 +28,7 @@ public class ComputerMenu extends AbstractContainerMenu {
     private final BlockPos computerPos;
     private ItemStack wrenchStack = ItemStack.EMPTY;
     private final Container wrenchContainer;
+    private boolean wrenchSlotActive = true;
 
     public ComputerMenu(int containerId, Inventory playerInv, BlockPos computerPos) {
         super(Registration.COMPUTER_MENU.get(), containerId);
@@ -76,6 +77,11 @@ public class ComputerMenu extends AbstractContainerMenu {
             @Override
             public int getMaxStackSize() {
                 return 1;
+            }
+
+            @Override
+            public boolean isActive() {
+                return wrenchSlotActive;
             }
         });
     }
@@ -133,6 +139,10 @@ public class ComputerMenu extends AbstractContainerMenu {
             player.getInventory().placeItemBackInInventory(wrenchStack);
             wrenchStack = ItemStack.EMPTY;
         }
+    }
+
+    public void setWrenchSlotActive(boolean active) {
+        this.wrenchSlotActive = active;
     }
 
     public BlockPos getComputerPos() {

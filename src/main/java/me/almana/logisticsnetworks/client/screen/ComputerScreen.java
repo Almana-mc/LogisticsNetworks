@@ -154,6 +154,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
         renderComputerShell(g);
 
+        menu.setWrenchSlotActive(currentPage == Page.NETWORK_LIST);
+
         switch (currentPage) {
             case NETWORK_LIST -> renderNetworkListPage(g, mouseX, mouseY);
             case IO_CHANNEL_LIST -> renderChannelListPage(g, mouseX, mouseY);
