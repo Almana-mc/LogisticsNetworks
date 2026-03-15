@@ -2,7 +2,11 @@ package me.almana.logisticsnetworks.entity;
 
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -13,13 +17,18 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkHooks;
+import com.mojang.logging.LogUtils;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -27,10 +36,11 @@ import java.util.UUID;
 
 public class LogisticsNodeEntity extends Entity {
 
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     public static final int UPGRADE_SLOT_COUNT = 4;
     public static final int CHANNEL_COUNT = 9;
 
-    // NBT Keys
     private static final String KEY_ATTACHED_POS = "AttachedPos";
     private static final String KEY_VALID = "Valid";
     private static final String KEY_NETWORK_ID = "NetworkId";
@@ -41,6 +51,9 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_CHANNEL_PREFIX = "Channel";
     private static final String KEY_SLOT = "Slot";
     private static final String KEY_ITEM = "Item";
+    private static final String KEY_OWNER_UUID = "OwnerUUID";
+    private static final String KEY_NODE_LABEL = "NodeLabel";
+    private static final String KEY_HIGHLIGHTED = "Highlighted";
 
     private static final EntityDataAccessor<BlockPos> ATTACHED_POS = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -52,6 +65,12 @@ public class LogisticsNodeEntity extends Entity {
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> RENDER_VISIBLE = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Optional<UUID>> OWNER_UUID = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<String> NODE_LABEL = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Boolean> HIGHLIGHTED = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
 
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
@@ -59,15 +78,18 @@ public class LogisticsNodeEntity extends Entity {
     private final long[] channelCooldowns = new long[CHANNEL_COUNT];
     private final int[] roundRobinIndex = new int[CHANNEL_COUNT];
     private final float[] backoffTicks = new float[CHANNEL_COUNT];
+    private final int[] recipeCursorEntry = new int[CHANNEL_COUNT];
+    private final int[] recipeCursorRemaining = new int[CHANNEL_COUNT];
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
         this.noCulling = true;
+        this.setNoGravity(true);
+        this.noPhysics = true;
 
         for (int i = 0; i < CHANNEL_COUNT; i++) {
             this.channels[i] = new ChannelData();
         }
-        this.channels[0] = new ChannelData(true);
 
         Arrays.fill(this.upgradeItems, ItemStack.EMPTY);
     }
@@ -85,6 +107,9 @@ public class LogisticsNodeEntity extends Entity {
         this.entityData.define(NETWORK_ID, Optional.empty());
         this.entityData.define(NETWORK_NAME, "");
         this.entityData.define(RENDER_VISIBLE, true);
+        this.entityData.define(OWNER_UUID, Optional.empty());
+        this.entityData.define(NODE_LABEL, "");
+        this.entityData.define(HIGHLIGHTED, false);
     }
 
     @Override
@@ -102,6 +127,15 @@ public class LogisticsNodeEntity extends Entity {
         }
         if (compound.contains(KEY_VISIBLE)) {
             setRenderVisible(compound.getBoolean(KEY_VISIBLE));
+        }
+        if (compound.contains(KEY_OWNER_UUID)) {
+            setOwnerUUID(compound.getUUID(KEY_OWNER_UUID));
+        }
+        if (compound.contains(KEY_NODE_LABEL, Tag.TAG_STRING)) {
+            setNodeLabel(compound.getString(KEY_NODE_LABEL));
+        }
+        if (compound.contains(KEY_HIGHLIGHTED)) {
+            setHighlighted(compound.getBoolean(KEY_HIGHLIGHTED));
         }
 
         HolderLookup.Provider provider = this.level().registryAccess();
@@ -145,6 +179,16 @@ public class LogisticsNodeEntity extends Entity {
         }
         compound.putBoolean(KEY_VISIBLE, isRenderVisible());
 
+        UUID owner = getOwnerUUID();
+        if (owner != null) {
+            compound.putUUID(KEY_OWNER_UUID, owner);
+        }
+        String label = getNodeLabel();
+        if (!label.isEmpty()) {
+            compound.putString(KEY_NODE_LABEL, label);
+        }
+        compound.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
+
         HolderLookup.Provider provider = level().registryAccess();
 
         CompoundTag channelsTag = new CompoundTag();
@@ -165,6 +209,57 @@ public class LogisticsNodeEntity extends Entity {
         if (!upgradesTag.isEmpty()) {
             compound.put(KEY_UPGRADES, upgradesTag);
         }
+    }
+
+    @Override
+    public void tick() {
+        BlockPos attached = getAttachedPos();
+        if (!attached.equals(BlockPos.ZERO)) {
+            Vec3 target = Vec3.atBottomCenterOf(attached);
+            if (distanceToSqr(target) > 0.001) {
+                setPos(target);
+            }
+
+            if (!this.level().isClientSide() && this.tickCount % 20 == 0) {
+                if (this.level().isEmptyBlock(attached)) {
+                    if (this.getNetworkId() != null && this.level() instanceof ServerLevel serverLevel) {
+                        NetworkRegistry.get(serverLevel)
+                                .removeNodeFromNetwork(this.getNetworkId(), this.getUUID());
+                    }
+                    if (Config.dropNodeItem) {
+                        this.spawnAtLocation(
+                                Registration.LOGISTICS_NODE_ITEM.get());
+                    }
+                    this.dropFilters();
+                    this.dropUpgrades();
+                    this.discard();
+                }
+            }
+        }
+    }
+
+    @Override
+    public boolean isPushable() {
+        return false;
+    }
+
+    @Override
+    public void push(double x, double y, double z) {
+    }
+
+    @Override
+    public void push(Entity entity) {
+    }
+
+    @Override
+    public boolean canBeCollidedWith() {
+        return false;
+    }
+
+    @Override
+    public void kill() {
+        LOGGER.warn(
+                "Attempt to kill LogisticsNodeEntity ignored. Please use '/logisticsnetworks removeNodes' or '/ln removeNodes' instead to safely remove nodes.");
     }
 
     @Override
@@ -224,6 +319,44 @@ public class LogisticsNodeEntity extends Entity {
         this.entityData.set(RENDER_VISIBLE, visible);
     }
 
+    public boolean isHighlighted() {
+        return this.entityData.get(HIGHLIGHTED);
+    }
+
+    public void setHighlighted(boolean highlighted) {
+        this.entityData.set(HIGHLIGHTED, highlighted);
+    }
+
+    @Nullable
+    public UUID getOwnerUUID() {
+        return this.entityData.get(OWNER_UUID).orElse(null);
+    }
+
+    public void setOwnerUUID(@Nullable UUID ownerUuid) {
+        this.entityData.set(OWNER_UUID, Optional.ofNullable(ownerUuid));
+    }
+
+    public boolean isOwnedBy(Player player) {
+        UUID owner = getOwnerUUID();
+        if (owner == null) return true;
+        if (owner.equals(player.getUUID())) return true;
+        if (FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(owner, player.getUUID())) return true;
+        if (player instanceof ServerPlayer sp && sp.hasPermissions(2)) return true;
+        return false;
+    }
+
+    public String getNodeLabel() {
+        return this.entityData.get(NODE_LABEL);
+    }
+
+    public void setNodeLabel(@Nullable String label) {
+        String sanitized = label == null ? "" : label.trim();
+        if (sanitized.length() > 48) {
+            sanitized = sanitized.substring(0, 48);
+        }
+        this.entityData.set(NODE_LABEL, sanitized);
+    }
+
     @Nullable
     public ChannelData getChannel(int index) {
         if (index < 0 || index >= CHANNEL_COUNT)
@@ -265,6 +398,36 @@ public class LogisticsNodeEntity extends Entity {
         }
     }
 
+    public void advanceRoundRobin(int channelIndex, int targetCount, int steps) {
+        if (targetCount > 0 && steps > 0) {
+            roundRobinIndex[channelIndex] = (roundRobinIndex[channelIndex] + steps) % targetCount;
+        }
+    }
+
+    public int getRecipeCursorEntry(int channelIndex) {
+        if (channelIndex < 0 || channelIndex >= CHANNEL_COUNT) return 0;
+        return recipeCursorEntry[channelIndex];
+    }
+
+    public int getRecipeCursorRemaining(int channelIndex) {
+        if (channelIndex < 0 || channelIndex >= CHANNEL_COUNT) return 0;
+        return recipeCursorRemaining[channelIndex];
+    }
+
+    public void setRecipeCursor(int channelIndex, int entryIndex, int remaining) {
+        if (channelIndex >= 0 && channelIndex < CHANNEL_COUNT) {
+            recipeCursorEntry[channelIndex] = entryIndex;
+            recipeCursorRemaining[channelIndex] = remaining;
+        }
+    }
+
+    public void resetRecipeCursor(int channelIndex) {
+        if (channelIndex >= 0 && channelIndex < CHANNEL_COUNT) {
+            recipeCursorEntry[channelIndex] = 0;
+            recipeCursorRemaining[channelIndex] = 0;
+        }
+    }
+
     public float getBackoffTicks(int channelIndex) {
         return backoffTicks[channelIndex];
     }
@@ -300,6 +463,3 @@ public class LogisticsNodeEntity extends Entity {
     }
 
 }
-
-
-

@@ -3,9 +3,11 @@ package me.almana.logisticsnetworks.client;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.client.model.NodeModel;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
+import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
+import me.almana.logisticsnetworks.client.screen.PatternSetterScreen;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraftforge.api.distmarker.Dist;
@@ -29,6 +31,8 @@ public class ClientEventHandler {
             MenuScreens.register(Registration.FILTER_MENU.get(), FilterScreen::new);
             MenuScreens.register(Registration.CLIPBOARD_MENU.get(), ClipboardScreen::new);
             MenuScreens.register(Registration.MASS_PLACEMENT_MENU.get(), MassPlacementScreen::new);
+            MenuScreens.register(Registration.PATTERN_SETTER_MENU.get(), PatternSetterScreen::new);
+            MenuScreens.register(Registration.COMPUTER_MENU.get(), ComputerScreen::new);
         });
     }
 
@@ -37,4 +41,3 @@ public class ClientEventHandler {
         event.registerLayerDefinition(NodeModel.LAYER_LOCATION, NodeModel::createBodyLayer);
     }
 }
-

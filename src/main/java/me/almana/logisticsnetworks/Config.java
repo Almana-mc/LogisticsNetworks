@@ -25,6 +25,7 @@ public class Config {
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
+        if (event.getConfig().getSpec() != SPEC) return;
         dropNodeItem = dropNodeItemSpec.get();
         debugMode = debugModeSpec.get();
     }

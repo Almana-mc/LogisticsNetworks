@@ -1,15 +1,14 @@
 package me.almana.logisticsnetworks.menu;
 
-import me.almana.logisticsnetworks.network.NetworkHandler;
-
-import me.almana.logisticsnetworks.util.ItemStackCompat;
-
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.network.NetworkHandler;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
+import me.almana.logisticsnetworks.util.ItemStackCompat;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
@@ -24,6 +23,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class NodeMenu extends AbstractContainerMenu {
@@ -33,15 +33,16 @@ public class NodeMenu extends AbstractContainerMenu {
 
     // Grid Layout constants
     private static final int FILTER_GRID_X = 168;
-    private static final int FILTER_GRID_Y = 50;
+    private static final int FILTER_GRID_Y = 54;
     private static final int FILTER_SLOTS = 9;
 
-    private static final int UPGRADE_GRID_Y = 119;
+    private static final int UPGRADE_GRID_Y = 123;
     private static final int UPGRADE_SLOTS = LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
     private static final int GRID_STEP = 19;
 
     private final LogisticsNodeEntity node;
     private int selectedChannel = 0;
+    private boolean nodeSlotsActive = true;
 
     private final Container filterContainer;
     private final Container upgradeContainer;
@@ -140,6 +141,10 @@ public class NodeMenu extends AbstractContainerMenu {
         broadcastChanges();
     }
 
+    public void setNodeSlotsVisible(boolean visible) {
+        this.nodeSlotsActive = visible;
+    }
+
     @Override
     public boolean stillValid(Player player) {
         return node != null && node.isAlive() && player.distanceToSqr(node) < 64.0;
@@ -149,9 +154,15 @@ public class NodeMenu extends AbstractContainerMenu {
         if (!(player.level() instanceof ServerLevel level))
             return;
 
-        var networks = NetworkRegistry.get(level).getAllNetworks().values();
-        List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
+        NetworkRegistry registry = NetworkRegistry.get(level);
+        Collection<LogisticsNetwork> networks;
+        if (player.hasPermissions(2)) {
+            networks = registry.getAllNetworks().values();
+        } else {
+            networks = registry.getNetworksForPlayer(player.getUUID());
+        }
 
+        List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {
             entries.add(new SyncNetworkListPayload.NetworkEntry(net.getId(), net.getName(), net.getNodeUuids().size()));
         }
@@ -181,17 +192,29 @@ public class NodeMenu extends AbstractContainerMenu {
                 return ItemStack.EMPTY;
             }
         } else {
+            int targetStart;
+            int targetEnd;
             if (fromStack.is(ModTags.FILTERS)) {
-                if (!moveItemStackTo(fromStack, 0, FILTER_SLOTS, false)) {
-                    return ItemStack.EMPTY;
-                }
+                targetStart = 0;
+                targetEnd = FILTER_SLOTS;
             } else if (fromStack.is(ModTags.UPGRADES)) {
-                if (!moveItemStackTo(fromStack, FILTER_SLOTS, nodeSlotCount, false)) {
-                    return ItemStack.EMPTY;
-                }
+                targetStart = FILTER_SLOTS;
+                targetEnd = nodeSlotCount;
             } else {
                 return ItemStack.EMPTY;
             }
+
+            ItemStack single = fromStack.copyWithCount(1);
+            if (!moveItemStackTo(single, targetStart, targetEnd, false)) {
+                return ItemStack.EMPTY;
+            }
+            fromStack.shrink(1);
+            if (fromStack.isEmpty()) {
+                fromSlot.set(ItemStack.EMPTY);
+            } else {
+                fromSlot.setChanged();
+            }
+            return ItemStack.EMPTY;
         }
 
         if (fromStack.isEmpty()) {
@@ -216,8 +239,11 @@ public class NodeMenu extends AbstractContainerMenu {
         @Override
         public void setItem(int slot, ItemStack stack) {
             if (node != null) {
-                node.getChannel(selectedChannel).setFilterItem(slot, ItemStackCompat.copyWithCount(stack, 1));
+                node.getChannel(selectedChannel).setFilterItem(slot, stack.copyWithCount(1));
                 markDirty();
+                if (node.level() instanceof ServerLevel) {
+                    ServerPayloadHandler.propagateToLabelGroup(node, selectedChannel);
+                }
             }
         }
     }
@@ -286,9 +312,14 @@ public class NodeMenu extends AbstractContainerMenu {
         }
     }
 
-    private static class FilterSlot extends Slot {
+    private class FilterSlot extends Slot {
         FilterSlot(Container c, int i, int x, int y) {
             super(c, i, x, y);
+        }
+
+        @Override
+        public boolean isActive() {
+            return nodeSlotsActive;
         }
 
         @Override
@@ -302,14 +333,30 @@ public class NodeMenu extends AbstractContainerMenu {
         }
     }
 
-    private static class UpgradeSlot extends Slot {
+    private class UpgradeSlot extends Slot {
         UpgradeSlot(Container c, int i, int x, int y) {
             super(c, i, x, y);
         }
 
         @Override
+        public boolean isActive() {
+            return nodeSlotsActive;
+        }
+
+        @Override
         public boolean mayPlace(ItemStack stack) {
-            return !stack.isEmpty() && stack.is(ModTags.UPGRADES);
+            if (stack.isEmpty() || !stack.is(ModTags.UPGRADES)) {
+                return false;
+            }
+            for (int i = 0; i < UPGRADE_SLOTS; i++) {
+                if (i == getContainerSlot())
+                    continue;
+                ItemStack existing = upgradeContainer.getItem(i);
+                if (!existing.isEmpty() && ItemStack.isSameItem(existing, stack)) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
@@ -318,7 +365,3 @@ public class NodeMenu extends AbstractContainerMenu {
         }
     }
 }
-
-
-
-

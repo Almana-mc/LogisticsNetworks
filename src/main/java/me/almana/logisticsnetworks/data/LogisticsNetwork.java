@@ -23,11 +23,13 @@ public class LogisticsNetwork {
     private static final String KEY_ID = "Id";
     private static final String KEY_NAME = "Name";
     private static final String KEY_SLEEPING = "Sleeping";
+    private static final String KEY_OWNER_UUID = "OwnerUUID";
     private static final String KEY_NODES = "Nodes";
     private static final String KEY_NODE_UUID = "Node";
 
     private final UUID id;
     private String name;
+    private UUID ownerUuid;
     private final Set<UUID> nodeUuids = new HashSet<>();
     private boolean sleeping = true;
 
@@ -70,6 +72,9 @@ public class LogisticsNetwork {
         tag.putUUID(KEY_ID, id);
         tag.putString(KEY_NAME, name);
         tag.putBoolean(KEY_SLEEPING, sleeping);
+        if (ownerUuid != null) {
+            tag.putUUID(KEY_OWNER_UUID, ownerUuid);
+        }
 
         ListTag nodesTag = new ListTag();
         for (UUID uuid : nodeUuids) {
@@ -91,6 +96,9 @@ public class LogisticsNetwork {
         }
         if (tag.contains(KEY_SLEEPING)) {
             network.sleeping = tag.getBoolean(KEY_SLEEPING);
+        }
+        if (tag.hasUUID(KEY_OWNER_UUID)) {
+            network.ownerUuid = tag.getUUID(KEY_OWNER_UUID);
         }
 
         if (tag.contains(KEY_NODES)) {
@@ -126,6 +134,14 @@ public class LogisticsNetwork {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public UUID getOwnerUuid() {
+        return ownerUuid;
+    }
+
+    public void setOwnerUuid(UUID ownerUuid) {
+        this.ownerUuid = ownerUuid;
     }
 
     public Set<UUID> getNodeUuids() {

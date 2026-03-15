@@ -12,25 +12,31 @@ import me.almana.logisticsnetworks.item.ModFilterItem;
 import me.almana.logisticsnetworks.item.NameFilterItem;
 import me.almana.logisticsnetworks.item.NbtFilterItem;
 import me.almana.logisticsnetworks.item.NodeUpgradeItem;
+import me.almana.logisticsnetworks.item.PatternSetterItem;
 import me.almana.logisticsnetworks.item.SlotFilterItem;
 import me.almana.logisticsnetworks.item.TagFilterItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
+import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
+import net.minecraft.world.level.block.Block;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.registries.DeferredRegister;
@@ -41,6 +47,8 @@ import java.util.function.Supplier;
 public class Registration {
 
         public static final DeferredRegister<EntityType<?>> ENTITIES = DeferredRegister.create(Registries.ENTITY_TYPE,
+                        Logisticsnetworks.MOD_ID);
+        public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(Registries.BLOCK,
                         Logisticsnetworks.MOD_ID);
         public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Registries.ITEM,
                         Logisticsnetworks.MOD_ID);
@@ -65,6 +73,11 @@ public class Registration {
         public static final RegistryObject<LogisticsNodeItem> LOGISTICS_NODE_ITEM = ITEMS.register(
                         "logistics_node",
                         () -> new LogisticsNodeItem(new Item.Properties()));
+
+        public static final RegistryObject<ComputerBlock> COMPUTER_BLOCK = BLOCKS.register("computer",
+                        () -> new ComputerBlock());
+        public static final RegistryObject<BlockItem> COMPUTER_ITEM = ITEMS.register("computer",
+                        () -> new BlockItem(COMPUTER_BLOCK.get(), new Item.Properties()));
 
         public static final RegistryObject<WrenchItem> WRENCH = ITEMS.register("wrench",
                         () -> new WrenchItem(new Item.Properties().stacksTo(1)));
@@ -115,6 +128,11 @@ public class Registration {
                                         "ars_source_upgrade",
                                         () -> new ArsSourceUpgradeItem(new Item.Properties()));
 
+        public static final RegistryObject<PatternSetterItem> PATTERN_SETTER = ITEMS
+                        .register(
+                                        "pattern_setter",
+                                        () -> new PatternSetterItem(new Item.Properties()));
+
         public static final RegistryObject<MenuType<NodeMenu>> NODE_MENU = MENUS.register("node_menu",
                         () -> IForgeMenuType.create(NodeMenu::new));
         public static final RegistryObject<MenuType<FilterMenu>> FILTER_MENU = MENUS.register(
@@ -127,6 +145,13 @@ public class Registration {
                         .register(
                                         "mass_placement_menu",
                                         () -> IForgeMenuType.create(MassPlacementMenu::new));
+        public static final RegistryObject<MenuType<PatternSetterMenu>> PATTERN_SETTER_MENU = MENUS
+                        .register(
+                                        "pattern_setter_menu",
+                                        () -> IForgeMenuType.create(PatternSetterMenu::new));
+        public static final RegistryObject<MenuType<ComputerMenu>> COMPUTER_MENU = MENUS.register(
+                        "computer_menu",
+                        () -> IForgeMenuType.create(ComputerMenu::new));
 
         public static final RegistryObject<SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
@@ -146,6 +171,7 @@ public class Registration {
 
         public static void init(IEventBus modEventBus) {
                 ENTITIES.register(modEventBus);
+                BLOCKS.register(modEventBus);
                 ITEMS.register(modEventBus);
                 MENUS.register(modEventBus);
                 RECIPE_SERIALIZERS.register(modEventBus);

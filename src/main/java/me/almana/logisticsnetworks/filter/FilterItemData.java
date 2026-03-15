@@ -328,6 +328,90 @@ public final class FilterItemData {
         return false;
     }
 
+    public static int getEntryAmount(ItemStack stack, int slot) {
+        if (!isFilterItem(stack))
+            return 0;
+        CompoundTag root = getRoot(stack);
+        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+        for (Tag t : list) {
+            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
+                return entry.contains("amount", Tag.TAG_INT) ? entry.getInt("amount") : 0;
+            }
+        }
+        return 0;
+    }
+
+    @Nullable
+    public static String getEntryTag(ItemStack stack, int slot) {
+        if (!isFilterItem(stack))
+            return null;
+        CompoundTag root = getRoot(stack);
+        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+        for (Tag t : list) {
+            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
+                if (entry.contains("tag", Tag.TAG_STRING)) {
+                    return entry.getString("tag");
+                }
+            }
+        }
+        return null;
+    }
+
+    public static boolean hasAnyAmountEntries(ItemStack stack) {
+        if (!isFilterItem(stack))
+            return false;
+        ListTag list = getRoot(stack).getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+        for (Tag t : list) {
+            if (t instanceof CompoundTag c && c.contains("amount", Tag.TAG_INT) && c.getInt("amount") > 0)
+                return true;
+        }
+        return false;
+    }
+
+    public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
+            HolderLookup.Provider provider) {
+        if (!isFilterItem(filter) || candidate.isEmpty())
+            return 0;
+        int cap = getCapacity(filter);
+        for (int i = 0; i < cap; i++) {
+            String tag = getEntryTag(filter, i);
+            if (tag != null) {
+                boolean tagMatch = candidate.getTags()
+                        .map(t -> t.location().toString())
+                        .anyMatch(tag::equals);
+                if (tagMatch)
+                    return getEntryAmount(filter, i);
+                continue;
+            }
+            ItemStack entry = getEntry(filter, i, provider);
+            if (!entry.isEmpty() && ItemStack.isSameItem(entry, candidate)) {
+                return getEntryAmount(filter, i);
+            }
+        }
+        return 0;
+    }
+
+    public static int getFluidAmountThresholdFull(ItemStack filter, FluidStack candidate,
+            @Nullable HolderLookup.Provider provider) {
+        if (!isFilterItem(filter) || candidate.isEmpty())
+            return 0;
+        int cap = getCapacity(filter);
+        for (int i = 0; i < cap; i++) {
+            String tag = getEntryTag(filter, i);
+            if (tag != null) {
+                boolean tagMatch = candidate.getFluid().builtInRegistryHolder().tags()
+                        .anyMatch(t -> t.location().toString().equals(tag));
+                if (tagMatch)
+                    return getEntryAmount(filter, i);
+                continue;
+            }
+            FluidStack entry = getFluidEntry(filter, i);
+            if (!entry.isEmpty() && entry.isFluidEqual(candidate))
+                return getEntryAmount(filter, i);
+        }
+        return 0;
+    }
+
     public static boolean hasAnyChemicalEntries(ItemStack stack) {
         return hasEntryType(stack, KEY_CHEMICAL_ID);
     }

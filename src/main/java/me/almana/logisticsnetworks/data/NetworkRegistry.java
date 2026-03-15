@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -26,6 +27,7 @@ public class NetworkRegistry extends SavedData {
 
     private final Map<UUID, LogisticsNetwork> networks = new HashMap<>();
     private final Set<UUID> dirtyNetworks = new HashSet<>();
+    private final TelemetryManager telemetryManager = new TelemetryManager();
 
     public NetworkRegistry() {
     }
@@ -88,8 +90,22 @@ public class NetworkRegistry extends SavedData {
         return networks.get(id);
     }
 
+    public TelemetryManager getTelemetryManager() {
+        return telemetryManager;
+    }
+
     public Map<UUID, LogisticsNetwork> getAllNetworks() {
         return Collections.unmodifiableMap(networks);
+    }
+
+    public Collection<LogisticsNetwork> getNetworksForPlayer(UUID playerUuid) {
+        List<LogisticsNetwork> result = new ArrayList<>();
+        for (LogisticsNetwork network : networks.values()) {
+            if (playerUuid.equals(network.getOwnerUuid())) {
+                result.add(network);
+            }
+        }
+        return result;
     }
 
     public void markNetworkDirty(UUID networkId) {

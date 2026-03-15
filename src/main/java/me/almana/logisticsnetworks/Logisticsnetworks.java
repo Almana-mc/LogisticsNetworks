@@ -20,6 +20,7 @@ public class Logisticsnetworks {
         NetworkHandler.register();
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC, "logistics-network/common.toml");
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC, "logistics-network/client.toml");
         UpgradeLimitsConfig.load();
     }
 }

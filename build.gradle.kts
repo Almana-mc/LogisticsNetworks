@@ -36,6 +36,9 @@ val modDescription = property("mod_description") as String
 val jeiVersion = property("jei_version") as String
 val mekanismVersion = property("mekanism_version") as String
 val arsNouveauVersion = property("ars_nouveau_version") as String
+val jadeVersion = property("jade_version") as String
+val ae2Version = property("ae2_version") as String
+val ftbTeamsVersion = property("ftb_teams_version") as String
 
 version = "${minecraftVersion}-${modVersion}"
 group = modGroupId
@@ -95,6 +98,8 @@ repositories {
     mavenLocal()
     maven(url = uri("https://maven.blamejared.com"))
     maven(url = uri("https://modmaven.dev/"))
+    maven(url = uri("https://api.modrinth.com/maven"))
+    maven(url = uri("https://maven.ftb.dev/releases"))
 }
 
 dependencies {
@@ -106,6 +111,9 @@ dependencies {
 
     compileOnly("mekanism:Mekanism:${mekanismVersion}")
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraftVersion}:${arsNouveauVersion}")
+    compileOnly("maven.modrinth:jade:${jadeVersion}")
+    compileOnly("appeng:appliedenergistics2-forge:${ae2Version}")
+    compileOnly("dev.ftb.mods:ftb-teams-forge-${minecraftVersion}:${ftbTeamsVersion}") { isTransitive = false }
 }
 
 tasks.withType<JavaCompile>().configureEach {

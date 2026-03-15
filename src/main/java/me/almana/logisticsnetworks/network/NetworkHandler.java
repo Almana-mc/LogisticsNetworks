@@ -52,8 +52,29 @@ public final class NetworkHandler {
         registerServer(CycleWrenchModePayload.class, CycleWrenchModePayload.STREAM_CODEC, ServerPayloadHandler::handleCycleWrenchMode);
         registerServer(MassSelectConnectedPayload.class, MassSelectConnectedPayload.STREAM_CODEC, ServerPayloadHandler::handleMassSelectConnected);
         registerServer(CopyPasteConnectedPayload.class, CopyPasteConnectedPayload.STREAM_CODEC, ServerPayloadHandler::handleCopyPasteConnected);
+        registerServer(OpenFilterInSlotPayload.class, OpenFilterInSlotPayload.STREAM_CODEC, ServerPayloadHandler::handleOpenFilterInSlot);
+        registerServer(RenameNetworkPayload.class, RenameNetworkPayload.STREAM_CODEC, ServerPayloadHandler::handleRenameNetwork);
+        registerServer(ApplyPatternPayload.class, ApplyPatternPayload.STREAM_CODEC, ServerPayloadHandler::handleApplyPattern);
+        registerServer(RequestNetworkNodesPayload.class, RequestNetworkNodesPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestNetworkNodes);
+        registerServer(RequestNetworkLabelsPayload.class, RequestNetworkLabelsPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestNetworkLabels);
+        registerServer(RequestOpenNodeSettingsPayload.class, RequestOpenNodeSettingsPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestOpenNodeSettings);
+        registerServer(SetNodeLabelPayload.class, SetNodeLabelPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNodeLabel);
+        registerServer(SetNetworkNodesVisibilityPayload.class, SetNetworkNodesVisibilityPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNetworkNodesVisibility);
+        registerServer(ToggleNetworkNodeHighlightPayload.class, ToggleNetworkNodeHighlightPayload.STREAM_CODEC, ServerPayloadHandler::handleToggleNetworkNodeHighlight);
+        registerServer(ToggleNetworkLabelHighlightPayload.class, ToggleNetworkLabelHighlightPayload.STREAM_CODEC, ServerPayloadHandler::handleToggleNetworkLabelHighlight);
+        registerServer(SubscribeTelemetryPayload.class, SubscribeTelemetryPayload.STREAM_CODEC, ServerPayloadHandler::handleSubscribeTelemetry);
+        registerServer(RequestChannelListPayload.class, RequestChannelListPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestChannelList);
+        registerServer(SetFilterEntryAmountPayload.class, SetFilterEntryAmountPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntryAmount);
+        registerServer(SetFilterEntryTagPayload.class, SetFilterEntryTagPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntryTag);
+        registerServer(SetFilterEntryNbtPayload.class, SetFilterEntryNbtPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntryNbt);
+        registerServer(SetFilterEntryDurabilityPayload.class, SetFilterEntryDurabilityPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntryDurability);
 
         registerClient(SyncNetworkListPayload.class, SyncNetworkListPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkList);
+        registerClient(SyncNetworkNodesPayload.class, SyncNetworkNodesPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkNodes);
+        registerClient(SyncNetworkLabelsPayload.class, SyncNetworkLabelsPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkLabels);
+        registerClient(SyncChannelDataPayload.class, SyncChannelDataPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncChannelData);
+        registerClient(SyncTelemetryPayload.class, SyncTelemetryPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncTelemetry);
+        registerClient(SyncChannelListPayload.class, SyncChannelListPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncChannelList);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {
