@@ -1,11 +1,16 @@
 package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.menu.ComputerMenu;
+import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
 import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
+import me.almana.logisticsnetworks.network.RequestChannelListPayload;
+import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
+import me.almana.logisticsnetworks.network.SyncChannelListPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
+import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import net.minecraft.client.gui.GuiGraphics;
@@ -33,7 +38,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     private enum Page {
         NETWORK_LIST,
-        ITEM_IO_GRAPH,
+        IO_CHANNEL_LIST,
+        IO_CHANNEL_GRAPH,
         NODE_MAP
     }
 
@@ -68,6 +74,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private static final int BACK_BTN_W = 52;
     private static final int BACK_BTN_H = 14;
     private static final int PANEL_HEADER_HEIGHT = 14;
+    private static final int CHANNEL_ENTRY_HEIGHT = 18;
+    private static final int CHANNELS_PER_PAGE = 7;
 
     private static final int COLOR_FRAME = 0xE0181E1A;
     private static final int COLOR_FRAME_EDGE = 0xFF73806F;
@@ -100,6 +108,10 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private static final int COLOR_LAMP_ON = 0xFF72A7FF;
     private static final int COLOR_LAMP_ON_GLOW = 0xFFBED6FF;
     private static final int COLOR_LAMP_BASE = 0xFF8FA39C;
+    private static final int COLOR_FLUID_BAR = 0xFF6EB4E8;
+    private static final int COLOR_ENERGY_BAR = 0xFFE8D46E;
+    private static final int COLOR_CHEMICAL_BAR = 0xFFD070E8;
+    private static final int COLOR_SOURCE_BAR = 0xFF70E8D0;
 
     private Page currentPage = Page.NETWORK_LIST;
     private List<SyncNetworkListPayload.NetworkEntry> networkList = new ArrayList<>();
@@ -110,6 +122,14 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private List<SyncNetworkNodesPayload.NodeInfo> nodeInfoList = new ArrayList<>();
     private int nodeMapScrollOffset = 0;
     private final Set<String> collapsedGroups = new HashSet<>();
+
+    private List<SyncChannelListPayload.ChannelEntry> channelList = new ArrayList<>();
+    private int channelListScrollOffset;
+    private int watchedChannelIndex;
+    private int watchedTypeOrdinal;
+    private long[] telemetryHistory = new long[TelemetryManager.HISTORY_SIZE];
+    private int telemetryIndex;
+    private boolean telemetrySubscribed;
 
     public ComputerScreen(ComputerMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -125,12 +145,19 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     @Override
+    public void removed() {
+        unsubscribeTelemetry();
+        super.removed();
+    }
+
+    @Override
     protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
         renderComputerShell(g);
 
         switch (currentPage) {
             case NETWORK_LIST -> renderNetworkListPage(g, mouseX, mouseY);
-            case ITEM_IO_GRAPH -> renderItemIOGraphPage(g, mouseX, mouseY);
+            case IO_CHANNEL_LIST -> renderChannelListPage(g, mouseX, mouseY);
+            case IO_CHANNEL_GRAPH -> renderChannelGraphPage(g, mouseX, mouseY);
             case NODE_MAP -> renderNodeMapPage(g, mouseX, mouseY);
         }
     }
@@ -314,69 +341,195 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         g.drawString(font, detail, x + 8, y + 20, COLOR_TEXT_SECONDARY);
     }
 
-    private void renderItemIOGraphPage(GuiGraphics g, int mouseX, int mouseY) {
+    private void renderChannelListPage(GuiGraphics g, int mouseX, int mouseY) {
         int contentX = leftPos + 10;
         int contentY = topPos + 34;
         int contentW = imageWidth - 20;
         int contentH = imageHeight - 44;
 
         renderTerminalPanel(g, contentX, contentY, contentW, contentH, "");
-        renderItemIOPreview(g, contentX, contentY, contentW, contentH);
         renderBackButton(g, mouseX, mouseY);
         g.drawString(font, trimText(line("gui.logisticsnetworks.computer.io_monitor_title", selectedNetworkName),
                         contentW - 88),
                 contentX + 64, contentY + 4, COLOR_ACCENT);
-    }
 
-    private void renderItemIOPreview(GuiGraphics g, int contentX, int contentY, int contentW, int contentH) {
-        int graphX = contentX + 10;
-        int graphY = contentY + 26;
-        int graphW = contentW - 20;
-        int graphH = 86;
-
-        g.fill(graphX, graphY, graphX + graphW, graphY + graphH, COLOR_PANEL_ALT);
-        g.renderOutline(graphX, graphY, graphW, graphH, COLOR_BORDER);
-
-        for (int x = graphX + 12; x < graphX + graphW; x += 18) {
-            g.fill(x, graphY + 4, x + 1, graphY + graphH - 4, COLOR_GRAPH_GRID);
-        }
-        for (int y = graphY + 8; y < graphY + graphH; y += 14) {
-            g.fill(graphX + 4, y, graphX + graphW - 4, y + 1, COLOR_GRAPH_GRID);
+        if (channelList.isEmpty()) {
+            g.drawString(font, label("gui.logisticsnetworks.computer.no_channels"), contentX + 12, contentY + 28,
+                    COLOR_TEXT_MUTED);
+            g.drawString(font, label("gui.logisticsnetworks.computer.enable_channels_hint"), contentX + 12,
+                    contentY + 40, COLOR_TEXT_MUTED);
+            return;
         }
 
-        int[] bars = { 14, 28, 20, 44, 52, 34, 40, 66, 50, 32, 58, 47 };
-        int barX = graphX + 12;
-        for (int height : bars) {
-            int top = graphY + graphH - 8 - height;
-            g.fill(barX, top, barX + 10, graphY + graphH - 8, COLOR_GRAPH);
-            g.fill(barX, top, barX + 10, top + 2, COLOR_ACCENT);
-            barX += 18;
-        }
-
-        g.drawString(font, label("gui.logisticsnetworks.computer.telemetry_buffer"), graphX + 8, graphY + 6,
+        int headerX = contentX + 8;
+        int headerY = contentY + 22;
+        int headerW = contentW - 16;
+        g.fill(headerX, headerY, headerX + headerW, headerY + 14, COLOR_PANEL_ALT);
+        g.renderOutline(headerX, headerY, headerW, 14, COLOR_BORDER);
+        g.drawString(font, label("gui.logisticsnetworks.computer.channel_header_device"), headerX + 8, headerY + 3,
                 COLOR_TEXT_SECONDARY);
+        g.drawString(font, label("gui.logisticsnetworks.computer.channel_header_type"), headerX + headerW - 72,
+                headerY + 3, COLOR_TEXT_SECONDARY);
 
-        int statY = graphY + graphH + 12;
-        renderMetricBlock(g, graphX, statY, 86, 32,
-                line("gui.logisticsnetworks.computer.metric.input"),
-                line("gui.logisticsnetworks.computer.metric.stable"));
-        renderMetricBlock(g, graphX + 96, statY, 86, 32,
-                line("gui.logisticsnetworks.computer.metric.output"),
-                line("gui.logisticsnetworks.computer.metric.standby"));
-        renderMetricBlock(g, graphX + 192, statY, 86, 32,
-                line("gui.logisticsnetworks.computer.metric.cache"),
-                line("gui.logisticsnetworks.computer.metric.empty"));
-        g.drawString(font, label("gui.logisticsnetworks.computer.live_capture_pending"), graphX, statY + 50,
-                COLOR_TEXT_MUTED);
-        g.drawString(font, label("gui.logisticsnetworks.computer.monitor_ready"), graphX, statY + 62,
-                COLOR_TEXT_MUTED);
+        int listY = contentY + 40;
+        int maxScroll = Math.max(0, channelList.size() - CHANNELS_PER_PAGE);
+        channelListScrollOffset = Math.max(0, Math.min(channelListScrollOffset, maxScroll));
+
+        for (int i = 0; i < CHANNELS_PER_PAGE && (i + channelListScrollOffset) < channelList.size(); i++) {
+            int index = i + channelListScrollOffset;
+            SyncChannelListPayload.ChannelEntry entry = channelList.get(index);
+            int entryY = listY + (i * CHANNEL_ENTRY_HEIGHT);
+            boolean hovered = mouseX >= headerX && mouseX < headerX + headerW
+                    && mouseY >= entryY && mouseY < entryY + CHANNEL_ENTRY_HEIGHT - 2;
+            renderChannelEntry(g, entry, headerX, entryY, headerW, hovered);
+        }
+
+        if (channelList.size() > CHANNELS_PER_PAGE) {
+            int first = channelListScrollOffset + 1;
+            int last = Math.min(channelListScrollOffset + CHANNELS_PER_PAGE, channelList.size());
+            String scrollInfo = line("gui.logisticsnetworks.node.page_info", first, last, channelList.size());
+            g.drawString(font, scrollInfo, contentX + contentW - 12 - font.width(scrollInfo),
+                    contentY + contentH - 14, COLOR_TEXT_MUTED);
+        }
     }
 
-    private void renderMetricBlock(GuiGraphics g, int x, int y, int w, int h, String label, String value) {
+    private void renderChannelEntry(GuiGraphics g, SyncChannelListPayload.ChannelEntry entry,
+            int x, int y, int width, boolean hovered) {
+        int h = CHANNEL_ENTRY_HEIGHT - 2;
+        int bgColor = hovered ? COLOR_ROW_HOVER : COLOR_ROW;
+        int borderColor = hovered ? COLOR_ACCENT_DARK : COLOR_BORDER;
+        int typeColor = resolveTypeColor(entry.typeOrdinal());
+
+        g.fill(x, y, x + width, y + h, bgColor);
+        g.renderOutline(x, y, width, h, borderColor);
+        g.fill(x + 1, y + 1, x + 3, y + h - 1, typeColor);
+
+        String chLabel = "CH" + entry.channelIndex();
+        String typeName = resolveTypeName(entry.typeOrdinal());
+        String nodesBadge = line("gui.logisticsnetworks.computer.channel_nodes", entry.nodeCount());
+
+        int textX = x + 8;
+        int nodesX = x + width - 6 - font.width(nodesBadge);
+        int typeX = nodesX - 6 - font.width(typeName);
+
+        g.drawString(font, chLabel, textX, y + 5, COLOR_TEXT);
+        g.drawString(font, typeName, typeX, y + 5, typeColor);
+        g.drawString(font, nodesBadge, nodesX, y + 5, COLOR_TEXT_SECONDARY);
+    }
+
+    private void renderChannelGraphPage(GuiGraphics g, int mouseX, int mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int contentW = imageWidth - 20;
+        int contentH = imageHeight - 44;
+
+        renderTerminalPanel(g, contentX, contentY, contentW, contentH, "");
+        renderBackButton(g, mouseX, mouseY);
+        g.drawString(font, trimText(line("gui.logisticsnetworks.computer.channel_graph_title",
+                        "CH" + watchedChannelIndex), contentW - 88),
+                contentX + 64, contentY + 4, COLOR_ACCENT);
+
+        int graphX = contentX + 10;
+        int graphY = contentY + 24;
+        int graphW = contentW - 20;
+        int graphH = contentH - 48;
+        int barColor = resolveTypeColor(watchedTypeOrdinal);
+        String typeName = resolveTypeName(watchedTypeOrdinal);
+        String unit = resolveTypeUnit(watchedTypeOrdinal);
+
+        renderTelemetryGraph(g, graphX, graphY, graphW, graphH,
+                typeName, telemetryHistory, telemetryIndex, barColor, unit);
+
+        int statusY = graphY + graphH + 4;
+        renderStatusBadge(g, graphX, statusY, 42, 10,
+                line("gui.logisticsnetworks.computer.telemetry.live"));
+    }
+
+    private int resolveTypeColor(int typeOrdinal) {
+        return switch (typeOrdinal) {
+            case 1 -> COLOR_FLUID_BAR;
+            case 2 -> COLOR_ENERGY_BAR;
+            case 3 -> COLOR_CHEMICAL_BAR;
+            case 4 -> COLOR_SOURCE_BAR;
+            default -> COLOR_GRAPH;
+        };
+    }
+
+    private String resolveTypeName(int typeOrdinal) {
+        return switch (typeOrdinal) {
+            case 1 -> line("gui.logisticsnetworks.computer.telemetry.fluids");
+            case 2 -> line("gui.logisticsnetworks.computer.telemetry.energy");
+            case 3 -> line("gui.logisticsnetworks.computer.telemetry.chemicals");
+            case 4 -> line("gui.logisticsnetworks.computer.telemetry.source");
+            default -> line("gui.logisticsnetworks.computer.telemetry.items");
+        };
+    }
+
+    private String resolveTypeUnit(int typeOrdinal) {
+        return switch (typeOrdinal) {
+            case 1 -> line("gui.logisticsnetworks.computer.telemetry.unit.fluids");
+            case 2 -> line("gui.logisticsnetworks.computer.telemetry.unit.energy");
+            case 3 -> line("gui.logisticsnetworks.computer.telemetry.unit.chemicals");
+            case 4 -> line("gui.logisticsnetworks.computer.telemetry.unit.source");
+            default -> line("gui.logisticsnetworks.computer.telemetry.unit.items");
+        };
+    }
+
+    private void renderTelemetryGraph(GuiGraphics g, int x, int y, int w, int h,
+            String label, long[] history, int writeIndex, int barColor, String unit) {
         g.fill(x, y, x + w, y + h, COLOR_PANEL_ALT);
         g.renderOutline(x, y, w, h, COLOR_BORDER);
-        g.drawString(font, label, x + 6, y + 6, COLOR_TEXT_SECONDARY);
-        g.drawString(font, value.toUpperCase(Locale.ROOT), x + 6, y + 18, COLOR_ACCENT);
+        g.fill(x + 1, y + 1, x + w - 1, y + 11, COLOR_PANEL_HEADER);
+        g.fill(x + 1, y + 11, x + w - 1, y + 12, COLOR_BORDER);
+
+        int barAreaX = x + 4;
+        int barAreaY = y + 14;
+        int barAreaW = w - 8;
+        int barAreaH = h - 18;
+
+        int barW = 4;
+        int barStep = barW + 1;
+        int maxBars = Math.min(barAreaW / barStep, TelemetryManager.HISTORY_SIZE);
+
+        long maxVal = 1;
+        for (int i = 0; i < maxBars; i++) {
+            int idx = ((writeIndex - 1 - i) % TelemetryManager.HISTORY_SIZE
+                    + TelemetryManager.HISTORY_SIZE) % TelemetryManager.HISTORY_SIZE;
+            maxVal = Math.max(maxVal, history[idx]);
+        }
+
+        for (int gy = barAreaY + 4; gy < barAreaY + barAreaH; gy += 6) {
+            g.fill(barAreaX, gy, barAreaX + barAreaW, gy + 1, COLOR_GRAPH_GRID);
+        }
+
+        int newestIdx = ((writeIndex - 1) % TelemetryManager.HISTORY_SIZE
+                + TelemetryManager.HISTORY_SIZE) % TelemetryManager.HISTORY_SIZE;
+        long newestVal = history[newestIdx];
+
+        for (int i = 0; i < maxBars; i++) {
+            int idx = ((writeIndex - 1 - i) % TelemetryManager.HISTORY_SIZE
+                    + TelemetryManager.HISTORY_SIZE) % TelemetryManager.HISTORY_SIZE;
+            long val = history[idx];
+            if (val <= 0) continue;
+
+            int barH = (int) (((double) val / maxVal) * (barAreaH - 2));
+            barH = Math.max(1, barH);
+            int bx = barAreaX + barAreaW - barStep * (i + 1);
+            if (bx < barAreaX) break;
+            int by = barAreaY + barAreaH - barH;
+            g.fill(bx, by, bx + barW, barAreaY + barAreaH, barColor);
+            g.fill(bx, by, bx + barW, by + 1, COLOR_ACCENT);
+        }
+
+        g.drawString(font, label, x + 4, y + 2, COLOR_TEXT_SECONDARY);
+        String valueText = formatThroughput(newestVal) + " " + unit;
+        g.drawString(font, valueText, x + w - 4 - font.width(valueText), y + 2, barColor);
+    }
+
+    private String formatThroughput(long value) {
+        if (value < 1000) return String.valueOf(value);
+        if (value < 1000000) return String.format("%.1fK", value / 1000.0);
+        return String.format("%.1fM", value / 1000000.0);
     }
 
     private void renderNodeMapPage(GuiGraphics g, int mouseX, int mouseY) {
@@ -685,6 +838,14 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                     return true;
                 }
             }
+            case IO_CHANNEL_LIST -> {
+                if (channelList.size() > CHANNELS_PER_PAGE) {
+                    channelListScrollOffset -= (int) scrollY;
+                    int maxScroll = Math.max(0, channelList.size() - CHANNELS_PER_PAGE);
+                    channelListScrollOffset = Math.max(0, Math.min(channelListScrollOffset, maxScroll));
+                    return true;
+                }
+            }
             case NODE_MAP -> {
                 if (!nodeInfoList.isEmpty()) {
                     List<RenderEntry> renderEntries = buildNodeRenderEntries();
@@ -714,9 +875,23 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                         return true;
                     }
                 }
-                case ITEM_IO_GRAPH -> {
+                case IO_CHANNEL_LIST -> {
                     if (isBackButtonClicked(mouseX, mouseY)) {
                         currentPage = Page.NETWORK_LIST;
+                        channelList.clear();
+                        channelListScrollOffset = 0;
+                        return true;
+                    }
+                    if (handleChannelListClick(mouseX, mouseY)) {
+                        return true;
+                    }
+                }
+                case IO_CHANNEL_GRAPH -> {
+                    if (isBackButtonClicked(mouseX, mouseY)) {
+                        unsubscribeTelemetry();
+                        currentPage = Page.IO_CHANNEL_LIST;
+                        channelListScrollOffset = 0;
+                        PacketDistributor.sendToServer(new RequestChannelListPayload(selectedNetworkId));
                         return true;
                     }
                 }
@@ -847,7 +1022,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
         if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button1Y && mouseY < button1Y + OPTION_BTN_HEIGHT) {
-            currentPage = Page.ITEM_IO_GRAPH;
+            currentPage = Page.IO_CHANNEL_LIST;
+            channelListScrollOffset = 0;
+            PacketDistributor.sendToServer(new RequestChannelListPayload(selectedNetworkId));
             return true;
         }
 
@@ -859,6 +1036,30 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             return true;
         }
 
+        return false;
+    }
+
+    private boolean handleChannelListClick(double mouseX, double mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int contentW = imageWidth - 20;
+        int headerX = contentX + 8;
+        int headerW = contentW - 16;
+        int listY = contentY + 40;
+
+        for (int i = 0; i < CHANNELS_PER_PAGE && (i + channelListScrollOffset) < channelList.size(); i++) {
+            int index = i + channelListScrollOffset;
+            int entryY = listY + (i * CHANNEL_ENTRY_HEIGHT);
+            if (mouseX >= headerX && mouseX < headerX + headerW
+                    && mouseY >= entryY && mouseY < entryY + CHANNEL_ENTRY_HEIGHT - 2) {
+                SyncChannelListPayload.ChannelEntry entry = channelList.get(index);
+                watchedChannelIndex = entry.channelIndex();
+                watchedTypeOrdinal = entry.typeOrdinal();
+                currentPage = Page.IO_CHANNEL_GRAPH;
+                subscribeTelemetry();
+                return true;
+            }
+        }
         return false;
     }
 
@@ -1105,6 +1306,40 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         if (networkId.equals(selectedNetworkId)) {
             this.nodeInfoList = new ArrayList<>(nodes);
             this.nodeMapScrollOffset = 0;
+        }
+    }
+
+    public void receiveChannelList(UUID networkId, List<SyncChannelListPayload.ChannelEntry> channels) {
+        if (networkId.equals(selectedNetworkId)) {
+            this.channelList = new ArrayList<>(channels);
+            this.channelListScrollOffset = Math.min(this.channelListScrollOffset,
+                    Math.max(0, channelList.size() - CHANNELS_PER_PAGE));
+        }
+    }
+
+    public void receiveTelemetry(SyncTelemetryPayload payload) {
+        if (payload.networkId().equals(selectedNetworkId)
+                && payload.channelIndex() == watchedChannelIndex) {
+            this.telemetryHistory = payload.history();
+            this.telemetryIndex = payload.historyIndex();
+        }
+    }
+
+    private void subscribeTelemetry() {
+        if (!telemetrySubscribed && selectedNetworkId != null) {
+            telemetryHistory = new long[TelemetryManager.HISTORY_SIZE];
+            telemetryIndex = 0;
+            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(
+                    selectedNetworkId, true, watchedChannelIndex));
+            telemetrySubscribed = true;
+        }
+    }
+
+    private void unsubscribeTelemetry() {
+        if (telemetrySubscribed && selectedNetworkId != null) {
+            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(
+                    selectedNetworkId, false, watchedChannelIndex));
+            telemetrySubscribed = false;
         }
     }
 

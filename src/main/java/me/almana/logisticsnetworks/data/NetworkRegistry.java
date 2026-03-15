@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -29,6 +30,7 @@ public class NetworkRegistry extends SavedData {
 
     private final Map<UUID, LogisticsNetwork> networks = new HashMap<>();
     private final Set<UUID> dirtyNetworks = new HashSet<>();
+    private final TelemetryManager telemetryManager = new TelemetryManager();
 
     public NetworkRegistry() {
     }
@@ -112,6 +114,10 @@ public class NetworkRegistry extends SavedData {
 
     public Map<UUID, LogisticsNetwork> getAllNetworks() {
         return Collections.unmodifiableMap(networks);
+    }
+
+    public TelemetryManager getTelemetryManager() {
+        return telemetryManager;
     }
 
     public void markNetworkDirty(UUID networkId) {

@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.data;
 
+import me.almana.logisticsnetworks.logic.ChannelTelemetry;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -37,6 +38,7 @@ public class ChannelData {
     private int priority = 0;
 
     private final ItemStack[] filterItems = new ItemStack[FILTER_SIZE];
+    private final transient ChannelTelemetry telemetry = new ChannelTelemetry();
 
     public ChannelData() {
         this(false);
@@ -212,6 +214,10 @@ public class ChannelData {
 
     public void setPriority(int priority) {
         this.priority = Math.max(-99, Math.min(99, priority));
+    }
+
+    public ChannelTelemetry getTelemetry() {
+        return telemetry;
     }
 
     public ItemStack[] getFilterItems() {

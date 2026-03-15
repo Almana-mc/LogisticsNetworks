@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.network;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
@@ -914,6 +915,84 @@ public class ServerPayloadHandler {
             }
         }
         LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated);
+    }
+
+    public static void handleSubscribeTelemetry(SubscribeTelemetryPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+            if (!(player.containerMenu instanceof ComputerMenu))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            TelemetryManager telemetry = registry.getTelemetryManager();
+
+            if (payload.subscribe()) {
+                int typeOrdinal = resolveChannelType(registry, payload.networkId(),
+                        payload.channelIndex(), player);
+                telemetry.subscribe(payload.networkId(), payload.channelIndex(), typeOrdinal,
+                        player, registry, player.getServer());
+            } else {
+                telemetry.unsubscribe(player);
+            }
+        });
+    }
+
+    public static void handleRequestChannelList(RequestChannelListPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+            if (!(player.containerMenu instanceof ComputerMenu))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network))
+                return;
+
+            int[] nodeCounts = new int[LogisticsNodeEntity.CHANNEL_COUNT];
+            int[] typeOrdinals = new int[LogisticsNodeEntity.CHANNEL_COUNT];
+            boolean[] found = new boolean[LogisticsNodeEntity.CHANNEL_COUNT];
+
+            for (UUID nodeId : network.getNodeUuids()) {
+                LogisticsNodeEntity node = findNode(player, nodeId);
+                if (node == null) continue;
+
+                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                    ChannelData channel = node.getChannel(i);
+                    if (channel.isEnabled()) {
+                        nodeCounts[i]++;
+                        if (!found[i]) {
+                            typeOrdinals[i] = channel.getType().ordinal();
+                            found[i] = true;
+                        }
+                    }
+                }
+            }
+
+            List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
+            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                if (nodeCounts[i] > 0) {
+                    entries.add(new SyncChannelListPayload.ChannelEntry(i, typeOrdinals[i], nodeCounts[i]));
+                }
+            }
+
+            PacketDistributor.sendToPlayer(player,
+                    new SyncChannelListPayload(payload.networkId(), entries));
+        });
+    }
+
+    private static int resolveChannelType(NetworkRegistry registry, UUID networkId,
+            int channelIndex, ServerPlayer player) {
+        LogisticsNetwork network = registry.getNetwork(networkId);
+        if (network == null) return 0;
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(player, nodeId);
+            if (node == null) continue;
+            ChannelData channel = node.getChannel(channelIndex);
+            if (channel.isEnabled()) return channel.getType().ordinal();
+        }
+        return 0;
     }
 
     private static boolean canAccessNetwork(ServerPlayer player, LogisticsNetwork network) {

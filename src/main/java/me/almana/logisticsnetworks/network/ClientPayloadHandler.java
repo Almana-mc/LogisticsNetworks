@@ -45,6 +45,24 @@ public class ClientPayloadHandler {
         });
     }
 
+    public static void handleSyncTelemetry(SyncTelemetryPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var screen = Minecraft.getInstance().screen;
+            if (screen instanceof ComputerScreen computerScreen) {
+                computerScreen.receiveTelemetry(payload);
+            }
+        });
+    }
+
+    public static void handleSyncChannelList(SyncChannelListPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var screen = Minecraft.getInstance().screen;
+            if (screen instanceof ComputerScreen computerScreen) {
+                computerScreen.receiveChannelList(payload.networkId(), payload.channels());
+            }
+        });
+    }
+
     public static void handleSyncChannelData(SyncChannelDataPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             var player = Minecraft.getInstance().player;
