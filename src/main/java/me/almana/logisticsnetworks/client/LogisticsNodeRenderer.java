@@ -66,7 +66,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         }
 
         if (isHighlighted) {
-            renderHighlightBox(poseStack, buffer, 0.15f, 0.45f, 1.0f, 0.35f);
+            renderHighlightBox(poseStack, buffer, 0.15f, 0.45f, 1.0f, 0.35f, true);
         } else if (isHoldingWrench) {
             renderWrenchOverlay(entity, poseStack, buffer, light);
         }
@@ -109,7 +109,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     private void renderWrenchOverlay(LogisticsNodeEntity entity, PoseStack poseStack, MultiBufferSource buffer,
             int light) {
-        renderHighlightBox(poseStack, buffer, 0f, 1f, 0f, 0.35f);
+        renderHighlightBox(poseStack, buffer, 0f, 1f, 0f, 0.35f, false);
 
         if (Config.debugMode) {
             poseStack.pushPose();
@@ -141,8 +141,8 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
     }
 
     private void renderHighlightBox(PoseStack poseStack, MultiBufferSource buffer, float r, float g, float b,
-            float a) {
-        VertexConsumer builder = buffer.getBuffer(ModRenderTypes.OVERLAY);
+            float a, boolean xray) {
+        VertexConsumer builder = buffer.getBuffer(xray ? ModRenderTypes.OVERLAY_XRAY : ModRenderTypes.OVERLAY);
         Matrix4f matrix = poseStack.last().pose();
 
         float minX = -0.501f, maxX = 0.501f;
