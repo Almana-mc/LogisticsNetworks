@@ -23,6 +23,7 @@ import java.util.List;
 public class MassPlacementMenu extends AbstractContainerMenu {
 
     public static final int ID_PLACE_NODES = 0;
+    public static final int ID_CLEAR_SELECTION = 1;
 
     private static final int DATA_SELECTED = 0;
     private static final int DATA_NODES_REQUIRED = 1;
@@ -127,6 +128,19 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             refreshState();
             broadcastChanges();
             return placed;
+        }
+
+        if (id == ID_CLEAR_SELECTION) {
+            ItemStack wrenchStack = getWrenchStack();
+            if (!wrenchStack.isEmpty() && wrenchStack.getItem() instanceof WrenchItem) {
+                WrenchItem.clearMassSelections(wrenchStack);
+                player.getInventory().setChanged();
+                player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.mass_placement.cleared"), true);
+                refreshState();
+                broadcastChanges();
+            }
+            return true;
         }
 
         return false;
