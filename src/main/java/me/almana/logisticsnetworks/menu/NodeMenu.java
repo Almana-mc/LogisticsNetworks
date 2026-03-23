@@ -40,6 +40,7 @@ public class NodeMenu extends AbstractContainerMenu {
     private static final int GRID_STEP = 19;
 
     private final LogisticsNodeEntity node;
+    private boolean remoteAccess;
     private int selectedChannel = 0;
     private boolean nodeSlotsActive = true;
 
@@ -148,9 +149,14 @@ public class NodeMenu extends AbstractContainerMenu {
         this.nodeSlotsActive = visible;
     }
 
+    public void setRemoteAccess(boolean remote) {
+        this.remoteAccess = remote;
+    }
+
     @Override
     public boolean stillValid(Player player) {
-        return node != null && node.isAlive() && player.distanceToSqr(node) < 64.0;
+        if (node == null || !node.isAlive()) return false;
+        return remoteAccess || player.distanceToSqr(node) < 64.0;
     }
 
     public void sendNetworkListToClient(ServerPlayer player) {
