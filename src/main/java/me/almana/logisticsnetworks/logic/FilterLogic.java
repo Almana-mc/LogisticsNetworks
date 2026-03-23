@@ -59,10 +59,9 @@ public final class FilterLogic {
                 isBlacklist = ModFilterData.isBlacklist(filter);
             } else if (NbtFilterData.isNbtFilter(filter)
                     && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                String path = NbtFilterData.getSelectedPath(filter);
-                if (path != null && !NbtFilterData.isFluidPath(path)) {
+                if (NbtFilterData.hasEnabledRules(filter)) {
                     isFilter = true;
-                    matched = NbtFilterData.matchesSelection(filter, path, candidateNbt);
+                    matched = NbtFilterData.matches(filter, candidateNbt);
                     isBlacklist = NbtFilterData.isBlacklist(filter);
                 }
             } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
@@ -142,8 +141,7 @@ public final class FilterLogic {
                 isBlacklist = ModFilterData.isBlacklist(filter);
             } else if (NbtFilterData.isNbtFilter(filter)
                     && NbtFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
-                String path = NbtFilterData.getSelectedPath(filter);
-                if (path != null && NbtFilterData.isFluidPath(path)) {
+                if (NbtFilterData.hasEnabledRules(filter)) {
                     isFilter = true;
                     matched = NbtFilterData.matchesSelection(filter, candidate, provider);
                     isBlacklist = NbtFilterData.isBlacklist(filter);
@@ -252,7 +250,7 @@ public final class FilterLogic {
         for (ItemStack filter : filters) {
             if (NbtFilterData.isNbtFilter(filter)
                     && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS
-                    && NbtFilterData.getSelectedPath(filter) != null) {
+                    && NbtFilterData.hasEnabledRules(filter)) {
                 return true;
             }
             if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyNbtEntries(filter)) {

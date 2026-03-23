@@ -8,18 +8,35 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 public record ModifyFilterNbtPayload(
-                String path,
-                boolean remove) implements CustomPacketPayload {
+                int actionOrdinal,
+                int ruleIndex,
+                String path) implements CustomPacketPayload {
+
+        public enum Action {
+                ADD_RULE,
+                TOGGLE_RULE,
+                REMOVE_RULE,
+                CYCLE_OPERATOR;
+
+                public static Action fromOrdinal(int ordinal) {
+                        Action[] values = values();
+                        if (ordinal < 0 || ordinal >= values.length)
+                                return ADD_RULE;
+                        return values[ordinal];
+                }
+        }
 
         public static final Type<ModifyFilterNbtPayload> TYPE = new Type<>(
                         ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "modify_filter_nbt"));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, ModifyFilterNbtPayload> STREAM_CODEC = StreamCodec
                         .composite(
+                                        ByteBufCodecs.VAR_INT,
+                                        ModifyFilterNbtPayload::actionOrdinal,
+                                        ByteBufCodecs.VAR_INT,
+                                        ModifyFilterNbtPayload::ruleIndex,
                                         ByteBufCodecs.STRING_UTF8,
                                         ModifyFilterNbtPayload::path,
-                                        ByteBufCodecs.BOOL,
-                                        ModifyFilterNbtPayload::remove,
                                         ModifyFilterNbtPayload::new);
 
         @Override

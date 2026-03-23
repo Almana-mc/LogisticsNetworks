@@ -1,13 +1,10 @@
 package me.almana.logisticsnetworks.item;
 
 import me.almana.logisticsnetworks.filter.NbtFilterData;
-import me.almana.logisticsnetworks.menu.FilterMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -25,23 +22,7 @@ public class NbtFilterItem extends Item {
         @Override
         public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
                 ItemStack stack = player.getItemInHand(hand);
-                if (player instanceof ServerPlayer serverPlayer) {
-                        serverPlayer.openMenu(new SimpleMenuProvider(
-                                        (containerId, playerInventory, ignored) -> new FilterMenu(containerId,
-                                                        playerInventory, hand),
-                                        stack.getHoverName()), buf -> {
-                                                buf.writeVarInt(hand.ordinal());
-                                                buf.writeVarInt(0);
-                                                buf.writeBoolean(false);
-                                                buf.writeBoolean(false);
-                                                buf.writeBoolean(true);
-                                                buf.writeBoolean(false);
-                                                buf.writeBoolean(false);
-                                                buf.writeBoolean(false);
-                                                buf.writeBoolean(false);
-                                        });
-                }
-                return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+                return InteractionResultHolder.pass(stack);
         }
 
         @Override
@@ -51,9 +32,11 @@ public class NbtFilterItem extends Item {
                                 .withStyle(ChatFormatting.RED));
 
                 boolean blacklist = NbtFilterData.isBlacklist(stack);
-                String selection = NbtFilterData.hasSelection(stack)
-                                ? NbtFilterData.getSelectedPath(stack)
-                                : Component.translatable("tooltip.logisticsnetworks.filter.nbt.none").getString();
+                List<NbtFilterData.NbtRule> rules = NbtFilterData.getRules(stack);
+                long enabledRules = rules.stream().filter(NbtFilterData.NbtRule::enabled).count();
+                String selection = rules.isEmpty()
+                                ? Component.translatable("tooltip.logisticsnetworks.filter.nbt.none").getString()
+                                : rules.get(0).path() + (rules.size() > 1 ? " +" + (rules.size() - 1) : "");
 
                 tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.nbt.desc")
                                 .withStyle(ChatFormatting.GRAY));
@@ -65,8 +48,7 @@ public class NbtFilterItem extends Item {
 
                 tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.nbt", selection)
                                 .withStyle(ChatFormatting.DARK_GRAY));
-
-                tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.open_hint")
-                                .withStyle(ChatFormatting.DARK_GRAY));
+                tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.nbt.rules",
+                                enabledRules, rules.size()).withStyle(ChatFormatting.DARK_GRAY));
         }
 }

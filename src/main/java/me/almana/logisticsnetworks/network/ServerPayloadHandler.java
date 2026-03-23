@@ -359,18 +359,23 @@ public class ServerPayloadHandler {
             if (player.containerMenu instanceof FilterMenu menu && menu.isNbtMode()) {
                 ItemStack filterStack = menu.getOpenedFilterStack(player);
                 if (NbtFilterData.isNbtFilter(filterStack)) {
-                    boolean changed;
-                    if (payload.remove()) {
-                        changed = NbtFilterData.clearSelection(filterStack);
-                    } else {
-                        ItemStack extractor = menu.getExtractorItem();
-                        Tag selectedValue = NbtFilterData.resolvePathValue(extractor, payload.path(),
-                                player.level().registryAccess());
-                        changed = selectedValue != null
-                                && NbtFilterData.setSelection(filterStack, payload.path(), selectedValue);
-                    }
-                    if (changed)
+                    boolean changed = switch (ModifyFilterNbtPayload.Action.fromOrdinal(payload.actionOrdinal())) {
+                        case ADD_RULE -> {
+                            ItemStack extractor = menu.getExtractorItem();
+                            Tag selectedValue = NbtFilterData.resolvePathValue(extractor, payload.path(),
+                                    player.level().registryAccess());
+                            yield selectedValue != null
+                                    && NbtFilterData.addRule(filterStack, payload.path(),
+                                            NbtFilterData.Operator.EQUALS, selectedValue);
+                        }
+                        case TOGGLE_RULE -> NbtFilterData.toggleRuleEnabled(filterStack, payload.ruleIndex());
+                        case REMOVE_RULE -> NbtFilterData.removeRule(filterStack, payload.ruleIndex());
+                        case CYCLE_OPERATOR -> NbtFilterData.cycleRuleOperator(filterStack, payload.ruleIndex());
+                    };
+                    if (changed) {
+                        player.getInventory().setChanged();
                         menu.broadcastChanges();
+                    }
                 }
             }
         });
@@ -518,15 +523,16 @@ public class ServerPayloadHandler {
             ItemStack stack = serverPlayer.getInventory().getItem(slotIndex);
             if (stack.isEmpty() || !stack.is(ModTags.FILTERS))
                 return;
+            if (stack.getItem() instanceof NbtFilterItem)
+                return;
 
             boolean isTag = stack.getItem() instanceof TagFilterItem;
             boolean isAmount = stack.getItem() instanceof AmountFilterItem;
-            boolean isNbt = stack.getItem() instanceof NbtFilterItem;
             boolean isDurability = stack.getItem() instanceof DurabilityFilterItem;
             boolean isMod = stack.getItem() instanceof ModFilterItem;
             boolean isSlot = stack.getItem() instanceof SlotFilterItem;
             boolean isName = stack.getItem() instanceof NameFilterItem;
-            boolean isSpecial = isTag || isAmount || isNbt || isDurability || isMod || isSlot || isName;
+            boolean isSpecial = isTag || isAmount || isDurability || isMod || isSlot || isName;
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
 
             serverPlayer.openMenu(new SimpleMenuProvider(
@@ -537,7 +543,7 @@ public class ServerPayloadHandler {
                         buf.writeVarInt(slotCount);
                         buf.writeBoolean(isTag);
                         buf.writeBoolean(isAmount);
-                        buf.writeBoolean(isNbt);
+                        buf.writeBoolean(false);
                         buf.writeBoolean(isDurability);
                         buf.writeBoolean(isMod);
                         buf.writeBoolean(isSlot);
@@ -556,7 +562,7 @@ public class ServerPayloadHandler {
     }
 
     private static boolean isSpecialMode(FilterMenu menu) {
-        return menu.isTagMode() || menu.isAmountMode() || menu.isNbtMode() || menu.isDurabilityMode()
+        return menu.isTagMode() || menu.isAmountMode() || menu.isDurabilityMode()
                 || menu.isModMode() || menu.isSlotMode() || menu.isNameMode();
     }
 

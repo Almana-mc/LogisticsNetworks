@@ -12,8 +12,8 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Comparator;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -24,8 +24,43 @@ public final class NbtFilterData {
     private static final String KEY_PATH = "path";
     private static final String KEY_VALUE = "value";
     private static final String KEY_TARGET_TYPE = "target";
+    private static final String KEY_RULES = "rules";
+    private static final String KEY_RULE_OPERATOR = "operator";
+    private static final String KEY_RULE_ENABLED = "enabled";
 
     public record NbtEntry(String path, String valueDisplay) {
+    }
+
+    public enum Operator {
+        EQUALS("="),
+        NOT_EQUALS("!=");
+
+        private final String symbol;
+
+        Operator(String symbol) {
+            this.symbol = symbol;
+        }
+
+        public String symbol() {
+            return symbol;
+        }
+
+        public Operator next() {
+            return values()[(ordinal() + 1) % values().length];
+        }
+
+        public static Operator fromOrdinal(int ordinal) {
+            Operator[] values = values();
+            if (ordinal < 0 || ordinal >= values.length)
+                return EQUALS;
+            return values[ordinal];
+        }
+    }
+
+    public record NbtRule(String path, Operator operator, Tag value, boolean enabled) {
+        public String valueDisplay() {
+            return value == null ? "" : value.toString();
+        }
     }
 
     private NbtFilterData() {
@@ -64,6 +99,15 @@ public final class NbtFilterData {
         }
 
         String path = root.getString(KEY_PATH);
+        if (path.isEmpty()) {
+            List<NbtRule> rules = readRules(root);
+            if (rules.isEmpty()) {
+                NbtRule legacy = readLegacyRule(root);
+                path = legacy == null ? "" : legacy.path();
+            } else {
+                path = rules.get(0).path();
+            }
+        }
         return isFluidPath(path) ? FilterTargetType.FLUIDS : FilterTargetType.ITEMS;
     }
 
@@ -82,27 +126,45 @@ public final class NbtFilterData {
     }
 
     public static boolean hasSelection(ItemStack stack) {
-        if (!isNbtFilter(stack))
-            return false;
-        CompoundTag root = getRoot(stack);
-        return root.contains(KEY_PATH, Tag.TAG_STRING) && root.contains(KEY_VALUE);
+        return hasAnyRules(stack);
     }
 
     public static @Nullable String getSelectedPath(ItemStack stack) {
-        if (!hasSelection(stack))
-            return null;
-        String path = getRoot(stack).getString(KEY_PATH).trim();
-        return path.isEmpty() ? null : path;
+        List<NbtRule> rules = getRules(stack);
+        return rules.isEmpty() ? null : rules.get(0).path();
     }
 
     public static String getSelectedValueDisplay(ItemStack stack) {
-        if (!hasSelection(stack))
-            return "";
-        Tag val = getRoot(stack).get(KEY_VALUE);
-        return val == null ? "" : val.toString();
+        List<NbtRule> rules = getRules(stack);
+        return rules.isEmpty() ? "" : rules.get(0).valueDisplay();
     }
 
-    public static boolean setSelection(ItemStack stack, String rawPath, Tag value) {
+    public static List<NbtRule> getRules(ItemStack stack) {
+        if (!isNbtFilter(stack))
+            return List.of();
+
+        CompoundTag root = getRoot(stack);
+        List<NbtRule> rules = readRules(root);
+        if (!rules.isEmpty())
+            return rules;
+
+        NbtRule legacy = readLegacyRule(root);
+        return legacy == null ? List.of() : List.of(legacy);
+    }
+
+    public static boolean hasAnyRules(ItemStack stack) {
+        return !getRules(stack).isEmpty();
+    }
+
+    public static boolean hasEnabledRules(ItemStack stack) {
+        for (NbtRule rule : getRules(stack)) {
+            if (rule.enabled())
+                return true;
+        }
+        return false;
+    }
+
+    public static boolean addRule(ItemStack stack, String rawPath, Operator operator, Tag value) {
         if (!isNbtFilter(stack) || value == null)
             return false;
 
@@ -110,22 +172,101 @@ public final class NbtFilterData {
         if (path == null)
             return false;
 
+        Operator resolvedOperator = operator == null ? Operator.EQUALS : operator;
         boolean[] result = { false };
 
         updateRoot(stack, root -> {
-            String currentPath = root.getString(KEY_PATH);
-            Tag currentValue = root.get(KEY_VALUE);
-
-            if (path.equals(currentPath) && value.equals(currentValue)) {
-                return;
+            List<NbtRule> rules = new ArrayList<>(readRules(root));
+            if (rules.isEmpty()) {
+                NbtRule legacy = readLegacyRule(root);
+                if (legacy != null)
+                    rules.add(legacy);
             }
 
-            root.putString(KEY_PATH, path);
-            root.put(KEY_VALUE, value.copy());
+            NbtRule updated = new NbtRule(path, resolvedOperator, value.copy(), true);
+            int index = findRuleIndex(rules, path, resolvedOperator);
+            if (index >= 0) {
+                NbtRule current = rules.get(index);
+                if (sameRule(current, updated))
+                    return;
+                rules.set(index, updated);
+            } else {
+                rules.add(updated);
+            }
+
+            if (isFluidPath(path)) {
+                root.putInt(KEY_TARGET_TYPE, FilterTargetType.FLUIDS.ordinal());
+            } else {
+                root.remove(KEY_TARGET_TYPE);
+            }
+            writeRules(root, rules);
             result[0] = true;
         });
 
         return result[0];
+    }
+
+    public static boolean removeRule(ItemStack stack, int index) {
+        if (!isNbtFilter(stack))
+            return false;
+
+        boolean[] result = { false };
+
+        updateRoot(stack, root -> {
+            List<NbtRule> rules = new ArrayList<>(getRulesFromRoot(root));
+            if (index < 0 || index >= rules.size())
+                return;
+            rules.remove(index);
+            writeRules(root, rules);
+            result[0] = true;
+        });
+
+        return result[0];
+    }
+
+    public static boolean toggleRuleEnabled(ItemStack stack, int index) {
+        if (!isNbtFilter(stack))
+            return false;
+
+        boolean[] result = { false };
+
+        updateRoot(stack, root -> {
+            List<NbtRule> rules = new ArrayList<>(getRulesFromRoot(root));
+            if (index < 0 || index >= rules.size())
+                return;
+
+            NbtRule current = rules.get(index);
+            rules.set(index, new NbtRule(current.path(), current.operator(), current.value().copy(), !current.enabled()));
+            writeRules(root, rules);
+            result[0] = true;
+        });
+
+        return result[0];
+    }
+
+    public static boolean cycleRuleOperator(ItemStack stack, int index) {
+        if (!isNbtFilter(stack))
+            return false;
+
+        boolean[] result = { false };
+
+        updateRoot(stack, root -> {
+            List<NbtRule> rules = new ArrayList<>(getRulesFromRoot(root));
+            if (index < 0 || index >= rules.size())
+                return;
+
+            NbtRule current = rules.get(index);
+            rules.set(index, new NbtRule(current.path(), current.operator().next(), current.value().copy(),
+                    current.enabled()));
+            writeRules(root, rules);
+            result[0] = true;
+        });
+
+        return result[0];
+    }
+
+    public static boolean setSelection(ItemStack stack, String rawPath, Tag value) {
+        return addRule(stack, rawPath, Operator.EQUALS, value);
     }
 
     public static boolean clearSelection(ItemStack stack) {
@@ -135,9 +276,10 @@ public final class NbtFilterData {
         boolean[] result = { false };
 
         updateRoot(stack, root -> {
-            if (root.contains(KEY_PATH) || root.contains(KEY_VALUE)) {
+            if (root.contains(KEY_PATH) || root.contains(KEY_VALUE) || root.contains(KEY_RULES, Tag.TAG_LIST)) {
                 root.remove(KEY_PATH);
                 root.remove(KEY_VALUE);
+                root.remove(KEY_RULES);
                 result[0] = true;
             }
         });
@@ -151,12 +293,8 @@ public final class NbtFilterData {
         if (getTargetType(filter) != FilterTargetType.ITEMS)
             return false;
 
-        String path = getSelectedPath(filter);
-        if (path == null)
-            return false;
-
         CompoundTag components = getSerializedComponents(candidate, provider);
-        return checkMatch(filter, path, components);
+        return matches(filter, components);
     }
 
     public static boolean matchesSelection(ItemStack filter, FluidStack candidate, HolderLookup.Provider provider) {
@@ -165,24 +303,32 @@ public final class NbtFilterData {
         if (getTargetType(filter) != FilterTargetType.FLUIDS)
             return false;
 
-        String path = getSelectedPath(filter);
-        if (path == null || !isFluidPath(path))
-            return false;
-
         CompoundTag components = getSerializedComponents(candidate, provider);
-        return checkMatch(filter, path, components);
+        return matches(filter, components);
     }
 
-    private static boolean checkMatch(ItemStack filter, String path, @Nullable CompoundTag components) {
+    public static boolean matches(ItemStack filter, @Nullable CompoundTag components) {
+        if (!isNbtFilter(filter))
+            return false;
+
+        return matches(getRules(filter), components);
+    }
+
+    public static boolean matches(List<NbtRule> rules, @Nullable CompoundTag components) {
         if (components == null)
             return false;
 
-        Tag expected = getRoot(filter).get(KEY_VALUE);
-        if (expected == null)
-            return false;
+        boolean hasEnabledRule = false;
+        for (NbtRule rule : rules) {
+            if (!rule.enabled())
+                continue;
 
-        Tag actual = resolvePathValue(components, path);
-        return actual != null && expected.equals(actual);
+            hasEnabledRule = true;
+            Tag actual = resolvePathValue(components, rule.path());
+            if (!matchesRule(rule, actual))
+                return false;
+        }
+        return hasEnabledRule;
     }
 
     public static boolean matchesSelection(ItemStack filter, String path, @Nullable CompoundTag components) {
@@ -192,7 +338,9 @@ public final class NbtFilterData {
         if (normalized == null)
             return false;
 
-        return checkMatch(filter, normalized, components);
+        Tag actual = resolvePathValue(components, normalized);
+        Tag expected = resolveExpectedValue(filter, normalized);
+        return expected != null && actual != null && expected.equals(actual);
     }
 
     public static @Nullable Tag resolvePathValue(ItemStack stack, String path, HolderLookup.Provider provider) {
@@ -370,6 +518,104 @@ public final class NbtFilterData {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    private static boolean matchesRule(NbtRule rule, @Nullable Tag actual) {
+        return switch (rule.operator()) {
+            case EQUALS -> actual != null && rule.value().equals(actual);
+            case NOT_EQUALS -> actual == null || !rule.value().equals(actual);
+        };
+    }
+
+    private static @Nullable Tag resolveExpectedValue(ItemStack filter, String path) {
+        for (NbtRule rule : getRules(filter)) {
+            if (rule.path().equals(path))
+                return rule.value();
+        }
+        return null;
+    }
+
+    private static List<NbtRule> getRulesFromRoot(CompoundTag root) {
+        List<NbtRule> rules = readRules(root);
+        if (!rules.isEmpty())
+            return rules;
+
+        NbtRule legacy = readLegacyRule(root);
+        return legacy == null ? List.of() : List.of(legacy);
+    }
+
+    private static List<NbtRule> readRules(CompoundTag root) {
+        if (!root.contains(KEY_RULES, Tag.TAG_LIST))
+            return List.of();
+
+        ListTag ruleList = root.getList(KEY_RULES, Tag.TAG_COMPOUND);
+        List<NbtRule> rules = new ArrayList<>(ruleList.size());
+        for (Tag tag : ruleList) {
+            if (!(tag instanceof CompoundTag ruleTag))
+                continue;
+
+            String path = normalizePath(ruleTag.getString(KEY_PATH));
+            Tag value = ruleTag.get(KEY_VALUE);
+            if (path == null || value == null)
+                continue;
+
+            Operator operator = ruleTag.contains(KEY_RULE_OPERATOR, Tag.TAG_INT)
+                    ? Operator.fromOrdinal(ruleTag.getInt(KEY_RULE_OPERATOR))
+                    : Operator.EQUALS;
+            boolean enabled = !ruleTag.contains(KEY_RULE_ENABLED, Tag.TAG_BYTE) || ruleTag.getBoolean(KEY_RULE_ENABLED);
+            rules.add(new NbtRule(path, operator, value.copy(), enabled));
+        }
+        return rules;
+    }
+
+    private static @Nullable NbtRule readLegacyRule(CompoundTag root) {
+        if (!root.contains(KEY_PATH, Tag.TAG_STRING) || !root.contains(KEY_VALUE))
+            return null;
+
+        String path = normalizePath(root.getString(KEY_PATH));
+        Tag value = root.get(KEY_VALUE);
+        if (path == null || value == null)
+            return null;
+
+        return new NbtRule(path, Operator.EQUALS, value.copy(), true);
+    }
+
+    private static void writeRules(CompoundTag root, List<NbtRule> rules) {
+        root.remove(KEY_PATH);
+        root.remove(KEY_VALUE);
+
+        if (rules.isEmpty()) {
+            root.remove(KEY_RULES);
+            return;
+        }
+
+        ListTag ruleList = new ListTag();
+        for (NbtRule rule : rules) {
+            CompoundTag ruleTag = new CompoundTag();
+            ruleTag.putString(KEY_PATH, rule.path());
+            ruleTag.putInt(KEY_RULE_OPERATOR, rule.operator().ordinal());
+            ruleTag.put(KEY_VALUE, rule.value().copy());
+            if (!rule.enabled())
+                ruleTag.putBoolean(KEY_RULE_ENABLED, false);
+            ruleList.add(ruleTag);
+        }
+        root.put(KEY_RULES, ruleList);
+    }
+
+    private static int findRuleIndex(List<NbtRule> rules, String path, Operator operator) {
+        for (int i = 0; i < rules.size(); i++) {
+            NbtRule rule = rules.get(i);
+            if (rule.path().equals(path) && rule.operator() == operator)
+                return i;
+        }
+        return -1;
+    }
+
+    private static boolean sameRule(NbtRule left, NbtRule right) {
+        return left.path().equals(right.path())
+                && left.operator() == right.operator()
+                && left.enabled() == right.enabled()
+                && left.value().equals(right.value());
+    }
+
     private static CompoundTag getRoot(ItemStack stack) {
 
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
@@ -378,7 +624,6 @@ public final class NbtFilterData {
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.getCompound(KEY_ROOT);
             CompoundTag workingRoot = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
                     ? customTag.getCompound(KEY_ROOT)
                     : new CompoundTag();

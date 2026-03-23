@@ -258,6 +258,7 @@
   "tooltip.logisticsnetworks.filter.mod": "Mod Filter: %s",
   "tooltip.logisticsnetworks.filter.mod.none": "None",
   "tooltip.logisticsnetworks.filter.nbt": "NBT: %s",
+  "tooltip.logisticsnetworks.filter.nbt.rules": "Rules: %s active / %s total",
   "tooltip.logisticsnetworks.filter.nbt.none": "None",
   "tooltip.logisticsnetworks.filter.slot.value": "Slots: %s",
   "tooltip.logisticsnetworks.filter.slot.none": "None",

@@ -74,12 +74,12 @@ public class FilterMenu extends AbstractContainerMenu {
         ItemStack stack = getOpenedStack();
         this.isTagMode = stack.getItem() instanceof TagFilterItem;
         this.isAmountMode = stack.getItem() instanceof AmountFilterItem;
-        this.isNbtMode = stack.getItem() instanceof NbtFilterItem;
+        this.isNbtMode = false;
         this.isDurabilityMode = stack.getItem() instanceof DurabilityFilterItem;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
         this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
-        this.isSpecialMode = isTagMode || isAmountMode || isNbtMode || isDurabilityMode || isModMode || isSlotMode
+        this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
                 || isNameMode;
 
         this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
@@ -104,12 +104,12 @@ public class FilterMenu extends AbstractContainerMenu {
         ItemStack stack = getOpenedStack();
         this.isTagMode = stack.getItem() instanceof TagFilterItem;
         this.isAmountMode = stack.getItem() instanceof AmountFilterItem;
-        this.isNbtMode = stack.getItem() instanceof NbtFilterItem;
+        this.isNbtMode = false;
         this.isDurabilityMode = stack.getItem() instanceof DurabilityFilterItem;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
         this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
-        this.isSpecialMode = isTagMode || isAmountMode || isNbtMode || isDurabilityMode || isModMode || isSlotMode
+        this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
                 || isNameMode;
 
         this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
@@ -144,12 +144,13 @@ public class FilterMenu extends AbstractContainerMenu {
 
         this.isTagMode = buf.readBoolean();
         this.isAmountMode = buf.readBoolean();
-        this.isNbtMode = buf.readBoolean();
+        buf.readBoolean();
+        this.isNbtMode = false;
         this.isDurabilityMode = buf.readBoolean();
         this.isModMode = buf.readBoolean();
         this.isSlotMode = buf.readBoolean();
         this.isNameMode = buf.readBoolean();
-        this.isSpecialMode = isTagMode || isAmountMode || isNbtMode || isDurabilityMode || isModMode || isSlotMode
+        this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
                 || isNameMode;
 
         this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
@@ -181,10 +182,6 @@ public class FilterMenu extends AbstractContainerMenu {
             data.set(2, 0);
             var mods = ModFilterData.getModFilters(stack);
             selectedMod = mods.isEmpty() ? null : mods.get(0);
-        } else if (isNbtMode) {
-            data.set(0, NbtFilterData.isBlacklist(stack) ? 1 : 0);
-            data.set(1, NbtFilterData.getTargetType(stack).ordinal());
-            data.set(2, 0);
         } else if (isAmountMode) {
             data.set(0, AmountFilterData.isBlacklist(stack) ? 1 : 0);
             data.set(1, AmountFilterData.getTargetType(stack).ordinal());
@@ -219,7 +216,7 @@ public class FilterMenu extends AbstractContainerMenu {
             }
         }
 
-        if (isTagMode || isNbtMode || isModMode) {
+        if (isTagMode || isModMode) {
             int y = FILTER_Y + 14;
             addSlot(new GhostSlot(extractorInventory, 0, FILTER_X, y));
         }
@@ -288,18 +285,6 @@ public class FilterMenu extends AbstractContainerMenu {
         this.selectedMod = (mod == null || mod.isBlank()) ? null : mod.trim();
     }
 
-    public String getSelectedNbtPath() {
-        return NbtFilterData.getSelectedPath(getOpenedStack());
-    }
-
-    public void setSelectedNbtPath(String path) {
-        NbtFilterData.setSelection(getOpenedStack(), path, null);
-    }
-
-    public String getSelectedNbtValue() {
-        return NbtFilterData.getSelectedValueDisplay(getOpenedStack());
-    }
-
     public boolean isTagMode() {
         return isTagMode;
     }
@@ -309,7 +294,7 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public boolean isNbtMode() {
-        return isNbtMode;
+        return false;
     }
 
     public boolean isAmountMode() {
@@ -378,11 +363,11 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public int getExtractorSlotIndex() {
-        return (isTagMode || isNbtMode || isModMode) ? slotCount : -1;
+        return (isTagMode || isModMode) ? slotCount : -1;
     }
 
     public ItemStack getExtractorItem() {
-        return (isTagMode || isNbtMode || isModMode) ? extractorInventory.getItem(0) : ItemStack.EMPTY;
+        return (isTagMode || isModMode) ? extractorInventory.getItem(0) : ItemStack.EMPTY;
     }
 
     public FluidStack getFluidFilter(int slot) {
@@ -585,8 +570,6 @@ public class FilterMenu extends AbstractContainerMenu {
             TagFilterData.setBlacklist(stack, newState);
         else if (isModMode)
             ModFilterData.setBlacklist(stack, newState);
-        else if (isNbtMode)
-            NbtFilterData.setBlacklist(stack, newState);
         else if (isNameMode)
             NameFilterData.setBlacklist(stack, newState);
         else if (isSlotMode)
@@ -611,8 +594,6 @@ public class FilterMenu extends AbstractContainerMenu {
             TagFilterData.setTargetType(stack, next);
         else if (isModMode)
             ModFilterData.setTargetType(stack, next);
-        else if (isNbtMode)
-            NbtFilterData.setTargetType(stack, next);
         else if (isNameMode)
             NameFilterData.setTargetType(stack, next);
         else if (isAmountMode)
@@ -805,7 +786,7 @@ public class FilterMenu extends AbstractContainerMenu {
                 handleGhostGridClick(player, slotId, dragType);
                 return;
             }
-            if ((isTagMode || isNbtMode || isModMode) && slotId == getExtractorSlotIndex()) {
+            if ((isTagMode || isModMode) && slotId == getExtractorSlotIndex()) {
                 handleExtractorClick(player, dragType);
                 return;
             }
