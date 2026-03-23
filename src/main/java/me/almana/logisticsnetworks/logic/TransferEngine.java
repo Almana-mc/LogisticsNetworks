@@ -17,6 +17,7 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
@@ -44,6 +45,50 @@ public class TransferEngine {
     private static final float BACKOFF_DECAY_DIVISOR = 3f;
     private static final float BACKOFF_MAX_TICKS = 40f;
     private static final float BACKOFF_MAX_TICKS_ENERGY = 5f;
+
+    private static long capKey(ServerLevel level, BlockPos pos, Direction dir) {
+        long packed = pos.asLong();
+        packed ^= ((long) dir.ordinal()) << 58;
+        packed ^= ((long) level.dimension().location().hashCode()) << 32;
+        return packed;
+    }
+
+    private static class CapCache {
+        private final Map<Long, Object> items = new HashMap<>();
+        private final Map<Long, Object> fluids = new HashMap<>();
+        private final Map<Long, Object> energy = new HashMap<>();
+        private static final Object ABSENT = new Object();
+
+        IItemHandler getItemHandler(ServerLevel level, BlockPos pos, Direction dir) {
+            long key = capKey(level, pos, dir);
+            Object cached = items.get(key);
+            if (cached == ABSENT) return null;
+            if (cached != null) return (IItemHandler) cached;
+            IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, dir);
+            items.put(key, handler != null ? handler : ABSENT);
+            return handler;
+        }
+
+        IFluidHandler getFluidHandler(ServerLevel level, BlockPos pos, Direction dir) {
+            long key = capKey(level, pos, dir);
+            Object cached = fluids.get(key);
+            if (cached == ABSENT) return null;
+            if (cached != null) return (IFluidHandler) cached;
+            IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, dir);
+            fluids.put(key, handler != null ? handler : ABSENT);
+            return handler;
+        }
+
+        IEnergyStorage getEnergyHandler(ServerLevel level, BlockPos pos, Direction dir) {
+            long key = capKey(level, pos, dir);
+            Object cached = energy.get(key);
+            if (cached == ABSENT) return null;
+            if (cached != null) return (IEnergyStorage) cached;
+            IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, dir);
+            energy.put(key, handler != null ? handler : ABSENT);
+            return handler;
+        }
+    }
 
     private record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
     }
@@ -153,11 +198,12 @@ public class TransferEngine {
         List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache);
 
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
+        CapCache capCache = new CapCache();
 
         boolean anyActivePotential = false;
         for (LogisticsNodeEntity sourceNode : sortedNodes) {
             if (processNode(sourceNode, itemImports, fluidImports, energyImports, chemicalImports,
-                    sourceImports, signalCache, dimensionalCache, tierCache, telemetryActive)) {
+                    sourceImports, signalCache, dimensionalCache, tierCache, telemetryActive, capCache)) {
                 anyActivePotential = true;
             }
         }
@@ -228,7 +274,8 @@ public class TransferEngine {
             Map<UUID, Integer> signalCache,
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache,
-            boolean telemetryActive) {
+            boolean telemetryActive,
+            CapCache capCache) {
 
         if (!sourceNode.isValidNode())
             return false;
@@ -272,15 +319,15 @@ public class TransferEngine {
 
             int result = switch (channel.getType()) {
                 case FLUID ->
-                    transferFluids(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
+                    transferFluids(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache, capCache);
                 case ENERGY ->
-                    transferEnergy(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
+                    transferEnergy(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache, capCache);
                 case CHEMICAL ->
                     transferChemicals(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
                 case SOURCE ->
                     transferSource(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
                 default ->
-                    transferItems(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache);
+                    transferItems(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
             };
 
             if (result < 0)
@@ -388,13 +435,12 @@ public class TransferEngine {
 
     private static int transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
-            Map<UUID, Boolean> dimensionalCache) {
+            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IItemHandler sourceHandler = sourceLevel.getCapability(Capabilities.ItemHandler.BLOCK, sourcePos,
-                exportChannel.getIoDirection());
+        IItemHandler sourceHandler = capCache.getItemHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null)
             return -1;
 
@@ -418,8 +464,7 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IItemHandler targetHandler = targetLevel.getCapability(Capabilities.ItemHandler.BLOCK, targetPos,
-                    target.channel.getIoDirection());
+            IItemHandler targetHandler = capCache.getItemHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null)
                 continue;
 
@@ -458,13 +503,12 @@ public class TransferEngine {
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimitMb,
-            Map<UUID, Boolean> dimensionalCache) {
+            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IFluidHandler sourceHandler = sourceLevel.getCapability(Capabilities.FluidHandler.BLOCK, sourcePos,
-                exportChannel.getIoDirection());
+        IFluidHandler sourceHandler = capCache.getFluidHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null)
             return -1;
 
@@ -488,8 +532,7 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IFluidHandler targetHandler = targetLevel.getCapability(Capabilities.FluidHandler.BLOCK, targetPos,
-                    target.channel.getIoDirection());
+            IFluidHandler targetHandler = capCache.getFluidHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null)
                 continue;
 
@@ -508,13 +551,12 @@ public class TransferEngine {
 
     private static int transferEnergy(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimitRF,
-            Map<UUID, Boolean> dimensionalCache) {
+            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IEnergyStorage sourceHandler = sourceLevel.getCapability(Capabilities.EnergyStorage.BLOCK, sourcePos,
-                exportChannel.getIoDirection());
+        IEnergyStorage sourceHandler = capCache.getEnergyHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null || !sourceHandler.canExtract())
             return -1;
 
@@ -538,8 +580,7 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IEnergyStorage targetHandler = targetLevel.getCapability(Capabilities.EnergyStorage.BLOCK, targetPos,
-                    target.channel.getIoDirection());
+            IEnergyStorage targetHandler = capCache.getEnergyHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null || !targetHandler.canReceive())
                 continue;
 
