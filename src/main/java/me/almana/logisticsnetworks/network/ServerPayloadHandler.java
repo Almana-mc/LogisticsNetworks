@@ -840,6 +840,7 @@ public class ServerPayloadHandler {
             });
 
             if (player.containerMenu instanceof NodeMenu menu) {
+                menu.setRemoteAccess(true);
                 menu.sendNetworkListToClient(player);
             }
         });

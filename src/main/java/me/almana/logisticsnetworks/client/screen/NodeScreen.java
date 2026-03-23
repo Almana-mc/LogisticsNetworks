@@ -81,6 +81,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private EditBox networkNameField;
     private List<SyncNetworkListPayload.NetworkEntry> networkList = new ArrayList<>();
+    private String lastNetworkFilter = "";
     private int networkScrollOffset = 0;
 
     private UUID renamingNetworkId = null;
@@ -264,24 +265,31 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         g.drawString(font, Component.translatable("gui.logisticsnetworks.node.existing_networks"), leftPos + 14,
                 topPos + 82, COLOR_DARK_GRAY, false);
 
-        int listY = topPos + 95;
-        int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, networkList.size());
+        String currentFilter = networkNameField != null ? networkNameField.getValue().trim() : "";
+        if (!currentFilter.equals(lastNetworkFilter)) {
+            lastNetworkFilter = currentFilter;
+            networkScrollOffset = 0;
+        }
 
-        if (networkList.isEmpty()) {
+        List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
+        int listY = topPos + 95;
+        int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, filtered.size());
+
+        if (filtered.isEmpty()) {
             g.drawCenteredString(font, Component.translatable("gui.logisticsnetworks.no_networks"), cx, listY + 15,
                     COLOR_DARK_GRAY);
         } else {
             for (int i = networkScrollOffset; i < endIdx; i++) {
-                SyncNetworkListPayload.NetworkEntry entry = networkList.get(i);
+                SyncNetworkListPayload.NetworkEntry entry = filtered.get(i);
                 int y = listY + (i - networkScrollOffset) * 20;
                 drawNetworkListEntry(g, entry, leftPos + 14, y, GUI_WIDTH - 28, mx, my);
             }
         }
 
-        if (networkList.size() > NETWORKS_PER_PAGE) {
+        if (filtered.size() > NETWORKS_PER_PAGE) {
             int pageInfoY = listY + NETWORKS_PER_PAGE * 20 + 4;
             String pageInfo = tr("gui.logisticsnetworks.node.page_info", networkScrollOffset + 1, endIdx,
-                    networkList.size());
+                    filtered.size());
             g.drawCenteredString(font, pageInfo, cx, pageInfoY, COLOR_DARK_GRAY);
         }
     }
@@ -628,11 +636,12 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             return true;
         }
 
+        List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
         int listY = topPos + 95;
         int entryW = GUI_WIDTH - 28;
-        int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, networkList.size());
+        int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, filtered.size());
         for (int i = networkScrollOffset; i < endIdx; i++) {
-            SyncNetworkListPayload.NetworkEntry entry = networkList.get(i);
+            SyncNetworkListPayload.NetworkEntry entry = filtered.get(i);
             int y = listY + (i - networkScrollOffset) * 20;
             int renameBtnW = font.width(tr("gui.logisticsnetworks.rename")) + 14;
             int renameBtnX = leftPos + 14 + entryW - renameBtnW;
@@ -1138,9 +1147,10 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             }
         }
         if (currentPage == Page.NETWORK_SELECT) {
+            List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
             if (sy > 0 && networkScrollOffset > 0)
                 networkScrollOffset--;
-            else if (sy < 0 && networkScrollOffset + NETWORKS_PER_PAGE < networkList.size())
+            else if (sy < 0 && networkScrollOffset + NETWORKS_PER_PAGE < filtered.size())
                 networkScrollOffset++;
             return true;
         }
@@ -1149,6 +1159,18 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
         this.networkList = new ArrayList<>(networks);
+    }
+
+    private List<SyncNetworkListPayload.NetworkEntry> getFilteredNetworks() {
+        if (networkNameField == null) return networkList;
+        String filter = networkNameField.getValue().trim().toLowerCase();
+        if (filter.isEmpty()) return networkList;
+        List<SyncNetworkListPayload.NetworkEntry> filtered = new ArrayList<>();
+        for (SyncNetworkListPayload.NetworkEntry entry : networkList) {
+            if (entry.name().toLowerCase().contains(filter))
+                filtered.add(entry);
+        }
+        return filtered;
     }
 
     private String tr(String key, Object... args) {

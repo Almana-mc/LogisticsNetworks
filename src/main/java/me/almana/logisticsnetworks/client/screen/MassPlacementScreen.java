@@ -2,7 +2,6 @@ package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -23,8 +22,16 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
     private static final int COLOR_MUTED = 0xFF999999;
     private static final int COLOR_OK = 0xFF44CC44;
     private static final int COLOR_FAIL = 0xFFCC4444;
+    private static final int COLOR_BTN_BG = 0xFF2A2A2A;
+    private static final int COLOR_BTN_HOVER = 0xFF333333;
+    private static final int COLOR_BTN_BORDER = 0xFF4A4A4A;
+    private static final int COLOR_WHITE = 0xFFFFFFFF;
+    private static final int COLOR_GRAY = 0xFFBBBBBB;
+    private static final int COLOR_DISABLED = 0xFF666666;
 
-    private Button placeButton;
+    private static final int BTN_H = 16;
+    private static final int BTN_PAD = 10;
+    private static final int BTN_GAP = 6;
 
     public MassPlacementScreen(MassPlacementMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -39,22 +46,6 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
         super.init();
         this.leftPos = (this.width - GUI_WIDTH) / 2;
         this.topPos = (this.height - GUI_HEIGHT) / 2;
-
-        placeButton = Button.builder(Component.translatable("gui.logisticsnetworks.mass_placement.place"), btn -> {
-            if (minecraft != null && minecraft.gameMode != null) {
-                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_PLACE_NODES);
-            }
-        }).bounds(leftPos + (GUI_WIDTH - 118) / 2, topPos + GUI_HEIGHT - 24, 118, 20).build();
-
-        addRenderableWidget(placeButton);
-    }
-
-    @Override
-    protected void containerTick() {
-        super.containerTick();
-        if (placeButton != null) {
-            placeButton.active = menu.canPlace();
-        }
     }
 
     @Override
@@ -132,10 +123,69 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
         int hintY = panelY + panelH + 6;
         drawWrappedLine(graphics, Component.translatable("gui.logisticsnetworks.mass_placement.hint"),
                 textX, hintY, textW, COLOR_MUTED);
+
+        String clearLabel = Component.translatable("gui.logisticsnetworks.mass_placement.clear").getString();
+        String placeLabel = Component.translatable("gui.logisticsnetworks.mass_placement.place").getString();
+        int clearW = font.width(clearLabel) + BTN_PAD * 2;
+        int placeW = font.width(placeLabel) + BTN_PAD * 2;
+        int totalW = clearW + BTN_GAP + placeW;
+        int startX = leftPos + (GUI_WIDTH - totalW) / 2;
+        int btnY = topPos + GUI_HEIGHT - BTN_H - 6;
+
+        drawThemedButton(graphics, startX, btnY, clearW, BTN_H, clearLabel,
+                menu.getSelectedCount() > 0, mouseX, mouseY);
+        drawThemedButton(graphics, startX + clearW + BTN_GAP, btnY, placeW, BTN_H, placeLabel,
+                menu.canPlace(), mouseX, mouseY);
+    }
+
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) {
+        if (button == 0) {
+            String clearLabel = Component.translatable("gui.logisticsnetworks.mass_placement.clear").getString();
+            String placeLabel = Component.translatable("gui.logisticsnetworks.mass_placement.place").getString();
+            int clearW = font.width(clearLabel) + BTN_PAD * 2;
+            int placeW = font.width(placeLabel) + BTN_PAD * 2;
+            int totalW = clearW + BTN_GAP + placeW;
+            int startX = leftPos + (GUI_WIDTH - totalW) / 2;
+            int btnY = topPos + GUI_HEIGHT - BTN_H - 6;
+
+            if (menu.getSelectedCount() > 0 && isHoveringAbs(startX, btnY, clearW, BTN_H, mx, my)) {
+                if (minecraft != null && minecraft.gameMode != null) {
+                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_CLEAR_SELECTION);
+                }
+                return true;
+            }
+
+            if (menu.canPlace() && isHoveringAbs(startX + clearW + BTN_GAP, btnY, placeW, BTN_H, mx, my)) {
+                if (minecraft != null && minecraft.gameMode != null) {
+                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_PLACE_NODES);
+                }
+                return true;
+            }
+        }
+        return super.mouseClicked(mx, my, button);
     }
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
+    }
+
+    private void drawThemedButton(GuiGraphics g, int x, int y, int w, int h, String label,
+                                  boolean enabled, int mx, int my) {
+        if (!enabled) {
+            g.fill(x, y, x + w, y + h, COLOR_PANEL);
+            g.renderOutline(x, y, w, h, COLOR_BORDER);
+            g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, COLOR_DISABLED);
+            return;
+        }
+        boolean hovered = isHoveringAbs(x, y, w, h, mx, my);
+        g.fill(x, y, x + w, y + h, hovered ? COLOR_BTN_HOVER : COLOR_BTN_BG);
+        g.renderOutline(x, y, w, h, hovered ? COLOR_ACCENT : COLOR_BTN_BORDER);
+        g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, hovered ? COLOR_WHITE : COLOR_GRAY);
+    }
+
+    private boolean isHoveringAbs(int x, int y, int w, int h, double mx, double my) {
+        return mx >= x && mx <= x + w && my >= y && my <= y + h;
     }
 
     private int drawWrappedLine(GuiGraphics graphics, Component text, int x, int y, int width, int color) {
