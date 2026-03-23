@@ -258,7 +258,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
     private List<WrenchItem.MassSelectionTarget> getValidTargets(List<WrenchItem.MassSelectionTarget> selected) {
         List<WrenchItem.MassSelectionTarget> validTargets = new ArrayList<>();
         for (WrenchItem.MassSelectionTarget target : selected) {
-            NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(player.level(), target.pos());
+            NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(player.level(), target.pos(), player.isCreative());
             if (validation == NodePlacementHelper.ValidationResult.OK) {
                 validTargets.add(target);
             }

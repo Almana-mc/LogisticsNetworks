@@ -30,6 +30,10 @@ public final class NodePlacementHelper {
     }
 
     public static ValidationResult validatePlacement(Level level, BlockPos pos) {
+        return validatePlacement(level, pos, false);
+    }
+
+    public static ValidationResult validatePlacement(Level level, BlockPos pos, boolean creative) {
         if (level.isEmptyBlock(pos)) {
             return ValidationResult.AIR;
         }
@@ -43,7 +47,7 @@ public final class NodePlacementHelper {
             return ValidationResult.NODE_ALREADY_EXISTS;
         }
 
-        if (!hasAnyStorageCapability(level, pos)) {
+        if (!creative && !hasAnyStorageCapability(level, pos)) {
             return ValidationResult.NO_STORAGE_CAPABILITY;
         }
 
@@ -92,14 +96,19 @@ public final class NodePlacementHelper {
     }
 
     public static LogisticsNodeEntity placeNode(Level level, BlockPos pos) {
+        return placeNode(level, pos, null);
+    }
+
+    public static LogisticsNodeEntity placeNode(Level level, BlockPos pos, java.util.UUID ownerUuid) {
         LogisticsNodeEntity node = Registration.LOGISTICS_NODE.get().create(level);
         if (node == null) {
             return null;
         }
 
-        node.setPos(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+        node.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
         node.setAttachedPos(pos);
         node.setValid(true);
+        node.setOwnerUUID(ownerUuid);
 
         if (!level.addFreshEntity(node)) {
             return null;

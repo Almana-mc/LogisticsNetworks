@@ -7,6 +7,7 @@ build/
 .idea/
 .vscode/
 bin/
+.eclipse/
 
 # Minecraft Run Stuff
 run/

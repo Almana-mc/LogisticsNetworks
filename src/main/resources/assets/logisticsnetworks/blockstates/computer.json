@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "logisticsnetworks:block/laptop" },
+    "facing=south": { "model": "logisticsnetworks:block/laptop", "y": 180 },
+    "facing=west": { "model": "logisticsnetworks:block/laptop", "y": 270 },
+    "facing=east": { "model": "logisticsnetworks:block/laptop", "y": 90 }
+  }
+}

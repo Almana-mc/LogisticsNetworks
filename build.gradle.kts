@@ -113,7 +113,7 @@ dependencies {
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraftVersion}:${arsNouveauVersion}")
     compileOnly("maven.modrinth:jade:${jadeVersion}")
     compileOnly("appeng:appliedenergistics2-forge:${ae2Version}")
-    compileOnly("dev.ftb.mods:ftb-teams-forge-${minecraftVersion}:${ftbTeamsVersion}") { isTransitive = false }
+    compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
 }
 
 tasks.withType<JavaCompile>().configureEach {

@@ -70,13 +70,13 @@ public class ClientPayloadHandler {
     public static void handleSyncChannelData(SyncChannelDataPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             var player = Minecraft.getInstance().player;
-            if (player == null || payload.channelData() == null)
+            if (player == null || payload.channelTag() == null)
                 return;
             Entity entity = player.level().getEntity(payload.entityId());
             if (entity instanceof LogisticsNodeEntity node) {
                 ChannelData channel = node.getChannel(payload.channelIndex());
                 if (channel != null) {
-                    channel.load(payload.channelData(), player.level().registryAccess());
+                    channel.load(payload.channelTag(), player.level().registryAccess());
                 }
             }
         });

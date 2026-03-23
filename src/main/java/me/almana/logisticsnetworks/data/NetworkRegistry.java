@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.nbt.CompoundTag;
@@ -14,6 +15,7 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
 import org.slf4j.Logger;
 
 import java.util.*;
+import org.jetbrains.annotations.Nullable;
 
 public class NetworkRegistry extends SavedData {
 
@@ -65,15 +67,17 @@ public class NetworkRegistry extends SavedData {
     }
 
     public LogisticsNetwork createNetwork() {
-        return createNetwork(null);
+        return createNetwork(null, null);
     }
 
-    public LogisticsNetwork createNetwork(@org.jetbrains.annotations.Nullable String name) {
+    public LogisticsNetwork createNetwork(@Nullable String name,
+            @Nullable UUID ownerUuid) {
         UUID id = UUID.randomUUID();
         LogisticsNetwork network = new LogisticsNetwork(id);
         if (name != null && !name.isBlank()) {
             network.setName(name);
         }
+        network.setOwnerUuid(ownerUuid);
         networks.put(id, network);
         setDirty();
         return network;
@@ -98,10 +102,14 @@ public class NetworkRegistry extends SavedData {
         return Collections.unmodifiableMap(networks);
     }
 
-    public Collection<LogisticsNetwork> getNetworksForPlayer(UUID playerUuid) {
+    public List<LogisticsNetwork> getNetworksForPlayer(UUID playerUuid) {
+        Set<UUID> teammateIds = FTBTeamsCompat.isLoaded()
+                ? FTBTeamsCompat.getTeammateIds(playerUuid)
+                : Collections.emptySet();
         List<LogisticsNetwork> result = new ArrayList<>();
         for (LogisticsNetwork network : networks.values()) {
-            if (playerUuid.equals(network.getOwnerUuid())) {
+            UUID owner = network.getOwnerUuid();
+            if (owner == null || owner.equals(playerUuid) || teammateIds.contains(owner)) {
                 result.add(network);
             }
         }

@@ -1137,7 +1137,8 @@ public class TransferEngine {
                 continue;
 
             int requestFromTank = Math.min(remaining, tankFluid.getAmount());
-            FluidStack simulated = source.drain(tankFluid.copyWithAmount(requestFromTank),
+            FluidStack drainRequest = new FluidStack(tankFluid, requestFromTank);
+            FluidStack simulated = source.drain(drainRequest,
                     IFluidHandler.FluidAction.SIMULATE);
             if (simulated.isEmpty())
                 continue;
@@ -1161,22 +1162,22 @@ public class TransferEngine {
                 continue;
 
             int request = Math.min(simulated.getAmount(), Math.min(remaining, allowedByAmount));
-            int accepted = target.fill(simulated.copyWithAmount(request), IFluidHandler.FluidAction.SIMULATE);
+            int accepted = target.fill(new FluidStack(simulated, request), IFluidHandler.FluidAction.SIMULATE);
             if (accepted <= 0)
                 continue;
 
             int toMove = Math.min(accepted,
-                    source.drain(simulated.copyWithAmount(accepted), IFluidHandler.FluidAction.SIMULATE).getAmount());
+                    source.drain(new FluidStack(simulated, accepted), IFluidHandler.FluidAction.SIMULATE).getAmount());
             if (toMove <= 0)
                 continue;
 
-            FluidStack drained = source.drain(simulated.copyWithAmount(toMove), IFluidHandler.FluidAction.EXECUTE);
+            FluidStack drained = source.drain(new FluidStack(simulated, toMove), IFluidHandler.FluidAction.EXECUTE);
             if (drained.isEmpty())
                 continue;
 
             int filled = target.fill(drained, IFluidHandler.FluidAction.EXECUTE);
             if (filled < drained.getAmount()) {
-                source.fill(drained.copyWithAmount(drained.getAmount() - filled), IFluidHandler.FluidAction.EXECUTE);
+                source.fill(new FluidStack(drained, drained.getAmount() - filled), IFluidHandler.FluidAction.EXECUTE);
             }
 
             if (filled > 0) {
@@ -1388,7 +1389,7 @@ public class TransferEngine {
         int amount = 0;
         for (int i = 0; i < handler.getTanks(); i++) {
             FluidStack stack = handler.getFluidInTank(i);
-            if (!stack.isEmpty() && FluidStack.isSameFluidSameComponents(stack, candidate)) {
+            if (!stack.isEmpty() && stack.isFluidEqual(candidate)) {
                 amount += stack.getAmount();
             }
         }

@@ -7,9 +7,20 @@ import me.almana.logisticsnetworks.util.ItemStackCompat;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
+import me.almana.logisticsnetworks.filter.NameFilterData;
+import me.almana.logisticsnetworks.filter.NameMatchScope;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.filter.SlotFilterData;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.components.MultiLineEditBox;
+import net.minecraft.util.Mth;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.tags.TagKey;
 
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
@@ -29,6 +40,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidUtil;
@@ -44,6 +56,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     // Control Constants
     private static final int LIST_ROW_H = 12;
     private static final int DROPDOWN_ROWS = 6;
+    private static final int SUBMODE_SCROLLBAR_W = 6;
+    private static final int SUBMODE_SCROLLBAR_GAP = 2;
 
     // Colors
     private static final int COL_BG = 0xFF1A1A1A;
@@ -68,10 +82,22 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private boolean flushedTextOnClose = false;
     private boolean wasManualInputFocused = false;
 
+    // Sub-mode state
+    private int tagEditSlot = -1;
+    private int nbtEditSlot = -1;
+    private List<String> cachedSlotTags = new ArrayList<>();
+    private List<NbtFilterData.NbtEntry> cachedSlotNbtEntries = new ArrayList<>();
+    private int subModeScrollOffset = 0;
+    private boolean subModeDropdownOpen = false;
+    private EditBox tagInputBox;
+    private MultiLineEditBox nbtInputBox;
+
     // Cached Data
     private List<String> cachedTags = new ArrayList<>();
     private List<String> cachedMods = new ArrayList<>();
     private List<NbtFilterData.NbtEntry> cachedNbtEntries = new ArrayList<>();
+    private ItemStack lastExtractorItem = ItemStack.EMPTY;
+    private FilterTargetType lastTargetType = null;
 
     // Animation
     private int textTick = 0;
@@ -106,6 +132,17 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         manualInputBox.setBordered(true);
         manualInputBox.setTextColor(COL_WHITE);
         addRenderableWidget(manualInputBox);
+
+        tagInputBox = new EditBox(font, leftPos + 12, topPos + 50, 100, 14, Component.empty());
+        tagInputBox.setMaxLength(256);
+        tagInputBox.setVisible(false);
+        tagInputBox.setBordered(true);
+        tagInputBox.setTextColor(COL_WHITE);
+
+        nbtInputBox = new ThemedMultiLineEditBox(
+                font, leftPos + 12, topPos + 50, 100, 45, Component.empty(), Component.empty());
+        nbtInputBox.setCharacterLimit(2048);
+        nbtInputBox.active = false;
     }
 
     @Override
@@ -185,26 +222,32 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         boolean isChemical = menu.getTargetType() == FilterTargetType.CHEMICALS;
 
         if (menu.isTagMode()) {
-            cachedTags.clear();
-            if (!extractor.isEmpty()) {
-                if (isFluid) {
-                    FluidStack fs = FluidUtil.getFluidContained(extractor).orElse(FluidStack.EMPTY);
-                    if (!fs.isEmpty()) {
-                        fs.getFluid().builtInRegistryHolder().tags()
-                                .forEach(t -> cachedTags.add(t.location().toString()));
+            FilterTargetType currentTarget = menu.getTargetType();
+            if (!ItemStack.isSameItemSameTags(extractor, lastExtractorItem)
+                    || currentTarget != lastTargetType) {
+                lastExtractorItem = extractor.copy();
+                lastTargetType = currentTarget;
+                cachedTags.clear();
+                if (!extractor.isEmpty()) {
+                    if (isFluid) {
+                        FluidStack fs = FluidUtil.getFluidContained(extractor).orElse(FluidStack.EMPTY);
+                        if (!fs.isEmpty()) {
+                            fs.getFluid().builtInRegistryHolder().tags()
+                                    .forEach(t -> cachedTags.add(t.location().toString()));
+                        }
+                    } else if (isChemical && MekanismCompat.isLoaded()) {
+                        List<String> chemTags = MekanismCompat.getChemicalTagsFromItem(extractor);
+                        if (chemTags != null) {
+                            cachedTags.addAll(chemTags);
+                        }
+                    } else {
+                        extractor.getTags().forEach(t -> cachedTags.add(t.location().toString()));
                     }
-                } else if (isChemical && MekanismCompat.isLoaded()) {
-                    List<String> chemTags = MekanismCompat.getChemicalTagsFromItem(extractor);
-                    if (chemTags != null) {
-                        cachedTags.addAll(chemTags);
-                    }
-                } else {
-                    extractor.getTags().forEach(t -> cachedTags.add(t.location().toString()));
+                } else if (selectorGhostChemicalTags != null) {
+                    cachedTags.addAll(selectorGhostChemicalTags);
                 }
-            } else if (selectorGhostChemicalTags != null) {
-                cachedTags.addAll(selectorGhostChemicalTags);
+                Collections.sort(cachedTags);
             }
-            Collections.sort(cachedTags);
         } else if (menu.isModMode()) {
             cachedMods.clear();
             if (!extractor.isEmpty()) {
@@ -240,7 +283,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     if (!fs.isEmpty())
                         cachedNbtEntries.addAll(NbtFilterData.extractEntries(fs, provider));
                 } else if (isChemical) {
-                    // NBT filtering is not currently supported for chemicals
                 } else {
                     cachedNbtEntries.addAll(NbtFilterData.extractEntries(extractor, provider));
                 }
@@ -250,7 +292,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        super.render(g, mx, my, pt);
+        if (tagEditSlot >= 0 || nbtEditSlot >= 0) {
+            super.render(g, -1, -1, pt);
+        } else {
+            super.render(g, mx, my, pt);
+        }
 
         boolean hoverSpecialFilter = (menu.isTagMode() || menu.isModMode() || menu.isNbtMode())
                 && this.hoveredSlot != null && this.hoveredSlot.index < menu.getFilterSlots();
@@ -262,6 +308,32 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         else if ((menu.getTargetType() == FilterTargetType.FLUIDS || menu.getTargetType() == FilterTargetType.CHEMICALS)
                 && !menu.isNbtMode()) {
             renderFluidTooltip(g, mx, my);
+        }
+
+        if (!menu.isTagMode() && !menu.isModMode() && !menu.isNbtMode()
+                && tagEditSlot < 0 && nbtEditSlot < 0
+                && this.hoveredSlot != null && this.hoveredSlot.index < menu.getFilterSlots()) {
+            int idx = this.hoveredSlot.index;
+            if (menu.isTagSlot(idx)) {
+                String tag = menu.getEntryTag(idx);
+                if (tag != null) {
+                    g.renderTooltip(font, Component.literal("#" + tag), mx, my);
+                    hoverSpecialFilter = true;
+                }
+            }
+            String nbtRaw = FilterItemData.getEntryNbtRaw(menu.getOpenedStack(), idx);
+            if (nbtRaw != null && !hoverSpecialFilter) {
+                g.renderTooltip(font, Component.literal("NBT: " + nbtRaw), mx, my);
+                hoverSpecialFilter = true;
+            } else if (!hoverSpecialFilter) {
+                String nbtPath = menu.getEntryNbtPath(idx);
+                if (nbtPath != null) {
+                    Tag nbtVal = FilterItemData.getEntryNbtValue(menu.getOpenedStack(), idx);
+                    String display = nbtVal != null ? "{" + nbtPath + ":" + nbtVal + "}" : nbtPath;
+                    g.renderTooltip(font, Component.literal("NBT: " + display), mx, my);
+                    hoverSpecialFilter = true;
+                }
+            }
         }
 
         if (!hoverSpecialFilter) {
@@ -302,13 +374,68 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        // Labels are rendered manually in renderBg to support custom layouts per mode.
     }
 
     private void renderStandardFilterGrid(GuiGraphics g, int mx, int my) {
         for (int i = 0; i < menu.getFilterSlots() && i < menu.slots.size(); i++) {
             var slot = menu.slots.get(i);
-            drawSlot(g, leftPos + slot.x - 1, topPos + slot.y - 1);
+            int sx = leftPos + slot.x - 1;
+            int sy = topPos + slot.y - 1;
+
+            if (menu.isTagSlot(i)) {
+                drawSlot(g, sx, sy);
+                g.renderOutline(sx, sy, 18, 18, 0xFF44BB44);
+
+                String tag = menu.getEntryTag(i);
+                if (tag != null) {
+                    ResourceLocation tagId = ResourceLocation.tryParse(tag);
+                    if (tagId != null) {
+                        TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagId);
+                        var holders = BuiltInRegistries.ITEM.getTag(tagKey);
+                        if (holders.isPresent()) {
+                            var list = holders.get().stream().toList();
+                            if (!list.isEmpty()) {
+                                long tick = (System.currentTimeMillis() / 1000);
+                                int idx = (int) (tick % list.size());
+                                ItemStack display = new ItemStack(list.get(idx));
+                                g.renderItem(display, sx + 1, sy + 1);
+                            }
+                        }
+                    }
+                }
+            } else if (FilterItemData.isNbtOnlySlot(menu.getOpenedStack(), i)) {
+                drawSlot(g, sx, sy);
+                g.renderOutline(sx, sy, 18, 18, 0xFFFFAA00);
+                g.pose().pushPose();
+                g.pose().translate(0, 0, 300);
+                int nx = sx + (18 - font.width("N")) / 2;
+                int ny = sy + 5;
+                g.drawString(font, "N", nx, ny, 0xFFFFAA00, true);
+                g.pose().popPose();
+            } else {
+                drawSlot(g, sx, sy);
+            }
+
+            if (FilterItemData.hasEntryNbt(menu.getOpenedStack(), i)
+                    && !FilterItemData.isNbtOnlySlot(menu.getOpenedStack(), i)) {
+                g.pose().pushPose();
+                g.pose().translate(0, 0, 300);
+                g.pose().scale(0.5f, 0.5f, 1.0f);
+                int bx = (int) ((sx + 1) / 0.5f);
+                int by = (int) ((sy + 1) / 0.5f);
+                g.drawString(font, "N", bx, by, 0xFFFFAA00, true);
+                g.pose().popPose();
+            }
+
+            if (FilterItemData.hasEntryDurability(menu.getOpenedStack(), i)) {
+                g.pose().pushPose();
+                g.pose().translate(0, 0, 300);
+                g.pose().scale(0.5f, 0.5f, 1.0f);
+                int bx = (int) ((sx + 12) / 0.5f);
+                int by = (int) ((sy + 1) / 0.5f);
+                g.drawString(font, "D", bx, by, 0xFF55BBFF, true);
+                g.pose().popPose();
+            }
         }
 
         if (menu.getTargetType() == FilterTargetType.FLUIDS) {
@@ -317,7 +444,48 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             renderChemicalGhostItems(g);
         }
 
+        renderEntryAmountOverlays(g);
         renderModeControls(g, mx, my, true);
+
+        if (tagEditSlot >= 0) {
+            renderTagSubMode(g, mx, my);
+        } else if (nbtEditSlot >= 0) {
+            renderNbtSubMode(g, mx, my);
+        }
+    }
+
+    private void renderEntryAmountOverlays(GuiGraphics g) {
+        boolean isMb = menu.getTargetType() == FilterTargetType.FLUIDS
+                || menu.getTargetType() == FilterTargetType.CHEMICALS;
+
+        for (int i = 0; i < menu.getFilterSlots() && i < menu.slots.size(); i++) {
+            int amount = menu.getEntryAmount(i);
+            if (amount <= 0)
+                continue;
+
+            var slot = menu.slots.get(i);
+            int x = leftPos + slot.x;
+            int y = topPos + slot.y;
+
+            String text = isMb ? formatMb(amount) : String.valueOf(amount);
+            float scale = isMb ? 0.5f : 0.65f;
+
+            g.pose().pushPose();
+            g.pose().translate(0, 0, 300);
+            g.pose().scale(scale, scale, 1.0f);
+            int textW = font.width(text);
+            int drawX = (int) ((x + 17) / scale) - textW;
+            int drawY = (int) ((y + 10) / scale);
+            g.drawString(font, text, drawX, drawY, 0xFFBBBBBB, true);
+            g.pose().popPose();
+        }
+    }
+
+    private String formatMb(int amount) {
+        if (amount >= 1000 && amount % 1000 == 0) {
+            return (amount / 1000) + "B";
+        }
+        return amount + "mB";
     }
 
     private void renderTagMode(GuiGraphics g, int mx, int my) {
@@ -366,9 +534,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int visibleRows = Math.min(items.size(), DROPDOWN_ROWS);
         int listH = visibleRows * LIST_ROW_H;
 
-        // Background
+        int maxScroll = Math.max(0, items.size() - DROPDOWN_ROWS);
+        listScrollOffset = Math.max(0, Math.min(listScrollOffset, maxScroll));
+
         g.pose().pushPose();
-        g.pose().translate(0, 0, 200); // Render on top
+        g.pose().translate(0, 0, 200);
         g.fill(x, y, x + w, y + listH, COL_BG);
         g.renderOutline(x, y, w, listH, COL_BORDER);
 
@@ -406,7 +576,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         renderModeControls(g, mx, my, false);
         renderExtractorSlotTarget(g, mx, my);
 
-        // Path Selector
         String path = menu.getSelectedNbtPath();
         String displayPath = path == null ? tr("gui.logisticsnetworks.filter.nbt.select_path") : path;
 
@@ -840,8 +1009,39 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             handled = handleDurabilityClick(mx, my, btn);
         else if (menu.isNameMode())
             handled = handleNameClick(mx, my, btn);
-        else
+        else {
+            if (tagEditSlot >= 0) {
+                handled = handleTagSubModeClick(mx, my, btn);
+                if (!handled) {
+                    closeTagSubMode();
+                    return true;
+                }
+                return true;
+            }
+            if (nbtEditSlot >= 0) {
+                handled = handleNbtSubModeClick(mx, my, btn);
+                if (!handled) {
+                    closeNbtSubMode();
+                    return true;
+                }
+                return true;
+            }
+
+            if (hasControlDown()) {
+                int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
+                if (hoveredSlot >= 0) {
+                    if (btn == 0) {
+                        enterTagSubMode(hoveredSlot);
+                        return true;
+                    } else if (btn == 1) {
+                        enterNbtSubMode(hoveredSlot);
+                        return true;
+                    }
+                }
+            }
+
             handled = handleModeControlClick(mx, my, true);
+        }
 
         if (!handled) {
             if (isDropdownOpen && !isHoveringDropdown(mx, my)) {
@@ -1052,6 +1252,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (isHovering(x, y, w, h, (int) mx, (int) my)) {
                 return true;
             }
+
+            amountInfoOpen = false;
+            return true;
         }
 
         boolean isMb = menu.getTargetType() == FilterTargetType.FLUIDS
@@ -1123,6 +1326,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (isHovering(x, y, w, h, (int) mx, (int) my)) {
                 return true;
             }
+
+            slotInfoOpen = false;
+            return true;
         }
 
         if (btn == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
@@ -1213,11 +1419,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private void renderNameMode(GuiGraphics g, int mx, int my) {
         int contentX = leftPos + 8;
         int contentW = imageWidth - 16;
-        int inputY = topPos + 34;
-        int activeY = topPos + 52;
-        int hintY = topPos + 62;
+        int btnRowY = topPos + 20;
+        int inputY = topPos + 38;
+        int activeY = topPos + 56;
+        int hintY = topPos + 66;
 
-        renderModeControls(g, mx, my, true);
+        renderNameButtons(g, mx, my, btnRowY);
 
         manualInputBox.setX(contentX);
         manualInputBox.setY(inputY);
@@ -1230,21 +1437,119 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         String activeLine = Component.translatable("gui.logisticsnetworks.filter.name.active", display).getString();
         g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, COL_ACCENT, false);
 
-        String hintLine = Component.translatable("gui.logisticsnetworks.filter.name.input_hint").getString();
-        g.drawString(font, font.plainSubstrByWidth(hintLine, contentW), contentX, hintY, COL_GRAY, false);
+        if (!value.isEmpty() && !NameFilterData.isValidRegex(value)) {
+            String warning = Component.translatable("gui.logisticsnetworks.filter.name.invalid_regex").getString();
+            g.drawString(font, warning, contentX, hintY, 0xFFFF5555, false);
+        } else {
+            String hintLine = Component.translatable("gui.logisticsnetworks.filter.name.input_hint").getString();
+            g.drawString(font, font.plainSubstrByWidth(hintLine, contentW), contentX, hintY, COL_GRAY, false);
+        }
+    }
+
+    private void renderNameButtons(GuiGraphics g, int mx, int my, int btnY) {
+        int btnH = 12;
+        int leftEdge = leftPos + 8;
+
+        NameMatchScope scope = menu.getNameMatchScope();
+        String scopeLabel;
+        if (scope == NameMatchScope.TOOLTIP) {
+            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.tooltip");
+        } else if (scope == NameMatchScope.BOTH) {
+            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.both");
+        } else {
+            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.name");
+        }
+        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
+        drawButton(g, leftEdge, btnY, scopeBtnW, btnH, scopeLabel, mx, my, true);
+
+        String typeLabel;
+        if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
+        } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
+        } else {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.items");
+        }
+        int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
+        int typeBtnX = leftEdge + scopeBtnW + 4;
+        drawButton(g, typeBtnX, btnY, typeBtnW, btnH, typeLabel, mx, my, true);
+
+        String modeLabel = menu.isBlacklistMode()
+                ? tr("gui.logisticsnetworks.filter.mode.blacklist")
+                : tr("gui.logisticsnetworks.filter.mode.whitelist");
+        int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
+        int modeBtnX = typeBtnX + typeBtnW + 4;
+        drawButton(g, modeBtnX, btnY, modeBtnW, btnH, modeLabel, mx, my, true);
     }
 
     private boolean handleNameClick(double mx, double my, int btn) {
         int contentX = leftPos + 8;
-        int inputY = topPos + 34;
+        int inputY = topPos + 38;
         int contentW = imageWidth - 16;
 
-        if (handleModeControlClick(mx, my, true))
+        if (handleNameButtonsClick(mx, my))
             return true;
 
         if (btn == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
             manualInputBox.setValue("");
             sendNameUpdate("");
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean handleNameButtonsClick(double mx, double my) {
+        int btnH = 12;
+        int btnY = topPos + 20;
+        int leftEdge = leftPos + 8;
+
+        NameMatchScope scope = menu.getNameMatchScope();
+        String scopeLabel;
+        if (scope == NameMatchScope.TOOLTIP) {
+            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.tooltip");
+        } else if (scope == NameMatchScope.BOTH) {
+            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.both");
+        } else {
+            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.name");
+        }
+        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
+
+        if (isHovering(leftEdge, btnY, scopeBtnW, btnH, (int) mx, (int) my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
+            }
+            return true;
+        }
+
+        String typeLabel;
+        if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
+        } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
+        } else {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.items");
+        }
+        int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
+        int typeBtnX = leftEdge + scopeBtnW + 4;
+
+        if (isHovering(typeBtnX, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
+            }
+            return true;
+        }
+
+        String modeLabel = menu.isBlacklistMode()
+                ? tr("gui.logisticsnetworks.filter.mode.blacklist")
+                : tr("gui.logisticsnetworks.filter.mode.whitelist");
+        int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
+        int modeBtnX = typeBtnX + typeBtnW + 4;
+
+        if (isHovering(modeBtnX, btnY, modeBtnW, btnH, (int) mx, (int) my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
+            }
             return true;
         }
 
@@ -1299,7 +1604,29 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (key == 256) {
+            if (tagEditSlot >= 0) {
+                closeTagSubMode();
+                return true;
+            }
+            if (nbtEditSlot >= 0) {
+                closeNbtSubMode();
+                return true;
+            }
             return super.keyPressed(key, scan, modifiers);
+        }
+
+        if (tagInputBox != null && tagInputBox.isFocused()) {
+            if (key == 257) {
+                commitTagInput();
+                return true;
+            }
+            tagInputBox.keyPressed(key, scan, modifiers);
+            return true;
+        }
+
+        if (nbtInputBox != null && nbtInputBox.isFocused()) {
+            nbtInputBox.keyPressed(key, scan, modifiers);
+            return true;
         }
 
         if (manualInputBox.isFocused()) {
@@ -1314,7 +1641,33 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     @Override
+    public boolean charTyped(char c, int modifiers) {
+        if (tagInputBox != null && tagInputBox.isFocused()) {
+            return tagInputBox.charTyped(c, modifiers);
+        }
+        if (nbtInputBox != null && nbtInputBox.isFocused()) {
+            return nbtInputBox.charTyped(c, modifiers);
+        }
+        if (manualInputBox.isFocused()) {
+            return manualInputBox.charTyped(c, modifiers);
+        }
+        return super.charTyped(c, modifiers);
+    }
+
+    @Override
     public boolean mouseScrolled(double mx, double my, double delta) {
+        if (nbtEditSlot >= 0 && nbtInputBox != null) {
+            return nbtInputBox.mouseScrolled(mx, my, delta);
+        }
+
+        if (subModeDropdownOpen) {
+            if (delta > 0 && subModeScrollOffset > 0)
+                subModeScrollOffset--;
+            else if (delta < 0)
+                subModeScrollOffset++;
+            return true;
+        }
+
         if (isDropdownOpen) {
             if (delta > 0 && listScrollOffset > 0)
                 listScrollOffset--;
@@ -1322,14 +1675,75 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 listScrollOffset++;
             return true;
         }
+
+        if (!menu.isAmountMode() && !menu.isTagMode() && !menu.isModMode() && !menu.isNbtMode()
+                && !menu.isDurabilityMode() && !menu.isSlotMode() && !menu.isNameMode()) {
+            int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
+            if (hoveredSlot >= 0 && hasEntryInSlot(hoveredSlot)) {
+                int current = menu.getEntryAmount(hoveredSlot);
+                int next;
+                if (hasAltDown()) {
+                    next = delta > 0 ? getMaxAmountForType(menu.getTargetType()) : (current > 0 ? 1 : 0);
+                } else {
+                    int scrollDelta = computeScrollDelta(delta, menu.getTargetType());
+                    next = Math.max(0, current + scrollDelta);
+                }
+                if (next != current) {
+                    menu.setEntryAmount(null, hoveredSlot, next);
+                    NetworkHandler.sendToServer(new SetFilterEntryAmountPayload(hoveredSlot, next));
+                }
+                return true;
+            }
+        }
+
         return super.mouseScrolled(mx, my, delta);
     }
 
-    @Override
-    public boolean charTyped(char ch, int modifiers) {
-        if (manualInputBox.isFocused())
-            return manualInputBox.charTyped(ch, modifiers);
-        return super.charTyped(ch, modifiers);
+    private int getHoveredFilterSlot(int mx, int my) {
+        for (int i = 0; i < menu.getFilterSlots() && i < menu.slots.size(); i++) {
+            var slot = menu.slots.get(i);
+            int slotX = leftPos + slot.x;
+            int slotY = topPos + slot.y;
+            if (mx >= slotX && mx < slotX + 16 && my >= slotY && my < slotY + 16) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private boolean hasEntryInSlot(int slot) {
+        if (menu.isTagSlot(slot))
+            return true;
+        if (menu.getTargetType() == FilterTargetType.FLUIDS) {
+            return !menu.getFluidFilter(slot).isEmpty();
+        }
+        if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
+            return menu.getChemicalFilter(slot) != null;
+        }
+        return slot < menu.slots.size() && !menu.slots.get(slot).getItem().isEmpty();
+    }
+
+    private int computeScrollDelta(double scrollDirection, FilterTargetType targetType) {
+        int sign = scrollDirection > 0 ? 1 : -1;
+        if (targetType == FilterTargetType.FLUIDS || targetType == FilterTargetType.CHEMICALS) {
+            if (hasControlDown())
+                return sign * 1000;
+            if (hasShiftDown())
+                return sign * 500;
+            return sign * 50;
+        }
+        if (hasControlDown())
+            return sign * 64;
+        if (hasShiftDown())
+            return sign * 8;
+        return sign;
+    }
+
+    private int getMaxAmountForType(FilterTargetType targetType) {
+        if (targetType == FilterTargetType.FLUIDS || targetType == FilterTargetType.CHEMICALS) {
+            return 1_000_000;
+        }
+        return 1024;
     }
 
     private void renderTagTooltip(GuiGraphics g, int mx, int my) {
@@ -1472,10 +1886,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             this.selectorGhostChemicalId = chemId;
             this.selectorGhostChemicalTags = tags;
             this.selectorGhostChemicalName = name;
-            // Force tag list refresh
             this.cachedTags.clear();
             this.cachedMods.clear();
             this.cachedNbtEntries.clear();
+            this.lastExtractorItem = ItemStack.EMPTY;
+            this.lastTargetType = null;
         }
     }
 
@@ -1526,8 +1941,421 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private String tr(String key, Object... args) {
         return Component.translatable(key, args).getString();
     }
+
+    private void enterTagSubMode(int slot) {
+        tagEditSlot = slot;
+        nbtEditSlot = -1;
+        subModeScrollOffset = 0;
+        subModeDropdownOpen = true;
+        cachedSlotTags.clear();
+
+        ItemStack slotItem = getSlotItemForSubMode(slot);
+        if (!slotItem.isEmpty()) {
+            slotItem.getTags().forEach(t -> cachedSlotTags.add(t.location().toString()));
+        }
+        Collections.sort(cachedSlotTags);
+
+        String existing = menu.getEntryTag(slot);
+        if (existing != null && !cachedSlotTags.contains(existing)) {
+            cachedSlotTags.add(0, existing);
+        }
+
+        tagInputBox.setValue(existing != null ? existing : "");
+        tagInputBox.setVisible(true);
+        tagInputBox.setFocused(true);
+    }
+
+    private void enterNbtSubMode(int slot) {
+        nbtEditSlot = slot;
+        tagEditSlot = -1;
+        subModeScrollOffset = 0;
+
+        int panelX = leftPos + 4;
+        int panelY = topPos + 20;
+        int panelW = imageWidth - 8;
+        int panelH = menu.getPlayerInventoryY() - 24;
+        int inputX = panelX + 4;
+        int inputY = panelY + 30;
+        int inputW = panelW - 8;
+        int inputH = panelH - 30 - 20;
+
+        nbtInputBox = new ThemedMultiLineEditBox(
+                font, inputX, inputY, inputW, inputH, Component.empty(), Component.empty());
+        nbtInputBox.setCharacterLimit(2048);
+
+        String existing = FilterItemData.getEntryNbtRaw(menu.getOpenedStack(), slot);
+        if (existing != null) {
+            nbtInputBox.setValue(existing);
+        } else {
+            ItemStack slotItem = getSlotItemForSubMode(slot);
+            if (!slotItem.isEmpty() && minecraft != null && minecraft.player != null) {
+                CompoundTag components = NbtFilterData.getSerializedComponents(
+                        slotItem, minecraft.player.level().registryAccess());
+                nbtInputBox.setValue(components != null ? components.toString() : "");
+            } else {
+                nbtInputBox.setValue("");
+            }
+        }
+        nbtInputBox.active = true;
+        nbtInputBox.setFocused(true);
+    }
+
+    private ItemStack getSlotItemForSubMode(int slot) {
+        if (menu.isTagSlot(slot)) {
+            return ItemStack.EMPTY;
+        }
+        if (slot < menu.slots.size()) {
+            return menu.slots.get(slot).getItem();
+        }
+        return ItemStack.EMPTY;
+    }
+
+    private int getTagSubModeVisibleRows() {
+        int panelY = topPos + 20;
+        int panelH = menu.getPlayerInventoryY() - 24;
+        int listY = panelY + 48;
+        int listBottom = panelY + panelH - 4;
+        return Math.max(1, (listBottom - listY) / LIST_ROW_H);
+    }
+
+    private int getTagSubModeMaxScroll() {
+        return Math.max(0, cachedSlotTags.size() - getTagSubModeVisibleRows());
+    }
+
+    private void clampTagSubModeScrollOffset() {
+        subModeScrollOffset = Math.max(0, Math.min(subModeScrollOffset, getTagSubModeMaxScroll()));
+    }
+
+    private void renderTagSubMode(GuiGraphics g, int mx, int my) {
+        int panelX = leftPos + 4;
+        int panelY = topPos + 20;
+        int panelW = imageWidth - 8;
+        int panelH = menu.getPlayerInventoryY() - 24;
+        clampTagSubModeScrollOffset();
+
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 400);
+
+        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xF0101010);
+        g.renderOutline(panelX, panelY, panelW, panelH, COL_ACCENT);
+
+        String title = "Tag for slot " + tagEditSlot;
+        g.drawString(font, title, panelX + 4, panelY + 4, COL_WHITE, false);
+
+        String current = menu.getEntryTag(tagEditSlot);
+        String display = current != null ? "#" + current : "None";
+        g.drawString(font, display, panelX + 4, panelY + 16, COL_ACCENT, false);
+
+        int clearW = 40;
+        int clearX = panelX + panelW - clearW - 4;
+        int clearY = panelY + 4;
+        boolean hoverClear = isHovering(clearX, clearY, clearW, 12, mx, my);
+        g.fill(clearX, clearY, clearX + clearW, clearY + 12,
+                hoverClear ? COL_BTN_HOVER : COL_BTN_BG);
+        g.renderOutline(clearX, clearY, clearW, 12,
+                hoverClear ? COL_WHITE : COL_BTN_BORDER);
+        g.drawCenteredString(font, "Clear", clearX + clearW / 2, clearY + 2,
+                hoverClear ? COL_WHITE : COL_GRAY);
+
+        int inputY = panelY + 30;
+        int inputW = panelW - 60;
+        tagInputBox.setX(panelX + 4);
+        tagInputBox.setY(inputY);
+        tagInputBox.setWidth(inputW);
+        tagInputBox.render(g, mx, my, 0);
+
+        int doneW = 40;
+        int doneX = panelX + panelW - doneW - 4;
+        drawButton(g, doneX, inputY, doneW, 14, "Done", mx, my, true);
+
+        int listY = inputY + 18;
+        int maxVisibleRows = getTagSubModeVisibleRows();
+        int visibleRows = Math.min(maxVisibleRows, cachedSlotTags.size());
+        int listH = maxVisibleRows * LIST_ROW_H;
+        boolean scrollable = cachedSlotTags.size() > maxVisibleRows;
+        int listX = panelX + 4;
+        int listW = panelW - 8;
+        int rowW = scrollable ? listW - SUBMODE_SCROLLBAR_W - SUBMODE_SCROLLBAR_GAP : listW;
+        int startIdx = subModeScrollOffset;
+        int endIdx = Math.min(startIdx + maxVisibleRows, cachedSlotTags.size());
+
+        g.fill(listX, listY, listX + listW, listY + listH, 0x40000000);
+        g.renderOutline(listX, listY, listW, listH, COL_BORDER);
+
+        for (int i = startIdx; i < endIdx; i++) {
+            int rowY = listY + (i - startIdx) * LIST_ROW_H;
+            String tag = cachedSlotTags.get(i);
+            boolean selected = Objects.equals(tag, current);
+            boolean hovered = mx >= listX && mx < listX + rowW
+                    && my >= rowY && my < rowY + LIST_ROW_H;
+
+            if (selected)
+                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_SELECTED);
+            else if (hovered)
+                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_HOVER);
+
+            String text = scrollText(tag, rowW - 6, i);
+            g.drawString(font, text, listX + 3, rowY + 2,
+                    selected ? COL_ACCENT : COL_WHITE, false);
+        }
+
+        if (scrollable) {
+            int maxScroll = getTagSubModeMaxScroll();
+            int scrollbarX = listX + rowW + SUBMODE_SCROLLBAR_GAP;
+            int thumbH = Math.max(8, (listH * maxVisibleRows) / cachedSlotTags.size());
+            int thumbTravel = Math.max(0, listH - thumbH);
+            int thumbY = maxScroll <= 0 ? listY : listY + (subModeScrollOffset * thumbTravel) / maxScroll;
+
+            g.fill(scrollbarX, listY, scrollbarX + SUBMODE_SCROLLBAR_W, listY + listH, COL_BTN_BG);
+            g.renderOutline(scrollbarX, listY, SUBMODE_SCROLLBAR_W, listH, COL_BTN_BORDER);
+            g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, COL_ACCENT);
+
+            if (subModeScrollOffset > 0) {
+                g.fill(scrollbarX + 1, listY + 1, scrollbarX + SUBMODE_SCROLLBAR_W - 1, listY + 2, COL_WHITE);
+            }
+            if (subModeScrollOffset < maxScroll) {
+                g.fill(scrollbarX + 1, listY + listH - 2, scrollbarX + SUBMODE_SCROLLBAR_W - 1,
+                        listY + listH - 1, COL_WHITE);
+            }
+        }
+
+        if (cachedSlotTags.isEmpty()) {
+            g.drawString(font, "No tags available", listX + 3, listY + 2, COL_GRAY, false);
+        }
+
+        g.pose().popPose();
+    }
+
+    private boolean handleTagSubModeClick(double mx, double my, int btn) {
+        int panelX = leftPos + 4;
+        int panelY = topPos + 20;
+        int panelW = imageWidth - 8;
+        int panelH = menu.getPlayerInventoryY() - 24;
+
+        if (!isHovering(panelX, panelY, panelW, panelH, (int) mx, (int) my)) {
+            return false;
+        }
+
+        int clearW = 40;
+        int clearX = panelX + panelW - clearW - 4;
+        int clearY = panelY + 4;
+        if (isHovering(clearX, clearY, clearW, 12, (int) mx, (int) my)) {
+            NetworkHandler.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, ""));
+            menu.clearEntryTag(tagEditSlot);
+            closeTagSubMode();
+            return true;
+        }
+
+        int inputY = panelY + 30;
+        int doneW = 40;
+        int doneX = panelX + panelW - doneW - 4;
+        if (isHovering(doneX, inputY, doneW, 14, (int) mx, (int) my)) {
+            commitTagInput();
+            return true;
+        }
+
+        if (tagInputBox != null && tagInputBox.isVisible()) {
+            int inputW = panelW - 60;
+            if (isHovering(panelX + 4, inputY, inputW, 14, (int) mx, (int) my)) {
+                tagInputBox.mouseClicked(mx, my, btn);
+                return true;
+            }
+        }
+
+        int listY = inputY + 18;
+        int maxVisibleRows = getTagSubModeVisibleRows();
+        int visibleRows = Math.min(maxVisibleRows, cachedSlotTags.size());
+        int listH = maxVisibleRows * LIST_ROW_H;
+        boolean scrollable = cachedSlotTags.size() > maxVisibleRows;
+        int listX = panelX + 4;
+        int listW = panelW - 8;
+        int rowW = scrollable ? listW - SUBMODE_SCROLLBAR_W - SUBMODE_SCROLLBAR_GAP : listW;
+        int startIdx = subModeScrollOffset;
+        int endIdx = Math.min(startIdx + maxVisibleRows, cachedSlotTags.size());
+
+        if (scrollable) {
+            int scrollbarX = listX + rowW + SUBMODE_SCROLLBAR_GAP;
+            if (isHovering(scrollbarX, listY, SUBMODE_SCROLLBAR_W, listH, (int) mx, (int) my)) {
+                int maxScroll = getTagSubModeMaxScroll();
+                int thumbH = Math.max(8, (listH * maxVisibleRows) / cachedSlotTags.size());
+                int thumbTravel = Math.max(0, listH - thumbH);
+                int thumbY = maxScroll <= 0 ? listY : listY + (subModeScrollOffset * thumbTravel) / maxScroll;
+                if (my < thumbY) {
+                    subModeScrollOffset = Math.max(0, subModeScrollOffset - 1);
+                } else if (my >= thumbY + thumbH) {
+                    subModeScrollOffset = Math.min(maxScroll, subModeScrollOffset + 1);
+                }
+                return true;
+            }
+        }
+
+        for (int i = startIdx; i < endIdx; i++) {
+            int rowY = listY + (i - startIdx) * LIST_ROW_H;
+            if (mx >= listX && mx < listX + rowW
+                    && my >= rowY && my < rowY + LIST_ROW_H) {
+                String tag = cachedSlotTags.get(i);
+                NetworkHandler.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, tag));
+                menu.setEntryTag(null, tagEditSlot, tag);
+                closeTagSubMode();
+                return true;
+            }
+        }
+
+        return true;
+    }
+
+    private void commitTagInput() {
+        if (tagInputBox == null || tagEditSlot < 0)
+            return;
+        String rawValue = tagInputBox.getValue();
+        String normalizedTag = FilterTagUtil.normalizeTag(rawValue);
+        if (normalizedTag != null) {
+            NetworkHandler.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, normalizedTag));
+            menu.setEntryTag(null, tagEditSlot, normalizedTag);
+        }
+        closeTagSubMode();
+    }
+
+    private void closeTagSubMode() {
+        tagEditSlot = -1;
+        subModeDropdownOpen = false;
+        if (tagInputBox != null) {
+            tagInputBox.setVisible(false);
+            tagInputBox.setFocused(false);
+        }
+    }
+
+    private void renderNbtSubMode(GuiGraphics g, int mx, int my) {
+        int panelX = leftPos + 4;
+        int panelY = topPos + 20;
+        int panelW = imageWidth - 8;
+        int panelH = menu.getPlayerInventoryY() - 24;
+
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 400);
+
+        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xF0101010);
+        g.renderOutline(panelX, panelY, panelW, panelH, 0xFFFFAA00);
+
+        g.drawString(font, "NBT Filter - Slot " + nbtEditSlot, panelX + 4, panelY + 4, COL_WHITE, false);
+
+        int clearW = 40;
+        int clearX = panelX + panelW - clearW - 4;
+        int clearY = panelY + 4;
+        drawButton(g, clearX, clearY, clearW, 12, "Clear", (int) mx, (int) my, true);
+
+        g.drawString(font, "Raw SNBT:", panelX + 4, panelY + 18, COL_ACCENT, false);
+
+        int inputY = panelY + 30;
+        int inputW = panelW - 8;
+        int inputH = panelH - 30 - 20;
+        nbtInputBox.render(g, mx, my, 0);
+
+        int doneW = 50;
+        int doneX = panelX + (panelW - doneW) / 2;
+        int doneY = inputY + inputH + 4;
+        drawButton(g, doneX, doneY, doneW, 14, "Done", mx, my, true);
+
+        int len = nbtInputBox.getValue().length();
+        if (len >= 1800) {
+            String counter = len + "/2048";
+            int counterColor = len >= 2000 ? 0xFFFF5555 : COL_GRAY;
+            int counterX = panelX + panelW - 4 - font.width(counter);
+            g.drawString(font, counter, counterX, doneY + 3, counterColor, false);
+        }
+
+        g.pose().popPose();
+    }
+
+    private boolean handleNbtSubModeClick(double mx, double my, int btn) {
+        int panelX = leftPos + 4;
+        int panelY = topPos + 20;
+        int panelW = imageWidth - 8;
+        int panelH = menu.getPlayerInventoryY() - 24;
+
+        if (!isHovering(panelX, panelY, panelW, panelH, (int) mx, (int) my)) {
+            return false;
+        }
+
+        int clearW = 40;
+        int clearX = panelX + panelW - clearW - 4;
+        int clearY = panelY + 4;
+        if (isHovering(clearX, clearY, clearW, 12, (int) mx, (int) my)) {
+            NetworkHandler.sendToServer(new SetFilterEntryNbtPayload(nbtEditSlot, "", true));
+            menu.clearEntryNbt(null, nbtEditSlot);
+            closeNbtSubMode();
+            return true;
+        }
+
+        int inputY = panelY + 30;
+        int inputH = panelH - 30 - 20;
+        int doneW = 50;
+        int doneX = panelX + (panelW - doneW) / 2;
+        int doneY = inputY + inputH + 4;
+        if (isHovering(doneX, doneY, doneW, 14, (int) mx, (int) my)) {
+            commitNbtInput();
+            return true;
+        }
+
+        if (nbtInputBox != null && nbtInputBox.active) {
+            nbtInputBox.mouseClicked(mx, my, btn);
+            return true;
+        }
+
+        return true;
+    }
+
+    private void commitNbtInput() {
+        if (nbtInputBox == null || nbtEditSlot < 0)
+            return;
+        String val = nbtInputBox.getValue().replace("\n", " ").trim();
+        if (!val.isEmpty()) {
+            NetworkHandler.sendToServer(
+                    new SetFilterEntryNbtPayload(nbtEditSlot, "", false, val));
+        }
+        closeNbtSubMode();
+    }
+
+    private void closeNbtSubMode() {
+        nbtEditSlot = -1;
+        subModeDropdownOpen = false;
+        if (nbtInputBox != null) {
+            nbtInputBox.active = false;
+            nbtInputBox.setFocused(false);
+        }
+    }
+
+    private static class ThemedMultiLineEditBox extends MultiLineEditBox {
+        ThemedMultiLineEditBox(Font font, int x, int y, int w, int h,
+                               Component message, Component placeholder) {
+            super(font, x, y, w, h, message, placeholder);
+        }
+
+        @Override
+        protected void renderDecorations(GuiGraphics graphics) {
+        }
+
+        @Override
+        public void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+            super.renderWidget(g, mouseX, mouseY, partialTick);
+            if (scrollbarVisible()) {
+                int sbX = getX() + width - 8;
+                int sbY = getY();
+                int sbH = height;
+
+                g.fill(sbX, sbY, sbX + 8, sbY + sbH, 0xFF111111);
+
+                int maxScroll = getMaxScrollAmount();
+                if (maxScroll > 0) {
+                    int totalH = sbH + maxScroll;
+                    int thumbH = Mth.clamp((int) ((float) (sbH * sbH) / (float) totalH), 32, sbH);
+                    int thumbY = (int) (scrollAmount() * (sbH - thumbH) / maxScroll) + sbY;
+                    thumbY = Math.max(thumbY, sbY);
+
+                    g.fill(sbX, thumbY, sbX + 8, thumbY + thumbH, 0xFF3A3A3A);
+                    g.fill(sbX, thumbY, sbX + 7, thumbY + thumbH - 1, 0xFF4A4A4A);
+                }
+            }
+        }
+    }
 }
-
-
-
-

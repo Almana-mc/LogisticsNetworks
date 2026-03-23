@@ -168,7 +168,7 @@ public class WrenchItem extends Item {
             return InteractionResult.CONSUME;
         }
 
-        NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(level, target.pos());
+        NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(level, target.pos(), player.isCreative());
         switch (validation) {
             case BLACKLISTED -> player.displayClientMessage(
                     Component.translatable("message.logisticsnetworks.block_blacklisted"), true);
@@ -411,7 +411,7 @@ public class WrenchItem extends Item {
                 continue;
             }
 
-            if (NodePlacementHelper.validatePlacement(level, current) == NodePlacementHelper.ValidationResult.OK) {
+            if (NodePlacementHelper.validatePlacement(level, current, player.isCreative()) == NodePlacementHelper.ValidationResult.OK) {
                 MassSelectionTarget target = new MassSelectionTarget(player.level().dimension(), current);
                 if (addMassSelection(wrenchStack, target)) {
                     added++;

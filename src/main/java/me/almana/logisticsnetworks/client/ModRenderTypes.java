@@ -27,4 +27,19 @@ public class ModRenderTypes extends RenderStateShard {
                     .setWriteMaskState(COLOR_WRITE)
                     .setCullState(NO_CULL)
                     .createCompositeState(false));
+
+    public static final RenderType OVERLAY_XRAY = RenderType.create(
+            "logisticsnetworks_overlay_xray",
+            DefaultVertexFormat.POSITION_COLOR,
+            VertexFormat.Mode.QUADS,
+            256,
+            false,
+            true,
+            RenderType.CompositeState.builder()
+                    .setShaderState(POSITION_COLOR_SHADER)
+                    .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                    .setDepthTestState(NO_DEPTH_TEST)
+                    .setWriteMaskState(COLOR_WRITE)
+                    .setCullState(NO_CULL)
+                    .createCompositeState(false));
 }

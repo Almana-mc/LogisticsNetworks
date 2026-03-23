@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.EntityHitResult;
 import snownee.jade.api.IWailaClientRegistration;
 import snownee.jade.api.IWailaCommonRegistration;
@@ -16,7 +17,7 @@ public class LogisticsJadePlugin implements IWailaPlugin {
 
     @Override
     public void register(IWailaCommonRegistration registration) {
-        registration.registerBlockDataProvider(NodeAttachedComponentProvider.INSTANCE, Block.class);
+        registration.registerBlockDataProvider(NodeAttachedComponentProvider.INSTANCE, BlockEntity.class);
         registration.registerEntityDataProvider(LogisticsNodeEntityProvider.INSTANCE, LogisticsNodeEntity.class);
     }
 

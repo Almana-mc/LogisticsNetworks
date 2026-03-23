@@ -1,0 +1,40 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "conditions": [
+        {
+            "type": "forge:mod_loaded",
+            "modid": "logisticsnetworks"
+        },
+        {
+            "type": "forge:mod_loaded",
+            "modid": "ae2"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "QPQ",
+        "RER",
+        "QIQ"
+    ],
+    "key": {
+        "Q": {
+            "item": "minecraft:quartz"
+        },
+        "P": {
+            "item": "ae2:blank_pattern"
+        },
+        "R": {
+            "item": "minecraft:redstone"
+        },
+        "E": {
+            "item": "minecraft:ender_pearl"
+        },
+        "I": {
+            "item": "minecraft:iron_ingot"
+        }
+    },
+    "result": {
+        "item": "logisticsnetworks:pattern_setter",
+        "count": 1
+    }
+}

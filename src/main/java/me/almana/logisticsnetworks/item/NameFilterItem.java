@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.item;
 
 import me.almana.logisticsnetworks.filter.NameFilterData;
+import me.almana.logisticsnetworks.filter.NameMatchScope;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import java.util.List;
 import net.minecraft.ChatFormatting;
@@ -59,6 +60,15 @@ public class NameFilterItem extends Item {
                 blacklist ? "tooltip.logisticsnetworks.filter.mode.blacklist"
                         : "tooltip.logisticsnetworks.filter.mode.whitelist")
                 .withStyle(ChatFormatting.GRAY));
+
+        NameMatchScope scope = NameFilterData.getMatchScope(stack);
+        String scopeKey = switch (scope) {
+            case TOOLTIP -> "gui.logisticsnetworks.filter.name.scope.tooltip";
+            case BOTH -> "gui.logisticsnetworks.filter.name.scope.both";
+            default -> "gui.logisticsnetworks.filter.name.scope.name";
+        };
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.name.scope",
+                Component.translatable(scopeKey)).withStyle(ChatFormatting.GRAY));
 
         tooltip.add(Component.translatable(
                 "tooltip.logisticsnetworks.filter.name",

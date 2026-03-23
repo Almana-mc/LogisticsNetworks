@@ -547,16 +547,16 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         drawButton(g, btnX, y - 1, btnW, 10, modeLabel, mx, my);
 
         int gridY = y + 12;
-        drawSlotGrid(g, x, gridY, 3, 3);
+        drawSlotGrid(g, x, gridY, 3, 3, mx, my);
 
         int upgY = gridY + 3 * 19 + 2;
         g.drawString(font, Component.translatable("gui.logisticsnetworks.node.upgrades"), x, upgY, COLOR_DARK_GRAY,
                 false);
 
-        drawSlotGrid(g, x, upgY + 10, 2, 2);
+        drawSlotGrid(g, x, upgY + 10, 2, 2, mx, my);
     }
 
-    private void drawSlotGrid(GuiGraphics g, int startX, int startY, int rows, int cols) {
+    private void drawSlotGrid(GuiGraphics g, int startX, int startY, int rows, int cols, int mx, int my) {
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
                 int x = startX + c * 19;
@@ -593,10 +593,6 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             return row == 4 || row == 5 || row == 7 || row == 8;
         }
         return (ch.getType() == ChannelType.ENERGY) && row == 8;
-    }
-
-    @Override
-    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
     }
 
     @Override

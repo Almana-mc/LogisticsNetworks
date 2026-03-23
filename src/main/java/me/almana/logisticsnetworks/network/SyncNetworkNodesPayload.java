@@ -17,11 +17,11 @@ public record SyncNetworkNodesPayload(UUID networkId, List<NodeInfo> nodes) impl
             UUID nodeId,
             BlockPos nodePos,
             BlockPos attachedPos,
-            String label,
+            String blockName,
+            String nodeLabel,
             String dimension,
-            ResourceLocation blockId,
             boolean visible,
-            boolean online) {
+            boolean highlighted) {
     }
 
     public static final CustomPacketPayload.Type<SyncNetworkNodesPayload> TYPE = new CustomPacketPayload.Type<>(
@@ -38,12 +38,12 @@ public record SyncNetworkNodesPayload(UUID networkId, List<NodeInfo> nodes) impl
             UUID nodeId = buf.readUUID();
             BlockPos nodePos = buf.readBlockPos();
             BlockPos attachedPos = buf.readBlockPos();
-            String label = buf.readUtf(64);
+            String blockName = buf.readUtf(256);
+            String nodeLabel = buf.readUtf(64);
             String dimension = buf.readUtf(256);
-            ResourceLocation blockId = buf.readResourceLocation();
             boolean visible = buf.readBoolean();
-            boolean online = buf.readBoolean();
-            nodes.add(new NodeInfo(nodeId, nodePos, attachedPos, label, dimension, blockId, visible, online));
+            boolean highlighted = buf.readBoolean();
+            nodes.add(new NodeInfo(nodeId, nodePos, attachedPos, blockName, nodeLabel, dimension, visible, highlighted));
         }
         return new SyncNetworkNodesPayload(networkId, nodes);
     }
@@ -55,11 +55,11 @@ public record SyncNetworkNodesPayload(UUID networkId, List<NodeInfo> nodes) impl
             buf.writeUUID(node.nodeId);
             buf.writeBlockPos(node.nodePos);
             buf.writeBlockPos(node.attachedPos);
-            buf.writeUtf(node.label, 64);
+            buf.writeUtf(node.blockName, 256);
+            buf.writeUtf(node.nodeLabel, 64);
             buf.writeUtf(node.dimension, 256);
-            buf.writeResourceLocation(node.blockId);
             buf.writeBoolean(node.visible);
-            buf.writeBoolean(node.online);
+            buf.writeBoolean(node.highlighted);
         }
     }
 

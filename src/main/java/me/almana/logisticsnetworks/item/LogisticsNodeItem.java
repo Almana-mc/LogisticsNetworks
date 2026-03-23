@@ -31,7 +31,8 @@ public class LogisticsNodeItem extends Item {
         if (level.isClientSide)
             return InteractionResult.SUCCESS;
 
-        NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(level, clickedPos);
+        boolean creative = player != null && player.isCreative();
+        NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(level, clickedPos, creative);
         if (validation != NodePlacementHelper.ValidationResult.OK) {
             if (player != null) {
                 switch (validation) {

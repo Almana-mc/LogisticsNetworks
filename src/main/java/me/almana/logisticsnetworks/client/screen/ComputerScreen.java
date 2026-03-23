@@ -404,14 +404,14 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int h = CHANNEL_ENTRY_HEIGHT - 2;
         int bgColor = hovered ? COLOR_ROW_HOVER : COLOR_ROW;
         int borderColor = hovered ? COLOR_ACCENT_DARK : COLOR_BORDER;
-        int typeColor = resolveTypeColor(entry.typeOrdinal());
+        int typeColor = resolveTypeColor(entry.type());
 
         g.fill(x, y, x + width, y + h, bgColor);
         g.renderOutline(x, y, width, h, borderColor);
         g.fill(x + 1, y + 1, x + 3, y + h - 1, typeColor);
 
         String chLabel = "CH" + entry.channelIndex();
-        String typeName = resolveTypeName(entry.typeOrdinal());
+        String typeName = resolveTypeName(entry.type());
         String nodesBadge = line("gui.logisticsnetworks.computer.channel_nodes", entry.nodeCount());
 
         int textX = x + 8;
@@ -834,7 +834,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
         switch (currentPage) {
             case NETWORK_LIST -> {
                 if (networkList.size() > NETWORKS_PER_PAGE) {
@@ -866,7 +866,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             default -> {
             }
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolled(mouseX, mouseY, scrollY);
     }
 
     @Override
@@ -1060,7 +1060,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                     && mouseY >= entryY && mouseY < entryY + CHANNEL_ENTRY_HEIGHT - 2) {
                 SyncChannelListPayload.ChannelEntry entry = channelList.get(index);
                 watchedChannelIndex = entry.channelIndex();
-                watchedTypeOrdinal = entry.typeOrdinal();
+                watchedTypeOrdinal = entry.type();
                 currentPage = Page.IO_CHANNEL_GRAPH;
                 subscribeTelemetry();
                 return true;
@@ -1281,7 +1281,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     private String formatPosition(SyncNetworkNodesPayload.NodeInfo nodeInfo) {
-        String dimension = nodeInfo.dimension().getPath();
+        String dimension = nodeInfo.dimension();
+        int colonIdx = dimension.indexOf(':');
+        if (colonIdx >= 0) dimension = dimension.substring(colonIdx + 1);
         if (dimension.equals("overworld")) {
             dimension = line("gui.logisticsnetworks.computer.dimension.overworld");
         } else if (dimension.equals("the_nether")) {
@@ -1327,7 +1329,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         if (payload.networkId().equals(selectedNetworkId)
                 && payload.channelIndex() == watchedChannelIndex) {
             this.telemetryHistory = payload.history();
-            this.telemetryIndex = payload.historyIndex();
+            this.telemetryIndex = payload.cursor();
         }
     }
 

@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.client.model.NodeModel;
@@ -9,20 +10,32 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.BlockPos;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.gui.Font;
+import net.minecraft.world.entity.Entity;
 import org.joml.Matrix4f;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     private static final ResourceLocation TEXTURE = new ResourceLocation(Logisticsnetworks.MOD_ID,
             "textures/entity/node.png");
     private final NodeModel<LogisticsNodeEntity> model;
+
+    private static Set<Integer> allowedNodeIds;
+    private static long lastComputeTick = -1;
 
     public LogisticsNodeRenderer(EntityRendererProvider.Context context) {
         super(context);
@@ -37,13 +50,22 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
             return;
 
         boolean isHoldingWrench = mc.player.isHolding(Registration.WRENCH.get());
+        if (isHoldingWrench) {
+            updateAllowedNodes(mc);
+            if (allowedNodeIds != null && !allowedNodeIds.contains(entity.getId())) {
+                isHoldingWrench = false;
+            }
+        }
         boolean isVisible = entity.isRenderVisible();
+        boolean isHighlighted = entity.isHighlighted();
 
-        if (isVisible || isHoldingWrench) {
+        if (isVisible || isHoldingWrench || isHighlighted) {
             renderModel(entity, poseStack, buffer, light, isVisible);
         }
 
-        if (isHoldingWrench) {
+        if (isHighlighted) {
+            renderHighlightBox(poseStack, buffer, 0.15f, 0.45f, 1.0f, 0.35f, true);
+        } else if (isHoldingWrench) {
             renderWrenchOverlay(entity, poseStack, buffer, light);
         }
 
@@ -53,7 +75,8 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
     @Override
     protected boolean shouldShowName(LogisticsNodeEntity entity) {
         var mc = Minecraft.getInstance();
-        return mc.player != null && mc.player.isHolding(Registration.WRENCH.get());
+        return mc.player != null && mc.player.isHolding(Registration.WRENCH.get())
+                && (allowedNodeIds == null || allowedNodeIds.contains(entity.getId()));
     }
 
     @Override
@@ -71,10 +94,11 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         float scaleXZ = 17.0f / 16.0f;
         float scaleY = 18.0f / 16.0f;
         poseStack.scale(-scaleXZ, -scaleY, scaleXZ);
-        poseStack.translate(0.0, -1.0625, 0.0);
+        poseStack.translate(0.0, -17.0f / 16.0f - (8.0f / 18.0f), 0.0);
 
-        VertexConsumer consumer = buffer.getBuffer(model.renderType(getTextureLocation(entity)));
         float alpha = isVisible ? 1.0F : 0.33333334F;
+        VertexConsumer consumer = buffer
+                .getBuffer(RenderType.entityCutoutNoCull(getTextureLocation(entity)));
         model.renderToBuffer(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, alpha);
 
         poseStack.popPose();
@@ -82,7 +106,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     private void renderWrenchOverlay(LogisticsNodeEntity entity, PoseStack poseStack, MultiBufferSource buffer,
             int light) {
-        renderHighlightBox(poseStack, buffer);
+        renderHighlightBox(poseStack, buffer, 0f, 1f, 0f, 0.35f, false);
 
         if (Config.debugMode) {
             poseStack.pushPose();
@@ -113,49 +137,44 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         poseStack.popPose();
     }
 
-    private void renderHighlightBox(PoseStack poseStack, MultiBufferSource buffer) {
-        VertexConsumer builder = buffer.getBuffer(ModRenderTypes.OVERLAY);
+    private void renderHighlightBox(PoseStack poseStack, MultiBufferSource buffer, float r, float g, float b,
+            float a, boolean xray) {
+        VertexConsumer builder = buffer.getBuffer(xray ? ModRenderTypes.OVERLAY_XRAY : ModRenderTypes.OVERLAY);
         Matrix4f matrix = poseStack.last().pose();
 
-        float min = -0.501f;
-        float max = 0.501f;
-        float r = 0f, g = 1f, b = 0f, a = 0.35f;
+        float minX = -0.501f, maxX = 0.501f;
+        float minY = -0.001f, maxY = 1.001f;
+        float minZ = -0.501f, maxZ = 0.501f;
 
-        // Top
-        addVertex(builder, matrix, min, max, min, r, g, b, a);
-        addVertex(builder, matrix, min, max, max, r, g, b, a);
-        addVertex(builder, matrix, max, max, max, r, g, b, a);
-        addVertex(builder, matrix, max, max, min, r, g, b, a);
+        addVertex(builder, matrix, minX, maxY, minZ, r, g, b, a);
+        addVertex(builder, matrix, minX, maxY, maxZ, r, g, b, a);
+        addVertex(builder, matrix, maxX, maxY, maxZ, r, g, b, a);
+        addVertex(builder, matrix, maxX, maxY, minZ, r, g, b, a);
 
-        // Bottom
-        addVertex(builder, matrix, max, min, min, r, g, b, a);
-        addVertex(builder, matrix, max, min, max, r, g, b, a);
-        addVertex(builder, matrix, min, min, max, r, g, b, a);
-        addVertex(builder, matrix, min, min, min, r, g, b, a);
+        addVertex(builder, matrix, maxX, minY, minZ, r, g, b, a);
+        addVertex(builder, matrix, maxX, minY, maxZ, r, g, b, a);
+        addVertex(builder, matrix, minX, minY, maxZ, r, g, b, a);
+        addVertex(builder, matrix, minX, minY, minZ, r, g, b, a);
 
-        // West
-        addVertex(builder, matrix, min, max, min, r, g, b, a);
-        addVertex(builder, matrix, min, min, min, r, g, b, a);
-        addVertex(builder, matrix, min, min, max, r, g, b, a);
-        addVertex(builder, matrix, min, max, max, r, g, b, a);
+        addVertex(builder, matrix, minX, maxY, minZ, r, g, b, a);
+        addVertex(builder, matrix, minX, minY, minZ, r, g, b, a);
+        addVertex(builder, matrix, minX, minY, maxZ, r, g, b, a);
+        addVertex(builder, matrix, minX, maxY, maxZ, r, g, b, a);
 
-        // East
-        addVertex(builder, matrix, max, max, max, r, g, b, a);
-        addVertex(builder, matrix, max, min, max, r, g, b, a);
-        addVertex(builder, matrix, max, min, min, r, g, b, a);
-        addVertex(builder, matrix, max, max, min, r, g, b, a);
+        addVertex(builder, matrix, maxX, maxY, maxZ, r, g, b, a);
+        addVertex(builder, matrix, maxX, minY, maxZ, r, g, b, a);
+        addVertex(builder, matrix, maxX, minY, minZ, r, g, b, a);
+        addVertex(builder, matrix, maxX, maxY, minZ, r, g, b, a);
 
-        // North
-        addVertex(builder, matrix, max, max, min, r, g, b, a);
-        addVertex(builder, matrix, max, min, min, r, g, b, a);
-        addVertex(builder, matrix, min, min, min, r, g, b, a);
-        addVertex(builder, matrix, min, max, min, r, g, b, a);
+        addVertex(builder, matrix, maxX, maxY, minZ, r, g, b, a);
+        addVertex(builder, matrix, maxX, minY, minZ, r, g, b, a);
+        addVertex(builder, matrix, minX, minY, minZ, r, g, b, a);
+        addVertex(builder, matrix, minX, maxY, minZ, r, g, b, a);
 
-        // South
-        addVertex(builder, matrix, min, max, max, r, g, b, a);
-        addVertex(builder, matrix, min, min, max, r, g, b, a);
-        addVertex(builder, matrix, max, min, max, r, g, b, a);
-        addVertex(builder, matrix, max, max, max, r, g, b, a);
+        addVertex(builder, matrix, minX, maxY, maxZ, r, g, b, a);
+        addVertex(builder, matrix, minX, minY, maxZ, r, g, b, a);
+        addVertex(builder, matrix, maxX, minY, maxZ, r, g, b, a);
+        addVertex(builder, matrix, maxX, maxY, maxZ, r, g, b, a);
     }
 
     private static void addVertex(VertexConsumer builder, Matrix4f matrix, float x, float y, float z,
@@ -175,7 +194,6 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         float x = (float) (-font.width(text) / 2);
         int fullbright = 15728880;
 
-        // Two-pass rendering like vanilla nametags: SEE_THROUGH for visibility behind geometry, NORMAL for solid text
         font.drawInBatch(text, x, 0, 0x20FFFFFF, false, poseStack.last().pose(), buffer,
                 Font.DisplayMode.SEE_THROUGH, 0x40000000, fullbright);
         font.drawInBatch(text, x, 0, 0xFFFFFFFF, false, poseStack.last().pose(), buffer,
@@ -184,9 +202,42 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         poseStack.popPose();
     }
 
+    private static void updateAllowedNodes(Minecraft mc) {
+        long tick = mc.level.getGameTime();
+        if (tick == lastComputeTick)
+            return;
+        lastComputeTick = tick;
+
+        int limit = ClientConfig.maxRenderedNodes;
+        List<LogisticsNodeEntity> nodes = new ArrayList<>();
+        for (Entity e : mc.level.entitiesForRendering()) {
+            if (e instanceof LogisticsNodeEntity node) {
+                nodes.add(node);
+            }
+        }
+
+        if (nodes.size() <= limit) {
+            allowedNodeIds = null;
+            return;
+        }
+
+        double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
+        nodes.sort(Comparator.comparingDouble(n -> n.distanceToSqr(px, py, pz)));
+
+        Set<Integer> ids = new HashSet<>(limit * 2);
+        for (int i = 0; i < limit; i++) {
+            ids.add(nodes.get(i).getId());
+        }
+        allowedNodeIds = ids;
+    }
+
+    @Override
+    protected int getBlockLightLevel(LogisticsNodeEntity entity, BlockPos pos) {
+        return 15;
+    }
+
     @Override
     public ResourceLocation getTextureLocation(LogisticsNodeEntity entity) {
         return TEXTURE;
     }
 }
-

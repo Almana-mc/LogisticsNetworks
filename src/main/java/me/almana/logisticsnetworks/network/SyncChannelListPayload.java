@@ -12,7 +12,7 @@ import java.util.UUID;
 
 public record SyncChannelListPayload(UUID networkId, List<ChannelEntry> channels) implements CustomPacketPayload {
 
-    public record ChannelEntry(int channelIndex, int mode, int type) {
+    public record ChannelEntry(int channelIndex, int mode, int type, int nodeCount) {
     }
 
     public static final CustomPacketPayload.Type<SyncChannelListPayload> TYPE = new CustomPacketPayload.Type<>(
@@ -29,7 +29,8 @@ public record SyncChannelListPayload(UUID networkId, List<ChannelEntry> channels
             int channelIndex = buf.readVarInt();
             int mode = buf.readVarInt();
             int type = buf.readVarInt();
-            entries.add(new ChannelEntry(channelIndex, mode, type));
+            int nodeCount = buf.readVarInt();
+            entries.add(new ChannelEntry(channelIndex, mode, type, nodeCount));
         }
         return new SyncChannelListPayload(networkId, entries);
     }
@@ -41,6 +42,7 @@ public record SyncChannelListPayload(UUID networkId, List<ChannelEntry> channels
             buf.writeVarInt(entry.channelIndex);
             buf.writeVarInt(entry.mode);
             buf.writeVarInt(entry.type);
+            buf.writeVarInt(entry.nodeCount);
         }
     }
 

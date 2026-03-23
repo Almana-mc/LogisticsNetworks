@@ -43,3 +43,24 @@ mandatory = false
 versionRange = "[4.0.0,)"
 ordering = "NONE"
 side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "jade"
+mandatory = false
+versionRange = "[11.0.0,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies."${mod_id}"]]
+modId = "ae2"
+mandatory = false
+versionRange = "[15.0.0,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "ftbteams"
+mandatory = false
+versionRange = "[2004.1.0,)"
+ordering = "NONE"
+side = "BOTH"

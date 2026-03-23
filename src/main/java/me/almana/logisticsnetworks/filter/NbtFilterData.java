@@ -272,7 +272,7 @@ public final class NbtFilterData {
         return components;
     }
 
-    private static @Nullable CompoundTag getSerializedComponents(FluidStack stack, HolderLookup.Provider provider) {
+    static @Nullable CompoundTag getSerializedComponents(FluidStack stack, HolderLookup.Provider provider) {
         if (stack == null || stack.isEmpty() || provider == null)
             return null;
 

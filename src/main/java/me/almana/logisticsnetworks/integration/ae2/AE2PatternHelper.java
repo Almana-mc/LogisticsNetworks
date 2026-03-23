@@ -7,6 +7,7 @@ import appeng.crafting.pattern.AECraftingPattern;
 import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.crafting.pattern.AESmithingTablePattern;
 import appeng.crafting.pattern.AEStonecuttingPattern;
+import appeng.api.crafting.IPatternDetails;
 import appeng.crafting.pattern.EncodedPatternItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -41,10 +42,10 @@ final class AE2PatternHelper {
                 return fromGenericStacks(crafting.getSparseInputs());
             }
             if (decoded instanceof AEStonecuttingPattern stonecutting) {
-                return fromGenericStacks(stonecutting.getSparseInputs());
+                return fromPatternInputs(stonecutting);
             }
             if (decoded instanceof AESmithingTablePattern smithing) {
-                return fromGenericStacks(smithing.getSparseInputs());
+                return fromPatternInputs(smithing);
             }
         } catch (Exception ignored) {
         }
@@ -89,6 +90,17 @@ final class AE2PatternHelper {
         } catch (Exception ignored) {
         }
         return List.of();
+    }
+
+    private static List<AE2Compat.PatternEntry> fromPatternInputs(IPatternDetails pattern) {
+        List<GenericStack> stacks = new ArrayList<>();
+        for (IPatternDetails.IInput input : pattern.getInputs()) {
+            GenericStack[] possible = input.getPossibleInputs();
+            if (possible.length > 0 && possible[0] != null) {
+                stacks.add(possible[0]);
+            }
+        }
+        return fromGenericStacks(stacks.toArray(new GenericStack[0]));
     }
 
     private static List<AE2Compat.PatternEntry> fromGenericStacks(GenericStack[] stacks) {

@@ -15,6 +15,12 @@ public final class FilterLogic {
 
     public static boolean matchesItem(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
             HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt) {
+        return matchesItem(filters, filterMode, candidate, provider, candidateNbt, null);
+    }
+
+    public static boolean matchesItem(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
+            HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
         if (filters == null || filters.length == 0)
             return true;
         if (candidate.isEmpty())
@@ -36,10 +42,11 @@ public final class FilterLogic {
             boolean isBlacklist = false;
 
             // Check each filter type
-            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyItemEntries(filter)) {
+            if (FilterItemData.isFilterItem(filter)
+                    && FilterItemData.hasAnyItemMatchEntries(filter, filterReadCache)) {
                 isFilter = true;
-                matched = FilterItemData.containsItem(filter, candidate, provider);
-                isBlacklist = FilterItemData.isBlacklist(filter);
+                matched = FilterItemData.containsItemFull(filter, candidate, provider, candidateNbt, filterReadCache);
+                isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
             } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
                     && TagFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
                 isFilter = true;
@@ -118,9 +125,10 @@ public final class FilterLogic {
             boolean matched = false;
             boolean isBlacklist = false;
 
-            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyFluidEntries(filter)) {
+            if (FilterItemData.isFilterItem(filter)
+                    && (FilterItemData.hasAnyFluidEntries(filter) || FilterItemData.hasAnyTagEntries(filter))) {
                 isFilter = true;
-                matched = FilterItemData.containsFluid(filter, candidate);
+                matched = FilterItemData.containsFluidFull(filter, candidate, provider);
                 isBlacklist = FilterItemData.isBlacklist(filter);
             } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
                     && TagFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
@@ -192,9 +200,10 @@ public final class FilterLogic {
             boolean matched = false;
             boolean isBlacklist = false;
 
-            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyChemicalEntries(filter)) {
+            if (FilterItemData.isFilterItem(filter)
+                    && (FilterItemData.hasAnyChemicalEntries(filter) || FilterItemData.hasAnyTagEntries(filter))) {
                 isFilter = true;
-                matched = FilterItemData.containsChemical(filter, chemicalId);
+                matched = FilterItemData.containsChemicalFull(filter, chemicalId);
                 isBlacklist = FilterItemData.isBlacklist(filter);
             } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
                     && TagFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
@@ -244,6 +253,9 @@ public final class FilterLogic {
             if (NbtFilterData.isNbtFilter(filter)
                     && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS
                     && NbtFilterData.getSelectedPath(filter) != null) {
+                return true;
+            }
+            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyNbtEntries(filter)) {
                 return true;
             }
         }

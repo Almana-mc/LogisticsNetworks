@@ -389,7 +389,7 @@ public class ServerPayloadHandler {
     public static void handleSetFilterEntryAmount(SetFilterEntryAmountPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !menu.isAmountMode()) {
-                menu.setEntryAmount((Player) context.player(), payload.slot(), payload.amount());
+                menu.setEntryAmount((Player) context.player(), payload.entryIndex(), payload.amount());
             }
         });
     }
@@ -397,11 +397,11 @@ public class ServerPayloadHandler {
     public static void handleSetFilterEntryTag(SetFilterEntryTagPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
-                String normalizedTag = FilterTagUtil.normalizeTag(payload.tag());
+                String normalizedTag = FilterTagUtil.normalizeTag(payload.tagId());
                 if (normalizedTag == null) {
-                    menu.clearEntryTag(payload.slot());
+                    menu.clearEntryTag(payload.entryIndex());
                 } else {
-                    menu.setEntryTag((Player) context.player(), payload.slot(), normalizedTag);
+                    menu.setEntryTag((Player) context.player(), payload.entryIndex(), normalizedTag);
                 }
             }
         });
@@ -410,12 +410,12 @@ public class ServerPayloadHandler {
     public static void handleSetFilterEntryNbt(SetFilterEntryNbtPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
-                if (payload.remove()) {
-                    menu.clearEntryNbt((Player) context.player(), payload.slot());
-                } else if (!payload.rawValue().isEmpty()) {
-                    menu.setEntryNbtRaw((Player) context.player(), payload.slot(), payload.path(), payload.rawValue());
+                if (!payload.matchValue()) {
+                    menu.clearEntryNbt((Player) context.player(), payload.entryIndex());
+                } else if (!payload.value().isEmpty()) {
+                    menu.setEntryNbtRaw((Player) context.player(), payload.entryIndex(), payload.key(), payload.value());
                 } else {
-                    menu.setEntryNbt((Player) context.player(), payload.slot(), payload.path());
+                    menu.setEntryNbt((Player) context.player(), payload.entryIndex(), payload.key());
                 }
             }
         });
@@ -425,11 +425,11 @@ public class ServerPayloadHandler {
             IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
-                if (payload.operator() == null || payload.operator().isEmpty()) {
-                    menu.clearEntryDurability((Player) context.player(), payload.slot());
+                if (payload.comparison() == null || payload.comparison().isEmpty()) {
+                    menu.clearEntryDurability((Player) context.player(), payload.entryIndex());
                 } else {
-                    menu.setEntryDurability((Player) context.player(), payload.slot(),
-                            payload.operator(), payload.value());
+                    menu.setEntryDurability((Player) context.player(), payload.entryIndex(),
+                            payload.comparison(), payload.value());
                 }
             }
         });
@@ -643,7 +643,7 @@ public class ServerPayloadHandler {
                         }
                         nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
                                 nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
-                                level.dimension().location(), node.isRenderVisible(), node.isHighlighted()));
+                                level.dimension().location().toString(), node.isRenderVisible(), node.isHighlighted()));
                         break;
                     }
                 }
@@ -979,7 +979,7 @@ public class ServerPayloadHandler {
             List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 if (nodeCounts[i] > 0) {
-                    entries.add(new SyncChannelListPayload.ChannelEntry(i, typeOrdinals[i], nodeCounts[i]));
+                    entries.add(new SyncChannelListPayload.ChannelEntry(i, 0, typeOrdinals[i], nodeCounts[i]));
                 }
             }
 

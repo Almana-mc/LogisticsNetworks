@@ -237,6 +237,22 @@ public class ChannelData {
             filterItems[slot] = stack == null ? ItemStack.EMPTY : ItemStackCompat.copyWithCount(stack, 1);
         }
     }
+
+    public void copyFrom(ChannelData source) {
+        this.enabled = source.enabled;
+        this.mode = source.mode;
+        this.type = source.type;
+        this.batchSize = source.batchSize;
+        this.tickDelay = source.tickDelay;
+        this.ioDirection = source.ioDirection;
+        this.redstoneMode = source.redstoneMode;
+        this.distributionMode = source.distributionMode;
+        this.filterMode = source.filterMode;
+        this.priority = source.priority;
+        for (int i = 0; i < FILTER_SIZE; i++) {
+            this.filterItems[i] = source.filterItems[i].isEmpty() ? ItemStack.EMPTY : source.filterItems[i].copy();
+        }
+    }
 }
 
 

@@ -1,5 +1,7 @@
 package me.almana.logisticsnetworks.upgrade;
 
+import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -99,13 +101,47 @@ public final class NodeUpgradeData {
 
         ResourceKey<Level> nodeDimension = node.level().dimension();
 
+        boolean[] hasExport = new boolean[LogisticsNodeEntity.CHANNEL_COUNT];
+        boolean[] hasImport = new boolean[LogisticsNodeEntity.CHANNEL_COUNT];
+        boolean hasAnyChannel = false;
+
+        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+            ChannelData ch = node.getChannel(i);
+            if (ch == null || !ch.isEnabled())
+                continue;
+            if (ch.getMode() == ChannelMode.EXPORT) {
+                hasExport[i] = true;
+                hasAnyChannel = true;
+            } else if (ch.getMode() == ChannelMode.IMPORT) {
+                hasImport[i] = true;
+                hasAnyChannel = true;
+            }
+        }
+
+        if (!hasAnyChannel)
+            return false;
+
         for (UUID otherId : network.getNodeUuids()) {
             if (otherId.equals(node.getUUID()))
                 continue;
 
             Entity entity = findEntity(server, otherId);
-            if (entity instanceof LogisticsNodeEntity otherNode && otherNode.isValidNode()) {
-                if (!otherNode.level().dimension().equals(nodeDimension)) {
+            if (!(entity instanceof LogisticsNodeEntity otherNode) || !otherNode.isValidNode())
+                continue;
+            if (otherNode.level().dimension().equals(nodeDimension))
+                continue;
+
+            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                ChannelData otherCh = otherNode.getChannel(i);
+                if (otherCh == null || !otherCh.isEnabled())
+                    continue;
+
+                if (hasExport[i] && otherCh.getMode() == ChannelMode.IMPORT
+                        && node.getChannel(i).getType() == otherCh.getType()) {
+                    return true;
+                }
+                if (hasImport[i] && otherCh.getMode() == ChannelMode.EXPORT
+                        && node.getChannel(i).getType() == otherCh.getType()) {
                     return true;
                 }
             }
