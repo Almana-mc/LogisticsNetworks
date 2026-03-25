@@ -41,6 +41,7 @@ import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
+import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
@@ -154,6 +155,9 @@ public class Logisticsnetworks {
                 registrar.playToServer(RequestChannelListPayload.TYPE,
                                 RequestChannelListPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleRequestChannelList);
+                registrar.playToServer(ToggleComputerPinnedNetworkPayload.TYPE,
+                                ToggleComputerPinnedNetworkPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleToggleComputerPinnedNetwork);
 
                 // Server -> Client
                 registrar.playToClient(SyncNetworkListPayload.TYPE, SyncNetworkListPayload.STREAM_CODEC,

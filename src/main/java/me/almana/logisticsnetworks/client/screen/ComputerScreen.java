@@ -11,9 +11,11 @@ import me.almana.logisticsnetworks.network.SyncChannelListPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
+import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -49,7 +51,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     private static final int GUI_WIDTH = 320;
     private static final int GUI_HEIGHT = 240;
-    private static final int NETWORKS_PER_PAGE = 5;
+    private static final int NETWORKS_PER_PAGE = 4;
     private static final int NETWORK_ENTRY_HEIGHT = 30;
     private static final int NETWORK_LIST_X = 12;
     private static final int NETWORK_LIST_Y = 68;
@@ -112,6 +114,13 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private static final int COLOR_LAMP_ON = 0xFF72A7FF;
     private static final int COLOR_LAMP_ON_GLOW = 0xFFBED6FF;
     private static final int COLOR_LAMP_BASE = 0xFF8FA39C;
+    private static final int COLOR_STAR = 0xFFFFD700;
+    private static final int COLOR_STAR_EMPTY = 0xFF4A5A4E;
+    private static final int STAR_BTN_W = 10;
+    private static final int SEARCH_BOX_HEIGHT = 16;
+    private static final int SEARCH_INPUT_HEIGHT = SEARCH_BOX_HEIGHT - 4;
+    private static final int SEARCH_INPUT_X = 4;
+    private static final int SEARCH_INPUT_WIDTH = NETWORK_LIST_WIDTH - 8;
     private static final int COLOR_FLUID_BAR = 0xFF6EB4E8;
     private static final int COLOR_ENERGY_BAR = 0xFFE8D46E;
     private static final int COLOR_CHEMICAL_BAR = 0xFFD070E8;
@@ -122,6 +131,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private int networkScrollOffset = 0;
     private UUID selectedNetworkId = null;
     private String selectedNetworkName = "";
+    private EditBox networkSearchBox;
+    private String lastSearchFilter = "";
 
     private List<SyncNetworkNodesPayload.NodeInfo> nodeInfoList = new ArrayList<>();
     private int nodeMapScrollOffset = 0;
@@ -146,6 +157,13 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     @Override
     protected void init() {
         super.init();
+        networkSearchBox = new EditBox(font, 0, 0, SEARCH_INPUT_WIDTH, SEARCH_INPUT_HEIGHT, Component.empty());
+        networkSearchBox.setMaxLength(32);
+        networkSearchBox.setBordered(false);
+        networkSearchBox.setTextColor(COLOR_TEXT);
+        networkSearchBox.setHint(Component.translatable("gui.logisticsnetworks.computer.search_hint"));
+        layoutSearchBox();
+        addRenderableWidget(networkSearchBox);
     }
 
     @Override
@@ -159,6 +177,11 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         renderComputerShell(g);
 
         menu.setWrenchSlotActive(currentPage == Page.NETWORK_LIST);
+        layoutSearchBox();
+        if (currentPage != Page.NETWORK_LIST && networkSearchBox.isFocused()) {
+            networkSearchBox.setFocused(false);
+        }
+        networkSearchBox.visible = (currentPage == Page.NETWORK_LIST);
 
         switch (currentPage) {
             case NETWORK_LIST -> renderNetworkListPage(g, mouseX, mouseY);
@@ -209,24 +232,31 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     private void renderDriveBay(GuiGraphics g) {
         Slot slot = menu.slots.get(0);
-        int bayX = leftPos + slot.x - 4;
-        int bayY = topPos + slot.y - 4;
-        g.fill(bayX, bayY, bayX + 24, bayY + 24, COLOR_PANEL_ALT);
-        g.renderOutline(bayX, bayY, 24, 24, COLOR_BORDER);
-        g.fill(bayX + 1, bayY + 1, bayX + 23, bayY + 23, COLOR_FRAME_INNER);
-        g.renderOutline(bayX + 3, bayY + 3, 18, 18, COLOR_ACCENT_DARK);
-        g.fill(bayX + 3, bayY + 3, bayX + 21, bayY + 4, COLOR_BORDER);
-        g.fill(bayX + 3, bayY + 20, bayX + 21, bayY + 21, COLOR_ACCENT_DARK);
+        int slotX = leftPos + slot.x;
+        int slotY = topPos + slot.y;
+        int housingX = slotX - 3;
+        int housingY = slotY - 3;
+        g.fill(housingX, housingY, housingX + 22, housingY + 22, COLOR_PANEL_ALT);
+        g.renderOutline(housingX, housingY, 22, 22, COLOR_BORDER);
+        g.fill(slotX - 2, slotY - 2, slotX + 18, slotY + 18, COLOR_FRAME_INNER);
+        g.renderOutline(slotX - 2, slotY - 2, 20, 20, COLOR_ACCENT_DARK);
+        g.fill(slotX - 1, slotY - 1, slotX + 17, slotY + 17, COLOR_PANEL);
+        g.renderOutline(slotX - 1, slotY - 1, 18, 18, COLOR_BORDER);
     }
 
     private void renderNetworkList(GuiGraphics g, int mouseX, int mouseY) {
         int startX = leftPos + NETWORK_LIST_X;
-        int startY = topPos + NETWORK_LIST_Y;
-        int summaryY = topPos + DETAIL_PANEL_Y + PANEL_HEADER_HEIGHT + 6;
-        String summary = networkList.isEmpty()
-                ? line("gui.logisticsnetworks.computer.no_signal")
-                : line("gui.logisticsnetworks.computer.mounted", networkList.size());
-        g.drawString(font, summary, startX, summaryY, COLOR_TEXT_SECONDARY);
+        int searchY = getSearchBoxTop();
+        g.fill(startX, searchY, startX + NETWORK_LIST_WIDTH, searchY + SEARCH_BOX_HEIGHT, COLOR_PANEL_ALT);
+        g.renderOutline(startX, searchY, NETWORK_LIST_WIDTH, SEARCH_BOX_HEIGHT, COLOR_BORDER);
+
+        int startY = searchY + SEARCH_BOX_HEIGHT + 2;
+
+        String currentFilter = networkSearchBox != null ? networkSearchBox.getValue().trim() : "";
+        if (!currentFilter.equals(lastSearchFilter)) {
+            lastSearchFilter = currentFilter;
+            networkScrollOffset = 0;
+        }
 
         if (networkList.isEmpty()) {
             g.drawString(font, label("gui.logisticsnetworks.computer.no_networks_online"), startX + 4, startY + 10,
@@ -236,23 +266,25 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             return;
         }
 
-        int maxScroll = Math.max(0, networkList.size() - NETWORKS_PER_PAGE);
+        List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
+        int maxScroll = Math.max(0, filtered.size() - NETWORKS_PER_PAGE);
         networkScrollOffset = Math.max(0, Math.min(networkScrollOffset, maxScroll));
 
-        for (int i = 0; i < NETWORKS_PER_PAGE && (i + networkScrollOffset) < networkList.size(); i++) {
+        int listYOffset = startY - topPos;
+        for (int i = 0; i < NETWORKS_PER_PAGE && (i + networkScrollOffset) < filtered.size(); i++) {
             int index = i + networkScrollOffset;
-            SyncNetworkListPayload.NetworkEntry entry = networkList.get(index);
+            SyncNetworkListPayload.NetworkEntry entry = filtered.get(index);
             int entryX = startX;
             int entryY = startY + (i * NETWORK_ENTRY_HEIGHT);
-            boolean hovered = isHovering(NETWORK_LIST_X, NETWORK_LIST_Y + (i * NETWORK_ENTRY_HEIGHT),
+            boolean hovered = isHovering(NETWORK_LIST_X, listYOffset + (i * NETWORK_ENTRY_HEIGHT),
                     NETWORK_LIST_WIDTH, NETWORK_ENTRY_HEIGHT - 2, mouseX, mouseY);
-            renderNetworkEntry(g, entry, entryX, entryY, NETWORK_LIST_WIDTH, hovered);
+            renderNetworkEntry(g, entry, entryX, entryY, NETWORK_LIST_WIDTH, hovered, mouseX, mouseY);
         }
 
-        if (networkList.size() > NETWORKS_PER_PAGE) {
+        if (filtered.size() > NETWORKS_PER_PAGE) {
             int first = networkScrollOffset + 1;
-            int last = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, networkList.size());
-            String pageInfo = line("gui.logisticsnetworks.node.page_info", first, last, networkList.size());
+            int last = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, filtered.size());
+            String pageInfo = line("gui.logisticsnetworks.node.page_info", first, last, filtered.size());
             int pageInfoX = leftPos + NETWORK_LIST_X + NETWORK_LIST_WIDTH - font.width(pageInfo);
             g.drawString(font, pageInfo, pageInfoX,
                     topPos + DETAIL_PANEL_Y + DETAIL_PANEL_HEIGHT - 11, COLOR_TEXT_MUTED);
@@ -260,8 +292,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     private void renderNetworkEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry,
-            int x, int y, int width, boolean hovered) {
+            int x, int y, int width, boolean hovered, int mouseX, int mouseY) {
         boolean selected = entry.id().equals(selectedNetworkId);
+        boolean isPinned = entry.pinned();
         int entryHeight = NETWORK_ENTRY_HEIGHT - 2;
         int bgColor = selected ? COLOR_ROW_SELECTED : (hovered ? COLOR_ROW_HOVER : COLOR_ROW);
         int borderColor = selected ? COLOR_BORDER_BRIGHT : (hovered ? COLOR_ACCENT_DARK : COLOR_BORDER);
@@ -270,17 +303,30 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         g.renderOutline(x, y, width, entryHeight, borderColor);
         g.fill(x + 1, y + 1, x + 3, y + entryHeight - 1, borderColor);
 
+        int starX = x + width - STAR_BTN_W - 3;
+        int starY = y + 4;
+        boolean starHovered = mouseX >= starX && mouseX < starX + STAR_BTN_W
+                && mouseY >= starY && mouseY < starY + STAR_BTN_W;
+        g.drawString(font, "\u2605", starX, starY,
+                isPinned ? COLOR_STAR : (starHovered ? COLOR_TEXT_SECONDARY : COLOR_STAR_EMPTY), false);
+
+        int textW = width - STAR_BTN_W - 14;
         String prefix = selected ? "> " : (hovered ? "+ " : "- ");
-        String name = trimText(prefix + entry.name(), width - 12);
+        String name = trimText(prefix + entry.name(), textW);
         String nodeCount = line("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
 
         g.drawString(font, name, x + 7, y + 6, selected ? COLOR_ACCENT : COLOR_TEXT);
-        g.drawString(font, trimText(nodeCount, width - 12), x + 7, y + 18, COLOR_TEXT_SECONDARY);
+        g.drawString(font, trimText(nodeCount, textW), x + 7, y + 18, COLOR_TEXT_SECONDARY);
     }
 
     private void renderIdleSession(GuiGraphics g, int panelX, int panelY) {
         int textX = panelX + 12;
         int lineY = panelY + 24;
+        String totalNetworks = line("gui.logisticsnetworks.computer.total_networks_badge", networkList.size());
+        int totalWidth = Math.max(58, font.width(totalNetworks) + 10);
+        int badgeGroupX = textX;
+        int badgeGroupW = 114;
+        int totalX = badgeGroupX + ((badgeGroupW - totalWidth) / 2);
 
         g.drawString(font, label("gui.logisticsnetworks.computer.no_network_mounted"), textX, lineY, COLOR_WARNING);
         g.drawString(font, label("gui.logisticsnetworks.computer.select_directory"), textX, lineY + 16,
@@ -289,6 +335,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 COLOR_TEXT_SECONDARY);
         renderStatusBadge(g, textX, lineY + 50, 48, 10, line("gui.logisticsnetworks.computer.status.idle"));
         renderStatusBadge(g, textX + 56, lineY + 50, 58, 10, line("gui.logisticsnetworks.computer.status.ready"));
+        renderStatusBadge(g, totalX, lineY + 64, totalWidth, 10, totalNetworks);
         g.drawString(font, label("gui.logisticsnetworks.computer.hint.dir"), textX, lineY + 76, COLOR_TEXT_MUTED);
         g.drawString(font, label("gui.logisticsnetworks.computer.hint.tab"), textX, lineY + 88, COLOR_TEXT_MUTED);
         g.drawString(font, label("gui.logisticsnetworks.computer.hint.run"), textX, lineY + 100, COLOR_TEXT_MUTED);
@@ -834,12 +881,34 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (currentPage == Page.NETWORK_LIST && networkSearchBox != null && networkSearchBox.isFocused()) {
+            if (keyCode == 256) {
+                networkSearchBox.setFocused(false);
+                return true;
+            }
+            networkSearchBox.keyPressed(keyCode, scanCode, modifiers);
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean charTyped(char ch, int modifiers) {
+        if (currentPage == Page.NETWORK_LIST && networkSearchBox != null && networkSearchBox.isFocused()) {
+            return networkSearchBox.charTyped(ch, modifiers);
+        }
+        return super.charTyped(ch, modifiers);
+    }
+
+    @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         switch (currentPage) {
             case NETWORK_LIST -> {
-                if (networkList.size() > NETWORKS_PER_PAGE) {
+                List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
+                if (filtered.size() > NETWORKS_PER_PAGE) {
                     networkScrollOffset -= (int) scrollY;
-                    int maxScroll = Math.max(0, networkList.size() - NETWORKS_PER_PAGE);
+                    int maxScroll = Math.max(0, filtered.size() - NETWORKS_PER_PAGE);
                     networkScrollOffset = Math.max(0, Math.min(networkScrollOffset, maxScroll));
                     return true;
                 }
@@ -871,6 +940,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (currentPage == Page.NETWORK_LIST && button == 0 && handleSearchBoxClick(mouseX, mouseY)) {
+            return true;
+        }
         if (button == 0) {
             switch (currentPage) {
                 case NETWORK_LIST -> {
@@ -920,12 +992,61 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
+    private void layoutSearchBox() {
+        if (networkSearchBox == null) {
+            return;
+        }
+        networkSearchBox.setX(leftPos + NETWORK_LIST_X + SEARCH_INPUT_X);
+        networkSearchBox.setY(getSearchBoxTop() + ((SEARCH_BOX_HEIGHT - SEARCH_INPUT_HEIGHT) / 2));
+        networkSearchBox.setWidth(SEARCH_INPUT_WIDTH);
+    }
+
+    private boolean handleSearchBoxClick(double mouseX, double mouseY) {
+        if (networkSearchBox == null) {
+            return false;
+        }
+        int startX = leftPos + NETWORK_LIST_X;
+        int searchY = getSearchBoxTop();
+        boolean inside = mouseX >= startX && mouseX < startX + NETWORK_LIST_WIDTH
+                && mouseY >= searchY && mouseY < searchY + SEARCH_BOX_HEIGHT;
+        if (!inside) {
+            if (networkSearchBox.isFocused()) {
+                networkSearchBox.setFocused(false);
+            }
+            return false;
+        }
+        networkSearchBox.setFocused(true);
+        setFocused(networkSearchBox);
+        networkSearchBox.mouseClicked(mouseX, mouseY, 0);
+        return true;
+    }
+
+    private int getSearchBoxTop() {
+        return topPos + DETAIL_PANEL_Y + PANEL_HEADER_HEIGHT + 4;
+    }
+
     private boolean handleNetworkListClick(double mouseX, double mouseY) {
-        for (int i = 0; i < NETWORKS_PER_PAGE && (i + networkScrollOffset) < networkList.size(); i++) {
+        List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
+        int searchY = getSearchBoxTop() - topPos;
+        int listYOffset = searchY + SEARCH_BOX_HEIGHT + 2;
+
+        for (int i = 0; i < NETWORKS_PER_PAGE && (i + networkScrollOffset) < filtered.size(); i++) {
             int index = i + networkScrollOffset;
-            if (isHovering(NETWORK_LIST_X, NETWORK_LIST_Y + (i * NETWORK_ENTRY_HEIGHT),
+            if (isHovering(NETWORK_LIST_X, listYOffset + (i * NETWORK_ENTRY_HEIGHT),
                     NETWORK_LIST_WIDTH, NETWORK_ENTRY_HEIGHT - 2, (int) mouseX, (int) mouseY)) {
-                SyncNetworkListPayload.NetworkEntry clickedEntry = networkList.get(index);
+                SyncNetworkListPayload.NetworkEntry clickedEntry = filtered.get(index);
+
+                int entryX = leftPos + NETWORK_LIST_X;
+                int entryY = topPos + listYOffset + (i * NETWORK_ENTRY_HEIGHT);
+                int starX = entryX + NETWORK_LIST_WIDTH - STAR_BTN_W - 3;
+                int starY = entryY + 4;
+                if (mouseX >= starX && mouseX < starX + STAR_BTN_W
+                        && mouseY >= starY && mouseY < starY + STAR_BTN_W) {
+                    PacketDistributor.sendToServer(
+                            new ToggleComputerPinnedNetworkPayload(menu.getComputerPos(), clickedEntry.id()));
+                    return true;
+                }
+
                 if (clickedEntry.id().equals(selectedNetworkId)) {
                     selectedNetworkId = null;
                     selectedNetworkName = "";
@@ -1236,6 +1357,23 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 info.dimension(),
                 info.visible(),
                 highlighted);
+    }
+
+    private List<SyncNetworkListPayload.NetworkEntry> getFilteredNetworks() {
+        String filter = networkSearchBox != null ? networkSearchBox.getValue().trim().toLowerCase(Locale.ROOT) : "";
+        List<SyncNetworkListPayload.NetworkEntry> pinned = new ArrayList<>();
+        List<SyncNetworkListPayload.NetworkEntry> unpinned = new ArrayList<>();
+        for (SyncNetworkListPayload.NetworkEntry entry : networkList) {
+            if (!filter.isEmpty() && !entry.name().toLowerCase(Locale.ROOT).contains(filter))
+                continue;
+            if (entry.pinned()) {
+                pinned.add(entry);
+            } else {
+                unpinned.add(entry);
+            }
+        }
+        pinned.addAll(unpinned);
+        return pinned;
     }
 
     private SyncNetworkListPayload.NetworkEntry getSelectedNetworkEntry() {

@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
+import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -92,6 +93,24 @@ public class ServerPayloadHandler {
 
     private static <T extends Enum<T>> boolean isValidEnum(int ordinal, T[] values) {
         return ordinal >= 0 && ordinal < values.length;
+    }
+
+    private static void refreshOpenComputerMenus(ServerPlayer sourcePlayer, BlockPos computerPos) {
+        if (sourcePlayer.getServer() == null) {
+            return;
+        }
+        for (ServerPlayer player : sourcePlayer.getServer().getPlayerList().getPlayers()) {
+            if (!(player.containerMenu instanceof ComputerMenu menu)) {
+                continue;
+            }
+            if (player.serverLevel() != sourcePlayer.serverLevel()) {
+                continue;
+            }
+            if (!menu.getComputerPos().equals(computerPos)) {
+                continue;
+            }
+            menu.requestNetworkList(player);
+        }
     }
 
     public static void handleAssignNetwork(AssignNetworkPayload payload, IPayloadContext context) {
@@ -196,6 +215,27 @@ public class ServerPayloadHandler {
             if (player.containerMenu instanceof NodeMenu menu) {
                 menu.sendNetworkListToClient(player);
             }
+        });
+    }
+
+    public static void handleToggleComputerPinnedNetwork(ToggleComputerPinnedNetworkPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+            if (!(player.containerMenu instanceof ComputerMenu menu)) {
+                return;
+            }
+            if (!menu.getComputerPos().equals(payload.computerPos())) {
+                return;
+            }
+            if (!(player.serverLevel().getBlockEntity(payload.computerPos()) instanceof ComputerBlockEntity computer)) {
+                return;
+            }
+
+            computer.toggleNetworkStar(payload.networkId());
+            refreshOpenComputerMenus(player, payload.computerPos());
         });
     }
 

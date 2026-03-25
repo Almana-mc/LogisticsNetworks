@@ -12,7 +12,9 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -26,8 +28,9 @@ import com.mojang.serialization.MapCodec;
 
 import java.util.EnumMap;
 import java.util.Map;
+import org.jetbrains.annotations.Nullable;
 
-public class ComputerBlock extends HorizontalDirectionalBlock {
+public class ComputerBlock extends HorizontalDirectionalBlock implements EntityBlock {
 
     public static final MapCodec<ComputerBlock> CODEC = simpleCodec(p -> new ComputerBlock());
 
@@ -81,10 +84,19 @@ public class ComputerBlock extends HorizontalDirectionalBlock {
     }
 
     @Override
+    public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new ComputerBlockEntity(pos, state);
+    }
+
+    @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
             Player player, BlockHitResult hit) {
         if (level.isClientSide) {
             return InteractionResult.SUCCESS;
+        }
+
+        if (level.getBlockEntity(pos) == null) {
+            level.setBlockEntity(new ComputerBlockEntity(pos, state));
         }
 
         if (player instanceof ServerPlayer serverPlayer) {

@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.registration;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.block.ComputerBlock;
+import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.item.AmountFilterItem;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
@@ -37,6 +38,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -56,6 +58,8 @@ public class Registration {
                         .create(Registries.CREATIVE_MODE_TAB, Logisticsnetworks.MOD_ID);
         public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU,
                         Logisticsnetworks.MOD_ID);
+        public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES = DeferredRegister
+                        .create(Registries.BLOCK_ENTITY_TYPE, Logisticsnetworks.MOD_ID);
         public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS = DeferredRegister
                         .create(Registries.RECIPE_SERIALIZER, Logisticsnetworks.MOD_ID);
 
@@ -76,6 +80,10 @@ public class Registration {
 
         public static final DeferredHolder<Block, ComputerBlock> COMPUTER_BLOCK = BLOCKS.register("computer",
                         () -> new ComputerBlock());
+        public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ComputerBlockEntity>> COMPUTER_BLOCK_ENTITY = BLOCK_ENTITY_TYPES
+                        .register("computer", () -> BlockEntityType.Builder.of(
+                                        ComputerBlockEntity::new,
+                                        COMPUTER_BLOCK.get()).build(null));
         public static final DeferredHolder<Item, BlockItem> COMPUTER_ITEM = ITEMS.register("computer",
                         () -> new BlockItem(COMPUTER_BLOCK.get(), new Item.Properties()));
 
@@ -174,6 +182,7 @@ public class Registration {
                 BLOCKS.register(modEventBus);
                 ITEMS.register(modEventBus);
                 MENUS.register(modEventBus);
+                BLOCK_ENTITY_TYPES.register(modEventBus);
                 RECIPE_SERIALIZERS.register(modEventBus);
                 CREATIVE_TABS.register(modEventBus);
         }
