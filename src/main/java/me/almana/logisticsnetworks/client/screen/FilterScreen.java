@@ -12,7 +12,6 @@ import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.filter.SlotFilterData;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.util.Mth;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
@@ -50,7 +49,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private static final int FILTER_SLOT_SIZE = 18;
 
     // Control Constants
-    private static final int LIST_ROW_H = 12;
+    private static final int LIST_ROW_H = 10;
     private static final int DROPDOWN_ROWS = 6;
     private static final int SUBMODE_SCROLLBAR_W = 6;
     private static final int SUBMODE_SCROLLBAR_GAP = 2;
@@ -82,10 +81,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private int tagEditSlot = -1;
     private int nbtEditSlot = -1;
     private List<String> cachedSlotTags = new ArrayList<>();
+    private List<NbtFilterData.NbtEntry> cachedSlotNbtEntries = new ArrayList<>();
     private int subModeScrollOffset = 0;
     private boolean subModeDropdownOpen = false;
+    private String nbtPendingOperator = "=";
     private EditBox tagInputBox;
-    private MultiLineEditBox nbtInputBox;
+
+    // NBT sub-mode state
+    private int nbtListScrollOffset = 0;
+    private int nbtEditingRuleIndex = -1;
+    private EditBox nbtValueEditBox;
 
     // Cached Data
     private List<String> cachedTags = new ArrayList<>();
@@ -133,10 +138,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         tagInputBox.setBordered(true);
         tagInputBox.setTextColor(COL_WHITE);
 
-        nbtInputBox = new ThemedMultiLineEditBox(
-                font, leftPos + 12, topPos + 50, 100, 45, Component.empty(), Component.empty());
-        nbtInputBox.setCharacterLimit(2048);
-        nbtInputBox.active = false;
+        nbtValueEditBox = new EditBox(font, 0, 0, 60, LIST_ROW_H, Component.empty());
+        nbtValueEditBox.setMaxLength(128);
+        nbtValueEditBox.setVisible(false);
+        nbtValueEditBox.setBordered(false);
+        nbtValueEditBox.setTextColor(0xFFFFAA00);
     }
 
     @Override
@@ -286,6 +292,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             super.render(g, mx, my, pt);
         }
 
+        // Render sub-mode overlays AFTER super.render to cover item/durability bars
+        if (tagEditSlot >= 0) {
+            renderTagSubMode(g, mx, my);
+        } else if (nbtEditSlot >= 0) {
+            renderNbtSubMode(g, mx, my);
+        }
+
         boolean hoverSpecialFilter = (menu.isTagMode() || menu.isModMode())
                 && this.hoveredSlot != null && this.hoveredSlot.index < menu.getFilterSlots();
 
@@ -309,17 +322,19 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     hoverSpecialFilter = true;
                 }
             }
-            // NBT info tooltip
-            String nbtRaw = FilterItemData.getEntryNbtRaw(menu.getOpenedStack(), idx);
-            if (nbtRaw != null && !hoverSpecialFilter) {
-                g.renderTooltip(font, Component.literal("NBT: " + nbtRaw), mx, my);
-                hoverSpecialFilter = true;
-            } else if (!hoverSpecialFilter) {
-                String nbtPath = menu.getEntryNbtPath(idx);
-                if (nbtPath != null) {
-                    Tag nbtVal = FilterItemData.getEntryNbtValue(menu.getOpenedStack(), idx);
-                    String display = nbtVal != null ? "{" + nbtPath + ":" + nbtVal + "}" : nbtPath;
-                    g.renderTooltip(font, Component.literal("NBT: " + display), mx, my);
+            if (!hoverSpecialFilter) {
+                List<FilterItemData.SlotNbtRule> nbtRules = menu.getSlotNbtRules(idx);
+                if (!nbtRules.isEmpty()) {
+                    List<Component> lines = new ArrayList<>();
+                    boolean matchAny = menu.isSlotNbtMatchAny(idx);
+                    lines.add(Component.literal("NBT (" + nbtRules.size() + " rules, "
+                            + (matchAny ? "any" : "all") + ")"));
+                    for (FilterItemData.SlotNbtRule r : nbtRules) {
+                        String path = formatNbtPath(r.path());
+                        String val = formatNbtValue(r.value() != null ? r.value().toString() : "");
+                        lines.add(Component.literal("  " + path + " " + r.operator() + " " + val));
+                    }
+                    g.renderTooltip(font, lines, Optional.empty(), mx, my);
                     hoverSpecialFilter = true;
                 }
             }
@@ -440,12 +455,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         renderEntryAmountOverlays(g);
         renderModeControls(g, mx, my, true);
 
-        // Render sub-mode overlays on top
-        if (tagEditSlot >= 0) {
-            renderTagSubMode(g, mx, my);
-        } else if (nbtEditSlot >= 0) {
-            renderNbtSubMode(g, mx, my);
-        }
     }
 
     private void renderEntryAmountOverlays(GuiGraphics g) {
@@ -1541,6 +1550,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (key == 256) {
+            if (nbtEditingRuleIndex >= 0) {
+                cancelNbtValueEdit();
+                return true;
+            }
             if (tagEditSlot >= 0) {
                 closeTagSubMode();
                 return true;
@@ -1552,6 +1565,15 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return super.keyPressed(key, scan, modifiers);
         }
 
+        if (nbtValueEditBox != null && nbtValueEditBox.isFocused()) {
+            if (key == 257) {
+                commitNbtValueEdit();
+                return true;
+            }
+            nbtValueEditBox.keyPressed(key, scan, modifiers);
+            return true;
+        }
+
         // Tag sub-mode input
         if (tagInputBox != null && tagInputBox.isFocused()) {
             if (key == 257) {
@@ -1559,12 +1581,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 return true;
             }
             tagInputBox.keyPressed(key, scan, modifiers);
-            return true;
-        }
-
-        // NBT sub-mode input
-        if (nbtInputBox != null && nbtInputBox.isFocused()) {
-            nbtInputBox.keyPressed(key, scan, modifiers);
             return true;
         }
 
@@ -1581,11 +1597,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     public boolean charTyped(char c, int modifiers) {
+        if (nbtValueEditBox != null && nbtValueEditBox.isFocused()) {
+            return nbtValueEditBox.charTyped(c, modifiers);
+        }
         if (tagInputBox != null && tagInputBox.isFocused()) {
             return tagInputBox.charTyped(c, modifiers);
-        }
-        if (nbtInputBox != null && nbtInputBox.isFocused()) {
-            return nbtInputBox.charTyped(c, modifiers);
         }
         if (manualInputBox.isFocused()) {
             return manualInputBox.charTyped(c, modifiers);
@@ -1595,8 +1611,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
-        if (nbtEditSlot >= 0 && nbtInputBox != null) {
-            return nbtInputBox.mouseScrolled(mx, my, sx, sy);
+        if (nbtEditSlot >= 0) {
+            int maxScroll = getNbtSubModeMaxScroll();
+            if (sy > 0 && nbtListScrollOffset > 0)
+                nbtListScrollOffset--;
+            else if (sy < 0 && nbtListScrollOffset < maxScroll)
+                nbtListScrollOffset++;
+            return true;
         }
 
         if (subModeDropdownOpen) {
@@ -1915,43 +1936,36 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         nbtEditSlot = slot;
         tagEditSlot = -1;
         subModeScrollOffset = 0;
+        subModeDropdownOpen = false;
+        nbtPendingOperator = "=";
+        nbtListScrollOffset = 0;
+        cachedSlotNbtEntries.clear();
 
-        int panelX = leftPos + 4;
-        int panelY = topPos + 20;
-        int panelW = imageWidth - 8;
-        int panelH = menu.getPlayerInventoryY() - 24;
-        int inputX = panelX + 4;
-        int inputY = panelY + 30;
-        int inputW = panelW - 8;
-        int inputH = panelH - 30 - 20;
-
-        nbtInputBox = new ThemedMultiLineEditBox(
-                font, inputX, inputY, inputW, inputH, Component.empty(), Component.empty());
-        nbtInputBox.setCharacterLimit(2048);
-
-        String existing = FilterItemData.getEntryNbtRaw(menu.getOpenedStack(), slot);
-        if (existing != null) {
-            nbtInputBox.setValue(existing);
-        } else {
-            ItemStack slotItem = getSlotItemForSubMode(slot);
-            if (!slotItem.isEmpty() && minecraft != null && minecraft.player != null) {
-                CompoundTag components = NbtFilterData.getSerializedComponents(
-                        slotItem, minecraft.player.level().registryAccess());
-                nbtInputBox.setValue(components != null ? components.toString() : "");
+        if (minecraft != null && minecraft.player != null) {
+            if (menu.getTargetType() == FilterTargetType.FLUIDS) {
+                FluidStack fluid = menu.getFluidFilter(slot);
+                if (!fluid.isEmpty()) {
+                    cachedSlotNbtEntries.addAll(NbtFilterData.extractEntries(
+                            fluid, minecraft.player.level().registryAccess()));
+                }
             } else {
-                nbtInputBox.setValue("");
+                ItemStack slotItem = getSlotItemForSubMode(slot);
+                if (!slotItem.isEmpty()) {
+                    cachedSlotNbtEntries.addAll(NbtFilterData.extractEntries(
+                            slotItem, minecraft.player.level().registryAccess()));
+                } else {
+                    cachedSlotNbtEntries.addAll(NbtFilterData.getDefaultEntries());
+                }
             }
         }
-        nbtInputBox.active = true;
-        nbtInputBox.setFocused(true);
     }
 
     private ItemStack getSlotItemForSubMode(int slot) {
         if (menu.isTagSlot(slot)) {
             return ItemStack.EMPTY;
         }
-        if (slot < menu.slots.size()) {
-            return menu.slots.get(slot).getItem();
+        if (minecraft != null && minecraft.player != null) {
+            return FilterItemData.getEntry(menu.getOpenedStack(), slot, minecraft.player.level().registryAccess());
         }
         return ItemStack.EMPTY;
     }
@@ -2171,143 +2185,483 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
     }
 
+    private int getNbtPanelX() {
+        int panelW = getNbtPanelW();
+        return (width - panelW) / 2;
+    }
+
+    private int getNbtPanelW() {
+        return imageWidth + 50;
+    }
+
     private void renderNbtSubMode(GuiGraphics g, int mx, int my) {
-        int panelX = leftPos + 4;
+        int panelW = getNbtPanelW();
+        int panelX = getNbtPanelX();
         int panelY = topPos + 20;
-        int panelW = imageWidth - 8;
         int panelH = menu.getPlayerInventoryY() - 24;
 
         g.pose().pushPose();
         g.pose().translate(0, 0, 400);
 
-        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xF0101010);
+        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xFF101010);
         g.renderOutline(panelX, panelY, panelW, panelH, 0xFFFFAA00);
 
-        g.drawString(font, "NBT Filter - Slot " + nbtEditSlot, panelX + 4, panelY + 4, COL_WHITE, false);
+        g.drawString(font, tr("gui.logisticsnetworks.filter.nbt.slot_title", nbtEditSlot + 1),
+                panelX + 4, panelY + 4, COL_WHITE, false);
 
-        int clearW = 40;
+        // Clear button
+        int clearW = 30;
         int clearX = panelX + panelW - clearW - 4;
         int clearY = panelY + 4;
-        drawButton(g, clearX, clearY, clearW, 12, "Clear", (int) mx, (int) my, true);
+        drawButton(g, clearX, clearY, clearW, 10, tr("gui.logisticsnetworks.filter.nbt.clear"), mx, my, true);
 
-        g.drawString(font, "Raw SNBT:", panelX + 4, panelY + 18, COL_ACCENT, false);
+        // NBT entries list
+        List<FilterItemData.SlotNbtRule> activeRules = menu.getSlotNbtRules(nbtEditSlot);
+        int listX = panelX + 4;
+        int listY = panelY + 16;
+        int listW = panelW - 8;
+        int listH = panelH - 34;
+        renderNbtEntryList(g, listX, listY, listW, listH, activeRules, mx, my);
 
-        int inputY = panelY + 30;
-        int inputW = panelW - 8;
-        int inputH = panelH - 30 - 20;
-        nbtInputBox.render(g, mx, my, 0);
-
-        int doneW = 50;
-        int doneX = panelX + (panelW - doneW) / 2;
-        int doneY = inputY + inputH + 4;
-        drawButton(g, doneX, doneY, doneW, 14, "Done", mx, my, true);
-
-        // Character counter shown when near the limit
-        int len = nbtInputBox.getValue().length();
-        if (len >= 1800) {
-            String counter = len + "/2048";
-            int counterColor = len >= 2000 ? 0xFFFF5555 : COL_GRAY;
-            int counterX = panelX + panelW - 4 - font.width(counter);
-            g.drawString(font, counter, counterX, doneY + 3, counterColor, false);
-        }
+        // Match mode button
+        boolean matchAny = menu.isSlotNbtMatchAny(nbtEditSlot);
+        String matchLabel = matchAny
+                ? tr("gui.logisticsnetworks.filter.nbt.match_any")
+                : tr("gui.logisticsnetworks.filter.nbt.match_all");
+        int matchW = font.width(matchLabel) + 12;
+        int matchX = panelX + 4;
+        int matchY = panelY + panelH - 16;
+        drawButton(g, matchX, matchY, matchW, 14, matchLabel, mx, my, true);
 
         g.pose().popPose();
     }
 
+    private static final int NBT_INDICATOR_W = 8;
+    private static final int NBT_OP_BTN_W = 18;
+
+    private int getNbtColW(int rowW) {
+        return (rowW - NBT_INDICATOR_W - NBT_OP_BTN_W - 4) / 2;
+    }
+
+    private boolean isBooleanValue(String displayVal) {
+        return "true".equals(displayVal) || "false".equals(displayVal);
+    }
+
+    private void renderNbtEntryList(GuiGraphics g, int listX, int listY, int listW, int listH,
+            List<FilterItemData.SlotNbtRule> activeRules, int mx, int my) {
+        int totalEntries = cachedSlotNbtEntries.size();
+        int maxRows = Math.max(1, listH / LIST_ROW_H);
+        int maxScroll = Math.max(0, totalEntries - maxRows);
+        nbtListScrollOffset = Mth.clamp(nbtListScrollOffset, 0, maxScroll);
+        int drawH = maxRows * LIST_ROW_H;
+        boolean scrollable = totalEntries > maxRows;
+        int rowW = scrollable ? listW - SUBMODE_SCROLLBAR_W - SUBMODE_SCROLLBAR_GAP : listW;
+        int endIdx = Math.min(nbtListScrollOffset + maxRows, totalEntries);
+
+        g.fill(listX, listY, listX + listW, listY + drawH, 0xFF101010);
+        g.renderOutline(listX, listY, listW, drawH, COL_BORDER);
+
+        int colW = getNbtColW(rowW);
+
+        for (int i = nbtListScrollOffset; i < endIdx; i++) {
+            int rowY = listY + (i - nbtListScrollOffset) * LIST_ROW_H;
+            NbtFilterData.NbtEntry entry = cachedSlotNbtEntries.get(i);
+            int ruleIdx = findActiveRuleIndex(activeRules, entry.path());
+            boolean active = ruleIdx >= 0;
+            boolean hovered = mx >= listX && mx < listX + rowW && my >= rowY && my < rowY + LIST_ROW_H;
+            boolean editing = active && nbtEditingRuleIndex == ruleIdx;
+
+            if (active)
+                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_SELECTED);
+            else if (hovered)
+                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_HOVER);
+
+            // Toggle indicator
+            int dotX = listX + 2;
+            int dotY = rowY + (LIST_ROW_H - 5) / 2;
+            if (active) {
+                g.fill(dotX, dotY, dotX + 5, dotY + 5, COL_ACCENT);
+            } else {
+                g.renderOutline(dotX, dotY, 5, 5, COL_GRAY);
+            }
+
+            FilterItemData.SlotNbtRule activeRule = active ? activeRules.get(ruleIdx) : null;
+            String op = active ? activeRule.operator() : "=";
+
+            // Layout: [indicator] [path col] [op col] [value col]
+            int pathX = listX + NBT_INDICATOR_W;
+            int opX = pathX + colW + 1;
+            int valX = opX + NBT_OP_BTN_W + 1;
+
+            // Path column
+            String displayPath = formatNbtPath(entry.path());
+            g.fill(pathX, rowY, pathX + colW, rowY + LIST_ROW_H, 0xFF080808);
+            g.renderOutline(pathX, rowY, colW, LIST_ROW_H, active ? COL_BTN_BORDER : 0xFF222222);
+            g.drawString(font, font.plainSubstrByWidth(displayPath, colW - 4),
+                    pathX + 2, rowY + 1, active ? COL_ACCENT : COL_WHITE, false);
+
+            // Operator column
+            boolean opHover = active && isHovering(opX, rowY, NBT_OP_BTN_W, LIST_ROW_H, mx, my);
+            g.fill(opX, rowY, opX + NBT_OP_BTN_W, rowY + LIST_ROW_H,
+                    opHover ? COL_BTN_HOVER : COL_BTN_BG);
+            g.renderOutline(opX, rowY, NBT_OP_BTN_W, LIST_ROW_H, COL_BTN_BORDER);
+            g.drawCenteredString(font, op, opX + NBT_OP_BTN_W / 2, rowY + 1,
+                    active ? (opHover ? COL_WHITE : 0xFFFFAA00) : COL_GRAY);
+
+            // Value column
+            String displayVal = active
+                    ? formatNbtValue(activeRule.value().toString())
+                    : formatNbtValue(entry.valueDisplay());
+
+            g.fill(valX, rowY, valX + colW, rowY + LIST_ROW_H, 0xFF080808);
+            boolean isBool = isBooleanValue(displayVal);
+            g.renderOutline(valX, rowY, colW, LIST_ROW_H,
+                    editing ? COL_ACCENT : (active ? COL_BTN_BORDER : 0xFF222222));
+
+            if (editing) {
+                nbtValueEditBox.setX(valX + 2);
+                nbtValueEditBox.setY(rowY + 1);
+                nbtValueEditBox.setWidth(colW - 4);
+                nbtValueEditBox.setVisible(true);
+                nbtValueEditBox.render(g, mx, my, 0);
+            } else {
+                int valColor;
+                if (isBool) {
+                    valColor = "true".equals(displayVal) ? COL_ACCENT : 0xFFFF5555;
+                } else {
+                    valColor = active ? COL_WHITE : COL_GRAY;
+                }
+                g.drawString(font, font.plainSubstrByWidth(displayVal, colW - 4), valX + 2, rowY + 1,
+                        valColor, false);
+            }
+        }
+
+        // Hide edit box if editing row scrolled out of view
+        if (nbtEditingRuleIndex >= 0) {
+            boolean visible = false;
+            for (int i = nbtListScrollOffset; i < endIdx; i++) {
+                int rIdx = findActiveRuleIndex(activeRules, cachedSlotNbtEntries.get(i).path());
+                if (rIdx == nbtEditingRuleIndex) { visible = true; break; }
+            }
+            if (!visible) {
+                nbtValueEditBox.setVisible(false);
+            }
+        }
+
+        if (scrollable) {
+            int scrollbarX = listX + rowW + SUBMODE_SCROLLBAR_GAP;
+            int thumbH = Math.max(8, (drawH * maxRows) / totalEntries);
+            int thumbTravel = Math.max(0, drawH - thumbH);
+            int thumbY = maxScroll <= 0 ? listY : listY + (nbtListScrollOffset * thumbTravel) / maxScroll;
+            g.fill(scrollbarX, listY, scrollbarX + SUBMODE_SCROLLBAR_W, listY + drawH, COL_BTN_BG);
+            g.renderOutline(scrollbarX, listY, SUBMODE_SCROLLBAR_W, drawH, COL_BTN_BORDER);
+            g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, COL_ACCENT);
+        }
+
+        if (totalEntries == 0) {
+            g.drawString(font, tr("gui.logisticsnetworks.filter.nbt.no_entries"),
+                    listX + 3, listY + 2, COL_GRAY, false);
+        }
+    }
+
     private boolean handleNbtSubModeClick(double mx, double my, int btn) {
-        int panelX = leftPos + 4;
+        int panelW = getNbtPanelW();
+        int panelX = getNbtPanelX();
         int panelY = topPos + 20;
-        int panelW = imageWidth - 8;
         int panelH = menu.getPlayerInventoryY() - 24;
 
-        if (!isHovering(panelX, panelY, panelW, panelH, (int) mx, (int) my)) {
+        if (!isHovering(panelX, panelY, panelW, panelH, (int) mx, (int) my))
             return false;
-        }
 
         // Clear button
-        int clearW = 40;
+        int clearW = 30;
         int clearX = panelX + panelW - clearW - 4;
         int clearY = panelY + 4;
-        if (isHovering(clearX, clearY, clearW, 12, (int) mx, (int) my)) {
-            PacketDistributor.sendToServer(new SetFilterEntryNbtPayload(nbtEditSlot, "", true));
-            menu.clearEntryNbt(null, nbtEditSlot);
-            closeNbtSubMode();
+        if (isHovering(clearX, clearY, clearW, 10, (int) mx, (int) my)) {
+            cancelNbtValueEdit();
+            PacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(nbtEditSlot));
+            menu.clearSlotNbtRules(nbtEditSlot);
             return true;
         }
 
-        // Done button
-        int inputY = panelY + 30;
-        int inputH = panelH - 30 - 20;
-        int doneW = 50;
-        int doneX = panelX + (panelW - doneW) / 2;
-        int doneY = inputY + inputH + 4;
-        if (isHovering(doneX, doneY, doneW, 14, (int) mx, (int) my)) {
-            commitNbtInput();
+        // NBT entries list
+        List<FilterItemData.SlotNbtRule> activeRules = menu.getSlotNbtRules(nbtEditSlot);
+        int listX = panelX + 4;
+        int listY = panelY + 16;
+        int listW = panelW - 8;
+        int listH = panelH - 34;
+        if (handleNbtEntryListClick(listX, listY, listW, listH, activeRules, mx, my, btn))
+            return true;
+
+        // Match mode button
+        boolean matchAny = menu.isSlotNbtMatchAny(nbtEditSlot);
+        String matchLabel = matchAny
+                ? tr("gui.logisticsnetworks.filter.nbt.match_any")
+                : tr("gui.logisticsnetworks.filter.nbt.match_all");
+        int matchW = font.width(matchLabel) + 12;
+        int matchX = panelX + 4;
+        int matchY = panelY + panelH - 16;
+        if (isHovering(matchX, matchY, matchW, 14, (int) mx, (int) my)) {
+            commitNbtValueEditIfActive();
+            PacketDistributor.sendToServer(SetFilterEntryNbtPayload.toggleMatch(nbtEditSlot));
+            menu.toggleSlotNbtMatchMode(nbtEditSlot);
             return true;
         }
 
-        // Input box click
-        if (nbtInputBox != null && nbtInputBox.active) {
-            nbtInputBox.mouseClicked(mx, my, btn);
-            return true;
-        }
-
+        commitNbtValueEditIfActive();
         return true;
     }
 
-    private void commitNbtInput() {
-        if (nbtInputBox == null || nbtEditSlot < 0)
-            return;
-        String val = nbtInputBox.getValue().replace("\n", " ").trim();
-        if (!val.isEmpty()) {
-            PacketDistributor.sendToServer(
-                    new SetFilterEntryNbtPayload(nbtEditSlot, "", false, val));
+    private boolean handleNbtEntryListClick(int listX, int listY, int listW, int listH,
+            List<FilterItemData.SlotNbtRule> activeRules, double mx, double my, int btn) {
+        int totalEntries = cachedSlotNbtEntries.size();
+        int maxRows = Math.max(1, listH / LIST_ROW_H);
+        int drawH = maxRows * LIST_ROW_H;
+        if (!isHovering(listX, listY, listW, drawH, (int) mx, (int) my))
+            return false;
+
+        boolean scrollable = totalEntries > maxRows;
+        int rowW = scrollable ? listW - SUBMODE_SCROLLBAR_W - SUBMODE_SCROLLBAR_GAP : listW;
+
+        if (scrollable) {
+            int scrollbarX = listX + rowW + SUBMODE_SCROLLBAR_GAP;
+            if (isHovering(scrollbarX, listY, SUBMODE_SCROLLBAR_W, drawH, (int) mx, (int) my)) {
+                int maxScroll = Math.max(0, totalEntries - maxRows);
+                if (my < listY + drawH / 2.0)
+                    nbtListScrollOffset = Math.max(0, nbtListScrollOffset - 1);
+                else
+                    nbtListScrollOffset = Math.min(maxScroll, nbtListScrollOffset + 1);
+                return true;
+            }
         }
-        closeNbtSubMode();
+
+        int colW = getNbtColW(rowW);
+        int endIdx = Math.min(nbtListScrollOffset + maxRows, totalEntries);
+        for (int i = nbtListScrollOffset; i < endIdx; i++) {
+            int rowY = listY + (i - nbtListScrollOffset) * LIST_ROW_H;
+            if (!(mx >= listX && mx < listX + rowW && my >= rowY && my < rowY + LIST_ROW_H))
+                continue;
+
+            NbtFilterData.NbtEntry entry = cachedSlotNbtEntries.get(i);
+            String path = entry.path();
+            int ruleIdx = findActiveRuleIndex(activeRules, path);
+            boolean active = ruleIdx >= 0;
+
+            int pathX = listX + NBT_INDICATOR_W;
+            int opX = pathX + colW + 1;
+            int valX = opX + NBT_OP_BTN_W + 1;
+
+            // Click operator button = cycle operator
+            if (active && isHovering(opX, rowY, NBT_OP_BTN_W, LIST_ROW_H, (int) mx, (int) my)) {
+                commitNbtValueEditIfActive();
+                String savedVal = formatNbtValue(activeRules.get(ruleIdx).value().toString());
+                String currentOp = activeRules.get(ruleIdx).operator();
+                String newOp = FilterItemData.nextNbtOperator(currentOp);
+                PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(nbtEditSlot, ruleIdx));
+                menu.removeSlotNbtRule(nbtEditSlot, ruleIdx);
+                PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, path, newOp));
+                if (minecraft != null && minecraft.player != null) {
+                    menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, newOp);
+                }
+                List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
+                int newIdx = findActiveRuleIndex(updatedRules, path);
+                if (newIdx >= 0) {
+                    PacketDistributor.sendToServer(
+                            SetFilterEntryNbtPayload.setValue(nbtEditSlot, newIdx, savedVal));
+                    menu.setSlotNbtRuleValue(nbtEditSlot, newIdx, savedVal);
+                }
+                return true;
+            }
+
+            // Click value area of active rule
+            if (active && btn == 0 && mx >= valX) {
+                String displayVal = formatNbtValue(activeRules.get(ruleIdx).value().toString());
+
+                // Boolean toggle
+                if (isBooleanValue(displayVal)) {
+                    commitNbtValueEditIfActive();
+                    String toggled = "true".equals(displayVal) ? "false" : "true";
+                    PacketDistributor.sendToServer(
+                            SetFilterEntryNbtPayload.setValue(nbtEditSlot, ruleIdx, toggled));
+                    menu.setSlotNbtRuleValue(nbtEditSlot, ruleIdx, toggled);
+                    return true;
+                }
+
+                // Edit value
+                if (nbtEditingRuleIndex == ruleIdx) {
+                    nbtValueEditBox.mouseClicked(mx, my, btn);
+                    return true;
+                }
+                commitNbtValueEditIfActive();
+                nbtEditingRuleIndex = ruleIdx;
+                nbtValueEditBox.setValue(displayVal);
+                nbtValueEditBox.setVisible(true);
+                nbtValueEditBox.setFocused(true);
+                return true;
+            }
+
+            // Click toggle indicator or path area = toggle rule
+            if (btn == 0 && mx < opX) {
+                commitNbtValueEditIfActive();
+                if (active) {
+                    PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(nbtEditSlot, ruleIdx));
+                    menu.removeSlotNbtRule(nbtEditSlot, ruleIdx);
+                } else {
+                    PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, path, "="));
+                    if (minecraft != null && minecraft.player != null) {
+                        menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, "=");
+                    }
+                }
+                return true;
+            }
+
+            // Right-click = cycle operator (if active)
+            if (active && btn == 1) {
+                commitNbtValueEditIfActive();
+                String savedVal = formatNbtValue(activeRules.get(ruleIdx).value().toString());
+                String currentOp = activeRules.get(ruleIdx).operator();
+                String newOp = FilterItemData.nextNbtOperator(currentOp);
+                PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(nbtEditSlot, ruleIdx));
+                menu.removeSlotNbtRule(nbtEditSlot, ruleIdx);
+                PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, path, newOp));
+                if (minecraft != null && minecraft.player != null) {
+                    menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, newOp);
+                }
+                List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
+                int newIdx = findActiveRuleIndex(updatedRules, path);
+                if (newIdx >= 0) {
+                    PacketDistributor.sendToServer(
+                            SetFilterEntryNbtPayload.setValue(nbtEditSlot, newIdx, savedVal));
+                    menu.setSlotNbtRuleValue(nbtEditSlot, newIdx, savedVal);
+                }
+                return true;
+            }
+
+            return true;
+        }
+
+        commitNbtValueEditIfActive();
+        return true;
+    }
+
+    private FilterItemData.SlotNbtRule findActiveRule(List<FilterItemData.SlotNbtRule> rules, String path) {
+        for (FilterItemData.SlotNbtRule rule : rules) {
+            if (rule.path().equals(path))
+                return rule;
+        }
+        return null;
+    }
+
+    private int findActiveRuleIndex(List<FilterItemData.SlotNbtRule> rules, String path) {
+        for (int i = 0; i < rules.size(); i++) {
+            if (rules.get(i).path().equals(path))
+                return i;
+        }
+        return -1;
+    }
+
+    private static final Map<String, String> PATH_ABBREV = Map.of(
+            "enchantments", "ench",
+            "stored_enchantments", "stored",
+            "potion_contents", "potion",
+            "custom_data", "data",
+            "attribute_modifiers", "attr"
+    );
+
+    private static String stripNamespace(String s) {
+        int colon = s.indexOf(':');
+        return colon >= 0 ? s.substring(colon + 1) : s;
+    }
+
+    private String formatNbtPath(String path) {
+        String[] segments = path.split("\\.");
+        String last = null;
+        String parent = null;
+        for (String seg : segments) {
+            if (seg.equals("levels")) continue;
+            String clean = stripNamespace(seg);
+            parent = last;
+            last = clean;
+        }
+        if (parent != null && last != null) {
+            String abbr = PATH_ABBREV.getOrDefault(parent, parent);
+            return abbr + " > " + last;
+        }
+        return last != null ? last : path;
+    }
+
+    private String formatNbtValue(String raw) {
+        if (raw.length() >= 2 && raw.startsWith("\"") && raw.endsWith("\"")) {
+            String inner = raw.substring(1, raw.length() - 1);
+            inner = stripNamespace(inner);
+            return inner;
+        }
+        if (raw.endsWith("b") || raw.endsWith("s") || raw.endsWith("L")
+                || raw.endsWith("f") || raw.endsWith("d")) {
+            String num = raw.substring(0, raw.length() - 1);
+            if (raw.endsWith("b")) {
+                if ("0".equals(num)) return "false";
+                if ("1".equals(num)) return "true";
+            }
+            return num;
+        }
+        return raw;
+    }
+
+    private int getNbtSubModeMaxScroll() {
+        int panelH = menu.getPlayerInventoryY() - 24;
+        int listH = panelH - 34;
+        int maxRows = Math.max(1, listH / LIST_ROW_H);
+        return Math.max(0, cachedSlotNbtEntries.size() - maxRows);
+    }
+
+    private void commitNbtValueEdit() {
+        if (nbtEditingRuleIndex < 0 || nbtEditSlot < 0) return;
+        String val = nbtValueEditBox.getValue().trim();
+        if (!val.isEmpty()) {
+            PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setValue(nbtEditSlot, nbtEditingRuleIndex, val));
+            menu.setSlotNbtRuleValue(nbtEditSlot, nbtEditingRuleIndex, val);
+        }
+        nbtEditingRuleIndex = -1;
+        nbtValueEditBox.setVisible(false);
+        nbtValueEditBox.setFocused(false);
+    }
+
+    private void commitNbtValueEditIfActive() {
+        if (nbtEditingRuleIndex >= 0) commitNbtValueEdit();
+    }
+
+    private void cancelNbtValueEdit() {
+        nbtEditingRuleIndex = -1;
+        nbtValueEditBox.setVisible(false);
+        nbtValueEditBox.setFocused(false);
     }
 
     private void closeNbtSubMode() {
+        commitNbtValueEditIfActive();
         nbtEditSlot = -1;
         subModeDropdownOpen = false;
-        if (nbtInputBox != null) {
-            nbtInputBox.active = false;
-            nbtInputBox.setFocused(false);
-        }
+        cachedSlotNbtEntries.clear();
+        nbtPendingOperator = "=";
+        nbtListScrollOffset = 0;
     }
 
-    private static class ThemedMultiLineEditBox extends MultiLineEditBox {
-        ThemedMultiLineEditBox(Font font, int x, int y, int w, int h,
-                               Component message, Component placeholder) {
-            super(font, x, y, w, h, message, placeholder);
+    public List<Rect2i> getExtraAreas() {
+        List<Rect2i> areas = new ArrayList<>();
+        if (nbtEditSlot >= 0) {
+            int panelW = getNbtPanelW();
+            int panelX = getNbtPanelX();
+            int panelY = topPos + 20;
+            int panelH = menu.getPlayerInventoryY() - 24;
+            areas.add(new Rect2i(panelX, panelY, panelW, panelH));
         }
-
-        @Override
-        protected void renderDecorations(GuiGraphics graphics) {
-            // Suppress built-in character counter
+        if (tagEditSlot >= 0) {
+            int panelX = leftPos + 4;
+            int panelY = topPos + 20;
+            int panelW = imageWidth - 8;
+            int panelH = menu.getPlayerInventoryY() - 24;
+            areas.add(new Rect2i(panelX, panelY, panelW, panelH));
         }
-
-        @Override
-        public void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-            super.renderWidget(g, mouseX, mouseY, partialTick);
-            if (scrollbarVisible()) {
-                int sbX = getX() + width - 8;
-                int sbY = getY();
-                int sbH = height;
-
-                // Dark track
-                g.fill(sbX, sbY, sbX + 8, sbY + sbH, 0xFF111111);
-
-                int maxScroll = getMaxScrollAmount();
-                if (maxScroll > 0) {
-                    int totalH = sbH + maxScroll;
-                    int thumbH = Mth.clamp((int) ((float) (sbH * sbH) / (float) totalH), 32, sbH);
-                    int thumbY = (int) (scrollAmount() * (sbH - thumbH) / maxScroll) + sbY;
-                    thumbY = Math.max(thumbY, sbY);
-
-                    g.fill(sbX, thumbY, sbX + 8, thumbY + thumbH, 0xFF3A3A3A);
-                    g.fill(sbX, thumbY, sbX + 7, thumbY + thumbH - 1, 0xFF4A4A4A);
-                }
-            }
-        }
+        return areas;
     }
 }

@@ -25,6 +25,7 @@ val mekanism_version: String by project
 val ars_nouveau_version: String by project
 val ae2_version: String by project
 val ftb_teams_version: String by project
+val emi_version: String by project
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -36,6 +37,7 @@ repositories {
     maven("https://modmaven.dev/")
     maven("https://api.modrinth.com/maven")
     maven("https://maven.ftb.dev/releases")
+    maven("https://maven.terraformersmc.com/releases")
 }
 
 base {
@@ -104,6 +106,10 @@ dependencies {
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
 
     compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftb_teams_version}") {
+        isTransitive = false
+    }
+
+    compileOnly("dev.emi:emi-neoforge:${emi_version}") {
         isTransitive = false
     }
 

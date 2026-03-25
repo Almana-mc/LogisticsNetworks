@@ -7,11 +7,33 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-public record SetFilterEntryNbtPayload(int slot, String path, boolean remove, String rawValue)
+public record SetFilterEntryNbtPayload(int slot, int action, String path, String operator, int ruleIndex, String value)
         implements CustomPacketPayload {
 
-    public SetFilterEntryNbtPayload(int slot, String path, boolean remove) {
-        this(slot, path, remove, "");
+    public static final int ACTION_ADD = 0;
+    public static final int ACTION_REMOVE = 1;
+    public static final int ACTION_TOGGLE_MATCH = 2;
+    public static final int ACTION_CLEAR = 3;
+    public static final int ACTION_SET_VALUE = 4;
+
+    public static SetFilterEntryNbtPayload add(int slot, String path, String operator) {
+        return new SetFilterEntryNbtPayload(slot, ACTION_ADD, path, operator, -1, "");
+    }
+
+    public static SetFilterEntryNbtPayload remove(int slot, int ruleIndex) {
+        return new SetFilterEntryNbtPayload(slot, ACTION_REMOVE, "", "=", ruleIndex, "");
+    }
+
+    public static SetFilterEntryNbtPayload toggleMatch(int slot) {
+        return new SetFilterEntryNbtPayload(slot, ACTION_TOGGLE_MATCH, "", "=", -1, "");
+    }
+
+    public static SetFilterEntryNbtPayload clear(int slot) {
+        return new SetFilterEntryNbtPayload(slot, ACTION_CLEAR, "", "=", -1, "");
+    }
+
+    public static SetFilterEntryNbtPayload setValue(int slot, int ruleIndex, String value) {
+        return new SetFilterEntryNbtPayload(slot, ACTION_SET_VALUE, "", "=", ruleIndex, value);
     }
 
     public static final Type<SetFilterEntryNbtPayload> TYPE = new Type<>(
@@ -21,12 +43,16 @@ public record SetFilterEntryNbtPayload(int slot, String path, boolean remove, St
             .composite(
                     ByteBufCodecs.VAR_INT,
                     SetFilterEntryNbtPayload::slot,
+                    ByteBufCodecs.VAR_INT,
+                    SetFilterEntryNbtPayload::action,
                     ByteBufCodecs.STRING_UTF8,
                     SetFilterEntryNbtPayload::path,
-                    ByteBufCodecs.BOOL,
-                    SetFilterEntryNbtPayload::remove,
                     ByteBufCodecs.STRING_UTF8,
-                    SetFilterEntryNbtPayload::rawValue,
+                    SetFilterEntryNbtPayload::operator,
+                    ByteBufCodecs.VAR_INT,
+                    SetFilterEntryNbtPayload::ruleIndex,
+                    ByteBufCodecs.STRING_UTF8,
+                    SetFilterEntryNbtPayload::value,
                     SetFilterEntryNbtPayload::new);
 
     @Override

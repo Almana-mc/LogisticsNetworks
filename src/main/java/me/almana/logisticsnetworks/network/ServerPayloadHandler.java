@@ -413,12 +413,18 @@ public class ServerPayloadHandler {
     public static void handleSetFilterEntryNbt(SetFilterEntryNbtPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
-                if (payload.remove()) {
-                    menu.clearEntryNbt((Player) context.player(), payload.slot());
-                } else if (!payload.rawValue().isEmpty()) {
-                    menu.setEntryNbtRaw((Player) context.player(), payload.slot(), payload.path(), payload.rawValue());
-                } else {
-                    menu.setEntryNbt((Player) context.player(), payload.slot(), payload.path());
+                switch (payload.action()) {
+                    case SetFilterEntryNbtPayload.ACTION_ADD ->
+                        menu.addSlotNbtRule((Player) context.player(), payload.slot(),
+                                payload.path(), payload.operator());
+                    case SetFilterEntryNbtPayload.ACTION_REMOVE ->
+                        menu.removeSlotNbtRule(payload.slot(), payload.ruleIndex());
+                    case SetFilterEntryNbtPayload.ACTION_TOGGLE_MATCH ->
+                        menu.toggleSlotNbtMatchMode(payload.slot());
+                    case SetFilterEntryNbtPayload.ACTION_CLEAR ->
+                        menu.clearSlotNbtRules(payload.slot());
+                    case SetFilterEntryNbtPayload.ACTION_SET_VALUE ->
+                        menu.setSlotNbtRuleValue(payload.slot(), payload.ruleIndex(), payload.value());
                 }
             }
         });

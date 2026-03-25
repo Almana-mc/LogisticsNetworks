@@ -3,10 +3,14 @@ package me.almana.logisticsnetworks.filter;
 import me.almana.logisticsnetworks.item.NbtFilterItem;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
@@ -29,6 +33,31 @@ public final class NbtFilterData {
     private static final String KEY_RULE_ENABLED = "enabled";
 
     public record NbtEntry(String path, String valueDisplay) {
+    }
+
+    private static final List<NbtEntry> DEFAULT_ENTRIES = List.of(
+            new NbtEntry("minecraft:enchanted", "false"),
+            new NbtEntry("minecraft:damage", "0"),
+            new NbtEntry("minecraft:durability", "0"),
+            new NbtEntry("minecraft:max_damage", "0"),
+            new NbtEntry("minecraft:max_stack_size", "64"),
+            new NbtEntry("minecraft:rarity", "\"common\"")
+    );
+
+    public static List<NbtEntry> getDefaultEntries() {
+        return DEFAULT_ENTRIES;
+    }
+
+    public static @Nullable Tag getDefaultValue(String path) {
+        return switch (path) {
+            case "minecraft:enchanted" -> ByteTag.valueOf(false);
+            case "minecraft:damage" -> IntTag.valueOf(0);
+            case "minecraft:durability" -> IntTag.valueOf(0);
+            case "minecraft:max_damage" -> IntTag.valueOf(0);
+            case "minecraft:max_stack_size" -> IntTag.valueOf(64);
+            case "minecraft:rarity" -> StringTag.valueOf("common");
+            default -> null;
+        };
     }
 
     public enum Operator {
@@ -410,10 +439,29 @@ public final class NbtFilterData {
             return null;
 
         Tag tag = stack.save(provider);
+        CompoundTag components = new CompoundTag();
         if (tag instanceof CompoundTag c && c.contains("components", Tag.TAG_COMPOUND)) {
-            return c.getCompound("components");
+            components = c.getCompound("components").copy();
         }
-        return null;
+
+        if (!components.contains("minecraft:max_stack_size"))
+            components.putInt("minecraft:max_stack_size", stack.getMaxStackSize());
+        if (!components.contains("minecraft:rarity"))
+            components.putString("minecraft:rarity", stack.getRarity().getSerializedName());
+        if (stack.isDamageableItem()) {
+            if (!components.contains("minecraft:damage"))
+                components.putInt("minecraft:damage", stack.getDamageValue());
+            if (!components.contains("minecraft:max_damage"))
+                components.putInt("minecraft:max_damage", stack.getMaxDamage());
+            components.putInt("minecraft:durability", stack.getMaxDamage() - stack.getDamageValue());
+        }
+
+        if (stack.isEnchantable() || stack.isEnchanted()) {
+            ItemEnchantments enchants = stack.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY);
+            components.put("minecraft:enchanted", ByteTag.valueOf(!enchants.isEmpty()));
+        }
+
+        return components.isEmpty() ? null : components;
     }
 
     public static @Nullable CompoundTag getSerializedComponents(FluidStack stack, HolderLookup.Provider provider) {
@@ -434,6 +482,10 @@ public final class NbtFilterData {
 
     private static void collectLeaves(Tag tag, String currentPath, List<NbtEntry> out) {
         if (tag instanceof CompoundTag c) {
+            if (c.isEmpty() && !currentPath.isEmpty()) {
+                out.add(new NbtEntry(currentPath, "true"));
+                return;
+            }
             c.getAllKeys().stream().sorted().forEach(key -> {
                 Tag child = c.get(key);
                 if (child != null) {
@@ -445,6 +497,10 @@ public final class NbtFilterData {
         }
 
         if (tag instanceof ListTag l) {
+            if (l.isEmpty() && !currentPath.isEmpty()) {
+                out.add(new NbtEntry(currentPath, "[]"));
+                return;
+            }
             for (int i = 0; i < l.size(); i++) {
                 collectLeaves(l.get(i), currentPath + "[" + i + "]", out);
             }
