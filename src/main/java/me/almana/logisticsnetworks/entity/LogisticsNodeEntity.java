@@ -1,38 +1,35 @@
 package me.almana.logisticsnetworks.entity;
 
+import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerEntity;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
-
-import me.almana.logisticsnetworks.Config;
-import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.Logisticsnetworks;
-import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.server.level.ServerLevel;
-import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
 
 public class LogisticsNodeEntity extends Entity {
 
@@ -41,7 +38,6 @@ public class LogisticsNodeEntity extends Entity {
     public static final int UPGRADE_SLOT_COUNT = 4;
     public static final int CHANNEL_COUNT = 9;
 
-    // NBT Keys
     private static final String KEY_ATTACHED_POS = "AttachedPos";
     private static final String KEY_VALID = "Valid";
     private static final String KEY_NETWORK_ID = "NetworkId";
@@ -60,14 +56,14 @@ public class LogisticsNodeEntity extends Entity {
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
     private static final EntityDataAccessor<Boolean> VALID = SynchedEntityData.defineId(LogisticsNodeEntity.class,
             EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Optional<UUID>> NETWORK_ID = SynchedEntityData
-            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<String> NETWORK_ID = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<String> NETWORK_NAME = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> RENDER_VISIBLE = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Optional<UUID>> OWNER_UUID = SynchedEntityData
-            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<String> OWNER_UUID = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<String> NODE_LABEL = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> HIGHLIGHTED = SynchedEntityData
@@ -84,131 +80,100 @@ public class LogisticsNodeEntity extends Entity {
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
-        this.noCulling = true;
-        this.setNoGravity(true);
-        this.noPhysics = true;
+        setNoGravity(true);
+        noPhysics = true;
 
         for (int i = 0; i < CHANNEL_COUNT; i++) {
-            this.channels[i] = new ChannelData();
+            channels[i] = new ChannelData();
         }
 
-        Arrays.fill(this.upgradeItems, ItemStack.EMPTY);
+        Arrays.fill(upgradeItems, ItemStack.EMPTY);
     }
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level, BlockPos pos) {
         this(entityType, level);
-        this.setPos(Vec3.atCenterOf(pos));
-        this.setAttachedPos(pos);
+        setPos(Vec3.atCenterOf(pos));
+        setAttachedPos(pos);
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(ATTACHED_POS, BlockPos.ZERO);
         builder.define(VALID, false);
-        builder.define(NETWORK_ID, Optional.empty());
+        builder.define(NETWORK_ID, "");
         builder.define(NETWORK_NAME, "");
         builder.define(RENDER_VISIBLE, true);
-        builder.define(OWNER_UUID, Optional.empty());
+        builder.define(OWNER_UUID, "");
         builder.define(NODE_LABEL, "");
         builder.define(HIGHLIGHTED, false);
     }
 
     @Override
-    protected void readAdditionalSaveData(CompoundTag compound) {
-        if (compound.contains(KEY_ATTACHED_POS)) {
-            setAttachedPos(BlockPos.of(compound.getLong(KEY_ATTACHED_POS)));
+    protected void readAdditionalSaveData(ValueInput input) {
+        if (input.getLong(KEY_ATTACHED_POS).isPresent()) {
+            setAttachedPos(BlockPos.of(input.getLongOr(KEY_ATTACHED_POS, BlockPos.ZERO.asLong())));
         }
-        setValid(compound.getBoolean(KEY_VALID));
+        setValid(input.getBooleanOr(KEY_VALID, false));
+        setNetworkId(parseOptionalUuid(input.getStringOr(KEY_NETWORK_ID, "")));
+        setNetworkName(input.getStringOr(KEY_NETWORK_NAME, ""));
+        setRenderVisible(input.getBooleanOr(KEY_VISIBLE, true));
+        setOwnerUUID(parseOptionalUuid(input.getStringOr(KEY_OWNER_UUID, "")));
+        setNodeLabel(input.getStringOr(KEY_NODE_LABEL, ""));
+        setHighlighted(input.getBooleanOr(KEY_HIGHLIGHTED, false));
 
-        if (compound.contains(KEY_NETWORK_ID)) {
-            setNetworkId(compound.getUUID(KEY_NETWORK_ID));
-        }
-        if (compound.contains(KEY_NETWORK_NAME, Tag.TAG_STRING)) {
-            setNetworkName(compound.getString(KEY_NETWORK_NAME));
-        }
-        if (compound.contains(KEY_VISIBLE)) {
-            setRenderVisible(compound.getBoolean(KEY_VISIBLE));
-        }
-        if (compound.contains(KEY_OWNER_UUID)) {
-            setOwnerUUID(compound.getUUID(KEY_OWNER_UUID));
-        }
-        if (compound.contains(KEY_NODE_LABEL, Tag.TAG_STRING)) {
-            setNodeLabel(compound.getString(KEY_NODE_LABEL));
-        }
-        if (compound.contains(KEY_HIGHLIGHTED)) {
-            setHighlighted(compound.getBoolean(KEY_HIGHLIGHTED));
+        ValueInput channelsInput = input.childOrEmpty(KEY_CHANNELS);
+        for (int i = 0; i < CHANNEL_COUNT; i++) {
+            channels[i].load(channelsInput.childOrEmpty(KEY_CHANNEL_PREFIX + i));
         }
 
-        HolderLookup.Provider provider = this.registryAccess();
-
-        if (compound.contains(KEY_CHANNELS)) {
-            CompoundTag channelsTag = compound.getCompound(KEY_CHANNELS);
-            for (int i = 0; i < CHANNEL_COUNT; i++) {
-                String key = KEY_CHANNEL_PREFIX + i;
-                if (channelsTag.contains(key)) {
-                    this.channels[i].load(channelsTag.getCompound(key), provider);
-                }
+        Arrays.fill(upgradeItems, ItemStack.EMPTY);
+        for (ValueInput entry : input.childrenListOrEmpty(KEY_UPGRADES)) {
+            int slot = entry.getIntOr(KEY_SLOT, -1);
+            if (slot < 0 || slot >= UPGRADE_SLOT_COUNT) {
+                continue;
             }
-        }
-
-        Arrays.fill(this.upgradeItems, ItemStack.EMPTY);
-        if (compound.contains(KEY_UPGRADES, Tag.TAG_LIST)) {
-            ListTag upgrades = compound.getList(KEY_UPGRADES, Tag.TAG_COMPOUND);
-            for (Tag tag : upgrades) {
-                if (tag instanceof CompoundTag entry) {
-                    int slot = entry.getInt(KEY_SLOT);
-                    if (slot >= 0 && slot < UPGRADE_SLOT_COUNT && entry.contains(KEY_ITEM, Tag.TAG_COMPOUND)) {
-                        this.upgradeItems[slot] = ItemStack.parseOptional(provider, entry.getCompound(KEY_ITEM));
-                    }
-                }
-            }
+            upgradeItems[slot] = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
         }
     }
 
     @Override
-    protected void addAdditionalSaveData(CompoundTag compound) {
-        compound.putLong(KEY_ATTACHED_POS, getAttachedPos().asLong());
-        compound.putBoolean(KEY_VALID, isValid());
+    protected void addAdditionalSaveData(ValueOutput output) {
+        output.putLong(KEY_ATTACHED_POS, getAttachedPos().asLong());
+        output.putBoolean(KEY_VALID, isValid());
 
         UUID netId = getNetworkId();
         if (netId != null) {
-            compound.putUUID(KEY_NETWORK_ID, netId);
+            output.putString(KEY_NETWORK_ID, netId.toString());
         }
         String networkName = getNetworkName();
         if (!networkName.isBlank()) {
-            compound.putString(KEY_NETWORK_NAME, networkName);
+            output.putString(KEY_NETWORK_NAME, networkName);
         }
-        compound.putBoolean(KEY_VISIBLE, isRenderVisible());
+        output.putBoolean(KEY_VISIBLE, isRenderVisible());
 
         UUID owner = getOwnerUUID();
         if (owner != null) {
-            compound.putUUID(KEY_OWNER_UUID, owner);
+            output.putString(KEY_OWNER_UUID, owner.toString());
         }
         String label = getNodeLabel();
         if (!label.isEmpty()) {
-            compound.putString(KEY_NODE_LABEL, label);
+            output.putString(KEY_NODE_LABEL, label);
         }
-        compound.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
+        output.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
 
-        HolderLookup.Provider provider = registryAccess();
-
-        CompoundTag channelsTag = new CompoundTag();
+        ValueOutput channelsOutput = output.child(KEY_CHANNELS);
         for (int i = 0; i < CHANNEL_COUNT; i++) {
-            channelsTag.put(KEY_CHANNEL_PREFIX + i, this.channels[i].save(provider));
+            channels[i].save(channelsOutput.child(KEY_CHANNEL_PREFIX + i));
         }
-        compound.put(KEY_CHANNELS, channelsTag);
 
-        ListTag upgradesTag = new ListTag();
+        var upgradesOutput = output.childrenList(KEY_UPGRADES);
         for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
-            if (!this.upgradeItems[i].isEmpty()) {
-                CompoundTag entry = new CompoundTag();
-                entry.putInt(KEY_SLOT, i);
-                entry.put(KEY_ITEM, this.upgradeItems[i].save(provider));
-                upgradesTag.add(entry);
+            if (upgradeItems[i].isEmpty()) {
+                continue;
             }
-        }
-        if (!upgradesTag.isEmpty()) {
-            compound.put(KEY_UPGRADES, upgradesTag);
+            ValueOutput entry = upgradesOutput.addChild();
+            entry.putInt(KEY_SLOT, i);
+            entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, upgradeItems[i]);
         }
     }
 
@@ -221,19 +186,17 @@ public class LogisticsNodeEntity extends Entity {
                 setPos(target);
             }
 
-            if (!this.level().isClientSide() && this.tickCount % 20 == 0) {
-                if (this.level().isEmptyBlock(attached)) {
-                    if (this.getNetworkId() != null && this.level() instanceof ServerLevel serverLevel) {
-                        NetworkRegistry.get(serverLevel)
-                                .removeNodeFromNetwork(this.getNetworkId(), this.getUUID());
+            if (!level().isClientSide() && tickCount % 20 == 0) {
+                if (level().isEmptyBlock(attached) && level() instanceof ServerLevel serverLevel) {
+                    if (getNetworkId() != null) {
+                        NetworkRegistry.get(serverLevel).removeNodeFromNetwork(getNetworkId(), getUUID());
                     }
                     if (Config.dropNodeItem) {
-                        this.spawnAtLocation(
-                                Registration.LOGISTICS_NODE_ITEM.get());
+                        spawnAtLocation(serverLevel, me.almana.logisticsnetworks.registration.Registration.logisticsNodeItem());
                     }
-                    this.dropFilters();
-                    this.dropUpgrades();
-                    this.discard();
+                    dropFilters();
+                    dropUpgrades();
+                    discard();
                 }
             }
         }
@@ -253,14 +216,19 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     @Override
-    public boolean canBeCollidedWith() {
+    public boolean canBeCollidedWith(Entity entity) {
         return false;
     }
 
     @Override
-    public void kill() {
+    public void kill(ServerLevel level) {
         LOGGER.warn(
                 "Attempt to kill LogisticsNodeEntity ignored. Please use '/logisticsnetworks removeNodes' or '/ln removeNodes' instead to safely remove nodes.");
+    }
+
+    @Override
+    public boolean hurtServer(ServerLevel level, DamageSource damageSource, float amount) {
+        return false;
     }
 
     @Override
@@ -269,19 +237,19 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     public void setAttachedPos(BlockPos pos) {
-        this.entityData.set(ATTACHED_POS, pos);
+        entityData.set(ATTACHED_POS, pos);
     }
 
     public BlockPos getAttachedPos() {
-        return this.entityData.get(ATTACHED_POS);
+        return entityData.get(ATTACHED_POS);
     }
 
     public void setValid(boolean valid) {
-        this.entityData.set(VALID, valid);
+        entityData.set(VALID, valid);
     }
 
     public boolean isValid() {
-        return this.entityData.get(VALID);
+        return entityData.get(VALID);
     }
 
     public boolean isValidNode() {
@@ -294,47 +262,47 @@ public class LogisticsNodeEntity extends Entity {
 
     @Nullable
     public UUID getNetworkId() {
-        return this.entityData.get(NETWORK_ID).orElse(null);
+        return parseOptionalUuid(entityData.get(NETWORK_ID));
     }
 
     public void setNetworkId(@Nullable UUID networkId) {
-        this.entityData.set(NETWORK_ID, Optional.ofNullable(networkId));
+        entityData.set(NETWORK_ID, networkId == null ? "" : networkId.toString());
         if (networkId == null) {
             setNetworkName("");
         }
     }
 
     public String getNetworkName() {
-        return this.entityData.get(NETWORK_NAME);
+        return entityData.get(NETWORK_NAME);
     }
 
     public void setNetworkName(@Nullable String networkName) {
-        this.entityData.set(NETWORK_NAME, networkName == null ? "" : networkName);
+        entityData.set(NETWORK_NAME, networkName == null ? "" : networkName);
     }
 
     public boolean isRenderVisible() {
-        return this.entityData.get(RENDER_VISIBLE);
+        return entityData.get(RENDER_VISIBLE);
     }
 
     public void setRenderVisible(boolean visible) {
-        this.entityData.set(RENDER_VISIBLE, visible);
+        entityData.set(RENDER_VISIBLE, visible);
     }
 
     public boolean isHighlighted() {
-        return this.entityData.get(HIGHLIGHTED);
+        return entityData.get(HIGHLIGHTED);
     }
 
     public void setHighlighted(boolean highlighted) {
-        this.entityData.set(HIGHLIGHTED, highlighted);
+        entityData.set(HIGHLIGHTED, highlighted);
     }
 
     @Nullable
     public UUID getOwnerUUID() {
-        return this.entityData.get(OWNER_UUID).orElse(null);
+        return parseOptionalUuid(entityData.get(OWNER_UUID));
     }
 
     public void setOwnerUUID(@Nullable UUID ownerUuid) {
-        this.entityData.set(OWNER_UUID, Optional.ofNullable(ownerUuid));
+        entityData.set(OWNER_UUID, ownerUuid == null ? "" : ownerUuid.toString());
     }
 
     public boolean isOwnedBy(Player player) {
@@ -342,12 +310,12 @@ public class LogisticsNodeEntity extends Entity {
         if (owner == null) return true;
         if (owner.equals(player.getUUID())) return true;
         if (FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(owner, player.getUUID())) return true;
-        if (player instanceof ServerPlayer sp && sp.hasPermissions(2)) return true;
+        if (player instanceof ServerPlayer sp && sp.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) return true;
         return false;
     }
 
     public String getNodeLabel() {
-        return this.entityData.get(NODE_LABEL);
+        return entityData.get(NODE_LABEL);
     }
 
     public void setNodeLabel(@Nullable String label) {
@@ -355,13 +323,14 @@ public class LogisticsNodeEntity extends Entity {
         if (sanitized.length() > 48) {
             sanitized = sanitized.substring(0, 48);
         }
-        this.entityData.set(NODE_LABEL, sanitized);
+        entityData.set(NODE_LABEL, sanitized);
     }
 
     @Nullable
     public ChannelData getChannel(int index) {
-        if (index < 0 || index >= CHANNEL_COUNT)
+        if (index < 0 || index >= CHANNEL_COUNT) {
             return null;
+        }
         return channels[index];
     }
 
@@ -370,8 +339,9 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     public ItemStack getUpgradeItem(int slot) {
-        if (slot < 0 || slot >= UPGRADE_SLOT_COUNT)
+        if (slot < 0 || slot >= UPGRADE_SLOT_COUNT) {
             return ItemStack.EMPTY;
+        }
         return upgradeItems[slot];
     }
 
@@ -438,16 +408,22 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     public void dropUpgrades() {
+        if (!(level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
         for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
             ItemStack stack = upgradeItems[i];
             if (!stack.isEmpty()) {
-                spawnAtLocation(stack.copy());
+                spawnAtLocation(serverLevel, stack.copy());
                 upgradeItems[i] = ItemStack.EMPTY;
             }
         }
     }
 
     public void dropFilters() {
+        if (!(level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
         for (int channelIndex = 0; channelIndex < CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = channels[channelIndex];
             if (channel == null) {
@@ -456,11 +432,21 @@ public class LogisticsNodeEntity extends Entity {
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                 ItemStack stack = channel.getFilterItem(slot);
                 if (!stack.isEmpty()) {
-                    spawnAtLocation(stack.copy());
+                    spawnAtLocation(serverLevel, stack.copy());
                     channel.setFilterItem(slot, ItemStack.EMPTY);
                 }
             }
         }
     }
 
+    private static UUID parseOptionalUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
 }

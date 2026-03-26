@@ -1,6 +1,5 @@
 package me.almana.logisticsnetworks.filter;
 
-import me.almana.logisticsnetworks.item.NbtFilterItem;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.ByteTag;
@@ -96,13 +95,13 @@ public final class NbtFilterData {
     }
 
     public static boolean isNbtFilter(ItemStack stack) {
-        return !stack.isEmpty() && stack.getItem() instanceof NbtFilterItem;
+        return false;
     }
 
     public static boolean isBlacklist(ItemStack stack) {
         if (!isNbtFilter(stack))
             return false;
-        return getRoot(stack).getBoolean(KEY_IS_BLACKLIST);
+        return getRoot(stack).getBooleanOr(KEY_IS_BLACKLIST, false);
     }
 
     public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
@@ -123,11 +122,11 @@ public final class NbtFilterData {
             return FilterTargetType.ITEMS;
 
         CompoundTag root = getRoot(stack);
-        if (root.contains(KEY_TARGET_TYPE, Tag.TAG_INT)) {
-            return FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE));
+        if (root.contains(KEY_TARGET_TYPE)) {
+            return FilterTargetType.fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
         }
 
-        String path = root.getString(KEY_PATH);
+        String path = root.getStringOr(KEY_PATH, "");
         if (path.isEmpty()) {
             List<NbtRule> rules = readRules(root);
             if (rules.isEmpty()) {
@@ -305,7 +304,7 @@ public final class NbtFilterData {
         boolean[] result = { false };
 
         updateRoot(stack, root -> {
-            if (root.contains(KEY_PATH) || root.contains(KEY_VALUE) || root.contains(KEY_RULES, Tag.TAG_LIST)) {
+            if (root.contains(KEY_PATH) || root.contains(KEY_VALUE) || root.contains(KEY_RULES)) {
                 root.remove(KEY_PATH);
                 root.remove(KEY_VALUE);
                 root.remove(KEY_RULES);
@@ -438,10 +437,14 @@ public final class NbtFilterData {
         if (stack.isEmpty() || provider == null)
             return null;
 
-        Tag tag = stack.save(provider);
+        CompoundTag wrapper = new CompoundTag();
+        wrapper.store("stack", ItemStack.OPTIONAL_CODEC, stack);
         CompoundTag components = new CompoundTag();
-        if (tag instanceof CompoundTag c && c.contains("components", Tag.TAG_COMPOUND)) {
-            components = c.getCompound("components").copy();
+        if (wrapper.contains("stack")) {
+            CompoundTag stackTag = wrapper.getCompound("stack").orElseGet(CompoundTag::new);
+            if (stackTag.contains("components")) {
+                components = stackTag.getCompound("components").map(CompoundTag::copy).orElseGet(CompoundTag::new);
+            }
         }
 
         if (!components.contains("minecraft:max_stack_size"))
@@ -468,9 +471,13 @@ public final class NbtFilterData {
         if (stack == null || stack.isEmpty() || provider == null)
             return null;
 
-        Tag tag = stack.saveOptional(provider);
-        if (tag instanceof CompoundTag c && c.contains("components", Tag.TAG_COMPOUND)) {
-            return c.getCompound("components");
+        CompoundTag wrapper = new CompoundTag();
+        wrapper.store("stack", FluidStack.OPTIONAL_CODEC, stack);
+        if (wrapper.contains("stack")) {
+            CompoundTag itemTag = wrapper.getCompound("stack").orElseGet(CompoundTag::new);
+            if (itemTag.contains("components")) {
+                return itemTag.getCompound("components").orElseGet(CompoundTag::new);
+            }
         }
         return null;
     }
@@ -486,7 +493,7 @@ public final class NbtFilterData {
                 out.add(new NbtEntry(currentPath, "true"));
                 return;
             }
-            c.getAllKeys().stream().sorted().forEach(key -> {
+            c.keySet().stream().sorted().forEach(key -> {
                 Tag child = c.get(key);
                 if (child != null) {
                     String nextPath = currentPath.isEmpty() ? key : currentPath + "." + key;
@@ -599,34 +606,34 @@ public final class NbtFilterData {
     }
 
     private static List<NbtRule> readRules(CompoundTag root) {
-        if (!root.contains(KEY_RULES, Tag.TAG_LIST))
+        if (!root.contains(KEY_RULES))
             return List.of();
 
-        ListTag ruleList = root.getList(KEY_RULES, Tag.TAG_COMPOUND);
+        ListTag ruleList = root.getListOrEmpty(KEY_RULES);
         List<NbtRule> rules = new ArrayList<>(ruleList.size());
         for (Tag tag : ruleList) {
             if (!(tag instanceof CompoundTag ruleTag))
                 continue;
 
-            String path = normalizePath(ruleTag.getString(KEY_PATH));
+            String path = normalizePath(ruleTag.getStringOr(KEY_PATH, ""));
             Tag value = ruleTag.get(KEY_VALUE);
             if (path == null || value == null)
                 continue;
 
-            Operator operator = ruleTag.contains(KEY_RULE_OPERATOR, Tag.TAG_INT)
-                    ? Operator.fromOrdinal(ruleTag.getInt(KEY_RULE_OPERATOR))
+            Operator operator = ruleTag.contains(KEY_RULE_OPERATOR)
+                    ? Operator.fromOrdinal(ruleTag.getIntOr(KEY_RULE_OPERATOR, Operator.EQUALS.ordinal()))
                     : Operator.EQUALS;
-            boolean enabled = !ruleTag.contains(KEY_RULE_ENABLED, Tag.TAG_BYTE) || ruleTag.getBoolean(KEY_RULE_ENABLED);
+            boolean enabled = !ruleTag.contains(KEY_RULE_ENABLED) || ruleTag.getBooleanOr(KEY_RULE_ENABLED, true);
             rules.add(new NbtRule(path, operator, value.copy(), enabled));
         }
         return rules;
     }
 
     private static @Nullable NbtRule readLegacyRule(CompoundTag root) {
-        if (!root.contains(KEY_PATH, Tag.TAG_STRING) || !root.contains(KEY_VALUE))
+        if (!root.contains(KEY_PATH) || !root.contains(KEY_VALUE))
             return null;
 
-        String path = normalizePath(root.getString(KEY_PATH));
+        String path = normalizePath(root.getStringOr(KEY_PATH, ""));
         Tag value = root.get(KEY_VALUE);
         if (path == null || value == null)
             return null;
@@ -675,13 +682,13 @@ public final class NbtFilterData {
     private static CompoundTag getRoot(ItemStack stack) {
 
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
+        return custom.contains(KEY_ROOT) ? custom.getCompound(KEY_ROOT).orElseGet(CompoundTag::new) : new CompoundTag();
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag workingRoot = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
-                    ? customTag.getCompound(KEY_ROOT)
+            CompoundTag workingRoot = customTag.contains(KEY_ROOT)
+                    ? customTag.getCompound(KEY_ROOT).orElseGet(CompoundTag::new)
                     : new CompoundTag();
 
             modifier.accept(workingRoot);

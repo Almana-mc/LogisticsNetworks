@@ -4,11 +4,7 @@
     "logisticsnetworks:small_filter",
     "logisticsnetworks:medium_filter",
     "logisticsnetworks:big_filter",
-    "logisticsnetworks:tag_filter",
     "logisticsnetworks:mod_filter",
-    "logisticsnetworks:amount_filter",
-    "logisticsnetworks:durability_filter",
-    "logisticsnetworks:nbt_filter",
     "logisticsnetworks:slot_filter",
     "logisticsnetworks:name_filter"
   ]

@@ -28,18 +28,18 @@ public class LogisticsNodeItem extends Item {
         BlockPos clickedPos = context.getClickedPos();
         Player player = context.getPlayer();
 
-        if (level.isClientSide)
+        if (level.isClientSide())
             return InteractionResult.SUCCESS;
 
         NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(level, clickedPos);
         if (validation != NodePlacementHelper.ValidationResult.OK) {
             if (player != null) {
                 switch (validation) {
-                    case BLACKLISTED -> player.displayClientMessage(
+                    case BLACKLISTED -> WrenchItem.sendPlayerMessage(player,
                             Component.translatable("message.logisticsnetworks.block_blacklisted"), true);
-                    case NO_STORAGE_CAPABILITY -> player.displayClientMessage(
+                    case NO_STORAGE_CAPABILITY -> WrenchItem.sendPlayerMessage(player,
                             Component.translatable("message.logisticsnetworks.no_storage_capability"), true);
-                    case NODE_ALREADY_EXISTS -> player.displayClientMessage(
+                    case NODE_ALREADY_EXISTS -> WrenchItem.sendPlayerMessage(player,
                             Component.translatable("message.logisticsnetworks.node_already_exists"), true);
                     case AIR, OK -> {
                     }
@@ -84,13 +84,13 @@ public class LogisticsNodeItem extends Item {
         switch (result) {
             case SUCCESS -> {
             }
-            case MISSING_ITEMS -> serverPlayer.displayClientMessage(
+            case MISSING_ITEMS -> WrenchItem.sendPlayerMessage(serverPlayer,
                     Component.translatable("message.logisticsnetworks.clipboard.paste.missing_items"), true);
-            case INVENTORY_FULL -> serverPlayer.displayClientMessage(
+            case INVENTORY_FULL -> WrenchItem.sendPlayerMessage(serverPlayer,
                     Component.translatable("message.logisticsnetworks.clipboard.paste.no_space"), true);
-            case INCOMPATIBLE_TARGET -> serverPlayer.displayClientMessage(
+            case INCOMPATIBLE_TARGET -> WrenchItem.sendPlayerMessage(serverPlayer,
                     Component.translatable("message.logisticsnetworks.clipboard.paste.incompatible"), true);
-            case CLIPBOARD_INVALID -> serverPlayer.displayClientMessage(
+            case CLIPBOARD_INVALID -> WrenchItem.sendPlayerMessage(serverPlayer,
                     Component.translatable("message.logisticsnetworks.clipboard.invalid"), true);
         }
     }

@@ -4,7 +4,7 @@ import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.IEntityComponentProvider;
@@ -16,7 +16,7 @@ import snownee.jade.api.config.IPluginConfig;
 public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, IServerDataProvider<EntityAccessor> {
     INSTANCE;
 
-    private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath(
+    private static final Identifier UID = Identifier.fromNamespaceAndPath(
             Logisticsnetworks.MOD_ID, "logistics_node_entity");
 
     @Override
@@ -36,7 +36,7 @@ public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, ISe
     }
 
     @Override
-    public ResourceLocation getUid() {
+    public Identifier getUid() {
         return UID;
     }
 }

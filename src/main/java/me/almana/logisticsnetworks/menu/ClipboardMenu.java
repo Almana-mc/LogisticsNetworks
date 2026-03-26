@@ -17,7 +17,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
@@ -79,7 +79,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
         super(Registration.CLIPBOARD_MENU.get(), containerId);
         this.hand = hand;
         this.player = playerInventory.player;
-        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInventory.selected : -1;
+        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInventory.getSelectedSlot() : -1;
 
         ItemStack wrenchStack = getWrenchStack();
         NodeClipboardConfig loaded = WrenchItem.getClipboard(wrenchStack, player.registryAccess());
@@ -95,7 +95,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
         int handOrdinal = buf.readVarInt();
         this.hand = handOrdinal == InteractionHand.OFF_HAND.ordinal() ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
         this.player = playerInventory.player;
-        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInventory.selected : -1;
+        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInventory.getSelectedSlot() : -1;
         this.clipboard = NodeClipboardConfig.createEmpty();
 
         layoutSlots(playerInventory);
@@ -192,15 +192,15 @@ public class ClipboardMenu extends AbstractContainerMenu {
     }
 
     @Override
-    public void clicked(int slotId, int dragType, ClickType clickType, Player player) {
+    public void clicked(int slotId, int dragType, ContainerInput clickType, Player player) {
         if (slotId >= 0 && slotId < VISUAL_SLOTS) {
-            if (clickType == ClickType.PICKUP) {
+            if (clickType == ContainerInput.PICKUP) {
                 applyVisualSlotClick(slotId);
             }
             return;
         }
 
-        if (clickType == ClickType.QUICK_MOVE) {
+        if (clickType == ContainerInput.QUICK_MOVE) {
             return;
         }
 
@@ -209,7 +209,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
-        if (player.level().isClientSide) {
+        if (player.level().isClientSide()) {
             return false;
         }
 
@@ -251,7 +251,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
             case ID_DELAY_DEC -> clipboard.setChannelTickDelay(selected, clipboard.getChannelTickDelay(selected) - 1);
             case ID_CLEAR_CLIPBOARD -> {
                 clipboard.clear();
-                player.displayClientMessage(net.minecraft.network.chat.Component
+                WrenchItem.sendPlayerMessage(player, net.minecraft.network.chat.Component
                         .translatable("message.logisticsnetworks.clipboard.cleared"), true);
             }
             default -> {
@@ -267,7 +267,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
     @Override
     public void removed(Player player) {
         super.removed(player);
-        if (!player.level().isClientSide) {
+        if (!player.level().isClientSide()) {
             WrenchItem.setClipboard(getWrenchStack(), clipboard, player.registryAccess());
         }
     }

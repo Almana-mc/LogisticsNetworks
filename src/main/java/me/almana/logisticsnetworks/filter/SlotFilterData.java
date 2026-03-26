@@ -3,7 +3,6 @@ package me.almana.logisticsnetworks.filter;
 import me.almana.logisticsnetworks.item.SlotFilterItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 
@@ -35,7 +34,7 @@ public final class SlotFilterData {
         if (!isSlotFilterItem(stack)) {
             return false;
         }
-        return getRoot(stack).getBoolean(KEY_IS_BLACKLIST);
+        return getRoot(stack).getBooleanOr(KEY_IS_BLACKLIST, false);
     }
 
     public static void setBlacklist(ItemStack stack, boolean blacklist) {
@@ -64,7 +63,7 @@ public final class SlotFilterData {
             return List.of();
         }
 
-        int[] stored = getRoot(stack).getIntArray(KEY_SLOTS);
+        int[] stored = getRoot(stack).getIntArray(KEY_SLOTS).orElseGet(() -> new int[0]);
         if (stored.length == 0) {
             return List.of();
         }
@@ -215,14 +214,12 @@ public final class SlotFilterData {
 
     private static CompoundTag getRoot(ItemStack stack) {
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
+        return custom.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
-                    ? customTag.getCompound(KEY_ROOT)
-                    : new CompoundTag();
+            CompoundTag root = customTag.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
 
             modifier.accept(root);
 

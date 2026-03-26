@@ -10,7 +10,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ScreenEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.minecraft.world.entity.player.Inventory;
 
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
@@ -40,7 +40,7 @@ public class FilterClickHandler {
         if (playerSlotIndex < 0)
             return;
 
-        PacketDistributor.sendToServer(new OpenFilterInSlotPayload(playerSlotIndex));
+        ClientPacketDistributor.sendToServer(new OpenFilterInSlotPayload(playerSlotIndex));
         event.setCanceled(true);
     }
 

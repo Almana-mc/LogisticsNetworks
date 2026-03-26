@@ -4,7 +4,7 @@ import me.almana.logisticsnetworks.Logisticsnetworks;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 
 public record SetFilterPayload(
@@ -14,7 +14,7 @@ public record SetFilterPayload(
         ItemStack filterItem) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SetFilterPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter"));
+            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterPayload> STREAM_CODEC = StreamCodec
             .of(SetFilterPayload::write, SetFilterPayload::read);

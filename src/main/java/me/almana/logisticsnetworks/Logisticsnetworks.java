@@ -5,14 +5,10 @@ import me.almana.logisticsnetworks.network.ClientPayloadHandler;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
 import me.almana.logisticsnetworks.network.ModifyFilterModPayload;
-import me.almana.logisticsnetworks.network.ModifyFilterNbtPayload;
-import me.almana.logisticsnetworks.network.ModifyFilterTagPayload;
 import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
-import me.almana.logisticsnetworks.network.SetAmountFilterValuePayload;
 import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
-import me.almana.logisticsnetworks.network.SetDurabilityFilterValuePayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryAmountPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryDurabilityPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryNbtPayload;
@@ -50,7 +46,9 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLEnvironment;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 @Mod(Logisticsnetworks.MOD_ID)
@@ -61,6 +59,12 @@ public class Logisticsnetworks {
         public Logisticsnetworks(IEventBus modBus) {
                 Registration.init(modBus);
                 modBus.addListener(this::registerPayloads);
+                if (FMLEnvironment.getDist() == Dist.CLIENT) {
+                        modBus.addListener(LogisticsClientEvents::registerRenderers);
+                        modBus.addListener(LogisticsClientEvents::registerLayers);
+                        modBus.addListener(LogisticsClientEvents::registerScreens);
+                        modBus.addListener(LogisticsClientEvents::registerKeyMappings);
+                }
 
                 ModLoadingContext.get().getActiveContainer()
                                 .registerConfig(ModConfig.Type.COMMON, Config.SPEC, "logistics-network/common.toml");
@@ -86,14 +90,8 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleSetNodeUpgradeItem);
                 registrar.playToServer(SelectNodeChannelPayload.TYPE, SelectNodeChannelPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSelectNodeChannel);
-                registrar.playToServer(ModifyFilterTagPayload.TYPE, ModifyFilterTagPayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleModifyFilterTag);
                 registrar.playToServer(ModifyFilterModPayload.TYPE, ModifyFilterModPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleModifyFilterMod);
-                registrar.playToServer(ModifyFilterNbtPayload.TYPE, ModifyFilterNbtPayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleModifyFilterNbt);
-                registrar.playToServer(SetAmountFilterValuePayload.TYPE, SetAmountFilterValuePayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleSetAmountFilterValue);
                 registrar.playToServer(SetFilterEntryAmountPayload.TYPE, SetFilterEntryAmountPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterEntryAmount);
                 registrar.playToServer(SetFilterEntryTagPayload.TYPE, SetFilterEntryTagPayload.STREAM_CODEC,
@@ -110,9 +108,6 @@ public class Logisticsnetworks {
                                                 context));
                 registrar.playToServer(SetFilterItemEntryPayload.TYPE, SetFilterItemEntryPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterItemEntry);
-                registrar.playToServer(SetDurabilityFilterValuePayload.TYPE,
-                                SetDurabilityFilterValuePayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleSetDurabilityFilterValue);
                 registrar.playToServer(SetSlotFilterSlotsPayload.TYPE, SetSlotFilterSlotsPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetSlotFilterSlots);
                 registrar.playToServer(SetNameFilterPayload.TYPE, SetNameFilterPayload.STREAM_CODEC,

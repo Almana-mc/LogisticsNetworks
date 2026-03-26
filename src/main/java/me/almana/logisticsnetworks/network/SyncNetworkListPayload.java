@@ -4,7 +4,7 @@ import me.almana.logisticsnetworks.Logisticsnetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +17,7 @@ public record SyncNetworkListPayload(
     }
 
     public static final CustomPacketPayload.Type<SyncNetworkListPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_network_list"));
+            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_network_list"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncNetworkListPayload> STREAM_CODEC = StreamCodec
             .of(SyncNetworkListPayload::write, SyncNetworkListPayload::read);

@@ -1,5 +1,8 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.ClientInput;
+import me.almana.logisticsnetworks.client.GuiGraphics;
+import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
@@ -14,18 +17,16 @@ import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
 import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
@@ -38,7 +39,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
+public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -147,9 +148,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private boolean telemetrySubscribed;
 
     public ComputerScreen(ComputerMenu menu, Inventory playerInventory, Component title) {
-        super(menu, playerInventory, title);
-        this.imageWidth = GUI_WIDTH;
-        this.imageHeight = GUI_HEIGHT;
+        super(menu, playerInventory, title, GUI_WIDTH, GUI_HEIGHT);
         this.titleLabelY = 10000;
         this.inventoryLabelY = 10000;
     }
@@ -181,7 +180,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         if (currentPage != Page.NETWORK_LIST && networkSearchBox.isFocused()) {
             networkSearchBox.setFocused(false);
         }
-        networkSearchBox.visible = (currentPage == Page.NETWORK_LIST);
+        networkSearchBox.setVisible(currentPage == Page.NETWORK_LIST);
 
         switch (currentPage) {
             case NETWORK_LIST -> renderNetworkListPage(g, mouseX, mouseY);
@@ -704,13 +703,13 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
         if (mouseX >= showX && mouseX < showX + VIS_BTN_W
                 && mouseY >= buttonY && mouseY < buttonY + VIS_BTN_H) {
-            PacketDistributor.sendToServer(new SetNetworkNodesVisibilityPayload(selectedNetworkId, true));
+            ClientPacketDistributor.sendToServer(new SetNetworkNodesVisibilityPayload(selectedNetworkId, true));
             setAllNodeVisibility(true);
             return true;
         }
         if (mouseX >= hideX && mouseX < hideX + VIS_BTN_W
                 && mouseY >= buttonY && mouseY < buttonY + VIS_BTN_H) {
-            PacketDistributor.sendToServer(new SetNetworkNodesVisibilityPayload(selectedNetworkId, false));
+            ClientPacketDistributor.sendToServer(new SetNetworkNodesVisibilityPayload(selectedNetworkId, false));
             setAllNodeVisibility(false);
             return true;
         }
@@ -790,9 +789,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             }
 
             ItemStack renderStack = ItemStack.EMPTY;
-            ResourceLocation blockId = ResourceLocation.tryParse(entry.nodeInfo.blockName());
+            Identifier blockId = Identifier.tryParse(entry.nodeInfo.blockName());
             if (blockId != null) {
-                Item item = BuiltInRegistries.ITEM.get(blockId);
+                Item item = BuiltInRegistries.ITEM.getValue(blockId);
                 if (item != Items.AIR) {
                     renderStack = new ItemStack(item);
                 }
@@ -887,7 +886,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 networkSearchBox.setFocused(false);
                 return true;
             }
-            networkSearchBox.keyPressed(keyCode, scanCode, modifiers);
+            networkSearchBox.keyPressed(ClientInput.key(keyCode, scanCode, modifiers));
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -896,7 +895,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     @Override
     public boolean charTyped(char ch, int modifiers) {
         if (currentPage == Page.NETWORK_LIST && networkSearchBox != null && networkSearchBox.isFocused()) {
-            return networkSearchBox.charTyped(ch, modifiers);
+            return networkSearchBox.charTyped(ClientInput.character(ch));
         }
         return super.charTyped(ch, modifiers);
     }
@@ -969,7 +968,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                         unsubscribeTelemetry();
                         currentPage = Page.IO_CHANNEL_LIST;
                         channelListScrollOffset = 0;
-                        PacketDistributor.sendToServer(new RequestChannelListPayload(selectedNetworkId));
+                        ClientPacketDistributor.sendToServer(new RequestChannelListPayload(selectedNetworkId));
                         return true;
                     }
                 }
@@ -1017,7 +1016,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         }
         networkSearchBox.setFocused(true);
         setFocused(networkSearchBox);
-        networkSearchBox.mouseClicked(mouseX, mouseY, 0);
+        networkSearchBox.mouseClicked(ClientInput.mouse(mouseX, mouseY, 0), false);
         return true;
     }
 
@@ -1042,7 +1041,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 int starY = entryY + 4;
                 if (mouseX >= starX && mouseX < starX + STAR_BTN_W
                         && mouseY >= starY && mouseY < starY + STAR_BTN_W) {
-                    PacketDistributor.sendToServer(
+                    ClientPacketDistributor.sendToServer(
                             new ToggleComputerPinnedNetworkPayload(menu.getComputerPos(), clickedEntry.id()));
                     return true;
                 }
@@ -1091,7 +1090,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                     return true;
                 }
                 if (buttonClicked) {
-                    PacketDistributor.sendToServer(new ToggleNetworkLabelHighlightPayload(selectedNetworkId, entry.headerName));
+                    ClientPacketDistributor.sendToServer(new ToggleNetworkLabelHighlightPayload(selectedNetworkId, entry.headerName));
                     toggleGroupHighlight(entry.headerName);
                     return true;
                 }
@@ -1112,14 +1111,14 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 boolean settingsClicked = mouseX >= settingsX && mouseX < settingsX + SETTINGS_BTN_W
                         && mouseY >= buttonY && mouseY < buttonY + SETTINGS_BTN_H;
                 if (settingsClicked) {
-                    PacketDistributor.sendToServer(
+                    ClientPacketDistributor.sendToServer(
                             new RequestOpenNodeSettingsPayload(selectedNetworkId, entry.nodeInfo.nodeId()));
                     return true;
                 }
             }
 
             if (buttonClicked) {
-                PacketDistributor.sendToServer(
+                ClientPacketDistributor.sendToServer(
                         new ToggleNetworkNodeHighlightPayload(selectedNetworkId, entry.nodeInfo.nodeId()));
                 toggleNodeHighlight(entry.nodeInfo.nodeId());
                 return true;
@@ -1132,7 +1131,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private void openFirstNodeInLabel(String labelName) {
         for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
             if (labelName.equals(info.nodeLabel())) {
-                PacketDistributor.sendToServer(
+                ClientPacketDistributor.sendToServer(
                         new RequestOpenNodeSettingsPayload(selectedNetworkId, info.nodeId()));
                 return;
             }
@@ -1151,7 +1150,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 && mouseY >= button1Y && mouseY < button1Y + OPTION_BTN_HEIGHT) {
             currentPage = Page.IO_CHANNEL_LIST;
             channelListScrollOffset = 0;
-            PacketDistributor.sendToServer(new RequestChannelListPayload(selectedNetworkId));
+            ClientPacketDistributor.sendToServer(new RequestChannelListPayload(selectedNetworkId));
             return true;
         }
 
@@ -1159,7 +1158,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 && mouseY >= button2Y && mouseY < button2Y + OPTION_BTN_HEIGHT) {
             currentPage = Page.NODE_MAP;
             nodeMapScrollOffset = 0;
-            PacketDistributor.sendToServer(new RequestNetworkNodesPayload(selectedNetworkId));
+            ClientPacketDistributor.sendToServer(new RequestNetworkNodesPayload(selectedNetworkId));
             return true;
         }
 
@@ -1407,9 +1406,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     private String resolveBlockLabel(String blockName) {
-        ResourceLocation blockId = ResourceLocation.tryParse(blockName);
+        Identifier blockId = Identifier.tryParse(blockName);
         if (blockId != null) {
-            Item item = BuiltInRegistries.ITEM.get(blockId);
+            Item item = BuiltInRegistries.ITEM.getValue(blockId);
             if (item != Items.AIR) {
                 return item.getDefaultInstance().getHoverName().getString();
             }
@@ -1473,7 +1472,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         if (!telemetrySubscribed && selectedNetworkId != null) {
             telemetryHistory = new long[TelemetryManager.HISTORY_SIZE];
             telemetryIndex = 0;
-            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(
+            ClientPacketDistributor.sendToServer(new SubscribeTelemetryPayload(
                     selectedNetworkId, true, watchedChannelIndex));
             telemetrySubscribed = true;
         }
@@ -1481,7 +1480,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     private void unsubscribeTelemetry() {
         if (telemetrySubscribed && selectedNetworkId != null) {
-            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(
+            ClientPacketDistributor.sendToServer(new SubscribeTelemetryPayload(
                     selectedNetworkId, false, watchedChannelIndex));
             telemetrySubscribed = false;
         }

@@ -1,8 +1,8 @@
 package me.almana.logisticsnetworks.network;
 
+import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
-import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;

@@ -47,35 +47,16 @@ public final class FilterLogic {
                 isFilter = true;
                 matched = FilterItemData.containsItemFull(filter, candidate, provider, candidateNbt, filterReadCache);
                 isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
-            } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
-                    && TagFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                isFilter = true;
-                matched = TagFilterData.containsTag(filter, candidate);
-                isBlacklist = TagFilterData.isBlacklist(filter);
             } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
                     && ModFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
                 isFilter = true;
                 matched = ModFilterData.containsMod(filter, candidate);
                 isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NbtFilterData.isNbtFilter(filter)
-                    && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                if (NbtFilterData.hasEnabledRules(filter)) {
-                    isFilter = true;
-                    matched = NbtFilterData.matches(filter, candidateNbt);
-                    isBlacklist = NbtFilterData.isBlacklist(filter);
-                }
             } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
                     && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
                 isFilter = true;
                 matched = NameFilterData.containsName(filter, candidate);
                 isBlacklist = NameFilterData.isBlacklist(filter);
-            } else if (DurabilityFilterData.isDurabilityFilterItem(filter)) {
-                isFilter = true;
-                if (!DurabilityFilterData.matches(filter, candidate)) {
-                    return false;
-                }
-                hasConfiguredFilter = true;
-                continue;
             }
 
             if (isFilter) {
@@ -129,23 +110,11 @@ public final class FilterLogic {
                 isFilter = true;
                 matched = FilterItemData.containsFluidFull(filter, candidate, provider);
                 isBlacklist = FilterItemData.isBlacklist(filter);
-            } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
-                    && TagFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
-                isFilter = true;
-                matched = TagFilterData.containsTag(filter, candidate);
-                isBlacklist = TagFilterData.isBlacklist(filter);
             } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
                     && ModFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
                 isFilter = true;
                 matched = ModFilterData.containsMod(filter, candidate);
                 isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NbtFilterData.isNbtFilter(filter)
-                    && NbtFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
-                if (NbtFilterData.hasEnabledRules(filter)) {
-                    isFilter = true;
-                    matched = NbtFilterData.matchesSelection(filter, candidate, provider);
-                    isBlacklist = NbtFilterData.isBlacklist(filter);
-                }
             } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
                     && NameFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
                 isFilter = true;
@@ -203,11 +172,6 @@ public final class FilterLogic {
                 isFilter = true;
                 matched = FilterItemData.containsChemicalFull(filter, chemicalId);
                 isBlacklist = FilterItemData.isBlacklist(filter);
-            } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
-                    && TagFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
-                isFilter = true;
-                matched = TagFilterData.containsTag(filter, chemicalId);
-                isBlacklist = TagFilterData.isBlacklist(filter);
             } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
                     && ModFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
                 isFilter = true;
@@ -248,11 +212,6 @@ public final class FilterLogic {
         if (filters == null)
             return false;
         for (ItemStack filter : filters) {
-            if (NbtFilterData.isNbtFilter(filter)
-                    && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS
-                    && NbtFilterData.hasEnabledRules(filter)) {
-                return true;
-            }
             if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyNbtEntries(filter)) {
                 return true;
             }

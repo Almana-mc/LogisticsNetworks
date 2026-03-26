@@ -5,9 +5,9 @@ import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -20,18 +20,17 @@ import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 public class WrenchHudOverlay {
 
     private static boolean hudVisible = true;
+    private static final KeyMapping.Category LOGISTICS_CATEGORY = new KeyMapping.Category(
+            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "logisticsnetworks"));
 
     public static final KeyMapping TOGGLE_HUD = new KeyMapping(
             "key.logisticsnetworks.toggle_wrench_hud",
             InputConstants.KEY_H,
-            "key.categories.logisticsnetworks");
+            LOGISTICS_CATEGORY);
 
-    @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-    public static class ModEvents {
-        @SubscribeEvent
-        public static void registerKeys(RegisterKeyMappingsEvent event) {
-            event.register(TOGGLE_HUD);
-        }
+    public static void registerKeys(RegisterKeyMappingsEvent event) {
+        event.registerCategory(LOGISTICS_CATEGORY);
+        event.register(TOGGLE_HUD);
     }
 
     @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
@@ -41,13 +40,13 @@ public class WrenchHudOverlay {
         public static void onKeyInput(InputEvent.Key event) {
             if (TOGGLE_HUD.consumeClick()) {
                 hudVisible = !hudVisible;
-                Player player = Minecraft.getInstance().player;
+                LocalPlayer player = Minecraft.getInstance().player;
                 if (player != null) {
                     String key = hudVisible
                             ? "message.logisticsnetworks.wrench_hud.enabled"
                             : "message.logisticsnetworks.wrench_hud.disabled";
-                    player.displayClientMessage(
-                            Component.translatable(key, TOGGLE_HUD.getTranslatedKeyMessage()), true);
+                    player.sendOverlayMessage(
+                            Component.translatable(key, TOGGLE_HUD.getTranslatedKeyMessage()));
                 }
             }
         }
@@ -60,7 +59,7 @@ public class WrenchHudOverlay {
                 return;
 
             Minecraft mc = Minecraft.getInstance();
-            Player player = mc.player;
+            LocalPlayer player = mc.player;
             if (player == null) return;
 
             ItemStack mainHand = player.getMainHandItem();
@@ -77,7 +76,7 @@ public class WrenchHudOverlay {
             Component text = Component.translatable("tooltip.logisticsnetworks.wrench.mode",
                     WrenchItem.getModeDisplayName(mode));
 
-            GuiGraphics g = event.getGuiGraphics();
+            GuiGraphics g = new GuiGraphics(event.getGuiGraphics());
             int screenWidth = mc.getWindow().getGuiScaledWidth();
             int screenHeight = mc.getWindow().getGuiScaledHeight();
 

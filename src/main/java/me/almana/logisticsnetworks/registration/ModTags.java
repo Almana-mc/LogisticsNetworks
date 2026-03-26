@@ -2,7 +2,7 @@ package me.almana.logisticsnetworks.registration;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -43,7 +43,7 @@ public final class ModTags {
         return TagKey.create(Registries.FLUID, id(path));
     }
 
-    private static ResourceLocation id(String path) {
-        return ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, path);
+    private static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, path);
     }
 }

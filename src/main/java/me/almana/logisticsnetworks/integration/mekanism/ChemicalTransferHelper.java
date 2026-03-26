@@ -1,56 +1,55 @@
 package me.almana.logisticsnetworks.integration.mekanism;
 
-import com.mojang.logging.LogUtils;
-import mekanism.api.Action;
-import mekanism.api.MekanismAPI;
-import mekanism.api.chemical.Chemical;
-import mekanism.api.chemical.ChemicalStack;
-import mekanism.api.chemical.IChemicalHandler;
-import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.FilterMode;
-import me.almana.logisticsnetworks.logic.FilterLogic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 public final class ChemicalTransferHelper {
 
+    // 26.1 Mek API pending
+    /*
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final TagKey<Chemical> RESOURCE_BLACKLIST_CHEMICALS = TagKey.create(
             MekanismAPI.CHEMICAL_REGISTRY_NAME,
             ResourceLocation.fromNamespaceAndPath("logisticsnetworks", "blacklist/chemicals"));
+    */
 
     private ChemicalTransferHelper() {
     }
 
+    // 26.1 Mek API pending
+    /*
     @Nullable
     public static IChemicalHandler getHandler(ServerLevel level, BlockPos pos, Direction side) {
         return level.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.block(), pos, side);
     }
+    */
 
     public static boolean hasHandler(ServerLevel level, BlockPos pos) {
+        // 26.1 Mek API pending
+        /*
         if (getHandler(level, pos, null) != null)
             return true;
         for (Direction dir : Direction.values()) {
             if (getHandler(level, pos, dir) != null)
                 return true;
         }
+        */
         return false;
     }
 
     public static List<String> getBlacklistedChemicalNames(ServerLevel level, BlockPos pos) {
+        // 26.1 Mek API pending
+        /*
         List<String> names = new ArrayList<>();
         IChemicalHandler handler = getHandler(level, pos, null);
         if (handler == null)
@@ -64,17 +63,13 @@ public final class ChemicalTransferHelper {
             }
         }
         return names;
-    }
-
-    @Nullable
-    public static String getChemicalId(ChemicalStack stack) {
-        if (stack.isEmpty())
-            return null;
-        ResourceLocation id = MekanismAPI.CHEMICAL_REGISTRY.getKey(stack.getChemical());
-        return id != null ? id.toString() : null;
+        */
+        return Collections.emptyList();
     }
 
     public static boolean chemicalHasTag(String chemicalId, String tagId) {
+        // 26.1 Mek API pending
+        /*
         if (chemicalId == null || tagId == null)
             return false;
         ResourceLocation chemLoc = ResourceLocation.tryParse(chemicalId);
@@ -88,10 +83,14 @@ public final class ChemicalTransferHelper {
 
         TagKey<Chemical> key = TagKey.create(MekanismAPI.CHEMICAL_REGISTRY_NAME, tagLoc);
         return chemical.get().is(key);
+        */
+        return false;
     }
 
     @Nullable
     public static String getChemicalIdFromItem(ItemStack itemStack) {
+        // 26.1 Mek API pending
+        /*
         if (itemStack.isEmpty())
             return null;
         var handler = itemStack.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.item());
@@ -103,11 +102,14 @@ public final class ChemicalTransferHelper {
                 return getChemicalId(stack);
             }
         }
+        */
         return null;
     }
 
     @Nullable
     public static List<String> getChemicalTagsFromItem(ItemStack itemStack) {
+        // 26.1 Mek API pending
+        /*
         if (itemStack.isEmpty())
             return null;
         var handler = itemStack.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.item());
@@ -119,6 +121,7 @@ public final class ChemicalTransferHelper {
                 return stack.getTags().map(tag -> tag.location().toString()).toList();
             }
         }
+        */
         return null;
     }
 
@@ -126,6 +129,8 @@ public final class ChemicalTransferHelper {
             ServerLevel targetLevel, BlockPos targetPos, Direction targetSide, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode) {
+        // 26.1 Mek API pending
+        /*
         IChemicalHandler source = getHandler(sourceLevel, sourcePos, sourceSide);
         if (source == null) {
             if (Config.debugMode)
@@ -143,6 +148,53 @@ public final class ChemicalTransferHelper {
                     sourcePos, targetPos, limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
                 importFilters, importFilterMode);
+        */
+        return 0;
+    }
+
+    @Nullable
+    public static Identifier getChemicalIcon(String chemicalId) {
+        // 26.1 Mek API pending
+        /*
+        ResourceLocation id = ResourceLocation.tryParse(chemicalId);
+        if (id == null)
+            return null;
+        return MekanismAPI.CHEMICAL_REGISTRY.getOptional(id).map(Chemical::getIcon).orElse(null);
+        */
+        return null;
+    }
+
+    public static int getChemicalTint(String chemicalId) {
+        // 26.1 Mek API pending
+        /*
+        ResourceLocation id = ResourceLocation.tryParse(chemicalId);
+        if (id == null)
+            return 0xFFFFFFFF;
+        return MekanismAPI.CHEMICAL_REGISTRY.getOptional(id).map(Chemical::getTint).orElse(0xFFFFFFFF);
+        */
+        return 0xFFFFFFFF;
+    }
+
+    @Nullable
+    public static Component getChemicalTextComponent(String chemicalId) {
+        // 26.1 Mek API pending
+        /*
+        ResourceLocation id = ResourceLocation.tryParse(chemicalId);
+        if (id == null)
+            return null;
+        return MekanismAPI.CHEMICAL_REGISTRY.getOptional(id).map(Chemical::getTextComponent).orElse(null);
+        */
+        return null;
+    }
+
+    // 26.1 Mek API pending
+    /*
+    @Nullable
+    public static String getChemicalId(ChemicalStack stack) {
+        if (stack.isEmpty())
+            return null;
+        ResourceLocation id = MekanismAPI.CHEMICAL_REGISTRY.getKey(stack.getChemical());
+        return id != null ? id.toString() : null;
     }
 
     private static long executeChemicalMove(IChemicalHandler source, IChemicalHandler target, long limitAmount,
@@ -212,27 +264,5 @@ public final class ChemicalTransferHelper {
 
         return limitAmount - remaining;
     }
-
-    @Nullable
-    public static ResourceLocation getChemicalIcon(String chemicalId) {
-        ResourceLocation id = ResourceLocation.tryParse(chemicalId);
-        if (id == null)
-            return null;
-        return MekanismAPI.CHEMICAL_REGISTRY.getOptional(id).map(Chemical::getIcon).orElse(null);
-    }
-
-    public static int getChemicalTint(String chemicalId) {
-        ResourceLocation id = ResourceLocation.tryParse(chemicalId);
-        if (id == null)
-            return 0xFFFFFFFF;
-        return MekanismAPI.CHEMICAL_REGISTRY.getOptional(id).map(Chemical::getTint).orElse(0xFFFFFFFF);
-    }
-
-    @Nullable
-    public static Component getChemicalTextComponent(String chemicalId) {
-        ResourceLocation id = ResourceLocation.tryParse(chemicalId);
-        if (id == null)
-            return null;
-        return MekanismAPI.CHEMICAL_REGISTRY.getOptional(id).map(Chemical::getTextComponent).orElse(null);
-    }
+    */
 }

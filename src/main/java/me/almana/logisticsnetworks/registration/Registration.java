@@ -3,22 +3,17 @@ package me.almana.logisticsnetworks.registration;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
-import me.almana.logisticsnetworks.item.AmountFilterItem;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
-import me.almana.logisticsnetworks.item.DurabilityFilterItem;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
 import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
 import me.almana.logisticsnetworks.item.PatternSetterItem;
 import me.almana.logisticsnetworks.item.ModFilterItem;
 import me.almana.logisticsnetworks.item.NameFilterItem;
-import me.almana.logisticsnetworks.item.NbtFilterItem;
 import me.almana.logisticsnetworks.item.NodeUpgradeItem;
 import me.almana.logisticsnetworks.item.SlotFilterItem;
-import me.almana.logisticsnetworks.item.TagFilterItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
-import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
@@ -28,6 +23,7 @@ import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.inventory.MenuType;
@@ -36,13 +32,17 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeSerializer;
-import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredItem;
 
 import java.util.function.Supplier;
 
@@ -50,10 +50,8 @@ public class Registration {
 
         public static final DeferredRegister<EntityType<?>> ENTITIES = DeferredRegister.create(Registries.ENTITY_TYPE,
                         Logisticsnetworks.MOD_ID);
-        public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(Registries.BLOCK,
-                        Logisticsnetworks.MOD_ID);
-        public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Registries.ITEM,
-                        Logisticsnetworks.MOD_ID);
+        public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(Logisticsnetworks.MOD_ID);
+        public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(Logisticsnetworks.MOD_ID);
         public static final DeferredRegister<CreativeModeTab> CREATIVE_TABS = DeferredRegister
                         .create(Registries.CREATIVE_MODE_TAB, Logisticsnetworks.MOD_ID);
         public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU,
@@ -66,80 +64,64 @@ public class Registration {
         // Some ugly shit I have done here....
         public static final DeferredHolder<EntityType<?>, EntityType<LogisticsNodeEntity>> LOGISTICS_NODE = ENTITIES
                         .register("logistics_node",
-                                        () -> EntityType.Builder
-                                                        .<LogisticsNodeEntity>of(LogisticsNodeEntity::new,
-                                                                        MobCategory.MISC)
-                                                        .sized(1.0f, 1.0f)
-                                                        .clientTrackingRange(8)
-                                                        .updateInterval(20)
-                                                        .build("logistics_node"));
+                                        Registration::createLogisticsNodeType);
 
-        public static final DeferredHolder<Item, LogisticsNodeItem> LOGISTICS_NODE_ITEM = ITEMS.register(
+        public static final DeferredItem<LogisticsNodeItem> LOGISTICS_NODE_ITEM = ITEMS.register(
                         "logistics_node",
-                        () -> new LogisticsNodeItem(new Item.Properties()));
+                        id -> new LogisticsNodeItem(itemProperties(id)));
 
-        public static final DeferredHolder<Block, ComputerBlock> COMPUTER_BLOCK = BLOCKS.register("computer",
-                        () -> new ComputerBlock());
+        public static final DeferredBlock<ComputerBlock> COMPUTER_BLOCK = BLOCKS.register("computer",
+                        id -> new ComputerBlock(computerBlockProperties(id)));
         public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ComputerBlockEntity>> COMPUTER_BLOCK_ENTITY = BLOCK_ENTITY_TYPES
-                        .register("computer", () -> BlockEntityType.Builder.of(
-                                        ComputerBlockEntity::new,
-                                        COMPUTER_BLOCK.get()).build(null));
-        public static final DeferredHolder<Item, BlockItem> COMPUTER_ITEM = ITEMS.register("computer",
-                        () -> new BlockItem(COMPUTER_BLOCK.get(), new Item.Properties()));
+                        .register("computer", Registration::createComputerBlockEntityType);
+        public static final DeferredItem<BlockItem> COMPUTER_ITEM = ITEMS.register("computer",
+                        id -> new BlockItem(COMPUTER_BLOCK.get(), blockItemProperties(id)));
 
-        public static final DeferredHolder<Item, WrenchItem> WRENCH = ITEMS.register("wrench",
-                        () -> new WrenchItem(new Item.Properties().stacksTo(1)));
+        public static final DeferredItem<WrenchItem> WRENCH = ITEMS.register("wrench",
+                        id -> new WrenchItem(itemProperties(id).stacksTo(1)));
 
-        public static final DeferredHolder<Item, BaseFilterItem> SMALL_FILTER = ITEMS.register("small_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 9));
-        public static final DeferredHolder<Item, BaseFilterItem> MEDIUM_FILTER = ITEMS.register("medium_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 18));
-        public static final DeferredHolder<Item, BaseFilterItem> BIG_FILTER = ITEMS.register("big_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 27));
+        public static final DeferredItem<BaseFilterItem> SMALL_FILTER = ITEMS.register("small_filter",
+                        id -> new BaseFilterItem(itemProperties(id), 9));
+        public static final DeferredItem<BaseFilterItem> MEDIUM_FILTER = ITEMS.register("medium_filter",
+                        id -> new BaseFilterItem(itemProperties(id), 18));
+        public static final DeferredItem<BaseFilterItem> BIG_FILTER = ITEMS.register("big_filter",
+                        id -> new BaseFilterItem(itemProperties(id), 27));
 
-        public static final DeferredHolder<Item, TagFilterItem> TAG_FILTER = ITEMS.register("tag_filter",
-                        () -> new TagFilterItem(new Item.Properties()));
-        public static final DeferredHolder<Item, AmountFilterItem> AMOUNT_FILTER = ITEMS.register("amount_filter",
-                        () -> new AmountFilterItem(new Item.Properties()));
-        public static final DeferredHolder<Item, DurabilityFilterItem> DURABILITY_FILTER = ITEMS
-                        .register("durability_filter", () -> new DurabilityFilterItem(new Item.Properties()));
-        public static final DeferredHolder<Item, NbtFilterItem> NBT_FILTER = ITEMS.register("nbt_filter",
-                        () -> new NbtFilterItem(new Item.Properties()));
-        public static final DeferredHolder<Item, ModFilterItem> MOD_FILTER = ITEMS.register("mod_filter",
-                        () -> new ModFilterItem(new Item.Properties()));
-        public static final DeferredHolder<Item, SlotFilterItem> SLOT_FILTER = ITEMS.register("slot_filter",
-                        () -> new SlotFilterItem(new Item.Properties()));
-        public static final DeferredHolder<Item, NameFilterItem> NAME_FILTER = ITEMS.register("name_filter",
-                        () -> new NameFilterItem(new Item.Properties()));
+        public static final DeferredItem<ModFilterItem> MOD_FILTER = ITEMS.register("mod_filter",
+                        id -> new ModFilterItem(itemProperties(id)));
+        public static final DeferredItem<SlotFilterItem> SLOT_FILTER = ITEMS.register("slot_filter",
+                        id -> new SlotFilterItem(itemProperties(id)));
+        public static final DeferredItem<NameFilterItem> NAME_FILTER = ITEMS.register("name_filter",
+                        id -> new NameFilterItem(itemProperties(id)));
 
-        public static final DeferredHolder<Item, NodeUpgradeItem> IRON_UPGRADE = ITEMS.register("iron_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 16, 1_000, 10_000, 10));
-        public static final DeferredHolder<Item, NodeUpgradeItem> GOLD_UPGRADE = ITEMS.register("gold_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 32, 5_000, 50_000, 5));
-        public static final DeferredHolder<Item, NodeUpgradeItem> DIAMOND_UPGRADE = ITEMS.register("diamond_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 64, 20_000, 250_000, 1));
-        public static final DeferredHolder<Item, NodeUpgradeItem> NETHERITE_UPGRADE = ITEMS.register(
+        public static final DeferredItem<NodeUpgradeItem> IRON_UPGRADE = ITEMS.register("iron_upgrade",
+                        id -> new NodeUpgradeItem(itemProperties(id), 16, 1_000, 10_000, 10));
+        public static final DeferredItem<NodeUpgradeItem> GOLD_UPGRADE = ITEMS.register("gold_upgrade",
+                        id -> new NodeUpgradeItem(itemProperties(id), 32, 5_000, 50_000, 5));
+        public static final DeferredItem<NodeUpgradeItem> DIAMOND_UPGRADE = ITEMS.register("diamond_upgrade",
+                        id -> new NodeUpgradeItem(itemProperties(id), 64, 20_000, 250_000, 1));
+        public static final DeferredItem<NodeUpgradeItem> NETHERITE_UPGRADE = ITEMS.register(
                         "netherite_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 10_000, 1_000_000, Integer.MAX_VALUE, 1));
+                        id -> new NodeUpgradeItem(itemProperties(id), 10_000, 1_000_000, Integer.MAX_VALUE, 1));
 
-        public static final DeferredHolder<Item, DimensionalUpgradeItem> DIMENSIONAL_UPGRADE = ITEMS.register(
+        public static final DeferredItem<DimensionalUpgradeItem> DIMENSIONAL_UPGRADE = ITEMS.register(
                         "dimensional_upgrade",
-                        () -> new DimensionalUpgradeItem(new Item.Properties()));
+                        id -> new DimensionalUpgradeItem(itemProperties(id)));
 
-        public static final DeferredHolder<Item, MekanismChemicalUpgradeItem> MEKANISM_CHEMICAL_UPGRADE = ITEMS
+        public static final DeferredItem<MekanismChemicalUpgradeItem> MEKANISM_CHEMICAL_UPGRADE = ITEMS
                         .register(
                                         "mekanism_chemical_upgrade",
-                                        () -> new MekanismChemicalUpgradeItem(new Item.Properties()));
+                                        id -> new MekanismChemicalUpgradeItem(itemProperties(id)));
 
-        public static final DeferredHolder<Item, ArsSourceUpgradeItem> ARS_SOURCE_UPGRADE = ITEMS
+        public static final DeferredItem<ArsSourceUpgradeItem> ARS_SOURCE_UPGRADE = ITEMS
                         .register(
                                         "ars_source_upgrade",
-                                        () -> new ArsSourceUpgradeItem(new Item.Properties()));
+                                        id -> new ArsSourceUpgradeItem(itemProperties(id)));
 
-        public static final DeferredHolder<Item, PatternSetterItem> PATTERN_SETTER = ITEMS
+        public static final DeferredItem<PatternSetterItem> PATTERN_SETTER = ITEMS
                         .register(
                                         "pattern_setter",
-                                        () -> new PatternSetterItem(new Item.Properties()));
+                                        id -> new PatternSetterItem(itemProperties(id)));
 
         public static final DeferredHolder<MenuType<?>, MenuType<NodeMenu>> NODE_MENU = MENUS.register("node_menu",
                         () -> IMenuTypeExtension.create(NodeMenu::new));
@@ -161,9 +143,12 @@ public class Registration {
                         "computer_menu",
                         () -> IMenuTypeExtension.create(ComputerMenu::new));
 
+        // 26.1 recipe API pending
+        /*
         public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
                                         () -> new SimpleCraftingRecipeSerializer<>(FilterCopyClearRecipe::new));
+        */
 
         public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = CREATIVE_TABS.register(
                         "logistics_tab",
@@ -185,5 +170,46 @@ public class Registration {
                 BLOCK_ENTITY_TYPES.register(modEventBus);
                 RECIPE_SERIALIZERS.register(modEventBus);
                 CREATIVE_TABS.register(modEventBus);
+        }
+
+        private static EntityType<LogisticsNodeEntity> createLogisticsNodeType(Identifier id) {
+                return net.minecraft.world.entity.EntityType.Builder
+                                .<LogisticsNodeEntity>of(LogisticsNodeEntity::new, MobCategory.MISC)
+                                .sized(1.0f, 1.0f)
+                                .clientTrackingRange(8)
+                                .updateInterval(20)
+                                .build(net.minecraft.resources.ResourceKey.create(Registries.ENTITY_TYPE, id));
+        }
+
+        private static BlockEntityType<ComputerBlockEntity> createComputerBlockEntityType() {
+                return new BlockEntityType<ComputerBlockEntity>(
+                                ComputerBlockEntity::new,
+                                java.util.Set.of(COMPUTER_BLOCK.get()));
+        }
+
+        private static Item.Properties itemProperties(Identifier id) {
+                return new Item.Properties()
+                                .setId(ResourceKey.create(Registries.ITEM, id));
+        }
+
+        private static Item.Properties blockItemProperties(Identifier id) {
+                return itemProperties(id)
+                                .useBlockDescriptionPrefix();
+        }
+
+        private static BlockBehaviour.Properties computerBlockProperties(Identifier id) {
+                return BlockBehaviour.Properties.of()
+                                .setId(ResourceKey.create(Registries.BLOCK, id))
+                                .strength(0.5f)
+                                .sound(SoundType.METAL)
+                                .noOcclusion();
+        }
+
+        public static BlockEntityType<ComputerBlockEntity> computerBlockEntityType() {
+                return COMPUTER_BLOCK_ENTITY.get();
+        }
+
+        public static Item logisticsNodeItem() {
+                return LOGISTICS_NODE_ITEM.get();
         }
 }

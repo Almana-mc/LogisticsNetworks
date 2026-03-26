@@ -1,21 +1,15 @@
 package me.almana.logisticsnetworks.integration.ars;
 
-import com.hollingsworth.arsnouveau.api.source.ISourceTile;
-import com.mojang.logging.LogUtils;
-import me.almana.logisticsnetworks.Config;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
 
 public final class SourceTransferHelper {
-
-    private static final Logger LOGGER = LogUtils.getLogger();
 
     private SourceTransferHelper() {
     }
 
+    // 26.1 Ars API pending
+    /*
     @Nullable
     public static ISourceTile getSourceTile(ServerLevel level, BlockPos pos) {
         BlockEntity be = level.getBlockEntity(pos);
@@ -24,13 +18,20 @@ public final class SourceTransferHelper {
         }
         return null;
     }
+    */
 
     public static boolean hasSourceTile(ServerLevel level, BlockPos pos) {
+        // 26.1 Ars API pending
+        /*
         return getSourceTile(level, pos) != null;
+        */
+        return false;
     }
 
     public static int transferBetween(ServerLevel sourceLevel, BlockPos sourcePos,
             ServerLevel targetLevel, BlockPos targetPos, int limit) {
+        // 26.1 Ars API pending
+        /*
         ISourceTile source = getSourceTile(sourceLevel, sourcePos);
         if (source == null) {
             if (Config.debugMode)
@@ -72,5 +73,7 @@ public final class SourceTransferHelper {
             LOGGER.debug("[Source] Transferred {} source from {} to {}", toMove, sourcePos, targetPos);
 
         return toMove;
+        */
+        return 0;
     }
 }

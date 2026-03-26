@@ -7,7 +7,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -33,7 +33,7 @@ public final class ModFilterData {
     public static boolean isBlacklist(ItemStack stack) {
         if (!isModFilter(stack))
             return false;
-        return getRoot(stack).getBoolean(KEY_IS_BLACKLIST);
+        return getRoot(stack).getBooleanOr(KEY_IS_BLACKLIST, false);
     }
 
     public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
@@ -53,7 +53,7 @@ public final class ModFilterData {
         if (!isModFilter(stack))
             return FilterTargetType.ITEMS;
         CompoundTag root = getRoot(stack);
-        return FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE));
+        return FilterTargetType.fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
     }
 
     public static void setTargetType(ItemStack stack, FilterTargetType type) {
@@ -75,16 +75,19 @@ public final class ModFilterData {
             return List.of();
 
         CompoundTag root = getRoot(stack);
-        if (!root.contains(KEY_MODS, Tag.TAG_LIST))
+        if (!root.contains(KEY_MODS))
             return List.of();
 
-        ListTag list = root.getList(KEY_MODS, Tag.TAG_STRING);
+        ListTag list = root.getListOrEmpty(KEY_MODS);
         List<String> mods = new ArrayList<>(list.size());
 
         for (int i = 0; i < list.size(); i++) {
-            String modId = normalizeModId(list.getString(i));
-            if (modId != null) {
-                mods.add(modId);
+            Tag tag = list.get(i);
+            if (tag instanceof StringTag st) {
+                String modId = normalizeModId(st.value());
+                if (modId != null) {
+                    mods.add(modId);
+                }
             }
         }
         return mods;
@@ -103,10 +106,10 @@ public final class ModFilterData {
 
         boolean[] changed = { false };
         updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_MODS, Tag.TAG_STRING);
+            ListTag list = root.getListOrEmpty(KEY_MODS);
 
             for (Tag t : list) {
-                if (t.getAsString().equals(modId))
+                if (t instanceof StringTag st && st.value().equals(modId))
                     return;
             }
 
@@ -126,8 +129,10 @@ public final class ModFilterData {
 
         boolean[] changed = { false };
         updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_MODS, Tag.TAG_STRING);
-            boolean alreadySingle = list.size() == 1 && modId.equals(list.getString(0));
+            ListTag list = root.getListOrEmpty(KEY_MODS);
+            boolean alreadySingle = list.size() == 1
+                    && list.get(0) instanceof StringTag st
+                    && modId.equals(st.value());
             if (alreadySingle) {
                 return;
             }
@@ -149,11 +154,11 @@ public final class ModFilterData {
 
         boolean[] changed = { false };
         updateRoot(stack, root -> {
-            if (!root.contains(KEY_MODS, Tag.TAG_LIST))
+            if (!root.contains(KEY_MODS))
                 return;
 
-            ListTag list = root.getList(KEY_MODS, Tag.TAG_STRING);
-            boolean removed = list.removeIf(t -> t.getAsString().equals(modId));
+            ListTag list = root.getListOrEmpty(KEY_MODS);
+            boolean removed = list.removeIf(t -> t instanceof StringTag st && st.value().equals(modId));
 
             if (removed) {
                 if (list.isEmpty()) {
@@ -185,7 +190,7 @@ public final class ModFilterData {
         return checkModMatch(stack, BuiltInRegistries.FLUID.getKey(candidate.getFluid()));
     }
 
-    private static boolean checkModMatch(ItemStack stack, ResourceLocation id) {
+    private static boolean checkModMatch(ItemStack stack, Identifier id) {
         if (id == null)
             return false;
         String namespace = id.getNamespace();
@@ -203,7 +208,7 @@ public final class ModFilterData {
         if (getTargetType(stack) != FilterTargetType.CHEMICALS)
             return false;
 
-        ResourceLocation id = ResourceLocation.tryParse(chemicalId);
+        Identifier id = Identifier.tryParse(chemicalId);
         return checkModMatch(stack, id);
     }
 
@@ -224,14 +229,12 @@ public final class ModFilterData {
 
     private static CompoundTag getRoot(ItemStack stack) {
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
+        return custom.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
-                    ? customTag.getCompound(KEY_ROOT)
-                    : new CompoundTag();
+            CompoundTag root = customTag.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
 
             modifier.accept(root);
 

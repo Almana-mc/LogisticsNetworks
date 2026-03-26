@@ -7,14 +7,14 @@ import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.client.renderer.RenderType;
 
 public class NodeModel<T extends Entity> extends EntityModel<T> {
 
         public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(
-                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "node"), "main");
+                        Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "node"), "main");
 
         private static final String MODEL_PATH = "/assets/logisticsnetworks/models/entity/node.json";
 

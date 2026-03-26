@@ -1,9 +1,7 @@
 package me.almana.logisticsnetworks.filter;
 
-import me.almana.logisticsnetworks.item.DurabilityFilterItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import org.jetbrains.annotations.Nullable;
@@ -65,13 +63,13 @@ public final class DurabilityFilterData {
     }
 
     public static boolean isDurabilityFilterItem(ItemStack stack) {
-        return !stack.isEmpty() && stack.getItem() instanceof DurabilityFilterItem;
+        return false;
     }
 
     public static boolean isBlacklist(ItemStack stack) {
         if (!isDurabilityFilterItem(stack))
             return false;
-        return getRootTag(stack).getBoolean(KEY_IS_BLACKLIST);
+        return getRootTag(stack).getBooleanOr(KEY_IS_BLACKLIST, false);
     }
 
     public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
@@ -92,7 +90,7 @@ public final class DurabilityFilterData {
         if (!isDurabilityFilterItem(stack))
             return FilterTargetType.ITEMS;
         CompoundTag root = getRootTag(stack);
-        return FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE));
+        return FilterTargetType.fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
     }
 
     public static void setTargetType(ItemStack stack, FilterTargetType type) {
@@ -115,10 +113,10 @@ public final class DurabilityFilterData {
             return DEFAULT_VALUE;
 
         CompoundTag root = getRootTag(stack);
-        if (!root.contains(KEY_VALUE, Tag.TAG_INT))
+        if (!root.contains(KEY_VALUE))
             return DEFAULT_VALUE;
 
-        return clamp(root.getInt(KEY_VALUE));
+        return clamp(root.getIntOr(KEY_VALUE, DEFAULT_VALUE));
     }
 
     public static void setValue(ItemStack stack, int value) {
@@ -142,10 +140,10 @@ public final class DurabilityFilterData {
             return DEFAULT_OPERATOR;
 
         CompoundTag root = getRootTag(stack);
-        if (!root.contains(KEY_OPERATOR, Tag.TAG_STRING))
+        if (!root.contains(KEY_OPERATOR))
             return DEFAULT_OPERATOR;
 
-        return Operator.fromId(root.getString(KEY_OPERATOR));
+        return Operator.fromId(root.getStringOr(KEY_OPERATOR, DEFAULT_OPERATOR.id()));
     }
 
     public static void setOperator(ItemStack stack, @Nullable Operator operator) {
@@ -197,8 +195,8 @@ public final class DurabilityFilterData {
     }
 
     private static CompoundTag getRootTag(CompoundTag customTag) {
-        if (customTag.contains(ROOT_KEY, Tag.TAG_COMPOUND)) {
-            return customTag.getCompound(ROOT_KEY).copy();
+        if (customTag.contains(ROOT_KEY)) {
+            return customTag.getCompound(ROOT_KEY).map(CompoundTag::copy).orElseGet(CompoundTag::new);
         }
         return new CompoundTag();
     }

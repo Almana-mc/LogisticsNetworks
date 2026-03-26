@@ -5,7 +5,7 @@ import me.almana.logisticsnetworks.logic.TelemetryManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.UUID;
 
@@ -17,7 +17,7 @@ public record SyncTelemetryPayload(
         int historyIndex) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SyncTelemetryPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_telemetry"));
+            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_telemetry"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncTelemetryPayload> STREAM_CODEC = StreamCodec
             .of(SyncTelemetryPayload::write, SyncTelemetryPayload::read);

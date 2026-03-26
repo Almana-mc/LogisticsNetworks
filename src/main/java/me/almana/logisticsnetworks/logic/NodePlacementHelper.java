@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -63,13 +64,13 @@ public final class NodePlacementHelper {
                 Direction.WEST, Direction.EAST };
 
         for (Direction direction : directions) {
-            if (serverLevel.getCapability(Capabilities.ItemHandler.BLOCK, pos, direction) != null) {
+            if (serverLevel.getCapability(Capabilities.Item.BLOCK, pos, direction) != null) {
                 return true;
             }
-            if (serverLevel.getCapability(Capabilities.FluidHandler.BLOCK, pos, direction) != null) {
+            if (serverLevel.getCapability(Capabilities.Fluid.BLOCK, pos, direction) != null) {
                 return true;
             }
-            if (serverLevel.getCapability(Capabilities.EnergyStorage.BLOCK, pos, direction) != null) {
+            if (serverLevel.getCapability(Capabilities.Energy.BLOCK, pos, direction) != null) {
                 return true;
             }
         }
@@ -97,7 +98,7 @@ public final class NodePlacementHelper {
     }
 
     public static LogisticsNodeEntity placeNode(Level level, BlockPos pos, UUID ownerUuid) {
-        LogisticsNodeEntity node = Registration.LOGISTICS_NODE.get().create(level);
+        LogisticsNodeEntity node = Registration.LOGISTICS_NODE.get().create(level, EntitySpawnReason.SPAWN_ITEM_USE);
         if (node == null) {
             return null;
         }

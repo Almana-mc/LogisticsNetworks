@@ -6,7 +6,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
 public class ClientConfig {
 
     private static final ModConfigSpec.Builder builder = new ModConfigSpec.Builder();

@@ -19,9 +19,10 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.Entity;
@@ -96,14 +97,14 @@ public class ServerPayloadHandler {
     }
 
     private static void refreshOpenComputerMenus(ServerPlayer sourcePlayer, BlockPos computerPos) {
-        if (sourcePlayer.getServer() == null) {
+        if (sourcePlayer.level().getServer() == null) {
             return;
         }
-        for (ServerPlayer player : sourcePlayer.getServer().getPlayerList().getPlayers()) {
+        for (ServerPlayer player : sourcePlayer.level().getServer().getPlayerList().getPlayers()) {
             if (!(player.containerMenu instanceof ComputerMenu menu)) {
                 continue;
             }
-            if (player.serverLevel() != sourcePlayer.serverLevel()) {
+            if (player.level() != sourcePlayer.level()) {
                 continue;
             }
             if (!menu.getComputerPos().equals(computerPos)) {
@@ -120,7 +121,7 @@ public class ServerPayloadHandler {
             if (node == null)
                 return;
 
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
 
             LogisticsNetwork targetNetwork = resolveNetwork(registry, payload, player);
             if (targetNetwork == null)
@@ -147,7 +148,7 @@ public class ServerPayloadHandler {
             node.setNetworkName(targetNetwork.getName());
             registry.addNodeToNetwork(targetNetwork.getId(), node.getUUID());
 
-            if (NodeUpgradeData.needsDimensionalUpgradeWarning(node, targetNetwork, player.getServer())) {
+            if (NodeUpgradeData.needsDimensionalUpgradeWarning(node, targetNetwork, player.level().getServer())) {
                 player.sendSystemMessage(Component.translatable("gui.logisticsnetworks.dimensional_upgrade_warning"));
             }
 
@@ -167,7 +168,7 @@ public class ServerPayloadHandler {
                     && !network.getOwnerUuid().equals(player.getUUID())
                     && !(FTBTeamsCompat.isLoaded()
                             && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
-                    && !player.hasPermissions(2)) {
+                    && !player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
                 return null;
             }
             return network;
@@ -186,7 +187,7 @@ public class ServerPayloadHandler {
             if (newName.isEmpty() || newName.length() > 32)
                 return;
 
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
             LogisticsNetwork network = registry.getNetwork(payload.networkId());
             if (network == null)
                 return;
@@ -195,7 +196,7 @@ public class ServerPayloadHandler {
                     && !network.getOwnerUuid().equals(player.getUUID())
                     && !(FTBTeamsCompat.isLoaded()
                             && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
-                    && !player.hasPermissions(2)) {
+                    && !player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
                 return;
             }
 
@@ -203,7 +204,7 @@ public class ServerPayloadHandler {
             registry.setDirty();
 
             for (java.util.UUID nodeId : network.getNodeUuids()) {
-                for (ServerLevel level : player.getServer().getAllLevels()) {
+                for (ServerLevel level : player.level().getServer().getAllLevels()) {
                     Entity entity = level.getEntity(nodeId);
                     if (entity instanceof LogisticsNodeEntity node) {
                         node.setNetworkName(newName);
@@ -230,7 +231,7 @@ public class ServerPayloadHandler {
             if (!menu.getComputerPos().equals(payload.computerPos())) {
                 return;
             }
-            if (!(player.serverLevel().getBlockEntity(payload.computerPos()) instanceof ComputerBlockEntity computer)) {
+            if (!(player.level().getBlockEntity(payload.computerPos()) instanceof ComputerBlockEntity computer)) {
                 return;
             }
 
@@ -264,7 +265,7 @@ public class ServerPayloadHandler {
 
             WrenchItem.Mode mode = WrenchItem.cycleMode(heldStack, payload.forward());
             player.getInventory().setChanged();
-            player.displayClientMessage(WrenchItem.getModeChangedMessage(mode), true);
+            WrenchItem.sendPlayerMessage(player, WrenchItem.getModeChangedMessage(mode), true);
         });
     }
 
@@ -357,25 +358,6 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleModifyFilterTag(ModifyFilterTagPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            Player player = (Player) context.player();
-            ItemStack filterStack = findOpenFilterStack(player, TagFilterData::isTagFilterItem);
-            if (TagFilterData.isTagFilterItem(filterStack)) {
-                String normalizedTag = FilterTagUtil.normalizeTag(payload.tag());
-                boolean changed = normalizedTag != null
-                        && (payload.remove() ? TagFilterData.removeTagFilter(filterStack, normalizedTag)
-                                : TagFilterData.addTagFilter(filterStack, normalizedTag));
-                if (changed) {
-                    player.getInventory().setChanged();
-                    if (player.containerMenu instanceof FilterMenu menu && menu.isTagMode()) {
-                        menu.broadcastChanges();
-                    }
-                }
-            }
-        });
-    }
-
     public static void handleModifyFilterMod(ModifyFilterModPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             Player player = (Player) context.player();
@@ -393,45 +375,9 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleModifyFilterNbt(ModifyFilterNbtPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            ServerPlayer player = (ServerPlayer) context.player();
-            if (player.containerMenu instanceof FilterMenu menu && menu.isNbtMode()) {
-                ItemStack filterStack = menu.getOpenedFilterStack(player);
-                if (NbtFilterData.isNbtFilter(filterStack)) {
-                    boolean changed = switch (ModifyFilterNbtPayload.Action.fromOrdinal(payload.actionOrdinal())) {
-                        case ADD_RULE -> {
-                            ItemStack extractor = menu.getExtractorItem();
-                            Tag selectedValue = NbtFilterData.resolvePathValue(extractor, payload.path(),
-                                    player.level().registryAccess());
-                            yield selectedValue != null
-                                    && NbtFilterData.addRule(filterStack, payload.path(),
-                                            NbtFilterData.Operator.EQUALS, selectedValue);
-                        }
-                        case TOGGLE_RULE -> NbtFilterData.toggleRuleEnabled(filterStack, payload.ruleIndex());
-                        case REMOVE_RULE -> NbtFilterData.removeRule(filterStack, payload.ruleIndex());
-                        case CYCLE_OPERATOR -> NbtFilterData.cycleRuleOperator(filterStack, payload.ruleIndex());
-                    };
-                    if (changed) {
-                        player.getInventory().setChanged();
-                        menu.broadcastChanges();
-                    }
-                }
-            }
-        });
-    }
-
-    public static void handleSetAmountFilterValue(SetAmountFilterValuePayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof FilterMenu menu && menu.isAmountMode()) {
-                menu.setAmountValue((Player) context.player(), payload.amount());
-            }
-        });
-    }
-
     public static void handleSetFilterEntryAmount(SetFilterEntryAmountPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof FilterMenu menu && !menu.isAmountMode()) {
+            if (context.player().containerMenu instanceof FilterMenu menu) {
                 menu.setEntryAmount((Player) context.player(), payload.slot(), payload.amount());
             }
         });
@@ -484,21 +430,12 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleSetDurabilityFilterValue(SetDurabilityFilterValuePayload payload,
-            IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof FilterMenu menu && menu.isDurabilityMode()) {
-                menu.setDurabilityValue((Player) context.player(), payload.value());
-            }
-        });
-    }
-
     public static void handleSetSlotFilterSlots(SetSlotFilterSlotsPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && menu.isSlotMode()) {
                 boolean ok = menu.setSlotExpression((Player) context.player(), payload.expression());
                 if (!ok && context.player() instanceof ServerPlayer player) {
-                    player.displayClientMessage(
+                    WrenchItem.sendPlayerMessage(player,
                             Component.translatable("message.logisticsnetworks.filter.slot.invalid"), true);
                 }
             }
@@ -508,7 +445,7 @@ public class ServerPayloadHandler {
     public static void handleSetFilterFluidEntry(SetFilterFluidEntryPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
-                ResourceLocation fluidId = ResourceLocation.tryParse(payload.fluidId());
+                Identifier fluidId = Identifier.tryParse(payload.fluidId());
                 if (fluidId != null) {
                     BuiltInRegistries.FLUID.getOptional(fluidId)
                             .ifPresent(fluid -> menu.setFluidFilterEntry((Player) context.player(), payload.slot(),
@@ -569,16 +506,11 @@ public class ServerPayloadHandler {
             ItemStack stack = serverPlayer.getInventory().getItem(slotIndex);
             if (stack.isEmpty() || !stack.is(ModTags.FILTERS))
                 return;
-            if (stack.getItem() instanceof NbtFilterItem)
-                return;
 
-            boolean isTag = stack.getItem() instanceof TagFilterItem;
-            boolean isAmount = stack.getItem() instanceof AmountFilterItem;
-            boolean isDurability = stack.getItem() instanceof DurabilityFilterItem;
             boolean isMod = stack.getItem() instanceof ModFilterItem;
             boolean isSlot = stack.getItem() instanceof SlotFilterItem;
             boolean isName = stack.getItem() instanceof NameFilterItem;
-            boolean isSpecial = isTag || isAmount || isDurability || isMod || isSlot || isName;
+            boolean isSpecial = isMod || isSlot || isName;
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
 
             serverPlayer.openMenu(new SimpleMenuProvider(
@@ -587,10 +519,9 @@ public class ServerPayloadHandler {
                         buf.writeVarInt(-1);
                         buf.writeVarInt(slotIndex);
                         buf.writeVarInt(slotCount);
-                        buf.writeBoolean(isTag);
-                        buf.writeBoolean(isAmount);
                         buf.writeBoolean(false);
-                        buf.writeBoolean(isDurability);
+                        buf.writeBoolean(false);
+                        buf.writeBoolean(false);
                         buf.writeBoolean(isMod);
                         buf.writeBoolean(isSlot);
                         buf.writeBoolean(isName);
@@ -608,8 +539,7 @@ public class ServerPayloadHandler {
     }
 
     private static boolean isSpecialMode(FilterMenu menu) {
-        return menu.isTagMode() || menu.isAmountMode() || menu.isDurabilityMode()
-                || menu.isModMode() || menu.isSlotMode() || menu.isNameMode();
+        return menu.isModMode() || menu.isSlotMode() || menu.isNameMode();
     }
 
     private static ItemStack findOpenFilterStack(Player player, java.util.function.Predicate<ItemStack> matcher) {
@@ -671,7 +601,7 @@ public class ServerPayloadHandler {
             if (!(player.containerMenu instanceof ComputerMenu))
                 return;
 
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
             LogisticsNetwork network = registry.getNetwork(payload.networkId());
             if (network == null)
                 return;
@@ -682,7 +612,7 @@ public class ServerPayloadHandler {
 
             List<SyncNetworkNodesPayload.NodeInfo> nodeInfos = new ArrayList<>();
             for (UUID nodeId : network.getNodeUuids()) {
-                for (ServerLevel level : player.getServer().getAllLevels()) {
+                for (ServerLevel level : player.level().getServer().getAllLevels()) {
                     Entity entity = level.getEntity(nodeId);
                     if (entity instanceof LogisticsNodeEntity node) {
                         BlockPos attachedPos = node.getAttachedPos();
@@ -693,7 +623,7 @@ public class ServerPayloadHandler {
                         }
                         nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
                                 nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
-                                level.dimension().location(), node.isRenderVisible(), node.isHighlighted()));
+                                level.dimension().identifier(), node.isRenderVisible(), node.isHighlighted()));
                         break;
                     }
                 }
@@ -762,7 +692,7 @@ public class ServerPayloadHandler {
             if (!(player.containerMenu instanceof ComputerMenu))
                 return;
 
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
             LogisticsNetwork network = registry.getNetwork(payload.networkId());
             if (network == null)
                 return;
@@ -772,7 +702,7 @@ public class ServerPayloadHandler {
             }
 
             for (UUID nodeId : network.getNodeUuids()) {
-                for (ServerLevel level : player.getServer().getAllLevels()) {
+                for (ServerLevel level : player.level().getServer().getAllLevels()) {
                     Entity entity = level.getEntity(nodeId);
                     if (entity instanceof LogisticsNodeEntity node) {
                         node.setRenderVisible(payload.visible());
@@ -791,7 +721,7 @@ public class ServerPayloadHandler {
             if (!(player.containerMenu instanceof ComputerMenu))
                 return;
 
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
             LogisticsNetwork network = registry.getNetwork(payload.networkId());
             if (network == null || !canAccessNetwork(player, network)
                     || !network.getNodeUuids().contains(payload.nodeId())) {
@@ -818,7 +748,7 @@ public class ServerPayloadHandler {
                 return;
             }
 
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
             LogisticsNetwork network = registry.getNetwork(payload.networkId());
             if (network == null || !canAccessNetwork(player, network)) {
                 return;
@@ -857,7 +787,7 @@ public class ServerPayloadHandler {
             if (!(player.containerMenu instanceof ComputerMenu))
                 return;
 
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
             LogisticsNetwork network = registry.getNetwork(payload.networkId());
             if (network == null || !canAccessNetwork(player, network))
                 return;
@@ -886,7 +816,9 @@ public class ServerPayloadHandler {
                     buf.writeNbt(ch != null ? ch.save(player.level().registryAccess()) : new CompoundTag());
                 }
                 for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-                    buf.writeNbt(node.getUpgradeItem(i).saveOptional(player.level().registryAccess()));
+                    CompoundTag entry = new CompoundTag();
+                    entry.store("Item", ItemStack.OPTIONAL_CODEC, node.getUpgradeItem(i));
+                    buf.writeNbt(entry);
                 }
             });
 
@@ -902,14 +834,14 @@ public class ServerPayloadHandler {
             if (!(context.player() instanceof ServerPlayer player))
                 return;
 
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
             LogisticsNetwork network = registry.getNetwork(payload.networkId());
             if (network == null || !canAccessNetwork(player, network))
                 return;
 
             Set<String> labels = new LinkedHashSet<>();
             for (UUID nodeId : network.getNodeUuids()) {
-                for (ServerLevel level : player.getServer().getAllLevels()) {
+                for (ServerLevel level : player.level().getServer().getAllLevels()) {
                     Entity entity = level.getEntity(nodeId);
                     if (entity instanceof LogisticsNodeEntity node) {
                         String label = node.getNodeLabel();
@@ -981,7 +913,7 @@ public class ServerPayloadHandler {
             if (!(player.containerMenu instanceof ComputerMenu))
                 return;
 
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
             TelemetryManager telemetry = registry.getTelemetryManager();
 
             if (payload.subscribe()) {
@@ -989,7 +921,7 @@ public class ServerPayloadHandler {
                 if (network == null || !canAccessNetwork(player, network))
                     return;
                 telemetry.subscribe(payload.networkId(), payload.channelIndex(),
-                        player, registry, player.getServer());
+                        player, registry, player.level().getServer());
             } else {
                 telemetry.unsubscribe(player);
             }
@@ -1003,7 +935,7 @@ public class ServerPayloadHandler {
             if (!(player.containerMenu instanceof ComputerMenu))
                 return;
 
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
             LogisticsNetwork network = registry.getNetwork(payload.networkId());
             if (network == null || !canAccessNetwork(player, network))
                 return;
@@ -1046,11 +978,11 @@ public class ServerPayloadHandler {
                 || network.getOwnerUuid().equals(player.getUUID())
                 || (FTBTeamsCompat.isLoaded()
                         && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
-                || player.hasPermissions(2);
+                || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
     }
 
     private static LogisticsNodeEntity findNode(ServerPlayer player, UUID nodeId) {
-        for (ServerLevel level : player.getServer().getAllLevels()) {
+        for (ServerLevel level : player.level().getServer().getAllLevels()) {
             Entity entity = level.getEntity(nodeId);
             if (entity instanceof LogisticsNodeEntity node) {
                 return node;

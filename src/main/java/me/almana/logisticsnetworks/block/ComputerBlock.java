@@ -18,7 +18,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -32,7 +31,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class ComputerBlock extends HorizontalDirectionalBlock implements EntityBlock {
 
-    public static final MapCodec<ComputerBlock> CODEC = simpleCodec(p -> new ComputerBlock());
+    public static final MapCodec<ComputerBlock> CODEC = simpleCodec(ComputerBlock::new);
 
     @Override
     protected MapCodec<? extends HorizontalDirectionalBlock> codec() {
@@ -60,11 +59,8 @@ public class ComputerBlock extends HorizontalDirectionalBlock implements EntityB
         SHAPES.put(Direction.EAST, Shapes.or(baseE, screenE));
     }
 
-    public ComputerBlock() {
-        super(BlockBehaviour.Properties.of()
-                .strength(0.5f)
-                .sound(SoundType.METAL)
-                .noOcclusion());
+    public ComputerBlock(BlockBehaviour.Properties properties) {
+        super(properties);
         registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
@@ -91,7 +87,7 @@ public class ComputerBlock extends HorizontalDirectionalBlock implements EntityB
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
             Player player, BlockHitResult hit) {
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
         }
 

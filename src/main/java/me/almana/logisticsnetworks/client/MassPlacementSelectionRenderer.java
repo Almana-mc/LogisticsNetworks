@@ -5,13 +5,14 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.ShapeRenderer;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -31,11 +32,7 @@ public final class MassPlacementSelectionRenderer {
     }
 
     @SubscribeEvent
-    public static void onRenderLevelStage(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
-            return;
-        }
-
+    public static void onRenderLevelStage(RenderLevelStageEvent.AfterTranslucentBlocks event) {
         Minecraft minecraft = Minecraft.getInstance();
         Player player = minecraft.player;
         if (player == null || minecraft.level == null) {
@@ -53,12 +50,9 @@ public final class MassPlacementSelectionRenderer {
         }
 
         PoseStack poseStack = event.getPoseStack();
-        Vec3 cameraPos = event.getCamera().getPosition();
+        Vec3 cameraPos = event.getLevelRenderState().cameraRenderState.pos;
         MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
-        VertexConsumer consumer = bufferSource.getBuffer(RenderType.lines());
-
-        poseStack.pushPose();
-        poseStack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
+        VertexConsumer consumer = bufferSource.getBuffer(RenderTypes.lines());
 
         for (WrenchItem.MassSelectionTarget selection : selections) {
             double centerX = selection.pos().getX() + 0.5D;
@@ -71,17 +65,17 @@ public final class MassPlacementSelectionRenderer {
                 continue;
             }
 
-            AABB box = new AABB(selection.pos()).inflate(OUTLINE_INFLATE);
-            if (!event.getFrustum().isVisible(box)) {
-                continue;
-            }
+            AABB box = new AABB(0.0D, 0.0D, 0.0D, 1.0D, 1.0D, 1.0D).inflate(OUTLINE_INFLATE);
+            Vec3 offset = Vec3.atLowerCornerOf(selection.pos()).subtract(cameraPos);
 
-            LevelRenderer.renderLineBox(poseStack, consumer, box,
-                    OUTLINE_RED, OUTLINE_GREEN, OUTLINE_BLUE, OUTLINE_ALPHA);
+            poseStack.pushPose();
+            poseStack.translate(offset.x, offset.y, offset.z);
+            ShapeRenderer.renderShape(poseStack, consumer, Shapes.create(box),
+                    0.0D, 0.0D, 0.0D, 0xFFFF8C00, OUTLINE_ALPHA);
+            poseStack.popPose();
         }
 
-        poseStack.popPose();
-        bufferSource.endBatch(RenderType.lines());
+        bufferSource.endBatch(RenderTypes.lines());
     }
 
     private static ItemStack getMassPlacementWrench(Player player) {

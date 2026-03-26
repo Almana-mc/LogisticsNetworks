@@ -1,12 +1,12 @@
 package me.almana.logisticsnetworks.client;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
-import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
 import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.BlockHitResult;
@@ -15,7 +15,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
@@ -42,13 +42,13 @@ public class WrenchInputHandler {
             return;
         }
 
-        PacketDistributor.sendToServer(new CycleWrenchModePayload(hand.ordinal(), event.getScrollDeltaY() > 0.0D));
+        ClientPacketDistributor.sendToServer(new CycleWrenchModePayload(hand.ordinal(), event.getScrollDeltaY() > 0.0D));
         event.setCanceled(true);
     }
 
     @SubscribeEvent
     public static void onInteractionKeyMappingTriggered(InputEvent.InteractionKeyMappingTriggered event) {
-        if (!event.isUseItem() || !Screen.hasControlDown()) {
+        if (!event.isUseItem() || !hasControlDown()) {
             return;
         }
 
@@ -74,12 +74,18 @@ public class WrenchInputHandler {
         }
 
         if (mode == WrenchItem.Mode.MASS_PLACEMENT) {
-            PacketDistributor.sendToServer(new MassSelectConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
+            ClientPacketDistributor.sendToServer(new MassSelectConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
         } else {
-            PacketDistributor.sendToServer(new CopyPasteConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
+            ClientPacketDistributor.sendToServer(new CopyPasteConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
         }
         event.setSwingHand(false);
         event.setCanceled(true);
+    }
+
+    private static boolean hasControlDown() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LCONTROL)
+                || InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_RCONTROL);
     }
 
     @Nullable

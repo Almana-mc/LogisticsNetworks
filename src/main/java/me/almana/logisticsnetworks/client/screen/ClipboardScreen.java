@@ -1,20 +1,20 @@
 package me.almana.logisticsnetworks.client.screen;
 
-import me.almana.logisticsnetworks.menu.ClipboardMenu;
+import me.almana.logisticsnetworks.client.GuiGraphics;
+import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.data.RedstoneMode;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 
 import java.util.Locale;
 
-public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
+public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
 
     private static final int GUI_WIDTH = 256;
     private static final int GUI_HEIGHT = 284;
@@ -31,9 +31,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
             .translatable("gui.logisticsnetworks.clipboard.visual_slots_hint");
 
     public ClipboardScreen(ClipboardMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title);
-        this.imageWidth = GUI_WIDTH;
-        this.imageHeight = GUI_HEIGHT;
+        super(menu, inventory, title, GUI_WIDTH, GUI_HEIGHT);
         this.inventoryLabelY = 10_000;
         this.titleLabelY = 10_000;
     }

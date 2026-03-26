@@ -1,15 +1,15 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.GuiGraphics;
+import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Inventory;
 
 import java.util.List;
 
-public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMenu> {
+public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu> {
 
     private static final int GUI_WIDTH = 246;
     private static final int GUI_HEIGHT = 218;
@@ -34,9 +34,7 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
     private static final int BTN_GAP = 6;
 
     public MassPlacementScreen(MassPlacementMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title);
-        this.imageWidth = GUI_WIDTH;
-        this.imageHeight = GUI_HEIGHT;
+        super(menu, inventory, title, GUI_WIDTH, GUI_HEIGHT);
         this.inventoryLabelY = 10_000;
         this.titleLabelY = 10_000;
     }

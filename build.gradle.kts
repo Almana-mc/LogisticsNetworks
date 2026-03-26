@@ -2,7 +2,7 @@ plugins {
     `java-library`
     `maven-publish`
     idea
-    id("net.neoforged.moddev") version "2.0.140"
+    id("net.neoforged.moddev") version "2.0.141"
 }
 
 val minecraft_version: String by project
@@ -19,8 +19,6 @@ val mod_authors: String by project
 val mod_description: String by project
 val jei_version: String by project
 val jade_version: String by project
-val parchment_minecraft_version: String by project
-val parchment_mappings_version: String by project
 val mekanism_version: String by project
 val ars_nouveau_version: String by project
 val ae2_version: String by project
@@ -45,16 +43,11 @@ base {
 }
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
 }
 
 neoForge {
     version = neo_version
-
-    parchment {
-        mappingsVersion = parchment_mappings_version
-        minecraftVersion = parchment_minecraft_version
-    }
 
     runs {
         create("client") {
@@ -71,7 +64,7 @@ neoForge {
             systemProperty("neoforge.enabledGameTestNamespaces", mod_id)
         }
         create("data") {
-            data()
+            clientData()
             programArguments.addAll(
                 "--mod", mod_id,
                 "--all",
@@ -93,8 +86,20 @@ neoForge {
 }
 
 sourceSets.main.get().resources.srcDir("src/generated/resources")
+// 26.1 compile triage
+sourceSets.main.get().java.exclude(
+    "me/almana/logisticsnetworks/client/ClientEventHandler.java",
+    "me/almana/logisticsnetworks/client/LogisticsNodeRenderer.java",
+    "me/almana/logisticsnetworks/client/model/**",
+    "me/almana/logisticsnetworks/integration/jei/**",
+    "me/almana/logisticsnetworks/integration/jade/**",
+    "me/almana/logisticsnetworks/integration/emi/**",
+    "me/almana/logisticsnetworks/recipe/**"
+)
 
 dependencies {
+    // 26.1 compat deps pending
+    /*
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
     runtimeOnly("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
@@ -115,6 +120,7 @@ dependencies {
 
     compileOnly("maven.modrinth:jade:${jade_version}")
     runtimeOnly("maven.modrinth:jade:${jade_version}")
+    */
 }
 
 val generateModMetadata by tasks.registering(ProcessResources::class) {
@@ -148,7 +154,7 @@ publishing {
     }
     repositories {
         maven {
-            url = uri("file://${project.projectDir}/repo")
+            url = project.layout.projectDirectory.dir("repo").asFile.toURI()
         }
     }
 }
@@ -162,10 +168,9 @@ idea {
 
 tasks.register<Copy>("copyJar") {
     from(tasks.named("jar"))
-    into("C:/Users/Kanishq/curseforge/minecraft/Instances/Test/mods")
+    into("C:/Users/Kanishq/AppData/Roaming/PrismLauncher/instances/26.1/minecraft/mods")
 }
 
 tasks.named("build") {
     finalizedBy("copyJar")
 }
-

@@ -1,15 +1,15 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.GuiGraphics;
+import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.network.ApplyPatternPayload;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
-public class PatternSetterScreen extends AbstractContainerScreen<PatternSetterMenu> {
+public class PatternSetterScreen extends LegacyContainerScreen<PatternSetterMenu> {
 
     private static final int GUI_WIDTH = 176;
     private static final int GUI_HEIGHT = 152;
@@ -45,9 +45,7 @@ public class PatternSetterScreen extends AbstractContainerScreen<PatternSetterMe
     private int feedbackTimer = 0;
 
     public PatternSetterScreen(PatternSetterMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title);
-        this.imageWidth = GUI_WIDTH;
-        this.imageHeight = GUI_HEIGHT;
+        super(menu, inventory, title, GUI_WIDTH, GUI_HEIGHT);
         this.inventoryLabelY = 10_000;
         this.titleLabelY = 10_000;
     }
@@ -91,14 +89,14 @@ public class PatternSetterScreen extends AbstractContainerScreen<PatternSetterMe
 
             // Input button
             if (relX >= BTN_X && relX < BTN_X + BTN_WIDTH && relY >= BTN_Y && relY < BTN_Y + BTN_HEIGHT) {
-                PacketDistributor.sendToServer(new ApplyPatternPayload(false, getMultiplier()));
+                ClientPacketDistributor.sendToServer(new ApplyPatternPayload(false, getMultiplier()));
                 feedbackTimer = 40;
                 return true;
             }
             // Output button
             int btn2X = BTN_X + BTN_WIDTH + BTN_GAP;
             if (relX >= btn2X && relX < btn2X + BTN_WIDTH && relY >= BTN_Y && relY < BTN_Y + BTN_HEIGHT) {
-                PacketDistributor.sendToServer(new ApplyPatternPayload(true, getMultiplier()));
+                ClientPacketDistributor.sendToServer(new ApplyPatternPayload(true, getMultiplier()));
                 feedbackTimer = 40;
                 return true;
             }

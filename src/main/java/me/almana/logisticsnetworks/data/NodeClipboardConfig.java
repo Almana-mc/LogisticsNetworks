@@ -449,7 +449,7 @@ public final class NodeClipboardConfig {
         CompoundTag root = new CompoundTag();
         root.putInt(KEY_VERSION, VERSION);
         if (networkId != null) {
-            root.putUUID(KEY_NETWORK_ID, networkId);
+            root.putString(KEY_NETWORK_ID, networkId.toString());
         }
         if (networkName != null && !networkName.isBlank()) {
             root.putString(KEY_NETWORK_NAME, networkName);
@@ -488,7 +488,7 @@ public final class NodeClipboardConfig {
                 CompoundTag entry = new CompoundTag();
                 entry.putInt(KEY_CHANNEL, channelIndex);
                 entry.putInt(KEY_SLOT, slot);
-                entry.put(KEY_ITEM, stack.save(provider));
+                entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, stack);
                 filtersTag.add(entry);
             }
         }
@@ -504,7 +504,7 @@ public final class NodeClipboardConfig {
             }
             CompoundTag entry = new CompoundTag();
             entry.putInt(KEY_SLOT, slot);
-            entry.put(KEY_ITEM, stack.save(provider));
+            entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, stack);
             upgradesTag.add(entry);
         }
         if (!upgradesTag.isEmpty()) {
@@ -514,7 +514,7 @@ public final class NodeClipboardConfig {
         ListTag requiredTag = new ListTag();
         for (Requirement requirement : buildRequirements(null)) {
             CompoundTag entry = new CompoundTag();
-            entry.put(KEY_ITEM, requirement.stack().save(provider));
+            entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, requirement.stack());
             entry.putInt(KEY_COUNT, requirement.count());
             requiredTag.add(entry);
         }
@@ -530,7 +530,7 @@ public final class NodeClipboardConfig {
             return null;
         }
 
-        if (root.contains(KEY_VERSION, Tag.TAG_INT) && root.getInt(KEY_VERSION) != VERSION) {
+        if (root.contains(KEY_VERSION) && root.getIntOr(KEY_VERSION, VERSION) != VERSION) {
             return null;
         }
 
@@ -544,86 +544,85 @@ public final class NodeClipboardConfig {
             Arrays.fill(filters[i], ItemStack.EMPTY);
         }
         Arrays.fill(upgrades, ItemStack.EMPTY);
-        UUID networkId = root.hasUUID(KEY_NETWORK_ID) ? root.getUUID(KEY_NETWORK_ID) : null;
-        String networkName = root.contains(KEY_NETWORK_NAME, Tag.TAG_STRING) ? root.getString(KEY_NETWORK_NAME) : null;
+        UUID networkId = parseOptionalUuid(root.getStringOr(KEY_NETWORK_ID, null));
+        String networkName = root.contains(KEY_NETWORK_NAME) ? root.getStringOr(KEY_NETWORK_NAME, null) : null;
         if (networkName != null && networkName.isBlank()) {
             networkName = null;
         }
 
-        if (!root.contains(KEY_CHANNELS, Tag.TAG_LIST)) {
+        if (!root.contains(KEY_CHANNELS)) {
             return null;
         }
 
-        ListTag channelsTag = root.getList(KEY_CHANNELS, Tag.TAG_COMPOUND);
+        ListTag channelsTag = root.getListOrEmpty(KEY_CHANNELS);
         for (Tag tag : channelsTag) {
             if (!(tag instanceof CompoundTag channelTag)) {
                 continue;
             }
-            int index = channelTag.getInt(KEY_INDEX);
+            int index = channelTag.getIntOr(KEY_INDEX, -1);
             if (index < 0 || index >= LogisticsNodeEntity.CHANNEL_COUNT) {
                 continue;
             }
 
             ChannelConfig config = defaultChannelConfig();
-            config.enabled = channelTag.getBoolean(KEY_ENABLED);
-            config.mode = parseEnum(channelTag.getString(KEY_MODE), ChannelMode.values(), ChannelMode.IMPORT);
-            config.type = parseEnum(channelTag.getString(KEY_TYPE), ChannelType.values(), ChannelType.ITEM);
-            config.batchSize = Math.max(1, channelTag.getInt(KEY_BATCH));
-            config.tickDelay = Math.max(1, channelTag.getInt(KEY_DELAY));
+            config.enabled = channelTag.getBooleanOr(KEY_ENABLED, false);
+            config.mode = parseEnum(channelTag.getStringOr(KEY_MODE, ChannelMode.IMPORT.name()), ChannelMode.values(), ChannelMode.IMPORT);
+            config.type = parseEnum(channelTag.getStringOr(KEY_TYPE, ChannelType.ITEM.name()), ChannelType.values(), ChannelType.ITEM);
+            config.batchSize = Math.max(1, channelTag.getIntOr(KEY_BATCH, 8));
+            config.tickDelay = Math.max(1, channelTag.getIntOr(KEY_DELAY, 20));
 
-            Direction direction = Direction.byName(channelTag.getString(KEY_IO));
+            Direction direction = Direction.byName(channelTag.getStringOr(KEY_IO, Direction.UP.getName()));
             config.ioDirection = direction == null ? Direction.UP : direction;
-            config.redstoneMode = parseEnum(channelTag.getString(KEY_REDSTONE), RedstoneMode.values(),
+            config.redstoneMode = parseEnum(channelTag.getStringOr(KEY_REDSTONE, RedstoneMode.ALWAYS_ON.name()), RedstoneMode.values(),
                     RedstoneMode.ALWAYS_ON);
-            config.distributionMode = parseEnum(channelTag.getString(KEY_DISTRIBUTION), DistributionMode.values(),
+            config.distributionMode = parseEnum(channelTag.getStringOr(KEY_DISTRIBUTION, DistributionMode.PRIORITY.name()), DistributionMode.values(),
                     DistributionMode.PRIORITY);
-            config.filterMode = parseEnum(channelTag.getString(KEY_FILTER_MODE), FilterMode.values(),
+            config.filterMode = parseEnum(channelTag.getStringOr(KEY_FILTER_MODE, FilterMode.MATCH_ANY.name()), FilterMode.values(),
                     FilterMode.MATCH_ANY);
-            config.priority = Math.max(-99, Math.min(99, channelTag.getInt(KEY_PRIORITY)));
+            config.priority = Math.max(-99, Math.min(99, channelTag.getIntOr(KEY_PRIORITY, 0)));
             channels[index] = config;
         }
 
-        if (root.contains(KEY_FILTERS, Tag.TAG_LIST)) {
-            ListTag filtersTag = root.getList(KEY_FILTERS, Tag.TAG_COMPOUND);
+        if (root.contains(KEY_FILTERS)) {
+            ListTag filtersTag = root.getListOrEmpty(KEY_FILTERS);
             for (Tag tag : filtersTag) {
                 if (!(tag instanceof CompoundTag entry)) {
                     continue;
                 }
-                int channel = entry.getInt(KEY_CHANNEL);
-                int slot = entry.getInt(KEY_SLOT);
+                int channel = entry.getIntOr(KEY_CHANNEL, -1);
+                int slot = entry.getIntOr(KEY_SLOT, -1);
                 if (channel < 0 || channel >= LogisticsNodeEntity.CHANNEL_COUNT || slot < 0
-                        || slot >= ChannelData.FILTER_SIZE || !entry.contains(KEY_ITEM, Tag.TAG_COMPOUND)) {
+                        || slot >= ChannelData.FILTER_SIZE) {
                     continue;
                 }
 
-                ItemStack stack = ItemStack.parseOptional(provider, entry.getCompound(KEY_ITEM));
+                ItemStack stack = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
                 filters[channel][slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
             }
         }
 
-        if (root.contains(KEY_UPGRADES, Tag.TAG_LIST)) {
-            ListTag upgradesTag = root.getList(KEY_UPGRADES, Tag.TAG_COMPOUND);
+        if (root.contains(KEY_UPGRADES)) {
+            ListTag upgradesTag = root.getListOrEmpty(KEY_UPGRADES);
             for (Tag tag : upgradesTag) {
                 if (!(tag instanceof CompoundTag entry)) {
                     continue;
                 }
-                int slot = entry.getInt(KEY_SLOT);
-                if (slot < 0 || slot >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT
-                        || !entry.contains(KEY_ITEM, Tag.TAG_COMPOUND)) {
+                int slot = entry.getIntOr(KEY_SLOT, -1);
+                if (slot < 0 || slot >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT) {
                     continue;
                 }
 
-                ItemStack stack = ItemStack.parseOptional(provider, entry.getCompound(KEY_ITEM));
+                ItemStack stack = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
                 upgrades[slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
             }
         }
 
         NodeClipboardConfig config = new NodeClipboardConfig(channels, filters, upgrades, networkId, networkName);
-        if (root.contains(KEY_VISIBLE, Tag.TAG_BYTE)) {
-            config.renderVisible = root.getBoolean(KEY_VISIBLE);
+        if (root.contains(KEY_VISIBLE)) {
+            config.renderVisible = root.getBooleanOr(KEY_VISIBLE, config.renderVisible);
         }
-        if (root.contains(KEY_NODE_LABEL, Tag.TAG_STRING)) {
-            config.nodeLabel = root.getString(KEY_NODE_LABEL);
+        if (root.contains(KEY_NODE_LABEL)) {
+            config.nodeLabel = root.getStringOr(KEY_NODE_LABEL, "");
         }
         return config.isStructurallyValid() ? config : null;
     }
@@ -1105,5 +1104,17 @@ public final class NodeClipboardConfig {
             }
         }
         return fallback;
+    }
+
+    @Nullable
+    private static UUID parseOptionalUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 }

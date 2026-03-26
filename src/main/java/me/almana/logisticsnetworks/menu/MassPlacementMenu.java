@@ -44,7 +44,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         super(Registration.MASS_PLACEMENT_MENU.get(), containerId);
         this.hand = hand;
         this.player = playerInventory.player;
-        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInventory.selected : -1;
+        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInventory.getSelectedSlot() : -1;
         addDataSlots(data);
         refreshState();
     }
@@ -54,7 +54,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         int handOrdinal = buf.readVarInt();
         this.hand = handOrdinal == InteractionHand.OFF_HAND.ordinal() ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
         this.player = playerInventory.player;
-        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInventory.selected : -1;
+        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInventory.getSelectedSlot() : -1;
         addDataSlots(data);
     }
 
@@ -119,7 +119,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
-        if (player.level().isClientSide) {
+        if (player.level().isClientSide()) {
             return false;
         }
 
@@ -135,7 +135,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             if (!wrenchStack.isEmpty() && wrenchStack.getItem() instanceof WrenchItem) {
                 WrenchItem.clearMassSelections(wrenchStack);
                 player.getInventory().setChanged();
-                player.displayClientMessage(
+                WrenchItem.sendPlayerMessage(player,
                         Component.translatable("message.logisticsnetworks.mass_placement.cleared"), true);
                 refreshState();
                 broadcastChanges();
@@ -148,7 +148,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
 
     @Override
     public void broadcastChanges() {
-        if (!player.level().isClientSide) {
+        if (!player.level().isClientSide()) {
             refreshState();
         }
         super.broadcastChanges();
@@ -207,14 +207,14 @@ public class MassPlacementMenu extends AbstractContainerMenu {
 
         List<WrenchItem.MassSelectionTarget> selected = WrenchItem.getMassSelections(wrenchStack, player.level().dimension());
         if (selected.isEmpty()) {
-            player.displayClientMessage(Component.translatable("message.logisticsnetworks.mass_placement.none_selected"),
+            WrenchItem.sendPlayerMessage(player, Component.translatable("message.logisticsnetworks.mass_placement.none_selected"),
                     true);
             return false;
         }
 
         List<WrenchItem.MassSelectionTarget> validTargets = getValidTargets(selected);
         if (validTargets.size() != selected.size()) {
-            player.displayClientMessage(
+            WrenchItem.sendPlayerMessage(player,
                     Component.translatable("message.logisticsnetworks.mass_placement.invalid_targets"), true);
             return false;
         }
@@ -222,7 +222,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrenchStack, player.registryAccess());
         boolean clipboardPresent = clipboard != null && !clipboard.isEffectivelyEmpty();
         if (clipboardPresent && !clipboard.isStructurallyValid()) {
-            player.displayClientMessage(Component.translatable("message.logisticsnetworks.clipboard.invalid"), true);
+            WrenchItem.sendPlayerMessage(player, Component.translatable("message.logisticsnetworks.clipboard.invalid"), true);
             return false;
         }
 
@@ -234,7 +234,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             List<Requirement> requirements = buildRequirements(nodeCount, clipboardPresent ? clipboard : null);
 
             if (!hasInventoryRequirements(player.getInventory(), requirements, protectedSlot)) {
-                player.displayClientMessage(
+                WrenchItem.sendPlayerMessage(player,
                         Component.translatable("message.logisticsnetworks.mass_placement.missing_items"), true);
                 return false;
             }
@@ -263,12 +263,12 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         player.getInventory().setChanged();
 
         if (placedCount > 0) {
-            player.displayClientMessage(
+            WrenchItem.sendPlayerMessage(player,
                     Component.translatable("message.logisticsnetworks.mass_placement.placed", placedCount), true);
             return true;
         }
 
-        player.displayClientMessage(Component.translatable("message.logisticsnetworks.mass_placement.failed"), true);
+        WrenchItem.sendPlayerMessage(player, Component.translatable("message.logisticsnetworks.mass_placement.failed"), true);
         return false;
     }
 

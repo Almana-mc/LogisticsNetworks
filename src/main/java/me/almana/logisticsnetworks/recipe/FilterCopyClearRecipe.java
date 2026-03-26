@@ -21,11 +21,7 @@ public class FilterCopyClearRecipe extends CustomRecipe {
 
     private static final Set<String> FILTER_ROOT_KEYS = Set.of(
             "ln_filter",
-            "ln_tag_filter",
-            "ln_mod_filter",
-            "ln_amount_filter",
-            "ln_durability_filter",
-            "ln_nbt_filter");
+            "ln_mod_filter");
 
     public FilterCopyClearRecipe(CraftingBookCategory category) {
         super(category);

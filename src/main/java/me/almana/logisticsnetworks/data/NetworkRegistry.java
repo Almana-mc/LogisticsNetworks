@@ -4,14 +4,15 @@ import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.TransferEngine;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraft.world.level.storage.DimensionDataStorage;
+import net.minecraft.world.level.saveddata.SavedDataType;
+import net.minecraft.world.level.storage.SavedDataStorage;
 
 import org.slf4j.Logger;
 
@@ -23,6 +24,10 @@ public class NetworkRegistry extends SavedData {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String DATA_NAME = "logistics_networks";
     private static final String KEY_NETWORKS = "Networks";
+    private static final SavedDataType<NetworkRegistry> DATA_TYPE = new SavedDataType<>(
+            Identifier.fromNamespaceAndPath("logisticsnetworks", DATA_NAME),
+            NetworkRegistry::new,
+            CompoundTag.CODEC.xmap(NetworkRegistry::load, NetworkRegistry::saveTag));
 
     // Limits & Warnings for beta
     private static final int WARNING_NODE_COUNT = 200;
@@ -36,11 +41,8 @@ public class NetworkRegistry extends SavedData {
     }
 
     public static NetworkRegistry get(ServerLevel level) {
-        DimensionDataStorage storage = level.getServer().overworld().getDataStorage();
-        return storage.computeIfAbsent(new SavedData.Factory<>(
-                NetworkRegistry::new,
-                NetworkRegistry::load,
-                null), DATA_NAME);
+        SavedDataStorage storage = level.getServer().overworld().getDataStorage();
+        return storage.computeIfAbsent(DATA_TYPE);
     }
 
     public void processDirtyNetworks(MinecraftServer server) {
@@ -154,8 +156,8 @@ public class NetworkRegistry extends SavedData {
         }
     }
 
-    @Override
-    public CompoundTag save(CompoundTag compoundTag, HolderLookup.Provider provider) {
+    public CompoundTag saveTag() {
+        CompoundTag compoundTag = new CompoundTag();
         ListTag list = new ListTag();
         for (LogisticsNetwork network : networks.values()) {
             list.add(network.save());
@@ -164,10 +166,10 @@ public class NetworkRegistry extends SavedData {
         return compoundTag;
     }
 
-    public static NetworkRegistry load(CompoundTag compoundTag, HolderLookup.Provider provider) {
+    public static NetworkRegistry load(CompoundTag compoundTag) {
         NetworkRegistry registry = new NetworkRegistry();
-        if (compoundTag.contains(KEY_NETWORKS, Tag.TAG_LIST)) {
-            ListTag list = compoundTag.getList(KEY_NETWORKS, Tag.TAG_COMPOUND);
+        if (compoundTag.contains(KEY_NETWORKS)) {
+            ListTag list = compoundTag.getListOrEmpty(KEY_NETWORKS);
             for (Tag t : list) {
                 if (t instanceof CompoundTag ct) {
                     try {

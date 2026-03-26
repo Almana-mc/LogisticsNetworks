@@ -17,7 +17,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.client.gui.Font;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.LightLayer;
@@ -32,7 +32,7 @@ import java.util.Set;
 
 public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
-    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID,
+    private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID,
             "textures/entity/node.png");
     private final NodeModel<LogisticsNodeEntity> model;
 
@@ -189,7 +189,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
     private void renderLabel(LogisticsNodeEntity entity, String text, PoseStack poseStack, MultiBufferSource buffer,
             int light) {
         poseStack.pushPose();
-        poseStack.mulPose(this.entityRenderDispatcher.cameraOrientation());
+        poseStack.mulPose(this.entityRenderDispatcher.camera.rotation());
         poseStack.scale(-0.025F, -0.025F, 0.025F);
 
         var font = this.getFont();
@@ -243,7 +243,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
     }
 
     @Override
-    public ResourceLocation getTextureLocation(LogisticsNodeEntity entity) {
+    public Identifier getTextureLocation(LogisticsNodeEntity entity) {
         return TEXTURE;
     }
 }

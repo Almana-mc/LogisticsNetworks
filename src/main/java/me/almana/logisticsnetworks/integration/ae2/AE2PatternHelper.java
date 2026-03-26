@@ -1,26 +1,33 @@
 package me.almana.logisticsnetworks.integration.ae2;
 
-import appeng.api.ids.AEComponents;
-import appeng.api.stacks.AEItemKey;
-import appeng.api.stacks.AEKey;
-import appeng.api.stacks.GenericStack;
-import appeng.crafting.pattern.EncodedCraftingPattern;
-import appeng.crafting.pattern.EncodedProcessingPattern;
-import appeng.crafting.pattern.EncodedSmithingTablePattern;
-import appeng.crafting.pattern.EncodedStonecuttingPattern;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 final class AE2PatternHelper {
+
+    // 26.1 AE2 API pending
+    /*
+    import appeng.api.ids.AEComponents;
+    import appeng.api.stacks.AEItemKey;
+    import appeng.api.stacks.AEKey;
+    import appeng.api.stacks.GenericStack;
+    import appeng.crafting.pattern.EncodedCraftingPattern;
+    import appeng.crafting.pattern.EncodedProcessingPattern;
+    import appeng.crafting.pattern.EncodedSmithingTablePattern;
+    import appeng.crafting.pattern.EncodedStonecuttingPattern;
+
+    import java.util.ArrayList;
+    import java.util.LinkedHashMap;
+    import java.util.Map;
+    */
 
     private AE2PatternHelper() {
     }
 
     static boolean isPattern(ItemStack stack) {
+        // 26.1 AE2 API pending
+        /*
         if (stack.isEmpty()) return false;
         AEItemKey key = AEItemKey.of(stack);
         if (key == null) return false;
@@ -28,9 +35,13 @@ final class AE2PatternHelper {
                 || key.get(AEComponents.ENCODED_CRAFTING_PATTERN) != null
                 || key.get(AEComponents.ENCODED_STONECUTTING_PATTERN) != null
                 || key.get(AEComponents.ENCODED_SMITHING_TABLE_PATTERN) != null;
+        */
+        return false;
     }
 
     static List<AE2Compat.PatternEntry> readInputs(ItemStack stack) {
+        // 26.1 AE2 API pending
+        /*
         if (stack.isEmpty()) return List.of();
         AEItemKey key = AEItemKey.of(stack);
         if (key == null) return List.of();
@@ -62,11 +73,13 @@ final class AE2PatternHelper {
             if (!smithing.addition().isEmpty()) result.add(new AE2Compat.PatternEntry(smithing.addition().copy(), 1));
             return result;
         }
-
+        */
         return List.of();
     }
 
     static List<AE2Compat.PatternEntry> readOutputs(ItemStack stack) {
+        // 26.1 AE2 API pending
+        /*
         if (stack.isEmpty()) return List.of();
         AEItemKey key = AEItemKey.of(stack);
         if (key == null) return List.of();
@@ -102,10 +115,12 @@ final class AE2PatternHelper {
             }
             return result;
         }
-
+        */
         return List.of();
     }
 
+    // 26.1 AE2 API pending
+    /*
     private static List<AE2Compat.PatternEntry> fromGenericStacks(List<GenericStack> stacks) {
         Map<ItemStack, Integer> merged = new LinkedHashMap<>();
         for (GenericStack gs : stacks) {
@@ -162,4 +177,5 @@ final class AE2PatternHelper {
         }
         return result;
     }
+    */
 }

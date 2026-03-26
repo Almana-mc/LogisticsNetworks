@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.filter;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 public final class FilterTagUtil {
@@ -22,7 +22,7 @@ public final class FilterTagUtil {
             return null;
         }
 
-        ResourceLocation id = ResourceLocation.tryParse(cleaned);
+        Identifier id = Identifier.tryParse(cleaned);
         return id == null ? null : id.toString();
     }
 }

@@ -4,7 +4,7 @@ import me.almana.logisticsnetworks.Logisticsnetworks;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 
 public record SetNodeUpgradeItemPayload(
@@ -13,7 +13,7 @@ public record SetNodeUpgradeItemPayload(
         ItemStack upgradeItem) implements CustomPacketPayload {
 
     public static final Type<SetNodeUpgradeItemPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_node_upgrade_item"));
+            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_node_upgrade_item"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetNodeUpgradeItemPayload> STREAM_CODEC = StreamCodec
             .of(SetNodeUpgradeItemPayload::write, SetNodeUpgradeItemPayload::read);

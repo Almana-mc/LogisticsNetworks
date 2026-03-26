@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public final class MekanismCompat {
 
@@ -59,7 +59,7 @@ public final class MekanismCompat {
     }
 
     @Nullable
-    public static ResourceLocation getChemicalIcon(String chemicalId) {
+    public static Identifier getChemicalIcon(String chemicalId) {
         if (!isLoaded())
             return null;
         return ChemicalTransferHelper.getChemicalIcon(chemicalId);

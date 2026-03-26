@@ -145,7 +145,7 @@ public class ComputerMenu extends AbstractContainerMenu {
     @Override
     public void removed(Player player) {
         super.removed(player);
-        if (!wrenchStack.isEmpty() && !player.level().isClientSide) {
+        if (!wrenchStack.isEmpty() && !player.level().isClientSide()) {
             player.getInventory().placeItemBackInInventory(wrenchStack);
             wrenchStack = ItemStack.EMPTY;
         }

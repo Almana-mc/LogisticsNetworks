@@ -12,6 +12,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
@@ -86,7 +87,7 @@ public class NodeMenu extends AbstractContainerMenu {
         for (int i = 0; i < UPGRADE_SLOTS; i++) {
             CompoundTag tag = buf.readNbt();
             if (tag != null) {
-                node.setUpgradeItem(i, ItemStack.parseOptional(provider, tag));
+                node.setUpgradeItem(i, tag.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY));
             }
         }
     }
@@ -165,7 +166,7 @@ public class NodeMenu extends AbstractContainerMenu {
 
         NetworkRegistry registry = NetworkRegistry.get(level);
         Collection<LogisticsNetwork> networks;
-        if (player.hasPermissions(2)) {
+        if (player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
             networks = registry.getAllNetworks().values();
         } else {
             networks = registry.getNetworksForPlayer(player.getUUID());

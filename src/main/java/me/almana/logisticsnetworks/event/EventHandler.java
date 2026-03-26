@@ -31,14 +31,14 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.common.util.TriState;
+import net.minecraft.util.TriState;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.item.ItemResource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -152,7 +152,7 @@ public class EventHandler {
                 }
 
                 if (Config.dropNodeItem) {
-                    node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
+                    node.spawnAtLocation(serverLevel, me.almana.logisticsnetworks.registration.Registration.logisticsNodeItem());
                 }
                 node.dropFilters();
                 node.dropUpgrades();
@@ -182,24 +182,23 @@ public class EventHandler {
     private static List<String> getBlacklistedResourceIds(ServerLevel level, BlockPos pos) {
         List<String> ids = new ArrayList<>();
 
-        IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
+        var itemHandler = level.getCapability(Capabilities.Item.BLOCK, pos, null);
         if (itemHandler != null) {
-            for (int slot = 0; slot < itemHandler.getSlots(); slot++) {
-                ItemStack stack = itemHandler.getStackInSlot(slot);
-                if (!stack.isEmpty() && stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
-                    String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+            for (int slot = 0; slot < itemHandler.size(); slot++) {
+                ItemResource resource = itemHandler.getResource(slot);
+                if (!resource.isEmpty() && resource.getItem().builtInRegistryHolder().is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
+                    String id = BuiltInRegistries.ITEM.getKey(resource.getItem()).toString();
                     if (!ids.contains(id))
                         ids.add(id);
                 }
             }
         }
 
-        IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null);
+        var fluidHandler = level.getCapability(Capabilities.Fluid.BLOCK, pos, null);
         if (fluidHandler != null) {
-            for (int tank = 0; tank < fluidHandler.getTanks(); tank++) {
-                FluidStack fluid = fluidHandler.getFluidInTank(tank);
-                if (!fluid.isEmpty()
-                        && fluid.getFluid().builtInRegistryHolder().is(ModTags.RESOURCE_BLACKLIST_FLUIDS)) {
+            for (int tank = 0; tank < fluidHandler.size(); tank++) {
+                FluidResource fluid = fluidHandler.getResource(tank);
+                if (!fluid.isEmpty() && fluid.getFluid().builtInRegistryHolder().is(ModTags.RESOURCE_BLACKLIST_FLUIDS)) {
                     String id = BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString();
                     if (!ids.contains(id))
                         ids.add(id);

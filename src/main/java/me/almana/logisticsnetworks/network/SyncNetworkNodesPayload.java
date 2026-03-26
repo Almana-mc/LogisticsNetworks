@@ -5,7 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,11 +16,11 @@ public record SyncNetworkNodesPayload(
         List<NodeInfo> nodes) implements CustomPacketPayload {
 
     public record NodeInfo(UUID nodeId, BlockPos nodePos, BlockPos attachedPos, String blockName, String nodeLabel,
-            ResourceLocation dimension, boolean visible, boolean highlighted) {
+            Identifier dimension, boolean visible, boolean highlighted) {
     }
 
     public static final CustomPacketPayload.Type<SyncNetworkNodesPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_network_nodes"));
+            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_network_nodes"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncNetworkNodesPayload> STREAM_CODEC = StreamCodec
             .of(SyncNetworkNodesPayload::write, SyncNetworkNodesPayload::read);
@@ -35,7 +35,7 @@ public record SyncNetworkNodesPayload(
             BlockPos attachedPos = buf.readBlockPos();
             String blockName = buf.readUtf(128);
             String nodeLabel = buf.readUtf(64);
-            ResourceLocation dimension = buf.readResourceLocation();
+            Identifier dimension = buf.readIdentifier();
             boolean visible = buf.readBoolean();
             boolean highlighted = buf.readBoolean();
             nodes.add(new NodeInfo(nodeId, nodePos, attachedPos, blockName, nodeLabel, dimension, visible, highlighted));
@@ -52,7 +52,7 @@ public record SyncNetworkNodesPayload(
             buf.writeBlockPos(node.attachedPos());
             buf.writeUtf(node.blockName(), 128);
             buf.writeUtf(node.nodeLabel(), 64);
-            buf.writeResourceLocation(node.dimension());
+            buf.writeIdentifier(node.dimension());
             buf.writeBoolean(node.visible());
             buf.writeBoolean(node.highlighted());
         }

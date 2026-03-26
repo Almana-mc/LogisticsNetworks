@@ -14,6 +14,7 @@ import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 
@@ -31,7 +32,7 @@ public class LogisticsCommand {
         NetworkRegistry registry = NetworkRegistry.get(level);
 
         Collection<LogisticsNetwork> networks;
-        if (source.hasPermission(2)) {
+        if (source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
             networks = registry.getAllNetworks().values();
         } else if (source.getEntity() instanceof ServerPlayer player) {
             networks = registry.getNetworksForPlayer(player.getUUID());
@@ -49,7 +50,7 @@ public class LogisticsCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         LiteralArgumentBuilder<CommandSourceStack> lnCommand = Commands.literal("logisticsnetworks")
                 .then(Commands.literal("removeNodes")
-                        .requires(source -> source.hasPermission(2))
+                        .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                         .executes(context -> removeNodes(context.getSource())))
                 .then(Commands.literal("cullNetwork")
                         .then(Commands.argument("name", StringArgumentType.greedyString())
@@ -58,7 +59,7 @@ public class LogisticsCommand {
 
         LiteralArgumentBuilder<CommandSourceStack> lnAlias = Commands.literal("ln")
                 .then(Commands.literal("removeNodes")
-                        .requires(source -> source.hasPermission(2))
+                        .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                         .executes(context -> removeNodes(context.getSource())))
                 .then(Commands.literal("cullNetwork")
                         .then(Commands.argument("name", StringArgumentType.greedyString())
@@ -114,7 +115,8 @@ public class LogisticsCommand {
         }
 
         // Check ownership: must own the network, be a teammate, or be op
-        if (!source.hasPermission(2) && source.getEntity() instanceof ServerPlayer player) {
+        if (!source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)
+                && source.getEntity() instanceof ServerPlayer player) {
             if (target.getOwnerUuid() != null
                     && !target.getOwnerUuid().equals(player.getUUID())
                     && !(FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(target.getOwnerUuid(), player.getUUID()))) {

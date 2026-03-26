@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
@@ -7,6 +8,9 @@ import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.data.RedstoneMode;
 
+import me.almana.logisticsnetworks.client.ClientInput;
+import me.almana.logisticsnetworks.client.GuiGraphics;
+import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -20,17 +24,15 @@ import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 import java.util.*;
 
-public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
+public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     private enum Page {
         NETWORK_SELECT, CHANNEL_CONFIG
@@ -118,9 +120,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     }
 
     public NodeScreen(NodeMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title);
-        this.imageWidth = GUI_WIDTH;
-        this.imageHeight = GUI_HEIGHT;
+        super(menu, inventory, title, GUI_WIDTH, GUI_HEIGHT);
         this.inventoryLabelY = 10_000;
         this.titleLabelY = 10_000;
     }
@@ -395,7 +395,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         // Edit Box
         if (labelEditBox != null) {
-            labelEditBox.render(g, mx, my, pt);
+            labelEditBox.extractRenderState(g.raw(), mx, my, pt);
         }
 
         // Character counter (shown only when > 40 chars)
@@ -706,7 +706,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (commit) {
             String newName = renameEditBox.getValue().trim();
             if (!newName.isEmpty()) {
-                PacketDistributor.sendToServer(new RenameNetworkPayload(renamingNetworkId, newName));
+                ClientPacketDistributor.sendToServer(new RenameNetworkPayload(renamingNetworkId, newName));
             }
         }
 
@@ -735,7 +735,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         // Request existing labels from server
         if (node.getNetworkId() != null) {
-            PacketDistributor.sendToServer(new RequestNetworkLabelsPayload(node.getNetworkId()));
+            ClientPacketDistributor.sendToServer(new RequestNetworkLabelsPayload(node.getNetworkId()));
         }
     }
 
@@ -752,7 +752,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         LogisticsNodeEntity node = getMenu().getNode();
         if (node != null) {
             node.setNodeLabel(label);
-            PacketDistributor.sendToServer(new SetNodeLabelPayload(node.getId(), label));
+            ClientPacketDistributor.sendToServer(new SetNodeLabelPayload(node.getId(), label));
         }
         closeLabelPicker();
     }
@@ -817,7 +817,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         String visibilityLabel = getVisibilityLabel(node.isRenderVisible());
         if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(visibilityLabel) + 10, 12, mx, my)) {
             node.setRenderVisible(!node.isRenderVisible());
-            PacketDistributor.sendToServer(new ToggleNodeVisibilityPayload(node.getId()));
+            ClientPacketDistributor.sendToServer(new ToggleNodeVisibilityPayload(node.getId()));
             return true;
         }
 
@@ -843,7 +843,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 selectedChannel = i;
                 settingsScrollOffset = 0;
                 getMenu().setSelectedChannel(i);
-                PacketDistributor.sendToServer(new SelectNodeChannelPayload(node.getId(), i));
+                ClientPacketDistributor.sendToServer(new SelectNodeChannelPayload(node.getId(), i));
                 return true;
             }
         }
@@ -1022,7 +1022,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private void commitChannelUpdate(LogisticsNodeEntity node, ChannelData ch) {
         validateChannelConfigs(node);
-        PacketDistributor.sendToServer(new UpdateChannelPayload(
+        ClientPacketDistributor.sendToServer(new UpdateChannelPayload(
                 node.getId(), selectedChannel, ch.isEnabled(),
                 ch.getMode().ordinal(), ch.getType().ordinal(),
                 ch.getBatchSize(), ch.getTickDelay(),
@@ -1036,7 +1036,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private void sendNetworkAssign(Optional<UUID> id, String name) {
         LogisticsNodeEntity node = getMenu().getNode();
         if (node != null) {
-            PacketDistributor.sendToServer(new AssignNetworkPayload(node.getId(), id, name));
+            ClientPacketDistributor.sendToServer(new AssignNetworkPayload(node.getId(), id, name));
         }
     }
 
@@ -1070,6 +1070,18 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         return mx >= x && mx <= x + w && my >= y && my <= y + h;
     }
 
+    private boolean hasAltDown() {
+        return minecraft != null
+                && (InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LALT)
+                        || InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_RALT));
+    }
+
+    private boolean hasShiftDown() {
+        return minecraft != null
+                && (InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LSHIFT)
+                        || InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_RSHIFT));
+    }
+
     private boolean isHoveringMenuSlot(double mx, double my) {
         for (Slot slot : menu.slots) {
             if (isHovering(slot.x, slot.y, 16, 16, mx, my)) {
@@ -1098,7 +1110,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 String val = labelEditBox.getValue().trim();
                 commitLabelChange(val);
             } else {
-                labelEditBox.keyPressed(key, scan, modifiers);
+                labelEditBox.keyPressed(ClientInput.key(key, scan, modifiers));
             }
             return true;
         }
@@ -1106,7 +1118,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             if (key == 257 || key == 335) {
                 stopRenameEdit(true);
             } else {
-                renameEditBox.keyPressed(key, scan, modifiers);
+                renameEditBox.keyPressed(ClientInput.key(key, scan, modifiers));
             }
             return true;
         }
@@ -1114,14 +1126,14 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             if (key == 257 || key == 335)
                 stopNumericEdit(true);
             else
-                numericEditBox.keyPressed(key, scan, modifiers);
+                numericEditBox.keyPressed(ClientInput.key(key, scan, modifiers));
             return true;
         }
         if (networkNameField != null && networkNameField.isFocused()) {
             if (key == 257 || key == 335)
                 networkNameField.setFocused(false);
             else
-                networkNameField.keyPressed(key, scan, modifiers);
+                networkNameField.keyPressed(ClientInput.key(key, scan, modifiers));
             return true;
         }
         return super.keyPressed(key, scan, modifiers);
@@ -1130,18 +1142,18 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     @Override
     public boolean charTyped(char ch, int modifiers) {
         if (labelPickerOpen && labelEditBox != null) {
-            return labelEditBox.charTyped(ch, modifiers);
+            return labelEditBox.charTyped(ClientInput.character(ch));
         }
         if (renamingNetworkId != null && renameEditBox != null) {
-            return renameEditBox.charTyped(ch, modifiers);
+            return renameEditBox.charTyped(ClientInput.character(ch));
         }
         if (editingRow != -1 && numericEditBox != null) {
             if (Character.isDigit(ch) || ch == '-')
-                return numericEditBox.charTyped(ch, modifiers);
+                return numericEditBox.charTyped(ClientInput.character(ch));
             return true;
         }
         if (networkNameField != null && networkNameField.isFocused()) {
-            return networkNameField.charTyped(ch, modifiers);
+            return networkNameField.charTyped(ClientInput.character(ch));
         }
         return super.charTyped(ch, modifiers);
     }

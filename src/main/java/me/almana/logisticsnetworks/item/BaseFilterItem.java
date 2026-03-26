@@ -7,15 +7,16 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.level.Level;
 
-import java.util.List;
+import java.util.function.Consumer;
 
 public class BaseFilterItem extends Item {
 
@@ -31,7 +32,7 @@ public class BaseFilterItem extends Item {
     }
 
     @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+    public InteractionResult use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
 
         if (player instanceof ServerPlayer serverPlayer) {
@@ -42,7 +43,7 @@ public class BaseFilterItem extends Item {
                     buf -> writeMenuData(buf, hand));
         }
 
-        return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+        return level.isClientSide() ? InteractionResult.SUCCESS : InteractionResult.SUCCESS_SERVER;
     }
 
     private void writeMenuData(FriendlyByteBuf buf, InteractionHand hand) {
@@ -57,21 +58,21 @@ public class BaseFilterItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, TooltipDisplay display, Consumer<Component> tooltip, TooltipFlag flag) {
         boolean blacklist = FilterItemData.isBlacklist(stack);
         int entryCount = FilterItemData.getEntryCount(stack);
 
-        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.base.desc", slotCount)
+        tooltip.accept(Component.translatable("tooltip.logisticsnetworks.filter.base.desc", slotCount)
                 .withStyle(ChatFormatting.GRAY));
 
         String modeKey = blacklist ? "tooltip.logisticsnetworks.filter.mode.blacklist"
                 : "tooltip.logisticsnetworks.filter.mode.whitelist";
-        tooltip.add(Component.translatable(modeKey).withStyle(ChatFormatting.GRAY));
+        tooltip.accept(Component.translatable(modeKey).withStyle(ChatFormatting.GRAY));
 
-        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.entries", entryCount, slotCount)
+        tooltip.accept(Component.translatable("tooltip.logisticsnetworks.filter.entries", entryCount, slotCount)
                 .withStyle(ChatFormatting.DARK_GRAY));
 
-        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.open_hint")
+        tooltip.accept(Component.translatable("tooltip.logisticsnetworks.filter.open_hint")
                 .withStyle(ChatFormatting.DARK_GRAY));
     }
 }

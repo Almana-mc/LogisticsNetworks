@@ -1,15 +1,13 @@
 package me.almana.logisticsnetworks.block;
-
-import me.almana.logisticsnetworks.registration.Registration;
+import com.mojang.serialization.Codec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -22,7 +20,7 @@ public class ComputerBlockEntity extends BlockEntity {
     private final Set<UUID> starredNetworks = new LinkedHashSet<>();
 
     public ComputerBlockEntity(BlockPos pos, BlockState blockState) {
-        super(Registration.COMPUTER_BLOCK_ENTITY.get(), pos, blockState);
+        super(me.almana.logisticsnetworks.registration.Registration.computerBlockEntityType(), pos, blockState);
     }
 
     public Set<UUID> getStarredNetworks() {
@@ -39,23 +37,21 @@ public class ComputerBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
-        ListTag starredList = new ListTag();
+    protected void saveAdditional(ValueOutput tag) {
+        super.saveAdditional(tag);
+        var starredList = tag.list(TAG_STARRED_NETWORKS, Codec.STRING);
         for (UUID networkId : starredNetworks) {
-            starredList.add(StringTag.valueOf(networkId.toString()));
+            starredList.add(networkId.toString());
         }
-        tag.put(TAG_STARRED_NETWORKS, starredList);
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
+    protected void loadAdditional(ValueInput tag) {
+        super.loadAdditional(tag);
         starredNetworks.clear();
-        ListTag starredList = tag.getList(TAG_STARRED_NETWORKS, Tag.TAG_STRING);
-        for (int i = 0; i < starredList.size(); i++) {
+        for (String rawId : tag.listOrEmpty(TAG_STARRED_NETWORKS, Codec.STRING)) {
             try {
-                starredNetworks.add(UUID.fromString(starredList.getString(i)));
+                starredNetworks.add(UUID.fromString(rawId));
             } catch (IllegalArgumentException ignored) {
             }
         }

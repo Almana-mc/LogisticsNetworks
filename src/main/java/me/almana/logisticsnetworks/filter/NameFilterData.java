@@ -4,7 +4,6 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.NameFilterItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -36,7 +35,7 @@ public final class NameFilterData {
     public static boolean isBlacklist(ItemStack stack) {
         if (!isNameFilter(stack))
             return false;
-        return getRoot(stack).getBoolean(KEY_IS_BLACKLIST);
+        return getRoot(stack).getBooleanOr(KEY_IS_BLACKLIST, false);
     }
 
     public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
@@ -56,7 +55,7 @@ public final class NameFilterData {
         if (!isNameFilter(stack))
             return FilterTargetType.ITEMS;
         CompoundTag root = getRoot(stack);
-        return FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE));
+        return FilterTargetType.fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
     }
 
     public static void setTargetType(ItemStack stack, FilterTargetType type) {
@@ -77,7 +76,7 @@ public final class NameFilterData {
         if (!isNameFilter(stack))
             return NameMatchScope.NAME;
         CompoundTag root = getRoot(stack);
-        return NameMatchScope.fromOrdinal(root.getInt(KEY_MATCH_SCOPE));
+        return NameMatchScope.fromOrdinal(root.getIntOr(KEY_MATCH_SCOPE, NameMatchScope.NAME.ordinal()));
     }
 
     public static void setMatchScope(ItemStack stack, NameMatchScope scope) {
@@ -98,7 +97,7 @@ public final class NameFilterData {
         if (!isNameFilter(stack))
             return "";
         CompoundTag root = getRoot(stack);
-        return root.contains(KEY_NAME, Tag.TAG_STRING) ? root.getString(KEY_NAME) : "";
+        return root.getStringOr(KEY_NAME, "");
     }
 
     public static void setNameFilter(ItemStack stack, String name) {
@@ -220,14 +219,12 @@ public final class NameFilterData {
 
     private static CompoundTag getRoot(ItemStack stack) {
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
+        return custom.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
-                    ? customTag.getCompound(KEY_ROOT)
-                    : new CompoundTag();
+            CompoundTag root = customTag.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
 
             modifier.accept(root);
 

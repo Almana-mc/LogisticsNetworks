@@ -25,17 +25,29 @@ public final class AE2Compat {
     }
 
     public static List<PatternEntry> readPatternInputs(ItemStack pattern) {
+        // 26.1 AE2 API pending
+        /*
         if (!isLoaded()) return Collections.emptyList();
         return AE2PatternHelper.readInputs(pattern);
+        */
+        return Collections.emptyList();
     }
 
     public static List<PatternEntry> readPatternOutputs(ItemStack pattern) {
+        // 26.1 AE2 API pending
+        /*
         if (!isLoaded()) return Collections.emptyList();
         return AE2PatternHelper.readOutputs(pattern);
+        */
+        return Collections.emptyList();
     }
 
     public static boolean isPattern(ItemStack stack) {
+        // 26.1 AE2 API pending
+        /*
         if (!isLoaded()) return false;
         return AE2PatternHelper.isPattern(stack);
+        */
+        return false;
     }
 }

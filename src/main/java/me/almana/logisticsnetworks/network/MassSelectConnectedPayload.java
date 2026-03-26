@@ -5,12 +5,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record MassSelectConnectedPayload(int handOrdinal, BlockPos pos) implements CustomPacketPayload {
 
     public static final Type<MassSelectConnectedPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "mass_select_connected"));
+            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "mass_select_connected"));
 
     public static final StreamCodec<FriendlyByteBuf, MassSelectConnectedPayload> STREAM_CODEC = StreamCodec
             .of(MassSelectConnectedPayload::write, MassSelectConnectedPayload::read);

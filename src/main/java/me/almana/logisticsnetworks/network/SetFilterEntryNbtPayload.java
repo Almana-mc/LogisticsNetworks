@@ -5,7 +5,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record SetFilterEntryNbtPayload(int slot, int action, String path, String operator, int ruleIndex, String value)
         implements CustomPacketPayload {
@@ -37,7 +37,7 @@ public record SetFilterEntryNbtPayload(int slot, int action, String path, String
     }
 
     public static final Type<SetFilterEntryNbtPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_entry_nbt"));
+            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_entry_nbt"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterEntryNbtPayload> STREAM_CODEC = StreamCodec
             .composite(

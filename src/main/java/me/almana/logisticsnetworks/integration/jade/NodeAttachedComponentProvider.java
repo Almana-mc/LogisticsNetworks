@@ -5,7 +5,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
@@ -20,7 +20,7 @@ import java.util.List;
 public enum NodeAttachedComponentProvider implements IBlockComponentProvider, IServerDataProvider<BlockAccessor> {
     INSTANCE;
 
-    private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath(
+    private static final Identifier UID = Identifier.fromNamespaceAndPath(
             Logisticsnetworks.MOD_ID, "node_attached");
     private static final String KEY_HAS_NODE = "has_node";
 
@@ -52,7 +52,7 @@ public enum NodeAttachedComponentProvider implements IBlockComponentProvider, IS
     }
 
     @Override
-    public ResourceLocation getUid() {
+    public Identifier getUid() {
         return UID;
     }
 }

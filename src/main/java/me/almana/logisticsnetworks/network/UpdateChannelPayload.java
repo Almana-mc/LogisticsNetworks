@@ -4,7 +4,7 @@ import me.almana.logisticsnetworks.Logisticsnetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record UpdateChannelPayload(
         int entityId,
@@ -21,7 +21,7 @@ public record UpdateChannelPayload(
         int priority) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<UpdateChannelPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "update_channel"));
+            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "update_channel"));
 
     public static final StreamCodec<FriendlyByteBuf, UpdateChannelPayload> STREAM_CODEC = StreamCodec
             .of(UpdateChannelPayload::write, UpdateChannelPayload::read);

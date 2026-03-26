@@ -5,8 +5,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipDisplay;
 
-import java.util.List;
+import java.util.function.Consumer;
 
 public class NodeUpgradeItem extends Item {
 
@@ -24,9 +25,9 @@ public class NodeUpgradeItem extends Item {
         }
 
         @Override
-        public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip,
+        public void appendHoverText(ItemStack stack, TooltipContext context, TooltipDisplay display, Consumer<Component> tooltip,
                         TooltipFlag flag) {
-                tooltip.add(Component.translatable("tooltip.logisticsnetworks.upgrade.description")
+                tooltip.accept(Component.translatable("tooltip.logisticsnetworks.upgrade.description")
                                 .withStyle(ChatFormatting.GRAY));
 
                 addStatTooltip(tooltip, "items", formatCap(itemCap));
@@ -37,8 +38,8 @@ public class NodeUpgradeItem extends Item {
                 addStatTooltip(tooltip, "delay", String.valueOf(minDelay));
         }
 
-        private void addStatTooltip(List<Component> tooltip, String statKey, String value) {
-                tooltip.add(Component.translatable("tooltip.logisticsnetworks.upgrade." + statKey, value)
+        private void addStatTooltip(Consumer<Component> tooltip, String statKey, String value) {
+                tooltip.accept(Component.translatable("tooltip.logisticsnetworks.upgrade." + statKey, value)
                                 .withStyle(ChatFormatting.DARK_GRAY));
         }
 

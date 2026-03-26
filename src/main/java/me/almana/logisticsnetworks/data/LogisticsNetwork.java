@@ -69,17 +69,17 @@ public class LogisticsNetwork {
 
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
-        tag.putUUID(KEY_ID, id);
+        tag.putString(KEY_ID, id.toString());
         tag.putString(KEY_NAME, name);
         tag.putBoolean(KEY_SLEEPING, sleeping);
         if (ownerUuid != null) {
-            tag.putUUID(KEY_OWNER_UUID, ownerUuid);
+            tag.putString(KEY_OWNER_UUID, ownerUuid.toString());
         }
 
         ListTag nodesTag = new ListTag();
         for (UUID uuid : nodeUuids) {
             CompoundTag uuidTag = new CompoundTag();
-            uuidTag.putUUID(KEY_NODE_UUID, uuid);
+            uuidTag.putString(KEY_NODE_UUID, uuid.toString());
             nodesTag.add(uuidTag);
         }
         tag.put(KEY_NODES, nodesTag);
@@ -88,24 +88,27 @@ public class LogisticsNetwork {
     }
 
     public static LogisticsNetwork load(CompoundTag tag) {
-        UUID id = tag.getUUID(KEY_ID);
+        UUID id = parseRequiredUuid(tag.getStringOr(KEY_ID, null));
         LogisticsNetwork network = new LogisticsNetwork(id);
 
         if (tag.contains(KEY_NAME)) {
-            network.name = tag.getString(KEY_NAME);
+            network.name = tag.getStringOr(KEY_NAME, network.name);
         }
         if (tag.contains(KEY_SLEEPING)) {
-            network.sleeping = tag.getBoolean(KEY_SLEEPING);
+            network.sleeping = tag.getBooleanOr(KEY_SLEEPING, network.sleeping);
         }
         if (tag.contains(KEY_OWNER_UUID)) {
-            network.ownerUuid = tag.getUUID(KEY_OWNER_UUID);
+            network.ownerUuid = parseOptionalUuid(tag.getStringOr(KEY_OWNER_UUID, null));
         }
 
         if (tag.contains(KEY_NODES)) {
-            ListTag nodesTag = tag.getList(KEY_NODES, Tag.TAG_COMPOUND);
+            ListTag nodesTag = tag.getListOrEmpty(KEY_NODES);
             for (Tag t : nodesTag) {
                 if (t instanceof CompoundTag ct && ct.contains(KEY_NODE_UUID)) {
-                    network.addNode(ct.getUUID(KEY_NODE_UUID));
+                    UUID nodeId = parseOptionalUuid(ct.getStringOr(KEY_NODE_UUID, null));
+                    if (nodeId != null) {
+                        network.addNode(nodeId);
+                    }
                 }
             }
         }
@@ -294,6 +297,22 @@ public class LogisticsNetwork {
                     }
                 }
             }
+        }
+    }
+
+    private static UUID parseRequiredUuid(String value) {
+        UUID parsed = parseOptionalUuid(value);
+        return parsed != null ? parsed : UUID.randomUUID();
+    }
+
+    private static UUID parseOptionalUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
         }
     }
 }
