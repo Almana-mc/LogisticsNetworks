@@ -17,7 +17,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.*;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.FluidUtil;
+import net.neoforged.neoforge.transfer.fluid.FluidUtil;
 
 import java.util.List;
 
@@ -899,9 +899,9 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     private FluidStack getFluidFromItem(ItemStack stack) {
-        var contained = FluidUtil.getFluidContained(stack);
-        if (contained.isPresent() && !contained.get().isEmpty()) {
-            return contained.get();
+        FluidStack contained = FluidUtil.getFirstStackContained(stack);
+        if (!contained.isEmpty()) {
+            return contained;
         }
 
         for (var fluid : BuiltInRegistries.FLUID) {

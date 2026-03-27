@@ -12,7 +12,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.FluidUtil;
+import net.neoforged.neoforge.transfer.fluid.FluidUtil;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -377,12 +377,12 @@ public final class NbtFilterData {
             return null;
 
         if (isFluidPath(normalized)) {
-            return FluidUtil.getFluidContained(stack)
-                    .map(fluid -> {
-                        CompoundTag tags = getSerializedComponents(fluid, provider);
-                        return resolvePathValue(tags, normalized);
-                    })
-                    .orElse(null);
+            FluidStack fluid = FluidUtil.getFirstStackContained(stack);
+            if (fluid.isEmpty()) {
+                return null;
+            }
+            CompoundTag tags = getSerializedComponents(fluid, provider);
+            return resolvePathValue(tags, normalized);
         }
 
         return resolvePathValue(getSerializedComponents(stack, provider), normalized);

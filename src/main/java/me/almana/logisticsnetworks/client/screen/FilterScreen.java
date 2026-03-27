@@ -40,7 +40,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.FluidUtil;
+import net.neoforged.neoforge.transfer.fluid.FluidUtil;
 
 import java.util.*;
 
@@ -219,7 +219,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             if (!extractor.isEmpty()) {
                 String ns = null;
                 if (isFluid) {
-                    FluidStack fs = FluidUtil.getFluidContained(extractor).orElse(FluidStack.EMPTY);
+                    FluidStack fs = FluidUtil.getFirstStackContained(extractor);
                     if (!fs.isEmpty())
                         ns = BuiltInRegistries.FLUID.getKey(fs.getFluid()).getNamespace();
                 } else if (isChemical && MekanismCompat.isLoaded()) {
@@ -1142,14 +1142,18 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         manualInputBox.setWidth(contentW);
 
         String value = menu.getNameFilter();
+        boolean validRegex = value.isEmpty() || NameFilterData.isValidRegex(value);
         String display = value.isEmpty()
                 ? Component.translatable("gui.logisticsnetworks.filter.name.none").getString()
                 : value;
-        String activeLine = Component.translatable("gui.logisticsnetworks.filter.name.active", display).getString();
-        g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, COL_ACCENT, false);
+        String activeKey = validRegex
+                ? "gui.logisticsnetworks.filter.name.active"
+                : "gui.logisticsnetworks.filter.name.pattern";
+        int activeColor = validRegex ? COL_ACCENT : COL_GRAY;
+        String activeLine = Component.translatable(activeKey, display).getString();
+        g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, activeColor, false);
 
-        // Show invalid regex warning
-        if (!value.isEmpty() && !NameFilterData.isValidRegex(value)) {
+        if (!value.isEmpty() && !validRegex) {
             String warning = Component.translatable("gui.logisticsnetworks.filter.name.invalid_regex").getString();
             g.drawString(font, warning, contentX, hintY, 0xFFFF5555, false);
         } else {

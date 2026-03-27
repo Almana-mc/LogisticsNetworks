@@ -287,6 +287,7 @@
   "tooltip.logisticsnetworks.filter.name.scope": "Match: %s",
   "gui.logisticsnetworks.filter.name.input_hint": "Enter regex (e.g. .*stone.*)",
   "gui.logisticsnetworks.filter.name.active": "Matching: %s",
+  "gui.logisticsnetworks.filter.name.pattern": "Pattern: %s",
   "gui.logisticsnetworks.filter.name.none": "No regex set",
   "gui.logisticsnetworks.filter.name.scope.name": "Name",
   "gui.logisticsnetworks.filter.name.scope.tooltip": "Tooltip",
