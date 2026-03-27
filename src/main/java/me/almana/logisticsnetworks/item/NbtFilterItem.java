@@ -48,6 +48,8 @@ public class NbtFilterItem extends Item {
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated")
                 .withStyle(ChatFormatting.RED));
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated.nbt")
+                .withStyle(ChatFormatting.RED));
 
         boolean blacklist = NbtFilterData.isBlacklist(stack);
         String selection = NbtFilterData.hasSelection(stack)
