@@ -47,14 +47,7 @@ public class BaseFilterItem extends Item {
     }
 
     private void writeMenuData(FriendlyByteBuf buf, InteractionHand hand) {
-        buf.writeVarInt(hand.ordinal());
-        buf.writeVarInt(slotCount);
-
-        for (int i = 0; i < 5; i++) {
-            buf.writeBoolean(false);
-        }
-        buf.writeBoolean(false);
-        buf.writeBoolean(false);
+        FilterMenu.writeMenuData(buf, hand, slotCount, false, false, false);
     }
 
     @Override

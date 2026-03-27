@@ -66,6 +66,29 @@ public class FilterMenu extends AbstractContainerMenu {
     private String selectedTag;
     private String selectedMod;
 
+    public static void writeMenuData(FriendlyByteBuf buf, InteractionHand hand, int slotCount,
+            boolean isMod, boolean isSlot, boolean isName) {
+        buf.writeVarInt(hand.ordinal());
+        writeModeData(buf, slotCount, isMod, isSlot, isName);
+    }
+
+    public static void writeMenuData(FriendlyByteBuf buf, int inventorySlotIndex, int slotCount,
+            boolean isMod, boolean isSlot, boolean isName) {
+        buf.writeVarInt(-1);
+        buf.writeVarInt(inventorySlotIndex);
+        writeModeData(buf, slotCount, isMod, isSlot, isName);
+    }
+
+    private static void writeModeData(FriendlyByteBuf buf, int slotCount,
+            boolean isMod, boolean isSlot, boolean isName) {
+        buf.writeVarInt(slotCount);
+        buf.writeBoolean(false);
+        buf.writeBoolean(false);
+        buf.writeBoolean(isMod);
+        buf.writeBoolean(isSlot);
+        buf.writeBoolean(isName);
+    }
+
     public FilterMenu(int containerId, Inventory playerInv, int inventorySlotIndex) {
         super(Registration.FILTER_MENU.get(), containerId);
         this.hand = InteractionHand.MAIN_HAND;

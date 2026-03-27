@@ -31,15 +31,7 @@ public class ModFilterItem extends Item {
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (containerId, playerInventory, ignored) -> new FilterMenu(containerId, playerInventory, hand),
                     stack.getHoverName()), buf -> {
-                        buf.writeVarInt(hand.ordinal());
-                        buf.writeVarInt(0);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(true);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(false);
+                        FilterMenu.writeMenuData(buf, hand, 0, true, false, false);
                     });
         }
         return level.isClientSide() ? InteractionResult.SUCCESS : InteractionResult.SUCCESS_SERVER;

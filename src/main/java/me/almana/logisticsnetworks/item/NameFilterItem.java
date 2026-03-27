@@ -31,15 +31,7 @@ public class NameFilterItem extends Item {
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (containerId, playerInventory, ignored) -> new FilterMenu(containerId, playerInventory, hand),
                     stack.getHoverName()), buf -> {
-                        buf.writeVarInt(hand.ordinal());
-                        buf.writeVarInt(0);
-                        buf.writeBoolean(false); // tag
-                        buf.writeBoolean(false); // amount
-                        buf.writeBoolean(false); // nbt
-                        buf.writeBoolean(false); // durability
-                        buf.writeBoolean(false); // mod
-                        buf.writeBoolean(false); // slot
-                        buf.writeBoolean(true);  // name
+                        FilterMenu.writeMenuData(buf, hand, 0, false, false, true);
                     });
         }
         return level.isClientSide() ? InteractionResult.SUCCESS : InteractionResult.SUCCESS_SERVER;

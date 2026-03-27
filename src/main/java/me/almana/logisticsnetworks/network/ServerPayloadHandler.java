@@ -515,17 +515,8 @@ public class ServerPayloadHandler {
 
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new FilterMenu(id, inv, slotIndex),
-                    stack.getHoverName()), buf -> {
-                        buf.writeVarInt(-1);
-                        buf.writeVarInt(slotIndex);
-                        buf.writeVarInt(slotCount);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(isMod);
-                        buf.writeBoolean(isSlot);
-                        buf.writeBoolean(isName);
-                    });
+                    stack.getHoverName()),
+                    buf -> FilterMenu.writeMenuData(buf, slotIndex, slotCount, isMod, isSlot, isName));
         });
     }
 

@@ -864,6 +864,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
+        blurManualInputIfNeeded(mx, my);
         boolean handled = false;
         if (menu.isModMode())
             handled = handleModClick(mx, my, btn);
@@ -916,6 +917,29 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return super.mouseClicked(mx, my, btn);
         }
         return true;
+    }
+
+    private void blurManualInputIfNeeded(double mx, double my) {
+        if (manualInputBox == null || !manualInputBox.isVisible() || !manualInputBox.isFocused()) {
+            return;
+        }
+        if (isHoveringManualInput(mx, my)) {
+            return;
+        }
+        saveManualInputAndClearFocus();
+    }
+
+    private boolean isHoveringManualInput(double mx, double my) {
+        if (menu.isModMode()) {
+            return isHovering(getSelectorInputX(), getSelectorInputY(), getSelectorInputWidth(), 14, (int) mx, (int) my);
+        }
+        if (menu.isSlotMode()) {
+            return isHovering(leftPos + 8, topPos + 34, imageWidth - 16, 14, (int) mx, (int) my);
+        }
+        if (menu.isNameMode()) {
+            return isHovering(leftPos + 8, topPos + 38, imageWidth - 16, 14, (int) mx, (int) my);
+        }
+        return false;
     }
 
     private boolean handleModeControlClick(double mx, double my, boolean hasTargetType) {
@@ -998,6 +1022,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 }
             }
         }
+        if (handleManualInputClick(mx, my, btn)) {
+            isDropdownOpen = false;
+            return true;
+        }
         if (btn == 1 && isHovering(x, y, w, 14, (int) mx, (int) my)) {
             String toRemove = menu.getSelectedMod();
             menu.setSelectedMod(null);
@@ -1056,6 +1084,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
             // Click outside info panel = close it
             slotInfoOpen = false;
+            return true;
+        }
+
+        if (handleManualInputClick(mx, my, btn)) {
             return true;
         }
 
@@ -1173,6 +1205,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (handleNameButtonsClick(mx, my))
             return true;
 
+        if (handleManualInputClick(mx, my, btn)) {
+            return true;
+        }
+
         if (btn == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
             manualInputBox.setValue("");
             sendNameUpdate("");
@@ -1248,6 +1284,27 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         }
         flushedTextOnClose = true;
         commitManualInput();
+        wasManualInputFocused = false;
+    }
+
+    private boolean handleManualInputClick(double mx, double my, int btn) {
+        if (btn != 0 || manualInputBox == null || !manualInputBox.isVisible() || !isHoveringManualInput(mx, my)) {
+            return false;
+        }
+        manualInputBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+        manualInputBox.setFocused(true);
+        setFocused(manualInputBox);
+        wasManualInputFocused = true;
+        return true;
+    }
+
+    private void saveManualInputAndClearFocus() {
+        if (manualInputBox == null || !manualInputBox.isVisible()) {
+            return;
+        }
+        commitManualInput();
+        manualInputBox.setFocused(false);
+        wasManualInputFocused = false;
     }
 
     private void commitManualInput() {
@@ -1284,6 +1341,11 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (key == 256) {
+            if (manualInputBox != null && manualInputBox.isFocused()) {
+                flushManualInputToServer();
+                manualInputBox.setFocused(false);
+                return super.keyPressed(key, scan, modifiers);
+            }
             if (nbtEditingRuleIndex >= 0) {
                 cancelNbtValueEdit();
                 return true;
@@ -1320,11 +1382,11 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (manualInputBox.isFocused()) {
             if (key == 257) {
-                commitManualInput();
-                manualInputBox.setFocused(false);
+                saveManualInputAndClearFocus();
                 return true;
             }
-            return manualInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
+            manualInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
+            return true;
         }
         return super.keyPressed(key, scan, modifiers);
     }
@@ -1332,13 +1394,16 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     @Override
     public boolean charTyped(char c, int modifiers) {
         if (nbtValueEditBox != null && nbtValueEditBox.isFocused()) {
-            return nbtValueEditBox.charTyped(ClientInput.character(c));
+            nbtValueEditBox.charTyped(ClientInput.character(c));
+            return true;
         }
         if (tagInputBox != null && tagInputBox.isFocused()) {
-            return tagInputBox.charTyped(ClientInput.character(c));
+            tagInputBox.charTyped(ClientInput.character(c));
+            return true;
         }
         if (manualInputBox.isFocused()) {
-            return manualInputBox.charTyped(ClientInput.character(c));
+            manualInputBox.charTyped(ClientInput.character(c));
+            return true;
         }
         return super.charTyped(c, modifiers);
     }
