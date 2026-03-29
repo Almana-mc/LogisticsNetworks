@@ -3,10 +3,6 @@ name: Release Build
 on:
   workflow_dispatch:
     inputs:
-      changelog:
-        description: "Release notes/changelog"
-        required: true
-        type: string
       publish_curseforge:
         description: "Publish to CurseForge"
         required: true
@@ -31,7 +27,6 @@ jobs:
     outputs:
       is_version_branch: ${{ steps.branch_check.outputs.is_version_branch }}
       target_branch: ${{ steps.branch_check.outputs.target_branch }}
-      changelog: ${{ steps.branch_check.outputs.changelog }}
       publish_curseforge: ${{ steps.branch_check.outputs.publish_curseforge }}
     steps:
       - name: Resolve trigger inputs
@@ -39,12 +34,10 @@ jobs:
         shell: bash
         env:
           TARGET_BRANCH: ${{ github.ref_name }}
-          INPUT_CHANGELOG: ${{ inputs.changelog }}
           INPUT_PUBLISH_CURSEFORGE: ${{ inputs.publish_curseforge }}
           INPUT_CONFIRM: ${{ inputs.confirm }}
         run: |
           target="$TARGET_BRANCH"
-          changelog="$INPUT_CHANGELOG"
           publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
 
           if [[ "$INPUT_CONFIRM" != "RELEASE" ]]; then
@@ -64,12 +57,6 @@ jobs:
           echo "target_branch=$target" >> "$GITHUB_OUTPUT"
           echo "publish_curseforge=$publish_curseforge" >> "$GITHUB_OUTPUT"
 
-          {
-            echo "changelog<<EOF"
-            echo "$changelog"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
   build:
     name: Build
     needs: validate-release
@@ -80,6 +67,7 @@ jobs:
       mod_version: ${{ steps.meta.outputs.mod_version }}
       mod_name: ${{ steps.meta.outputs.mod_name }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
+      changelog: ${{ steps.meta.outputs.changelog }}
       java_version: ${{ steps.meta.outputs.java_version }}
       loader: ${{ steps.meta.outputs.loader }}
 
@@ -98,10 +86,16 @@ jobs:
           mod_version="$(awk -F= '/^mod_version=/{print $2}' gradle.properties | tr -d '\r')"
           mod_name="$(awk -F= '/^mod_name=/{print $2}' gradle.properties | tr -d '\r')"
           release_tag="${minecraft_version}-${mod_version}"
+          changelog_file="CHANGELOGS/${release_tag}.md"
           java_version="$(grep -oE 'JavaLanguageVersion\\.of\\([0-9]+\\)' build.gradle.kts | head -n1 | grep -oE '[0-9]+' || true)"
 
           if [[ -z "$java_version" ]]; then
             java_version="21"
+          fi
+
+          if [[ ! -f "$changelog_file" ]]; then
+            echo "Missing changelog file: $changelog_file"
+            exit 1
           fi
 
           if grep -q 'id("net.neoforged.moddev")' build.gradle.kts; then
@@ -118,6 +112,11 @@ jobs:
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
           echo "java_version=$java_version" >> "$GITHUB_OUTPUT"
           echo "loader=$loader" >> "$GITHUB_OUTPUT"
+          {
+            echo "changelog<<EOF"
+            cat "$changelog_file"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -143,7 +142,7 @@ jobs:
         env:
           CI: true
           BUILD_VERSION: ${{ steps.meta.outputs.release_tag }}
-          CHANGELOG: ${{ needs.validate-release.outputs.changelog }}
+          CHANGELOG: ${{ steps.meta.outputs.changelog }}
           PUBLISH: true
 
       - name: Upload build artifacts
@@ -186,7 +185,7 @@ jobs:
           name: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
           version: ${{ needs.build.outputs.release_tag }}
           files: build/libs/*.jar
-          changelog: ${{ needs.validate-release.outputs.changelog }}
+          changelog: ${{ needs.build.outputs.changelog }}
           loaders: ${{ needs.build.outputs.loader }}
           game-versions: ${{ needs.build.outputs.minecraft_version }}
           java: ${{ needs.build.outputs.java_version }}
