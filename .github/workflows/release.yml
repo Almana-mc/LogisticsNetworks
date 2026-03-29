@@ -1,0 +1,272 @@
+name: Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Version branch (e.g. 26.1, 1.21.1)"
+        required: true
+        type: string
+      release_tag:
+        description: "Version/tag label (e.g. 26.1-1.6.0)"
+        required: true
+        type: string
+      release_name:
+        description: "Display name for this release run"
+        required: true
+        type: string
+      changelog:
+        description: "Release notes/changelog"
+        required: true
+        type: string
+      publish_curseforge:
+        description: "Publish to CurseForge"
+        required: true
+        type: boolean
+        default: true
+      publish_modrinth:
+        description: "Publish to Modrinth"
+        required: true
+        type: boolean
+        default: true
+      confirm:
+        description: "Type RELEASE to confirm"
+        required: true
+        type: string
+  release:
+    types: [published]
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.release_tag || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  validate-release:
+    name: Validate Release Target
+    runs-on: ubuntu-latest
+    outputs:
+      is_version_branch: ${{ steps.branch_check.outputs.is_version_branch }}
+      target_branch: ${{ steps.branch_check.outputs.target_branch }}
+      release_tag: ${{ steps.branch_check.outputs.release_tag }}
+      release_name: ${{ steps.branch_check.outputs.release_name }}
+      changelog: ${{ steps.branch_check.outputs.changelog }}
+      checkout_ref: ${{ steps.branch_check.outputs.checkout_ref }}
+      publish_curseforge: ${{ steps.branch_check.outputs.publish_curseforge }}
+      publish_modrinth: ${{ steps.branch_check.outputs.publish_modrinth }}
+    steps:
+      - name: Resolve trigger inputs
+        id: branch_check
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TARGET: ${{ github.event.release.target_commitish }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          INPUT_TARGET_BRANCH: ${{ inputs.target_branch }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+          INPUT_RELEASE_NAME: ${{ inputs.release_name }}
+          INPUT_CHANGELOG: ${{ inputs.changelog }}
+          INPUT_PUBLISH_CURSEFORGE: ${{ inputs.publish_curseforge }}
+          INPUT_PUBLISH_MODRINTH: ${{ inputs.publish_modrinth }}
+          INPUT_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            target="$RELEASE_TARGET"
+            release_tag="$RELEASE_TAG"
+            release_name="$RELEASE_NAME"
+            changelog="$RELEASE_BODY"
+            publish_curseforge="true"
+            publish_modrinth="true"
+            checkout_ref="refs/tags/$release_tag"
+          else
+            target="$INPUT_TARGET_BRANCH"
+            release_tag="$INPUT_RELEASE_TAG"
+            release_name="$INPUT_RELEASE_NAME"
+            changelog="$INPUT_CHANGELOG"
+            publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
+            publish_modrinth="$INPUT_PUBLISH_MODRINTH"
+            checkout_ref="refs/heads/$target"
+
+            if [[ "$INPUT_CONFIRM" != "RELEASE" ]]; then
+              echo "Manual confirmation failed. Type RELEASE in the confirm input."
+              exit 1
+            fi
+          fi
+
+          target="${target#refs/heads/}"
+          if [[ -z "$release_name" ]]; then
+            release_name="$release_tag"
+          fi
+
+          # Accept branch names like 26.1, 1.21.1, 1.20.2, etc.
+          if [[ "$target" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "is_version_branch=true" >> "$GITHUB_OUTPUT"
+            echo "Release target branch '$target' accepted."
+          else
+            echo "is_version_branch=false" >> "$GITHUB_OUTPUT"
+            echo "Release target branch '$target' is not a version branch. Workflow will skip."
+          fi
+
+          echo "target_branch=$target" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "release_name=$release_name" >> "$GITHUB_OUTPUT"
+          echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
+          echo "publish_curseforge=$publish_curseforge" >> "$GITHUB_OUTPUT"
+          echo "publish_modrinth=$publish_modrinth" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "changelog<<EOF"
+            echo "$changelog"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build
+    needs: validate-release
+    if: needs.validate-release.outputs.is_version_branch == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      minecraft_version: ${{ steps.meta.outputs.minecraft_version }}
+      mod_name: ${{ steps.meta.outputs.mod_name }}
+      java_version: ${{ steps.meta.outputs.java_version }}
+      loader: ${{ steps.meta.outputs.loader }}
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.validate-release.outputs.checkout_ref }}
+
+      - name: Read project metadata
+        id: meta
+        shell: bash
+        run: |
+          minecraft_version="$(awk -F= '/^minecraft_version=/{print $2}' gradle.properties | tr -d '\r')"
+          mod_name="$(awk -F= '/^mod_name=/{print $2}' gradle.properties | tr -d '\r')"
+          java_version="$(grep -oE 'JavaLanguageVersion\\.of\\([0-9]+\\)' build.gradle.kts | head -n1 | grep -oE '[0-9]+' || true)"
+
+          if [[ -z "$java_version" ]]; then
+            java_version="21"
+          fi
+
+          if grep -q 'id("net.neoforged.moddev")' build.gradle.kts; then
+            loader="neoforge"
+          elif grep -q 'id("net.minecraftforge.gradle")' build.gradle.kts; then
+            loader="forge"
+          else
+            loader="neoforge"
+          fi
+
+          echo "minecraft_version=$minecraft_version" >> "$GITHUB_OUTPUT"
+          echo "mod_name=$mod_name" >> "$GITHUB_OUTPUT"
+          echo "java_version=$java_version" >> "$GITHUB_OUTPUT"
+          echo "loader=$loader" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.meta.outputs.java_version }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
+      - name: Build
+        shell: bash
+        run: |
+          exclude_args=()
+          if ./gradlew tasks --all --console=plain | grep -qE '^copyJar\\s'; then
+            exclude_args=(-x copyJar)
+          fi
+
+          ./gradlew clean build "${exclude_args[@]}" --console=plain
+        env:
+          CI: true
+          BUILD_VERSION: ${{ needs.validate-release.outputs.release_tag }}
+          CHANGELOG: ${{ needs.validate-release.outputs.changelog }}
+          PUBLISH: true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build
+          path: build/libs/*.jar
+
+  publish-github:
+    name: Publish to GitHub Release
+    needs: [validate-release, build]
+    if: needs.build.result == 'success' && github.event_name == 'release'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+          path: build/libs
+
+      - name: Upload assets to release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: build/libs/*.jar
+
+  publish-curseforge:
+    name: Publish to CurseForge
+    needs: [validate-release, build]
+    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_curseforge == 'true' && vars.CURSEFORGE_PROJECT_ID != '' && secrets.TOKEN_CURSEFORGE != ''
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+          path: build/libs
+
+      - name: Publish to CurseForge
+        uses: Kira-NT/mc-publish@v3.3.0
+        with:
+          name: ${{ needs.build.outputs.mod_name }} - ${{ needs.validate-release.outputs.release_tag }}
+          version: ${{ needs.validate-release.outputs.release_tag }}
+          files: build/libs/*.jar
+          changelog: ${{ needs.validate-release.outputs.changelog }}
+          loaders: ${{ needs.build.outputs.loader }}
+          game-versions: ${{ needs.build.outputs.minecraft_version }}
+          java: ${{ needs.build.outputs.java_version }}
+          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          curseforge-token: ${{ secrets.TOKEN_CURSEFORGE }}
+
+  publish-modrinth:
+    name: Publish to Modrinth
+    needs: [validate-release, build]
+    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_modrinth == 'true' && vars.MODRINTH_PROJECT_ID != '' && secrets.TOKEN_MODRINTH != ''
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+          path: build/libs
+
+      - name: Publish to Modrinth
+        uses: Kira-NT/mc-publish@v3.3.0
+        with:
+          name: ${{ needs.build.outputs.mod_name }} - ${{ needs.validate-release.outputs.release_tag }}
+          version: ${{ needs.validate-release.outputs.release_tag }}
+          files: build/libs/*.jar
+          changelog: ${{ needs.validate-release.outputs.changelog }}
+          loaders: ${{ needs.build.outputs.loader }}
+          game-versions: ${{ needs.build.outputs.minecraft_version }}
+          java: ${{ needs.build.outputs.java_version }}
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.TOKEN_MODRINTH }}
