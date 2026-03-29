@@ -3,18 +3,6 @@ name: Release Build
 on:
   workflow_dispatch:
     inputs:
-      target_branch:
-        description: "Version branch (e.g. 26.1, 1.21.1)"
-        required: true
-        type: string
-      release_tag:
-        description: "Version/tag label (e.g. 26.1-1.6.0)"
-        required: true
-        type: string
-      release_name:
-        description: "Display name for this release run"
-        required: true
-        type: string
       changelog:
         description: "Release notes/changelog"
         required: true
@@ -30,7 +18,7 @@ on:
         type: string
 
 concurrency:
-  group: release-${{ inputs.release_tag || github.run_id }}
+  group: release-${{ github.ref_name || github.run_id }}
   cancel-in-progress: false
 
 permissions:
@@ -43,38 +31,25 @@ jobs:
     outputs:
       is_version_branch: ${{ steps.branch_check.outputs.is_version_branch }}
       target_branch: ${{ steps.branch_check.outputs.target_branch }}
-      release_tag: ${{ steps.branch_check.outputs.release_tag }}
-      release_name: ${{ steps.branch_check.outputs.release_name }}
       changelog: ${{ steps.branch_check.outputs.changelog }}
-      checkout_ref: ${{ steps.branch_check.outputs.checkout_ref }}
       publish_curseforge: ${{ steps.branch_check.outputs.publish_curseforge }}
     steps:
       - name: Resolve trigger inputs
         id: branch_check
         shell: bash
         env:
-          INPUT_TARGET_BRANCH: ${{ inputs.target_branch }}
-          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
-          INPUT_RELEASE_NAME: ${{ inputs.release_name }}
+          TARGET_BRANCH: ${{ github.ref_name }}
           INPUT_CHANGELOG: ${{ inputs.changelog }}
           INPUT_PUBLISH_CURSEFORGE: ${{ inputs.publish_curseforge }}
           INPUT_CONFIRM: ${{ inputs.confirm }}
         run: |
-          target="$INPUT_TARGET_BRANCH"
-          release_tag="$INPUT_RELEASE_TAG"
-          release_name="$INPUT_RELEASE_NAME"
+          target="$TARGET_BRANCH"
           changelog="$INPUT_CHANGELOG"
           publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
-          checkout_ref="refs/heads/$target"
 
           if [[ "$INPUT_CONFIRM" != "RELEASE" ]]; then
             echo "Manual confirmation failed. Type RELEASE in the confirm input."
             exit 1
-          fi
-
-          target="${target#refs/heads/}"
-          if [[ -z "$release_name" ]]; then
-            release_name="$release_tag"
           fi
 
           # Accept branch names like 26.1, 1.21.1, 1.20.2, etc.
@@ -87,9 +62,6 @@ jobs:
           fi
 
           echo "target_branch=$target" >> "$GITHUB_OUTPUT"
-          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
-          echo "release_name=$release_name" >> "$GITHUB_OUTPUT"
-          echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
           echo "publish_curseforge=$publish_curseforge" >> "$GITHUB_OUTPUT"
 
           {
@@ -105,7 +77,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       minecraft_version: ${{ steps.meta.outputs.minecraft_version }}
+      mod_version: ${{ steps.meta.outputs.mod_version }}
       mod_name: ${{ steps.meta.outputs.mod_name }}
+      release_tag: ${{ steps.meta.outputs.release_tag }}
       java_version: ${{ steps.meta.outputs.java_version }}
       loader: ${{ steps.meta.outputs.loader }}
 
@@ -114,14 +88,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ needs.validate-release.outputs.checkout_ref }}
+          ref: ${{ github.ref }}
 
       - name: Read project metadata
         id: meta
         shell: bash
         run: |
           minecraft_version="$(awk -F= '/^minecraft_version=/{print $2}' gradle.properties | tr -d '\r')"
+          mod_version="$(awk -F= '/^mod_version=/{print $2}' gradle.properties | tr -d '\r')"
           mod_name="$(awk -F= '/^mod_name=/{print $2}' gradle.properties | tr -d '\r')"
+          release_tag="${minecraft_version}-${mod_version}"
           java_version="$(grep -oE 'JavaLanguageVersion\\.of\\([0-9]+\\)' build.gradle.kts | head -n1 | grep -oE '[0-9]+' || true)"
 
           if [[ -z "$java_version" ]]; then
@@ -137,7 +113,9 @@ jobs:
           fi
 
           echo "minecraft_version=$minecraft_version" >> "$GITHUB_OUTPUT"
+          echo "mod_version=$mod_version" >> "$GITHUB_OUTPUT"
           echo "mod_name=$mod_name" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
           echo "java_version=$java_version" >> "$GITHUB_OUTPUT"
           echo "loader=$loader" >> "$GITHUB_OUTPUT"
 
@@ -164,7 +142,7 @@ jobs:
           ./gradlew clean build "${exclude_args[@]}" --console=plain
         env:
           CI: true
-          BUILD_VERSION: ${{ needs.validate-release.outputs.release_tag }}
+          BUILD_VERSION: ${{ steps.meta.outputs.release_tag }}
           CHANGELOG: ${{ needs.validate-release.outputs.changelog }}
           PUBLISH: true
 
@@ -205,8 +183,8 @@ jobs:
         if: steps.curseforge_config.outputs.enabled == 'true'
         uses: Kira-NT/mc-publish@v3.3.0
         with:
-          name: ${{ needs.build.outputs.mod_name }} - ${{ needs.validate-release.outputs.release_tag }}
-          version: ${{ needs.validate-release.outputs.release_tag }}
+          name: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
+          version: ${{ needs.build.outputs.release_tag }}
           files: build/libs/*.jar
           changelog: ${{ needs.validate-release.outputs.changelog }}
           loaders: ${{ needs.build.outputs.loader }}
