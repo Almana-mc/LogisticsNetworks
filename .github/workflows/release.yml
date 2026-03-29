@@ -177,17 +177,32 @@ jobs:
   publish-curseforge:
     name: Publish to CurseForge
     needs: [validate-release, build]
-    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_curseforge == 'true' && vars.CURSEFORGE_PROJECT_ID != '' && secrets.TOKEN_CURSEFORGE != ''
+    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_curseforge == 'true' && vars.CURSEFORGE_PROJECT_ID != ''
     runs-on: ubuntu-latest
+    env:
+      CURSEFORGE_TOKEN: ${{ secrets.TOKEN_CURSEFORGE }}
 
     steps:
+      - name: Validate CurseForge config
+        id: curseforge_config
+        shell: bash
+        run: |
+          if [[ -z "$CURSEFORGE_TOKEN" ]]; then
+            echo "CurseForge token is not configured. Skipping publish."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download artifacts
+        if: steps.curseforge_config.outputs.enabled == 'true'
         uses: actions/download-artifact@v4
         with:
           name: release-build
           path: build/libs
 
       - name: Publish to CurseForge
+        if: steps.curseforge_config.outputs.enabled == 'true'
         uses: Kira-NT/mc-publish@v3.3.0
         with:
           name: ${{ needs.build.outputs.mod_name }} - ${{ needs.validate-release.outputs.release_tag }}
@@ -198,4 +213,4 @@ jobs:
           game-versions: ${{ needs.build.outputs.minecraft_version }}
           java: ${{ needs.build.outputs.java_version }}
           curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
-          curseforge-token: ${{ secrets.TOKEN_CURSEFORGE }}
+          curseforge-token: ${{ env.CURSEFORGE_TOKEN }}
