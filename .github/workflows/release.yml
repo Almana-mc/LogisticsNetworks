@@ -3,6 +3,11 @@ name: Release Build
 on:
   workflow_dispatch:
     inputs:
+      publish_discord:
+        description: "Send Discord notification"
+        required: true
+        type: boolean
+        default: true
       publish_github:
         description: "Publish to GitHub Releases"
         required: true
@@ -37,6 +42,7 @@ jobs:
     outputs:
       is_version_branch: ${{ steps.branch_check.outputs.is_version_branch }}
       target_branch: ${{ steps.branch_check.outputs.target_branch }}
+      publish_discord: ${{ steps.branch_check.outputs.publish_discord }}
       publish_github: ${{ steps.branch_check.outputs.publish_github }}
       publish_curseforge: ${{ steps.branch_check.outputs.publish_curseforge }}
       publish_modrinth: ${{ steps.branch_check.outputs.publish_modrinth }}
@@ -46,12 +52,14 @@ jobs:
         shell: bash
         env:
           TARGET_BRANCH: ${{ github.ref_name }}
+          INPUT_PUBLISH_DISCORD: ${{ inputs.publish_discord }}
           INPUT_PUBLISH_GITHUB: ${{ inputs.publish_github }}
           INPUT_PUBLISH_CURSEFORGE: ${{ inputs.publish_curseforge }}
           INPUT_PUBLISH_MODRINTH: ${{ inputs.publish_modrinth }}
           INPUT_CONFIRM: ${{ inputs.confirm }}
         run: |
           target="$TARGET_BRANCH"
+          publish_discord="$INPUT_PUBLISH_DISCORD"
           publish_github="$INPUT_PUBLISH_GITHUB"
           publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
           publish_modrinth="$INPUT_PUBLISH_MODRINTH"
@@ -71,6 +79,7 @@ jobs:
           fi
 
           echo "target_branch=$target" >> "$GITHUB_OUTPUT"
+          echo "publish_discord=$publish_discord" >> "$GITHUB_OUTPUT"
           echo "publish_github=$publish_github" >> "$GITHUB_OUTPUT"
           echo "publish_curseforge=$publish_curseforge" >> "$GITHUB_OUTPUT"
           echo "publish_modrinth=$publish_modrinth" >> "$GITHUB_OUTPUT"
@@ -176,6 +185,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      release_url: ${{ steps.github_release.outputs.url }}
 
     steps:
       - name: Download artifacts
@@ -185,6 +196,7 @@ jobs:
           path: build/libs
 
       - name: Publish to GitHub Releases
+        id: github_release
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -202,6 +214,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CURSEFORGE_TOKEN: ${{ secrets.TOKEN_CURSEFORGE }}
+    outputs:
+      release_url: ${{ steps.curseforge_publish.outputs.curseforge-url }}
 
     steps:
       - name: Validate CurseForge config
@@ -224,6 +238,7 @@ jobs:
 
       - name: Publish to CurseForge
         if: steps.curseforge_config.outputs.enabled == 'true'
+        id: curseforge_publish
         uses: Kira-NT/mc-publish@v3.3.0
         with:
           name: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
@@ -243,6 +258,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MODRINTH_TOKEN: ${{ secrets.TOKEN_MODRINTH }}
+    outputs:
+      release_url: ${{ steps.modrinth_publish.outputs.modrinth-url }}
 
     steps:
       - name: Validate Modrinth config
@@ -265,6 +282,7 @@ jobs:
 
       - name: Publish to Modrinth
         if: steps.modrinth_config.outputs.enabled == 'true'
+        id: modrinth_publish
         uses: Kira-NT/mc-publish@v3.3.0
         with:
           name: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
@@ -276,3 +294,129 @@ jobs:
           java: ${{ needs.build.outputs.java_version }}
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ env.MODRINTH_TOKEN }}
+
+  notify-discord:
+    name: Notify Discord
+    needs: [validate-release, build, publish-github, publish-curseforge, publish-modrinth]
+    if: always() && needs.validate-release.outputs.is_version_branch == 'true' && needs.validate-release.outputs.publish_discord == 'true' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+      DISCORD_ROLE_ID: ${{ vars.DISCORD_RELEASE_ROLE_ID }}
+      TARGET_BRANCH: ${{ needs.validate-release.outputs.target_branch }}
+      MINECRAFT_VERSION: ${{ needs.build.outputs.minecraft_version }}
+      MOD_VERSION: ${{ needs.build.outputs.mod_version }}
+      RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+      MOD_NAME: ${{ needs.build.outputs.mod_name }}
+      CHANGELOG: ${{ needs.build.outputs.changelog }}
+      BUILD_RESULT: ${{ needs.build.result }}
+      GITHUB_RESULT: ${{ needs.publish-github.result }}
+      GITHUB_URL: ${{ needs.publish-github.outputs.release_url }}
+      CURSEFORGE_RESULT: ${{ needs.publish-curseforge.result }}
+      CURSEFORGE_URL: ${{ needs.publish-curseforge.outputs.release_url }}
+      MODRINTH_RESULT: ${{ needs.publish-modrinth.result }}
+      MODRINTH_URL: ${{ needs.publish-modrinth.outputs.release_url }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ACTOR: ${{ github.actor }}
+      REPOSITORY: ${{ github.repository }}
+
+    steps:
+      - name: Validate Discord config
+        id: discord_config
+        shell: bash
+        run: |
+          if [[ -z "$DISCORD_WEBHOOK_URL" ]]; then
+            echo "Discord webhook is not configured. Skipping notification."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Send Discord notification
+        if: steps.discord_config.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          payload=$(python3 - <<'PY'
+import json
+import os
+
+def link_line(label, url, result):
+    if url:
+        return f"{label}: {url}"
+    if result == "skipped":
+        return f"{label}: Skipped"
+    if result == "success":
+        return f"{label}: Published"
+    if result == "failure":
+        return f"{label}: Failed"
+    if result == "cancelled":
+        return f"{label}: Cancelled"
+    return f"{label}: {result}"
+
+role_id = os.environ.get("DISCORD_ROLE_ID", "").strip()
+greeting = f"Hey <@&{role_id}>" if role_id else "Hey"
+release_name = f"LogisticsNetwork-{os.environ['MINECRAFT_VERSION']}-{os.environ['MOD_VERSION']}"
+
+lines = [
+    greeting,
+    "",
+    f"New release: {release_name}",
+    "## Changelog",
+    "",
+]
+
+changelog = os.environ.get("CHANGELOG", "").strip()
+if changelog:
+    lines.append(changelog)
+else:
+    lines.append("No changelog provided.")
+
+lines.extend([
+    "",
+    link_line("Curseforge", os.environ.get("CURSEFORGE_URL", "").strip(), os.environ.get("CURSEFORGE_RESULT", "").strip()),
+    link_line("Modrinth", os.environ.get("MODRINTH_URL", "").strip(), os.environ.get("MODRINTH_RESULT", "").strip()),
+    link_line("Github", os.environ.get("GITHUB_URL", "").strip(), os.environ.get("GITHUB_RESULT", "").strip()),
+    "",
+    "Thank you all for downloading,",
+    "AlmanaX21",
+])
+
+content = "\n".join(lines)
+if len(content) > 1900:
+    static_lines = [
+        greeting,
+        "",
+        f"New release: {release_name}",
+        "## Changelog",
+        "",
+    ]
+    footer_lines = [
+        "",
+        link_line("Curseforge", os.environ.get("CURSEFORGE_URL", "").strip(), os.environ.get("CURSEFORGE_RESULT", "").strip()),
+        link_line("Modrinth", os.environ.get("MODRINTH_URL", "").strip(), os.environ.get("MODRINTH_RESULT", "").strip()),
+        link_line("Github", os.environ.get("GITHUB_URL", "").strip(), os.environ.get("GITHUB_RESULT", "").strip()),
+        "",
+        "Thank you all for downloading,",
+        "AlmanaX21",
+    ]
+    static_prefix = "\n".join(static_lines)
+    static_suffix = "\n".join(footer_lines)
+    available = 1900 - len(static_prefix) - len(static_suffix) - len("\n...\n")
+    trimmed = changelog[:max(0, available)].rstrip()
+    content = "\n".join(static_lines + [trimmed, "..."] + footer_lines)
+
+payload = {"content": content}
+if role_id:
+    payload["allowed_mentions"] = {"parse": [], "roles": [role_id]}
+
+print(json.dumps(payload))
+PY
+          )
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$DISCORD_WEBHOOK_URL"
