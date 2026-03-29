@@ -3,8 +3,18 @@ name: Release Build
 on:
   workflow_dispatch:
     inputs:
+      publish_github:
+        description: "Publish to GitHub Releases"
+        required: true
+        type: boolean
+        default: true
       publish_curseforge:
         description: "Publish to CurseForge"
+        required: true
+        type: boolean
+        default: true
+      publish_modrinth:
+        description: "Publish to Modrinth"
         required: true
         type: boolean
         default: true
@@ -27,18 +37,24 @@ jobs:
     outputs:
       is_version_branch: ${{ steps.branch_check.outputs.is_version_branch }}
       target_branch: ${{ steps.branch_check.outputs.target_branch }}
+      publish_github: ${{ steps.branch_check.outputs.publish_github }}
       publish_curseforge: ${{ steps.branch_check.outputs.publish_curseforge }}
+      publish_modrinth: ${{ steps.branch_check.outputs.publish_modrinth }}
     steps:
       - name: Resolve trigger inputs
         id: branch_check
         shell: bash
         env:
           TARGET_BRANCH: ${{ github.ref_name }}
+          INPUT_PUBLISH_GITHUB: ${{ inputs.publish_github }}
           INPUT_PUBLISH_CURSEFORGE: ${{ inputs.publish_curseforge }}
+          INPUT_PUBLISH_MODRINTH: ${{ inputs.publish_modrinth }}
           INPUT_CONFIRM: ${{ inputs.confirm }}
         run: |
           target="$TARGET_BRANCH"
+          publish_github="$INPUT_PUBLISH_GITHUB"
           publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
+          publish_modrinth="$INPUT_PUBLISH_MODRINTH"
 
           if [[ "$INPUT_CONFIRM" != "RELEASE" ]]; then
             echo "Manual confirmation failed. Type RELEASE in the confirm input."
@@ -55,7 +71,9 @@ jobs:
           fi
 
           echo "target_branch=$target" >> "$GITHUB_OUTPUT"
+          echo "publish_github=$publish_github" >> "$GITHUB_OUTPUT"
           echo "publish_curseforge=$publish_curseforge" >> "$GITHUB_OUTPUT"
+          echo "publish_modrinth=$publish_modrinth" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build
@@ -151,6 +169,32 @@ jobs:
           name: release-build
           path: build/libs/*.jar
 
+  publish-github:
+    name: Publish to GitHub Releases
+    needs: [validate-release, build]
+    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_github == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+          path: build/libs
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ needs.build.outputs.release_tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
+          body: ${{ needs.build.outputs.changelog }}
+          files: build/libs/*.jar
+          fail_on_unmatched_files: true
+
   publish-curseforge:
     name: Publish to CurseForge
     needs: [validate-release, build]
@@ -191,3 +235,44 @@ jobs:
           java: ${{ needs.build.outputs.java_version }}
           curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
           curseforge-token: ${{ env.CURSEFORGE_TOKEN }}
+
+  publish-modrinth:
+    name: Publish to Modrinth
+    needs: [validate-release, build]
+    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_modrinth == 'true' && vars.MODRINTH_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    env:
+      MODRINTH_TOKEN: ${{ secrets.TOKEN_MODRINTH }}
+
+    steps:
+      - name: Validate Modrinth config
+        id: modrinth_config
+        shell: bash
+        run: |
+          if [[ -z "$MODRINTH_TOKEN" ]]; then
+            echo "Modrinth token is not configured. Skipping publish."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download artifacts
+        if: steps.modrinth_config.outputs.enabled == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+          path: build/libs
+
+      - name: Publish to Modrinth
+        if: steps.modrinth_config.outputs.enabled == 'true'
+        uses: Kira-NT/mc-publish@v3.3.0
+        with:
+          name: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
+          version: ${{ needs.build.outputs.release_tag }}
+          files: build/libs/*.jar
+          changelog: ${{ needs.build.outputs.changelog }}
+          loaders: ${{ needs.build.outputs.loader }}
+          game-versions: ${{ needs.build.outputs.minecraft_version }}
+          java: ${{ needs.build.outputs.java_version }}
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ env.MODRINTH_TOKEN }}
