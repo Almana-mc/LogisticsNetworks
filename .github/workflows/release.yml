@@ -24,24 +24,17 @@ on:
         required: true
         type: boolean
         default: true
-      publish_modrinth:
-        description: "Publish to Modrinth"
-        required: true
-        type: boolean
-        default: true
       confirm:
         description: "Type RELEASE to confirm"
         required: true
         type: string
-  release:
-    types: [published]
 
 concurrency:
-  group: release-${{ github.event.release.tag_name || inputs.release_tag || github.run_id }}
+  group: release-${{ inputs.release_tag || github.run_id }}
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate-release:
@@ -55,46 +48,28 @@ jobs:
       changelog: ${{ steps.branch_check.outputs.changelog }}
       checkout_ref: ${{ steps.branch_check.outputs.checkout_ref }}
       publish_curseforge: ${{ steps.branch_check.outputs.publish_curseforge }}
-      publish_modrinth: ${{ steps.branch_check.outputs.publish_modrinth }}
     steps:
       - name: Resolve trigger inputs
         id: branch_check
         shell: bash
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          RELEASE_TARGET: ${{ github.event.release.target_commitish }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          RELEASE_NAME: ${{ github.event.release.name }}
-          RELEASE_BODY: ${{ github.event.release.body }}
           INPUT_TARGET_BRANCH: ${{ inputs.target_branch }}
           INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
           INPUT_RELEASE_NAME: ${{ inputs.release_name }}
           INPUT_CHANGELOG: ${{ inputs.changelog }}
           INPUT_PUBLISH_CURSEFORGE: ${{ inputs.publish_curseforge }}
-          INPUT_PUBLISH_MODRINTH: ${{ inputs.publish_modrinth }}
           INPUT_CONFIRM: ${{ inputs.confirm }}
         run: |
-          if [[ "$EVENT_NAME" == "release" ]]; then
-            target="$RELEASE_TARGET"
-            release_tag="$RELEASE_TAG"
-            release_name="$RELEASE_NAME"
-            changelog="$RELEASE_BODY"
-            publish_curseforge="true"
-            publish_modrinth="true"
-            checkout_ref="refs/tags/$release_tag"
-          else
-            target="$INPUT_TARGET_BRANCH"
-            release_tag="$INPUT_RELEASE_TAG"
-            release_name="$INPUT_RELEASE_NAME"
-            changelog="$INPUT_CHANGELOG"
-            publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
-            publish_modrinth="$INPUT_PUBLISH_MODRINTH"
-            checkout_ref="refs/heads/$target"
+          target="$INPUT_TARGET_BRANCH"
+          release_tag="$INPUT_RELEASE_TAG"
+          release_name="$INPUT_RELEASE_NAME"
+          changelog="$INPUT_CHANGELOG"
+          publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
+          checkout_ref="refs/heads/$target"
 
-            if [[ "$INPUT_CONFIRM" != "RELEASE" ]]; then
-              echo "Manual confirmation failed. Type RELEASE in the confirm input."
-              exit 1
-            fi
+          if [[ "$INPUT_CONFIRM" != "RELEASE" ]]; then
+            echo "Manual confirmation failed. Type RELEASE in the confirm input."
+            exit 1
           fi
 
           target="${target#refs/heads/}"
@@ -116,7 +91,6 @@ jobs:
           echo "release_name=$release_name" >> "$GITHUB_OUTPUT"
           echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
           echo "publish_curseforge=$publish_curseforge" >> "$GITHUB_OUTPUT"
-          echo "publish_modrinth=$publish_modrinth" >> "$GITHUB_OUTPUT"
 
           {
             echo "changelog<<EOF"
@@ -136,7 +110,7 @@ jobs:
       loader: ${{ steps.meta.outputs.loader }}
 
     steps:
-      - name: Checkout tag
+      - name: Checkout target branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -200,25 +174,6 @@ jobs:
           name: release-build
           path: build/libs/*.jar
 
-  publish-github:
-    name: Publish to GitHub Release
-    needs: [validate-release, build]
-    if: needs.build.result == 'success' && github.event_name == 'release'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: release-build
-          path: build/libs
-
-      - name: Upload assets to release
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: build/libs/*.jar
-
   publish-curseforge:
     name: Publish to CurseForge
     needs: [validate-release, build]
@@ -244,29 +199,3 @@ jobs:
           java: ${{ needs.build.outputs.java_version }}
           curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
           curseforge-token: ${{ secrets.TOKEN_CURSEFORGE }}
-
-  publish-modrinth:
-    name: Publish to Modrinth
-    needs: [validate-release, build]
-    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_modrinth == 'true' && vars.MODRINTH_PROJECT_ID != '' && secrets.TOKEN_MODRINTH != ''
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: release-build
-          path: build/libs
-
-      - name: Publish to Modrinth
-        uses: Kira-NT/mc-publish@v3.3.0
-        with:
-          name: ${{ needs.build.outputs.mod_name }} - ${{ needs.validate-release.outputs.release_tag }}
-          version: ${{ needs.validate-release.outputs.release_tag }}
-          files: build/libs/*.jar
-          changelog: ${{ needs.validate-release.outputs.changelog }}
-          loaders: ${{ needs.build.outputs.loader }}
-          game-versions: ${{ needs.build.outputs.minecraft_version }}
-          java: ${{ needs.build.outputs.java_version }}
-          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
-          modrinth-token: ${{ secrets.TOKEN_MODRINTH }}
