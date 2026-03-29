@@ -337,80 +337,80 @@ jobs:
         shell: bash
         run: |
           payload=$(python3 - <<'PY'
-import json
-import os
+          import json
+          import os
 
-def link_line(label, url, result):
-    if url:
-        return f"{label}: {url}"
-    if result == "skipped":
-        return f"{label}: Skipped"
-    if result == "success":
-        return f"{label}: Published"
-    if result == "failure":
-        return f"{label}: Failed"
-    if result == "cancelled":
-        return f"{label}: Cancelled"
-    return f"{label}: {result}"
+          def link_line(label, url, result):
+              if url:
+                  return f"{label}: {url}"
+              if result == "skipped":
+                  return f"{label}: Skipped"
+              if result == "success":
+                  return f"{label}: Published"
+              if result == "failure":
+                  return f"{label}: Failed"
+              if result == "cancelled":
+                  return f"{label}: Cancelled"
+              return f"{label}: {result}"
 
-role_id = os.environ.get("DISCORD_ROLE_ID", "").strip()
-greeting = f"Hey <@&{role_id}>" if role_id else "Hey"
-release_name = f"LogisticsNetwork-{os.environ['MINECRAFT_VERSION']}-{os.environ['MOD_VERSION']}"
+          role_id = os.environ.get("DISCORD_ROLE_ID", "").strip()
+          greeting = f"Hey <@&{role_id}>" if role_id else "Hey"
+          release_name = f"LogisticsNetwork-{os.environ['MINECRAFT_VERSION']}-{os.environ['MOD_VERSION']}"
 
-lines = [
-    greeting,
-    "",
-    f"New release: {release_name}",
-    "## Changelog",
-    "",
-]
+          lines = [
+              greeting,
+              "",
+              f"New release: {release_name}",
+              "## Changelog",
+              "",
+          ]
 
-changelog = os.environ.get("CHANGELOG", "").strip()
-if changelog:
-    lines.append(changelog)
-else:
-    lines.append("No changelog provided.")
+          changelog = os.environ.get("CHANGELOG", "").strip()
+          if changelog:
+              lines.append(changelog)
+          else:
+              lines.append("No changelog provided.")
 
-lines.extend([
-    "",
-    link_line("Curseforge", os.environ.get("CURSEFORGE_URL", "").strip(), os.environ.get("CURSEFORGE_RESULT", "").strip()),
-    link_line("Modrinth", os.environ.get("MODRINTH_URL", "").strip(), os.environ.get("MODRINTH_RESULT", "").strip()),
-    link_line("Github", os.environ.get("GITHUB_URL", "").strip(), os.environ.get("GITHUB_RESULT", "").strip()),
-    "",
-    "Thank you all for downloading,",
-    "AlmanaX21",
-])
+          lines.extend([
+              "",
+              link_line("Curseforge", os.environ.get("CURSEFORGE_URL", "").strip(), os.environ.get("CURSEFORGE_RESULT", "").strip()),
+              link_line("Modrinth", os.environ.get("MODRINTH_URL", "").strip(), os.environ.get("MODRINTH_RESULT", "").strip()),
+              link_line("Github", os.environ.get("GITHUB_URL", "").strip(), os.environ.get("GITHUB_RESULT", "").strip()),
+              "",
+              "Thank you all for downloading,",
+              "AlmanaX21",
+          ])
 
-content = "\n".join(lines)
-if len(content) > 1900:
-    static_lines = [
-        greeting,
-        "",
-        f"New release: {release_name}",
-        "## Changelog",
-        "",
-    ]
-    footer_lines = [
-        "",
-        link_line("Curseforge", os.environ.get("CURSEFORGE_URL", "").strip(), os.environ.get("CURSEFORGE_RESULT", "").strip()),
-        link_line("Modrinth", os.environ.get("MODRINTH_URL", "").strip(), os.environ.get("MODRINTH_RESULT", "").strip()),
-        link_line("Github", os.environ.get("GITHUB_URL", "").strip(), os.environ.get("GITHUB_RESULT", "").strip()),
-        "",
-        "Thank you all for downloading,",
-        "AlmanaX21",
-    ]
-    static_prefix = "\n".join(static_lines)
-    static_suffix = "\n".join(footer_lines)
-    available = 1900 - len(static_prefix) - len(static_suffix) - len("\n...\n")
-    trimmed = changelog[:max(0, available)].rstrip()
-    content = "\n".join(static_lines + [trimmed, "..."] + footer_lines)
+          content = "\n".join(lines)
+          if len(content) > 1900:
+              static_lines = [
+                  greeting,
+                  "",
+                  f"New release: {release_name}",
+                  "## Changelog",
+                  "",
+              ]
+              footer_lines = [
+                  "",
+                  link_line("Curseforge", os.environ.get("CURSEFORGE_URL", "").strip(), os.environ.get("CURSEFORGE_RESULT", "").strip()),
+                  link_line("Modrinth", os.environ.get("MODRINTH_URL", "").strip(), os.environ.get("MODRINTH_RESULT", "").strip()),
+                  link_line("Github", os.environ.get("GITHUB_URL", "").strip(), os.environ.get("GITHUB_RESULT", "").strip()),
+                  "",
+                  "Thank you all for downloading,",
+                  "AlmanaX21",
+              ]
+              static_prefix = "\n".join(static_lines)
+              static_suffix = "\n".join(footer_lines)
+              available = 1900 - len(static_prefix) - len(static_suffix) - len("\n...\n")
+              trimmed = changelog[:max(0, available)].rstrip()
+              content = "\n".join(static_lines + [trimmed, "..."] + footer_lines)
 
-payload = {"content": content}
-if role_id:
-    payload["allowed_mentions"] = {"parse": [], "roles": [role_id]}
+          payload = {"content": content}
+          if role_id:
+              payload["allowed_mentions"] = {"parse": [], "roles": [role_id]}
 
-print(json.dumps(payload))
-PY
+          print(json.dumps(payload))
+          PY
           )
 
           curl \
