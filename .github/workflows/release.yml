@@ -114,7 +114,7 @@ jobs:
           mod_name="$(awk -F= '/^mod_name=/{print $2}' gradle.properties | tr -d '\r')"
           release_tag="${minecraft_version}-${mod_version}"
           changelog_file="CHANGELOGS/${release_tag}.md"
-          java_version="$(grep -oE 'JavaLanguageVersion\\.of\\([0-9]+\\)' build.gradle.kts | head -n1 | grep -oE '[0-9]+' || true)"
+          java_version="$(grep -oE 'JavaLanguageVersion\.of\([0-9]+\)' build.gradle.kts | head -n1 | grep -oE '[0-9]+' || true)"
 
           if [[ -z "$java_version" ]]; then
             java_version="21"
