@@ -161,11 +161,11 @@ jobs:
         shell: bash
         run: |
           exclude_args=()
-          if ./gradlew tasks --all --console=plain | grep -qE '^copyJar\\s'; then
+          if ./gradlew tasks --all --no-daemon --console=plain | grep -qE '^copyJar\s'; then
             exclude_args=(-x copyJar)
           fi
 
-          ./gradlew clean build "${exclude_args[@]}" --console=plain
+          ./gradlew build "${exclude_args[@]}" --no-daemon --console=plain
         env:
           CI: true
           BUILD_VERSION: ${{ steps.meta.outputs.release_tag }}
