@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
 import net.minecraft.network.FriendlyByteBuf;
@@ -10,7 +11,7 @@ import java.util.UUID;
 
 public record SyncTelemetryPayload(UUID networkId, int channelIndex, int cursor, long[] history, int historySize) implements CustomPacketPayload {
 
-    public static final int HISTORY_SIZE = 60;
+    public static final int HISTORY_SIZE = TelemetryManager.HISTORY_SIZE;
 
     public static final CustomPacketPayload.Type<SyncTelemetryPayload> TYPE = new CustomPacketPayload.Type<>(
             new ResourceLocation(Logisticsnetworks.MOD_ID, "sync_telemetry"));
