@@ -88,7 +88,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private EditBox renameEditBox = null;
 
     private int settingsScrollOffset = 0;
-    private static final int SETTINGS_VISIBLE_ROWS = 6;
+    private static final int SETTINGS_VISIBLE_ROWS = 9;
     private static final int SETTINGS_TOTAL_ROWS = 9;
 
     private boolean labelPickerOpen = false;
@@ -1089,7 +1089,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 networkNameField.keyPressed(key, scan, modifiers);
             return true;
         }
-        return super.keyPressed(key, scan, modifiers);
+        return true;
     }
 
     @Override

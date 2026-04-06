@@ -34,6 +34,12 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
     }
 
     @Override
+    public boolean keyPressed(int key, int scan, int modifiers) {
+        if (key == 256) return super.keyPressed(key, scan, modifiers);
+        return true;
+    }
+
+    @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
     }
 

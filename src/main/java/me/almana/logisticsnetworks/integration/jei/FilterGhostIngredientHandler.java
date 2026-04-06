@@ -23,6 +23,9 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
     public <I> List<Target<I>> getTargetsTyped(FilterScreen screen, ITypedIngredient<I> ingredient, boolean doStart) {
         Optional<FluidStack> fluid = ingredient.getIngredient(ForgeTypes.FLUID_STACK);
         if (fluid.isPresent()) {
+            if (screen.isDetailPageOpen()) {
+                return List.of();
+            }
             if (screen.acceptsFluidSelectorGhostIngredient()) {
                 return castTargets(buildSelectorFluidTarget(screen, fluid.get()));
             }
@@ -34,6 +37,9 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
 
         Optional<ItemStack> item = ingredient.getItemStack();
         if (item.isPresent() && !item.get().isEmpty()) {
+            if (screen.isDetailPageOpen()) {
+                return castTargets(buildDetailItemTarget(screen, item.get()));
+            }
             if (screen.acceptsItemSelectorGhostIngredient()) {
                 return castTargets(buildSelectorItemTarget(screen, item.get()));
             }
@@ -114,6 +120,11 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
         }
         return List.of(
                 new FilterTarget<>(screen.getSelectorGhostArea(), ignored -> screen.setSelectorGhostFluid(fluidStack)));
+    }
+
+    private List<Target<ItemStack>> buildDetailItemTarget(FilterScreen screen, ItemStack itemStack) {
+        return List.of(new FilterTarget<>(screen.getDetailSlotArea(),
+                ignored -> screen.setDetailGhostItem(itemStack)));
     }
 
     private List<Target<ItemStack>> buildItemTargets(FilterScreen screen, ItemStack itemStack) {

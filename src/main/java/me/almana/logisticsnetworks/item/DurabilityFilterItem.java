@@ -46,6 +46,11 @@ public class DurabilityFilterItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated")
+                .withStyle(ChatFormatting.RED));
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated.durability")
+                .withStyle(ChatFormatting.RED));
+
         DurabilityFilterData.Operator operator = DurabilityFilterData.getOperator(stack);
         int value = DurabilityFilterData.getValue(stack);
 

@@ -389,7 +389,8 @@ public class ServerPayloadHandler {
     public static void handleSetFilterEntryAmount(SetFilterEntryAmountPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !menu.isAmountMode()) {
-                menu.setEntryAmount((Player) context.player(), payload.entryIndex(), payload.amount());
+                menu.setEntryBatch((Player) context.player(), payload.entryIndex(), payload.batch());
+                menu.setEntryStock((Player) context.player(), payload.entryIndex(), payload.stock());
             }
         });
     }
@@ -412,10 +413,13 @@ public class ServerPayloadHandler {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
                 if (!payload.matchValue()) {
                     menu.clearEntryNbt((Player) context.player(), payload.entryIndex());
-                } else if (!payload.value().isEmpty()) {
+                } else if (!payload.value().isEmpty() && payload.key().isEmpty()) {
                     menu.setEntryNbtRaw((Player) context.player(), payload.entryIndex(), payload.key(), payload.value());
+                } else if (!payload.value().isEmpty() && !payload.key().isEmpty()) {
+                    menu.setEntryNbtWithValue((Player) context.player(), payload.entryIndex(),
+                            payload.key(), payload.value(), payload.op());
                 } else {
-                    menu.setEntryNbt((Player) context.player(), payload.entryIndex(), payload.key());
+                    menu.setEntryNbt((Player) context.player(), payload.entryIndex(), payload.key(), payload.op());
                 }
             }
         });
@@ -431,6 +435,25 @@ public class ServerPayloadHandler {
                     menu.setEntryDurability((Player) context.player(), payload.entryIndex(),
                             payload.comparison(), payload.value());
                 }
+            }
+        });
+    }
+
+    public static void handleSetFilterEntrySlotMapping(SetFilterEntrySlotMappingPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
+                menu.setEntrySlotMapping((Player) context.player(), payload.entryIndex(), payload.slotExpression());
+            }
+        });
+    }
+
+    public static void handleSetFilterEntryEnchanted(SetFilterEntryEnchantedPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
+                menu.setEntryEnchanted((Player) context.player(), payload.entryIndex(),
+                        payload.enabled() ? payload.value() : null);
             }
         });
     }
@@ -482,7 +505,9 @@ public class ServerPayloadHandler {
     public static void handleSetFilterItemEntry(SetFilterItemEntryPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
-                if (!payload.itemStack().isEmpty()) {
+                if (payload.itemStack().isEmpty()) {
+                    menu.clearFilterEntryItem(payload.slot());
+                } else {
                     menu.setItemFilterEntry((Player) context.player(), payload.slot(), payload.itemStack());
                 }
             }

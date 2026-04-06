@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.util.ItemStackCompat;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.*;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -20,6 +21,9 @@ import net.minecraft.world.inventory.*;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidUtil;
+
+import java.util.BitSet;
+import java.util.List;
 
 public class FilterMenu extends AbstractContainerMenu {
 
@@ -395,16 +399,29 @@ public class FilterMenu extends AbstractContainerMenu {
         return FilterItemData.getChemicalEntry(getOpenedStack(), slot);
     }
 
-    public int getEntryAmount(int slot) {
+    public int getEntryBatch(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return 0;
-        return FilterItemData.getEntryAmount(getOpenedStack(), slot);
+        return FilterItemData.getEntryBatch(getOpenedStack(), slot);
     }
 
-    public void setEntryAmount(Player player, int slot, int amount) {
+    public int getEntryStock(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return 0;
+        return FilterItemData.getEntryStock(getOpenedStack(), slot);
+    }
+
+    public void setEntryBatch(Player player, int slot, int batch) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
-        FilterItemData.setEntryAmount(getOpenedStack(), slot, Math.max(0, amount));
+        FilterItemData.setEntryBatch(getOpenedStack(), slot, Math.max(0, batch));
+        broadcastChanges();
+    }
+
+    public void setEntryStock(Player player, int slot, int stock) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.setEntryStock(getOpenedStack(), slot, Math.max(0, stock));
         broadcastChanges();
     }
 
@@ -469,6 +486,10 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public void setEntryNbt(Player player, int slot, String path) {
+        setEntryNbt(player, slot, path, "");
+    }
+
+    public void setEntryNbt(Player player, int slot, String path, String op) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
         ItemStack filterStack = getOpenedStack();
@@ -479,7 +500,31 @@ public class FilterMenu extends AbstractContainerMenu {
         if (value == null)
             return;
         FilterItemData.setEntryNbt(filterStack, slot, path, value);
+        if (op != null && !op.isEmpty()) {
+            FilterItemData.setEntryNbtOp(filterStack, slot, op);
+        }
+        CompoundTag raw = FilterItemData.buildRawFromPath(path, value);
+        FilterItemData.setEntryNbtRaw(filterStack, slot, raw.toString());
         broadcastChanges();
+    }
+
+    public void setEntryNbtWithValue(Player player, int slot, String path, String valueStr, String op) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        ItemStack filterStack = getOpenedStack();
+        try {
+            net.minecraft.nbt.Tag parsed = net.minecraft.nbt.TagParser.parseTag("{v:" + valueStr + "}").get("v");
+            if (parsed != null) {
+                FilterItemData.setEntryNbt(filterStack, slot, path, parsed);
+                if (op != null && !op.isEmpty()) {
+                    FilterItemData.setEntryNbtOp(filterStack, slot, op);
+                }
+                CompoundTag raw = FilterItemData.buildRawFromPath(path, parsed);
+                FilterItemData.setEntryNbtRaw(filterStack, slot, raw.toString());
+                broadcastChanges();
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     public void setEntryNbtRaw(Player player, int slot, String path, String rawValue) {
@@ -492,8 +537,10 @@ public class FilterMenu extends AbstractContainerMenu {
     public void clearEntryNbt(Player player, int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
-        FilterItemData.setEntryNbt(getOpenedStack(), slot, null, null);
-        FilterItemData.setEntryNbtRaw(getOpenedStack(), slot, null);
+        ItemStack filterStack = getOpenedStack();
+        FilterItemData.setEntryNbt(filterStack, slot, null, null);
+        FilterItemData.setEntryNbtRaw(filterStack, slot, null);
+        FilterItemData.setEntryNbtOp(filterStack, slot, null);
         broadcastChanges();
     }
 
@@ -509,6 +556,35 @@ public class FilterMenu extends AbstractContainerMenu {
             return;
         FilterItemData.setEntryDurability(getOpenedStack(), slot, null, 0);
         broadcastChanges();
+    }
+
+    public void setEntryEnchanted(Player player, int slot, Boolean value) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.setEntryEnchanted(getOpenedStack(), slot, value);
+        broadcastChanges();
+    }
+
+    public void setEntrySlotMapping(Player player, int slot, String slotExpression) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        String normalized = slotExpression == null ? "" : slotExpression.trim();
+        if (normalized.isEmpty()) {
+            FilterItemData.setEntrySlotMapping(getOpenedStack(), slot, null);
+        } else {
+            BitSet parsed = SlotExpressionUtil.parseSlots(normalized);
+            if (parsed != null) {
+                List<Integer> list = SlotExpressionUtil.bitSetToList(parsed);
+                FilterItemData.setEntrySlotMapping(getOpenedStack(), slot, list.stream().mapToInt(Integer::intValue).toArray());
+            }
+        }
+        broadcastChanges();
+    }
+
+    public String getEntrySlotMappingExpression(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return "";
+        return FilterItemData.getEntrySlotMappingExpression(getOpenedStack(), slot);
     }
 
     public void setAmountValue(Player player, int amount) {
@@ -772,7 +848,7 @@ public class FilterMenu extends AbstractContainerMenu {
         return false;
     }
 
-    private void clearFilterEntry(int slot) {
+    public void clearFilterEntry(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
 
@@ -784,9 +860,20 @@ public class FilterMenu extends AbstractContainerMenu {
             FilterItemData.setEntryTag(stack, s, null);
             FilterItemData.setEntryNbt(stack, s, null, null);
             FilterItemData.setEntryDurability(stack, s, null, 0);
+            FilterItemData.setEntrySlotMapping(stack, s, null);
             isFluidSlot[s] = false;
             isChemicalSlot[s] = false;
             isTagSlot[s] = false;
+            filterInventory.setItem(s, ItemStack.EMPTY);
+        });
+    }
+
+    public void clearFilterEntryItem(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        updateFilter(slot, s -> {
+            ItemStack stack = getOpenedStack();
+            FilterItemData.clearEntryItem(stack, s);
             filterInventory.setItem(s, ItemStack.EMPTY);
         });
     }
@@ -1024,7 +1111,12 @@ public class FilterMenu extends AbstractContainerMenu {
         FilterItemData.setBlacklist(stack, isBlacklistMode());
         for (int i = 0; i < slotCount; i++) {
             if (isTagSlot[i] || isChemicalSlot[i]) {
-            } else if (FilterItemData.hasEntryNbt(stack, i)) {
+            } else if (FilterItemData.hasEntryNbt(stack, i)
+                    || FilterItemData.hasEntryDurability(stack, i)
+                    || FilterItemData.hasEntryEnchanted(stack, i)) {
+            } else if (filterInventory.getItem(i).isEmpty()
+                    && (FilterItemData.getEntryBatch(stack, i) > 0
+                    || FilterItemData.getEntryStock(stack, i) > 0)) {
             } else if (isFluidSlot[i]) {
                 FluidStack fluid = FilterItemData.getFluidEntry(stack, i);
                 FilterItemData.setFluidEntry(stack, i, fluid);

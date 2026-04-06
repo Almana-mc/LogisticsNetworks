@@ -7,7 +7,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
@@ -17,8 +16,8 @@ public final class SlotFilterData {
     private static final String KEY_IS_BLACKLIST = "blacklist";
     private static final String KEY_SLOTS = "slots";
 
-    public static final int MIN_SLOT = 0;
-    public static final int MAX_SLOT = 53;
+    public static final int MIN_SLOT = SlotExpressionUtil.MIN_SLOT;
+    public static final int MAX_SLOT = SlotExpressionUtil.MAX_SLOT;
 
     public record ParseResult(boolean valid, boolean changed) {
     }
@@ -68,9 +67,9 @@ public final class SlotFilterData {
             return List.of();
         }
 
-        BitSet bits = new BitSet(MAX_SLOT + 1);
+        BitSet bits = new BitSet(SlotExpressionUtil.MAX_SLOT + 1);
         for (int slot : stored) {
-            if (slot >= MIN_SLOT && slot <= MAX_SLOT) {
+            if (slot >= SlotExpressionUtil.MIN_SLOT && slot <= SlotExpressionUtil.MAX_SLOT) {
                 bits.set(slot);
             }
         }
@@ -79,15 +78,11 @@ public final class SlotFilterData {
             return List.of();
         }
 
-        List<Integer> slots = new ArrayList<>();
-        for (int slot = bits.nextSetBit(MIN_SLOT); slot >= 0; slot = bits.nextSetBit(slot + 1)) {
-            slots.add(slot);
-        }
-        return slots;
+        return SlotExpressionUtil.bitSetToList(bits);
     }
 
     public static String getSlotExpression(ItemStack stack) {
-        return formatSlots(getSlots(stack));
+        return SlotExpressionUtil.formatSlots(getSlots(stack));
     }
 
     public static ParseResult setSlotsFromExpression(ItemStack stack, String expression) {
@@ -101,46 +96,13 @@ public final class SlotFilterData {
             return new ParseResult(true, changed);
         }
 
-        BitSet parsed = parseSlots(normalized);
+        BitSet parsed = SlotExpressionUtil.parseSlots(normalized);
         if (parsed == null) {
             return new ParseResult(false, false);
         }
 
-        List<Integer> slots = new ArrayList<>();
-        for (int slot = parsed.nextSetBit(MIN_SLOT); slot >= 0; slot = parsed.nextSetBit(slot + 1)) {
-            slots.add(slot);
-        }
-        boolean changed = setSlots(stack, slots);
+        boolean changed = setSlots(stack, SlotExpressionUtil.bitSetToList(parsed));
         return new ParseResult(true, changed);
-    }
-
-    public static String formatSlots(List<Integer> slots) {
-        if (slots == null || slots.isEmpty()) {
-            return "";
-        }
-
-        StringBuilder out = new StringBuilder();
-        int i = 0;
-        while (i < slots.size()) {
-            int start = slots.get(i);
-            int end = start;
-            while (i + 1 < slots.size() && slots.get(i + 1) == end + 1) {
-                i++;
-                end = slots.get(i);
-            }
-
-            if (!out.isEmpty()) {
-                out.append(", ");
-            }
-            if (start == end) {
-                out.append(start);
-            } else {
-                out.append(start).append('-').append(end);
-            }
-            i++;
-        }
-
-        return out.toString();
     }
 
     private static boolean setSlots(ItemStack stack, List<Integer> slots) {
@@ -158,58 +120,6 @@ public final class SlotFilterData {
             }
         });
         return true;
-    }
-
-    private static BitSet parseSlots(String expression) {
-        BitSet bits = new BitSet(MAX_SLOT + 1);
-        String[] tokens = expression.split("[,;\\s]+");
-
-        for (String rawToken : tokens) {
-            if (rawToken == null) {
-                continue;
-            }
-            String token = rawToken.trim();
-            if (token.isEmpty()) {
-                continue;
-            }
-
-            int dash = token.indexOf('-');
-            if (dash >= 0) {
-                String left = token.substring(0, dash).trim();
-                String right = token.substring(dash + 1).trim();
-                Integer a = parseSlot(left);
-                Integer b = parseSlot(right);
-                if (a == null || b == null) {
-                    return null;
-                }
-
-                int from = Math.min(a, b);
-                int to = Math.max(a, b);
-                bits.set(from, to + 1);
-            } else {
-                Integer slot = parseSlot(token);
-                if (slot == null) {
-                    return null;
-                }
-                bits.set(slot);
-            }
-        }
-        return bits;
-    }
-
-    private static Integer parseSlot(String raw) {
-        if (raw == null || raw.isEmpty()) {
-            return null;
-        }
-        try {
-            int value = Integer.parseInt(raw);
-            if (value < MIN_SLOT || value > MAX_SLOT) {
-                return null;
-            }
-            return value;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
     }
 
     private static CompoundTag getRoot(ItemStack stack) {

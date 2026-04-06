@@ -6,10 +6,14 @@ import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-public record SetFilterEntryNbtPayload(int entryIndex, String key, boolean matchValue, String value) implements CustomPacketPayload {
+public record SetFilterEntryNbtPayload(int entryIndex, String key, boolean matchValue, String value, String op) implements CustomPacketPayload {
 
     public SetFilterEntryNbtPayload(int entryIndex, String key, boolean matchValue) {
-        this(entryIndex, key, matchValue, "");
+        this(entryIndex, key, matchValue, "", "");
+    }
+
+    public SetFilterEntryNbtPayload(int entryIndex, String key, boolean matchValue, String value) {
+        this(entryIndex, key, matchValue, value, "");
     }
 
     public static final Type<SetFilterEntryNbtPayload> TYPE = new Type<>(
@@ -23,7 +27,8 @@ public record SetFilterEntryNbtPayload(int entryIndex, String key, boolean match
         String key = buf.readUtf();
         boolean matchValue = buf.readBoolean();
         String value = buf.readUtf();
-        return new SetFilterEntryNbtPayload(entryIndex, key, matchValue, value);
+        String op = buf.readUtf();
+        return new SetFilterEntryNbtPayload(entryIndex, key, matchValue, value, op);
     }
 
     public static void write(RegistryFriendlyByteBuf buf, SetFilterEntryNbtPayload payload) {
@@ -31,6 +36,7 @@ public record SetFilterEntryNbtPayload(int entryIndex, String key, boolean match
         buf.writeUtf(payload.key);
         buf.writeBoolean(payload.matchValue);
         buf.writeUtf(payload.value);
+        buf.writeUtf(payload.op);
     }
 
     @Override

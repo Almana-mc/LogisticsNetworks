@@ -46,6 +46,11 @@ public class SlotFilterItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated")
+                .withStyle(ChatFormatting.RED));
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated.slot")
+                .withStyle(ChatFormatting.RED));
+
         boolean blacklist = SlotFilterData.isBlacklist(stack);
         String slots = SlotFilterData.getSlotExpression(stack);
         if (slots.isBlank()) {

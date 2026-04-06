@@ -68,6 +68,8 @@ public final class NetworkHandler {
         registerServer(SetFilterEntryTagPayload.class, SetFilterEntryTagPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntryTag);
         registerServer(SetFilterEntryNbtPayload.class, SetFilterEntryNbtPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntryNbt);
         registerServer(SetFilterEntryDurabilityPayload.class, SetFilterEntryDurabilityPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntryDurability);
+        registerServer(SetFilterEntrySlotMappingPayload.class, SetFilterEntrySlotMappingPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntrySlotMapping);
+        registerServer(SetFilterEntryEnchantedPayload.class, SetFilterEntryEnchantedPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntryEnchanted);
 
         registerClient(SyncNetworkListPayload.class, SyncNetworkListPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkList);
         registerClient(SyncNetworkNodesPayload.class, SyncNetworkNodesPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkNodes);

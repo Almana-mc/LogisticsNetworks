@@ -22,6 +22,13 @@ public class LogisticsJeiPlugin implements IModPlugin {
     @Override
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
         registration.addGhostIngredientHandler(FilterScreen.class, FILTER_GHOST_HANDLER);
+        registration.addGuiContainerHandler(FilterScreen.class,
+                new mezz.jei.api.gui.handlers.IGuiContainerHandler<>() {
+                    @Override
+                    public java.util.List<net.minecraft.client.renderer.Rect2i> getGuiExtraAreas(FilterScreen screen) {
+                        return screen.getExtraGuiAreas();
+                    }
+                });
     }
 }
 

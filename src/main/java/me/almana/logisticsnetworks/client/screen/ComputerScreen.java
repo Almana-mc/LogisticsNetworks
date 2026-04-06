@@ -834,6 +834,12 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     @Override
+    public boolean keyPressed(int key, int scan, int modifiers) {
+        if (key == 256) return super.keyPressed(key, scan, modifiers);
+        return true;
+    }
+
+    @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
         switch (currentPage) {
             case NETWORK_LIST -> {

@@ -108,7 +108,7 @@ public class TransferEngine {
             boolean hasPerEntryAmounts) {
     }
 
-    private record RecipeEntry(ItemStack item, String tag, int amount) {
+    private record RecipeEntry(ItemStack item, String tag, int batch) {
     }
 
     private record RecipeCursorResult(int moved, int entryIndex, int entryRemaining, boolean completed) {
@@ -124,19 +124,19 @@ public class TransferEngine {
                 continue;
             int cap = FilterItemData.getCapacity(filter);
             for (int slot = 0; slot < cap; slot++) {
-                int amount = FilterItemData.getEntryAmount(filter, slot);
-                if (amount <= 0)
+                int batch = FilterItemData.getEntryBatch(filter, slot);
+                if (batch <= 0)
                     continue;
 
                 String tag = FilterItemData.getEntryTag(filter, slot);
                 if (tag != null) {
-                    recipe.add(new RecipeEntry(ItemStack.EMPTY, tag, amount));
+                    recipe.add(new RecipeEntry(ItemStack.EMPTY, tag, batch));
                     continue;
                 }
 
                 ItemStack entry = FilterItemData.getEntry(filter, slot, provider);
                 if (!entry.isEmpty()) {
-                    recipe.add(new RecipeEntry(entry, null, amount));
+                    recipe.add(new RecipeEntry(entry, null, batch));
                 }
             }
         }
@@ -790,14 +790,14 @@ public class TransferEngine {
                             : null;
 
                     if (provider != null) {
-                        if (!FilterLogic.matchesItem(exportFilters, exportFilterMode, extracted, provider,
-                                candidateComponents, filterReadCache)) {
+                        if (!FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode, extracted,
+                                slot, provider, candidateComponents, filterReadCache)) {
                             continue;
                         }
                     }
 
-                    if (provider != null && !FilterLogic.matchesItem(target.importFilters(), target.importFilterMode(),
-                            extracted, provider, candidateComponents, filterReadCache)) {
+                    if (provider != null && !FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(),
+                            extracted, -1, provider, candidateComponents, filterReadCache)) {
                         continue;
                     }
 
@@ -822,6 +822,14 @@ public class TransferEngine {
                     }
                     if (allowedByAmount <= 0) {
                         continue;
+                    }
+
+                    if (anyAmountConstraints && target.constraints().hasPerEntryAmounts && provider != null) {
+                        int batchCap = getPerEntryBatchLimit(extracted, exportFilters,
+                                target.importFilters(), provider, candidateComponents, filterReadCache);
+                        if (batchCap > 0) {
+                            allowedByAmount = Math.min(allowedByAmount, batchCap);
+                        }
                     }
 
                     int allowed = Math.min(extracted.getCount(), allowedByAmount);
@@ -935,8 +943,8 @@ public class TransferEngine {
                     continue;
                 }
 
-                if (provider != null && !FilterLogic.matchesItem(target.importFilters(),
-                        target.importFilterMode(), extracted, provider, null, filterReadCache)) {
+                if (provider != null && !FilterLogic.matchesItemInSlot(target.importFilters(),
+                        target.importFilterMode(), extracted, -1, provider, null, filterReadCache)) {
                     continue;
                 }
 
@@ -982,7 +990,7 @@ public class TransferEngine {
             if (currentRemaining <= 0) {
                 currentEntryIdx++;
                 if (currentEntryIdx < recipe.size()) {
-                    currentRemaining = recipe.get(currentEntryIdx).amount();
+                    currentRemaining = recipe.get(currentEntryIdx).batch();
                 } else {
                     return new RecipeCursorResult(totalMoved, 0, 0, true);
                 }
@@ -1022,7 +1030,7 @@ public class TransferEngine {
             cursorRemaining = 0;
         }
         if (cursorRemaining <= 0) {
-            cursorRemaining = recipe.get(cursorEntry).amount();
+            cursorRemaining = recipe.get(cursorEntry).batch();
         }
 
         int totalMoved = 0;
@@ -1044,7 +1052,7 @@ public class TransferEngine {
             if (result.completed()) {
                 targetsCompleted++;
                 cursorEntry = 0;
-                cursorRemaining = recipe.get(0).amount();
+                cursorRemaining = recipe.get(0).batch();
             } else {
                 cursorEntry = result.entryIndex();
                 cursorRemaining = result.entryRemaining();
@@ -1366,11 +1374,9 @@ public class TransferEngine {
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                int threshold = FilterItemData.getItemAmountThresholdFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache);
-                if (threshold > 0) {
-                    int sourceCount = sourceCounts != null ? sourceCounts.getOrDefault(candidate.getItem(), 0) : 0;
-                    int exportCap = sourceCount - threshold;
+                int exportCap = FilterItemData.getItemExportCapFull(filter, candidate, provider,
+                        candidateComponents, filterReadCache, sourceCounts);
+                if (exportCap >= 0) {
                     if (exportCap <= 0)
                         return 0;
                     allowed = Math.min(allowed, exportCap);
@@ -1380,11 +1386,9 @@ public class TransferEngine {
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                int threshold = FilterItemData.getItemAmountThresholdFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache);
-                if (threshold > 0) {
-                    int targetCount = targetCounts != null ? targetCounts.getOrDefault(candidate.getItem(), 0) : 0;
-                    int importCap = threshold - targetCount;
+                int importCap = FilterItemData.getItemImportCapFull(filter, candidate, provider,
+                        candidateComponents, filterReadCache, targetCounts);
+                if (importCap >= 0) {
                     if (importCap <= 0)
                         return 0;
                     allowed = Math.min(allowed, importCap);
@@ -1393,6 +1397,34 @@ public class TransferEngine {
         }
 
         return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
+    }
+
+    private static int getPerEntryBatchLimit(ItemStack candidate, ItemStack[] exportFilters,
+            ItemStack[] importFilters, HolderLookup.Provider provider,
+            @Nullable CompoundTag candidateComponents, @Nullable FilterItemData.ReadCache filterReadCache) {
+        int limit = Integer.MAX_VALUE;
+
+        if (exportFilters != null) {
+            for (ItemStack filter : exportFilters) {
+                int batch = FilterItemData.getItemBatchLimitFull(filter, candidate, provider,
+                        candidateComponents, filterReadCache);
+                if (batch > 0) {
+                    limit = Math.min(limit, batch);
+                }
+            }
+        }
+
+        if (importFilters != null) {
+            for (ItemStack filter : importFilters) {
+                int batch = FilterItemData.getItemBatchLimitFull(filter, candidate, provider,
+                        candidateComponents, filterReadCache);
+                if (batch > 0) {
+                    limit = Math.min(limit, batch);
+                }
+            }
+        }
+
+        return limit == Integer.MAX_VALUE ? -1 : limit;
     }
 
     private static int getPerEntryFluidAmountLimit(FluidStack candidate, ItemStack[] exportFilters,
@@ -1456,29 +1488,30 @@ public class TransferEngine {
         boolean hasWhitelist = false;
 
         for (ItemStack filter : filters) {
-            if (!SlotFilterData.isSlotFilterItem(filter) || !SlotFilterData.hasAnySlots(filter)) {
-                continue;
-            }
-
-            hasConfiguredSlotFilter = true;
-            List<Integer> slots = SlotFilterData.getSlots(filter);
-            if (slots.isEmpty()) {
-                continue;
-            }
-
-            if (SlotFilterData.isBlacklist(filter)) {
-                for (int slot : slots) {
-                    if (slot >= 0 && slot < slotCount) {
-                        blacklistMask[slot] = true;
+            if (SlotFilterData.isSlotFilterItem(filter) && SlotFilterData.hasAnySlots(filter)) {
+                hasConfiguredSlotFilter = true;
+                List<Integer> slots = SlotFilterData.getSlots(filter);
+                if (!slots.isEmpty()) {
+                    if (SlotFilterData.isBlacklist(filter)) {
+                        for (int slot : slots) {
+                            if (slot >= 0 && slot < slotCount) {
+                                blacklistMask[slot] = true;
+                            }
+                        }
+                    } else {
+                        hasWhitelist = true;
+                        for (int slot : slots) {
+                            if (slot >= 0 && slot < slotCount) {
+                                allowed[slot] = true;
+                            }
+                        }
                     }
                 }
-            } else {
+            } else if (FilterItemData.isFilterItem(filter)
+                    && FilterItemData.hasAnySlotMappings(filter, null)) {
+                hasConfiguredSlotFilter = true;
                 hasWhitelist = true;
-                for (int slot : slots) {
-                    if (slot >= 0 && slot < slotCount) {
-                        allowed[slot] = true;
-                    }
-                }
+                FilterItemData.collectMappedSlots(filter, allowed, null);
             }
         }
 
