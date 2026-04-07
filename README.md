@@ -19,7 +19,7 @@ The mod is completely wireless. Along with that it can be totally **hidden**. Th
 
 This mod is what I wanted in modded minecraft for a while. Its fast, highly configurable, lag friendly and also is completely invisible if you want it to be.
 
-Currently, it can transport items, fluids and energy. In future, I plan to add support for several resources of different mods. Along with this, I will work on adding special compat to allow better suitability for certain larger builds.
+It supports items, fluids, energy, Mekanism chemicals, and Ars Nouveau source. I will continue to work on adding special compat to allow better suitability for certain larger builds.
 
 ## Official Partners
 
@@ -37,4 +37,4 @@ This mod offers certain tags to allow more control over what can transferred and
 
 ## Development
 
-As a solo developer, updates may take time sometimes. I wish you will be patient with me and my work. For any questions regarding ports, I have no particular plans for backports yet. If there is a higher demand, I may backport to 1.20 or at most 1.19.
+As a solo developer, updates may take time sometimes. I wish you will be patient with me and my work. The mod currently supports 1.20.1.

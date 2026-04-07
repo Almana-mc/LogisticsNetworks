@@ -9,6 +9,8 @@ navigation:
 
 # Durability Filter
 
+> Deprecated: Durability filtering is now available per-entry in the filter detail page. Ctrl+Left Click a base filter slot to access it. The standalone recipe has been removed.
+
 Durability Filter checks remaining durability on damageable items.
 
 You can set:
@@ -28,5 +30,5 @@ Current behavior in transfer logic:
 
 It does not affect fluid, chemical, energy, or source transfers.
 
-<RecipeFor id="logisticsnetworks:durability_filter" />
+Recipe removed. Use a base filter (Small/Medium/Big) with the filter detail page instead.
 

@@ -9,6 +9,8 @@ navigation:
 
 # Amount Filter
 
+> Amount filtering is now also available per-entry in the filter detail page. Ctrl+Left Click a base filter slot to access it.
+
 Amount Filter sets a threshold value.
 Default value is 64.
 

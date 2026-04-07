@@ -31,6 +31,20 @@ Matching details:
 
 Duplicate entries are blocked by the menu logic.
 
+## Filter Detail Page
+
+Ctrl+Left Click on any filter slot to open the filter detail page. Per-entry settings:
+
+1. Amount threshold
+2. NBT matching with operator support (=, !=, >=, <=) and raw SNBT mode
+3. Durability check
+4. Slot mapping (e.g. 0-8,13)
+5. Enchanted flag
+
+Remove the item from an entry to create an nbtOnly filter that matches any item with the configured NBT, durability, or enchanted settings.
+
+JEI ghost ingredients are supported on the filter detail page.
+
 <RecipeFor id="logisticsnetworks:small_filter" />
 <RecipeFor id="logisticsnetworks:medium_filter" />
 <RecipeFor id="logisticsnetworks:big_filter" />

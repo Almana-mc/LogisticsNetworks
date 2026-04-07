@@ -9,6 +9,8 @@ navigation:
 
 # Slot Filter
 
+> Deprecated: Slot mapping is now available per-entry in the filter detail page. Ctrl+Left Click a base filter slot to access it. The standalone recipe has been removed.
+
 Slot Filter limits inventory slot access for item transfer.
 
 Slot range is 0 to 53.
@@ -31,5 +33,5 @@ The same logic is applied on both ends:
 
 This filter is used by item transfer path only.
 
-<RecipeFor id="logisticsnetworks:slot_filter" />
+Recipe removed. Use a base filter (Small/Medium/Big) with the filter detail page instead.
 

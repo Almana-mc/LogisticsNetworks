@@ -1,19 +1,25 @@
 ---
 item_ids: [logisticsnetworks:name_filter]
 navigation:
-  title: Name Filter
+  title: Regex Filter
   parent: filters.md
   icon: logisticsnetworks:name_filter
   position: 4
 ---
 
-# Name Filter
+# Regex Filter
 
-Name Filter does lowercase contains matching on display names.
+Regex Filter matches by regex pattern (case-insensitive) on display names and tooltips.
 
 Example:
 
-If you set `stone`, it matches any target name that contains `stone`.
+If you set `.*stone.*`, it matches any target whose name contains "stone". The pattern uses Java regex syntax and is case-insensitive.
+
+Match scope can be set to:
+
+1. Name: matches against display name only.
+2. Tooltip: matches against tooltip lines only.
+3. Both: matches against name and tooltip lines.
 
 Target type can be:
 

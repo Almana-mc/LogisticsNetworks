@@ -9,6 +9,8 @@ navigation:
 
 # Tag Filter
 
+> Tag filtering is now also available per-entry in the filter detail page. Ctrl+Left Click a base filter slot to access it.
+
 Tag Filter stores one tag value.
 
 You can set it by:

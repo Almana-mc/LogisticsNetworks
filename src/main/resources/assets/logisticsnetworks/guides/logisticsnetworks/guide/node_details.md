@@ -27,18 +27,20 @@ Rows in the left settings panel:
 7. Priority
 8. Batch
 9. Delay
+10. Name
 
 ## What Each Row Does
 
 1. Status toggles channel enabled and disabled.
-2. Mode cycles Import and Export.
+2. Mode cycles Receiver and Sender.
 3. Type cycles Item, Fluid, Energy, Chemical, and Source with upgrade checks.
 4. Side sets the capability side for extraction or insertion.
 5. Redstone sets run condition.
-6. Distribution picks target ordering for export.
+6. Distribution picks target ordering for sender.
 7. Priority is used by Priority distribution mode.
 8. Batch sets max amount per operation.
 9. Delay sets ticks between runs.
+10. Name sets a custom label for the channel.
 
 ## Limits and Special Cases
 
@@ -46,7 +48,7 @@ Rows in the left settings panel:
 2. Batch is clamped to the current upgrade tier cap.
 3. Delay has a minimum from upgrade tier config.
 4. Energy type forces delay to 1 tick.
-5. In Import mode, Distribution, Batch, and Delay rows are disabled in UI.
+5. In Receiver mode, Distribution, Batch, and Delay rows are disabled in UI.
 
 Upgrade slots are shared for the whole node, not per channel.
 

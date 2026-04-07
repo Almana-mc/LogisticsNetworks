@@ -9,6 +9,8 @@ navigation:
 
 # NBT Filter
 
+> Deprecated: NBT filtering is now available per-entry in the filter detail page with operator support (=, !=, >=, <=) and raw SNBT mode. Ctrl+Left Click a base filter slot to access it.
+
 NBT Filter stores one selected path and one exact value.
 
 Setup flow:
