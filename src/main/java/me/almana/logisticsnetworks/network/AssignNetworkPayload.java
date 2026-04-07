@@ -15,7 +15,7 @@ public record AssignNetworkPayload(
         String newNetworkName) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<AssignNetworkPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "assign_network"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "assign_network"));
 
     public static final StreamCodec<FriendlyByteBuf, AssignNetworkPayload> STREAM_CODEC = StreamCodec
             .of(AssignNetworkPayload::write, AssignNetworkPayload::read);

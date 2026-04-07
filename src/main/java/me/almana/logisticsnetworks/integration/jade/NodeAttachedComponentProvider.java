@@ -20,7 +20,7 @@ import java.util.List;
 public enum NodeAttachedComponentProvider implements IBlockComponentProvider, IServerDataProvider<BlockAccessor> {
     INSTANCE;
 
-    private static final ResourceLocation UID = new ResourceLocation(
+    private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath(
             Logisticsnetworks.MOD_ID, "node_attached");
     private static final String KEY_HAS_NODE = "has_node";
 

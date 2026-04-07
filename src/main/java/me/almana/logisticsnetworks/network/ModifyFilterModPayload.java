@@ -12,7 +12,7 @@ public record ModifyFilterModPayload(
                 boolean remove) implements CustomPacketPayload {
 
         public static final Type<ModifyFilterModPayload> TYPE = new Type<>(
-                        new ResourceLocation(Logisticsnetworks.MOD_ID, "modify_filter_mod"));
+                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "modify_filter_mod"));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, ModifyFilterModPayload> STREAM_CODEC = StreamCodec
                         .composite(

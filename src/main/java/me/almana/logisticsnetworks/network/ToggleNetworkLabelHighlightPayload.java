@@ -11,7 +11,7 @@ import java.util.UUID;
 public record ToggleNetworkLabelHighlightPayload(UUID networkId, String label) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<ToggleNetworkLabelHighlightPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "toggle_network_label_highlight"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "toggle_network_label_highlight"));
 
     public static final StreamCodec<FriendlyByteBuf, ToggleNetworkLabelHighlightPayload> STREAM_CODEC = StreamCodec
             .of(ToggleNetworkLabelHighlightPayload::write, ToggleNetworkLabelHighlightPayload::read);

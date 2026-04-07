@@ -25,7 +25,7 @@ public record SyncNetworkNodesPayload(UUID networkId, List<NodeInfo> nodes) impl
     }
 
     public static final CustomPacketPayload.Type<SyncNetworkNodesPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "sync_network_nodes"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_network_nodes"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncNetworkNodesPayload> STREAM_CODEC = StreamCodec
             .of(SyncNetworkNodesPayload::write, SyncNetworkNodesPayload::read);

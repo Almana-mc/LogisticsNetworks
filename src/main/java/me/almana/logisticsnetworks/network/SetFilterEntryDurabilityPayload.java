@@ -9,7 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 public record SetFilterEntryDurabilityPayload(int entryIndex, String comparison, int value) implements CustomPacketPayload {
 
     public static final Type<SetFilterEntryDurabilityPayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "set_filter_entry_durability"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_entry_durability"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterEntryDurabilityPayload> STREAM_CODEC = StreamCodec
             .of(SetFilterEntryDurabilityPayload::write, SetFilterEntryDurabilityPayload::read);

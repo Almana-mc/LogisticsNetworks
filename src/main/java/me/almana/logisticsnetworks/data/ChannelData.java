@@ -27,6 +27,7 @@ public class ChannelData {
     private static final String KEY_FILTER_MODE = "FilterMode";
     private static final String KEY_PRIORITY = "Priority";
     private static final String KEY_FILTERS = "Filters";
+    private static final String KEY_NAME = "Name";
 
     private boolean enabled;
     private ChannelMode mode = ChannelMode.IMPORT;
@@ -38,6 +39,7 @@ public class ChannelData {
     private DistributionMode distributionMode = DistributionMode.PRIORITY;
     private FilterMode filterMode = FilterMode.MATCH_ANY;
     private int priority = 0;
+    private String name = "";
 
     private final transient ChannelTelemetry telemetry = new ChannelTelemetry();
     private final ItemStack[] filterItems = new ItemStack[FILTER_SIZE];
@@ -63,6 +65,8 @@ public class ChannelData {
         tag.putString(KEY_DISTRIB, distributionMode.name());
         tag.putString(KEY_FILTER_MODE, filterMode.name());
         tag.putInt(KEY_PRIORITY, priority);
+        if (!name.isEmpty())
+            tag.putString(KEY_NAME, name);
 
         if (provider != null) {
             ListTag list = new ListTag();
@@ -105,6 +109,8 @@ public class ChannelData {
         if (tag.contains(KEY_PRIORITY)) {
             priority = Math.max(-99, Math.min(99, tag.getInt(KEY_PRIORITY)));
         }
+
+        name = tag.contains(KEY_NAME) ? tag.getString(KEY_NAME) : "";
 
         Arrays.fill(filterItems, ItemStack.EMPTY);
         if (provider != null && tag.contains(KEY_FILTERS, Tag.TAG_LIST)) {
@@ -218,6 +224,14 @@ public class ChannelData {
         this.priority = Math.max(-99, Math.min(99, priority));
     }
 
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name == null ? "" : name;
+    }
+
     public ChannelTelemetry getTelemetry() {
         return telemetry;
     }
@@ -249,6 +263,7 @@ public class ChannelData {
         this.distributionMode = source.distributionMode;
         this.filterMode = source.filterMode;
         this.priority = source.priority;
+        this.name = source.name;
         for (int i = 0; i < FILTER_SIZE; i++) {
             this.filterItems[i] = source.filterItems[i].isEmpty() ? ItemStack.EMPTY : source.filterItems[i].copy();
         }

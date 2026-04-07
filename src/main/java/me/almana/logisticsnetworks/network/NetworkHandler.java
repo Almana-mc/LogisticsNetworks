@@ -21,7 +21,7 @@ public final class NetworkHandler {
 
     private static final String PROTOCOL_VERSION = "1";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "main"),
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "main"),
             () -> PROTOCOL_VERSION,
             PROTOCOL_VERSION::equals,
             PROTOCOL_VERSION::equals);
@@ -59,6 +59,7 @@ public final class NetworkHandler {
         registerServer(RequestNetworkLabelsPayload.class, RequestNetworkLabelsPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestNetworkLabels);
         registerServer(RequestOpenNodeSettingsPayload.class, RequestOpenNodeSettingsPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestOpenNodeSettings);
         registerServer(SetNodeLabelPayload.class, SetNodeLabelPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNodeLabel);
+        registerServer(SetChannelNamePayload.class, SetChannelNamePayload.STREAM_CODEC, ServerPayloadHandler::handleSetChannelName);
         registerServer(SetNetworkNodesVisibilityPayload.class, SetNetworkNodesVisibilityPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNetworkNodesVisibility);
         registerServer(ToggleNetworkNodeHighlightPayload.class, ToggleNetworkNodeHighlightPayload.STREAM_CODEC, ServerPayloadHandler::handleToggleNetworkNodeHighlight);
         registerServer(ToggleNetworkLabelHighlightPayload.class, ToggleNetworkLabelHighlightPayload.STREAM_CODEC, ServerPayloadHandler::handleToggleNetworkLabelHighlight);

@@ -13,7 +13,7 @@ public record SetNodeUpgradeItemPayload(
         ItemStack upgradeItem) implements CustomPacketPayload {
 
     public static final Type<SetNodeUpgradeItemPayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "set_node_upgrade_item"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_node_upgrade_item"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetNodeUpgradeItemPayload> STREAM_CODEC = StreamCodec
             .of(SetNodeUpgradeItemPayload::write, SetNodeUpgradeItemPayload::read);

@@ -13,7 +13,7 @@ import net.minecraft.world.entity.Entity;
 public class NodeModel<T extends Entity> extends EntityModel<T> {
 
         public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(
-                        new ResourceLocation(Logisticsnetworks.MOD_ID, "node"), "main");
+                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "node"), "main");
 
         private static final String MODEL_PATH = "/assets/logisticsnetworks/models/entity/node.json";
 

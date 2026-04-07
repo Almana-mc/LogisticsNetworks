@@ -17,7 +17,7 @@ public record SetFilterEntryNbtPayload(int entryIndex, String key, boolean match
     }
 
     public static final Type<SetFilterEntryNbtPayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "set_filter_entry_nbt"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_entry_nbt"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterEntryNbtPayload> STREAM_CODEC = StreamCodec
             .of(SetFilterEntryNbtPayload::write, SetFilterEntryNbtPayload::read);

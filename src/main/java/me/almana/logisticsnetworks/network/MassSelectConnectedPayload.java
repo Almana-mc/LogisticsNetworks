@@ -10,7 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 public record MassSelectConnectedPayload(int handOrdinal, BlockPos pos) implements CustomPacketPayload {
 
     public static final Type<MassSelectConnectedPayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "mass_select_connected"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "mass_select_connected"));
 
     public static final StreamCodec<FriendlyByteBuf, MassSelectConnectedPayload> STREAM_CODEC = StreamCodec
             .of(MassSelectConnectedPayload::write, MassSelectConnectedPayload::read);

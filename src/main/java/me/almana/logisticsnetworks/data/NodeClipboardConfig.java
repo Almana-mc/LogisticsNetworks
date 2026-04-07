@@ -86,6 +86,7 @@ public final class NodeClipboardConfig {
         DistributionMode distributionMode;
         FilterMode filterMode;
         int priority;
+        String name = "";
     }
 
     private NodeClipboardConfig(ChannelConfig[] channels, ItemStack[][] filterItems, ItemStack[] upgradeItems,
@@ -317,7 +318,8 @@ public final class NodeClipboardConfig {
                     || config.redstoneMode != defaults.redstoneMode
                     || config.distributionMode != defaults.distributionMode
                     || config.filterMode != defaults.filterMode
-                    || config.priority != defaults.priority) {
+                    || config.priority != defaults.priority
+                    || !config.name.equals(defaults.name)) {
                 return false;
             }
         }
@@ -404,6 +406,7 @@ public final class NodeClipboardConfig {
                 config.distributionMode = channel.getDistributionMode();
                 config.filterMode = channel.getFilterMode();
                 config.priority = channel.getPriority();
+                config.name = channel.getName();
 
                 for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                     ItemStack stack = channel.getFilterItem(slot);
@@ -472,6 +475,8 @@ public final class NodeClipboardConfig {
             channelTag.putString(KEY_DISTRIBUTION, channel.distributionMode.name());
             channelTag.putString(KEY_FILTER_MODE, channel.filterMode.name());
             channelTag.putInt(KEY_PRIORITY, channel.priority);
+            if (!channel.name.isEmpty())
+                channelTag.putString("Name", channel.name);
             channelsTag.add(channelTag);
         }
         root.put(KEY_CHANNELS, channelsTag);
@@ -582,6 +587,7 @@ public final class NodeClipboardConfig {
             config.filterMode = parseEnum(channelTag.getString(KEY_FILTER_MODE), FilterMode.values(),
                     FilterMode.MATCH_ANY);
             config.priority = Math.max(-99, Math.min(99, channelTag.getInt(KEY_PRIORITY)));
+            config.name = channelTag.contains("Name") ? channelTag.getString("Name") : "";
             channels[index] = config;
         }
 
@@ -1054,6 +1060,7 @@ public final class NodeClipboardConfig {
             channel.setDistributionMode(config.distributionMode);
             channel.setFilterMode(config.filterMode);
             channel.setPriority(config.priority);
+            channel.setName(config.name);
 
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                 ItemStack expected = filterItems[channelIndex][slot];

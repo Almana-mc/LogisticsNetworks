@@ -29,7 +29,7 @@ import java.util.List;
 public final class ChemicalTransferHelper {
 
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final ResourceLocation BLACKLIST_TAG_ID = new ResourceLocation("logisticsnetworks", "blacklist/chemicals");
+    private static final ResourceLocation BLACKLIST_TAG_ID = ResourceLocation.fromNamespaceAndPath("logisticsnetworks", "blacklist/chemicals");
 
     private static final String TYPE_GAS = "gas";
     private static final String TYPE_INFUSE = "infuse";

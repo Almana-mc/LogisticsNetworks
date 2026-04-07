@@ -10,7 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 @JeiPlugin
 public class LogisticsJeiPlugin implements IModPlugin {
 
-    private static final ResourceLocation UID = new ResourceLocation(Logisticsnetworks.MOD_ID,
+    private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID,
             "jei_plugin");
     private static final FilterGhostIngredientHandler FILTER_GHOST_HANDLER = new FilterGhostIngredientHandler();
 

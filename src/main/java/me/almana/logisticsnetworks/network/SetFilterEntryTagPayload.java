@@ -9,7 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 public record SetFilterEntryTagPayload(int entryIndex, String tagId) implements CustomPacketPayload {
 
     public static final Type<SetFilterEntryTagPayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "set_filter_entry_tag"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_entry_tag"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterEntryTagPayload> STREAM_CODEC = StreamCodec
             .of(SetFilterEntryTagPayload::write, SetFilterEntryTagPayload::read);

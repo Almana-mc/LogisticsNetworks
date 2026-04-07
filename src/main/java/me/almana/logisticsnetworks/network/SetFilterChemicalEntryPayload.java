@@ -12,7 +12,7 @@ public record SetFilterChemicalEntryPayload(
         String chemicalId) implements CustomPacketPayload {
 
     public static final Type<SetFilterChemicalEntryPayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "set_filter_chemical_entry"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_chemical_entry"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterChemicalEntryPayload> STREAM_CODEC = StreamCodec
             .composite(

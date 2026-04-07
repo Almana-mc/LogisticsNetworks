@@ -11,7 +11,7 @@ public record SelectNodeChannelPayload(
         int channelIndex) implements CustomPacketPayload {
 
     public static final Type<SelectNodeChannelPayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "select_node_channel"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "select_node_channel"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SelectNodeChannelPayload> STREAM_CODEC = StreamCodec
             .of(SelectNodeChannelPayload::write, SelectNodeChannelPayload::read);

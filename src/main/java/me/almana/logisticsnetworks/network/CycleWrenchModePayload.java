@@ -9,7 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 public record CycleWrenchModePayload(int handOrdinal, boolean forward) implements CustomPacketPayload {
 
     public static final Type<CycleWrenchModePayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "cycle_wrench_mode"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "cycle_wrench_mode"));
 
     public static final StreamCodec<FriendlyByteBuf, CycleWrenchModePayload> STREAM_CODEC = StreamCodec
             .of(CycleWrenchModePayload::write, CycleWrenchModePayload::read);

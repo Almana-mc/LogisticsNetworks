@@ -16,6 +16,7 @@ import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
+import me.almana.logisticsnetworks.network.SetChannelNamePayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
@@ -90,6 +91,17 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private int settingsScrollOffset = 0;
     private static final int SETTINGS_VISIBLE_ROWS = 9;
     private static final int SETTINGS_TOTAL_ROWS = 9;
+
+    private int settingsHoverRow = -1;
+    private long settingsHoverStartTime = 0;
+    private static final long TOOLTIP_DELAY = 1000L;
+
+    private long lastTabClickTime = 0;
+    private int lastTabClickIndex = -1;
+    private boolean channelNameEditing = false;
+    private EditBox channelNameEditBox = null;
+    private int editingChannelIndex = -1;
+    private Component hoveredChannelName = null;
 
     private boolean labelPickerOpen = false;
     private EditBox labelEditBox = null;
@@ -212,6 +224,15 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             renderLabelPicker(g, mx, my, pt);
         }
         this.renderTooltip(g, mx, my);
+        if (hoveredChannelName != null && currentPage == Page.CHANNEL_CONFIG) {
+            g.renderTooltip(font, hoveredChannelName, mx, my);
+        }
+        if (settingsHoverRow >= 0 && currentPage == Page.CHANNEL_CONFIG
+                && System.currentTimeMillis() - settingsHoverStartTime >= TOOLTIP_DELAY) {
+            LogisticsNodeEntity node = getMenu().getNode();
+            List<Component> tip = getSettingTooltip(node.getChannel(selectedChannel), settingsHoverRow);
+            g.renderComponentTooltip(font, tip, mx, my);
+        }
     }
 
     @Override
@@ -340,31 +361,53 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         boolean isVisible = node.isRenderVisible();
         String visibilityLabel = getVisibilityLabel(isVisible);
-        drawButton(g, leftPos + 8, topPos + 4, font.width(visibilityLabel) + 10, 12, visibilityLabel, mx, my);
-        drawButton(g, leftPos + GUI_WIDTH - 50, topPos + 4, 42, 12,
+        drawButton(g, leftPos + 8, topPos + 4, font.width(visibilityLabel) + 10, 10, visibilityLabel, mx, my);
+        drawButton(g, leftPos + GUI_WIDTH - 50, topPos + 4, 42, 10,
                 tr("gui.logisticsnetworks.node.change_network"), mx, my);
 
-        drawChannelTabs(g, node, topPos + 16);
+        drawChannelTabs(g, node, topPos + 14);
 
-        String nodeLabel = node.getNodeLabel();
-        String labelDisplay = nodeLabel.isEmpty() ? tr("gui.logisticsnetworks.node.label.set") : nodeLabel;
-        int labelW = font.width(labelDisplay) + 8;
-        int labelX = leftPos + 10 + (148 - labelW) / 2;
-        int labelY = topPos + 33;
-        drawButton(g, labelX, labelY, labelW, 14, labelDisplay, mx, my);
+        hoveredChannelName = null;
+        if (!channelNameEditing) {
+            for (int i = 0; i < 9; i++) {
+                ChannelData ch = node.getChannel(i);
+                if (ch != null && !ch.getName().isEmpty()) {
+                    int tabX = leftPos + 10 + i * 26;
+                    if (mx >= tabX && mx <= tabX + 24 && my >= topPos + 14 && my <= topPos + 26) {
+                        hoveredChannelName = Component.literal(ch.getName());
+                    }
+                }
+            }
+        }
+
+        if (!channelNameEditing) {
+            String nodeLabel = node.getNodeLabel();
+            String labelDisplay = nodeLabel.isEmpty() ? tr("gui.logisticsnetworks.node.label.set") : nodeLabel;
+            int labelW = font.width(labelDisplay) + 8;
+            int labelX = leftPos + 10 + (148 - labelW) / 2;
+            int labelY = topPos + 28;
+            drawButton(g, labelX, labelY, labelW, 12, labelDisplay, mx, my);
+        } else if (channelNameEditBox != null) {
+            int ebx = channelNameEditBox.getX() - 2;
+            int eby = channelNameEditBox.getY() - 2;
+            int ebw = channelNameEditBox.getWidth() + 4;
+            int ebh = channelNameEditBox.getHeight() + 4;
+            g.fill(ebx, eby, ebx + ebw, eby + ebh, COLOR_PANEL);
+            g.renderOutline(ebx, eby, ebw, ebh, COLOR_ACCENT);
+        }
 
         ChannelData channel = node.getChannel(selectedChannel);
         if (channel == null)
             return;
 
-        drawSettingsPanel(g, channel, leftPos + 10, topPos + 52, mx, my);
+        drawSettingsPanel(g, channel, leftPos + 10, topPos + 44, mx, my);
         drawFilterGrid(g, channel, leftPos + 168, topPos + 42, mx, my);
     }
 
     private void renderLabelPicker(GuiGraphics g, int mx, int my, float pt) {
         int pickerW = getLabelPickerWidth();
         int pickerX = leftPos + 10 + (148 - pickerW) / 2;
-        int pickerY = topPos + 52;
+        int pickerY = topPos + 44;
         int entryCount = Math.min(networkLabels.size(), LABEL_PICKER_MAX_VISIBLE);
         int listH = entryCount * LABEL_PICKER_ENTRY_H;
         int pickerH = 22 + listH + (networkLabels.isEmpty() ? 0 : 4) + 16;
@@ -477,15 +520,15 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             int textColor = isSelected ? COLOR_WHITE : (isEnabled ? COLOR_ACCENT : COLOR_DARK_GRAY);
 
             int x = startX + i * 26;
-            g.fill(x, y, x + 24, y + 14, bgColor | 0xFF000000);
-            g.renderOutline(x, y, 24, 14, borderColor);
-            g.drawCenteredString(font, String.valueOf(i), x + 12, y + 3, textColor);
+            g.fill(x, y, x + 24, y + 12, bgColor | 0xFF000000);
+            g.renderOutline(x, y, 24, 12, borderColor);
+            g.drawCenteredString(font, String.valueOf(i), x + 12, y + 2, textColor);
         }
     }
 
     private void drawSettingsPanel(GuiGraphics g, ChannelData ch, int x, int y, int mx, int my) {
         int w = 148;
-        int rowH = 13;
+        int rowH = 11;
         int h = rowH * SETTINGS_VISIBLE_ROWS + 4;
 
         g.fill(x, y, x + w, y + h, COLOR_PANEL);
@@ -530,11 +573,21 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         int rx = x + 2;
         int ry = y + 2;
 
+        int hoveredRow = -1;
         for (int vi = 0; vi < SETTINGS_VISIBLE_ROWS; vi++) {
             int row = vi + settingsScrollOffset;
             if (row >= SETTINGS_TOTAL_ROWS)
                 break;
             drawSettingRow(g, rx, ry + vi * rowH, rowW, labels[row], values[row], colors[row], mx, my, enabled[row]);
+            if (!labelPickerOpen && enabled[row] && editingRow == -1
+                    && mx >= rx && mx <= rx + rowW && my >= ry + vi * rowH && my <= ry + vi * rowH + 11) {
+                hoveredRow = row;
+            }
+        }
+
+        if (hoveredRow != settingsHoverRow) {
+            settingsHoverRow = hoveredRow;
+            settingsHoverStartTime = System.currentTimeMillis();
         }
 
         if (settingsScrollOffset > 0) {
@@ -576,12 +629,12 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private void drawSettingRow(GuiGraphics g, int x, int y, int w, String label, String value, int color, int mx,
             int my, boolean enabled) {
-        boolean hovered = !labelPickerOpen && mx >= x && mx <= x + w && my >= y && my <= y + 13;
+        boolean hovered = !labelPickerOpen && mx >= x && mx <= x + w && my >= y && my <= y + 11;
         if (enabled && hovered) {
-            g.fill(x, y, x + w, y + 13, COLOR_HOVER);
+            g.fill(x, y, x + w, y + 11, COLOR_HOVER);
         }
-        g.drawString(font, label, x + 4, y + 4, enabled ? COLOR_GRAY : COLOR_DISABLED_TXT, false);
-        g.drawString(font, value, x + w - font.width(value) - 4, y + 4, enabled ? color : COLOR_DISABLED_TXT, false);
+        g.drawString(font, label, x + 4, y + 2, enabled ? COLOR_GRAY : COLOR_DISABLED_TXT, false);
+        g.drawString(font, value, x + w - font.width(value) - 4, y + 2, enabled ? color : COLOR_DISABLED_TXT, false);
     }
 
     private String formatBatchDisplay(ChannelData ch) {
@@ -607,6 +660,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     public boolean mouseClicked(double mx, double my, int btn) {
         if (editingRow != -1 && numericEditBox != null && !numericEditBox.isMouseOver(mx, my)) {
             stopNumericEdit(true);
+        }
+        if (channelNameEditing && channelNameEditBox != null && !channelNameEditBox.isMouseOver(mx, my)) {
+            stopChannelNameEdit(true);
         }
 
         if (isHoveringMenuSlot(mx, my)) {
@@ -695,7 +751,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         int pickerW = getLabelPickerWidth();
         int pickerX = leftPos + 10 + (148 - pickerW) / 2;
-        int pickerY = topPos + 52;
+        int pickerY = topPos + 44;
 
         labelEditBox = new EditBox(font, pickerX + 2, pickerY + 2, pickerW - 4, 16, Component.empty());
         labelEditBox.setMaxLength(48);
@@ -732,7 +788,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private boolean handleLabelPickerClick(LogisticsNodeEntity node, double mx, double my) {
         int pickerW = getLabelPickerWidth();
         int pickerX = leftPos + 10 + (148 - pickerW) / 2;
-        int pickerY = topPos + 52;
+        int pickerY = topPos + 44;
         int entryCount = Math.min(networkLabels.size(), LABEL_PICKER_MAX_VISIBLE);
         int listH = entryCount * LABEL_PICKER_ENTRY_H;
         int pickerH = 22 + listH + (networkLabels.isEmpty() ? 0 : 4) + 16;
@@ -782,13 +838,13 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
 
         String visibilityLabel = getVisibilityLabel(node.isRenderVisible());
-        if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(visibilityLabel) + 10, 12, mx, my)) {
+        if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(visibilityLabel) + 10, 10, mx, my)) {
             node.setRenderVisible(!node.isRenderVisible());
             NetworkHandler.sendToServer(new ToggleNodeVisibilityPayload(node.getId()));
             return true;
         }
 
-        if (isHoveringAbs(leftPos + GUI_WIDTH - 50, topPos + 4, 42, 12, mx, my)) {
+        if (isHoveringAbs(leftPos + GUI_WIDTH - 50, topPos + 4, 42, 10, mx, my)) {
             currentPage = Page.NETWORK_SELECT;
             rebuildPageLayout();
             return true;
@@ -798,18 +854,22 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         String labelDisplay = nodeLabel.isEmpty() ? tr("gui.logisticsnetworks.node.label.set") : nodeLabel;
         int labelW = font.width(labelDisplay) + 8;
         int labelX = leftPos + 10 + (148 - labelW) / 2;
-        int labelY = topPos + 33;
-        if (isHoveringAbs(labelX, labelY, labelW, 14, mx, my)) {
+        int labelY = topPos + 28;
+        if (isHoveringAbs(labelX, labelY, labelW, 12, mx, my)) {
             openLabelPicker(node);
             return true;
         }
 
         for (int i = 0; i < 9; i++) {
-            if (isHoveringAbs(leftPos + 10 + i * 26, topPos + 16, 24, 14, mx, my)) {
-                selectedChannel = i;
-                settingsScrollOffset = 0;
-                getMenu().setSelectedChannel(i);
-                NetworkHandler.sendToServer(new SelectNodeChannelPayload(node.getId(), i));
+            if (isHoveringAbs(leftPos + 10 + i * 26, topPos + 14, 24, 12, mx, my)) {
+                if (i == selectedChannel && checkTabDoubleClick(i)) {
+                    startChannelNameEdit(node, i);
+                } else {
+                    selectedChannel = i;
+                    settingsScrollOffset = 0;
+                    getMenu().setSelectedChannel(i);
+                    NetworkHandler.sendToServer(new SelectNodeChannelPayload(node.getId(), i));
+                }
                 return true;
             }
         }
@@ -822,8 +882,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (ch == null || (btn != 0 && btn != 1))
             return false;
 
-        int rowH = 13;
-        int startY = topPos + 54;
+        int rowH = 11;
+        int startY = topPos + 46;
         int startX = leftPos + 12;
         int w = 144;
 
@@ -950,7 +1010,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             default -> "";
         };
 
-        numericEditBox = new EditBox(font, x, y, 70, 13, Component.empty());
+        numericEditBox = new EditBox(font, x, y, 70, 11, Component.empty());
         numericEditBox.setMaxLength(10);
         numericEditBox.setValue(val);
         numericEditBox.setBordered(true);
@@ -1014,10 +1074,73 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         return isDouble;
     }
 
+    private boolean checkTabDoubleClick(int tabIndex) {
+        long now = System.currentTimeMillis();
+        boolean isDouble = (lastTabClickIndex == tabIndex && now - lastTabClickTime < 250);
+        lastTabClickIndex = tabIndex;
+        lastTabClickTime = now;
+        return isDouble;
+    }
+
+    private void startChannelNameEdit(LogisticsNodeEntity node, int channelIndex) {
+        stopChannelNameEdit(false);
+        channelNameEditing = true;
+        editingChannelIndex = channelIndex;
+
+        ChannelData ch = node.getChannel(channelIndex);
+        int tabX = leftPos + 10 + channelIndex * 26;
+        int editX = Math.max(leftPos + 4, Math.min(tabX - 20, leftPos + GUI_WIDTH - 84));
+
+        channelNameEditBox = new EditBox(font, editX, topPos + 28, 80, 12, Component.empty());
+        channelNameEditBox.setMaxLength(24);
+        channelNameEditBox.setValue(ch.getName());
+        channelNameEditBox.setBordered(true);
+        channelNameEditBox.setTextColor(COLOR_WHITE);
+        channelNameEditBox.setFocused(true);
+        addRenderableWidget(channelNameEditBox);
+        setFocused(channelNameEditBox);
+    }
+
+    private void stopChannelNameEdit(boolean commit) {
+        if (!channelNameEditing || channelNameEditBox == null)
+            return;
+
+        if (commit) {
+            String name = channelNameEditBox.getValue().trim();
+            LogisticsNodeEntity node = getMenu().getNode();
+            if (node != null) {
+                ChannelData ch = node.getChannel(editingChannelIndex);
+                if (ch != null) {
+                    ch.setName(name);
+                    NetworkHandler.sendToServer(new SetChannelNamePayload(node.getId(), editingChannelIndex, name));
+                }
+            }
+        }
+
+        removeWidget(channelNameEditBox);
+        channelNameEditBox = null;
+        channelNameEditing = false;
+        editingChannelIndex = -1;
+    }
+
     private void setNumericExtremum(ChannelData ch, int row, boolean max) {
         switch (row) {
             case 6 -> ch.setPriority(max ? PRIORITY_MAX : PRIORITY_MIN);
-            case 7 -> ch.setBatchSize(max ? BATCH_MAX : BATCH_MIN);
+            case 7 -> {
+                if (max) {
+                    LogisticsNodeEntity node = getMenu().getNode();
+                    int cap = switch (ch.getType()) {
+                        case FLUID -> NodeUpgradeData.getFluidOperationCapMb(node);
+                        case ENERGY -> NodeUpgradeData.getEnergyOperationCap(node);
+                        case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(node);
+                        case SOURCE -> NodeUpgradeData.getSourceOperationCap(node);
+                        default -> NodeUpgradeData.getItemOperationCap(node);
+                    };
+                    ch.setBatchSize(cap);
+                } else {
+                    ch.setBatchSize(BATCH_MIN);
+                }
+            }
             case 8 -> ch.setTickDelay(max ? DELAY_MAX : DELAY_MIN);
         }
     }
@@ -1047,6 +1170,10 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (key == 256) {
+            if (channelNameEditing) {
+                stopChannelNameEdit(false);
+                return true;
+            }
             if (labelPickerOpen) {
                 closeLabelPicker();
                 return true;
@@ -1058,6 +1185,14 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             return super.keyPressed(key, scan, modifiers);
         }
 
+        if (channelNameEditing && channelNameEditBox != null) {
+            if (key == 257 || key == 335) {
+                stopChannelNameEdit(true);
+            } else {
+                channelNameEditBox.keyPressed(key, scan, modifiers);
+            }
+            return true;
+        }
         if (labelPickerOpen && labelEditBox != null) {
             if (key == 257 || key == 335) {
                 String val = labelEditBox.getValue().trim();
@@ -1094,6 +1229,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     @Override
     public boolean charTyped(char ch, int modifiers) {
+        if (channelNameEditing && channelNameEditBox != null) {
+            return channelNameEditBox.charTyped(ch, modifiers);
+        }
         if (labelPickerOpen && labelEditBox != null) {
             return labelEditBox.charTyped(ch, modifiers);
         }
@@ -1116,7 +1254,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (labelPickerOpen && networkLabels.size() > LABEL_PICKER_MAX_VISIBLE) {
             int pickerW = getLabelPickerWidth();
             int pickerX = leftPos + 10 + (148 - pickerW) / 2;
-            int pickerY = topPos + 52;
+            int pickerY = topPos + 44;
             int entryCount = Math.min(networkLabels.size(), LABEL_PICKER_MAX_VISIBLE);
             int listH = entryCount * LABEL_PICKER_ENTRY_H;
             int pickerH = 22 + listH + (networkLabels.isEmpty() ? 0 : 4) + 16;
@@ -1132,9 +1270,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
         if (currentPage == Page.CHANNEL_CONFIG) {
             int panelX = leftPos + 10;
-            int panelY = topPos + 52;
+            int panelY = topPos + 44;
             int panelW = 148;
-            int panelH = 13 * SETTINGS_VISIBLE_ROWS + 4;
+            int panelH = 11 * SETTINGS_VISIBLE_ROWS + 4;
             if (mx >= panelX && mx <= panelX + panelW && my >= panelY && my <= panelY + panelH) {
                 int maxScroll = SETTINGS_TOTAL_ROWS - SETTINGS_VISIBLE_ROWS;
                 if (sy > 0 && settingsScrollOffset > 0) {
@@ -1181,6 +1319,38 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         return tr(visible
                 ? "gui.logisticsnetworks.node.visibility.visible"
                 : "gui.logisticsnetworks.node.visibility.hidden");
+    }
+
+    private List<Component> getSettingTooltip(ChannelData ch, int row) {
+        String[] tipKeys = {
+                "gui.logisticsnetworks.node.tip.status",
+                "gui.logisticsnetworks.node.tip.mode",
+                "gui.logisticsnetworks.node.tip.type",
+                "gui.logisticsnetworks.node.tip.side",
+                "gui.logisticsnetworks.node.tip.redstone",
+                "gui.logisticsnetworks.node.tip.distribution",
+                "gui.logisticsnetworks.node.tip.priority",
+                "gui.logisticsnetworks.node.tip.batch",
+                "gui.logisticsnetworks.node.tip.delay"
+        };
+
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.translatable(tipKeys[row]));
+
+        String valueTipKey = null;
+        if (row == 1) {
+            valueTipKey = "gui.logisticsnetworks.node.tip.mode." + ch.getMode().name().toLowerCase(Locale.ROOT);
+        } else if (row == 4) {
+            valueTipKey = "gui.logisticsnetworks.node.tip.redstone." + ch.getRedstoneMode().name().toLowerCase(Locale.ROOT);
+        } else if (row == 5) {
+            valueTipKey = "gui.logisticsnetworks.node.tip.distribution." + ch.getDistributionMode().name().toLowerCase(Locale.ROOT);
+        }
+
+        if (valueTipKey != null) {
+            lines.add(Component.translatable(valueTipKey).withStyle(style -> style.withColor(0x999999)));
+        }
+
+        return lines;
     }
 
     private String getChannelModeLabel(ChannelMode mode) {

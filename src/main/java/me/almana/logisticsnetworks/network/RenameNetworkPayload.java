@@ -11,7 +11,7 @@ import java.util.UUID;
 public record RenameNetworkPayload(UUID networkId, String newName) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<RenameNetworkPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "rename_network"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "rename_network"));
 
     public static final StreamCodec<FriendlyByteBuf, RenameNetworkPayload> STREAM_CODEC = StreamCodec
             .of(RenameNetworkPayload::write, RenameNetworkPayload::read);

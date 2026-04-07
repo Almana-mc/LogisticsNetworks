@@ -11,7 +11,7 @@ import java.util.UUID;
 public record SetNetworkNodesVisibilityPayload(UUID networkId, boolean visible) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SetNetworkNodesVisibilityPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "set_network_nodes_visibility"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_network_nodes_visibility"));
 
     public static final StreamCodec<FriendlyByteBuf, SetNetworkNodesVisibilityPayload> STREAM_CODEC = StreamCodec
             .of(SetNetworkNodesVisibilityPayload::write, SetNetworkNodesVisibilityPayload::read);

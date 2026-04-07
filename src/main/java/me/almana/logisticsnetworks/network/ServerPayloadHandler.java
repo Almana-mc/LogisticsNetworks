@@ -616,11 +616,10 @@ public class ServerPayloadHandler {
     private static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
         int maxBatch = getMaxBatch(node, channel.getType());
 
+        channel.setBatchSize(Math.max(1, Math.min(channel.getBatchSize(), maxBatch)));
+
         if (channel.getType() == ChannelType.ENERGY) {
-            channel.setBatchSize(maxBatch);
             channel.setTickDelay(1);
-        } else {
-            channel.setBatchSize(Math.max(1, Math.min(channel.getBatchSize(), maxBatch)));
         }
 
         int minDelay = NodeUpgradeData.getMinTickDelay(node);
@@ -725,6 +724,25 @@ public class ServerPayloadHandler {
                     LOGGER.debug("[LabelSync] No matching labeled node found in network");
                 }
             }
+        });
+    }
+
+    public static void handleSetChannelName(SetChannelNamePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            if (node == null)
+                return;
+
+            ChannelData channel = node.getChannel(payload.channelIndex());
+            if (channel == null)
+                return;
+
+            String name = payload.name().trim();
+            if (name.length() > 24)
+                name = name.substring(0, 24);
+
+            channel.setName(name);
+            markNetworkDirty(node);
         });
     }
 

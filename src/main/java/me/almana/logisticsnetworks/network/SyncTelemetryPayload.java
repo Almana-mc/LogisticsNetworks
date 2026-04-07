@@ -14,7 +14,7 @@ public record SyncTelemetryPayload(UUID networkId, int channelIndex, int cursor,
     public static final int HISTORY_SIZE = TelemetryManager.HISTORY_SIZE;
 
     public static final CustomPacketPayload.Type<SyncTelemetryPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "sync_telemetry"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_telemetry"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncTelemetryPayload> STREAM_CODEC = StreamCodec
             .of(SyncTelemetryPayload::write, SyncTelemetryPayload::read);

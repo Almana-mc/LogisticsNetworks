@@ -12,7 +12,7 @@ public record SetFilterFluidEntryPayload(
                 String fluidId) implements CustomPacketPayload {
 
         public static final Type<SetFilterFluidEntryPayload> TYPE = new Type<>(
-                        new ResourceLocation(Logisticsnetworks.MOD_ID, "set_filter_fluid_entry"));
+                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_fluid_entry"));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterFluidEntryPayload> STREAM_CODEC = StreamCodec
                         .composite(

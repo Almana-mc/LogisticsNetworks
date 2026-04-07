@@ -12,7 +12,7 @@ public record ModifyFilterNbtPayload(
                 boolean remove) implements CustomPacketPayload {
 
         public static final Type<ModifyFilterNbtPayload> TYPE = new Type<>(
-                        new ResourceLocation(Logisticsnetworks.MOD_ID, "modify_filter_nbt"));
+                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "modify_filter_nbt"));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, ModifyFilterNbtPayload> STREAM_CODEC = StreamCodec
                         .composite(

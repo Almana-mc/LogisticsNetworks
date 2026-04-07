@@ -10,7 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 public record OpenFilterInSlotPayload(int slotIndex) implements CustomPacketPayload {
 
     public static final Type<OpenFilterInSlotPayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "open_filter_in_slot"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "open_filter_in_slot"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, OpenFilterInSlotPayload> STREAM_CODEC = StreamCodec
             .composite(

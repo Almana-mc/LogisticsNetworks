@@ -15,7 +15,7 @@ import snownee.jade.api.config.IPluginConfig;
 public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, IServerDataProvider<EntityAccessor> {
     INSTANCE;
 
-    private static final ResourceLocation UID = new ResourceLocation(
+    private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath(
             Logisticsnetworks.MOD_ID, "logistics_node_entity");
 
     @Override
@@ -27,7 +27,7 @@ public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, ISe
         ItemStack main = accessor.getPlayer().getMainHandItem();
         ItemStack off = accessor.getPlayer().getOffhandItem();
         if (main.getItem() instanceof WrenchItem || off.getItem() instanceof WrenchItem) {
-            tooltip.remove(new ResourceLocation("jade", "mod_name"));
+            tooltip.remove(ResourceLocation.fromNamespaceAndPath("jade", "mod_name"));
             return;
         }
         tooltip.clear();

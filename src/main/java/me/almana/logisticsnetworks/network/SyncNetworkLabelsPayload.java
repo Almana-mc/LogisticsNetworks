@@ -12,7 +12,7 @@ import java.util.List;
 public record SyncNetworkLabelsPayload(List<String> labels) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SyncNetworkLabelsPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "sync_network_labels"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_network_labels"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncNetworkLabelsPayload> STREAM_CODEC = StreamCodec
             .of(SyncNetworkLabelsPayload::write, SyncNetworkLabelsPayload::read);

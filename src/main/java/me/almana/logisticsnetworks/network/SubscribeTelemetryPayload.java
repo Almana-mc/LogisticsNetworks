@@ -11,7 +11,7 @@ import java.util.UUID;
 public record SubscribeTelemetryPayload(UUID networkId, boolean subscribe, int channelIndex) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SubscribeTelemetryPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "subscribe_telemetry"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "subscribe_telemetry"));
 
     public static final StreamCodec<FriendlyByteBuf, SubscribeTelemetryPayload> STREAM_CODEC = StreamCodec
             .of(SubscribeTelemetryPayload::write, SubscribeTelemetryPayload::read);

@@ -21,7 +21,7 @@ public record UpdateChannelPayload(
         int priority) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<UpdateChannelPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "update_channel"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "update_channel"));
 
     public static final StreamCodec<FriendlyByteBuf, UpdateChannelPayload> STREAM_CODEC = StreamCodec
             .of(UpdateChannelPayload::write, UpdateChannelPayload::read);

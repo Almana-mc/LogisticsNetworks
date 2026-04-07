@@ -16,7 +16,7 @@ public record SyncChannelListPayload(UUID networkId, List<ChannelEntry> channels
     }
 
     public static final CustomPacketPayload.Type<SyncChannelListPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "sync_channel_list"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_channel_list"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncChannelListPayload> STREAM_CODEC = StreamCodec
             .of(SyncChannelListPayload::write, SyncChannelListPayload::read);

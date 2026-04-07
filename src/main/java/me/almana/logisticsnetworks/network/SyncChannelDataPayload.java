@@ -10,7 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 public record SyncChannelDataPayload(int entityId, int channelIndex, CompoundTag channelTag) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SyncChannelDataPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "sync_channel_data"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_channel_data"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncChannelDataPayload> STREAM_CODEC = StreamCodec
             .of(SyncChannelDataPayload::write, SyncChannelDataPayload::read);

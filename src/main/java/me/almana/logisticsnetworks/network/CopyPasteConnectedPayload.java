@@ -10,7 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 public record CopyPasteConnectedPayload(int handOrdinal, BlockPos pos) implements CustomPacketPayload {
 
     public static final Type<CopyPasteConnectedPayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "copy_paste_connected"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "copy_paste_connected"));
 
     public static final StreamCodec<FriendlyByteBuf, CopyPasteConnectedPayload> STREAM_CODEC = StreamCodec
             .of(CopyPasteConnectedPayload::write, CopyPasteConnectedPayload::read);

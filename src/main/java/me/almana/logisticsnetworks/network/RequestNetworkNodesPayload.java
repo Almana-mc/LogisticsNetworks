@@ -11,7 +11,7 @@ import java.util.UUID;
 public record RequestNetworkNodesPayload(UUID networkId) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<RequestNetworkNodesPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "request_network_nodes"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "request_network_nodes"));
 
     public static final StreamCodec<FriendlyByteBuf, RequestNetworkNodesPayload> STREAM_CODEC = StreamCodec
             .of(RequestNetworkNodesPayload::write, RequestNetworkNodesPayload::read);

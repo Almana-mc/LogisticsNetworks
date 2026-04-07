@@ -14,7 +14,7 @@ public record SetFilterPayload(
         ItemStack filterItem) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SetFilterPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "set_filter"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterPayload> STREAM_CODEC = StreamCodec
             .of(SetFilterPayload::write, SetFilterPayload::read);

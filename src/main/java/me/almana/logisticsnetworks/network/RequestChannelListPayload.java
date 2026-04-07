@@ -11,7 +11,7 @@ import java.util.UUID;
 public record RequestChannelListPayload(UUID networkId) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<RequestChannelListPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "request_channel_list"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "request_channel_list"));
 
     public static final StreamCodec<FriendlyByteBuf, RequestChannelListPayload> STREAM_CODEC = StreamCodec
             .of(RequestChannelListPayload::write, RequestChannelListPayload::read);

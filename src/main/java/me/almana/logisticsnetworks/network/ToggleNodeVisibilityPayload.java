@@ -10,7 +10,7 @@ public record ToggleNodeVisibilityPayload(
         int entityId) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<ToggleNodeVisibilityPayload> TYPE = new CustomPacketPayload.Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "toggle_visibility"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "toggle_visibility"));
 
     public static final StreamCodec<FriendlyByteBuf, ToggleNodeVisibilityPayload> STREAM_CODEC = StreamCodec
             .of(ToggleNodeVisibilityPayload::write, ToggleNodeVisibilityPayload::read);

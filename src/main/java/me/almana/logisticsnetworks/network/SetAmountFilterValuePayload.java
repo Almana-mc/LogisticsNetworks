@@ -10,7 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 public record SetAmountFilterValuePayload(int amount) implements CustomPacketPayload {
 
         public static final Type<SetAmountFilterValuePayload> TYPE = new Type<>(
-                        new ResourceLocation(Logisticsnetworks.MOD_ID, "set_amount_filter_value"));
+                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_amount_filter_value"));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, SetAmountFilterValuePayload> STREAM_CODEC = StreamCodec
                         .composite(

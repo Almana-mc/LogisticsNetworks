@@ -9,7 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 public record SetFilterEntryEnchantedPayload(int entryIndex, boolean enabled, boolean value) implements CustomPacketPayload {
 
     public static final Type<SetFilterEntryEnchantedPayload> TYPE = new Type<>(
-            new ResourceLocation(Logisticsnetworks.MOD_ID, "set_filter_entry_enchanted"));
+            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_entry_enchanted"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterEntryEnchantedPayload> STREAM_CODEC = StreamCodec
             .of(SetFilterEntryEnchantedPayload::write, SetFilterEntryEnchantedPayload::read);
