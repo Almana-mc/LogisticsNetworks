@@ -111,6 +111,7 @@
   "gui.logisticsnetworks.direction.south": "South",
   "gui.logisticsnetworks.direction.west": "West",
   "gui.logisticsnetworks.direction.east": "East",
+  "gui.logisticsnetworks.direction.all": "All",
   "gui.logisticsnetworks.filter_mode.match_any": "Any",
   "gui.logisticsnetworks.filter_mode.match_all": "All",
   "gui.logisticsnetworks.filter.mode.whitelist": "Whitelist",

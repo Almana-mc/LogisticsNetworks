@@ -81,7 +81,7 @@ public final class NodeClipboardConfig {
         ChannelType type;
         int batchSize;
         int tickDelay;
-        Direction ioDirection;
+        @Nullable Direction ioDirection;
         RedstoneMode redstoneMode;
         DistributionMode distributionMode;
         FilterMode filterMode;
@@ -161,12 +161,12 @@ public final class NodeClipboardConfig {
         getChannelConfig(channel).type = type == null ? ChannelType.ITEM : type;
     }
 
-    public Direction getChannelDirection(int channel) {
+    public @Nullable Direction getChannelDirection(int channel) {
         return getChannelConfig(channel).ioDirection;
     }
 
-    public void setChannelDirection(int channel, Direction direction) {
-        getChannelConfig(channel).ioDirection = direction == null ? Direction.UP : direction;
+    public void setChannelDirection(int channel, @Nullable Direction direction) {
+        getChannelConfig(channel).ioDirection = direction;
     }
 
     public RedstoneMode getChannelRedstoneMode(int channel) {
@@ -470,7 +470,7 @@ public final class NodeClipboardConfig {
             channelTag.putString(KEY_TYPE, channel.type.name());
             channelTag.putInt(KEY_BATCH, channel.batchSize);
             channelTag.putInt(KEY_DELAY, channel.tickDelay);
-            channelTag.putString(KEY_IO, channel.ioDirection.getName());
+            channelTag.putString(KEY_IO, channel.ioDirection != null ? channel.ioDirection.getName() : "all");
             channelTag.putString(KEY_REDSTONE, channel.redstoneMode.name());
             channelTag.putString(KEY_DISTRIBUTION, channel.distributionMode.name());
             channelTag.putString(KEY_FILTER_MODE, channel.filterMode.name());
@@ -578,8 +578,13 @@ public final class NodeClipboardConfig {
             config.batchSize = Math.max(1, channelTag.getInt(KEY_BATCH));
             config.tickDelay = Math.max(1, channelTag.getInt(KEY_DELAY));
 
-            Direction direction = Direction.byName(channelTag.getString(KEY_IO));
-            config.ioDirection = direction == null ? Direction.UP : direction;
+            String ioStr = channelTag.getString(KEY_IO);
+            if ("all".equals(ioStr)) {
+                config.ioDirection = null;
+            } else {
+                Direction direction = Direction.byName(ioStr);
+                config.ioDirection = direction == null ? Direction.UP : direction;
+            }
             config.redstoneMode = parseEnum(channelTag.getString(KEY_REDSTONE), RedstoneMode.values(),
                     RedstoneMode.ALWAYS_ON);
             config.distributionMode = parseEnum(channelTag.getString(KEY_DISTRIBUTION), DistributionMode.values(),

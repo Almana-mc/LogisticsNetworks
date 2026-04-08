@@ -2,6 +2,9 @@ package me.almana.logisticsnetworks.menu;
 
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
+import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.*;
@@ -12,9 +15,11 @@ import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.*;
@@ -66,6 +71,10 @@ public class FilterMenu extends AbstractContainerMenu {
     private final boolean[] isChemicalSlot;
     private final boolean[] isTagSlot;
     private boolean ignoreUpdates = false;
+
+    private LogisticsNodeEntity nodeSource;
+    private int nodeChannel = -1;
+    private int nodeFilterSlot = -1;
 
     private String selectedTag;
     private String selectedMod;
@@ -130,10 +139,54 @@ public class FilterMenu extends AbstractContainerMenu {
         addDataSlots(data);
     }
 
+    public FilterMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node, int channel, int filterSlot) {
+        super(Registration.FILTER_MENU.get(), containerId);
+        this.hand = InteractionHand.MAIN_HAND;
+        this.player = playerInv.player;
+        this.inventorySlotIndex = -1;
+        this.lockedSlot = -1;
+        this.nodeSource = node;
+        this.nodeChannel = channel;
+        this.nodeFilterSlot = filterSlot;
+
+        ItemStack stack = getOpenedStack();
+        this.isTagMode = stack.getItem() instanceof TagFilterItem;
+        this.isAmountMode = stack.getItem() instanceof AmountFilterItem;
+        this.isNbtMode = stack.getItem() instanceof NbtFilterItem;
+        this.isDurabilityMode = stack.getItem() instanceof DurabilityFilterItem;
+        this.isModMode = stack.getItem() instanceof ModFilterItem;
+        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isNameMode = stack.getItem() instanceof NameFilterItem;
+        this.isSpecialMode = isTagMode || isAmountMode || isNbtMode || isDurabilityMode || isModMode || isSlotMode
+                || isNameMode;
+
+        this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
+        this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
+        this.filterInventory = new SimpleContainer(slotCount);
+        this.isFluidSlot = new boolean[slotCount];
+        this.isChemicalSlot = new boolean[slotCount];
+        this.isTagSlot = new boolean[slotCount];
+
+        initSyncedData(stack);
+        layoutSlots(playerInv);
+        addDataSlots(data);
+    }
+
     public FilterMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
         super(Registration.FILTER_MENU.get(), containerId);
         int handOrdinal = buf.readVarInt();
-        if (handOrdinal == -1) {
+        if (handOrdinal == -2) {
+            int entityId = buf.readVarInt();
+            int ch = buf.readVarInt();
+            int fs = buf.readVarInt();
+            Entity entity = playerInv.player.level().getEntity(entityId);
+            this.nodeSource = (entity instanceof LogisticsNodeEntity n) ? n : null;
+            this.nodeChannel = ch;
+            this.nodeFilterSlot = fs;
+            this.inventorySlotIndex = -1;
+            this.hand = InteractionHand.MAIN_HAND;
+            this.lockedSlot = -1;
+        } else if (handOrdinal == -1) {
             this.inventorySlotIndex = buf.readVarInt();
             this.hand = InteractionHand.MAIN_HAND;
             this.lockedSlot = inventorySlotIndex;
@@ -499,12 +552,7 @@ public class FilterMenu extends AbstractContainerMenu {
         Tag value = NbtFilterData.resolvePathValue(slotItem, path, player.level().registryAccess());
         if (value == null)
             return;
-        FilterItemData.setEntryNbt(filterStack, slot, path, value);
-        if (op != null && !op.isEmpty()) {
-            FilterItemData.setEntryNbtOp(filterStack, slot, op);
-        }
-        CompoundTag raw = FilterItemData.buildRawFromPath(path, value);
-        FilterItemData.setEntryNbtRaw(filterStack, slot, raw.toString());
+        FilterItemData.addEntryNbtConstraint(filterStack, slot, path, value, op);
         broadcastChanges();
     }
 
@@ -515,16 +563,18 @@ public class FilterMenu extends AbstractContainerMenu {
         try {
             net.minecraft.nbt.Tag parsed = net.minecraft.nbt.TagParser.parseTag("{v:" + valueStr + "}").get("v");
             if (parsed != null) {
-                FilterItemData.setEntryNbt(filterStack, slot, path, parsed);
-                if (op != null && !op.isEmpty()) {
-                    FilterItemData.setEntryNbtOp(filterStack, slot, op);
-                }
-                CompoundTag raw = FilterItemData.buildRawFromPath(path, parsed);
-                FilterItemData.setEntryNbtRaw(filterStack, slot, raw.toString());
+                FilterItemData.addEntryNbtConstraint(filterStack, slot, path, parsed, op);
                 broadcastChanges();
             }
         } catch (Exception ignored) {
         }
+    }
+
+    public void removeEntryNbt(Player player, int slot, String path) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.removeEntryNbtConstraint(getOpenedStack(), slot, path);
+        broadcastChanges();
     }
 
     public void setEntryNbtRaw(Player player, int slot, String path, String rawValue) {
@@ -537,10 +587,7 @@ public class FilterMenu extends AbstractContainerMenu {
     public void clearEntryNbt(Player player, int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
-        ItemStack filterStack = getOpenedStack();
-        FilterItemData.setEntryNbt(filterStack, slot, null, null);
-        FilterItemData.setEntryNbtRaw(filterStack, slot, null);
-        FilterItemData.setEntryNbtOp(filterStack, slot, null);
+        FilterItemData.clearAllEntryNbt(getOpenedStack(), slot);
         broadcastChanges();
     }
 
@@ -625,6 +672,8 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public ItemStack getOpenedStack() {
+        if (nodeSource != null && nodeChannel >= 0 && nodeFilterSlot >= 0)
+            return nodeSource.getChannel(nodeChannel).getFilterItem(nodeFilterSlot);
         if (inventorySlotIndex >= 0)
             return player.getInventory().getItem(inventorySlotIndex);
         if (hand == InteractionHand.OFF_HAND)
@@ -858,7 +907,7 @@ public class FilterMenu extends AbstractContainerMenu {
             FilterItemData.setFluidEntry(stack, s, FluidStack.EMPTY);
             FilterItemData.setChemicalEntry(stack, s, null);
             FilterItemData.setEntryTag(stack, s, null);
-            FilterItemData.setEntryNbt(stack, s, null, null);
+            FilterItemData.clearAllEntryNbt(stack, s);
             FilterItemData.setEntryDurability(stack, s, null, 0);
             FilterItemData.setEntrySlotMapping(stack, s, null);
             isFluidSlot[s] = false;
@@ -1075,6 +1124,14 @@ public class FilterMenu extends AbstractContainerMenu {
         super.removed(player);
         if (!player.level().isClientSide && !isSpecialMode) {
             saveFilterItems(getOpenedStack(), player.level().registryAccess());
+        }
+        if (!player.level().isClientSide && nodeSource != null) {
+            if (player.level() instanceof ServerLevel level) {
+                ServerPayloadHandler.propagateToLabelGroup(nodeSource, nodeChannel);
+                if (nodeSource.getNetworkId() != null) {
+                    NetworkRegistry.get(level).markNetworkDirty(nodeSource.getNetworkId());
+                }
+            }
         }
     }
 

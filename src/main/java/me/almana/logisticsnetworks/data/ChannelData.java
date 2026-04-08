@@ -34,7 +34,7 @@ public class ChannelData {
     private ChannelType type = ChannelType.ITEM;
     private int batchSize = 8;
     private int tickDelay = 20;
-    private Direction ioDirection = Direction.UP;
+    private @Nullable Direction ioDirection = Direction.UP;
     private RedstoneMode redstoneMode = RedstoneMode.ALWAYS_ON;
     private DistributionMode distributionMode = DistributionMode.PRIORITY;
     private FilterMode filterMode = FilterMode.MATCH_ANY;
@@ -60,7 +60,7 @@ public class ChannelData {
         tag.putString(KEY_TYPE, type.name());
         tag.putInt(KEY_BATCH, batchSize);
         tag.putInt(KEY_DELAY, tickDelay);
-        tag.putString(KEY_IO, ioDirection.getName());
+        tag.putString(KEY_IO, ioDirection != null ? ioDirection.getName() : "all");
         tag.putString(KEY_REDSTONE, redstoneMode.name());
         tag.putString(KEY_DISTRIB, distributionMode.name());
         tag.putString(KEY_FILTER_MODE, filterMode.name());
@@ -101,9 +101,14 @@ public class ChannelData {
             tickDelay = Math.max(1, tag.getInt(KEY_DELAY));
 
         if (tag.contains(KEY_IO)) {
-            ioDirection = Direction.byName(tag.getString(KEY_IO));
-            if (ioDirection == null)
-                ioDirection = Direction.UP;
+            String ioStr = tag.getString(KEY_IO);
+            if ("all".equals(ioStr)) {
+                ioDirection = null;
+            } else {
+                ioDirection = Direction.byName(ioStr);
+                if (ioDirection == null)
+                    ioDirection = Direction.UP;
+            }
         }
 
         if (tag.contains(KEY_PRIORITY)) {
@@ -180,13 +185,12 @@ public class ChannelData {
         this.tickDelay = Math.max(1, tickDelay);
     }
 
-    public Direction getIoDirection() {
+    public @Nullable Direction getIoDirection() {
         return ioDirection;
     }
 
-    public void setIoDirection(Direction ioDirection) {
-        if (ioDirection != null)
-            this.ioDirection = ioDirection;
+    public void setIoDirection(@Nullable Direction ioDirection) {
+        this.ioDirection = ioDirection;
     }
 
     public RedstoneMode getRedstoneMode() {

@@ -93,6 +93,33 @@ public class TransferEngine {
             energy.put(key, handler != null ? handler : ABSENT);
             return handler;
         }
+
+        IItemHandler findItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+            if (dir != null) return getItemHandler(level, pos, dir);
+            for (Direction d : Direction.values()) {
+                IItemHandler h = getItemHandler(level, pos, d);
+                if (h != null) return h;
+            }
+            return null;
+        }
+
+        IFluidHandler findFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+            if (dir != null) return getFluidHandler(level, pos, dir);
+            for (Direction d : Direction.values()) {
+                IFluidHandler h = getFluidHandler(level, pos, d);
+                if (h != null) return h;
+            }
+            return null;
+        }
+
+        IEnergyStorage findEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+            if (dir != null) return getEnergyHandler(level, pos, dir);
+            for (Direction d : Direction.values()) {
+                IEnergyStorage h = getEnergyHandler(level, pos, d);
+                if (h != null) return h;
+            }
+            return null;
+        }
     }
 
     private record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
@@ -445,7 +472,7 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IItemHandler sourceHandler = capCache.getItemHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
+        IItemHandler sourceHandler = capCache.findItemHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null)
             return -1;
 
@@ -469,7 +496,7 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IItemHandler targetHandler = capCache.getItemHandler(targetLevel, targetPos, target.channel.getIoDirection());
+            IItemHandler targetHandler = capCache.findItemHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null)
                 continue;
 
@@ -513,7 +540,7 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IFluidHandler sourceHandler = capCache.getFluidHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
+        IFluidHandler sourceHandler = capCache.findFluidHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null)
             return -1;
 
@@ -537,7 +564,7 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IFluidHandler targetHandler = capCache.getFluidHandler(targetLevel, targetPos, target.channel.getIoDirection());
+            IFluidHandler targetHandler = capCache.findFluidHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null)
                 continue;
 
@@ -561,7 +588,7 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IEnergyStorage sourceHandler = capCache.getEnergyHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
+        IEnergyStorage sourceHandler = capCache.findEnergyHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null || !sourceHandler.canExtract())
             return -1;
 
@@ -585,7 +612,7 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IEnergyStorage targetHandler = capCache.getEnergyHandler(targetLevel, targetPos, target.channel.getIoDirection());
+            IEnergyStorage targetHandler = capCache.findEnergyHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null || !targetHandler.canReceive())
                 continue;
 
@@ -639,9 +666,11 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
+            Direction srcSide = resolveChemicalSide(sourceLevel, sourcePos, exportChannel.getIoDirection());
+            Direction tgtSide = resolveChemicalSide(targetLevel, targetPos, target.channel().getIoDirection());
             long moved = ChemicalTransferHelper.transferBetween(
-                    sourceLevel, sourcePos, exportChannel.getIoDirection(),
-                    targetLevel, targetPos, target.channel().getIoDirection(),
+                    sourceLevel, sourcePos, srcSide,
+                    targetLevel, targetPos, tgtSide,
                     remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel().getFilterItems(), target.channel().getFilterMode());
@@ -711,6 +740,15 @@ public class TransferEngine {
         if (!anyReachable)
             return -1;
         return batchLimit - remaining;
+    }
+
+    private static @Nullable Direction resolveChemicalSide(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+        if (dir != null) return dir;
+        for (Direction d : Direction.values()) {
+            if (ChemicalTransferHelper.getHandler(level, pos, d) != null)
+                return d;
+        }
+        return null;
     }
 
     private static boolean canReach(LogisticsNodeEntity source, LogisticsNodeEntity target, boolean sourceDim,

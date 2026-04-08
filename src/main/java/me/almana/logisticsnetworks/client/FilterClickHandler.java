@@ -1,8 +1,10 @@
 package me.almana.logisticsnetworks.client;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
+import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.Slot;
@@ -32,15 +34,25 @@ public class FilterClickHandler {
         if (!stack.is(ModTags.FILTERS))
             return;
 
-        if (!isPlayerInventorySlot(screen, hoveredSlot))
+        if (isPlayerInventorySlot(screen, hoveredSlot)) {
+            int playerSlotIndex = hoveredSlot.getSlotIndex();
+            if (playerSlotIndex < 0)
+                return;
+            NetworkHandler.sendToServer(new OpenFilterInSlotPayload(playerSlotIndex));
+            event.setCanceled(true);
             return;
+        }
 
-        int playerSlotIndex = hoveredSlot.getSlotIndex();
-        if (playerSlotIndex < 0)
-            return;
-
-        NetworkHandler.sendToServer(new OpenFilterInSlotPayload(playerSlotIndex));
-        event.setCanceled(true);
+        if (screen.getMenu() instanceof NodeMenu nodeMenu) {
+            int slotIndex = hoveredSlot.getContainerSlot();
+            if (slotIndex < 0 || slotIndex >= 9)
+                return;
+            NetworkHandler.sendToServer(new OpenNodeFilterPayload(
+                    nodeMenu.getNode().getId(),
+                    nodeMenu.getSelectedChannel(),
+                    slotIndex));
+            event.setCanceled(true);
+        }
     }
 
     private static boolean isPlayerInventorySlot(AbstractContainerScreen<?> screen, Slot slot) {

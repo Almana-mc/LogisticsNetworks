@@ -1,5 +1,8 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import net.minecraft.core.Direction;
+import org.jetbrains.annotations.Nullable;
+
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
@@ -550,7 +553,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                         : tr("gui.logisticsnetworks.node.value.disabled"),
                 getChannelModeLabel(ch.getMode()),
                 getChannelTypeLabel(ch.getType()),
-                getDirectionLabel(ch.getIoDirection().getName()),
+                ch.getIoDirection() != null ? getDirectionLabel(ch.getIoDirection().getName()) : getDirectionLabel("all"),
                 getRedstoneModeLabel(ch.getRedstoneMode()),
                 getDistributionModeLabel(ch.getDistributionMode()),
                 editingRow == 6 ? "" : String.valueOf(ch.getPriority()),
@@ -938,7 +941,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 ch.setType(cycleChannelType(ch.getType(), dir));
                 resetDefaultsForTypeChange(ch, oldT, ch.getType());
             }
-            case 3 -> ch.setIoDirection(cycleEnum(ch.getIoDirection(), dir));
+            case 3 -> ch.setIoDirection(cycleSide(ch.getIoDirection(), dir));
             case 4 -> ch.setRedstoneMode(cycleEnum(ch.getRedstoneMode(), dir));
             case 5 -> ch.setDistributionMode(cycleEnum(ch.getDistributionMode(), dir));
             case 6 -> ch.setPriority(ch.getPriority() + (hasShiftDown() ? 10 : 1) * dir);
@@ -983,6 +986,12 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         T[] values = current.getDeclaringClass().getEnumConstants();
         int index = (current.ordinal() + dir + values.length) % values.length;
         return values[index];
+    }
+
+    private @Nullable Direction cycleSide(@Nullable Direction current, int dir) {
+        int pos = current != null ? current.ordinal() : 6;
+        pos = (pos + dir + 7) % 7;
+        return pos < 6 ? Direction.values()[pos] : null;
     }
 
     private void resetDefaultsForTypeChange(ChannelData ch, ChannelType oldT, ChannelType newT) {
@@ -1052,7 +1061,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 node.getId(), selectedChannel, ch.isEnabled(),
                 ch.getMode().ordinal(), ch.getType().ordinal(),
                 ch.getBatchSize(), ch.getTickDelay(),
-                ch.getIoDirection().ordinal(),
+                ch.getIoDirection() != null ? ch.getIoDirection().ordinal() : 6,
                 ch.getRedstoneMode().ordinal(),
                 ch.getDistributionMode().ordinal(),
                 ch.getFilterMode().ordinal(),

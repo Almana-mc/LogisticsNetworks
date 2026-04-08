@@ -98,6 +98,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private int detailNbtScrollOffset = 0;
     private int detailNbtSelectedIdx = -1;
     private String detailNbtOp = "=";
+    private Map<String, String> detailNbtActiveOps = new HashMap<>();
     private int nbtTableEditingRow = -1;
     private boolean detailItemEnchanted = false;
     private boolean detailEnchantedEnabled = false;
@@ -1886,17 +1887,19 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             lines.add(Component.literal("Batch | Stock: " + batch + " | " + stock).withStyle(ChatFormatting.GRAY));
         }
 
-        String nbtRaw = FilterItemData.getEntryNbtRaw(filterStack, slot);
-        String nbtPath = menu.getEntryNbtPath(slot);
-        if (nbtRaw != null) {
-            String preview = nbtRaw.length() > 50 ? nbtRaw.substring(0, 50) + "..." : nbtRaw;
-            lines.add(Component.literal("NBT: " + preview).withStyle(ChatFormatting.GOLD));
-        } else if (nbtPath != null) {
-            Tag nbtVal = FilterItemData.getEntryNbtValue(filterStack, slot);
-            String nbtOp = FilterItemData.getEntryNbtOp(filterStack, slot);
-            String opStr = nbtOp != null ? FilterItemData.NbtOperator.fromId(nbtOp).symbol() : "=";
-            String display = nbtVal != null ? nbtPath + " " + opStr + " " + nbtVal : nbtPath;
-            lines.add(Component.literal("NBT: " + display).withStyle(ChatFormatting.GOLD));
+        List<FilterItemData.NbtConstraint> nbtConstraints = FilterItemData.getEntryNbtConstraints(filterStack, slot);
+        if (!nbtConstraints.isEmpty()) {
+            for (FilterItemData.NbtConstraint c : nbtConstraints) {
+                String opStr = FilterItemData.NbtOperator.fromId(c.op()).symbol();
+                String display = c.path() + " " + opStr + " " + c.value();
+                lines.add(Component.literal("NBT: " + display).withStyle(ChatFormatting.GOLD));
+            }
+        } else {
+            String nbtRaw = FilterItemData.getEntryNbtRaw(filterStack, slot);
+            if (nbtRaw != null) {
+                String preview = nbtRaw.length() > 50 ? nbtRaw.substring(0, 50) + "..." : nbtRaw;
+                lines.add(Component.literal("NBT: " + preview).withStyle(ChatFormatting.GOLD));
+            }
         }
 
         Boolean enchanted = FilterItemData.getEntryEnchanted(filterStack, slot);
@@ -2622,28 +2625,22 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailCachedNbtEntries.addAll(NbtFilterData.extractEntries(
                     slotItem, minecraft.player.level().registryAccess()));
         } else {
-            String storedPath = FilterItemData.getEntryNbtPath(menu.getOpenedStack(), slot);
-            Tag storedValue = FilterItemData.getEntryNbtValue(menu.getOpenedStack(), slot);
-            if (storedPath != null) {
-                String display = storedValue != null ? storedValue.getAsString() : "?";
-                detailCachedNbtEntries.add(new NbtFilterData.NbtEntry(storedPath, display));
+            List<FilterItemData.NbtConstraint> stored = FilterItemData.getEntryNbtConstraints(menu.getOpenedStack(), slot);
+            for (FilterItemData.NbtConstraint c : stored) {
+                String display = c.value() != null ? c.value().getAsString() : "?";
+                detailCachedNbtEntries.add(new NbtFilterData.NbtEntry(c.path(), display));
             }
         }
         nbtCollapsedGroups.clear();
         buildNbtRows();
 
-        String existingNbtOp = FilterItemData.getEntryNbtOp(menu.getOpenedStack(), slot);
-        detailNbtOp = existingNbtOp != null ? FilterItemData.NbtOperator.fromId(existingNbtOp).symbol() : "=";
-        detailNbtSelectedIdx = -1;
-        String existingPath = FilterItemData.getEntryNbtPath(menu.getOpenedStack(), slot);
-        if (existingPath != null) {
-            for (int i = 0; i < detailCachedNbtEntries.size(); i++) {
-                if (detailCachedNbtEntries.get(i).path().equals(existingPath)) {
-                    detailNbtSelectedIdx = i;
-                    break;
-                }
-            }
+        detailNbtActiveOps.clear();
+        List<FilterItemData.NbtConstraint> existingConstraints = FilterItemData.getEntryNbtConstraints(menu.getOpenedStack(), slot);
+        for (FilterItemData.NbtConstraint c : existingConstraints) {
+            detailNbtActiveOps.put(c.path(), FilterItemData.NbtOperator.fromId(c.op()).symbol());
         }
+        detailNbtOp = "=";
+        detailNbtSelectedIdx = -1;
         detailNbtValueBox.setValue("");
         detailNbtValueBox.setVisible(false);
         detailNbtValueBox.setFocused(false);
@@ -2986,13 +2983,20 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, true);
 
         if (isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
-            String nbtPath = FilterItemData.getEntryNbtPath(openedStack, detailEditSlot);
-            String nbtRaw = FilterItemData.getEntryNbtRaw(openedStack, detailEditSlot);
-            if (nbtPath != null) {
-                g.renderTooltip(font, Component.literal("Path: " + abbreviateNbtPath(nbtPath)), mx, my);
-            } else if (nbtRaw != null) {
-                String preview = nbtRaw.length() > 60 ? nbtRaw.substring(0, 60) + "..." : nbtRaw;
-                g.renderTooltip(font, Component.literal("SNBT: " + preview), mx, my);
+            List<FilterItemData.NbtConstraint> hoverConstraints = FilterItemData.getEntryNbtConstraints(openedStack, detailEditSlot);
+            if (!hoverConstraints.isEmpty()) {
+                List<Component> tipLines = new ArrayList<>();
+                for (FilterItemData.NbtConstraint c : hoverConstraints) {
+                    String opStr = FilterItemData.NbtOperator.fromId(c.op()).symbol();
+                    tipLines.add(Component.literal(abbreviateNbtPath(c.path()) + " " + opStr + " " + c.value()));
+                }
+                g.renderComponentTooltip(font, tipLines, mx, my);
+            } else {
+                String nbtRaw = FilterItemData.getEntryNbtRaw(openedStack, detailEditSlot);
+                if (nbtRaw != null) {
+                    String preview = nbtRaw.length() > 60 ? nbtRaw.substring(0, 60) + "..." : nbtRaw;
+                    g.renderTooltip(font, Component.literal("SNBT: " + preview), mx, my);
+                }
             }
         }
         y += DETAIL_SECTION_H;
@@ -3150,7 +3154,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void renderNbtTable(GuiGraphics g, int mx, int my, int tableX, int tableY, int tableW, int tableH) {
-        String selectedPath = FilterItemData.getEntryNbtPath(menu.getOpenedStack(), detailEditSlot);
+        Set<String> activePaths = detailNbtActiveOps.keySet();
         boolean durEnabled = detailDurabilityOp != null;
         if (nbtTableEditingRow < 0) detailNbtValueBox.setVisible(false);
 
@@ -3242,7 +3246,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 } else {
                     int entryIdx = row.entryIdx();
                     NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
-                    boolean active = Objects.equals(entry.path(), selectedPath);
+                    boolean active = activePaths.contains(entry.path());
                     boolean indented = !row.group().isEmpty();
 
                     if (active)
@@ -3263,7 +3267,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                         hoveredFullText = entry.path() + " = " + entry.valueDisplay();
                     }
 
-                    String opStr = active ? detailNbtOp : "=";
+                    String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path(), "=") : "=";
                     int opColor = active ? COL_WHITE : COL_GRAY;
                     g.drawString(font, opStr, colOpX + 4, rowY + 3, opColor, false);
 
@@ -3486,6 +3490,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             NetworkHandler.sendToServer(new SetFilterEntryNbtPayload(detailEditSlot, "", false));
             menu.clearEntryNbt(null, detailEditSlot);
             detailNbtSelectedIdx = -1;
+            detailNbtActiveOps.clear();
             nbtTableEditingRow = -1;
             detailNbtInputBox.setValue("");
             detailNbtValueBox.setValue("");
@@ -3539,7 +3544,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private boolean handleNbtTableClick(double mx, double my, int btn,
                                          int tableX, int tableY, int tableW, int tableH) {
-        String selectedPath = FilterItemData.getEntryNbtPath(menu.getOpenedStack(), detailEditSlot);
+        Set<String> activePaths = detailNbtActiveOps.keySet();
         List<NbtRow> visible = getVisibleNbtRows();
         int totalRows = NBT_BUILTIN_ROWS + visible.size();
         boolean scrollable = totalRows * NBT_ROW_H > tableH;
@@ -3614,19 +3619,23 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
             int entryIdx = row.entryIdx();
             NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
-            boolean active = Objects.equals(entry.path(), selectedPath);
+            boolean active = activePaths.contains(entry.path());
 
             if (mx < colToggleX + NBT_COL_TOGGLE + 4) {
                 if (active) {
-                    NetworkHandler.sendToServer(new SetFilterEntryNbtPayload(detailEditSlot, "", false));
-                    menu.clearEntryNbt(null, detailEditSlot);
-                    detailNbtSelectedIdx = -1;
-                    nbtTableEditingRow = -1;
-                    detailNbtValueBox.setValue("");
-                    detailNbtValueBox.setVisible(false);
-                    detailNbtValueBox.setFocused(false);
+                    NetworkHandler.sendToServer(new SetFilterEntryNbtPayload(detailEditSlot, entry.path(), false));
+                    menu.removeEntryNbt(minecraft.player, detailEditSlot, entry.path());
+                    detailNbtActiveOps.remove(entry.path());
+                    if (detailNbtSelectedIdx == entryIdx) {
+                        detailNbtSelectedIdx = -1;
+                        nbtTableEditingRow = -1;
+                        detailNbtValueBox.setValue("");
+                        detailNbtValueBox.setVisible(false);
+                        detailNbtValueBox.setFocused(false);
+                    }
                 } else {
                     detailNbtSelectedIdx = entryIdx;
+                    detailNbtOp = "=";
                     detailNbtValueBox.setValue(entry.valueDisplay());
                     applyNbtSelection();
                     nbtTableEditingRow = -1;
@@ -3637,11 +3646,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (mx >= colOpX && mx < colOpX + NBT_COL_OP) {
                 if (!active) {
                     detailNbtSelectedIdx = entryIdx;
+                    detailNbtOp = "=";
                     detailNbtValueBox.setValue(entry.valueDisplay());
                     applyNbtSelection();
                 }
-                cycleNbtOp();
-                if (active) applyNbtSelection();
+                cycleNbtOp(entry.path());
                 return true;
             }
 
@@ -3667,15 +3676,22 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return true;
     }
 
-    private void cycleNbtOp() {
+    private void cycleNbtOp(String path) {
+        String currentSymbol = detailNbtActiveOps.getOrDefault(path, "=");
         FilterItemData.NbtOperator current = FilterItemData.NbtOperator.EQUAL;
         for (FilterItemData.NbtOperator op : FilterItemData.NbtOperator.values()) {
-            if (op.symbol().equals(detailNbtOp)) {
+            if (op.symbol().equals(currentSymbol)) {
                 current = op;
                 break;
             }
         }
-        detailNbtOp = current.next().symbol();
+        FilterItemData.NbtOperator next = current.next();
+        detailNbtActiveOps.put(path, next.symbol());
+        detailNbtOp = next.symbol();
+
+        FilterItemData.setEntryNbtOp(menu.getOpenedStack(), detailEditSlot, path, next.id());
+        NetworkHandler.sendToServer(new SetFilterEntryNbtPayload(
+                detailEditSlot, path, true, "", next.id()));
     }
 
     private void applyNbtSelection() {
@@ -3684,9 +3700,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return;
 
         NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(detailNbtSelectedIdx);
+        String opSymbol = detailNbtActiveOps.getOrDefault(entry.path(), detailNbtOp);
         FilterItemData.NbtOperator op = FilterItemData.NbtOperator.EQUAL;
         for (FilterItemData.NbtOperator o : FilterItemData.NbtOperator.values()) {
-            if (o.symbol().equals(detailNbtOp)) {
+            if (o.symbol().equals(opSymbol)) {
                 op = o;
                 break;
             }
@@ -3705,6 +3722,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     detailEditSlot, entry.path(), true, "", op.id()));
             menu.setEntryNbt(minecraft.player, detailEditSlot, entry.path(), op.id());
         }
+        detailNbtActiveOps.put(entry.path(), op.symbol());
     }
 
     private String getBuiltinDefault(int builtinId) {
@@ -4019,6 +4037,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailNbtValueBox.setValue("");
             detailNbtSelectedIdx = -1;
             detailNbtOp = "=";
+            detailNbtActiveOps.clear();
             nbtTableEditingRow = -1;
         }
     }

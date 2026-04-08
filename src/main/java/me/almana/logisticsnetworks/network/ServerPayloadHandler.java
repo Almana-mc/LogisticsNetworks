@@ -14,8 +14,13 @@ import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
@@ -58,7 +63,10 @@ public class ServerPayloadHandler {
             if (channel == null)
                 return;
 
+            ChannelType oldType = channel.getType();
             updateChannelData(channel, payload);
+            if (oldType != channel.getType())
+                autoDetectSide(node, channel);
             clampChannelToUpgradeLimits(node, channel);
             propagateToLabelGroup(node, payload.channelIndex());
             markNetworkDirty(node);
@@ -77,8 +85,11 @@ public class ServerPayloadHandler {
         channel.setBatchSize(payload.batchSize());
         channel.setTickDelay(payload.tickDelay());
 
-        if (isValidEnum(payload.directionOrdinal(), Direction.values()))
+        if (payload.directionOrdinal() == 6) {
+            channel.setIoDirection(null);
+        } else if (isValidEnum(payload.directionOrdinal(), Direction.values())) {
             channel.setIoDirection(Direction.values()[payload.directionOrdinal()]);
+        }
 
         if (isValidEnum(payload.redstoneModeOrdinal(), RedstoneMode.values()))
             channel.setRedstoneMode(RedstoneMode.values()[payload.redstoneModeOrdinal()]);
@@ -94,6 +105,53 @@ public class ServerPayloadHandler {
 
     private static <T extends Enum<T>> boolean isValidEnum(int ordinal, T[] values) {
         return ordinal >= 0 && ordinal < values.length;
+    }
+
+    private static void autoDetectSide(LogisticsNodeEntity node, ChannelData channel) {
+        if (!(node.level() instanceof ServerLevel level))
+            return;
+        BlockPos pos = node.getAttachedPos();
+        BlockEntity be = level.getBlockEntity(pos);
+        if (be == null)
+            return;
+
+        switch (channel.getType()) {
+            case ITEM -> {
+                for (Direction d : Direction.values()) {
+                    if (be.getCapability(ForgeCapabilities.ITEM_HANDLER, d).isPresent()) {
+                        channel.setIoDirection(d);
+                        return;
+                    }
+                }
+            }
+            case FLUID -> {
+                for (Direction d : Direction.values()) {
+                    if (be.getCapability(ForgeCapabilities.FLUID_HANDLER, d).isPresent()) {
+                        channel.setIoDirection(d);
+                        return;
+                    }
+                }
+            }
+            case ENERGY -> {
+                for (Direction d : Direction.values()) {
+                    if (be.getCapability(ForgeCapabilities.ENERGY, d).isPresent()) {
+                        channel.setIoDirection(d);
+                        return;
+                    }
+                }
+            }
+            case CHEMICAL -> {
+                if (MekanismCompat.isLoaded()) {
+                    for (Direction d : Direction.values()) {
+                        if (ChemicalTransferHelper.getHandler(level, pos, d) != null) {
+                            channel.setIoDirection(d);
+                            return;
+                        }
+                    }
+                }
+            }
+            case SOURCE -> {} // non-directional
+        }
     }
 
     public static void handleAssignNetwork(AssignNetworkPayload payload, IPayloadContext context) {
@@ -412,7 +470,11 @@ public class ServerPayloadHandler {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
                 if (!payload.matchValue()) {
-                    menu.clearEntryNbt((Player) context.player(), payload.entryIndex());
+                    if (!payload.key().isEmpty()) {
+                        menu.removeEntryNbt((Player) context.player(), payload.entryIndex(), payload.key());
+                    } else {
+                        menu.clearEntryNbt((Player) context.player(), payload.entryIndex());
+                    }
                 } else if (!payload.value().isEmpty() && payload.key().isEmpty()) {
                     menu.setEntryNbtRaw((Player) context.player(), payload.entryIndex(), payload.key(), payload.value());
                 } else if (!payload.value().isEmpty() && !payload.key().isEmpty()) {
@@ -561,6 +623,53 @@ public class ServerPayloadHandler {
                     stack.getHoverName()), buf -> {
                         buf.writeVarInt(-1);
                         buf.writeVarInt(slotIndex);
+                        buf.writeVarInt(slotCount);
+                        buf.writeBoolean(isTag);
+                        buf.writeBoolean(isAmount);
+                        buf.writeBoolean(isNbt);
+                        buf.writeBoolean(isDurability);
+                        buf.writeBoolean(isMod);
+                        buf.writeBoolean(isSlot);
+                        buf.writeBoolean(isName);
+                    });
+        });
+    }
+
+    public static void handleOpenNodeFilter(OpenNodeFilterPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer serverPlayer))
+                return;
+
+            Entity entity = serverPlayer.level().getEntity(payload.entityId());
+            if (!(entity instanceof LogisticsNodeEntity node))
+                return;
+
+            int channel = payload.channel();
+            int filterSlot = payload.filterSlot();
+            if (channel < 0 || channel >= 9 || filterSlot < 0 || filterSlot >= 9)
+                return;
+
+            ItemStack stack = node.getChannel(channel).getFilterItem(filterSlot);
+            if (stack.isEmpty() || !stack.is(ModTags.FILTERS))
+                return;
+
+            boolean isTag = stack.getItem() instanceof TagFilterItem;
+            boolean isAmount = stack.getItem() instanceof AmountFilterItem;
+            boolean isNbt = stack.getItem() instanceof NbtFilterItem;
+            boolean isDurability = stack.getItem() instanceof DurabilityFilterItem;
+            boolean isMod = stack.getItem() instanceof ModFilterItem;
+            boolean isSlot = stack.getItem() instanceof SlotFilterItem;
+            boolean isName = stack.getItem() instanceof NameFilterItem;
+            boolean isSpecial = isTag || isAmount || isNbt || isDurability || isMod || isSlot || isName;
+            int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
+
+            NetworkHooks.openScreen(serverPlayer, new SimpleMenuProvider(
+                    (id, inv, p) -> new FilterMenu(id, inv, node, channel, filterSlot),
+                    stack.getHoverName()), buf -> {
+                        buf.writeVarInt(-2);
+                        buf.writeVarInt(node.getId());
+                        buf.writeVarInt(channel);
+                        buf.writeVarInt(filterSlot);
                         buf.writeVarInt(slotCount);
                         buf.writeBoolean(isTag);
                         buf.writeBoolean(isAmount);

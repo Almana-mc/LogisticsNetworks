@@ -46,6 +46,7 @@ public final class FilterItemData {
     private static final String KEY_DUR_VAL = "dur_val";
     private static final String KEY_NBT_RAW = "nbt_raw";
     private static final String KEY_NBT_OP = "nbt_op";
+    private static final String KEY_NBT_ENTRIES = "nbt_list";
     private static final String KEY_SLOT_MAPPING = "slot_map";
     private static final String KEY_ENCHANTED = "enchanted";
 
@@ -91,14 +92,15 @@ public final class FilterItemData {
         }
     }
 
+    public record NbtConstraint(String path, Tag value, String op) {
+    }
+
     private record ItemFilterSlot(
             @Nullable String tag,
             @Nullable Item item,
             int batch,
             int stock,
-            @Nullable String nbtPath,
-            @Nullable Tag nbtValue,
-            @Nullable String nbtOp,
+            List<NbtConstraint> nbtConstraints,
             @Nullable CompoundTag rawNbt,
             boolean invalidRawNbt,
             @Nullable String durOp,
@@ -619,34 +621,86 @@ public final class FilterItemData {
 
     @Nullable
     public static String getEntryNbtPath(ItemStack stack, int slot) {
-        if (!isFilterItem(stack))
-            return null;
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_NBT_PATH, Tag.TAG_STRING)) {
-                    return entry.getString(KEY_NBT_PATH);
-                }
-            }
-        }
-        return null;
+        List<NbtConstraint> constraints = getEntryNbtConstraints(stack, slot);
+        return constraints.isEmpty() ? null : constraints.get(0).path();
     }
 
     @Nullable
     public static Tag getEntryNbtValue(ItemStack stack, int slot) {
+        List<NbtConstraint> constraints = getEntryNbtConstraints(stack, slot);
+        return constraints.isEmpty() ? null : constraints.get(0).value();
+    }
+
+    public static void addEntryNbtConstraint(ItemStack stack, int slot, String path, Tag value, @Nullable String op) {
+        if (!isFilterItem(stack) || path == null || path.isEmpty() || value == null)
+            return;
+        if (slot < 0 || slot >= getCapacity(stack))
+            return;
+
+        updateRoot(stack, root -> {
+            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+            for (Tag t : list) {
+                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
+                    List<NbtConstraint> constraints = new ArrayList<>(readNbtConstraints(entry));
+                    constraints.removeIf(c -> c.path().equals(path));
+                    constraints.add(new NbtConstraint(path, value.copy(), op));
+                    writeNbtConstraints(entry, constraints);
+                    root.put(KEY_ITEMS, list);
+                    return;
+                }
+            }
+        });
+    }
+
+    public static void removeEntryNbtConstraint(ItemStack stack, int slot, String path) {
+        if (!isFilterItem(stack) || path == null || path.isEmpty())
+            return;
+        if (slot < 0 || slot >= getCapacity(stack))
+            return;
+
+        updateRoot(stack, root -> {
+            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+            for (Tag t : list) {
+                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
+                    List<NbtConstraint> constraints = new ArrayList<>(readNbtConstraints(entry));
+                    constraints.removeIf(c -> c.path().equals(path));
+                    writeNbtConstraints(entry, constraints);
+                    root.put(KEY_ITEMS, list);
+                    return;
+                }
+            }
+        });
+    }
+
+    public static void clearAllEntryNbt(ItemStack stack, int slot) {
         if (!isFilterItem(stack))
-            return null;
+            return;
+        if (slot < 0 || slot >= getCapacity(stack))
+            return;
+
+        updateRoot(stack, root -> {
+            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+            for (Tag t : list) {
+                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
+                    writeNbtConstraints(entry, List.of());
+                    root.put(KEY_ITEMS, list);
+                    return;
+                }
+            }
+        });
+    }
+
+    public static List<NbtConstraint> getEntryNbtConstraints(ItemStack stack, int slot) {
+        if (!isFilterItem(stack))
+            return List.of();
         CompoundTag root = getRoot(stack);
         ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
         for (Tag t : list) {
             if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_NBT_VALUE)) {
-                    return entry.get(KEY_NBT_VALUE);
-                }
+                return readNbtConstraints(entry);
             }
         }
-        return null;
+        return List.of();
     }
 
     public static void setEntryNbt(ItemStack stack, int slot, @Nullable String path, @Nullable Tag value) {
@@ -654,44 +708,21 @@ public final class FilterItemData {
             return;
         if (slot < 0 || slot >= getCapacity(stack))
             return;
-
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-            for (Tag t : list) {
-                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    if (path != null && !path.isEmpty() && value != null) {
-                        entry.putString(KEY_NBT_PATH, path);
-                        entry.put(KEY_NBT_VALUE, value.copy());
-                    } else {
-                        entry.remove(KEY_NBT_PATH);
-                        entry.remove(KEY_NBT_VALUE);
-                        entry.remove(KEY_NBT_OP);
-                    }
-                    root.put(KEY_ITEMS, list);
-                    return;
-                }
-            }
-        });
+        if (path != null && !path.isEmpty() && value != null) {
+            addEntryNbtConstraint(stack, slot, path, value, null);
+        } else {
+            clearAllEntryNbt(stack, slot);
+        }
     }
 
     @Nullable
     public static String getEntryNbtOp(ItemStack stack, int slot) {
-        if (!isFilterItem(stack))
-            return null;
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_NBT_OP, Tag.TAG_STRING)) {
-                    return entry.getString(KEY_NBT_OP);
-                }
-            }
-        }
-        return null;
+        List<NbtConstraint> constraints = getEntryNbtConstraints(stack, slot);
+        return constraints.isEmpty() ? null : constraints.get(0).op();
     }
 
-    public static void setEntryNbtOp(ItemStack stack, int slot, @Nullable String op) {
-        if (!isFilterItem(stack))
+    public static void setEntryNbtOp(ItemStack stack, int slot, String path, @Nullable String op) {
+        if (!isFilterItem(stack) || path == null || path.isEmpty())
             return;
         if (slot < 0 || slot >= getCapacity(stack))
             return;
@@ -700,11 +731,15 @@ public final class FilterItemData {
             ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
             for (Tag t : list) {
                 if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    if (op != null && !op.isEmpty()) {
-                        entry.putString(KEY_NBT_OP, op);
-                    } else {
-                        entry.remove(KEY_NBT_OP);
+                    List<NbtConstraint> constraints = new ArrayList<>(readNbtConstraints(entry));
+                    for (int i = 0; i < constraints.size(); i++) {
+                        if (constraints.get(i).path().equals(path)) {
+                            NbtConstraint old = constraints.get(i);
+                            constraints.set(i, new NbtConstraint(old.path(), old.value(), op));
+                            break;
+                        }
                     }
+                    writeNbtConstraints(entry, constraints);
                     root.put(KEY_ITEMS, list);
                     return;
                 }
@@ -712,8 +747,16 @@ public final class FilterItemData {
         });
     }
 
+    @Deprecated
+    public static void setEntryNbtOp(ItemStack stack, int slot, @Nullable String op) {
+        List<NbtConstraint> constraints = getEntryNbtConstraints(stack, slot);
+        if (!constraints.isEmpty()) {
+            setEntryNbtOp(stack, slot, constraints.get(0).path(), op);
+        }
+    }
+
     public static boolean hasEntryNbt(ItemStack stack, int slot) {
-        return getEntryNbtPath(stack, slot) != null || getEntryNbtRaw(stack, slot) != null;
+        return !getEntryNbtConstraints(stack, slot).isEmpty() || getEntryNbtRaw(stack, slot) != null;
     }
 
     @Nullable
@@ -743,6 +786,10 @@ public final class FilterItemData {
             ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
             for (Tag t : list) {
                 if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
+                    entry.remove(KEY_NBT_PATH);
+                    entry.remove(KEY_NBT_VALUE);
+                    entry.remove(KEY_NBT_OP);
+                    entry.remove(KEY_NBT_ENTRIES);
                     if (rawSnbt != null && !rawSnbt.isEmpty()) {
                         entry.putString(KEY_NBT_RAW, rawSnbt);
                     } else {
@@ -775,7 +822,7 @@ public final class FilterItemData {
     }
 
     public static boolean hasAnyNbtEntries(ItemStack stack) {
-        return hasEntryType(stack, KEY_NBT_PATH) || hasEntryType(stack, KEY_NBT_RAW);
+        return hasEntryType(stack, KEY_NBT_PATH) || hasEntryType(stack, KEY_NBT_RAW) || hasEntryType(stack, KEY_NBT_ENTRIES);
     }
 
     public static boolean isNbtOnlySlot(ItemStack stack, int slot) {
@@ -950,18 +997,14 @@ public final class FilterItemData {
             }
 
             if (entry.nbtOnly()) {
-                LOGGER.debug("[nbtOnly] candidate={}, hasNbt={}, path={}, value={}, rawNbt={}",
-                        candidate.getItem(), entry.hasNbt(), entry.nbtPath(),
-                        entry.nbtValue() != null ? entry.nbtValue().getAsString() : "null",
+                LOGGER.debug("[nbtOnly] candidate={}, hasNbt={}, constraints={}, rawNbt={}",
+                        candidate.getItem(), entry.hasNbt(), entry.nbtConstraints().size(),
                         entry.rawNbt());
                 if (entry.hasNbt()) {
                     if (!candidateComponentsResolved) {
                         resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
                         candidateComponentsResolved = true;
                     }
-                    LOGGER.debug("[nbtOnly] candidateComponents={}", resolvedCandidateComponents);
-                    Tag resolved = NbtFilterData.resolvePathValue(resolvedCandidateComponents, entry.nbtPath());
-                    LOGGER.debug("[nbtOnly] resolvedValue={}, expected={}", resolved, entry.nbtValue());
                     if (!checkNbtConstraint(entry, resolvedCandidateComponents))
                         continue;
                 }
@@ -1034,8 +1077,8 @@ public final class FilterItemData {
             }
 
             if (entry.nbtOnly()) {
-                LOGGER.debug("[nbtOnlySlot] candidate={}, slot={}, hasNbt={}, path={}, slotMap={}",
-                        candidate.getItem(), inventorySlot, entry.hasNbt(), entry.nbtPath(),
+                LOGGER.debug("[nbtOnlySlot] candidate={}, slot={}, hasNbt={}, constraints={}, slotMap={}",
+                        candidate.getItem(), inventorySlot, entry.hasNbt(), entry.nbtConstraints().size(),
                         entry.slotMapping() != null ? java.util.Arrays.toString(entry.slotMapping()) : "none");
                 if (entry.hasNbt()) {
                     if (!candidateComponentsResolved) {
@@ -1517,14 +1560,16 @@ public final class FilterItemData {
         if (components == null)
             return false;
 
-        String nbtPath = entry.nbtPath();
-        Tag nbtExpected = entry.nbtValue();
-        if (nbtPath != null && nbtExpected != null) {
-            Tag actual = NbtFilterData.resolvePathValue(components, nbtPath);
-            if (actual == null)
-                return false;
-            NbtOperator op = NbtOperator.fromId(entry.nbtOp());
-            return compareNbtValues(actual, nbtExpected, op);
+        if (!entry.nbtConstraints().isEmpty()) {
+            for (NbtConstraint c : entry.nbtConstraints()) {
+                Tag actual = NbtFilterData.resolvePathValue(components, c.path());
+                if (actual == null)
+                    return false;
+                NbtOperator op = NbtOperator.fromId(c.op());
+                if (!compareNbtValues(actual, c.value(), op))
+                    return false;
+            }
+            return true;
         }
 
         CompoundTag rawNbt = entry.rawNbt();
@@ -1542,14 +1587,17 @@ public final class FilterItemData {
         if (components == null)
             return false;
 
-        String nbtPath = getEntryNbtPath(entry);
-        Tag nbtExpected = getEntryNbtValue(entry);
-        if (nbtPath != null && nbtExpected != null) {
-            Tag actual = NbtFilterData.resolvePathValue(components, nbtPath);
-            if (actual == null)
-                return false;
-            NbtOperator op = NbtOperator.fromId(getEntryNbtOp(entry));
-            return compareNbtValues(actual, nbtExpected, op);
+        List<NbtConstraint> constraints = readNbtConstraints(entry);
+        if (!constraints.isEmpty()) {
+            for (NbtConstraint c : constraints) {
+                Tag actual = NbtFilterData.resolvePathValue(components, c.path());
+                if (actual == null)
+                    return false;
+                NbtOperator op = NbtOperator.fromId(c.op());
+                if (!compareNbtValues(actual, c.value(), op))
+                    return false;
+            }
+            return true;
         }
 
         String raw = getEntryNbtRaw(entry);
@@ -1853,8 +1901,7 @@ public final class FilterItemData {
             Item item = resolveEntryItem(entry);
             boolean hasFluid = entry.contains(KEY_FLUID_ID, Tag.TAG_STRING);
             boolean hasChemical = entry.contains(KEY_CHEMICAL_ID, Tag.TAG_STRING);
-            String nbtPath = getEntryNbtPath(entry);
-            Tag nbtValue = getEntryNbtValue(entry);
+            List<NbtConstraint> nbtConstraints = readNbtConstraints(entry);
             String raw = getEntryNbtRaw(entry);
             CompoundTag rawNbt = null;
             boolean invalidRawNbt = false;
@@ -1866,14 +1913,13 @@ public final class FilterItemData {
                 }
             }
 
-            String nbtOp = getEntryNbtOp(entry);
             String durOp = getEntryDurabilityOp(entry);
             int durVal = getEntryDurabilityValue(entry);
             int batch = getEntryBatch(entry);
             int stock = getEntryStock(entry);
             Boolean enchanted = entry.contains(KEY_ENCHANTED, Tag.TAG_BYTE)
                     ? entry.getBoolean(KEY_ENCHANTED) : null;
-            boolean hasNbt = nbtPath != null || raw != null;
+            boolean hasNbt = !nbtConstraints.isEmpty() || raw != null;
             boolean nbtOnly = (hasNbt || durOp != null || enchanted != null || batch > 0 || stock > 0)
                     && tag == null && item == null && !hasFluid && !hasChemical;
             int[] slotMapping = entry.contains(KEY_SLOT_MAPPING, Tag.TAG_INT_ARRAY)
@@ -1881,7 +1927,7 @@ public final class FilterItemData {
                     : null;
             if (slotMapping != null && slotMapping.length == 0) slotMapping = null;
 
-            entriesBySlot[slot] = new ItemFilterSlot(tag, item, batch, stock, nbtPath, nbtValue, nbtOp, rawNbt,
+            entriesBySlot[slot] = new ItemFilterSlot(tag, item, batch, stock, nbtConstraints, rawNbt,
                     invalidRawNbt, durOp, durVal, hasNbt, nbtOnly, slotMapping, enchanted);
 
             hasItemEntries |= item != null || nbtOnly;
@@ -1977,8 +2023,74 @@ public final class FilterItemData {
         return 0;
     }
 
+    private static List<NbtConstraint> readNbtConstraints(CompoundTag entry) {
+        if (entry.contains(KEY_NBT_ENTRIES, Tag.TAG_LIST)) {
+            ListTag list = entry.getList(KEY_NBT_ENTRIES, Tag.TAG_COMPOUND);
+            List<NbtConstraint> constraints = new ArrayList<>(list.size());
+            for (Tag t : list) {
+                if (t instanceof CompoundTag c) {
+                    String path = c.getString(KEY_NBT_PATH);
+                    Tag value = c.get(KEY_NBT_VALUE);
+                    String op = c.contains(KEY_NBT_OP, Tag.TAG_STRING) ? c.getString(KEY_NBT_OP) : null;
+                    if (!path.isEmpty() && value != null) {
+                        constraints.add(new NbtConstraint(path, value, op));
+                    }
+                }
+            }
+            return constraints;
+        }
+        String path = getEntryNbtPath(entry);
+        Tag value = getEntryNbtValue(entry);
+        if (path != null && value != null) {
+            String op = getEntryNbtOp(entry);
+            return List.of(new NbtConstraint(path, value, op));
+        }
+        return List.of();
+    }
+
+    private static void writeNbtConstraints(CompoundTag entry, List<NbtConstraint> constraints) {
+        entry.remove(KEY_NBT_PATH);
+        entry.remove(KEY_NBT_VALUE);
+        entry.remove(KEY_NBT_OP);
+
+        if (constraints.isEmpty()) {
+            entry.remove(KEY_NBT_ENTRIES);
+            entry.remove(KEY_NBT_RAW);
+            return;
+        }
+
+        ListTag list = new ListTag();
+        for (NbtConstraint c : constraints) {
+            CompoundTag ct = new CompoundTag();
+            ct.putString(KEY_NBT_PATH, c.path());
+            ct.put(KEY_NBT_VALUE, c.value().copy());
+            if (c.op() != null && !c.op().isEmpty()) {
+                ct.putString(KEY_NBT_OP, c.op());
+            }
+            list.add(ct);
+        }
+        entry.put(KEY_NBT_ENTRIES, list);
+
+        CompoundTag merged = new CompoundTag();
+        for (NbtConstraint c : constraints) {
+            mergeInto(merged, buildRawFromPath(c.path(), c.value()));
+        }
+        entry.putString(KEY_NBT_RAW, merged.toString());
+    }
+
+    private static void mergeInto(CompoundTag target, CompoundTag source) {
+        for (String key : source.getAllKeys()) {
+            Tag srcVal = source.get(key);
+            if (srcVal instanceof CompoundTag sc && target.contains(key, Tag.TAG_COMPOUND)) {
+                mergeInto(target.getCompound(key), sc);
+            } else if (srcVal != null) {
+                target.put(key, srcVal.copy());
+            }
+        }
+    }
+
     private static boolean hasEntryNbt(CompoundTag entry) {
-        return getEntryNbtPath(entry) != null || getEntryNbtRaw(entry) != null;
+        return !readNbtConstraints(entry).isEmpty() || getEntryNbtRaw(entry) != null;
     }
 
     private static boolean hasEntryDurability(CompoundTag entry) {
