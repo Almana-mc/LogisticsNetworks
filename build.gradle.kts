@@ -160,7 +160,7 @@ idea {
     }
 }
 
-val copyJarDest = file("C:/Users/Kanishq/curseforge/minecraft/Instances/Test/mods")
+val copyJarDest = File("C:/Users/Kanishq/curseforge/minecraft/Instances/Test/mods")
 if (copyJarDest.isDirectory) {
     tasks.register<Copy>("copyJar") {
         from(tasks.named("jar"))
