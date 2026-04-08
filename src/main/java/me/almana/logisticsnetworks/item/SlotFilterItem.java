@@ -64,5 +64,9 @@ public class SlotFilterItem extends Item {
 
         tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.open_hint")
                 .withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated.line1")
+                .withStyle(ChatFormatting.RED));
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated.line2")
+                .withStyle(ChatFormatting.RED));
     }
 }

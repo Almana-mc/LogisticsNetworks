@@ -88,6 +88,33 @@ public class TransferEngine {
             energy.put(key, handler != null ? handler : ABSENT);
             return handler;
         }
+
+        IItemHandler findItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+            if (dir != null) return getItemHandler(level, pos, dir);
+            for (Direction d : Direction.values()) {
+                IItemHandler h = getItemHandler(level, pos, d);
+                if (h != null) return h;
+            }
+            return null;
+        }
+
+        IFluidHandler findFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+            if (dir != null) return getFluidHandler(level, pos, dir);
+            for (Direction d : Direction.values()) {
+                IFluidHandler h = getFluidHandler(level, pos, d);
+                if (h != null) return h;
+            }
+            return null;
+        }
+
+        IEnergyStorage findEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+            if (dir != null) return getEnergyHandler(level, pos, dir);
+            for (Direction d : Direction.values()) {
+                IEnergyStorage h = getEnergyHandler(level, pos, d);
+                if (h != null) return h;
+            }
+            return null;
+        }
     }
 
     private record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
@@ -103,7 +130,7 @@ public class TransferEngine {
             boolean hasPerEntryAmounts) {
     }
 
-    private record RecipeEntry(ItemStack item, String tag, int amount) {
+    private record RecipeEntry(ItemStack item, String tag, int batch) {
     }
 
     private record RecipeCursorResult(int moved, int entryIndex, int entryRemaining, boolean completed) {
@@ -119,19 +146,19 @@ public class TransferEngine {
                 continue;
             int cap = FilterItemData.getCapacity(filter);
             for (int slot = 0; slot < cap; slot++) {
-                int amount = FilterItemData.getEntryAmount(filter, slot);
-                if (amount <= 0)
+                int batch = FilterItemData.getEntryBatch(filter, slot);
+                if (batch <= 0)
                     continue;
 
                 String tag = FilterItemData.getEntryTag(filter, slot);
                 if (tag != null) {
-                    recipe.add(new RecipeEntry(ItemStack.EMPTY, tag, amount));
+                    recipe.add(new RecipeEntry(ItemStack.EMPTY, tag, batch));
                     continue;
                 }
 
                 ItemStack entry = FilterItemData.getEntry(filter, slot, provider);
                 if (!entry.isEmpty()) {
-                    recipe.add(new RecipeEntry(entry, null, amount));
+                    recipe.add(new RecipeEntry(entry, null, batch));
                 }
             }
         }
@@ -440,7 +467,7 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IItemHandler sourceHandler = capCache.getItemHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
+        IItemHandler sourceHandler = capCache.findItemHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null)
             return -1;
 
@@ -464,7 +491,7 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IItemHandler targetHandler = capCache.getItemHandler(targetLevel, targetPos, target.channel.getIoDirection());
+            IItemHandler targetHandler = capCache.findItemHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null)
                 continue;
 
@@ -508,7 +535,7 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IFluidHandler sourceHandler = capCache.getFluidHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
+        IFluidHandler sourceHandler = capCache.findFluidHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null)
             return -1;
 
@@ -532,7 +559,7 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IFluidHandler targetHandler = capCache.getFluidHandler(targetLevel, targetPos, target.channel.getIoDirection());
+            IFluidHandler targetHandler = capCache.findFluidHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null)
                 continue;
 
@@ -556,7 +583,7 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IEnergyStorage sourceHandler = capCache.getEnergyHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
+        IEnergyStorage sourceHandler = capCache.findEnergyHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null || !sourceHandler.canExtract())
             return -1;
 
@@ -580,7 +607,7 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IEnergyStorage targetHandler = capCache.getEnergyHandler(targetLevel, targetPos, target.channel.getIoDirection());
+            IEnergyStorage targetHandler = capCache.findEnergyHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null || !targetHandler.canReceive())
                 continue;
 
@@ -742,6 +769,7 @@ public class TransferEngine {
             }
         }
         Map<Item, Integer> sourceItemCounts = anyAmountConstraints ? buildItemCountCache(source) : null;
+        Map<Item, Integer> batchMoved = anyAmountConstraints ? new HashMap<>() : null;
         List<Map<Item, Integer>> targetItemCounts = null;
         if (anyAmountConstraints) {
             targetItemCounts = new ArrayList<>(targets.size());
@@ -785,14 +813,14 @@ public class TransferEngine {
                             : null;
 
                     if (provider != null) {
-                        if (!FilterLogic.matchesItem(exportFilters, exportFilterMode, extracted, provider,
-                                candidateComponents, filterReadCache)) {
+                        if (!FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode, extracted, provider,
+                                candidateComponents, filterReadCache, slot)) {
                             continue;
                         }
                     }
 
-                    if (provider != null && !FilterLogic.matchesItem(target.importFilters(), target.importFilterMode(),
-                            extracted, provider, candidateComponents, filterReadCache)) {
+                    if (provider != null && !FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(),
+                            extracted, provider, candidateComponents, filterReadCache, -1)) {
                         continue;
                     }
 
@@ -812,6 +840,12 @@ public class TransferEngine {
                                     filterReadCache);
                             if (perEntry >= 0) {
                                 allowedByAmount = Math.min(allowedByAmount, perEntry);
+                            }
+                            int batchLimit = getPerEntryBatchLimit(extracted, exportFilters, provider,
+                                    candidateComponents, filterReadCache);
+                            if (batchLimit > 0) {
+                                int alreadyMoved = batchMoved.getOrDefault(extracted.getItem(), 0);
+                                allowedByAmount = Math.min(allowedByAmount, Math.max(0, batchLimit - alreadyMoved));
                             }
                         }
                     }
@@ -874,6 +908,7 @@ public class TransferEngine {
                             if (tgtCache != null) {
                                 tgtCache.merge(movedItem, moved, Integer::sum);
                             }
+                            batchMoved.merge(movedItem, moved, Integer::sum);
                         }
 
                         // We successfully transferred an item to this target.
@@ -977,7 +1012,7 @@ public class TransferEngine {
             if (currentRemaining <= 0) {
                 currentEntryIdx++;
                 if (currentEntryIdx < recipe.size()) {
-                    currentRemaining = recipe.get(currentEntryIdx).amount();
+                    currentRemaining = recipe.get(currentEntryIdx).batch();
                 } else {
                     return new RecipeCursorResult(totalMoved, 0, 0, true);
                 }
@@ -1017,7 +1052,7 @@ public class TransferEngine {
             cursorRemaining = 0;
         }
         if (cursorRemaining <= 0) {
-            cursorRemaining = recipe.get(cursorEntry).amount();
+            cursorRemaining = recipe.get(cursorEntry).batch();
         }
 
         int totalMoved = 0;
@@ -1039,7 +1074,7 @@ public class TransferEngine {
             if (result.completed()) {
                 targetsCompleted++;
                 cursorEntry = 0;
-                cursorRemaining = recipe.get(0).amount();
+                cursorRemaining = recipe.get(0).batch();
             } else {
                 cursorEntry = result.entryIndex();
                 cursorRemaining = result.entryRemaining();
@@ -1387,6 +1422,20 @@ public class TransferEngine {
         }
 
         return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
+    }
+
+    private static int getPerEntryBatchLimit(ItemStack candidate, ItemStack[] exportFilters,
+            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        if (exportFilters == null) return -1;
+        int limit = Integer.MAX_VALUE;
+        for (ItemStack filter : exportFilters) {
+            int batch = FilterItemData.getItemBatchLimitFull(filter, candidate, provider,
+                    candidateComponents, filterReadCache);
+            if (batch > 0)
+                limit = Math.min(limit, batch);
+        }
+        return limit == Integer.MAX_VALUE ? -1 : limit;
     }
 
     private static int getPerEntryFluidAmountLimit(FluidStack candidate, ItemStack[] exportFilters,

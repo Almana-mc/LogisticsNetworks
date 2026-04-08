@@ -76,8 +76,11 @@ public class ServerPayloadHandler {
         channel.setBatchSize(payload.batchSize());
         channel.setTickDelay(payload.tickDelay());
 
-        if (isValidEnum(payload.directionOrdinal(), Direction.values()))
+        if (payload.directionOrdinal() == 6) {
+            channel.setIoDirection(null);
+        } else if (isValidEnum(payload.directionOrdinal(), Direction.values())) {
             channel.setIoDirection(Direction.values()[payload.directionOrdinal()]);
+        }
 
         if (isValidEnum(payload.redstoneModeOrdinal(), RedstoneMode.values()))
             channel.setRedstoneMode(RedstoneMode.values()[payload.redstoneModeOrdinal()]);
@@ -432,8 +435,88 @@ public class ServerPayloadHandler {
     public static void handleSetFilterEntryAmount(SetFilterEntryAmountPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !menu.isAmountMode()) {
-                menu.setEntryAmount((Player) context.player(), payload.slot(), payload.amount());
+                menu.setEntryBatch((Player) context.player(), payload.slot(), payload.batch());
+                menu.setEntryStock((Player) context.player(), payload.slot(), payload.stock());
             }
+        });
+    }
+
+    public static void handleSetFilterEntryEnchanted(SetFilterEntryEnchantedPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
+                if (payload.enabled()) {
+                    menu.setEntryEnchanted((Player) context.player(), payload.entryIndex(), payload.value());
+                } else {
+                    menu.setEntryEnchanted((Player) context.player(), payload.entryIndex(), null);
+                }
+            }
+        });
+    }
+
+    public static void handleSetFilterEntrySlotMapping(SetFilterEntrySlotMappingPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
+                menu.setEntrySlotMapping((Player) context.player(), payload.entryIndex(), payload.slotExpression());
+            }
+        });
+    }
+
+    public static void handleSetChannelName(SetChannelNamePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            if (node == null) return;
+            ChannelData channel = node.getChannel(payload.channelIndex());
+            if (channel == null) return;
+            String name = payload.name().trim();
+            if (name.length() > 24) name = name.substring(0, 24);
+            channel.setName(name);
+            markNetworkDirty(node);
+        });
+    }
+
+    public static void handleOpenNodeFilter(OpenNodeFilterPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer serverPlayer)) return;
+
+            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            if (node == null) return;
+
+            int ch = payload.channel();
+            int fs = payload.filterSlot();
+            if (ch < 0 || ch >= 9 || fs < 0 || fs >= 9) return;
+
+            ChannelData channel = node.getChannel(ch);
+            if (channel == null) return;
+
+            ItemStack stack = channel.getFilterItem(fs);
+            if (stack.isEmpty() || !stack.is(ModTags.FILTERS)) return;
+
+            boolean isTag = stack.getItem() instanceof TagFilterItem;
+            boolean isAmount = stack.getItem() instanceof AmountFilterItem;
+            boolean isDurability = stack.getItem() instanceof DurabilityFilterItem;
+            boolean isMod = stack.getItem() instanceof ModFilterItem;
+            boolean isSlot = stack.getItem() instanceof SlotFilterItem;
+            boolean isName = stack.getItem() instanceof NameFilterItem;
+            boolean isSpecial = isTag || isAmount || isDurability || isMod || isSlot || isName;
+            int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
+
+            serverPlayer.openMenu(new SimpleMenuProvider(
+                    (id, inv, p) -> new FilterMenu(id, inv, node, ch, fs),
+                    stack.getHoverName()), buf -> {
+                        buf.writeVarInt(-2);
+                        buf.writeVarInt(payload.entityId());
+                        buf.writeVarInt(ch);
+                        buf.writeVarInt(fs);
+                        buf.writeVarInt(slotCount);
+                        buf.writeBoolean(isTag);
+                        buf.writeBoolean(isAmount);
+                        buf.writeBoolean(false);
+                        buf.writeBoolean(isDurability);
+                        buf.writeBoolean(isMod);
+                        buf.writeBoolean(isSlot);
+                        buf.writeBoolean(isName);
+                    });
         });
     }
 
@@ -456,7 +539,7 @@ public class ServerPayloadHandler {
                 switch (payload.action()) {
                     case SetFilterEntryNbtPayload.ACTION_ADD ->
                         menu.addSlotNbtRule((Player) context.player(), payload.slot(),
-                                payload.path(), payload.operator());
+                                payload.path(), payload.operator(), payload.value());
                     case SetFilterEntryNbtPayload.ACTION_REMOVE ->
                         menu.removeSlotNbtRule(payload.slot(), payload.ruleIndex());
                     case SetFilterEntryNbtPayload.ACTION_TOGGLE_MATCH ->
@@ -465,6 +548,9 @@ public class ServerPayloadHandler {
                         menu.clearSlotNbtRules(payload.slot());
                     case SetFilterEntryNbtPayload.ACTION_SET_VALUE ->
                         menu.setSlotNbtRuleValue(payload.slot(), payload.ruleIndex(), payload.value());
+                    case SetFilterEntryNbtPayload.ACTION_SET_RAW ->
+                        menu.setEntryNbtRaw((Player) context.player(), payload.slot(),
+                                payload.path(), payload.value());
                 }
             }
         });
@@ -543,7 +629,7 @@ public class ServerPayloadHandler {
         return (entity instanceof LogisticsNodeEntity node && node.isValidNode()) ? node : null;
     }
 
-    private static void markNetworkDirty(LogisticsNodeEntity node) {
+    public static void markNetworkDirty(LogisticsNodeEntity node) {
         if (node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
             NetworkRegistry.get(level).markNetworkDirty(node.getNetworkId());
         }

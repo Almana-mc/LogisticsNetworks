@@ -139,6 +139,12 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
     }
 
     @Override
+    public boolean keyPressed(int key, int scan, int modifiers) {
+        if (key == 256) return super.keyPressed(key, scan, modifiers);
+        return true;
+    }
+
+    @Override
     public boolean mouseClicked(double mx, double my, int button) {
         if (button == 0) {
             String clearLabel = Component.translatable("gui.logisticsnetworks.mass_placement.clear").getString();

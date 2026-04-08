@@ -1,8 +1,11 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.*;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import net.minecraft.nbt.Tag;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -19,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
 
+import javax.annotation.Nullable;
 import java.util.List;
 
 public class FilterMenu extends AbstractContainerMenu {
@@ -63,6 +67,11 @@ public class FilterMenu extends AbstractContainerMenu {
     private final boolean[] isTagSlot;
     private boolean ignoreUpdates = false;
 
+    @Nullable
+    private final LogisticsNodeEntity nodeSource;
+    private final int nodeChannel;
+    private final int nodeFilterSlot;
+
     private String selectedTag;
     private String selectedMod;
 
@@ -72,6 +81,9 @@ public class FilterMenu extends AbstractContainerMenu {
         this.player = playerInv.player;
         this.inventorySlotIndex = inventorySlotIndex;
         this.lockedSlot = inventorySlotIndex;
+        this.nodeSource = null;
+        this.nodeChannel = -1;
+        this.nodeFilterSlot = -1;
 
         ItemStack stack = getOpenedStack();
         this.isTagMode = stack.getItem() instanceof TagFilterItem;
@@ -102,6 +114,42 @@ public class FilterMenu extends AbstractContainerMenu {
         this.player = playerInv.player;
         this.inventorySlotIndex = -1;
         this.lockedSlot = (hand == InteractionHand.MAIN_HAND) ? playerInv.selected : -1;
+        this.nodeSource = null;
+        this.nodeChannel = -1;
+        this.nodeFilterSlot = -1;
+
+        ItemStack stack = getOpenedStack();
+        this.isTagMode = stack.getItem() instanceof TagFilterItem;
+        this.isAmountMode = stack.getItem() instanceof AmountFilterItem;
+        this.isNbtMode = false;
+        this.isDurabilityMode = stack.getItem() instanceof DurabilityFilterItem;
+        this.isModMode = stack.getItem() instanceof ModFilterItem;
+        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isNameMode = stack.getItem() instanceof NameFilterItem;
+        this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
+                || isNameMode;
+
+        this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
+        this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
+        this.filterInventory = new SimpleContainer(slotCount);
+        this.isFluidSlot = new boolean[slotCount];
+        this.isChemicalSlot = new boolean[slotCount];
+        this.isTagSlot = new boolean[slotCount];
+
+        initSyncedData(stack);
+        layoutSlots(playerInv);
+        addDataSlots(data);
+    }
+
+    public FilterMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node, int channel, int filterSlot) {
+        super(Registration.FILTER_MENU.get(), containerId);
+        this.hand = InteractionHand.MAIN_HAND;
+        this.player = playerInv.player;
+        this.inventorySlotIndex = -1;
+        this.lockedSlot = -1;
+        this.nodeSource = node;
+        this.nodeChannel = channel;
+        this.nodeFilterSlot = filterSlot;
 
         ItemStack stack = getOpenedStack();
         this.isTagMode = stack.getItem() instanceof TagFilterItem;
@@ -129,16 +177,31 @@ public class FilterMenu extends AbstractContainerMenu {
     public FilterMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
         super(Registration.FILTER_MENU.get(), containerId);
         int handOrdinal = buf.readVarInt();
-        if (handOrdinal == -1) {
+        if (handOrdinal == -2) {
+            int entityId = buf.readVarInt();
+            this.nodeChannel = buf.readVarInt();
+            this.nodeFilterSlot = buf.readVarInt();
+            this.inventorySlotIndex = -1;
+            this.hand = InteractionHand.MAIN_HAND;
+            this.lockedSlot = -1;
+            var entity = playerInv.player.level().getEntity(entityId);
+            this.nodeSource = (entity instanceof LogisticsNodeEntity node) ? node : null;
+        } else if (handOrdinal == -1) {
             this.inventorySlotIndex = buf.readVarInt();
             this.hand = InteractionHand.MAIN_HAND;
             this.lockedSlot = inventorySlotIndex;
+            this.nodeSource = null;
+            this.nodeChannel = -1;
+            this.nodeFilterSlot = -1;
         } else {
             this.inventorySlotIndex = -1;
             this.hand = (handOrdinal >= 0 && handOrdinal < InteractionHand.values().length)
                     ? InteractionHand.values()[handOrdinal]
                     : InteractionHand.MAIN_HAND;
             this.lockedSlot = (hand == InteractionHand.MAIN_HAND) ? playerInv.selected : -1;
+            this.nodeSource = null;
+            this.nodeChannel = -1;
+            this.nodeFilterSlot = -1;
         }
         this.player = playerInv.player;
 
@@ -315,6 +378,23 @@ public class FilterMenu extends AbstractContainerMenu {
         return isNameMode;
     }
 
+    public boolean isNodeFilter() {
+        return nodeSource != null;
+    }
+
+    @Nullable
+    public LogisticsNodeEntity getNodeSource() {
+        return nodeSource;
+    }
+
+    public int getNodeChannel() {
+        return nodeChannel;
+    }
+
+    public int getNodeFilterSlot() {
+        return nodeFilterSlot;
+    }
+
     public String getNameFilter() {
         if (!isNameMode)
             return "";
@@ -393,6 +473,74 @@ public class FilterMenu extends AbstractContainerMenu {
         broadcastChanges();
     }
 
+    public int getEntryBatch(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return 0;
+        return FilterItemData.getEntryBatch(getOpenedStack(), slot);
+    }
+
+    public void setEntryBatch(Player player, int slot, int batch) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.setEntryBatch(getOpenedStack(), slot, Math.max(0, batch));
+        broadcastChanges();
+    }
+
+    public int getEntryStock(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return 0;
+        return FilterItemData.getEntryStock(getOpenedStack(), slot);
+    }
+
+    public void setEntryStock(Player player, int slot, int stock) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.setEntryStock(getOpenedStack(), slot, Math.max(0, stock));
+        broadcastChanges();
+    }
+
+    @Nullable
+    public Boolean getEntryEnchanted(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return null;
+        return FilterItemData.getEntryEnchanted(getOpenedStack(), slot);
+    }
+
+    public void setEntryEnchanted(Player player, int slot, @Nullable Boolean value) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.setEntryEnchanted(getOpenedStack(), slot, value);
+        broadcastChanges();
+    }
+
+    public String getEntrySlotMappingExpression(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return "";
+        return FilterItemData.getEntrySlotMappingExpression(getOpenedStack(), slot);
+    }
+
+    public void setEntrySlotMapping(Player player, int slot, String expression) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        java.util.BitSet parsed = SlotExpressionUtil.parseSlots(expression);
+        FilterItemData.setEntrySlotMapping(getOpenedStack(), slot,
+                parsed != null ? SlotExpressionUtil.bitSetToList(parsed).stream().mapToInt(Integer::intValue).toArray() : null);
+        broadcastChanges();
+    }
+
+    public void clearFilterEntryItem(Player player, int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.clearEntryItem(getOpenedStack(), slot);
+        isFluidSlot[slot] = false;
+        isChemicalSlot[slot] = false;
+        isTagSlot[slot] = false;
+        ignoreUpdates = true;
+        filterInventory.setItem(slot, ItemStack.EMPTY);
+        ignoreUpdates = false;
+        broadcastChanges();
+    }
+
     // Per-slot tag
     public String getEntryTag(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
@@ -462,6 +610,10 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public void addSlotNbtRule(Player player, int slot, String path, String operator) {
+        addSlotNbtRule(player, slot, path, operator, "");
+    }
+
+    public void addSlotNbtRule(Player player, int slot, String path, String operator, String fallbackValue) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
         ItemStack filterStack = getOpenedStack();
@@ -483,6 +635,8 @@ public class FilterMenu extends AbstractContainerMenu {
 
         if (value == null)
             value = NbtFilterData.getDefaultValue(path);
+        if (value == null && !fallbackValue.isEmpty())
+            value = NbtFilterData.parseValueString(fallbackValue);
         if (value == null)
             return;
         FilterItemData.addSlotNbtRule(filterStack, slot, path, operator, value);
@@ -568,6 +722,7 @@ public class FilterMenu extends AbstractContainerMenu {
             return;
         FilterItemData.setEntryNbt(getOpenedStack(), slot, null, null);
         FilterItemData.setEntryNbtRaw(getOpenedStack(), slot, null);
+        FilterItemData.clearSlotNbtRules(getOpenedStack(), slot);
         broadcastChanges();
     }
 
@@ -624,6 +779,10 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public ItemStack getOpenedStack() {
+        if (nodeSource != null) {
+            ChannelData ch = nodeSource.getChannel(nodeChannel);
+            return ch != null ? ch.getFilterItem(nodeFilterSlot) : ItemStack.EMPTY;
+        }
         if (inventorySlotIndex >= 0)
             return player.getInventory().getItem(inventorySlotIndex);
         if (hand == InteractionHand.OFF_HAND)
@@ -843,7 +1002,7 @@ public class FilterMenu extends AbstractContainerMenu {
         return false;
     }
 
-    private void clearFilterEntry(int slot) {
+    public void clearFilterEntry(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
 
@@ -856,6 +1015,10 @@ public class FilterMenu extends AbstractContainerMenu {
             FilterItemData.setEntryNbt(stack, s, null, null);
             FilterItemData.clearSlotNbtRules(stack, s);
             FilterItemData.setEntryDurability(stack, s, null, 0);
+            FilterItemData.setEntrySlotMapping(stack, s, null);
+            FilterItemData.setEntryEnchanted(stack, s, null);
+            FilterItemData.setEntryBatch(stack, s, 0);
+            FilterItemData.setEntryStock(stack, s, 0);
             isFluidSlot[s] = false;
             isChemicalSlot[s] = false;
             isTagSlot[s] = false;
@@ -1044,6 +1207,8 @@ public class FilterMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
+        if (nodeSource != null)
+            return nodeSource.isAlive();
         ItemStack stack = getOpenedStack();
         return !stack.isEmpty() && (stack.getItem() instanceof BaseFilterItem ||
                 stack.getItem() instanceof TagFilterItem ||
@@ -1060,6 +1225,10 @@ public class FilterMenu extends AbstractContainerMenu {
         super.removed(player);
         if (!player.level().isClientSide && !isSpecialMode) {
             saveFilterItems(getOpenedStack(), player.level().registryAccess());
+        }
+        if (!player.level().isClientSide && nodeSource != null) {
+            ServerPayloadHandler.propagateToLabelGroup(nodeSource, nodeChannel);
+            ServerPayloadHandler.markNetworkDirty(nodeSource);
         }
     }
 
@@ -1097,8 +1266,8 @@ public class FilterMenu extends AbstractContainerMenu {
         for (int i = 0; i < slotCount; i++) {
             if (isTagSlot[i] || isChemicalSlot[i]) {
                 // data lives in NBT already
-            } else if (FilterItemData.hasEntryNbt(stack, i)) {
-                // NBT filter data lives in NBT already
+            } else if (FilterItemData.isNbtOnlySlot(stack, i)) {
+                // nbt-only entries preserved in-place
             } else if (isFluidSlot[i]) {
                 FluidStack fluid = FilterItemData.getFluidEntry(stack, i);
                 FilterItemData.setFluidEntry(stack, i, fluid);

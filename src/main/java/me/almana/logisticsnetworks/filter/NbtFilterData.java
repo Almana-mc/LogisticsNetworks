@@ -60,6 +60,16 @@ public final class NbtFilterData {
         };
     }
 
+    public static @Nullable Tag parseValueString(String value) {
+        if (value == null || value.isEmpty()) return null;
+        if ("true".equals(value)) return ByteTag.valueOf(true);
+        if ("false".equals(value)) return ByteTag.valueOf(false);
+        if (value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2)
+            return StringTag.valueOf(value.substring(1, value.length() - 1));
+        try { return IntTag.valueOf(Integer.parseInt(value)); } catch (NumberFormatException ignored) {}
+        return StringTag.valueOf(value);
+    }
+
     public enum Operator {
         EQUALS("="),
         NOT_EQUALS("!=");

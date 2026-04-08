@@ -25,17 +25,20 @@ public class ChannelData {
     private static final String KEY_FILTER_MODE = "FilterMode";
     private static final String KEY_PRIORITY = "Priority";
     private static final String KEY_FILTERS = "Filters";
+    private static final String KEY_NAME = "Name";
 
     private boolean enabled;
     private ChannelMode mode = ChannelMode.IMPORT;
     private ChannelType type = ChannelType.ITEM;
     private int batchSize = 8;
     private int tickDelay = 20;
+    @Nullable
     private Direction ioDirection = Direction.UP;
     private RedstoneMode redstoneMode = RedstoneMode.ALWAYS_ON;
     private DistributionMode distributionMode = DistributionMode.PRIORITY;
     private FilterMode filterMode = FilterMode.MATCH_ANY;
     private int priority = 0;
+    private String name = "";
 
     private final ItemStack[] filterItems = new ItemStack[FILTER_SIZE];
     private final transient ChannelTelemetry telemetry = new ChannelTelemetry();
@@ -56,8 +59,10 @@ public class ChannelData {
         tag.putString(KEY_TYPE, type.name());
         tag.putInt(KEY_BATCH, batchSize);
         tag.putInt(KEY_DELAY, tickDelay);
-        tag.putString(KEY_IO, ioDirection.getName());
+        tag.putString(KEY_IO, ioDirection != null ? ioDirection.getName() : "all");
         tag.putString(KEY_REDSTONE, redstoneMode.name());
+        if (!name.isEmpty())
+            tag.putString(KEY_NAME, name);
         tag.putString(KEY_DISTRIB, distributionMode.name());
         tag.putString(KEY_FILTER_MODE, filterMode.name());
         tag.putInt(KEY_PRIORITY, priority);
@@ -95,10 +100,20 @@ public class ChannelData {
             tickDelay = Math.max(1, tag.getInt(KEY_DELAY));
 
         if (tag.contains(KEY_IO)) {
-            ioDirection = Direction.byName(tag.getString(KEY_IO));
-            if (ioDirection == null)
-                ioDirection = Direction.UP;
+            String dirStr = tag.getString(KEY_IO);
+            if ("all".equals(dirStr)) {
+                ioDirection = null;
+            } else {
+                ioDirection = Direction.byName(dirStr);
+                if (ioDirection == null)
+                    ioDirection = Direction.UP;
+            }
         }
+
+        if (tag.contains(KEY_NAME))
+            name = tag.getString(KEY_NAME);
+        else
+            name = "";
 
         if (tag.contains(KEY_PRIORITY)) {
             priority = Math.max(-99, Math.min(99, tag.getInt(KEY_PRIORITY)));
@@ -172,13 +187,13 @@ public class ChannelData {
         this.tickDelay = Math.max(1, tickDelay);
     }
 
+    @Nullable
     public Direction getIoDirection() {
         return ioDirection;
     }
 
-    public void setIoDirection(Direction ioDirection) {
-        if (ioDirection != null)
-            this.ioDirection = ioDirection;
+    public void setIoDirection(@Nullable Direction ioDirection) {
+        this.ioDirection = ioDirection;
     }
 
     public RedstoneMode getRedstoneMode() {
@@ -216,6 +231,14 @@ public class ChannelData {
         this.priority = Math.max(-99, Math.min(99, priority));
     }
 
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name == null ? "" : name;
+    }
+
     public ChannelTelemetry getTelemetry() {
         return telemetry;
     }
@@ -247,6 +270,7 @@ public class ChannelData {
         this.distributionMode = source.distributionMode;
         this.filterMode = source.filterMode;
         this.priority = source.priority;
+        this.name = source.name;
         for (int i = 0; i < FILTER_SIZE; i++) {
             this.filterItems[i] = source.filterItems[i].isEmpty() ? ItemStack.EMPTY : source.filterItems[i].copy();
         }

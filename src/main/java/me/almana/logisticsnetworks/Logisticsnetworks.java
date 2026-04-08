@@ -15,8 +15,12 @@ import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
 import me.almana.logisticsnetworks.network.SetDurabilityFilterValuePayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryAmountPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryDurabilityPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryEnchantedPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryNbtPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntrySlotMappingPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryTagPayload;
+import me.almana.logisticsnetworks.network.SetChannelNamePayload;
+import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
@@ -96,6 +100,15 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleSetAmountFilterValue);
                 registrar.playToServer(SetFilterEntryAmountPayload.TYPE, SetFilterEntryAmountPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterEntryAmount);
+                registrar.playToServer(SetFilterEntryEnchantedPayload.TYPE, SetFilterEntryEnchantedPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetFilterEntryEnchanted);
+                registrar.playToServer(SetFilterEntrySlotMappingPayload.TYPE,
+                                SetFilterEntrySlotMappingPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetFilterEntrySlotMapping);
+                registrar.playToServer(SetChannelNamePayload.TYPE, SetChannelNamePayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetChannelName);
+                registrar.playToServer(OpenNodeFilterPayload.TYPE, OpenNodeFilterPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleOpenNodeFilter);
                 registrar.playToServer(SetFilterEntryTagPayload.TYPE, SetFilterEntryTagPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterEntryTag);
                 registrar.playToServer(SetFilterEntryNbtPayload.TYPE, SetFilterEntryNbtPayload.STREAM_CODEC,

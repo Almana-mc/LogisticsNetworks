@@ -890,7 +890,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             networkSearchBox.keyPressed(keyCode, scanCode, modifiers);
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        if (keyCode == 256) return super.keyPressed(keyCode, scanCode, modifiers);
+        return true;
     }
 
     @Override
