@@ -160,12 +160,15 @@ idea {
     }
 }
 
-tasks.register<Copy>("copyJar") {
-    from(tasks.named("jar"))
-    into("C:/Users/Kanishq/curseforge/minecraft/Instances/Test/mods")
-}
+val copyJarDest = file("C:/Users/Kanishq/curseforge/minecraft/Instances/Test/mods")
+if (copyJarDest.isDirectory) {
+    tasks.register<Copy>("copyJar") {
+        from(tasks.named("jar"))
+        into(copyJarDest)
+    }
 
-tasks.named("build") {
-    finalizedBy("copyJar")
+    tasks.named("build") {
+        finalizedBy("copyJar")
+    }
 }
 
