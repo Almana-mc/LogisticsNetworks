@@ -526,6 +526,24 @@ public class FilterMenu extends AbstractContainerMenu {
         return FilterItemData.getEntryNbtPath(getOpenedStack(), slot);
     }
 
+    public String getEntryNbtOperator(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return "=";
+        return FilterItemData.getEntryNbtOperator(getOpenedStack(), slot);
+    }
+
+    public List<FilterItemData.SlotNbtRule> getSlotNbtRules(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return List.of();
+        return FilterItemData.getSlotNbtRules(getOpenedStack(), slot);
+    }
+
+    public boolean isSlotNbtMatchAny(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return false;
+        return FilterItemData.isSlotNbtMatchAny(getOpenedStack(), slot);
+    }
+
     public String getEntryDurabilityOp(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return null;
@@ -538,11 +556,78 @@ public class FilterMenu extends AbstractContainerMenu {
         return FilterItemData.getEntryDurabilityValue(getOpenedStack(), slot);
     }
 
-    public void setEntryNbt(Player player, int slot, String path) {
-        setEntryNbt(player, slot, path, "");
+    public void addSlotNbtRule(Player player, int slot, String path, String operator) {
+        addSlotNbtRule(player, slot, path, operator, "");
     }
 
-    public void setEntryNbt(Player player, int slot, String path, String op) {
+    public void addSlotNbtRule(Player player, int slot, String path, String operator, String fallbackValue) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        ItemStack filterStack = getOpenedStack();
+        Tag value = null;
+
+        ItemStack slotItem = FilterItemData.getEntry(filterStack, slot, player.level().registryAccess());
+        if (!slotItem.isEmpty()) {
+            if (NbtFilterData.isFluidPath(path)) {
+                net.minecraft.nbt.CompoundTag fluidComponents = NbtFilterData.getSerializedComponents(
+                        FilterItemData.getFluidEntry(filterStack, slot), player.level().registryAccess());
+                value = NbtFilterData.resolvePathValue(fluidComponents, path);
+            } else {
+                value = NbtFilterData.resolvePathValue(slotItem, path, player.level().registryAccess());
+            }
+        }
+
+        if (value == null)
+            value = NbtFilterData.getDefaultValue(path);
+        if (value == null && !fallbackValue.isEmpty())
+            value = NbtFilterData.parseValueString(fallbackValue);
+        if (value == null) return;
+
+        FilterItemData.addSlotNbtRule(filterStack, slot, path, operator, value);
+        broadcastChanges();
+    }
+
+    public void removeSlotNbtRule(int slot, int ruleIndex) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.removeSlotNbtRule(getOpenedStack(), slot, ruleIndex);
+        broadcastChanges();
+    }
+
+    public void toggleSlotNbtMatchMode(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.toggleSlotNbtMatchMode(getOpenedStack(), slot);
+        broadcastChanges();
+    }
+
+    public void setSlotNbtRuleValue(int slot, int ruleIndex, String valueStr) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        net.minecraft.nbt.Tag parsed = parseNbtValue(valueStr);
+        if (parsed == null) return;
+
+        FilterItemData.setSlotNbtRuleValue(getOpenedStack(), slot, ruleIndex, parsed);
+        broadcastChanges();
+    }
+
+    private net.minecraft.nbt.Tag parseNbtValue(String input) {
+        if (input == null || input.isEmpty()) return null;
+        try {
+            return net.minecraft.nbt.TagParser.parseTag("{v:" + input + "}").get("v");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public void clearSlotNbtRules(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.clearSlotNbtRules(getOpenedStack(), slot);
+        broadcastChanges();
+    }
+
+    public void setEntryNbt(Player player, int slot, String path, String operator) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
         ItemStack filterStack = getOpenedStack();
@@ -552,28 +637,7 @@ public class FilterMenu extends AbstractContainerMenu {
         Tag value = NbtFilterData.resolvePathValue(slotItem, path, player.level().registryAccess());
         if (value == null)
             return;
-        FilterItemData.addEntryNbtConstraint(filterStack, slot, path, value, op);
-        broadcastChanges();
-    }
-
-    public void setEntryNbtWithValue(Player player, int slot, String path, String valueStr, String op) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount)
-            return;
-        ItemStack filterStack = getOpenedStack();
-        try {
-            net.minecraft.nbt.Tag parsed = net.minecraft.nbt.TagParser.parseTag("{v:" + valueStr + "}").get("v");
-            if (parsed != null) {
-                FilterItemData.addEntryNbtConstraint(filterStack, slot, path, parsed, op);
-                broadcastChanges();
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    public void removeEntryNbt(Player player, int slot, String path) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount)
-            return;
-        FilterItemData.removeEntryNbtConstraint(getOpenedStack(), slot, path);
+        FilterItemData.setEntryNbt(filterStack, slot, path, value, operator);
         broadcastChanges();
     }
 
@@ -581,13 +645,6 @@ public class FilterMenu extends AbstractContainerMenu {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
         FilterItemData.setEntryNbtRaw(getOpenedStack(), slot, rawValue);
-        broadcastChanges();
-    }
-
-    public void clearEntryNbt(Player player, int slot) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount)
-            return;
-        FilterItemData.clearAllEntryNbt(getOpenedStack(), slot);
         broadcastChanges();
     }
 
@@ -907,7 +964,7 @@ public class FilterMenu extends AbstractContainerMenu {
             FilterItemData.setFluidEntry(stack, s, FluidStack.EMPTY);
             FilterItemData.setChemicalEntry(stack, s, null);
             FilterItemData.setEntryTag(stack, s, null);
-            FilterItemData.clearAllEntryNbt(stack, s);
+            FilterItemData.clearSlotNbtRules(stack, s);
             FilterItemData.setEntryDurability(stack, s, null, 0);
             FilterItemData.setEntrySlotMapping(stack, s, null);
             isFluidSlot[s] = false;

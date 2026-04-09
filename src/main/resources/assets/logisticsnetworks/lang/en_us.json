@@ -114,6 +114,7 @@
   "gui.logisticsnetworks.direction.all": "All",
   "gui.logisticsnetworks.filter_mode.match_any": "Any",
   "gui.logisticsnetworks.filter_mode.match_all": "All",
+  "gui.logisticsnetworks.filter.hint.ctrl_click": "Ctrl + left click for advanced options",
   "gui.logisticsnetworks.filter.mode.whitelist": "Whitelist",
   "gui.logisticsnetworks.filter.mode.blacklist": "Blacklist",
   "gui.logisticsnetworks.filter.info.icon": "i",
@@ -359,6 +360,11 @@
   "gui.logisticsnetworks.filter.detail.slots": "Slots:",
   "tooltip.logisticsnetworks.filter.deprecated.durability": "Use Ctrl + Left Click on a filter slot instead",
   "tooltip.logisticsnetworks.filter.deprecated.slot": "Use Ctrl + Left Click on a filter slot instead",
+  "gui.logisticsnetworks.filter.nbt.slot_title": "NBT For Slot %s",
+  "gui.logisticsnetworks.filter.nbt.clear": "Clr",
+  "gui.logisticsnetworks.filter.nbt.no_entries": "No NBT (insert item/fluid)",
+  "gui.logisticsnetworks.filter.nbt.match_any": "Match Any",
+  "gui.logisticsnetworks.filter.nbt.match_all": "Match All",
   "advancement.logisticsnetworks.root.title": "Logistics Networks",
   "advancement.logisticsnetworks.root.description": "Hold 'G' over items for guide"
 }

@@ -469,19 +469,21 @@ public class ServerPayloadHandler {
     public static void handleSetFilterEntryNbt(SetFilterEntryNbtPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
-                if (!payload.matchValue()) {
-                    if (!payload.key().isEmpty()) {
-                        menu.removeEntryNbt((Player) context.player(), payload.entryIndex(), payload.key());
-                    } else {
-                        menu.clearEntryNbt((Player) context.player(), payload.entryIndex());
-                    }
-                } else if (!payload.value().isEmpty() && payload.key().isEmpty()) {
-                    menu.setEntryNbtRaw((Player) context.player(), payload.entryIndex(), payload.key(), payload.value());
-                } else if (!payload.value().isEmpty() && !payload.key().isEmpty()) {
-                    menu.setEntryNbtWithValue((Player) context.player(), payload.entryIndex(),
-                            payload.key(), payload.value(), payload.op());
-                } else {
-                    menu.setEntryNbt((Player) context.player(), payload.entryIndex(), payload.key(), payload.op());
+                switch (payload.action()) {
+                    case SetFilterEntryNbtPayload.ACTION_ADD ->
+                        menu.addSlotNbtRule((Player) context.player(), payload.slot(),
+                                payload.path(), payload.operator(), payload.value());
+                    case SetFilterEntryNbtPayload.ACTION_REMOVE ->
+                        menu.removeSlotNbtRule(payload.slot(), payload.ruleIndex());
+                    case SetFilterEntryNbtPayload.ACTION_TOGGLE_MATCH ->
+                        menu.toggleSlotNbtMatchMode(payload.slot());
+                    case SetFilterEntryNbtPayload.ACTION_CLEAR ->
+                        menu.clearSlotNbtRules(payload.slot());
+                    case SetFilterEntryNbtPayload.ACTION_SET_VALUE ->
+                        menu.setSlotNbtRuleValue(payload.slot(), payload.ruleIndex(), payload.value());
+                    case SetFilterEntryNbtPayload.ACTION_SET_RAW ->
+                        menu.setEntryNbtRaw((Player) context.player(), payload.slot(),
+                                payload.path(), payload.value());
                 }
             }
         });
