@@ -141,7 +141,8 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 tasks.register<Copy>("copyJar") {
-    val modsDir = file("C:/Users/Kanishq/AppData/Roaming/PrismLauncher/instances/1.20.1-LN/minecraft/mods")
+    val modsPath = "C:/Users/Kanishq/AppData/Roaming/PrismLauncher/instances/1.20.1-LN/minecraft/mods"
+    val modsDir = File(modsPath)
     from(tasks.named("jar").map { it.outputs.files })
     into(modsDir)
     isEnabled = modsDir.exists()
