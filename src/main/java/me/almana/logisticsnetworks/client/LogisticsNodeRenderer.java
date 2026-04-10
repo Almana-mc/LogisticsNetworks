@@ -34,7 +34,9 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
             "textures/entity/node.png");
     private final NodeModel<LogisticsNodeEntity> model;
 
+    private static final List<LogisticsNodeEntity> cachedNodeList = new ArrayList<>();
     private static Set<Integer> allowedNodeIds;
+    private static Set<Integer> visibleNodeIds;
     private static long lastComputeTick = -1;
 
     public LogisticsNodeRenderer(EntityRendererProvider.Context context) {
@@ -49,17 +51,23 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         if (mc.player == null)
             return;
 
-        boolean isHoldingWrench = mc.player.isHolding(Registration.WRENCH.get());
-        if (isHoldingWrench) {
-            updateAllowedNodes(mc);
-            if (allowedNodeIds != null && !allowedNodeIds.contains(entity.getId())) {
-                isHoldingWrench = false;
-            }
-        }
         boolean isVisible = entity.isRenderVisible();
         boolean isHighlighted = entity.isHighlighted();
+        boolean isHoldingWrench = mc.player.isHolding(Registration.WRENCH.get());
 
-        if (isVisible || isHoldingWrench || isHighlighted) {
+        if (!isVisible && !isHighlighted && !isHoldingWrench)
+            return;
+
+        updateAllowedNodes(mc);
+
+        if (isHoldingWrench && allowedNodeIds != null && !allowedNodeIds.contains(entity.getId())) {
+            isHoldingWrench = false;
+            if (!isVisible && !isHighlighted)
+                return;
+        }
+
+        boolean canRenderModel = visibleNodeIds == null || visibleNodeIds.contains(entity.getId());
+        if ((isVisible || isHoldingWrench || isHighlighted) && canRenderModel) {
             renderModel(entity, poseStack, buffer, light, isVisible);
         }
 
@@ -69,7 +77,9 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
             renderWrenchOverlay(entity, poseStack, buffer, light);
         }
 
-        super.render(entity, yaw, partialTick, poseStack, buffer, light);
+        if (isHoldingWrench || isHighlighted) {
+            super.render(entity, yaw, partialTick, poseStack, buffer, light);
+        }
     }
 
     @Override
@@ -204,31 +214,56 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     private static void updateAllowedNodes(Minecraft mc) {
         long tick = mc.level.getGameTime();
-        if (tick == lastComputeTick)
+        if (tick - lastComputeTick < 5)
             return;
         lastComputeTick = tick;
 
-        int limit = ClientConfig.maxRenderedNodes;
-        List<LogisticsNodeEntity> nodes = new ArrayList<>();
+        cachedNodeList.clear();
         for (Entity e : mc.level.entitiesForRendering()) {
             if (e instanceof LogisticsNodeEntity node) {
-                nodes.add(node);
+                cachedNodeList.add(node);
             }
         }
 
-        if (nodes.size() <= limit) {
+        int wrenchLimit = ClientConfig.maxRenderedNodes;
+        int visibleLimit = ClientConfig.maxVisibleNodes;
+        boolean needsSort = cachedNodeList.size() > wrenchLimit
+                || (visibleLimit > 0 && cachedNodeList.size() > visibleLimit);
+
+        if (!needsSort) {
             allowedNodeIds = null;
+            visibleNodeIds = null;
             return;
         }
 
         double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
-        nodes.sort(Comparator.comparingDouble(n -> n.distanceToSqr(px, py, pz)));
+        cachedNodeList.sort(Comparator.comparingDouble(n -> n.distanceToSqr(px, py, pz)));
 
-        Set<Integer> ids = new HashSet<>(limit * 2);
-        for (int i = 0; i < limit; i++) {
-            ids.add(nodes.get(i).getId());
+        if (cachedNodeList.size() > wrenchLimit) {
+            if (allowedNodeIds == null) {
+                allowedNodeIds = new HashSet<>(wrenchLimit * 2);
+            } else {
+                allowedNodeIds.clear();
+            }
+            for (int i = 0; i < wrenchLimit && i < cachedNodeList.size(); i++) {
+                allowedNodeIds.add(cachedNodeList.get(i).getId());
+            }
+        } else {
+            allowedNodeIds = null;
         }
-        allowedNodeIds = ids;
+
+        if (visibleLimit > 0 && cachedNodeList.size() > visibleLimit) {
+            if (visibleNodeIds == null) {
+                visibleNodeIds = new HashSet<>(visibleLimit * 2);
+            } else {
+                visibleNodeIds.clear();
+            }
+            for (int i = 0; i < visibleLimit && i < cachedNodeList.size(); i++) {
+                visibleNodeIds.add(cachedNodeList.get(i).getId());
+            }
+        } else {
+            visibleNodeIds = null;
+        }
     }
 
     @Override

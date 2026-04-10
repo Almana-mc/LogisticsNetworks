@@ -66,8 +66,8 @@ public class Registration {
                                                         .<LogisticsNodeEntity>of(LogisticsNodeEntity::new,
                                                                         MobCategory.MISC)
                                                         .sized(1.0f, 1.0f)
-                                                        .clientTrackingRange(8)
-                                                        .updateInterval(20)
+                                                        .clientTrackingRange(4)
+                                                        .updateInterval(40)
                                                         .build("logistics_node"));
 
         public static final RegistryObject<LogisticsNodeItem> LOGISTICS_NODE_ITEM = ITEMS.register(

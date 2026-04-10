@@ -83,7 +83,6 @@ public class LogisticsNodeEntity extends Entity {
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
-        this.noCulling = true;
         this.setNoGravity(true);
         this.noPhysics = true;
 
@@ -213,6 +212,8 @@ public class LogisticsNodeEntity extends Entity {
 
     @Override
     public void tick() {
+        if (this.level().isClientSide()) return;
+
         BlockPos attached = getAttachedPos();
         if (!attached.equals(BlockPos.ZERO)) {
             Vec3 target = Vec3.atBottomCenterOf(attached);
@@ -220,7 +221,7 @@ public class LogisticsNodeEntity extends Entity {
                 setPos(target);
             }
 
-            if (!this.level().isClientSide() && this.tickCount % 20 == 0) {
+            if (this.tickCount % 20 == 0) {
                 if (this.level().isEmptyBlock(attached)) {
                     if (this.getNetworkId() != null && this.level() instanceof ServerLevel serverLevel) {
                         NetworkRegistry.get(serverLevel)
@@ -236,6 +237,11 @@ public class LogisticsNodeEntity extends Entity {
                 }
             }
         }
+    }
+
+    @Override
+    public boolean shouldRenderAtSqrDistance(double distanceSq) {
+        return distanceSq < 48.0 * 48.0;
     }
 
     @Override

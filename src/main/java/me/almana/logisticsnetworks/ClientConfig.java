@@ -15,13 +15,19 @@ public class ClientConfig {
             .comment("Maximum number of nodes rendered when holding a wrench. Nearest nodes are prioritized.")
             .defineInRange("maxRenderedNodes", 200, 1, Integer.MAX_VALUE);
 
+    private static final ForgeConfigSpec.IntValue maxVisibleNodesSpec = builder
+            .comment("Maximum number of visible node models rendered. Nearest nodes are prioritized. 0 = unlimited.")
+            .defineInRange("maxVisibleNodes", 500, 0, Integer.MAX_VALUE);
+
     static final ForgeConfigSpec SPEC = builder.build();
 
     public static int maxRenderedNodes = 200;
+    public static int maxVisibleNodes = 500;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
         if (event.getConfig().getSpec() != SPEC) return;
         maxRenderedNodes = maxRenderedNodesSpec.get();
+        maxVisibleNodes = maxVisibleNodesSpec.get();
     }
 }
