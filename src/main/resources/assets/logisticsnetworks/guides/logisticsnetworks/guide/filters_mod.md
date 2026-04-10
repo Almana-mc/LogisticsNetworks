@@ -9,17 +9,19 @@ navigation:
 
 # Mod Filter
 
-Mod Filter checks namespace, like `minecraft` or `mekanism`.
+Mod Filter matches items, fluids, or chemicals by their mod namespace. You can type a namespace or place an item in the extractor slot and select from the picker.
 
-You can type a namespace or select from the extractor picker.
+The match is exact on the namespace portion of the item id (the part before the colon).
 
-Target type can be:
+## Examples
 
-1. Items
-2. Fluids
-3. Chemicals
+1. `minecraft` matches all vanilla items (e.g. minecraft:stone, minecraft:diamond)
+2. `mekanism` matches all Mekanism items and chemicals
+3. `create` matches all Create mod items and fluids
+4. `thermal` matches all Thermal Series items
+5. `ae2` matches all Applied Energistics 2 items
 
-In the current UI flow, you work with one selected mod value.
+Typing `minecraft:stone` will be normalized to `minecraft`.
 
 <RecipeFor id="logisticsnetworks:mod_filter" />
 

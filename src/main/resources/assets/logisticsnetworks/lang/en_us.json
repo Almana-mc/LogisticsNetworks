@@ -114,7 +114,7 @@
   "gui.logisticsnetworks.direction.all": "All",
   "gui.logisticsnetworks.filter_mode.match_any": "Any",
   "gui.logisticsnetworks.filter_mode.match_all": "All",
-  "gui.logisticsnetworks.filter.hint.ctrl_click": "Ctrl + left click for advanced options",
+  "gui.logisticsnetworks.filter.hint.ctrl_click": "Ctrl + Click for advanced options",
   "gui.logisticsnetworks.filter.mode.whitelist": "Whitelist",
   "gui.logisticsnetworks.filter.mode.blacklist": "Blacklist",
   "gui.logisticsnetworks.filter.info.icon": "i",

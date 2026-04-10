@@ -36,7 +36,7 @@ Duplicate entries are blocked by the menu logic.
 Ctrl+Left Click on any filter slot to open the filter detail page. Per-entry settings:
 
 1. Amount threshold
-2. NBT matching with operator support (=, !=, >=, <=) and raw SNBT mode
+2. NBT matching with operator support (`=`, `!=`, `>=`, `<=`) and raw SNBT mode
 3. Durability check
 4. Slot mapping (e.g. 0-8,13)
 5. Enchanted flag

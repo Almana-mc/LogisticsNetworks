@@ -1251,6 +1251,10 @@ public class TransferEngine {
                 continue;
 
             int request = Math.min(simulated.getAmount(), Math.min(remaining, allowedByAmount));
+            int perEntryBatch = getPerEntryFluidBatchLimit(simulated, exportFilters, importFilters);
+            if (perEntryBatch > 0) {
+                request = Math.min(request, perEntryBatch);
+            }
             int accepted = target.fill(new FluidStack(simulated, request), IFluidHandler.FluidAction.SIMULATE);
             if (accepted <= 0)
                 continue;
@@ -1496,6 +1500,31 @@ public class TransferEngine {
         }
 
         return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
+    }
+
+    private static int getPerEntryFluidBatchLimit(FluidStack candidate, ItemStack[] exportFilters,
+            ItemStack[] importFilters) {
+        int limit = Integer.MAX_VALUE;
+
+        if (exportFilters != null) {
+            for (ItemStack filter : exportFilters) {
+                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate);
+                if (batch > 0) {
+                    limit = Math.min(limit, batch);
+                }
+            }
+        }
+
+        if (importFilters != null) {
+            for (ItemStack filter : importFilters) {
+                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate);
+                if (batch > 0) {
+                    limit = Math.min(limit, batch);
+                }
+            }
+        }
+
+        return limit == Integer.MAX_VALUE ? -1 : limit;
     }
 
     private static int countMatchingFluid(IFluidHandler handler, FluidStack candidate) {

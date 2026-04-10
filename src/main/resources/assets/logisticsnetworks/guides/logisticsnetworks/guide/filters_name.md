@@ -9,25 +9,23 @@ navigation:
 
 # Regex Filter
 
-Regex Filter matches by regex pattern (case-insensitive) on display names and tooltips.
+Regex Filter matches items, fluids, or chemicals by name using Java regex patterns. All matching is case-insensitive and partial (the pattern does not need to match the full name).
 
-Example:
+Match scope:
 
-If you set `.*stone.*`, it matches any target whose name contains "stone". The pattern uses Java regex syntax and is case-insensitive.
+1. Name: matches against display name only
+2. Tooltip: matches against tooltip lines only
+3. Both: matches against name and tooltip lines
 
-Match scope can be set to:
+## Examples
 
-1. Name: matches against display name only.
-2. Tooltip: matches against tooltip lines only.
-3. Both: matches against name and tooltip lines.
-
-Target type can be:
-
-1. Items
-2. Fluids
-3. Chemicals
-
-Chemical name matching uses Mekanism text when available, then falls back to chemical id text.
+1. `stone` matches anything containing "stone" (e.g. Stone, Cobblestone, Stonecutter)
+2. `^Iron` matches names starting with "Iron" (e.g. Iron Ingot, Iron Sword)
+3. `Sword$` matches names ending with "Sword" (e.g. Diamond Sword, Netherite Sword)
+4. `^Diamond .+` matches names starting with "Diamond " followed by anything
+5. `Potion|Arrow` matches anything containing "Potion" or "Arrow"
+6. `Deepslate.*Ore` matches names containing "Deepslate" followed by "Ore" (e.g. Deepslate Iron Ore)
+7. `^(?!Golden).*Helmet` matches any Helmet except Golden Helmet
 
 <RecipeFor id="logisticsnetworks:name_filter" />
 

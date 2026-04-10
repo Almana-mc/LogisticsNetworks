@@ -12,6 +12,7 @@ import mekanism.api.chemical.pigment.Pigment;
 import mekanism.api.chemical.slurry.Slurry;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -215,7 +216,14 @@ public final class ChemicalTransferHelper {
                 }
             }
 
-            long requestFromTank = Math.min(remaining, tankChemical.getAmount());
+            long allowedByAmount = remaining;
+            if (chemId != null) {
+                long stockAllowed = getPerEntryChemicalAmountLimit(chemId, exportFilters, importFilters, source, target);
+                if (stockAllowed == 0) continue;
+                if (stockAllowed > 0) allowedByAmount = Math.min(allowedByAmount, stockAllowed);
+            }
+
+            long requestFromTank = Math.min(allowedByAmount, tankChemical.getAmount());
             ChemicalStack<?> simulated = (ChemicalStack<?>) source.extractChemical(tank, requestFromTank, Action.SIMULATE);
             if (simulated.isEmpty()) {
                 if (Config.debugMode) {
@@ -224,7 +232,13 @@ public final class ChemicalTransferHelper {
                 continue;
             }
 
-            long request = Math.min(simulated.getAmount(), remaining);
+            long request = Math.min(simulated.getAmount(), allowedByAmount);
+            if (chemId != null) {
+                int perEntryBatch = getPerEntryChemicalBatchLimit(chemId, exportFilters, importFilters);
+                if (perEntryBatch > 0) {
+                    request = Math.min(request, perEntryBatch);
+                }
+            }
             ChemicalStack<?> requestStack = simulated.copy();
             requestStack.setAmount(request);
 
@@ -372,6 +386,120 @@ public final class ChemicalTransferHelper {
         }
 
         return matches;
+    }
+
+    public static boolean isValidChemicalId(String chemicalId) {
+        return resolveFirstChemical(chemicalId).isPresent();
+    }
+
+    @SuppressWarnings("rawtypes")
+    public static List<String> getAllChemicalIds() {
+        List<String> ids = new ArrayList<>();
+        for (Gas gas : MekanismAPI.gasRegistry()) {
+            ResourceLocation key = MekanismAPI.gasRegistry().getKey(gas);
+            if (key != null) ids.add(TYPE_GAS + TYPE_SEPARATOR + key);
+        }
+        for (InfuseType infuse : MekanismAPI.infuseTypeRegistry()) {
+            ResourceLocation key = MekanismAPI.infuseTypeRegistry().getKey(infuse);
+            if (key != null) ids.add(TYPE_INFUSE + TYPE_SEPARATOR + key);
+        }
+        for (Pigment pigment : MekanismAPI.pigmentRegistry()) {
+            ResourceLocation key = MekanismAPI.pigmentRegistry().getKey(pigment);
+            if (key != null) ids.add(TYPE_PIGMENT + TYPE_SEPARATOR + key);
+        }
+        for (Slurry slurry : MekanismAPI.slurryRegistry()) {
+            ResourceLocation key = MekanismAPI.slurryRegistry().getKey(slurry);
+            if (key != null) ids.add(TYPE_SLURRY + TYPE_SEPARATOR + key);
+        }
+        return ids;
+    }
+
+    public static List<String> getAllChemicalTags() {
+        java.util.Set<String> tags = new java.util.LinkedHashSet<>();
+        for (Gas gas : MekanismAPI.gasRegistry()) {
+            gas.getTags().forEach(t -> tags.add(t.location().toString()));
+        }
+        for (InfuseType infuse : MekanismAPI.infuseTypeRegistry()) {
+            infuse.getTags().forEach(t -> tags.add(t.location().toString()));
+        }
+        for (Pigment pigment : MekanismAPI.pigmentRegistry()) {
+            pigment.getTags().forEach(t -> tags.add(t.location().toString()));
+        }
+        for (Slurry slurry : MekanismAPI.slurryRegistry()) {
+            slurry.getTags().forEach(t -> tags.add(t.location().toString()));
+        }
+        return new ArrayList<>(tags);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static long countMatchingChemical(IChemicalHandler handler, String chemicalId) {
+        long amount = 0;
+        for (int i = 0; i < handler.getTanks(); i++) {
+            ChemicalStack<?> stack = (ChemicalStack<?>) handler.getChemicalInTank(i);
+            if (!stack.isEmpty()) {
+                String id = getChemicalId(stack);
+                if (chemicalId.equals(id)) {
+                    amount += stack.getAmount();
+                }
+            }
+        }
+        return amount;
+    }
+
+    private static long getPerEntryChemicalAmountLimit(String chemicalId, ItemStack[] exportFilters,
+            ItemStack[] importFilters, IChemicalHandler source, IChemicalHandler target) {
+        long allowed = Long.MAX_VALUE;
+
+        if (exportFilters != null) {
+            for (ItemStack filter : exportFilters) {
+                int threshold = FilterItemData.getChemicalAmountThresholdFull(filter, chemicalId);
+                if (threshold > 0) {
+                    long sourceAmount = countMatchingChemical(source, chemicalId);
+                    long exportCap = sourceAmount - threshold;
+                    if (exportCap <= 0) return 0;
+                    allowed = Math.min(allowed, exportCap);
+                }
+            }
+        }
+
+        if (importFilters != null) {
+            for (ItemStack filter : importFilters) {
+                int threshold = FilterItemData.getChemicalAmountThresholdFull(filter, chemicalId);
+                if (threshold > 0) {
+                    long targetAmount = countMatchingChemical(target, chemicalId);
+                    long importCap = threshold - targetAmount;
+                    if (importCap <= 0) return 0;
+                    allowed = Math.min(allowed, importCap);
+                }
+            }
+        }
+
+        return allowed == Long.MAX_VALUE ? -1 : Math.max(0, allowed);
+    }
+
+    private static int getPerEntryChemicalBatchLimit(String chemicalId, ItemStack[] exportFilters,
+            ItemStack[] importFilters) {
+        int limit = Integer.MAX_VALUE;
+
+        if (exportFilters != null) {
+            for (ItemStack filter : exportFilters) {
+                int batch = FilterItemData.getChemicalBatchLimitFull(filter, chemicalId);
+                if (batch > 0) {
+                    limit = Math.min(limit, batch);
+                }
+            }
+        }
+
+        if (importFilters != null) {
+            for (ItemStack filter : importFilters) {
+                int batch = FilterItemData.getChemicalBatchLimitFull(filter, chemicalId);
+                if (batch > 0) {
+                    limit = Math.min(limit, batch);
+                }
+            }
+        }
+
+        return limit == Integer.MAX_VALUE ? -1 : limit;
     }
 
     @Nullable
