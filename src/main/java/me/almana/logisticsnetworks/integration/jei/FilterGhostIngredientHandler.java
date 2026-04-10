@@ -35,6 +35,14 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
 
         Optional<ItemStack> item = ingredient.getItemStack();
         if (item.isPresent() && !item.get().isEmpty()) {
+            if (screen.isDetailPageOpen()) {
+                Rect2i area = screen.getDetailSlotArea();
+                if (area != null) {
+                    ItemStack stack = item.get();
+                    return castTargets(List.of(new FilterTarget<>(area,
+                            ignored -> screen.setDetailGhostItem(stack))));
+                }
+            }
             if (screen.acceptsItemSelectorGhostIngredient()) {
                 return castTargets(buildSelectorItemTarget(screen, item.get()));
             }

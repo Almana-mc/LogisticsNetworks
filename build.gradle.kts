@@ -166,11 +166,14 @@ idea {
     }
 }
 
-tasks.register<Copy>("copyJar") {
-    from(tasks.named("jar"))
-    into("C:/Users/Kanishq/AppData/Roaming/PrismLauncher/instances/26.1/minecraft/mods")
-}
+val copyJarDest = File("C:/Users/Kanishq/AppData/Roaming/PrismLauncher/instances/26.1/minecraft/mods")
+if (copyJarDest.isDirectory) {
+    tasks.register<Copy>("copyJar") {
+        from(tasks.named("jar"))
+        into(copyJarDest)
+    }
 
-tasks.named("build") {
-    finalizedBy("copyJar")
+    tasks.named("build") {
+        finalizedBy("copyJar")
+    }
 }

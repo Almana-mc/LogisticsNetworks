@@ -183,6 +183,12 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
     }
 
     @Override
+    public boolean keyPressed(int key, int scan, int modifiers) {
+        if (key == 256) return super.keyPressed(key, scan, modifiers);
+        return true;
+    }
+
+    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (isHoveringMenuSlot(mouseX, mouseY)) {
             return super.mouseClicked(mouseX, mouseY, button);

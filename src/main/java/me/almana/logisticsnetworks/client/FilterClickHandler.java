@@ -1,7 +1,10 @@
 package me.almana.logisticsnetworks.client;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.client.screen.NodeScreen;
+import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
+import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.Slot;
@@ -32,7 +35,17 @@ public class FilterClickHandler {
         if (!stack.is(ModTags.FILTERS))
             return;
 
-        // Only intercept clicks on player inventory slots, not container slots
+        if (screen instanceof NodeScreen nodeScreen && screen.getMenu() instanceof NodeMenu nodeMenu) {
+            int filterSlot = hoveredSlot.getSlotIndex();
+            if (filterSlot >= 0 && filterSlot < 9) {
+                int entityId = nodeMenu.getNode().getId();
+                int channel = nodeScreen.getSelectedChannel();
+                ClientPacketDistributor.sendToServer(new OpenNodeFilterPayload(entityId, channel, filterSlot));
+                event.setCanceled(true);
+                return;
+            }
+        }
+
         if (!isPlayerInventorySlot(screen, hoveredSlot))
             return;
 

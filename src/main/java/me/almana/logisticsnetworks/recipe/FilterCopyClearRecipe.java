@@ -106,7 +106,7 @@ public class FilterCopyClearRecipe extends CustomRecipe {
 
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         for (String rootKey : FILTER_ROOT_KEYS) {
-            if (custom.contains(rootKey, Tag.TAG_COMPOUND) && !custom.getCompound(rootKey).isEmpty()) {
+            if (custom.contains(rootKey) && !custom.getCompound(rootKey).isEmpty()) {
                 return true;
             }
         }

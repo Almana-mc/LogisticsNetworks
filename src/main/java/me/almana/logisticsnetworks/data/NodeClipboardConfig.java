@@ -48,6 +48,7 @@ public final class NodeClipboardConfig {
     private static final String KEY_SLOT = "slot";
     private static final String KEY_ITEM = "item";
     private static final String KEY_COUNT = "count";
+    private static final String KEY_CH_NAME = "name";
 
     private final ChannelConfig[] channels;
     private final ItemStack[][] filterItems;
@@ -79,11 +80,13 @@ public final class NodeClipboardConfig {
         ChannelType type;
         int batchSize;
         int tickDelay;
+        @Nullable
         Direction ioDirection;
         RedstoneMode redstoneMode;
         DistributionMode distributionMode;
         FilterMode filterMode;
         int priority;
+        String name = "";
     }
 
     private NodeClipboardConfig(ChannelConfig[] channels, ItemStack[][] filterItems, ItemStack[] upgradeItems,
@@ -158,12 +161,13 @@ public final class NodeClipboardConfig {
         getChannelConfig(channel).type = type == null ? ChannelType.ITEM : type;
     }
 
+    @Nullable
     public Direction getChannelDirection(int channel) {
         return getChannelConfig(channel).ioDirection;
     }
 
-    public void setChannelDirection(int channel, Direction direction) {
-        getChannelConfig(channel).ioDirection = direction == null ? Direction.UP : direction;
+    public void setChannelDirection(int channel, @Nullable Direction direction) {
+        getChannelConfig(channel).ioDirection = direction;
     }
 
     public RedstoneMode getChannelRedstoneMode(int channel) {
@@ -315,7 +319,8 @@ public final class NodeClipboardConfig {
                     || config.redstoneMode != defaults.redstoneMode
                     || config.distributionMode != defaults.distributionMode
                     || config.filterMode != defaults.filterMode
-                    || config.priority != defaults.priority) {
+                    || config.priority != defaults.priority
+                    || !config.name.isEmpty()) {
                 return false;
             }
         }
@@ -402,6 +407,7 @@ public final class NodeClipboardConfig {
                 config.distributionMode = channel.getDistributionMode();
                 config.filterMode = channel.getFilterMode();
                 config.priority = channel.getPriority();
+                config.name = channel.getName();
 
                 for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                     ItemStack stack = channel.getFilterItem(slot);
@@ -465,11 +471,13 @@ public final class NodeClipboardConfig {
             channelTag.putString(KEY_TYPE, channel.type.name());
             channelTag.putInt(KEY_BATCH, channel.batchSize);
             channelTag.putInt(KEY_DELAY, channel.tickDelay);
-            channelTag.putString(KEY_IO, channel.ioDirection.getName());
+            channelTag.putString(KEY_IO, channel.ioDirection != null ? channel.ioDirection.getName() : "all");
             channelTag.putString(KEY_REDSTONE, channel.redstoneMode.name());
             channelTag.putString(KEY_DISTRIBUTION, channel.distributionMode.name());
             channelTag.putString(KEY_FILTER_MODE, channel.filterMode.name());
             channelTag.putInt(KEY_PRIORITY, channel.priority);
+            if (!channel.name.isEmpty())
+                channelTag.putString(KEY_CH_NAME, channel.name);
             channelsTag.add(channelTag);
         }
         root.put(KEY_CHANNELS, channelsTag);
@@ -571,8 +579,13 @@ public final class NodeClipboardConfig {
             config.batchSize = Math.max(1, channelTag.getIntOr(KEY_BATCH, 8));
             config.tickDelay = Math.max(1, channelTag.getIntOr(KEY_DELAY, 20));
 
-            Direction direction = Direction.byName(channelTag.getStringOr(KEY_IO, Direction.UP.getName()));
-            config.ioDirection = direction == null ? Direction.UP : direction;
+            String dirStr = channelTag.getStringOr(KEY_IO, Direction.UP.getName());
+            if ("all".equals(dirStr)) {
+                config.ioDirection = null;
+            } else {
+                Direction direction = Direction.byName(dirStr);
+                config.ioDirection = direction == null ? Direction.UP : direction;
+            }
             config.redstoneMode = parseEnum(channelTag.getStringOr(KEY_REDSTONE, RedstoneMode.ALWAYS_ON.name()), RedstoneMode.values(),
                     RedstoneMode.ALWAYS_ON);
             config.distributionMode = parseEnum(channelTag.getStringOr(KEY_DISTRIBUTION, DistributionMode.PRIORITY.name()), DistributionMode.values(),
@@ -580,6 +593,8 @@ public final class NodeClipboardConfig {
             config.filterMode = parseEnum(channelTag.getStringOr(KEY_FILTER_MODE, FilterMode.MATCH_ANY.name()), FilterMode.values(),
                     FilterMode.MATCH_ANY);
             config.priority = Math.max(-99, Math.min(99, channelTag.getIntOr(KEY_PRIORITY, 0)));
+            if (channelTag.contains(KEY_CH_NAME))
+                config.name = channelTag.getStringOr(KEY_CH_NAME, "");
             channels[index] = config;
         }
 
@@ -1051,6 +1066,7 @@ public final class NodeClipboardConfig {
             channel.setDistributionMode(config.distributionMode);
             channel.setFilterMode(config.filterMode);
             channel.setPriority(config.priority);
+            channel.setName(config.name);
 
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                 ItemStack expected = filterItems[channelIndex][slot];

@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.network.ApplyPatternPayload;
 import net.minecraft.client.gui.components.EditBox;
+import me.almana.logisticsnetworks.client.ClientInput;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
@@ -79,6 +80,19 @@ public class PatternSetterScreen extends LegacyContainerScreen<PatternSetterMenu
     protected void containerTick() {
         super.containerTick();
         if (feedbackTimer > 0) feedbackTimer--;
+    }
+
+    @Override
+    public boolean keyPressed(int key, int scan, int modifiers) {
+        if (key == 256) return super.keyPressed(key, scan, modifiers);
+        if (key == 257 && multiplierField != null && multiplierField.isFocused()) {
+            multiplierField.setFocused(false);
+            return true;
+        }
+        if (multiplierField != null && multiplierField.isFocused()) {
+            return multiplierField.keyPressed(ClientInput.key(key, scan, modifiers));
+        }
+        return true;
     }
 
     @Override

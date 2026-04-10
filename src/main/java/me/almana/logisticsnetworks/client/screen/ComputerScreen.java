@@ -889,7 +889,8 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             networkSearchBox.keyPressed(ClientInput.key(keyCode, scanCode, modifiers));
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        if (keyCode == 256) return super.keyPressed(keyCode, scanCode, modifiers);
+        return true;
     }
 
     @Override

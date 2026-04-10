@@ -29,8 +29,14 @@ public final class ChemicalTransferHelper {
     // 26.1 Mek API pending
     /*
     @Nullable
-    public static IChemicalHandler getHandler(ServerLevel level, BlockPos pos, Direction side) {
-        return level.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.block(), pos, side);
+    public static IChemicalHandler getHandler(ServerLevel level, BlockPos pos, @Nullable Direction side) {
+        if (side != null)
+            return level.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.block(), pos, side);
+        for (Direction d : Direction.values()) {
+            IChemicalHandler h = level.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.block(), pos, d);
+            if (h != null) return h;
+        }
+        return null;
     }
     */
 
@@ -125,8 +131,8 @@ public final class ChemicalTransferHelper {
         return null;
     }
 
-    public static long transferBetween(ServerLevel sourceLevel, BlockPos sourcePos, Direction sourceSide,
-            ServerLevel targetLevel, BlockPos targetPos, Direction targetSide, long limit,
+    public static long transferBetween(ServerLevel sourceLevel, BlockPos sourcePos, @Nullable Direction sourceSide,
+            ServerLevel targetLevel, BlockPos targetPos, @Nullable Direction targetSide, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode) {
         // 26.1 Mek API pending
