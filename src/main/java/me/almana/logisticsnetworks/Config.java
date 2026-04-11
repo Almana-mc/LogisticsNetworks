@@ -11,20 +11,20 @@ public class Config {
 
     private static final ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
 
-    private static final ForgeConfigSpec.BooleanValue dropNodeItemSpec = builder
+    public static final ForgeConfigSpec.BooleanValue dropNodeItemSpec = builder
             .comment("Whether nodes should drop their item when the attached block is broken.")
             .define("dropNodeItem", true);
 
-    private static final ForgeConfigSpec.BooleanValue debugModeSpec = builder
+    public static final ForgeConfigSpec.BooleanValue debugModeSpec = builder
             .comment("Enable debug overlays and diagnostic logging.")
             .define("debugMode", false);
 
-    private static final ForgeConfigSpec.IntValue backoffMaxTicksSpec;
-    private static final ForgeConfigSpec.BooleanValue backoffItemSpec;
-    private static final ForgeConfigSpec.BooleanValue backoffFluidSpec;
-    private static final ForgeConfigSpec.BooleanValue backoffEnergySpec;
-    private static final ForgeConfigSpec.BooleanValue backoffChemicalSpec;
-    private static final ForgeConfigSpec.BooleanValue backoffSourceSpec;
+    public static final ForgeConfigSpec.IntValue backoffMaxTicksSpec;
+    public static final ForgeConfigSpec.BooleanValue backoffItemSpec;
+    public static final ForgeConfigSpec.BooleanValue backoffFluidSpec;
+    public static final ForgeConfigSpec.BooleanValue backoffEnergySpec;
+    public static final ForgeConfigSpec.BooleanValue backoffChemicalSpec;
+    public static final ForgeConfigSpec.BooleanValue backoffSourceSpec;
 
     static {
         builder.push("backoff");
@@ -49,6 +49,10 @@ public class Config {
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
         if (event.getConfig().getSpec() != SPEC) return;
+        refresh();
+    }
+
+    public static void refresh() {
         dropNodeItem = dropNodeItemSpec.get();
         debugMode = debugModeSpec.get();
         backoffMaxTicks = backoffMaxTicksSpec.get();

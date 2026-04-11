@@ -23,6 +23,7 @@ public final class UpgradeLimitsConfig {
     private static final String DIR_NAME = "logistics-network";
     private static final String[] TIER_KEYS = { "none", "iron", "gold", "diamond", "netherite" };
 
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final TierLimits[] TIERS = new TierLimits[5];
     private static boolean loaded = false;
 
@@ -72,25 +73,27 @@ public final class UpgradeLimitsConfig {
 
     private static void generateDefault(File file) {
         try {
-            JsonObject root = new JsonObject();
-            for (int i = 0; i < TIER_KEYS.length; i++) {
-                JsonObject tierObj = new JsonObject();
-                TierLimits limits = TIERS[i];
-                tierObj.addProperty("minTicks", limits.minTicks());
-                tierObj.addProperty("itemBatch", limits.itemBatch());
-                tierObj.addProperty("fluidBatch", limits.fluidBatch());
-                tierObj.addProperty("energyBatch", limits.energyBatch());
-                tierObj.addProperty("chemicalBatch", limits.chemicalBatch());
-                tierObj.addProperty("sourceBatch", limits.sourceBatch());
-                root.add(TIER_KEYS[i], tierObj);
-            }
-
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            try (FileWriter writer = new FileWriter(file, StandardCharsets.UTF_8)) {
-                gson.toJson(root, writer);
-            }
+            writeToFile(file);
         } catch (Exception e) {
             LOGGER.error("Failed to generate default config {}", FILE_NAME, e);
+        }
+    }
+
+    private static void writeToFile(File file) throws Exception {
+        JsonObject root = new JsonObject();
+        for (int i = 0; i < TIER_KEYS.length; i++) {
+            JsonObject tierObj = new JsonObject();
+            TierLimits limits = TIERS[i];
+            tierObj.addProperty("minTicks", limits.minTicks());
+            tierObj.addProperty("itemBatch", limits.itemBatch());
+            tierObj.addProperty("fluidBatch", limits.fluidBatch());
+            tierObj.addProperty("energyBatch", limits.energyBatch());
+            tierObj.addProperty("chemicalBatch", limits.chemicalBatch());
+            tierObj.addProperty("sourceBatch", limits.sourceBatch());
+            root.add(TIER_KEYS[i], tierObj);
+        }
+        try (FileWriter writer = new FileWriter(file, StandardCharsets.UTF_8)) {
+            GSON.toJson(root, writer);
         }
     }
 
@@ -133,6 +136,32 @@ public final class UpgradeLimitsConfig {
         if (tier < 0 || tier >= TIERS.length)
             return TIERS[0];
         return TIERS[tier];
+    }
+
+    public static TierLimits[] getAll() {
+        if (!loaded)
+            load();
+        return TIERS.clone();
+    }
+
+    public static void setTier(int tier, TierLimits limits) {
+        if (tier < 0 || tier >= TIERS.length)
+            return;
+        TIERS[tier] = limits;
+    }
+
+    public static void save() {
+        Path dirPath = FMLPaths.CONFIGDIR.get().resolve(DIR_NAME);
+        File file = dirPath.resolve(FILE_NAME).toFile();
+        try {
+            writeToFile(file);
+        } catch (Exception e) {
+            LOGGER.error("Failed to save {}", FILE_NAME, e);
+        }
+    }
+
+    public static String[] getTierKeys() {
+        return TIER_KEYS.clone();
     }
 
     public record TierLimits(int minTicks, int itemBatch, int fluidBatch, int energyBatch, int chemicalBatch,
