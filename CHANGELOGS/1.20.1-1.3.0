@@ -1,1 +1,2 @@
-- Fixed channel naming 
+- Fixed channel naming
+- Added configurable backoff 
