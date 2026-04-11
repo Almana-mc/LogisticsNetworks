@@ -26,6 +26,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleMenuProvider;
@@ -187,6 +188,13 @@ public class ServerPayloadHandler {
             node.setNetworkId(targetNetwork.getId());
             node.setNetworkName(targetNetwork.getName());
             registry.addNodeToNetwork(targetNetwork.getId(), node.getUUID());
+
+            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                ChannelData ch = node.getChannel(i);
+                if (ch != null) {
+                    ch.setName(targetNetwork.getChannelName(i));
+                }
+            }
 
             if (NodeUpgradeData.needsDimensionalUpgradeWarning(node, targetNetwork, player.getServer())) {
                 player.sendSystemMessage(Component.translatable("gui.logisticsnetworks.dimensional_upgrade_warning"));
@@ -852,7 +860,33 @@ public class ServerPayloadHandler {
             if (name.length() > 24)
                 name = name.substring(0, 24);
 
-            channel.setName(name);
+            UUID networkId = node.getNetworkId();
+            if (networkId != null && node.level() instanceof ServerLevel level) {
+                NetworkRegistry registry = NetworkRegistry.get(level);
+                LogisticsNetwork network = registry.getNetwork(networkId);
+                if (network != null) {
+                    network.setChannelName(payload.channelIndex(), name);
+                    registry.setDirty();
+
+                    MinecraftServer server = level.getServer();
+                    for (UUID nodeId : network.getNodeUuids()) {
+                        for (ServerLevel sl : server.getAllLevels()) {
+                            Entity entity = sl.getEntity(nodeId);
+                            if (entity instanceof LogisticsNodeEntity otherNode) {
+                                ChannelData otherCh = otherNode.getChannel(payload.channelIndex());
+                                if (otherCh != null) {
+                                    otherCh.setName(name);
+                                    sendChannelSyncToViewers(otherNode, payload.channelIndex(), otherCh);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                channel.setName(name);
+            }
+
             markNetworkDirty(node);
         });
     }

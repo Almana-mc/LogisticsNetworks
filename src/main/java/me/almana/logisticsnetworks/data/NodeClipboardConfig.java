@@ -774,6 +774,13 @@ public final class NodeClipboardConfig {
         node.setNetworkId(targetNetworkId);
         node.setNetworkName(targetNetwork.getName());
         registry.addNodeToNetwork(targetNetworkId, node.getUUID());
+
+        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+            ChannelData ch = node.getChannel(i);
+            if (ch != null) {
+                ch.setName(targetNetwork.getChannelName(i));
+            }
+        }
     }
 
     @Nullable
