@@ -3,8 +3,10 @@ package me.almana.logisticsnetworks.data;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.registration.ModTags;
 import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -642,6 +644,11 @@ public final class NodeClipboardConfig {
     }
 
     public PasteResult applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack) {
+        return applyToNode(player, node, protectedStack, null);
+    }
+
+    public PasteResult applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack,
+                                   @Nullable GlobalPos ae2Link) {
         if (player == null || node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT) {
             return PasteResult.CLIPBOARD_INVALID;
         }
@@ -659,14 +666,21 @@ public final class NodeClipboardConfig {
         List<Requirement> requirements = buildRequirements(node);
         List<ItemStack> returnedItems = collectReturnedItems(node);
 
-        if (!hasInventoryRequirements(inventory, requirements, protectedSlot)) {
-            return PasteResult.MISSING_ITEMS;
+        ServerLevel level = player.level() instanceof ServerLevel sl ? sl : null;
+        for (Requirement requirement : requirements) {
+            if (!AE2Compat.hasCombinedStock(inventory, requirement.stack(), requirement.count(),
+                    protectedSlot, ae2Link, level)) {
+                return PasteResult.MISSING_ITEMS;
+            }
         }
         if (!canFitReturnedItemsAfterConsumption(inventory, requirements, returnedItems, protectedSlot)) {
             return PasteResult.INVENTORY_FULL;
         }
 
-        consumeInventoryRequirements(inventory, requirements, protectedSlot);
+        for (Requirement requirement : requirements) {
+            AE2Compat.consumeCombined(inventory, requirement.stack(), requirement.count(),
+                    protectedSlot, ae2Link, player);
+        }
         applyToNode(node);
         applyNetworkToNode(node);
         List<ItemStack> leftovers = returnItemsToInventory(inventory, returnedItems, protectedSlot);
@@ -862,61 +876,7 @@ public final class NodeClipboardConfig {
         return -1;
     }
 
-    private static boolean hasInventoryRequirements(Inventory inventory, List<Requirement> requirements,
-            int protectedSlot) {
-        for (Requirement requirement : requirements) {
-            int total = countMatching(inventory, requirement.stack(), protectedSlot);
-            if (total < requirement.count()) {
-                return false;
-            }
-        }
-        return true;
-    }
 
-    private static int countMatching(Inventory inventory, ItemStack pattern, int protectedSlot) {
-        int total = 0;
-        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            if (slot == protectedSlot) {
-                continue;
-            }
-            ItemStack stack = inventory.getItem(slot);
-            if (stack.isEmpty()) {
-                continue;
-            }
-            if (ItemStack.isSameItem(stack, pattern)) {
-                total += stack.getCount();
-            }
-        }
-        return total;
-    }
-
-    private static void consumeInventoryRequirements(Inventory inventory, List<Requirement> requirements,
-            int protectedSlot) {
-        for (Requirement requirement : requirements) {
-            int remaining = requirement.count();
-            for (int slot = 0; slot < inventory.getContainerSize() && remaining > 0; slot++) {
-                if (slot == protectedSlot) {
-                    continue;
-                }
-                ItemStack stack = inventory.getItem(slot);
-                if (stack.isEmpty()) {
-                    continue;
-                }
-                if (!ItemStack.isSameItem(stack, requirement.stack())) {
-                    continue;
-                }
-
-                int consumed = Math.min(remaining, stack.getCount());
-                stack.shrink(consumed);
-                if (stack.isEmpty()) {
-                    inventory.setItem(slot, ItemStack.EMPTY);
-                } else {
-                    inventory.setItem(slot, stack);
-                }
-                remaining -= consumed;
-            }
-        }
-    }
 
     private static boolean canFitReturnedItemsAfterConsumption(Inventory inventory, List<Requirement> requirements,
             List<ItemStack> returnedItems, int protectedSlot) {

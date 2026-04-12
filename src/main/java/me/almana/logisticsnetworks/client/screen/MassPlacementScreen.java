@@ -109,6 +109,10 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
                 Component line = Component.literal(requirementMark + " ")
                         .append(requirement.name().copy())
                         .append(Component.literal(": " + requirement.available() + "/" + requirement.required()));
+                if (requirement.fromAE2() > 0) {
+                    line = line.copy().append(Component.literal(" +" + requirement.fromAE2() + " ME")
+                            .withStyle(net.minecraft.ChatFormatting.DARK_PURPLE));
+                }
                 y = drawWrappedLine(graphics, line, textX, y, textW, color);
             }
 

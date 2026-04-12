@@ -4,9 +4,11 @@ import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
 import me.almana.logisticsnetworks.registration.Registration;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -18,6 +20,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +42,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
     private final int lockedSlot;
     private final ContainerData data = new SimpleContainerData(DATA_SIZE);
 
-    public record RequirementView(Component name, int required, int available, boolean missing) {
+    public record RequirementView(Component name, int required, int available, int fromAE2, boolean missing) {
     }
 
     public MassPlacementMenu(int containerId, Inventory playerInventory, InteractionHand hand) {
@@ -99,10 +102,17 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         int protectedSlot = findProtectedSlot(player.getInventory(), wrenchStack);
         List<RequirementView> views = new ArrayList<>(requirements.size());
 
+        GlobalPos ae2Link = getAE2Link();
         for (Requirement requirement : requirements) {
-            int available = countMatching(player.getInventory(), requirement.stack, protectedSlot);
+            int invCount = AE2Compat.countInInventory(player.getInventory(), requirement.stack, protectedSlot);
+            int ae2Count = 0;
+            if (invCount < requirement.count && ae2Link != null && player.level() instanceof ServerLevel serverLevel) {
+                ae2Count = (int) Math.min(AE2Compat.countAvailable(serverLevel, ae2Link, requirement.stack),
+                        Integer.MAX_VALUE);
+            }
+            int available = invCount + ae2Count;
             boolean missing = available < requirement.count;
-            views.add(new RequirementView(requirement.stack.getHoverName().copy(), requirement.count, available, missing));
+            views.add(new RequirementView(requirement.stack.getHoverName().copy(), requirement.count, available, ae2Count, missing));
         }
 
         return views;
@@ -178,7 +188,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
 
         int protectedSlot = findProtectedSlot(player.getInventory(), wrenchStack);
         List<Requirement> requirements = buildRequirements(nodeCount, clipboardPresent && clipboardValid ? clipboard : null);
-        boolean hasItems = hasInventoryRequirements(player.getInventory(), requirements, protectedSlot);
+        boolean hasItems = hasCombinedRequirements(player.getInventory(), requirements, protectedSlot);
         boolean canPlace = selectedCount > 0 && selectedCount == nodeCount && clipboardValid && hasItems;
 
         data.set(DATA_SELECTED, selectedCount);
@@ -231,13 +241,13 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         int protectedSlot = findProtectedSlot(player.getInventory(), wrenchStack);
         List<Requirement> requirements = buildRequirements(nodeCount, clipboardPresent ? clipboard : null);
 
-        if (!hasInventoryRequirements(player.getInventory(), requirements, protectedSlot)) {
+        if (!hasCombinedRequirements(player.getInventory(), requirements, protectedSlot)) {
             player.displayClientMessage(
                     Component.translatable("message.logisticsnetworks.mass_placement.missing_items"), true);
             return false;
         }
 
-        consumeInventoryRequirements(player.getInventory(), requirements, protectedSlot);
+        consumeCombinedRequirements(player.getInventory(), requirements, protectedSlot, serverPlayer);
 
         int placedCount = 0;
         List<WrenchItem.MassSelectionTarget> placedTargets = new ArrayList<>();
@@ -314,57 +324,28 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         requirements.add(new Requirement(ItemStackCompat.copyWithCount(stack, 1), count));
     }
 
-    private boolean hasInventoryRequirements(Inventory inventory, List<Requirement> requirements, int protectedSlot) {
+    @Nullable
+    private GlobalPos getAE2Link() {
+        ItemStack wrenchStack = getWrenchStack();
+        if (!AE2Compat.isLoaded() || !WrenchItem.hasAE2Link(wrenchStack)) return null;
+        return WrenchItem.getAE2LinkPos(wrenchStack);
+    }
+
+    private boolean hasCombinedRequirements(Inventory inventory, List<Requirement> requirements, int protectedSlot) {
+        GlobalPos ae2Link = getAE2Link();
+        ServerLevel level = player.level() instanceof ServerLevel sl ? sl : null;
         for (Requirement requirement : requirements) {
-            int total = countMatching(inventory, requirement.stack, protectedSlot);
-            if (total < requirement.count) {
+            if (!AE2Compat.hasCombinedStock(inventory, requirement.stack, requirement.count, protectedSlot, ae2Link, level)) {
                 return false;
             }
         }
         return true;
     }
 
-    private int countMatching(Inventory inventory, ItemStack pattern, int protectedSlot) {
-        int total = 0;
-        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            if (slot == protectedSlot) {
-                continue;
-            }
-
-            ItemStack stack = inventory.getItem(slot);
-            if (stack.isEmpty()) {
-                continue;
-            }
-
-            if (ItemStack.isSameItem(stack, pattern)) {
-                total += stack.getCount();
-            }
-        }
-        return total;
-    }
-
-    private void consumeInventoryRequirements(Inventory inventory, List<Requirement> requirements, int protectedSlot) {
+    private void consumeCombinedRequirements(Inventory inventory, List<Requirement> requirements, int protectedSlot, ServerPlayer serverPlayer) {
+        GlobalPos ae2Link = getAE2Link();
         for (Requirement requirement : requirements) {
-            int remaining = requirement.count;
-            for (int slot = 0; slot < inventory.getContainerSize() && remaining > 0; slot++) {
-                if (slot == protectedSlot) {
-                    continue;
-                }
-
-                ItemStack stack = inventory.getItem(slot);
-                if (stack.isEmpty() || !ItemStack.isSameItem(stack, requirement.stack)) {
-                    continue;
-                }
-
-                int consume = Math.min(remaining, stack.getCount());
-                stack.shrink(consume);
-                if (stack.isEmpty()) {
-                    inventory.setItem(slot, ItemStack.EMPTY);
-                } else {
-                    inventory.setItem(slot, stack);
-                }
-                remaining -= consume;
-            }
+            AE2Compat.consumeCombined(inventory, requirement.stack, requirement.count, protectedSlot, ae2Link, serverPlayer);
         }
     }
 
