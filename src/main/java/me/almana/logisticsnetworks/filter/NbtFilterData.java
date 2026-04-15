@@ -6,8 +6,10 @@ import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.item.component.CustomData;
@@ -448,7 +450,8 @@ public final class NbtFilterData {
             return null;
 
         CompoundTag wrapper = new CompoundTag();
-        wrapper.store("stack", ItemStack.OPTIONAL_CODEC, stack);
+        RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, provider);
+        wrapper.store("stack", ItemStack.OPTIONAL_CODEC, ops, stack);
         CompoundTag components = new CompoundTag();
         if (wrapper.contains("stack")) {
             CompoundTag stackTag = wrapper.getCompound("stack").orElseGet(CompoundTag::new);

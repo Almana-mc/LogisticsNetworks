@@ -1,6 +1,5 @@
 package me.almana.logisticsnetworks.filter;
 
-import me.almana.logisticsnetworks.item.SlotFilterItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
@@ -27,7 +26,7 @@ public final class SlotFilterData {
     }
 
     public static boolean isSlotFilterItem(ItemStack stack) {
-        return !stack.isEmpty() && stack.getItem() instanceof SlotFilterItem;
+        return false;
     }
 
     public static boolean isBlacklist(ItemStack stack) {

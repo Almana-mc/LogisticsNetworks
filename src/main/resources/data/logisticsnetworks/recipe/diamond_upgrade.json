@@ -13,21 +13,12 @@
         "DHD"
     ],
     "key": {
-        "D": {
-            "item": "minecraft:diamond"
-        },
-        "H": {
-            "item": "minecraft:hopper"
-        },
-        "C": {
-            "item": "minecraft:chest"
-        },
-        "S": {
-            "item": "minecraft:smooth_stone"
-        }
+        "D": "minecraft:diamond",
+        "H": "minecraft:hopper",
+        "C": "minecraft:chest",
+        "S": "minecraft:smooth_stone"
     },
     "result": {
-        "id": "logisticsnetworks:diamond_upgrade",
-        "count": 1
+        "id": "logisticsnetworks:diamond_upgrade"
     }
 }

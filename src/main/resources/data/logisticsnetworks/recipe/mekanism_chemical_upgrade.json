@@ -17,21 +17,12 @@
         "GTG"
     ],
     "key": {
-        "G": {
-            "item": "mekanism:basic_chemical_tank"
-        },
-        "T": {
-            "item": "mekanism:alloy_infused"
-        },
-        "C": {
-            "item": "minecraft:chest"
-        },
-        "S": {
-            "item": "logisticsnetworks:iron_upgrade"
-        }
+        "G": "mekanism:basic_chemical_tank",
+        "T": "mekanism:alloy_infused",
+        "C": "minecraft:chest",
+        "S": "logisticsnetworks:iron_upgrade"
     },
     "result": {
-        "id": "logisticsnetworks:mekanism_chemical_upgrade",
-        "count": 1
+        "id": "logisticsnetworks:mekanism_chemical_upgrade"
     }
 }

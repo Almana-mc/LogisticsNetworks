@@ -13,21 +13,12 @@
         "CEC"
     ],
     "key": {
-        "C": {
-            "item": "minecraft:crying_obsidian"
-        },
-        "E": {
-            "item": "minecraft:end_crystal"
-        },
-        "B": {
-            "item": "minecraft:dragon_breath"
-        },
-        "S": {
-            "item": "minecraft:nether_star"
-        }
+        "C": "minecraft:crying_obsidian",
+        "E": "minecraft:end_crystal",
+        "B": "minecraft:dragon_breath",
+        "S": "minecraft:nether_star"
     },
     "result": {
-        "id": "logisticsnetworks:dimensional_upgrade",
-        "count": 1
+        "id": "logisticsnetworks:dimensional_upgrade"
     }
 }

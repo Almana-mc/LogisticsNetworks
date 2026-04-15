@@ -13,15 +13,10 @@
         "PPP"
     ],
     "key": {
-        "P": {
-            "item": "minecraft:paper"
-        },
-        "M": {
-            "item": "logisticsnetworks:medium_filter"
-        }
+        "P": "minecraft:paper",
+        "M": "logisticsnetworks:medium_filter"
     },
     "result": {
-        "id": "logisticsnetworks:big_filter",
-        "count": 1
+        "id": "logisticsnetworks:big_filter"
     }
 }

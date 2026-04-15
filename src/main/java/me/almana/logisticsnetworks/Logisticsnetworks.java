@@ -45,14 +45,17 @@ import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
+import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
+import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.registration.Registration;
+import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
-import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
-import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 @Mod(Logisticsnetworks.MOD_ID)
@@ -63,11 +66,13 @@ public class Logisticsnetworks {
         public Logisticsnetworks(IEventBus modBus) {
                 Registration.init(modBus);
                 modBus.addListener(this::registerPayloads);
+                modBus.addListener(this::commonSetup);
                 if (FMLEnvironment.getDist() == Dist.CLIENT) {
                         modBus.addListener(LogisticsClientEvents::registerRenderers);
                         modBus.addListener(LogisticsClientEvents::registerLayers);
                         modBus.addListener(LogisticsClientEvents::registerScreens);
                         modBus.addListener(LogisticsClientEvents::registerKeyMappings);
+                        ConfigScreenRegistrar.register();
                 }
 
                 ModLoadingContext.get().getActiveContainer()
@@ -76,6 +81,10 @@ public class Logisticsnetworks {
                                 .registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC,
                                                 "logistics-network/client.toml");
                 UpgradeLimitsConfig.load();
+        }
+
+        private void commonSetup(FMLCommonSetupEvent event) {
+                event.enqueueWork(AE2Compat::registerLinkable);
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {

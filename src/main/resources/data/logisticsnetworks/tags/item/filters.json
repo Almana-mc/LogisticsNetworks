@@ -5,7 +5,6 @@
     "logisticsnetworks:medium_filter",
     "logisticsnetworks:big_filter",
     "logisticsnetworks:mod_filter",
-    "logisticsnetworks:slot_filter",
     "logisticsnetworks:name_filter"
   ]
 }

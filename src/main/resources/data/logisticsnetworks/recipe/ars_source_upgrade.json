@@ -17,18 +17,11 @@
         "GSG"
     ],
     "key": {
-        "G": {
-            "item": "ars_nouveau:source_gem"
-        },
-        "S": {
-            "item": "ars_nouveau:source_jar"
-        },
-        "C": {
-            "item": "logisticsnetworks:iron_upgrade"
-        }
+        "G": "ars_nouveau:source_gem",
+        "S": "ars_nouveau:source_jar",
+        "C": "logisticsnetworks:iron_upgrade"
     },
     "result": {
-        "id": "logisticsnetworks:ars_source_upgrade",
-        "count": 1
+        "id": "logisticsnetworks:ars_source_upgrade"
     }
 }

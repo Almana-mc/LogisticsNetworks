@@ -151,6 +151,13 @@ public class ServerPayloadHandler {
             node.setNetworkName(targetNetwork.getName());
             registry.addNodeToNetwork(targetNetwork.getId(), node.getUUID());
 
+            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                ChannelData ch = node.getChannel(i);
+                if (ch != null) {
+                    ch.setName(targetNetwork.getChannelName(i));
+                }
+            }
+
             if (NodeUpgradeData.needsDimensionalUpgradeWarning(node, targetNetwork, player.level().getServer())) {
                 player.sendSystemMessage(Component.translatable("gui.logisticsnetworks.dimensional_upgrade_warning"));
             }
@@ -416,7 +423,34 @@ public class ServerPayloadHandler {
             if (channel == null) return;
             String name = payload.name().trim();
             if (name.length() > 24) name = name.substring(0, 24);
-            channel.setName(name);
+
+            java.util.UUID networkId = node.getNetworkId();
+            if (networkId != null && node.level() instanceof ServerLevel level) {
+                NetworkRegistry registry = NetworkRegistry.get(level);
+                LogisticsNetwork network = registry.getNetwork(networkId);
+                if (network != null) {
+                    network.setChannelName(payload.channelIndex(), name);
+                    registry.setDirty();
+
+                    net.minecraft.server.MinecraftServer server = level.getServer();
+                    for (java.util.UUID nodeId : network.getNodeUuids()) {
+                        for (ServerLevel sl : server.getAllLevels()) {
+                            Entity entity = sl.getEntity(nodeId);
+                            if (entity instanceof LogisticsNodeEntity otherNode) {
+                                ChannelData otherCh = otherNode.getChannel(payload.channelIndex());
+                                if (otherCh != null) {
+                                    otherCh.setName(name);
+                                    sendChannelSyncToViewers(otherNode, payload.channelIndex(), otherCh);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                channel.setName(name);
+            }
+
             markNetworkDirty(node);
         });
     }
@@ -439,7 +473,7 @@ public class ServerPayloadHandler {
             if (stack.isEmpty() || !stack.is(ModTags.FILTERS)) return;
 
             boolean isMod = stack.getItem() instanceof ModFilterItem;
-            boolean isSlot = stack.getItem() instanceof SlotFilterItem;
+            boolean isSlot = false;
             boolean isName = stack.getItem() instanceof NameFilterItem;
             boolean isSpecial = isMod || isSlot || isName;
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
@@ -589,7 +623,7 @@ public class ServerPayloadHandler {
                 return;
 
             boolean isMod = stack.getItem() instanceof ModFilterItem;
-            boolean isSlot = stack.getItem() instanceof SlotFilterItem;
+            boolean isSlot = false;
             boolean isName = stack.getItem() instanceof NameFilterItem;
             boolean isSpecial = isMod || isSlot || isName;
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));

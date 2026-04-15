@@ -13,18 +13,11 @@
         "PSP"
     ],
     "key": {
-        "P": {
-            "tag": "minecraft:planks"
-        },
-        "S": {
-            "tag": "c:strings"
-        },
-        "A": {
-            "item": "minecraft:paper"
-        }
+        "P": "#minecraft:planks",
+        "S": "#c:strings",
+        "A": "minecraft:paper"
     },
     "result": {
-        "id": "logisticsnetworks:small_filter",
-        "count": 1
+        "id": "logisticsnetworks:small_filter"
     }
 }

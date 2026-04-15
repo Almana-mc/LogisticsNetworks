@@ -7,10 +7,12 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NumericTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
@@ -175,7 +177,8 @@ public final class FilterItemData {
         for (Tag t : list) {
             if (t instanceof CompoundTag entry && getSlotIndex(entry) == slot) {
                 if (entry.contains(KEY_ITEM_TAG)) {
-                    return entry.read(KEY_ITEM_TAG, ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+                    RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, provider);
+                    return entry.read(KEY_ITEM_TAG, ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY);
                 }
             }
         }
@@ -189,6 +192,7 @@ public final class FilterItemData {
             return;
 
         ItemStack item = (value == null || value.isEmpty()) ? ItemStack.EMPTY : value.copyWithCount(1);
+        RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, provider);
 
         updateRoot(stack, root -> {
             ListTag list = getItemEntries(root);
@@ -205,11 +209,11 @@ public final class FilterItemData {
 
             if (!item.isEmpty()) {
                 if (existing != null) {
-                    existing.store(KEY_ITEM_TAG, ItemStack.OPTIONAL_CODEC, item);
+                    existing.store(KEY_ITEM_TAG, ItemStack.OPTIONAL_CODEC, ops, item);
                 } else {
                     CompoundTag entry = new CompoundTag();
                     entry.putInt(KEY_SLOT, slot);
-                    entry.store(KEY_ITEM_TAG, ItemStack.OPTIONAL_CODEC, item);
+                    entry.store(KEY_ITEM_TAG, ItemStack.OPTIONAL_CODEC, ops, item);
                     list.add(entry);
                 }
             } else if (existing != null) {
@@ -1555,6 +1559,44 @@ public final class FilterItemData {
         return 0;
     }
 
+    public static int getFluidBatchLimitFull(ItemStack filter, FluidStack candidate) {
+        if (!isFilterItem(filter) || candidate.isEmpty())
+            return 0;
+        int cap = getCapacity(filter);
+        for (int i = 0; i < cap; i++) {
+            String tag = getEntryTag(filter, i);
+            if (tag != null) {
+                if (candidate.typeHolder().tags().map(t -> t.location().toString()).anyMatch(tag::equals))
+                    return getEntryBatch(filter, i);
+                continue;
+            }
+
+            FluidStack entry = getFluidEntry(filter, i);
+            if (!entry.isEmpty() && FluidStack.isSameFluidSameComponents(entry, candidate))
+                return getEntryBatch(filter, i);
+        }
+        return 0;
+    }
+
+    public static int getChemicalBatchLimitFull(ItemStack filter, String chemicalId) {
+        if (!isFilterItem(filter) || chemicalId == null || chemicalId.isEmpty())
+            return 0;
+        int cap = getCapacity(filter);
+        for (int i = 0; i < cap; i++) {
+            String tag = getEntryTag(filter, i);
+            if (tag != null) {
+                if (MekanismCompat.chemicalHasTag(chemicalId, tag))
+                    return getEntryBatch(filter, i);
+                continue;
+            }
+
+            String entry = getChemicalEntry(filter, i);
+            if (entry != null && entry.equals(chemicalId))
+                return getEntryBatch(filter, i);
+        }
+        return 0;
+    }
+
     // ── Constraint helpers ──
 
     private static boolean checkNbtConstraint(ItemStack filter, int slot, @Nullable CompoundTag components) {
@@ -2072,7 +2114,8 @@ public final class FilterItemData {
     private static ItemStack parseItemEntry(CompoundTag entry, @Nullable HolderLookup.Provider provider) {
         if (provider == null || !entry.contains(KEY_ITEM_TAG))
             return ItemStack.EMPTY;
-        return entry.read(KEY_ITEM_TAG, ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, provider);
+        return entry.read(KEY_ITEM_TAG, ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY);
     }
 
     private static ListTag getItemEntries(CompoundTag root) {

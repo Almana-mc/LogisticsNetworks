@@ -17,7 +17,6 @@ Filters control exactly which resources a channel will transfer. Each channel ha
 - **Amount Filter** — Set a threshold: exports keep a reserve, imports cap at a limit.
 - **Durability Filter** — Match items by remaining durability percentage.
 - **NBT Filter** — Match items by specific NBT data paths.
-- **Slot Filter** — Restrict which inventory slots a channel can access (whitelist or blacklist).
 - **Regex Filter** — Match items by name or tooltip using a regular expression.
 
 ## Filter Modes

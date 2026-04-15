@@ -193,6 +193,42 @@ public final class ChemicalTransferHelper {
         return null;
     }
 
+    public static boolean isValidChemicalId(String chemicalId) {
+        // 26.1 Mek API pending
+        /*
+        if (chemicalId == null) return false;
+        ResourceLocation id = ResourceLocation.tryParse(chemicalId);
+        if (id == null) return false;
+        return MekanismAPI.CHEMICAL_REGISTRY.getOptional(id).isPresent();
+        */
+        return false;
+    }
+
+    public static List<String> getAllChemicalIds() {
+        // 26.1 Mek API pending
+        /*
+        List<String> ids = new ArrayList<>();
+        for (Chemical chemical : MekanismAPI.CHEMICAL_REGISTRY) {
+            ResourceLocation key = MekanismAPI.CHEMICAL_REGISTRY.getKey(chemical);
+            if (key != null) ids.add(key.toString());
+        }
+        return ids;
+        */
+        return Collections.emptyList();
+    }
+
+    public static List<String> getAllChemicalTags() {
+        // 26.1 Mek API pending
+        /*
+        java.util.Set<String> tags = new java.util.LinkedHashSet<>();
+        for (Chemical chemical : MekanismAPI.CHEMICAL_REGISTRY) {
+            chemical.getTags().forEach(t -> tags.add(t.location().toString()));
+        }
+        return new ArrayList<>(tags);
+        */
+        return Collections.emptyList();
+    }
+
     // 26.1 Mek API pending
     /*
     @Nullable

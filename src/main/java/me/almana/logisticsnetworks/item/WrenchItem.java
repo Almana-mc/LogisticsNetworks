@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.item;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -10,6 +11,7 @@ import me.almana.logisticsnetworks.logic.NodePlacementHelper;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.core.component.DataComponents;
@@ -59,6 +61,7 @@ public class WrenchItem extends Item {
     private static final String KEY_MASS_SELECTIONS = "mass_selections";
     private static final String KEY_SELECTION_DIMENSION = "dimension";
     private static final String KEY_SELECTION_POS = "pos";
+    private static final String KEY_AE2_LINK = "ae2_link";
     private static final int MAX_MASS_SELECTIONS = 2048;
 
     public record MassSelectionTarget(ResourceKey<Level> dimension, BlockPos pos) {
@@ -311,9 +314,10 @@ public class WrenchItem extends Item {
         boolean missingItems = false;
         boolean inventoryFull = false;
         boolean incompatibleOnly = false;
+        GlobalPos ae2Link = getAE2LinkPos(wrenchStack);
 
         for (LogisticsNodeEntity node : targets) {
-            NodeClipboardConfig.PasteResult result = clipboard.applyToNode(player, node, wrenchStack);
+            NodeClipboardConfig.PasteResult result = clipboard.applyToNode(player, node, wrenchStack, ae2Link);
             switch (result) {
                 case SUCCESS -> {
                     pasted++;
@@ -504,6 +508,9 @@ public class WrenchItem extends Item {
 
         LogisticsNodeEntity node = findNodeAt(level, clickedPos);
         if (node == null) {
+            if (player.isShiftKeyDown() && AE2Compat.isLoaded() && AE2Compat.isGridHost(level, clickedPos)) {
+                return toggleAE2Link(context.getItemInHand(), player, level, clickedPos);
+            }
             return InteractionResult.SUCCESS;
         }
 
@@ -639,6 +646,23 @@ public class WrenchItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, TooltipDisplay display, Consumer<Component> tooltip, TooltipFlag flag) {
         tooltip.accept(Component.translatable("tooltip.logisticsnetworks.wrench.mode", getModeDisplayName(getMode(stack))));
+        GlobalPos ae2Link = getAE2LinkPos(stack);
+        if (ae2Link != null) {
+            var window = net.minecraft.client.Minecraft.getInstance().getWindow();
+            if (com.mojang.blaze3d.platform.InputConstants.isKeyDown(window, com.mojang.blaze3d.platform.InputConstants.KEY_LSHIFT)
+                    || com.mojang.blaze3d.platform.InputConstants.isKeyDown(window, com.mojang.blaze3d.platform.InputConstants.KEY_RSHIFT)) {
+                BlockPos p = ae2Link.pos();
+                String dim = ae2Link.dimension().identifier().toString();
+                tooltip.accept(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_linked_detail",
+                        p.getX(), p.getY(), p.getZ(), dim).withStyle(ChatFormatting.GREEN));
+            } else {
+                tooltip.accept(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_linked")
+                        .withStyle(ChatFormatting.GREEN));
+            }
+        } else if (AE2Compat.isLoaded()) {
+            tooltip.accept(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_unlinked")
+                    .withStyle(ChatFormatting.RED));
+        }
     }
 
     @Nullable
@@ -717,7 +741,8 @@ public class WrenchItem extends Item {
             return InteractionResult.CONSUME;
         }
 
-        NodeClipboardConfig.PasteResult result = clipboard.applyToNode(serverPlayer, node, wrenchStack);
+        GlobalPos ae2Link = getAE2LinkPos(wrenchStack);
+        NodeClipboardConfig.PasteResult result = clipboard.applyToNode(serverPlayer, node, wrenchStack, ae2Link);
         switch (result) {
             case SUCCESS -> {
                 markNodeNetworkDirty(node);
@@ -802,6 +827,53 @@ public class WrenchItem extends Item {
             root.remove(KEY_CLIPBOARD);
             writeRoot(customTag, root);
         });
+    }
+
+    private InteractionResult toggleAE2Link(ItemStack wrenchStack, Player player, Level level, BlockPos clickedPos) {
+        GlobalPos current = getAE2LinkPos(wrenchStack);
+        if (current != null && current.pos().equals(clickedPos) && current.dimension().equals(level.dimension())) {
+            clearAE2Link(wrenchStack);
+            sendPlayerMessage(player, Component.translatable("message.logisticsnetworks.ae2.unlinked"), true);
+        } else {
+            setAE2Link(wrenchStack, level.dimension(), clickedPos);
+            sendPlayerMessage(player, Component.translatable("message.logisticsnetworks.ae2.linked",
+                    clickedPos.getX(), clickedPos.getY(), clickedPos.getZ()), true);
+        }
+        return InteractionResult.CONSUME;
+    }
+
+    public static void setAE2Link(ItemStack stack, ResourceKey<Level> dimension, BlockPos pos) {
+        if (stack.isEmpty()) return;
+        GlobalPos globalPos = GlobalPos.of(dimension, pos);
+        Tag encoded = GlobalPos.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, globalPos)
+                .result().orElse(null);
+        if (encoded == null) return;
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            root.put(KEY_AE2_LINK, encoded);
+            writeRoot(customTag, root);
+        });
+    }
+
+    public static void clearAE2Link(ItemStack stack) {
+        if (stack.isEmpty()) return;
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            root.remove(KEY_AE2_LINK);
+            writeRoot(customTag, root);
+        });
+    }
+
+    public static boolean hasAE2Link(ItemStack stack) {
+        return getRootTag(stack).contains(KEY_AE2_LINK);
+    }
+
+    @Nullable
+    public static GlobalPos getAE2LinkPos(ItemStack stack) {
+        CompoundTag root = getRootTag(stack);
+        if (!root.contains(KEY_AE2_LINK)) return null;
+        return GlobalPos.CODEC.decode(net.minecraft.nbt.NbtOps.INSTANCE, root.get(KEY_AE2_LINK))
+                .result().map(com.mojang.datafixers.util.Pair::getFirst).orElse(null);
     }
 
     public static List<MassSelectionTarget> getMassSelections(ItemStack stack) {

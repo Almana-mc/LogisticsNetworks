@@ -13,24 +13,13 @@
         "OTO"
     ],
     "key": {
-        "O": {
-            "item": "minecraft:obsidian"
-        },
-        "R": {
-            "item": "minecraft:redstone_block"
-        },
-        "H": {
-            "item": "minecraft:hopper"
-        },
-        "E": {
-            "item": "minecraft:ender_eye"
-        },
-        "T": {
-            "item": "minecraft:redstone_torch"
-        }
+        "O": "minecraft:obsidian",
+        "R": "minecraft:redstone_block",
+        "H": "minecraft:hopper",
+        "E": "minecraft:ender_eye",
+        "T": "minecraft:redstone_torch"
     },
     "result": {
-        "id": "logisticsnetworks:logistics_node",
-        "count": 1
+        "id": "logisticsnetworks:logistics_node"
     }
 }

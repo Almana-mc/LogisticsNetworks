@@ -13,21 +13,12 @@
         "GHG"
     ],
     "key": {
-        "G": {
-            "item": "minecraft:gold_ingot"
-        },
-        "H": {
-            "item": "minecraft:hopper"
-        },
-        "C": {
-            "item": "minecraft:chest"
-        },
-        "S": {
-            "item": "minecraft:smooth_stone"
-        }
+        "G": "minecraft:gold_ingot",
+        "H": "minecraft:hopper",
+        "C": "minecraft:chest",
+        "S": "minecraft:smooth_stone"
     },
     "result": {
-        "id": "logisticsnetworks:gold_upgrade",
-        "count": 1
+        "id": "logisticsnetworks:gold_upgrade"
     }
 }

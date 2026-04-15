@@ -12,7 +12,6 @@ import me.almana.logisticsnetworks.item.PatternSetterItem;
 import me.almana.logisticsnetworks.item.ModFilterItem;
 import me.almana.logisticsnetworks.item.NameFilterItem;
 import me.almana.logisticsnetworks.item.NodeUpgradeItem;
-import me.almana.logisticsnetworks.item.SlotFilterItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
@@ -21,6 +20,7 @@ import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
+import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -89,8 +89,6 @@ public class Registration {
 
         public static final DeferredItem<ModFilterItem> MOD_FILTER = ITEMS.register("mod_filter",
                         id -> new ModFilterItem(itemProperties(id)));
-        public static final DeferredItem<SlotFilterItem> SLOT_FILTER = ITEMS.register("slot_filter",
-                        id -> new SlotFilterItem(itemProperties(id)));
         public static final DeferredItem<NameFilterItem> NAME_FILTER = ITEMS.register("name_filter",
                         id -> new NameFilterItem(itemProperties(id)));
 
@@ -143,12 +141,9 @@ public class Registration {
                         "computer_menu",
                         () -> IMenuTypeExtension.create(ComputerMenu::new));
 
-        // 26.1 recipe API pending
-        /*
-        public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
+        public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
-                                        () -> new SimpleCraftingRecipeSerializer<>(FilterCopyClearRecipe::new));
-        */
+                                        () -> FilterCopyClearRecipe.SERIALIZER);
 
         public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = CREATIVE_TABS.register(
                         "logistics_tab",
@@ -176,8 +171,8 @@ public class Registration {
                 return net.minecraft.world.entity.EntityType.Builder
                                 .<LogisticsNodeEntity>of(LogisticsNodeEntity::new, MobCategory.MISC)
                                 .sized(1.0f, 1.0f)
-                                .clientTrackingRange(8)
-                                .updateInterval(20)
+                                .clientTrackingRange(4)
+                                .updateInterval(40)
                                 .build(net.minecraft.resources.ResourceKey.create(Registries.ENTITY_TYPE, id));
         }
 

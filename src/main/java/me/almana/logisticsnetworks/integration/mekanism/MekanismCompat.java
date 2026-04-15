@@ -77,4 +77,22 @@ public final class MekanismCompat {
             return null;
         return ChemicalTransferHelper.getChemicalTextComponent(chemicalId);
     }
+
+    public static boolean isValidChemicalId(String chemicalId) {
+        if (!isLoaded())
+            return false;
+        return ChemicalTransferHelper.isValidChemicalId(chemicalId);
+    }
+
+    public static List<String> getAllChemicalIds() {
+        if (!isLoaded())
+            return Collections.emptyList();
+        return ChemicalTransferHelper.getAllChemicalIds();
+    }
+
+    public static List<String> getAllChemicalTags() {
+        if (!isLoaded())
+            return Collections.emptyList();
+        return ChemicalTransferHelper.getAllChemicalTags();
+    }
 }

@@ -13,21 +13,12 @@
         "IHI"
     ],
     "key": {
-        "I": {
-            "item": "minecraft:iron_ingot"
-        },
-        "H": {
-            "item": "minecraft:hopper"
-        },
-        "C": {
-            "item": "minecraft:chest"
-        },
-        "S": {
-            "item": "minecraft:smooth_stone"
-        }
+        "I": "minecraft:iron_ingot",
+        "H": "minecraft:hopper",
+        "C": "minecraft:chest",
+        "S": "minecraft:smooth_stone"
     },
     "result": {
-        "id": "logisticsnetworks:iron_upgrade",
-        "count": 1
+        "id": "logisticsnetworks:iron_upgrade"
     }
 }

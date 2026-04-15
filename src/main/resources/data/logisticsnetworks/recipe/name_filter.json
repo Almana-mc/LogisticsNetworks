@@ -8,15 +8,10 @@
     ],
     "category": "misc",
     "ingredients": [
-        {
-            "item": "logisticsnetworks:small_filter"
-        },
-        {
-            "item": "minecraft:name_tag"
-        }
+        "logisticsnetworks:small_filter",
+        "minecraft:name_tag"
     ],
     "result": {
-        "id": "logisticsnetworks:name_filter",
-        "count": 1
+        "id": "logisticsnetworks:name_filter"
     }
 }

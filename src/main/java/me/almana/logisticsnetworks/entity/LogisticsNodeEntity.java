@@ -179,6 +179,8 @@ public class LogisticsNodeEntity extends Entity {
 
     @Override
     public void tick() {
+        if (this.level().isClientSide()) return;
+
         BlockPos attached = getAttachedPos();
         if (!attached.equals(BlockPos.ZERO)) {
             Vec3 target = Vec3.atBottomCenterOf(attached);
@@ -186,7 +188,7 @@ public class LogisticsNodeEntity extends Entity {
                 setPos(target);
             }
 
-            if (!level().isClientSide() && tickCount % 20 == 0) {
+            if (this.tickCount % 20 == 0) {
                 if (level().isEmptyBlock(attached) && level() instanceof ServerLevel serverLevel) {
                     if (getNetworkId() != null) {
                         NetworkRegistry.get(serverLevel).removeNodeFromNetwork(getNetworkId(), getUUID());
@@ -200,6 +202,11 @@ public class LogisticsNodeEntity extends Entity {
                 }
             }
         }
+    }
+
+    @Override
+    public boolean shouldRenderAtSqrDistance(double distanceSq) {
+        return distanceSq < 48.0 * 48.0;
     }
 
     @Override

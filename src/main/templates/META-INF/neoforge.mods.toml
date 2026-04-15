@@ -74,8 +74,8 @@ side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "jei"
-type = "optional"
-versionRange = "[19.27.0,)"
+type = "required"
+versionRange = "[29.5.0,)"
 ordering = "NONE"
 side = "CLIENT"
 
@@ -90,6 +90,13 @@ side = "BOTH"
 modId = "ars_nouveau"
 type = "optional"
 versionRange = "[5.0.0,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "ftbteams"
+type = "optional"
+versionRange = "[26.1.0,)"
 ordering = "NONE"
 side = "BOTH"
 

@@ -72,6 +72,8 @@ public class FilterMenu extends AbstractContainerMenu {
     private final int nodeChannel;
     private final int nodeFilterSlot;
 
+    private boolean slotsHidden;
+
     private String selectedTag;
     private String selectedMod;
 
@@ -114,7 +116,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.isNbtMode = false;
         this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
         this.isSpecialMode = isModMode || isSlotMode || isNameMode;
 
@@ -146,7 +148,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.isNbtMode = false;
         this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
         this.isSpecialMode = isModMode || isSlotMode || isNameMode;
 
@@ -178,7 +180,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.isNbtMode = false;
         this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
         this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
                 || isNameMode;
@@ -303,6 +305,10 @@ public class FilterMenu extends AbstractContainerMenu {
             addSlot(new PlayerSlot(playerInv, c, 8 + c * 18, playerY + 58));
         }
         playerSlotEnd = slots.size();
+    }
+
+    public void setSlotsHidden(boolean hidden) {
+        this.slotsHidden = hidden;
     }
 
     public boolean isBlacklistMode() {
@@ -851,8 +857,6 @@ public class FilterMenu extends AbstractContainerMenu {
     public boolean setFluidFilterEntry(Player player, int slot, FluidStack fluid) {
         if (isSpecialMode || slot < 0 || slot >= slotCount || fluid.isEmpty())
             return false;
-        if (hasFluid(fluid))
-            return false;
 
         updateFilter(slot, s -> {
             FilterItemData.setFluidEntry(getOpenedStack(), s, fluid);
@@ -869,8 +873,6 @@ public class FilterMenu extends AbstractContainerMenu {
         if (isSpecialMode || slot < 0 || slot >= slotCount
                 || chemicalId == null || chemicalId.isEmpty())
             return false;
-        if (hasChemical(chemicalId))
-            return false;
 
         updateFilter(slot, s -> {
             FilterItemData.setChemicalEntry(getOpenedStack(), s, chemicalId);
@@ -886,8 +888,6 @@ public class FilterMenu extends AbstractContainerMenu {
     public boolean setItemFilterEntry(Player player, int slot, ItemStack stack) {
         if (isSpecialMode || slot < 0 || slot >= slotCount || stack.isEmpty() || stack.is(ModTags.FILTERS))
             return false;
-        if (hasItem(stack))
-            return false;
 
         ItemStack itemEntry = stack.copyWithCount(1);
         updateFilter(slot, s -> {
@@ -899,34 +899,6 @@ public class FilterMenu extends AbstractContainerMenu {
         return true;
     }
 
-    private boolean hasFluid(FluidStack target) {
-        for (int i = 0; i < slotCount; i++) {
-            FluidStack existing = FilterItemData.getFluidEntry(getOpenedStack(), i);
-            if (!existing.isEmpty() && existing.getFluid() == target.getFluid())
-                return true;
-        }
-        return false;
-    }
-
-    private boolean hasItem(ItemStack target) {
-        for (int i = 0; i < slotCount; i++) {
-            if (isFluidSlot[i] || isChemicalSlot[i])
-                continue;
-            ItemStack existing = filterInventory.getItem(i);
-            if (!existing.isEmpty() && ItemStack.isSameItemSameComponents(existing, target))
-                return true;
-        }
-        return false;
-    }
-
-    private boolean hasChemical(String chemicalId) {
-        for (int i = 0; i < slotCount; i++) {
-            String existing = FilterItemData.getChemicalEntry(getOpenedStack(), i);
-            if (existing != null && existing.equals(chemicalId))
-                return true;
-        }
-        return false;
-    }
 
     public void clearFilterEntry(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
@@ -1138,7 +1110,7 @@ public class FilterMenu extends AbstractContainerMenu {
         ItemStack stack = getOpenedStack();
         return !stack.isEmpty() && (stack.getItem() instanceof BaseFilterItem ||
                 stack.getItem() instanceof ModFilterItem ||
-                stack.getItem() instanceof SlotFilterItem ||
+                false ||
                 stack.getItem() instanceof NameFilterItem);
     }
 
@@ -1205,6 +1177,11 @@ public class FilterMenu extends AbstractContainerMenu {
         }
 
         @Override
+        public boolean isActive() {
+            return !slotsHidden;
+        }
+
+        @Override
         public boolean mayPlace(ItemStack stack) {
             return false;
         }
@@ -1235,6 +1212,11 @@ public class FilterMenu extends AbstractContainerMenu {
         public PlayerSlot(Container container, int index, int x, int y) {
             super(container, index, x, y);
             this.index = index;
+        }
+
+        @Override
+        public boolean isActive() {
+            return !slotsHidden;
         }
 
         @Override

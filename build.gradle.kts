@@ -91,28 +91,26 @@ sourceSets.main.get().java.exclude(
     "me/almana/logisticsnetworks/client/ClientEventHandler.java",
     "me/almana/logisticsnetworks/client/LogisticsNodeRenderer.java",
     "me/almana/logisticsnetworks/client/model/**",
-    "me/almana/logisticsnetworks/integration/jei/**",
     "me/almana/logisticsnetworks/integration/jade/**",
-    "me/almana/logisticsnetworks/integration/emi/**",
-    "me/almana/logisticsnetworks/recipe/**"
+    "me/almana/logisticsnetworks/integration/emi/**"
 )
 
 dependencies {
-    // 26.1 compat deps pending
-    /*
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
     runtimeOnly("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
 
+    compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftb_teams_version}") {
+        isTransitive = false
+    }
+
+    // 26.1 compat deps pending
+    /*
     compileOnly("mekanism:Mekanism:${mekanism_version}")
 
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
 
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
-
-    compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftb_teams_version}") {
-        isTransitive = false
-    }
 
     compileOnly("dev.emi:emi-neoforge:${emi_version}") {
         isTransitive = false

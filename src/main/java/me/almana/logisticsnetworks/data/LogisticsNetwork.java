@@ -26,6 +26,7 @@ public class LogisticsNetwork {
     private static final String KEY_NODES = "Nodes";
     private static final String KEY_NODE_UUID = "Node";
     private static final String KEY_OWNER_UUID = "OwnerUUID";
+    private static final String KEY_CHANNEL_NAMES = "ChannelNames";
 
     private final UUID id;
     private String name;
@@ -36,6 +37,8 @@ public class LogisticsNetwork {
     // Runtime flags
     private boolean dirty = false;
     private boolean scheduled = false;
+
+    private final String[] channelNames = new String[9];
 
     @SuppressWarnings("unchecked")
     private final List<NodeRef>[] itemImports = new List[9];
@@ -59,6 +62,7 @@ public class LogisticsNetwork {
         this.name = name;
 
         for (int i = 0; i < 9; i++) {
+            this.channelNames[i] = "";
             this.itemImports[i] = new ArrayList<>();
             this.fluidImports[i] = new ArrayList<>();
             this.energyImports[i] = new ArrayList<>();
@@ -83,6 +87,14 @@ public class LogisticsNetwork {
             nodesTag.add(uuidTag);
         }
         tag.put(KEY_NODES, nodesTag);
+
+        ListTag channelNamesTag = new ListTag();
+        for (int i = 0; i < 9; i++) {
+            CompoundTag entry = new CompoundTag();
+            entry.putString("Name", channelNames[i]);
+            channelNamesTag.add(entry);
+        }
+        tag.put(KEY_CHANNEL_NAMES, channelNamesTag);
 
         return tag;
     }
@@ -112,6 +124,15 @@ public class LogisticsNetwork {
                 }
             }
         }
+        if (tag.contains(KEY_CHANNEL_NAMES)) {
+            ListTag namesTag = tag.getListOrEmpty(KEY_CHANNEL_NAMES);
+            for (int i = 0; i < Math.min(namesTag.size(), 9); i++) {
+                if (namesTag.get(i) instanceof CompoundTag ct) {
+                    network.channelNames[i] = ct.getStringOr("Name", "");
+                }
+            }
+        }
+
         return network;
     }
 
@@ -137,6 +158,17 @@ public class LogisticsNetwork {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getChannelName(int index) {
+        if (index >= 0 && index < 9) return channelNames[index];
+        return "";
+    }
+
+    public void setChannelName(int index, String name) {
+        if (index >= 0 && index < 9) {
+            this.channelNames[index] = name == null ? "" : name;
+        }
     }
 
     public UUID getOwnerUuid() {
@@ -248,6 +280,8 @@ public class LogisticsNetwork {
             return;
         }
 
+        List<LogisticsNodeEntity> resolved = new ArrayList<>();
+
         for (UUID nodeId : nodeUuids) {
             LogisticsNodeEntity node = null;
             for (ServerLevel level : server.getAllLevels()) {
@@ -262,7 +296,26 @@ public class LogisticsNetwork {
                 continue;
             }
 
+            for (int i = 0; i < 9; i++) {
+                if (channelNames[i].isEmpty()) {
+                    ChannelData ch = node.getChannel(i);
+                    if (ch != null && !ch.getName().isEmpty()) {
+                        channelNames[i] = ch.getName();
+                    }
+                }
+            }
+
+            resolved.add(node);
             classifyNode(node);
+        }
+
+        for (LogisticsNodeEntity node : resolved) {
+            for (int i = 0; i < 9; i++) {
+                ChannelData ch = node.getChannel(i);
+                if (ch != null) {
+                    ch.setName(channelNames[i]);
+                }
+            }
         }
     }
 

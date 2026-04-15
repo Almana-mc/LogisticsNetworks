@@ -1,15 +1,15 @@
 package me.almana.logisticsnetworks.recipe;
 
+import com.mojang.serialization.MapCodec;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
-import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
 import net.minecraft.world.item.crafting.RecipeSerializer;
@@ -19,13 +19,14 @@ import java.util.Set;
 
 public class FilterCopyClearRecipe extends CustomRecipe {
 
+    public static final FilterCopyClearRecipe INSTANCE = new FilterCopyClearRecipe();
+    public static final MapCodec<FilterCopyClearRecipe> MAP_CODEC = MapCodec.unit(INSTANCE);
+    public static final StreamCodec<RegistryFriendlyByteBuf, FilterCopyClearRecipe> STREAM_CODEC = StreamCodec.unit(INSTANCE);
+    public static final RecipeSerializer<FilterCopyClearRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
+
     private static final Set<String> FILTER_ROOT_KEYS = Set.of(
             "ln_filter",
             "ln_mod_filter");
-
-    public FilterCopyClearRecipe(CraftingBookCategory category) {
-        super(category);
-    }
 
     @Override
     public boolean matches(CraftingInput input, Level level) {
@@ -33,23 +34,13 @@ public class FilterCopyClearRecipe extends CustomRecipe {
     }
 
     @Override
-    public ItemStack assemble(CraftingInput input, HolderLookup.Provider registries) {
+    public ItemStack assemble(CraftingInput input) {
         return buildResult(input);
     }
 
     @Override
-    public boolean canCraftInDimensions(int width, int height) {
-        return width * height >= 1;
-    }
-
-    @Override
-    public RecipeSerializer<?> getSerializer() {
-        return Registration.FILTER_COPY_CLEAR_RECIPE.get();
-    }
-
-    @Override
-    public boolean isSpecial() {
-        return true;
+    public RecipeSerializer<FilterCopyClearRecipe> getSerializer() {
+        return SERIALIZER;
     }
 
     private static ItemStack buildResult(CraftingInput input) {
@@ -106,7 +97,7 @@ public class FilterCopyClearRecipe extends CustomRecipe {
 
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         for (String rootKey : FILTER_ROOT_KEYS) {
-            if (custom.contains(rootKey) && !custom.getCompound(rootKey).isEmpty()) {
+            if (custom.contains(rootKey) && !custom.getCompound(rootKey).orElseGet(CompoundTag::new).isEmpty()) {
                 return true;
             }
         }

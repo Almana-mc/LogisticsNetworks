@@ -44,7 +44,6 @@ public class TransferEngine {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final float BACKOFF_MULTIPLIER = 1.3f;
     private static final float BACKOFF_DECAY_DIVISOR = 3f;
-    private static final float BACKOFF_MAX_TICKS = 40f;
     private static final float BACKOFF_MAX_TICKS_ENERGY = 5f;
 
     private static long capKey(ServerLevel level, BlockPos pos, Direction dir) {
@@ -378,7 +377,8 @@ public class TransferEngine {
         long configuredDelay = isInstantType ? 1
                 : Math.max(channel.getTickDelay(), NodeUpgradeData.getMinTickDelay(tier));
         float backoff = node.getBackoffTicks(index);
-        long effectiveDelay = Math.max(configuredDelay, (long) backoff);
+        boolean useBackoff = Config.backoffEnabled[channel.getType().ordinal()];
+        long effectiveDelay = useBackoff ? Math.max(configuredDelay, (long) backoff) : configuredDelay;
 
         return gameTime - lastRun < effectiveDelay;
     }
@@ -408,14 +408,10 @@ public class TransferEngine {
             if (channel.getDistributionMode() == DistributionMode.ROUND_ROBIN) {
                 node.advanceRoundRobin(index, targetCount);
             }
-        } else {
-            float maxBackoff = isInstantType ? BACKOFF_MAX_TICKS_ENERGY : BACKOFF_MAX_TICKS;
+        } else if (Config.backoffEnabled[channel.getType().ordinal()]) {
+            float maxBackoff = isInstantType ? BACKOFF_MAX_TICKS_ENERGY : (float) Config.backoffMaxTicks;
             float curBackoff = Math.max(node.getBackoffTicks(index), configuredDelay);
             if (curBackoff <= configuredDelay) {
-                // First failure: Set backoff such that it doesn't incur an extra integer tick
-                // of delay now,
-                // but the NEXT failure (multiplied by BACKOFF_MULTIPLIER) will cross the +1
-                // threshold.
                 float nextThreshold = (configuredDelay + 1.05f) / BACKOFF_MULTIPLIER;
                 node.setBackoffTicks(index, Math.min(maxBackoff, Math.max(configuredDelay + 0.1f, nextThreshold)));
             } else {
@@ -1230,6 +1226,10 @@ public class TransferEngine {
                 continue;
 
             int request = Math.min(simulated.getAmount(), Math.min(remaining, allowedByAmount));
+            int perEntryBatch = getPerEntryFluidBatchLimit(simulated, exportFilters, importFilters);
+            if (perEntryBatch > 0) {
+                request = Math.min(request, perEntryBatch);
+            }
             int accepted = fillFluid(target, simulated.copyWithAmount(request), true);
             if (accepted <= 0)
                 continue;
@@ -1469,6 +1469,31 @@ public class TransferEngine {
         }
 
         return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
+    }
+
+    private static int getPerEntryFluidBatchLimit(FluidStack candidate, ItemStack[] exportFilters,
+            ItemStack[] importFilters) {
+        int limit = Integer.MAX_VALUE;
+
+        if (exportFilters != null) {
+            for (ItemStack filter : exportFilters) {
+                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate);
+                if (batch > 0) {
+                    limit = Math.min(limit, batch);
+                }
+            }
+        }
+
+        if (importFilters != null) {
+            for (ItemStack filter : importFilters) {
+                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate);
+                if (batch > 0) {
+                    limit = Math.min(limit, batch);
+                }
+            }
+        }
+
+        return limit == Integer.MAX_VALUE ? -1 : limit;
     }
 
     private static int countMatchingFluid(ResourceHandler<FluidResource> handler, FluidStack candidate) {
