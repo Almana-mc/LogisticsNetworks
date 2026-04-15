@@ -1553,6 +1553,44 @@ public final class FilterItemData {
         return 0;
     }
 
+    public static int getFluidBatchLimitFull(ItemStack filter, FluidStack candidate) {
+        if (!isFilterItem(filter) || candidate.isEmpty())
+            return 0;
+        int cap = getCapacity(filter);
+        for (int i = 0; i < cap; i++) {
+            String tag = getEntryTag(filter, i);
+            if (tag != null) {
+                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals))
+                    return getEntryBatch(filter, i);
+                continue;
+            }
+
+            FluidStack entry = getFluidEntry(filter, i);
+            if (!entry.isEmpty() && FluidStack.isSameFluidSameComponents(entry, candidate))
+                return getEntryBatch(filter, i);
+        }
+        return 0;
+    }
+
+    public static int getChemicalBatchLimitFull(ItemStack filter, String chemicalId) {
+        if (!isFilterItem(filter) || chemicalId == null || chemicalId.isEmpty())
+            return 0;
+        int cap = getCapacity(filter);
+        for (int i = 0; i < cap; i++) {
+            String tag = getEntryTag(filter, i);
+            if (tag != null) {
+                if (MekanismCompat.chemicalHasTag(chemicalId, tag))
+                    return getEntryBatch(filter, i);
+                continue;
+            }
+
+            String entry = getChemicalEntry(filter, i);
+            if (entry != null && entry.equals(chemicalId))
+                return getEntryBatch(filter, i);
+        }
+        return 0;
+    }
+
     // ── Constraint helpers ──
 
     private static boolean checkNbtConstraint(ItemStack filter, int slot, @Nullable CompoundTag components) {

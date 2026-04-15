@@ -39,6 +39,7 @@ import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
@@ -497,15 +498,33 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 if (tag != null) {
                     ResourceLocation tagId = ResourceLocation.tryParse(tag);
                     if (tagId != null) {
-                        TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagId);
-                        var holders = BuiltInRegistries.ITEM.getTag(tagKey);
-                        if (holders.isPresent()) {
-                            var list = holders.get().stream().toList();
+                        FilterTargetType targetType = menu.getTargetType();
+                        if (targetType == FilterTargetType.FLUIDS) {
+                            TagKey<Fluid> fluidTagKey = TagKey.create(Registries.FLUID, tagId);
+                            var list = new ArrayList<Fluid>();
+                            for (Fluid fluid : BuiltInRegistries.FLUID) {
+                                if (fluid.builtInRegistryHolder().is(fluidTagKey)) {
+                                    list.add(fluid);
+                                }
+                            }
                             if (!list.isEmpty()) {
                                 long tick = (System.currentTimeMillis() / 1000);
                                 int idx = (int) (tick % list.size());
-                                ItemStack display = new ItemStack(list.get(idx));
-                                g.renderItem(display, sx + 1, sy + 1);
+                                renderFluidStack(g, new FluidStack(list.get(idx), 1000), sx + 1, sy + 1);
+                            }
+                        } else if (targetType == FilterTargetType.CHEMICALS) {
+                            g.drawString(font, "#", sx + 5, sy + 5, 0xFF44BB44, true);
+                        } else {
+                            TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagId);
+                            var holders = BuiltInRegistries.ITEM.getTag(tagKey);
+                            if (holders.isPresent()) {
+                                var list = holders.get().stream().toList();
+                                if (!list.isEmpty()) {
+                                    long tick = (System.currentTimeMillis() / 1000);
+                                    int idx = (int) (tick % list.size());
+                                    ItemStack display = new ItemStack(list.get(idx));
+                                    g.renderItem(display, sx + 1, sy + 1);
+                                }
                             }
                         }
                     }
@@ -2869,47 +2888,103 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             topPos = (height - imageHeight) / 2;
         }
 
+        FilterTargetType targetType = menu.getTargetType();
+        boolean isFluidOrChemical = targetType != FilterTargetType.ITEMS;
+
         detailCachedTags.clear();
         detailAllTags.clear();
-        ItemStack slotItem = getSlotItemForSubMode(slot);
-        if (!slotItem.isEmpty()) {
-            var item = slotItem.getItem();
-            BuiltInRegistries.ITEM.getTagNames().forEach(tagKey -> {
-                var holders = BuiltInRegistries.ITEM.getTag(tagKey);
-                if (holders.isPresent()
-                        && holders.get().stream().anyMatch(h -> h.value() == item)) {
-                    detailCachedTags.add(tagKey.location().toString());
-                }
-            });
-        }
-        Collections.sort(detailCachedTags);
-
-        BuiltInRegistries.ITEM.getTagNames().forEach(tagKey -> {
-            String tagStr = tagKey.location().toString();
-            if (!detailCachedTags.contains(tagStr)) {
-                detailAllTags.add(tagStr);
-            }
-        });
-        Collections.sort(detailAllTags);
-        detailAllTags.addAll(0, detailCachedTags);
+        detailAllItemIds.clear();
 
         String existingTag = menu.getEntryTag(slot);
+
+        if (targetType == FilterTargetType.FLUIDS) {
+            FluidStack fluidEntry = FilterItemData.getFluidEntry(menu.getOpenedStack(), slot);
+            if (!fluidEntry.isEmpty()) {
+                fluidEntry.getFluid().builtInRegistryHolder().tags()
+                        .forEach(t -> detailCachedTags.add(t.location().toString()));
+            }
+            Collections.sort(detailCachedTags);
+
+            BuiltInRegistries.FLUID.getTagNames().forEach(tagKey -> {
+                String tagStr = tagKey.location().toString();
+                if (!detailCachedTags.contains(tagStr)) {
+                    detailAllTags.add(tagStr);
+                }
+            });
+            Collections.sort(detailAllTags);
+            detailAllTags.addAll(0, detailCachedTags);
+
+            BuiltInRegistries.FLUID.keySet().forEach(rl -> detailAllItemIds.add(rl.toString()));
+            Collections.sort(detailAllItemIds);
+
+            if (existingTag != null) {
+                detailIdInputBox.setValue("#" + existingTag);
+            } else if (!fluidEntry.isEmpty()) {
+                ResourceLocation fluidId = BuiltInRegistries.FLUID.getKey(fluidEntry.getFluid());
+                detailIdInputBox.setValue(fluidId.toString());
+            } else {
+                detailIdInputBox.setValue("");
+            }
+            detailIdInputBox.setHint(Component.literal("Fluid or #tag"));
+        } else if (targetType == FilterTargetType.CHEMICALS) {
+            List<String> allChemTags = MekanismCompat.getAllChemicalTags();
+            detailAllTags.addAll(allChemTags);
+            Collections.sort(detailAllTags);
+
+            List<String> allChemIds = MekanismCompat.getAllChemicalIds();
+            detailAllItemIds.addAll(allChemIds);
+            Collections.sort(detailAllItemIds);
+
+            String chemEntry = FilterItemData.getChemicalEntry(menu.getOpenedStack(), slot);
+            if (existingTag != null) {
+                detailIdInputBox.setValue("#" + existingTag);
+            } else if (chemEntry != null) {
+                detailIdInputBox.setValue(chemEntry);
+            } else {
+                detailIdInputBox.setValue("");
+            }
+            detailIdInputBox.setHint(Component.literal("Chemical or #tag"));
+        } else {
+            ItemStack slotItem = getSlotItemForSubMode(slot);
+            if (!slotItem.isEmpty()) {
+                var item = slotItem.getItem();
+                BuiltInRegistries.ITEM.getTagNames().forEach(tagKey -> {
+                    var holders = BuiltInRegistries.ITEM.getTag(tagKey);
+                    if (holders.isPresent()
+                            && holders.get().stream().anyMatch(h -> h.value() == item)) {
+                        detailCachedTags.add(tagKey.location().toString());
+                    }
+                });
+            }
+            Collections.sort(detailCachedTags);
+
+            BuiltInRegistries.ITEM.getTagNames().forEach(tagKey -> {
+                String tagStr = tagKey.location().toString();
+                if (!detailCachedTags.contains(tagStr)) {
+                    detailAllTags.add(tagStr);
+                }
+            });
+            Collections.sort(detailAllTags);
+            detailAllTags.addAll(0, detailCachedTags);
+
+            BuiltInRegistries.ITEM.keySet().forEach(rl -> detailAllItemIds.add(rl.toString()));
+            Collections.sort(detailAllItemIds);
+
+            if (existingTag != null) {
+                detailIdInputBox.setValue("#" + existingTag);
+            } else if (!slotItem.isEmpty()) {
+                ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(slotItem.getItem());
+                detailIdInputBox.setValue(itemId.toString());
+            } else {
+                detailIdInputBox.setValue("");
+            }
+            detailIdInputBox.setHint(Component.literal("Item or #tag"));
+        }
+
         if (existingTag != null && !detailAllTags.contains(existingTag)) {
             detailAllTags.add(0, existingTag);
         }
 
-        detailAllItemIds.clear();
-        BuiltInRegistries.ITEM.keySet().forEach(rl -> detailAllItemIds.add(rl.toString()));
-        Collections.sort(detailAllItemIds);
-
-        if (existingTag != null) {
-            detailIdInputBox.setValue("#" + existingTag);
-        } else if (!slotItem.isEmpty()) {
-            ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(slotItem.getItem());
-            detailIdInputBox.setValue(itemId.toString());
-        } else {
-            detailIdInputBox.setValue("");
-        }
         detailIdInputBox.setVisible(true);
         detailIdInputBox.setFocused(false);
         rebuildIdFilteredList();
@@ -2923,72 +2998,95 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailStockInputBox.setVisible(true);
         detailStockInputBox.setFocused(false);
 
-        String slotMapping = menu.getEntrySlotMappingExpression(slot);
-        detailSlotMappingInputBox.setValue(slotMapping);
-        detailSlotMappingInputBox.setVisible(true);
-        detailSlotMappingInputBox.setFocused(false);
-
-        ItemStack openedStack = menu.getOpenedStack();
-        String durOp = FilterItemData.getEntryDurabilityOp(openedStack, slot);
-        detailDurabilityOp = durOp;
-        detailDurabilityValueBox.setVisible(false);
-        detailDurabilityValueBox.setFocused(false);
-
-        String existingNbtRaw = FilterItemData.getEntryNbtRaw(openedStack, slot);
-        if (existingNbtRaw != null) {
-            detailNbtInputBox.setValue(existingNbtRaw);
-        } else {
-            if (!slotItem.isEmpty() && minecraft != null && minecraft.player != null) {
-                CompoundTag components = NbtFilterData.getSerializedComponents(
-                        slotItem, minecraft.player.level().registryAccess());
-                detailNbtInputBox.setValue(components != null ? components.toString() : "");
-            } else {
-                detailNbtInputBox.setValue("");
-            }
-        }
-        detailNbtInputBox.active = false;
-        detailNbtInputBox.setFocused(false);
-
-        detailCachedNbtEntries.clear();
-        if (!slotItem.isEmpty() && minecraft != null && minecraft.player != null) {
-            detailCachedNbtEntries.addAll(NbtFilterData.extractEntries(
-                    slotItem, minecraft.player.level().registryAccess()));
-        } else {
-            List<FilterItemData.SlotNbtRule> stored = menu.getSlotNbtRules(slot);
-            for (FilterItemData.SlotNbtRule r : stored) {
-                String display = r.value() != null ? r.value().getAsString() : "?";
-                detailCachedNbtEntries.add(new NbtFilterData.NbtEntry(r.path(), display));
-            }
-        }
-        nbtCollapsedGroups.clear();
-        buildNbtRows();
-
-        detailNbtActiveOps.clear();
-        List<FilterItemData.SlotNbtRule> existingRules = menu.getSlotNbtRules(slot);
-        for (FilterItemData.SlotNbtRule r : existingRules) {
-            detailNbtActiveOps.put(r.path(), r.operator());
-        }
-        detailNbtOp = "=";
-        detailNbtSelectedIdx = -1;
-        detailNbtValueBox.setValue("");
-        detailNbtValueBox.setVisible(false);
-        detailNbtValueBox.setFocused(false);
-        nbtTableEditingRow = -1;
-
-        Boolean savedEnchanted = FilterItemData.getEntryEnchanted(openedStack, slot);
-        if (!slotItem.isEmpty()) {
-            detailItemEnchanted = savedEnchanted != null ? savedEnchanted : slotItem.isEnchanted();
-            detailEnchantedEnabled = savedEnchanted != null;
-            detailItemMaxDurability = slotItem.getMaxDamage();
-            detailItemDurability = detailItemMaxDurability > 0
-                    ? detailItemMaxDurability - slotItem.getDamageValue() : -1;
-            detailItemStackSize = slotItem.getCount();
-        } else {
-            detailItemEnchanted = savedEnchanted != null ? savedEnchanted : false;
-            detailEnchantedEnabled = savedEnchanted != null;
-            detailItemDurability = 0;
+        if (isFluidOrChemical) {
+            detailSlotMappingInputBox.setValue("");
+            detailSlotMappingInputBox.setVisible(false);
+            detailDurabilityOp = null;
+            detailDurabilityValueBox.setVisible(false);
+            detailNbtInputBox.setValue("");
+            detailNbtInputBox.active = false;
+            detailNbtInputBox.setFocused(false);
+            detailCachedNbtEntries.clear();
+            detailNbtActiveOps.clear();
+            detailNbtOp = "=";
+            detailNbtSelectedIdx = -1;
+            detailNbtValueBox.setValue("");
+            detailNbtValueBox.setVisible(false);
+            nbtTableEditingRow = -1;
+            detailItemEnchanted = false;
+            detailEnchantedEnabled = false;
+            detailItemDurability = -1;
             detailItemMaxDurability = 0;
             detailItemStackSize = 1;
+        } else {
+            String slotMapping = menu.getEntrySlotMappingExpression(slot);
+            detailSlotMappingInputBox.setValue(slotMapping);
+            detailSlotMappingInputBox.setVisible(true);
+            detailSlotMappingInputBox.setFocused(false);
+
+            ItemStack openedStack = menu.getOpenedStack();
+            String durOp = FilterItemData.getEntryDurabilityOp(openedStack, slot);
+            detailDurabilityOp = durOp;
+            detailDurabilityValueBox.setVisible(false);
+            detailDurabilityValueBox.setFocused(false);
+
+            ItemStack slotItem = getSlotItemForSubMode(slot);
+            String existingNbtRaw = FilterItemData.getEntryNbtRaw(openedStack, slot);
+            if (existingNbtRaw != null) {
+                detailNbtInputBox.setValue(existingNbtRaw);
+            } else {
+                if (!slotItem.isEmpty() && minecraft != null && minecraft.player != null) {
+                    CompoundTag components = NbtFilterData.getSerializedComponents(
+                            slotItem, minecraft.player.level().registryAccess());
+                    detailNbtInputBox.setValue(components != null ? components.toString() : "");
+                } else {
+                    detailNbtInputBox.setValue("");
+                }
+            }
+            detailNbtInputBox.active = false;
+            detailNbtInputBox.setFocused(false);
+
+            detailCachedNbtEntries.clear();
+            if (!slotItem.isEmpty() && minecraft != null && minecraft.player != null) {
+                detailCachedNbtEntries.addAll(NbtFilterData.extractEntries(
+                        slotItem, minecraft.player.level().registryAccess()));
+            } else {
+                List<FilterItemData.SlotNbtRule> stored = menu.getSlotNbtRules(slot);
+                for (FilterItemData.SlotNbtRule r : stored) {
+                    String display = r.value() != null ? r.value().getAsString() : "?";
+                    detailCachedNbtEntries.add(new NbtFilterData.NbtEntry(r.path(), display));
+                }
+            }
+            nbtCollapsedGroups.clear();
+            buildNbtRows();
+
+            detailNbtActiveOps.clear();
+            List<FilterItemData.SlotNbtRule> existingRules = menu.getSlotNbtRules(slot);
+            for (FilterItemData.SlotNbtRule r : existingRules) {
+                detailNbtActiveOps.put(r.path(), r.operator());
+            }
+            detailNbtOp = "=";
+            detailNbtSelectedIdx = -1;
+            detailNbtValueBox.setValue("");
+            detailNbtValueBox.setVisible(false);
+            detailNbtValueBox.setFocused(false);
+            nbtTableEditingRow = -1;
+
+            Boolean savedEnchanted = FilterItemData.getEntryEnchanted(openedStack, slot);
+            if (!slotItem.isEmpty()) {
+                detailItemEnchanted = savedEnchanted != null ? savedEnchanted : slotItem.isEnchanted();
+                detailEnchantedEnabled = savedEnchanted != null;
+                detailItemMaxDurability = slotItem.getMaxDamage();
+                detailItemDurability = detailItemMaxDurability > 0
+                        ? detailItemMaxDurability - slotItem.getDamageValue() : -1;
+                detailItemStackSize = slotItem.getCount();
+            } else {
+                detailItemEnchanted = savedEnchanted != null ? savedEnchanted : false;
+                detailEnchantedEnabled = savedEnchanted != null;
+                detailItemDurability = 0;
+                detailItemMaxDurability = 0;
+                detailItemStackSize = 1;
+            }
         }
     }
 
@@ -3055,6 +3153,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private void flushDetailPageInputs() {
         if (detailEditSlot < 0) return;
         int slot = detailEditSlot;
+        FilterTargetType targetType = menu.getTargetType();
+        boolean isFluidOrChemical = targetType != FilterTargetType.ITEMS;
 
         String idVal = detailIdInputBox.getValue().trim();
         if (idVal.startsWith("#")) {
@@ -3070,31 +3170,52 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 }
             }
         } else if (!idVal.isEmpty()) {
-            ResourceLocation itemId = ResourceLocation.tryParse(idVal);
-            if (itemId != null && BuiltInRegistries.ITEM.containsKey(itemId)) {
-                Item item = BuiltInRegistries.ITEM.get(itemId);
-                if (item != Items.AIR) {
-                    ItemStack currentSlotItem = getSlotItemForSubMode(slot);
-                    if (currentSlotItem.isEmpty() || !currentSlotItem.is(item)) {
-                        ItemStack stack = new ItemStack(item);
-                        if (menu.getEntryTag(slot) != null) {
-                            menu.clearEntryTag(slot);
+            if (targetType == FilterTargetType.FLUIDS) {
+                ResourceLocation fluidId = ResourceLocation.tryParse(idVal);
+                if (fluidId != null && BuiltInRegistries.FLUID.containsKey(fluidId)) {
+                    if (menu.getEntryTag(slot) != null) {
+                        menu.clearEntryTag(slot);
+                    }
+                    setFluidFilterEntry(minecraft.player, slot, new FluidStack(BuiltInRegistries.FLUID.get(fluidId), 1000));
+                }
+            } else if (targetType == FilterTargetType.CHEMICALS) {
+                if (MekanismCompat.isValidChemicalId(idVal)) {
+                    if (menu.getEntryTag(slot) != null) {
+                        menu.clearEntryTag(slot);
+                    }
+                    setChemicalFilterEntry(minecraft.player, slot, idVal);
+                }
+            } else {
+                ResourceLocation itemId = ResourceLocation.tryParse(idVal);
+                if (itemId != null && BuiltInRegistries.ITEM.containsKey(itemId)) {
+                    Item item = BuiltInRegistries.ITEM.get(itemId);
+                    if (item != Items.AIR) {
+                        ItemStack currentSlotItem = getSlotItemForSubMode(slot);
+                        if (currentSlotItem.isEmpty() || !currentSlotItem.is(item)) {
+                            ItemStack stack = new ItemStack(item);
+                            if (menu.getEntryTag(slot) != null) {
+                                menu.clearEntryTag(slot);
+                            }
+                            PacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, stack));
+                            menu.setItemFilterEntry(minecraft.player, slot, stack);
                         }
-                        PacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, stack));
-                        menu.setItemFilterEntry(minecraft.player, slot, stack);
                     }
                 }
             }
         } else if (hasEntryInSlot(slot)) {
-            ItemStack opened = menu.getOpenedStack();
-            boolean hasConfig = FilterItemData.hasEntryNbt(opened, slot)
-                    || FilterItemData.hasEntryDurability(opened, slot)
-                    || FilterItemData.hasEntryEnchanted(opened, slot);
-            if (hasConfig) {
-                menu.clearFilterEntryItem(minecraft.player, slot);
-                PacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, ItemStack.EMPTY));
-            } else {
+            if (isFluidOrChemical) {
                 menu.clearFilterEntry(slot);
+            } else {
+                ItemStack opened = menu.getOpenedStack();
+                boolean hasConfig = FilterItemData.hasEntryNbt(opened, slot)
+                        || FilterItemData.hasEntryDurability(opened, slot)
+                        || FilterItemData.hasEntryEnchanted(opened, slot);
+                if (hasConfig) {
+                    menu.clearFilterEntryItem(minecraft.player, slot);
+                    PacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, ItemStack.EMPTY));
+                } else {
+                    menu.clearFilterEntry(slot);
+                }
             }
         }
 
@@ -3116,27 +3237,29 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             PacketDistributor.sendToServer(new SetFilterEntryAmountPayload(slot, batchVal, stockVal));
         }
 
-        String slotMapStr = detailSlotMappingInputBox.getValue().trim();
-        String currentSlotMap = menu.getEntrySlotMappingExpression(slot);
-        if (!slotMapStr.equals(currentSlotMap)) {
-            PacketDistributor.sendToServer(new SetFilterEntrySlotMappingPayload(slot, slotMapStr));
-            menu.setEntrySlotMapping(minecraft.player, slot, slotMapStr);
-        }
-
-        if (detailDurabilityOp != null && detailItemDurability >= 0) {
-            menu.setEntryDurability(minecraft.player, slot, detailDurabilityOp, detailItemDurability);
-            PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(
-                    slot, detailDurabilityOp, detailItemDurability));
-        } else {
-            String existingOp = FilterItemData.getEntryDurabilityOp(menu.getOpenedStack(), slot);
-            if (existingOp != null) {
-                menu.clearEntryDurability(minecraft.player, slot);
-                PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
+        if (!isFluidOrChemical) {
+            String slotMapStr = detailSlotMappingInputBox.getValue().trim();
+            String currentSlotMap = menu.getEntrySlotMappingExpression(slot);
+            if (!slotMapStr.equals(currentSlotMap)) {
+                PacketDistributor.sendToServer(new SetFilterEntrySlotMappingPayload(slot, slotMapStr));
+                menu.setEntrySlotMapping(minecraft.player, slot, slotMapStr);
             }
-        }
 
-        if (detailNbtPageOpen) {
-            flushNbtSubPage();
+            if (detailDurabilityOp != null && detailItemDurability >= 0) {
+                menu.setEntryDurability(minecraft.player, slot, detailDurabilityOp, detailItemDurability);
+                PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(
+                        slot, detailDurabilityOp, detailItemDurability));
+            } else {
+                String existingOp = FilterItemData.getEntryDurabilityOp(menu.getOpenedStack(), slot);
+                if (existingOp != null) {
+                    menu.clearEntryDurability(minecraft.player, slot);
+                    PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
+                }
+            }
+
+            if (detailNbtPageOpen) {
+                flushNbtSubPage();
+            }
         }
     }
 
@@ -3172,19 +3295,37 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int slotY = y;
         drawSlot(g, slotX, slotY);
 
+        FilterTargetType detailTargetType = menu.getTargetType();
+        boolean isFluidOrChemical = detailTargetType != FilterTargetType.ITEMS;
         String idVal = detailIdInputBox.getValue().trim();
         if (idVal.startsWith("#")) {
             String tagStr = idVal.substring(1).trim();
             ResourceLocation tagId = ResourceLocation.tryParse(tagStr);
             if (tagId != null) {
                 g.renderOutline(slotX, slotY, 18, 18, DETAIL_TAG_COLOR);
-                TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagId);
-                var holders = BuiltInRegistries.ITEM.getTag(tagKey);
-                if (holders.isPresent()) {
-                    var list = holders.get().stream().toList();
+                if (detailTargetType == FilterTargetType.FLUIDS) {
+                    TagKey<Fluid> fluidTagKey = TagKey.create(Registries.FLUID, tagId);
+                    var list = new ArrayList<Fluid>();
+                    for (Fluid fluid : BuiltInRegistries.FLUID) {
+                        if (fluid.builtInRegistryHolder().is(fluidTagKey)) {
+                            list.add(fluid);
+                        }
+                    }
                     if (!list.isEmpty()) {
                         int idx = (int) ((System.currentTimeMillis() / 1000) % list.size());
-                        g.renderItem(new ItemStack(list.get(idx)), slotX + 1, slotY + 1);
+                        renderFluidStack(g, new FluidStack(list.get(idx), 1000), slotX + 1, slotY + 1);
+                    }
+                } else if (detailTargetType == FilterTargetType.CHEMICALS) {
+                    g.drawString(font, "#", slotX + 5, slotY + 5, DETAIL_TAG_COLOR, true);
+                } else {
+                    TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagId);
+                    var holders = BuiltInRegistries.ITEM.getTag(tagKey);
+                    if (holders.isPresent()) {
+                        var list = holders.get().stream().toList();
+                        if (!list.isEmpty()) {
+                            int idx = (int) ((System.currentTimeMillis() / 1000) % list.size());
+                            g.renderItem(new ItemStack(list.get(idx)), slotX + 1, slotY + 1);
+                        }
                     }
                 }
             } else {
@@ -3193,27 +3334,46 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
             }
         } else if (!idVal.isEmpty()) {
-            ResourceLocation itemId = ResourceLocation.tryParse(idVal);
-            if (itemId != null && BuiltInRegistries.ITEM.containsKey(itemId)) {
-                Item item = BuiltInRegistries.ITEM.get(itemId);
-                if (item != Items.AIR) {
-                    g.renderItem(new ItemStack(item), slotX + 1, slotY + 1);
+            if (detailTargetType == FilterTargetType.FLUIDS) {
+                ResourceLocation fluidId = ResourceLocation.tryParse(idVal);
+                if (fluidId != null && BuiltInRegistries.FLUID.containsKey(fluidId)) {
+                    renderFluidStack(g, new FluidStack(BuiltInRegistries.FLUID.get(fluidId), 1000), slotX + 1, slotY + 1);
                 } else {
                     g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
                     int qx = slotX + (18 - font.width("?")) / 2;
                     g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
                 }
-            } else if (detailEditSlot < menu.slots.size()) {
-                ItemStack itemInSlot = menu.slots.get(detailEditSlot).getItem();
-                if (!itemInSlot.isEmpty()) {
-                    g.renderItem(itemInSlot, slotX + 1, slotY + 1);
+            } else if (detailTargetType == FilterTargetType.CHEMICALS) {
+                if (MekanismCompat.isValidChemicalId(idVal)) {
+                    renderChemicalStack(g, idVal, slotX + 1, slotY + 1);
                 } else {
                     g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
                     int qx = slotX + (18 - font.width("?")) / 2;
                     g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
+                }
+            } else {
+                ResourceLocation itemId = ResourceLocation.tryParse(idVal);
+                if (itemId != null && BuiltInRegistries.ITEM.containsKey(itemId)) {
+                    Item item = BuiltInRegistries.ITEM.get(itemId);
+                    if (item != Items.AIR) {
+                        g.renderItem(new ItemStack(item), slotX + 1, slotY + 1);
+                    } else {
+                        g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
+                        int qx = slotX + (18 - font.width("?")) / 2;
+                        g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
+                    }
+                } else if (detailEditSlot < menu.slots.size()) {
+                    ItemStack itemInSlot = menu.slots.get(detailEditSlot).getItem();
+                    if (!itemInSlot.isEmpty()) {
+                        g.renderItem(itemInSlot, slotX + 1, slotY + 1);
+                    } else {
+                        g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
+                        int qx = slotX + (18 - font.width("?")) / 2;
+                        g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
+                    }
                 }
             }
-        } else if (FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
+        } else if (!isFluidOrChemical && FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
             boolean hasNbt = FilterItemData.hasEntryNbt(openedStack, detailEditSlot);
             int ic = hasNbt ? DETAIL_NBT_COLOR : DETAIL_DUR_COLOR;
             String il = hasNbt ? "N" : "D";
@@ -3292,6 +3452,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailBatchInputBox.setY(y);
         detailBatchInputBox.setWidth(50);
         detailBatchInputBox.render(g, mx, my, 0);
+        if (isFluidOrChemical) {
+            g.drawString(font, "mB", batchInputX + 54, y + 3, COL_GRAY, false);
+        }
         y += DETAIL_SECTION_H;
 
         g.drawString(font, tr("gui.logisticsnetworks.filter.detail.stock"), contentX, y + 3, COL_WHITE, false);
@@ -3300,40 +3463,45 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailStockInputBox.setY(y);
         detailStockInputBox.setWidth(50);
         detailStockInputBox.render(g, mx, my, 0);
-        y += DETAIL_SECTION_H;
-
-        g.drawString(font, tr("gui.logisticsnetworks.filter.detail.nbt"), contentX, y + 3, DETAIL_NBT_COLOR, false);
-        int nbtBtnX = contentX + labelW;
-        String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
-        int nbtBtnW = Math.max(70, font.width(nbtBtnLabel) + 8);
-        drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, true);
-
-        if (isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
-            List<FilterItemData.SlotNbtRule> hoverRules = menu.getSlotNbtRules(detailEditSlot);
-            if (!hoverRules.isEmpty()) {
-                List<Component> tipLines = new ArrayList<>();
-                for (FilterItemData.SlotNbtRule r : hoverRules) {
-                    tipLines.add(Component.literal(abbreviateNbtPath(r.path()) + " " + r.operator() + " " + r.value()));
-                }
-                g.renderTooltip(font, tipLines, Optional.empty(), mx, my);
-            } else {
-                String nbtRaw = FilterItemData.getEntryNbtRaw(openedStack, detailEditSlot);
-                if (nbtRaw != null) {
-                    String preview = nbtRaw.length() > 60 ? nbtRaw.substring(0, 60) + "..." : nbtRaw;
-                    g.renderTooltip(font, Component.literal("SNBT: " + preview), mx, my);
-                }
-            }
+        if (isFluidOrChemical) {
+            g.drawString(font, "mB", stockInputX + 54, y + 3, COL_GRAY, false);
         }
         y += DETAIL_SECTION_H;
 
-        g.drawString(font, tr("gui.logisticsnetworks.filter.detail.slots"), contentX, y + 3, DETAIL_SLOT_COLOR, false);
-        int slotInputX = contentX + labelW;
-        int slotInputW = contentW - labelW;
-        detailSlotMappingInputBox.setX(slotInputX);
-        detailSlotMappingInputBox.setY(y);
-        detailSlotMappingInputBox.setWidth(slotInputW);
-        detailSlotMappingInputBox.setHint(Component.empty());
-        detailSlotMappingInputBox.render(g, mx, my, 0);
+        if (!isFluidOrChemical) {
+            g.drawString(font, tr("gui.logisticsnetworks.filter.detail.nbt"), contentX, y + 3, DETAIL_NBT_COLOR, false);
+            int nbtBtnX = contentX + labelW;
+            String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
+            int nbtBtnW = Math.max(70, font.width(nbtBtnLabel) + 8);
+            drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, true);
+
+            if (isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
+                List<FilterItemData.SlotNbtRule> hoverRules = menu.getSlotNbtRules(detailEditSlot);
+                if (!hoverRules.isEmpty()) {
+                    List<Component> tipLines = new ArrayList<>();
+                    for (FilterItemData.SlotNbtRule r : hoverRules) {
+                        tipLines.add(Component.literal(abbreviateNbtPath(r.path()) + " " + r.operator() + " " + r.value()));
+                    }
+                    g.renderTooltip(font, tipLines, Optional.empty(), mx, my);
+                } else {
+                    String nbtRaw = FilterItemData.getEntryNbtRaw(openedStack, detailEditSlot);
+                    if (nbtRaw != null) {
+                        String preview = nbtRaw.length() > 60 ? nbtRaw.substring(0, 60) + "..." : nbtRaw;
+                        g.renderTooltip(font, Component.literal("SNBT: " + preview), mx, my);
+                    }
+                }
+            }
+            y += DETAIL_SECTION_H;
+
+            g.drawString(font, tr("gui.logisticsnetworks.filter.detail.slots"), contentX, y + 3, DETAIL_SLOT_COLOR, false);
+            int slotInputX = contentX + labelW;
+            int slotInputW = contentW - labelW;
+            detailSlotMappingInputBox.setX(slotInputX);
+            detailSlotMappingInputBox.setY(y);
+            detailSlotMappingInputBox.setWidth(slotInputW);
+            detailSlotMappingInputBox.setHint(Component.empty());
+            detailSlotMappingInputBox.render(g, mx, my, 0);
+        }
     }
 
     private void renderNbtSubPage(GuiGraphics g, int mx, int my) {
@@ -3648,6 +3816,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return handleNbtSubPageClick(mx, my, btn);
         }
 
+        FilterTargetType targetType = menu.getTargetType();
+        boolean isFluidOrChemical = targetType != FilterTargetType.ITEMS;
+
         int panelX = leftPos + 4;
         int panelY = topPos + 20;
         int panelW = imageWidth - 8;
@@ -3680,15 +3851,19 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (isHovering(slotX, itemSlotY, 18, 18, (int) mx, (int) my)) {
             String currentId = detailIdInputBox.getValue().trim();
             if (!currentId.isEmpty() && !currentId.startsWith("#")) {
-                ItemStack openedStack = menu.getOpenedStack();
-                boolean hasConfig = FilterItemData.hasEntryNbt(openedStack, detailEditSlot)
-                        || FilterItemData.hasEntryDurability(openedStack, detailEditSlot)
-                        || FilterItemData.hasEntryEnchanted(openedStack, detailEditSlot);
-                if (hasConfig) {
-                    menu.clearFilterEntryItem(minecraft.player, detailEditSlot);
-                    PacketDistributor.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, ItemStack.EMPTY));
-                } else {
+                if (isFluidOrChemical) {
                     menu.clearFilterEntry(detailEditSlot);
+                } else {
+                    ItemStack openedStack = menu.getOpenedStack();
+                    boolean hasConfig = FilterItemData.hasEntryNbt(openedStack, detailEditSlot)
+                            || FilterItemData.hasEntryDurability(openedStack, detailEditSlot)
+                            || FilterItemData.hasEntryEnchanted(openedStack, detailEditSlot);
+                    if (hasConfig) {
+                        menu.clearFilterEntryItem(minecraft.player, detailEditSlot);
+                        PacketDistributor.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, ItemStack.EMPTY));
+                    } else {
+                        menu.clearFilterEntry(detailEditSlot);
+                    }
                 }
                 detailIdInputBox.setValue("");
                 return true;
@@ -3718,6 +3893,19 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                             PacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, selected));
                             menu.setEntryTag(minecraft.player, detailEditSlot, selected);
                             detailIdInputBox.setValue("#" + selected);
+                        } else if (targetType == FilterTargetType.FLUIDS) {
+                            ResourceLocation fluidId = ResourceLocation.tryParse(selected);
+                            if (fluidId != null && BuiltInRegistries.FLUID.containsKey(fluidId)) {
+                                menu.clearEntryTag(detailEditSlot);
+                                setFluidFilterEntry(minecraft.player, detailEditSlot, new FluidStack(BuiltInRegistries.FLUID.get(fluidId), 1000));
+                                detailIdInputBox.setValue(selected);
+                            }
+                        } else if (targetType == FilterTargetType.CHEMICALS) {
+                            if (MekanismCompat.isValidChemicalId(selected)) {
+                                menu.clearEntryTag(detailEditSlot);
+                                setChemicalFilterEntry(minecraft.player, detailEditSlot, selected);
+                                detailIdInputBox.setValue(selected);
+                            }
                         } else {
                             ResourceLocation itemId = ResourceLocation.tryParse(selected);
                             if (itemId != null && BuiltInRegistries.ITEM.containsKey(itemId)) {
@@ -3743,23 +3931,26 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int labelW = 52;
         int batchY = dropY;
         int stockY = batchY + DETAIL_SECTION_H;
-        int nbtY = stockY + DETAIL_SECTION_H;
 
-        int nbtBtnX = contentX + labelW;
-        String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
-        int nbtBtnW = Math.max(70, font.width(nbtBtnLabel) + 8);
-        if (isHovering(nbtBtnX, nbtY, nbtBtnW, 14, (int) mx, (int) my)) {
-            detailNbtPageOpen = true;
-            detailNbtScrollOffset = 0;
-            detailNbtInputBox.active = true;
-            detailNbtInputBox.setFocused(false);
-            nbtSavedImageWidth = imageWidth;
-            nbtSavedLeftPos = leftPos;
-            if (imageWidth < DETAIL_NBT_MIN_WIDTH) {
-                imageWidth = DETAIL_NBT_MIN_WIDTH;
-                leftPos = (width - imageWidth) / 2;
+        if (!isFluidOrChemical) {
+            int nbtY = stockY + DETAIL_SECTION_H;
+
+            int nbtBtnX = contentX + labelW;
+            String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
+            int nbtBtnW = Math.max(70, font.width(nbtBtnLabel) + 8);
+            if (isHovering(nbtBtnX, nbtY, nbtBtnW, 14, (int) mx, (int) my)) {
+                detailNbtPageOpen = true;
+                detailNbtScrollOffset = 0;
+                detailNbtInputBox.active = true;
+                detailNbtInputBox.setFocused(false);
+                nbtSavedImageWidth = imageWidth;
+                nbtSavedLeftPos = leftPos;
+                if (imageWidth < DETAIL_NBT_MIN_WIDTH) {
+                    imageWidth = DETAIL_NBT_MIN_WIDTH;
+                    leftPos = (width - imageWidth) / 2;
+                }
+                return true;
             }
-            return true;
         }
 
         unfocusAllDetailInputs();
@@ -3779,7 +3970,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailStockInputBox.mouseClicked(mx, my, btn);
             return true;
         }
-        if (detailSlotMappingInputBox.isMouseOver(mx, my)) {
+        if (!isFluidOrChemical && detailSlotMappingInputBox.isMouseOver(mx, my)) {
             detailSlotMappingInputBox.setFocused(true);
             detailSlotMappingInputBox.mouseClicked(mx, my, btn);
             return true;

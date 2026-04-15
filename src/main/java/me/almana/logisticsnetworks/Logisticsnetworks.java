@@ -49,12 +49,17 @@ import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
+import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
+import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.registration.Registration;
+import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
-import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 @Mod(Logisticsnetworks.MOD_ID)
@@ -65,13 +70,23 @@ public class Logisticsnetworks {
         public Logisticsnetworks(IEventBus modBus) {
                 Registration.init(modBus);
                 modBus.addListener(this::registerPayloads);
+                modBus.addListener(this::commonSetup);
 
                 ModLoadingContext.get().getActiveContainer()
                                 .registerConfig(ModConfig.Type.COMMON, Config.SPEC, "logistics-network/common.toml");
                 ModLoadingContext.get().getActiveContainer()
                                 .registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC,
                                                 "logistics-network/client.toml");
+
+                if (FMLEnvironment.dist == Dist.CLIENT) {
+                        ConfigScreenRegistrar.register();
+                }
+
                 UpgradeLimitsConfig.load();
+        }
+
+        private void commonSetup(FMLCommonSetupEvent event) {
+                event.enqueueWork(AE2Compat::registerLinkable);
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
