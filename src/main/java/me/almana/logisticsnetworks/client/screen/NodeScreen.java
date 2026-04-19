@@ -23,6 +23,10 @@ import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
+import me.almana.logisticsnetworks.client.theme.Themes;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -42,9 +46,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     // Constants
     private static final int GUI_WIDTH = 256;
-    private static final int GUI_HEIGHT = 256;
+    private static final int GUI_HEIGHT = 298;
     private static final int INV_X = 47;
-    private static final int INV_Y = 176;
+    private static final int INV_Y = 218;
     private static final int NETWORKS_PER_PAGE = 3;
     private static final int BATCH_MIN = 1;
     private static final int BATCH_MAX = 1_000_000;
@@ -53,25 +57,19 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private static final int PRIORITY_MIN = -99;
     private static final int PRIORITY_MAX = 99;
 
-    // Colors
-    private static final int COLOR_BG = 0xE6111111;
-    private static final int COLOR_PANEL = 0xFF1A1A1A;
-    private static final int COLOR_BORDER = 0xFF333333;
-    private static final int COLOR_ACCENT = 0xFF44BB44;
-    private static final int COLOR_WHITE = 0xFFFFFFFF;
-    private static final int COLOR_GRAY = 0xFF999999;
-    private static final int COLOR_DARK_GRAY = 0xFF666666;
-    private static final int COLOR_ENABLED_BG = 0xFF1A3A1A;
-    private static final int COLOR_DISABLED_BG = 0xFF3A1A1A;
-    private static final int COLOR_IMPORT = 0xFF5599FF;
-    private static final int COLOR_EXPORT = 0xFFFF9944;
-    private static final int COLOR_HOVER = 0x33FFFFFF;
-    private static final int COLOR_SLOT_BG = 0xFF0A0A0A;
-    private static final int COLOR_SLOT_BORDER = 0xFF3A3A3A;
-    private static final int COLOR_BTN_BG = 0xFF2A2A2A;
-    private static final int COLOR_BTN_HOVER = 0xFF3A3A3A;
-    private static final int COLOR_BTN_BORDER = 0xFF4A4A4A;
-    private static final int COLOR_DISABLED_TXT = 0xFF666666;
+    private Theme theme() { return ThemeState.active(); }
+    private int cPanel() { return theme().surface2(); }
+    private int cBorder() { return theme().border(); }
+    private int cBorderStrong() { return theme().borderStrong(); }
+    private int cAccent() { return theme().accent(); }
+    private int cDanger() { return theme().danger(); }
+    private int cWarn() { return theme().warn(); }
+    private int cInfo() { return theme().info(); }
+    private int cText() { return theme().text(); }
+    private int cMuted() { return theme().textMuted(); }
+    private int cSubtle() { return theme().textSubtle(); }
+    private int cHover() { return 0x22FFFFFF; }
+    private final Runnable themeListener = () -> { if (getMenu() != null) rebuildPageLayout(); };
 
     private Page currentPage = Page.NETWORK_SELECT;
     private int selectedChannel = 0;
@@ -154,6 +152,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 currentPage = Page.CHANNEL_CONFIG;
                 lastKnownNetworkId = node.getNetworkId();
             }
+            ThemeState.addListener(themeListener);
         }
         selectedChannel = getMenu().getSelectedChannel();
         rebuildPageLayout();
@@ -232,12 +231,15 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (labelPickerOpen && currentPage == Page.CHANNEL_CONFIG) {
             renderLabelPicker(g, mx, my, pt);
         }
+        if (tweaksOpen) {
+            renderTweaksPanel(g, mx, my);
+        }
         this.renderTooltip(g, mx, my);
         if (hoveredChannelName != null && currentPage == Page.CHANNEL_CONFIG) {
             g.renderTooltip(font, hoveredChannelName, mx, my);
         }
         if (settingsHoverRow >= 0 && currentPage == Page.CHANNEL_CONFIG
-                && System.currentTimeMillis() - settingsHoverStartTime >= TOOLTIP_DELAY) {
+                && System.currentTimeMillis() - settingsHoverStartTime >= TOOLTIP_DELAY && !tweaksOpen) {
             LogisticsNodeEntity node = getMenu().getNode();
             List<Component> tip = getSettingTooltip(node.getChannel(selectedChannel), settingsHoverRow);
             g.renderComponentTooltip(font, tip, mx, my);
@@ -245,10 +247,135 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     }
 
     @Override
+    public void onClose() {
+        ThemeState.removeListener(themeListener);
+        super.onClose();
+    }
+
+    @Override
+    public void removed() {
+        ThemeState.removeListener(themeListener);
+        super.removed();
+    }
+
+    private boolean tweaksOpen = false;
+
+    private int tweaksFabX() { return leftPos + GUI_WIDTH - 56; }
+    private int tweaksFabY() { return topPos + INV_Y - 38; }
+    private int tweaksFabW() { return 48; }
+    private int tweaksFabH() { return 10; }
+
+    private boolean isInTweaksFab(double mx, double my) {
+        return mx >= tweaksFabX() && mx <= tweaksFabX() + tweaksFabW()
+                && my >= tweaksFabY() && my <= tweaksFabY() + tweaksFabH();
+    }
+
+    private void renderTweaksFab(GuiGraphics g, int mx, int my) {
+        if (currentPage != Page.CHANNEL_CONFIG) return;
+        int fx = tweaksFabX();
+        int fy = tweaksFabY();
+        int fw = tweaksFabW();
+        int fh = tweaksFabH();
+        boolean hovered = !tweaksOpen && isInTweaksFab(mx, my);
+        String label = tr("gui.logisticsnetworks.node.tweaks");
+        Theme t = theme();
+        int bg = hovered ? t.surface() : t.surface2();
+        int border = hovered ? t.accent() : t.borderStrong();
+        ThemePaint.roundRect(g, fx, fy, fw, fh, fh / 2, bg, t.sharpCorners());
+        ThemePaint.roundOutline(g, fx, fy, fw, fh, fh / 2, border, t.sharpCorners());
+        int gx = fx + 4;
+        int gy = fy + fh / 2 - 1;
+        g.fill(gx, gy, gx + 3, gy + 1, t.text());
+        g.drawString(font, label, fx + 10, fy + 1, t.text(), false);
+    }
+
+    private static final int TWEAKS_W = 164;
+    private static final int TWEAKS_H = 150;
+
+    private int tweaksX() { return leftPos + (GUI_WIDTH - TWEAKS_W) / 2; }
+    private int tweaksY() { return topPos + (GUI_HEIGHT - TWEAKS_H) / 2; }
+
+    private void renderTweaksPanel(GuiGraphics g, int mx, int my) {
+        Theme t = theme();
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 300);
+        ThemePaint.modalVeil(g, leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, t);
+
+        int x = tweaksX();
+        int y = tweaksY();
+        ThemePaint.window(g, x, y, TWEAKS_W, TWEAKS_H, t);
+
+        g.drawString(font, tr("gui.logisticsnetworks.node.tweaks"), x + 10, y + 8, cMuted(), false);
+        String closeStr = "\u00D7";
+        int closeX = x + TWEAKS_W - 14;
+        int closeY = y + 6;
+        boolean closeHover = mx >= closeX && mx <= closeX + 10 && my >= closeY && my <= closeY + 10;
+        g.drawString(font, closeStr, closeX + 2, closeY + 1, closeHover ? cText() : cMuted(), false);
+
+        ThemePaint.divider(g, x + 8, y + 20, TWEAKS_W - 16, t);
+
+        g.drawString(font, tr("gui.logisticsnetworks.node.tweaks.theme"), x + 10, y + 26, cSubtle(), false);
+
+        int cols = 2;
+        int swatchW = (TWEAKS_W - 20 - (cols - 1) * 4) / cols;
+        int swatchH = 22;
+        int startY = y + 36;
+        for (int i = 0; i < Themes.ALL.size(); i++) {
+            Theme preview = Themes.ALL.get(i);
+            int col = i % cols;
+            int row = i / cols;
+            int sx = x + 10 + col * (swatchW + 4);
+            int sy = startY + row * (swatchH + 4);
+            boolean active = preview.id().equals(t.id());
+            boolean hovered = mx >= sx && mx <= sx + swatchW && my >= sy && my <= sy + swatchH;
+            ThemePaint.swatchPreview(g, sx, sy, swatchW, 12, preview, t);
+            int labelY = sy + 13;
+            int fg = active ? cAccent() : (hovered ? cText() : cMuted());
+            ThemePaint.drawCentered(g, font, preview.label(), sx + swatchW / 2, labelY, fg);
+            if (active) {
+                ThemePaint.roundOutline(g, sx, sy, swatchW, swatchH, 2, cAccent(), t.sharpCorners());
+            }
+        }
+
+        g.pose().popPose();
+    }
+
+    private boolean handleTweaksClick(double mx, double my) {
+        int x = tweaksX();
+        int y = tweaksY();
+        if (mx < x || mx > x + TWEAKS_W || my < y || my > y + TWEAKS_H) {
+            tweaksOpen = false;
+            return true;
+        }
+        int closeX = x + TWEAKS_W - 14;
+        int closeY = y + 6;
+        if (mx >= closeX && mx <= closeX + 10 && my >= closeY && my <= closeY + 10) {
+            tweaksOpen = false;
+            return true;
+        }
+
+        int cols = 2;
+        int swatchW = (TWEAKS_W - 20 - (cols - 1) * 4) / cols;
+        int swatchH = 22;
+        int startY = y + 36;
+        for (int i = 0; i < Themes.ALL.size(); i++) {
+            int col = i % cols;
+            int row = i / cols;
+            int sx = x + 10 + col * (swatchW + 4);
+            int sy = startY + row * (swatchH + 4);
+            if (mx >= sx && mx <= sx + swatchW && my >= sy && my <= sy + swatchH) {
+                ThemeState.setTheme(Themes.ALL.get(i));
+                return true;
+            }
+        }
+
+        return true;
+    }
+
+    @Override
     protected void renderBg(GuiGraphics g, float pt, int mx, int my) {
-        // Main Background
-        g.fill(leftPos, topPos, leftPos + GUI_WIDTH, topPos + GUI_HEIGHT, COLOR_BG);
-        g.renderOutline(leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, COLOR_BORDER);
+        Theme t = theme();
+        ThemePaint.window(g, leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, t);
 
         if (currentPage == Page.NETWORK_SELECT) {
             renderNetworkSelectionPage(g, mx, my);
@@ -256,17 +383,17 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             renderChannelConfigPage(g, mx, my);
         }
 
-        // Inventory Separator
-        int sepY = topPos + INV_Y - 14;
-        g.fill(leftPos + 4, sepY, leftPos + GUI_WIDTH - 4, sepY + 1, COLOR_BORDER);
+        int sepY = topPos + INV_Y - 18;
+        ThemePaint.divider(g, leftPos + 6, sepY, GUI_WIDTH - 12, t);
         g.drawString(font, Component.translatable("gui.logisticsnetworks.node.inventory"), leftPos + INV_X,
-                topPos + INV_Y - 11, COLOR_DARK_GRAY, false);
+                topPos + INV_Y - 12, cSubtle(), false);
 
         renderPlayerSlots(g);
+
+        renderTweaksFab(g, mx, my);
     }
 
     private void renderPlayerSlots(GuiGraphics g) {
-        // Main Inventory (3 rows)
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 int x = leftPos + INV_X + col * 18 - 1;
@@ -274,7 +401,6 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 drawSlot(g, x, y);
             }
         }
-        // Hotbar
         for (int col = 0; col < 9; col++) {
             int x = leftPos + INV_X + col * 18 - 1;
             int y = topPos + INV_Y + 58 - 1;
@@ -283,21 +409,19 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     }
 
     private void drawSlot(GuiGraphics g, int x, int y) {
-        g.fill(x, y, x + 18, y + 18, COLOR_SLOT_BG);
-        g.renderOutline(x, y, 18, 18, COLOR_SLOT_BORDER);
+        ThemePaint.slot(g, x, y, 18, theme());
     }
 
     private void renderNetworkSelectionPage(GuiGraphics g, int mx, int my) {
         int cx = leftPos + GUI_WIDTH / 2;
-        g.drawCenteredString(font, Component.translatable("gui.logisticsnetworks.select_network"), cx, topPos + 8,
-                COLOR_ACCENT);
+        ThemePaint.drawCentered(g, font, Component.translatable("gui.logisticsnetworks.select_network"), cx, topPos + 8, cAccent());
 
         drawButton(g, cx - 45, topPos + 54, 90, 16,
                 tr("gui.logisticsnetworks.create_network"), mx, my);
 
-        g.fill(leftPos + 12, topPos + 76, leftPos + GUI_WIDTH - 12, topPos + 77, COLOR_BORDER);
+        g.fill(leftPos + 12, topPos + 76, leftPos + GUI_WIDTH - 12, topPos + 77, cBorder());
         g.drawString(font, Component.translatable("gui.logisticsnetworks.node.existing_networks"), leftPos + 14,
-                topPos + 82, COLOR_DARK_GRAY, false);
+                topPos + 82, cSubtle(), false);
 
         String currentFilter = networkNameField != null ? networkNameField.getValue().trim() : "";
         if (!currentFilter.equals(lastNetworkFilter)) {
@@ -310,8 +434,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, filtered.size());
 
         if (filtered.isEmpty()) {
-            g.drawCenteredString(font, Component.translatable("gui.logisticsnetworks.no_networks"), cx, listY + 15,
-                    COLOR_DARK_GRAY);
+            ThemePaint.drawCentered(g, font, Component.translatable("gui.logisticsnetworks.no_networks"), cx, listY + 15, cSubtle());
         } else {
             for (int i = networkScrollOffset; i < endIdx; i++) {
                 SyncNetworkListPayload.NetworkEntry entry = filtered.get(i);
@@ -324,15 +447,13 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             int pageInfoY = listY + NETWORKS_PER_PAGE * 20 + 4;
             String pageInfo = tr("gui.logisticsnetworks.node.page_info", networkScrollOffset + 1, endIdx,
                     filtered.size());
-            g.drawCenteredString(font, pageInfo, cx, pageInfoY, COLOR_DARK_GRAY);
+            ThemePaint.drawCentered(g, font, pageInfo, cx, pageInfoY, cSubtle());
         }
     }
 
     private void drawButton(GuiGraphics g, int x, int y, int w, int h, String label, int mx, int my) {
         boolean hovered = !labelPickerOpen && mx >= x && mx <= x + w && my >= y && my <= y + h;
-        g.fill(x, y, x + w, y + h, hovered ? COLOR_BTN_HOVER : COLOR_BTN_BG);
-        g.renderOutline(x, y, w, h, hovered ? COLOR_ACCENT : COLOR_BTN_BORDER);
-        g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, hovered ? COLOR_WHITE : COLOR_GRAY);
+        ThemePaint.button(g, font, x, y, w, h, label, hovered, theme());
     }
 
     private void drawNetworkListEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, int x, int y, int w,
@@ -342,44 +463,55 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         int renameBtnX = x + w - renameBtnW;
 
         if (isRenaming && renameEditBox != null) {
-            g.fill(x, y, x + w, y + 17, COLOR_PANEL);
-            g.renderOutline(x, y, w, 17, COLOR_ACCENT);
+            g.fill(x, y, x + w, y + 17, cPanel());
+            g.renderOutline(x, y, w, 17, cAccent());
             return;
         }
 
         boolean hoveredRow = mx >= x && mx <= x + w && my >= y && my <= y + 17;
         boolean hoveredRename = mx >= renameBtnX && mx <= renameBtnX + renameBtnW && my >= y && my <= y + 17;
 
-        g.fill(x, y, x + w, y + 17, hoveredRow ? COLOR_BTN_HOVER : COLOR_PANEL);
-        g.renderOutline(x, y, w, 17, hoveredRow ? COLOR_ACCENT : COLOR_BORDER);
-        g.drawString(font, entry.name(), x + 5, y + 4, hoveredRow ? COLOR_WHITE : COLOR_GRAY, false);
+        g.fill(x, y, x + w, y + 17, hoveredRow ? cBorderStrong() : cPanel());
+        g.renderOutline(x, y, w, 17, hoveredRow ? cAccent() : cBorder());
+        g.drawString(font, entry.name(), x + 5, y + 4, hoveredRow ? cText() : cMuted(), false);
 
         String info = tr("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
         int infoX = renameBtnX - font.width(info) - 4;
-        g.drawString(font, info, infoX, y + 4, COLOR_DARK_GRAY, false);
+        g.drawString(font, info, infoX, y + 4, cSubtle(), false);
 
         // Rename button
-        g.fill(renameBtnX, y, renameBtnX + renameBtnW, y + 17, hoveredRename ? COLOR_BTN_HOVER : COLOR_BTN_BG);
-        g.renderOutline(renameBtnX, y, renameBtnW, 17, hoveredRename ? COLOR_ACCENT : COLOR_BTN_BORDER);
-        g.drawCenteredString(font, tr("gui.logisticsnetworks.rename"), renameBtnX + renameBtnW / 2, y + 4,
-                hoveredRename ? COLOR_WHITE : COLOR_GRAY);
+        g.fill(renameBtnX, y, renameBtnX + renameBtnW, y + 17, hoveredRename ? cBorderStrong() : cPanel());
+        g.renderOutline(renameBtnX, y, renameBtnW, 17, hoveredRename ? cAccent() : cBorder());
+        ThemePaint.drawCentered(g, font, tr("gui.logisticsnetworks.rename"), renameBtnX + renameBtnW / 2, y + 4,
+                hoveredRename ? cText() : cMuted());
     }
 
     private void renderChannelConfigPage(GuiGraphics g, int mx, int my) {
+        Theme t = theme();
         LogisticsNodeEntity node = getMenu().getNode();
         if (node == null)
             return;
 
-        String netName = clipToWidth(getNetworkName(node.getNetworkId()), GUI_WIDTH - 120);
-        g.drawCenteredString(font, netName, leftPos + GUI_WIDTH / 2, topPos + 6, COLOR_ACCENT);
+        String netName = clipToWidth(getNetworkName(node.getNetworkId()), GUI_WIDTH - 140);
+        int netNameW = font.width(netName);
+        int netChipX = leftPos + (GUI_WIDTH - netNameW - 12) / 2;
+        ThemePaint.chip(g, font, netChipX, topPos + 4, netName, t);
 
         boolean isVisible = node.isRenderVisible();
         String visibilityLabel = getVisibilityLabel(isVisible);
-        drawButton(g, leftPos + 8, topPos + 4, font.width(visibilityLabel) + 10, 10, visibilityLabel, mx, my);
-        drawButton(g, leftPos + GUI_WIDTH - 50, topPos + 4, 42, 10,
-                tr("gui.logisticsnetworks.node.change_network"), mx, my);
+        int visW = font.width(visibilityLabel) + 16;
+        boolean visHover = !labelPickerOpen && mx >= leftPos + 8 && mx <= leftPos + 8 + visW
+                && my >= topPos + 4 && my <= topPos + 16;
+        ThemePaint.visibleToggle(g, font, leftPos + 8, topPos + 4, visW, 12,
+                visibilityLabel, isVisible, visHover, t);
 
-        drawChannelTabs(g, node, topPos + 14);
+        String changeLabel = tr("gui.logisticsnetworks.node.change_network");
+        boolean changeHover = !labelPickerOpen && mx >= leftPos + GUI_WIDTH - 52 && mx <= leftPos + GUI_WIDTH - 8
+                && my >= topPos + 4 && my <= topPos + 16;
+        ThemePaint.ghostButton(g, font, leftPos + GUI_WIDTH - 52, topPos + 4, 44, 12,
+                changeLabel, changeHover, t);
+
+        drawChannelTabs(g, node, topPos + 22, mx, my);
 
         hoveredChannelName = null;
         if (!channelNameEditing) {
@@ -387,7 +519,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 ChannelData ch = node.getChannel(i);
                 if (ch != null) {
                     int tabX = leftPos + 10 + i * 26;
-                    if (mx >= tabX && mx <= tabX + 24 && my >= topPos + 14 && my <= topPos + 26) {
+                    if (mx >= tabX && mx <= tabX + 24 && my >= topPos + 22 && my <= topPos + 34) {
                         if (!ch.getName().isEmpty()) {
                             hoveredChannelName = Component.literal(ch.getName());
                         } else {
@@ -401,31 +533,33 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (!channelNameEditing) {
             String nodeLabel = node.getNodeLabel();
             String labelDisplay = nodeLabel.isEmpty() ? tr("gui.logisticsnetworks.node.label.set") : nodeLabel;
-            int labelW = font.width(labelDisplay) + 8;
+            int labelW = font.width(labelDisplay) + 14;
             int labelX = leftPos + 10 + (148 - labelW) / 2;
-            int labelY = topPos + 28;
-            drawButton(g, labelX, labelY, labelW, 12, labelDisplay, mx, my);
+            int labelY = topPos + 40;
+            boolean labelHover = !labelPickerOpen && mx >= labelX && mx <= labelX + labelW
+                    && my >= labelY && my <= labelY + 12;
+            ThemePaint.setLabelBtn(g, font, labelX, labelY, labelW, 12, labelDisplay, labelHover, t);
         } else if (channelNameEditBox != null) {
             int ebx = channelNameEditBox.getX() - 2;
             int eby = channelNameEditBox.getY() - 2;
             int ebw = channelNameEditBox.getWidth() + 4;
             int ebh = channelNameEditBox.getHeight() + 4;
-            g.fill(ebx, eby, ebx + ebw, eby + ebh, COLOR_PANEL);
-            g.renderOutline(ebx, eby, ebw, ebh, COLOR_ACCENT);
+            ThemePaint.panel(g, ebx, eby, ebw, ebh, t);
+            ThemePaint.roundOutline(g, ebx, eby, ebw, ebh, 2, cAccent(), t.sharpCorners());
         }
 
         ChannelData channel = node.getChannel(selectedChannel);
         if (channel == null)
             return;
 
-        drawSettingsPanel(g, channel, leftPos + 10, topPos + 44, mx, my);
-        drawFilterGrid(g, channel, leftPos + 168, topPos + 42, mx, my);
+        drawSettingsPanel(g, channel, leftPos + 10, topPos + 58, mx, my);
+        drawFilterGrid(g, channel, leftPos + 168, topPos + 56, mx, my);
     }
 
     private void renderLabelPicker(GuiGraphics g, int mx, int my, float pt) {
         int pickerW = getLabelPickerWidth();
         int pickerX = leftPos + 10 + (148 - pickerW) / 2;
-        int pickerY = topPos + 44;
+        int pickerY = topPos + 58;
         int entryCount = Math.min(networkLabels.size(), LABEL_PICKER_MAX_VISIBLE);
         int listH = entryCount * LABEL_PICKER_ENTRY_H;
         int pickerH = 22 + listH + (networkLabels.isEmpty() ? 0 : 4) + 16; // edit + list + clear btn
@@ -439,8 +573,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         g.pose().translate(0, 0, 200);
 
         // Background
-        g.fill(pickerX - 1, pickerY - 1, pickerX + pickerW + 1, pickerY + pickerH + 1, COLOR_BORDER);
-        g.fill(pickerX, pickerY, pickerX + pickerW, pickerY + pickerH, 0xFF1E1E1E);
+        g.fill(pickerX - 1, pickerY - 1, pickerX + pickerW + 1, pickerY + pickerH + 1, cBorder());
+        g.fill(pickerX, pickerY, pickerX + pickerW, pickerY + pickerH, cPanel());
 
         // Edit Box
         if (labelEditBox != null) {
@@ -451,7 +585,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (labelEditBox != null && labelEditBox.getValue().length() > 40) {
             String counter = labelEditBox.getValue().length() + "/48";
             int counterX = pickerX + pickerW - font.width(counter) - 3;
-            int counterColor = labelEditBox.getValue().length() >= 48 ? 0xFFFF5555 : COLOR_DARK_GRAY;
+            int counterColor = labelEditBox.getValue().length() >= 48 ? cDanger() : cSubtle();
             g.drawString(font, counter, counterX, pickerY + 22, counterColor, false);
         }
 
@@ -468,13 +602,13 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                     && my >= entryY && my < entryY + LABEL_PICKER_ENTRY_H;
             if (hovered) {
                 g.fill(pickerX + 2, entryY, pickerX + pickerW - 2,
-                        entryY + LABEL_PICKER_ENTRY_H, COLOR_HOVER);
+                        entryY + LABEL_PICKER_ENTRY_H, cHover());
             }
             String display = label;
             if (font.width(display) > pickerW - 8) {
                 display = font.plainSubstrByWidth(display, pickerW - 13) + "...";
             }
-            g.drawCenteredString(font, display, pickerX + pickerW / 2, entryY + 3, 0xFF88AACC);
+            ThemePaint.drawCentered(g, font, display, pickerX + pickerW / 2, entryY + 3, cInfo());
         }
 
         // Clear button
@@ -485,9 +619,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         boolean clearHovered = mx >= clearX && mx < clearX + clearW
                 && my >= clearY && my < clearY + 12;
         g.fill(clearX, clearY, clearX + clearW, clearY + 12,
-                clearHovered ? COLOR_BTN_HOVER : COLOR_BTN_BG);
-        g.renderOutline(clearX, clearY, clearW, 12, COLOR_BTN_BORDER);
-        g.drawString(font, clearLabel, clearX + 4, clearY + 2, COLOR_GRAY);
+                clearHovered ? cBorderStrong() : cPanel());
+        g.renderOutline(clearX, clearY, clearW, 12, cBorder());
+        g.drawString(font, clearLabel, clearX + 4, clearY + 2, cMuted(), false);
 
         g.pose().popPose();
     }
@@ -532,31 +666,30 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         return value.isEmpty() ? ellipsis : value + ellipsis;
     }
 
-    private void drawChannelTabs(GuiGraphics g, LogisticsNodeEntity node, int y) {
+    private void drawChannelTabs(GuiGraphics g, LogisticsNodeEntity node, int y, int mx, int my) {
+        Theme t = theme();
         int startX = leftPos + 10;
         for (int i = 0; i < 9; i++) {
             ChannelData ch = node.getChannel(i);
             boolean isSelected = (i == selectedChannel);
             boolean isEnabled = ch != null && ch.isEnabled();
-
-            int borderColor = isSelected ? (isEnabled ? COLOR_ACCENT : 0xFFCC3333) : COLOR_BORDER;
-            int bgColor = isSelected ? (isEnabled ? COLOR_ENABLED_BG : COLOR_DISABLED_BG) : COLOR_PANEL;
-            int textColor = isSelected ? COLOR_WHITE : (isEnabled ? COLOR_ACCENT : COLOR_DARK_GRAY);
-
             int x = startX + i * 26;
-            g.fill(x, y, x + 24, y + 12, bgColor | 0xFF000000);
-            g.renderOutline(x, y, 24, 12, borderColor);
-            g.drawCenteredString(font, String.valueOf(i), x + 12, y + 2, textColor);
+            boolean hovered = !labelPickerOpen && mx >= x && mx <= x + 24 && my >= y && my <= y + 12;
+            boolean hasDot = !isSelected && isEnabled;
+            ThemePaint.tab(g, font, x, y, 24, 12, String.valueOf(i), isSelected, hasDot, hovered, t);
+            if (isSelected && !isEnabled) {
+                ThemePaint.roundOutline(g, x, y, 24, 12, 2, cDanger(), t.sharpCorners());
+            }
         }
     }
 
     private void drawSettingsPanel(GuiGraphics g, ChannelData ch, int x, int y, int mx, int my) {
+        Theme t = theme();
         int w = 148;
-        int rowH = 11;
+        int rowH = 14;
         int h = rowH * SETTINGS_VISIBLE_ROWS + 4;
 
-        g.fill(x, y, x + w, y + h, COLOR_PANEL);
-        g.renderOutline(x, y, w, h, COLOR_BORDER);
+        ThemePaint.panel(g, x, y, w, h, t);
 
         String[] labels = {
                 tr("gui.logisticsnetworks.node.setting.status"),
@@ -581,10 +714,16 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 editingRow == 7 ? "" : formatBatchDisplay(ch),
                 editingRow == 8 ? "" : tr("gui.logisticsnetworks.node.value.tick_delay", ch.getTickDelay())
         };
-        int[] colors = {
-                ch.isEnabled() ? COLOR_ACCENT : 0xFFCC3333,
-                getModeColor(ch.getMode()),
-                COLOR_WHITE, COLOR_WHITE, 0xFFFF5555, 0xFFBB88FF, 0xFFFFDD44, COLOR_WHITE, COLOR_WHITE
+        Theme.Variant[] variants = {
+                ch.isEnabled() ? Theme.Variant.ACCENT : Theme.Variant.NEUTRAL,
+                getModeVariant(ch.getMode()),
+                getTypeVariant(ch.getType()),
+                Theme.Variant.NEUTRAL,
+                getRedstoneVariant(ch.getRedstoneMode()),
+                getDistributionVariant(ch.getDistributionMode()),
+                Theme.Variant.NEUTRAL,
+                Theme.Variant.NEUTRAL,
+                Theme.Variant.NEUTRAL
         };
         boolean[] enabled = new boolean[9];
         for (int i = 0; i < 9; i++)
@@ -602,9 +741,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             int row = vi + settingsScrollOffset;
             if (row >= SETTINGS_TOTAL_ROWS)
                 break;
-            drawSettingRow(g, rx, ry + vi * rowH, rowW, labels[row], values[row], colors[row], mx, my, enabled[row]);
+            drawSettingRow(g, rx, ry + vi * rowH, rowW, rowH, labels[row], values[row], variants[row], row, mx, my, enabled[row], vi < SETTINGS_VISIBLE_ROWS - 1);
             if (!labelPickerOpen && enabled[row] && editingRow == -1
-                    && mx >= rx && mx <= rx + rowW && my >= ry + vi * rowH && my <= ry + vi * rowH + 11) {
+                    && mx >= rx && mx <= rx + rowW && my >= ry + vi * rowH && my <= ry + vi * rowH + rowH) {
                 hoveredRow = row;
             }
         }
@@ -615,31 +754,69 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
 
         if (settingsScrollOffset > 0) {
-            g.drawString(font, "\u25B2", x + w + 2, y + 1, COLOR_DARK_GRAY, false);
+            g.drawString(font, "\u25B2", x + w + 2, y + 1, cSubtle(), false);
         }
         if (settingsScrollOffset < maxScroll) {
-            g.drawString(font, "\u25BC", x + w + 2, y + h - 9, COLOR_DARK_GRAY, false);
+            g.drawString(font, "\u25BC", x + w + 2, y + h - 9, cSubtle(), false);
         }
     }
 
+    private Theme.Variant getModeVariant(ChannelMode mode) {
+        return mode == ChannelMode.EXPORT ? Theme.Variant.WARN : Theme.Variant.ACCENT;
+    }
+
+    private Theme.Variant getTypeVariant(ChannelType type) {
+        return switch (type) {
+            case ITEM -> Theme.Variant.ACCENT;
+            case FLUID -> Theme.Variant.INFO;
+            case ENERGY -> Theme.Variant.WARN;
+            case CHEMICAL -> Theme.Variant.NEUTRAL;
+            case SOURCE -> Theme.Variant.INFO;
+        };
+    }
+
+    private Theme.Variant getRedstoneVariant(RedstoneMode mode) {
+        return switch (mode) {
+            case ALWAYS_ON -> Theme.Variant.DANGER;
+            case ALWAYS_OFF -> Theme.Variant.NEUTRAL;
+            case HIGH -> Theme.Variant.ACCENT;
+            case LOW -> Theme.Variant.WARN;
+        };
+    }
+
+    private Theme.Variant getDistributionVariant(DistributionMode mode) {
+        return switch (mode) {
+            case PRIORITY -> Theme.Variant.INFO;
+            case ROUND_ROBIN -> Theme.Variant.ACCENT;
+            case RECIPE_ROBIN -> Theme.Variant.INFO;
+            case NEAREST_FIRST -> Theme.Variant.WARN;
+            case FARTHEST_FIRST -> Theme.Variant.WARN;
+        };
+    }
+
     private void drawFilterGrid(GuiGraphics g, ChannelData ch, int x, int y, int mx, int my) {
+        Theme t = theme();
         String filtersLabel = tr("gui.logisticsnetworks.node.filters");
-        g.drawString(font, filtersLabel, x, y, COLOR_DARK_GRAY, false);
+        g.drawString(font, filtersLabel, x, y, cMuted(), false);
 
         String modeLabel = getFilterModeLabel(ch.getFilterMode());
-        int btnW = font.width(modeLabel) + 8;
+        int btnW = font.width(modeLabel) + 10;
         int btnX = x + font.width(filtersLabel) + 4;
-        drawButton(g, btnX, y - 1, btnW, 10, modeLabel, mx, my);
+        boolean modeHover = !labelPickerOpen && mx >= btnX && mx <= btnX + btnW
+                && my >= y - 1 && my <= y + 9;
+        ThemePaint.button(g, font, btnX, y - 1, btnW, 10, modeLabel, modeHover, t);
 
-        // Grid Filters
         int gridY = y + 12;
+        int gridW = 3 * 19 - 1;
+        ThemePaint.sunkPanel(g, x - 2, gridY - 2, gridW + 4, 3 * 19 + 2, t);
         drawSlotGrid(g, x, gridY, 3, 3, mx, my);
 
         int upgY = gridY + 3 * 19 + 2;
-        g.drawString(font, Component.translatable("gui.logisticsnetworks.node.upgrades"), x, upgY, COLOR_DARK_GRAY,
-                false);
+        String upgradesLabel = Component.translatable("gui.logisticsnetworks.node.upgrades").getString();
+        g.drawString(font, upgradesLabel, x, upgY, cMuted(), false);
 
-        // Grid Upgrades
+        int gridW2 = 2 * 19 - 1;
+        ThemePaint.sunkPanel(g, x - 2, upgY + 8, gridW2 + 4, 2 * 19 + 2, t);
         drawSlotGrid(g, x, upgY + 10, 2, 2, mx, my);
     }
 
@@ -653,14 +830,55 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
     }
 
-    private void drawSettingRow(GuiGraphics g, int x, int y, int w, String label, String value, int color, int mx,
-            int my, boolean enabled) {
-        boolean hovered = !labelPickerOpen && mx >= x && mx <= x + w && my >= y && my <= y + 11;
+    private void drawSettingRow(GuiGraphics g, int x, int y, int w, int rowH, String label, String value,
+            Theme.Variant variant, int row, int mx, int my, boolean enabled, boolean showDivider) {
+        Theme t = theme();
+        boolean hovered = !labelPickerOpen && mx >= x && mx <= x + w && my >= y && my <= y + rowH;
         if (enabled && hovered) {
-            g.fill(x, y, x + w, y + 11, COLOR_HOVER);
+            g.fill(x, y, x + w, y + rowH, cHover());
         }
-        g.drawString(font, label, x + 4, y + 2, enabled ? COLOR_GRAY : COLOR_DISABLED_TXT, false);
-        g.drawString(font, value, x + w - font.width(value) - 4, y + 2, enabled ? color : COLOR_DISABLED_TXT, false);
+
+        int valueBoxW;
+        if (value.isEmpty()) {
+            valueBoxW = 0;
+        } else if (row >= 6 && row <= 8 || row == 3) {
+            valueBoxW = font.width(value) + 8;
+        } else {
+            valueBoxW = ThemePaint.pillWidth(font, value);
+        }
+
+        int textY = y + (rowH - 7) / 2;
+        int chipY = y + (rowH - 9) / 2;
+        int pillY = y + (rowH - 10) / 2;
+
+        int labelX = x + 4;
+        int labelMaxW = w - 4 - valueBoxW - 6;
+        String labelDraw = label;
+        if (font.width(labelDraw) > labelMaxW && labelMaxW > 0) {
+            labelDraw = font.plainSubstrByWidth(labelDraw, labelMaxW);
+        }
+        g.drawString(font, labelDraw, labelX, textY, enabled ? cMuted() : cSubtle(), false);
+
+        if (showDivider) {
+            g.fill(x + 2, y + rowH - 1, x + w - 2, y + rowH, t.border());
+        }
+
+        if (value.isEmpty()) return;
+
+        if (!enabled) {
+            g.drawString(font, value, x + w - font.width(value) - 4, textY, cSubtle(), false);
+            return;
+        }
+
+        if (row >= 6 && row <= 8 || row == 3) {
+            int vx = x + w - valueBoxW - 3;
+            g.fill(vx, chipY, vx + valueBoxW, chipY + 9, t.surfaceSunken());
+            g.drawString(font, value, vx + 4, chipY + 1, cText(), false);
+            return;
+        }
+
+        int pillX = x + w - valueBoxW - 3;
+        ThemePaint.pill(g, font, pillX, pillY, value, variant, false, t);
     }
 
     private String formatBatchDisplay(ChannelData ch) {
@@ -684,6 +902,14 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
+        if (tweaksOpen) {
+            if (btn == 0) return handleTweaksClick(mx, my);
+            return true;
+        }
+        if (currentPage == Page.CHANNEL_CONFIG && btn == 0 && isInTweaksFab(mx, my)) {
+            tweaksOpen = true;
+            return true;
+        }
         if (editingRow != -1 && numericEditBox != null && !numericEditBox.isMouseOver(mx, my)) {
             stopNumericEdit(true);
         }
@@ -751,7 +977,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         renameEditBox.setMaxLength(32);
         renameEditBox.setValue(entry.name());
         renameEditBox.setBordered(false);
-        renameEditBox.setTextColor(COLOR_WHITE);
+        renameEditBox.setTextColor(cText());
         renameEditBox.setFocused(true);
         addRenderableWidget(renameEditBox);
         setFocused(renameEditBox);
@@ -780,13 +1006,13 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         int pickerW = getLabelPickerWidth();
         int pickerX = leftPos + 10 + (148 - pickerW) / 2;
-        int pickerY = topPos + 44;
+        int pickerY = topPos + 58;
 
         labelEditBox = new EditBox(font, pickerX + 2, pickerY + 2, pickerW - 4, 16, Component.empty());
         labelEditBox.setMaxLength(48);
         labelEditBox.setValue(node.getNodeLabel());
         labelEditBox.setBordered(true);
-        labelEditBox.setTextColor(COLOR_WHITE);
+        labelEditBox.setTextColor(cText());
         labelEditBox.setFocused(true);
         addRenderableWidget(labelEditBox);
         setFocused(labelEditBox);
@@ -818,7 +1044,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private boolean handleLabelPickerClick(LogisticsNodeEntity node, double mx, double my) {
         int pickerW = getLabelPickerWidth();
         int pickerX = leftPos + 10 + (148 - pickerW) / 2;
-        int pickerY = topPos + 44;
+        int pickerY = topPos + 58;
         int entryCount = Math.min(networkLabels.size(), LABEL_PICKER_MAX_VISIBLE);
         int listH = entryCount * LABEL_PICKER_ENTRY_H;
         int pickerH = 22 + listH + (networkLabels.isEmpty() ? 0 : 4) + 16;
@@ -873,13 +1099,13 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
 
         String visibilityLabel = getVisibilityLabel(node.isRenderVisible());
-        if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(visibilityLabel) + 10, 10, mx, my)) {
+        if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(visibilityLabel) + 16, 12, mx, my)) {
             node.setRenderVisible(!node.isRenderVisible());
             PacketDistributor.sendToServer(new ToggleNodeVisibilityPayload(node.getId()));
             return true;
         }
 
-        if (isHoveringAbs(leftPos + GUI_WIDTH - 50, topPos + 4, 42, 10, mx, my)) {
+        if (isHoveringAbs(leftPos + GUI_WIDTH - 52, topPos + 4, 44, 12, mx, my)) {
             currentPage = Page.NETWORK_SELECT;
             rebuildPageLayout();
             return true;
@@ -887,16 +1113,16 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         String nodeLabel = node.getNodeLabel();
         String labelDisplay = nodeLabel.isEmpty() ? tr("gui.logisticsnetworks.node.label.set") : nodeLabel;
-        int labelW = font.width(labelDisplay) + 8;
+        int labelW = font.width(labelDisplay) + 14;
         int labelX = leftPos + 10 + (148 - labelW) / 2;
-        int labelY = topPos + 28;
+        int labelY = topPos + 40;
         if (isHoveringAbs(labelX, labelY, labelW, 12, mx, my)) {
             openLabelPicker(node);
             return true;
         }
 
         for (int i = 0; i < 9; i++) {
-            if (isHoveringAbs(leftPos + 10 + i * 26, topPos + 14, 24, 12, mx, my)) {
+            if (isHoveringAbs(leftPos + 10 + i * 26, topPos + 22, 24, 12, mx, my)) {
                 if (i == selectedChannel && checkTabDoubleClick(i)) {
                     startChannelNameEdit(node, i);
                 } else {
@@ -917,8 +1143,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (ch == null || (btn != 0 && btn != 1))
             return false;
 
-        int rowH = 11;
-        int startY = topPos + 46;
+        int rowH = 14;
+        int startY = topPos + 60;
         int startX = leftPos + 12;
         int w = 144;
 
@@ -951,7 +1177,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
 
         int modeBtnX = leftPos + 168 + font.width(tr("gui.logisticsnetworks.node.filters")) + 4;
-        int modeBtnY = topPos + 42 - 1;
+        int modeBtnY = topPos + 56 - 1;
         String modeLabel = getFilterModeLabel(ch.getFilterMode());
         int modeBtnW = font.width(modeLabel) + 8;
 
@@ -1055,7 +1281,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         numericEditBox.setMaxLength(10);
         numericEditBox.setValue(val);
         numericEditBox.setBordered(true);
-        numericEditBox.setTextColor(COLOR_WHITE);
+        numericEditBox.setTextColor(cText());
         numericEditBox.setFocused(true);
         addRenderableWidget(numericEditBox);
         setFocused(numericEditBox);
@@ -1132,11 +1358,11 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         int tabX = leftPos + 10 + channelIndex * 26;
         int editX = Math.max(leftPos + 4, Math.min(tabX - 20, leftPos + GUI_WIDTH - 84));
 
-        channelNameEditBox = new EditBox(font, editX, topPos + 28, 80, 12, Component.empty());
+        channelNameEditBox = new EditBox(font, editX, topPos + 40, 80, 12, Component.empty());
         channelNameEditBox.setMaxLength(24);
         channelNameEditBox.setValue(ch.getName());
         channelNameEditBox.setBordered(true);
-        channelNameEditBox.setTextColor(COLOR_WHITE);
+        channelNameEditBox.setTextColor(cText());
         channelNameEditBox.setFocused(true);
         addRenderableWidget(channelNameEditBox);
         setFocused(channelNameEditBox);
@@ -1296,7 +1522,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (labelPickerOpen && networkLabels.size() > LABEL_PICKER_MAX_VISIBLE) {
             int pickerW = getLabelPickerWidth();
             int pickerX = leftPos + 10 + (148 - pickerW) / 2;
-            int pickerY = topPos + 44;
+            int pickerY = topPos + 58;
             int entryCount = Math.min(networkLabels.size(), LABEL_PICKER_MAX_VISIBLE);
             int listH = entryCount * LABEL_PICKER_ENTRY_H;
             int pickerH = 22 + listH + (networkLabels.isEmpty() ? 0 : 4) + 16;
@@ -1312,9 +1538,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
         if (currentPage == Page.CHANNEL_CONFIG) {
             int panelX = leftPos + 10;
-            int panelY = topPos + 44;
+            int panelY = topPos + 58;
             int panelW = 148;
-            int panelH = 11 * SETTINGS_VISIBLE_ROWS + 4;
+            int panelH = 14 * SETTINGS_VISIBLE_ROWS + 4;
             if (mx >= panelX && mx <= panelX + panelW && my >= panelY && my <= panelY + panelH) {
                 int maxScroll = SETTINGS_TOTAL_ROWS - SETTINGS_VISIBLE_ROWS;
                 if (sy > 0 && settingsScrollOffset > 0) {
@@ -1397,10 +1623,6 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private String getChannelModeLabel(ChannelMode mode) {
         return tr("gui.logisticsnetworks.channel_mode." + mode.name().toLowerCase(Locale.ROOT));
-    }
-
-    private int getModeColor(ChannelMode mode) {
-        return mode == ChannelMode.EXPORT ? COLOR_EXPORT : COLOR_IMPORT;
     }
 
     private String getChannelTypeLabel(ChannelType type) {

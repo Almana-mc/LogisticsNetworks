@@ -404,5 +404,21 @@
   "tooltip.logisticsnetworks.wrench.ae2_linked_detail": "Linked to [%s, %s, %s] in %s",
   "tooltip.logisticsnetworks.wrench.ae2_unlinked": "Unlinked",
   "message.logisticsnetworks.ae2.linked": "Linked wrench to ME Network at [%s, %s, %s]",
-  "message.logisticsnetworks.ae2.unlinked": "Unlinked wrench from ME Network"
+  "message.logisticsnetworks.ae2.unlinked": "Unlinked wrench from ME Network",
+  "gui.logisticsnetworks.node.search": "Search items\u2026",
+  "gui.logisticsnetworks.node.tweaks": "Tweaks",
+  "gui.logisticsnetworks.node.tweaks.theme": "Theme",
+  "gui.logisticsnetworks.node.tweaks.density": "Density",
+  "gui.logisticsnetworks.node.tweaks.density.normal": "Normal",
+  "gui.logisticsnetworks.node.tweaks.density.compact": "Compact",
+  "gui.logisticsnetworks.theme.light": "Light",
+  "gui.logisticsnetworks.theme.dark": "Dark",
+  "gui.logisticsnetworks.theme.redstone": "Redstone",
+  "gui.logisticsnetworks.theme.nebula": "Nebula",
+  "gui.logisticsnetworks.theme.glass": "Glass",
+  "gui.logisticsnetworks.theme.terminal": "Terminal",
+  "gui.logisticsnetworks.theme.pastel": "Pastel",
+  "gui.logisticsnetworks.theme.brutalist": "Brutalist",
+  "gui.logisticsnetworks.config.client.theme": "Theme",
+  "gui.logisticsnetworks.config.client.density": "Density"
 }

@@ -1,10 +1,13 @@
 package me.almana.logisticsnetworks;
 
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
+
+import java.util.List;
 
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
 public class ClientConfig {
@@ -18,6 +21,13 @@ public class ClientConfig {
     public static final ModConfigSpec.IntValue maxVisibleNodesSpec = builder
             .comment("Maximum number of visible node models rendered. Nearest nodes are prioritized. 0 = unlimited.")
             .defineInRange("maxVisibleNodes", 500, 0, Integer.MAX_VALUE);
+
+    private static final List<String> THEMES = List.of(
+            "light", "dark", "redstone", "nebula", "glass", "terminal", "pastel", "brutalist");
+
+    public static final ModConfigSpec.ConfigValue<String> themeSpec = builder
+            .comment("GUI theme for logistics node screens: light, dark, redstone, nebula, glass, terminal, pastel, brutalist")
+            .define("theme", "dark", o -> o instanceof String s && THEMES.contains(s));
 
     static final ModConfigSpec SPEC = builder.build();
 
@@ -33,5 +43,6 @@ public class ClientConfig {
     public static void refresh() {
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
+        ThemeState.applyFromConfig(themeSpec.get());
     }
 }
