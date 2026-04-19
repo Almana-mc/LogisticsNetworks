@@ -94,7 +94,7 @@ public final class ChemicalTransferHelper {
             return false;
 
         TagKey<Chemical> key = TagKey.create(MekanismAPI.CHEMICAL_REGISTRY_NAME, tagLoc);
-        return chemical.get().is(key);
+        return MekanismAPI.CHEMICAL_REGISTRY.wrapAsHolder(chemical.get()).is(key);
     }
 
     @Nullable
@@ -252,7 +252,7 @@ public final class ChemicalTransferHelper {
     public static List<String> getAllChemicalTags() {
         java.util.Set<String> tags = new java.util.LinkedHashSet<>();
         for (Chemical chemical : MekanismAPI.CHEMICAL_REGISTRY) {
-            chemical.getTags().forEach(t -> tags.add(t.location().toString()));
+            MekanismAPI.CHEMICAL_REGISTRY.wrapAsHolder(chemical).tags().forEach(t -> tags.add(t.location().toString()));
         }
         return new ArrayList<>(tags);
     }

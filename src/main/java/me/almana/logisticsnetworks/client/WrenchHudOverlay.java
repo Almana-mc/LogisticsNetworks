@@ -26,7 +26,7 @@ public class WrenchHudOverlay {
             InputConstants.KEY_H,
             "key.categories.logisticsnetworks");
 
-    @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
     public static class ModEvents {
         @SubscribeEvent
         public static void registerKeys(RegisterKeyMappingsEvent event) {
