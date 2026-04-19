@@ -363,6 +363,7 @@
   "gui.logisticsnetworks.node.tip.batch": "Items moved per operation",
   "gui.logisticsnetworks.node.tip.delay": "Ticks between operations",
   "gui.logisticsnetworks.node.channel_name.hint": "Channel name...",
+  "gui.logisticsnetworks.node.channel_name.set_tooltip": "Double click to name channel",
   "advancement.logisticsnetworks.root.title": "Logistics Networks",
   "advancement.logisticsnetworks.root.description": "Hold 'G' over items for guide",
 

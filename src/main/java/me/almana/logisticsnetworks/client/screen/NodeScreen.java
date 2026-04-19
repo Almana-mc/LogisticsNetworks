@@ -385,10 +385,14 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (!channelNameEditing) {
             for (int i = 0; i < 9; i++) {
                 ChannelData ch = node.getChannel(i);
-                if (ch != null && !ch.getName().isEmpty()) {
+                if (ch != null) {
                     int tabX = leftPos + 10 + i * 26;
                     if (mx >= tabX && mx <= tabX + 24 && my >= topPos + 14 && my <= topPos + 26) {
-                        hoveredChannelName = Component.literal(ch.getName());
+                        if (!ch.getName().isEmpty()) {
+                            hoveredChannelName = Component.literal(ch.getName());
+                        } else {
+                            hoveredChannelName = Component.translatable("gui.logisticsnetworks.node.channel_name.set_tooltip");
+                        }
                     }
                 }
             }

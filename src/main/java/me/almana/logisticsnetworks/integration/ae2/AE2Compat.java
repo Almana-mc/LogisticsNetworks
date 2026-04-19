@@ -5,6 +5,7 @@ import net.minecraft.core.GlobalPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
@@ -66,6 +67,16 @@ public final class AE2Compat {
         return AE2StorageHelper.extractItems(level, linkPos, pattern, amount, player);
     }
 
+    public static long countAvailableByItem(ServerLevel level, GlobalPos linkPos, Item target) {
+        if (!isLoaded()) return 0;
+        return AE2StorageHelper.countAvailableByItem(level, linkPos, target);
+    }
+
+    public static int extractItemsByItem(ServerLevel level, GlobalPos linkPos, Item target, int amount, ServerPlayer player) {
+        if (!isLoaded()) return 0;
+        return AE2StorageHelper.extractItemsByItem(level, linkPos, target, amount, player);
+    }
+
     public static void registerLinkable() {
         if (!isLoaded()) return;
         AE2StorageHelper.registerWrenchLinkable();
@@ -104,18 +115,37 @@ public final class AE2Compat {
     public static boolean hasCombinedStock(Inventory inventory, ItemStack pattern, int needed,
                                            int protectedSlot, @Nullable GlobalPos ae2Link,
                                            @Nullable ServerLevel level) {
+        return hasCombinedStock(inventory, pattern, needed, protectedSlot, ae2Link, level, false);
+    }
+
+    public static boolean hasCombinedStock(Inventory inventory, ItemStack pattern, int needed,
+                                           int protectedSlot, @Nullable GlobalPos ae2Link,
+                                           @Nullable ServerLevel level, boolean looseMatch) {
         int invCount = countInInventory(inventory, pattern, protectedSlot);
         if (invCount >= needed) return true;
         if (ae2Link == null || level == null) return false;
-        return invCount + countAvailable(level, ae2Link, pattern) >= needed;
+        long aeCount = looseMatch
+                ? countAvailableByItem(level, ae2Link, pattern.getItem())
+                : countAvailable(level, ae2Link, pattern);
+        return invCount + aeCount >= needed;
     }
 
     public static void consumeCombined(Inventory inventory, ItemStack pattern, int amount,
                                        int protectedSlot, @Nullable GlobalPos ae2Link,
                                        @Nullable ServerPlayer player) {
+        consumeCombined(inventory, pattern, amount, protectedSlot, ae2Link, player, false);
+    }
+
+    public static void consumeCombined(Inventory inventory, ItemStack pattern, int amount,
+                                       int protectedSlot, @Nullable GlobalPos ae2Link,
+                                       @Nullable ServerPlayer player, boolean looseMatch) {
         int remaining = consumeFromInventory(inventory, pattern, amount, protectedSlot);
         if (remaining > 0 && ae2Link != null && player != null && player.level() instanceof ServerLevel sl) {
-            extractItems(sl, ae2Link, pattern, remaining, player);
+            if (looseMatch) {
+                extractItemsByItem(sl, ae2Link, pattern.getItem(), remaining, player);
+            } else {
+                extractItems(sl, ae2Link, pattern, remaining, player);
+            }
         }
     }
 }
