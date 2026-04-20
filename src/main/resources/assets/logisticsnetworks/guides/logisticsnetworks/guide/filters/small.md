@@ -22,6 +22,8 @@ Any resource whose item id or fluid id is in the filter's entry list. Matching i
 - Put any item or fluid bucket into an entry slot to add it to the list. Remove it to take it off the list.
 - Empty entry slots are ignored. A filter with zero entries matches nothing in Whitelist mode and everything in Blacklist mode.
 
+Each entry has a hidden **Detail** page with per-entry options — match by tag, override batch size, set a stock threshold, add NBT rules, restrict to specific inventory slots. See [Advanced Filtering](advanced-filtering.md).
+
 ## Whitelist vs Blacklist
 
 - **Whitelist** — only the 9 listed entries are allowed to move through this channel.

@@ -21,6 +21,8 @@ Any resource whose item id or fluid id is in the filter's entry list. Matching i
 - Right-click the filter in-hand to open the menu.
 - Empty slots are ignored.
 
+Each entry has a hidden **Detail** page with per-entry options — see [Advanced Filtering](advanced-filtering.md).
+
 ## Whitelist vs Blacklist
 
 - **Whitelist** — only the listed entries are allowed through.
