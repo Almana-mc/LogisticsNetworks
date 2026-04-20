@@ -404,6 +404,7 @@
   "message.logisticsnetworks.ae2.linked": "Linked wrench to ME Network at [%s, %s, %s]",
   "message.logisticsnetworks.ae2.unlinked": "Unlinked wrench from ME Network",
   "gui.logisticsnetworks.node.search": "Search items\u2026",
+  "gui.logisticsnetworks.node.docs": "Docs",
   "gui.logisticsnetworks.node.tweaks": "Tweaks",
   "gui.logisticsnetworks.node.tweaks.theme": "Theme",
   "gui.logisticsnetworks.node.tweaks.density": "Density",
