@@ -10,7 +10,9 @@ import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.data.RedstoneMode;
 
+import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
+import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -32,6 +34,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -261,13 +264,42 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private boolean tweaksOpen = false;
 
     private int tweaksFabX() { return leftPos + GUI_WIDTH - 56; }
-    private int tweaksFabY() { return topPos + INV_Y - 38; }
+    private int tweaksFabY() { return topPos + INV_Y - 36; }
     private int tweaksFabW() { return 48; }
     private int tweaksFabH() { return 10; }
 
     private boolean isInTweaksFab(double mx, double my) {
         return mx >= tweaksFabX() && mx <= tweaksFabX() + tweaksFabW()
                 && my >= tweaksFabY() && my <= tweaksFabY() + tweaksFabH();
+    }
+
+    private int docsFabX() { return tweaksFabX() - (docsFabW() + 6); }
+    private int docsFabY() { return tweaksFabY(); }
+    private int docsFabW() { return 38; }
+    private int docsFabH() { return tweaksFabH(); }
+
+    private boolean isInDocsFab(double mx, double my) {
+        return mx >= docsFabX() && mx <= docsFabX() + docsFabW()
+                && my >= docsFabY() && my <= docsFabY() + docsFabH();
+    }
+
+    private void renderDocsFab(GuiGraphics g, int mx, int my) {
+        if (currentPage != Page.CHANNEL_CONFIG) return;
+        int fx = docsFabX();
+        int fy = docsFabY();
+        int fw = docsFabW();
+        int fh = docsFabH();
+        boolean hovered = !tweaksOpen && isInDocsFab(mx, my);
+        String label = tr("gui.logisticsnetworks.node.docs");
+        Theme t = theme();
+        int bg = hovered ? t.surface() : t.surface2();
+        int border = hovered ? t.accent() : t.borderStrong();
+        ThemePaint.roundRect(g, fx, fy, fw, fh, fh / 2, bg, t.sharpCorners());
+        ThemePaint.roundOutline(g, fx, fy, fw, fh, fh / 2, border, t.sharpCorners());
+        int gx = fx + 4;
+        int gy = fy + fh / 2 - 1;
+        g.fill(gx, gy, gx + 3, gy + 1, t.text());
+        g.drawString(font, label, fx + 10, fy + 1, t.text(), false);
     }
 
     private void renderTweaksFab(GuiGraphics g, int mx, int my) {
@@ -390,6 +422,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         renderPlayerSlots(g);
 
+        renderDocsFab(g, mx, my);
         renderTweaksFab(g, mx, my);
     }
 
@@ -903,6 +936,13 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     public boolean mouseClicked(double mx, double my, int btn) {
         if (tweaksOpen) {
             if (btn == 0) return handleTweaksClick(mx, my);
+            return true;
+        }
+        if (currentPage == Page.CHANNEL_CONFIG && btn == 0 && isInDocsFab(mx, my)) {
+            if (minecraft != null && minecraft.player != null) {
+                GuideMeCompat.openGuide(minecraft.player,
+                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "guide"));
+            }
             return true;
         }
         if (currentPage == Page.CHANNEL_CONFIG && btn == 0 && isInTweaksFab(mx, my)) {

@@ -90,29 +90,53 @@ public class TransferEngine {
 
         IItemHandler findItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
             if (dir != null) return getItemHandler(level, pos, dir);
+            List<IItemHandler> found = new ArrayList<>(6);
             for (Direction d : Direction.values()) {
                 IItemHandler h = getItemHandler(level, pos, d);
-                if (h != null) return h;
+                if (h == null) continue;
+                boolean dup = false;
+                for (IItemHandler existing : found) {
+                    if (existing == h) { dup = true; break; }
+                }
+                if (!dup) found.add(h);
             }
-            return null;
+            if (found.isEmpty()) return null;
+            if (found.size() == 1) return found.get(0);
+            return new CombinedItemHandler(found.toArray(new IItemHandler[0]));
         }
 
         IFluidHandler findFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
             if (dir != null) return getFluidHandler(level, pos, dir);
+            List<IFluidHandler> found = new ArrayList<>(6);
             for (Direction d : Direction.values()) {
                 IFluidHandler h = getFluidHandler(level, pos, d);
-                if (h != null) return h;
+                if (h == null) continue;
+                boolean dup = false;
+                for (IFluidHandler existing : found) {
+                    if (existing == h) { dup = true; break; }
+                }
+                if (!dup) found.add(h);
             }
-            return null;
+            if (found.isEmpty()) return null;
+            if (found.size() == 1) return found.get(0);
+            return new CombinedFluidHandler(found.toArray(new IFluidHandler[0]));
         }
 
         IEnergyStorage findEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
             if (dir != null) return getEnergyHandler(level, pos, dir);
+            List<IEnergyStorage> found = new ArrayList<>(6);
             for (Direction d : Direction.values()) {
                 IEnergyStorage h = getEnergyHandler(level, pos, d);
-                if (h != null) return h;
+                if (h == null) continue;
+                boolean dup = false;
+                for (IEnergyStorage existing : found) {
+                    if (existing == h) { dup = true; break; }
+                }
+                if (!dup) found.add(h);
             }
-            return null;
+            if (found.isEmpty()) return null;
+            if (found.size() == 1) return found.get(0);
+            return new CombinedEnergyStorage(found.toArray(new IEnergyStorage[0]));
         }
     }
 
@@ -1370,5 +1394,242 @@ public class TransferEngine {
             }
         }
         return false;
+    }
+
+    private static final class CombinedItemHandler implements IItemHandler {
+        private final IItemHandler[] handlers;
+        private final int[] slotOffsets;
+        private final int totalSlots;
+
+        CombinedItemHandler(IItemHandler[] handlers) {
+            this.handlers = handlers;
+            this.slotOffsets = new int[handlers.length];
+            int running = 0;
+            for (int i = 0; i < handlers.length; i++) {
+                slotOffsets[i] = running;
+                running += handlers[i].getSlots();
+            }
+            this.totalSlots = running;
+        }
+
+        private int handlerIndex(int slot) {
+            for (int i = handlers.length - 1; i >= 0; i--) {
+                if (slot >= slotOffsets[i]) return i;
+            }
+            return 0;
+        }
+
+        @Override
+        public int getSlots() {
+            return totalSlots;
+        }
+
+        @Override
+        public ItemStack getStackInSlot(int slot) {
+            if (slot < 0 || slot >= totalSlots) return ItemStack.EMPTY;
+            int i = handlerIndex(slot);
+            return handlers[i].getStackInSlot(slot - slotOffsets[i]);
+        }
+
+        @Override
+        public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+            if (slot < 0 || slot >= totalSlots) return stack;
+            int i = handlerIndex(slot);
+            return handlers[i].insertItem(slot - slotOffsets[i], stack, simulate);
+        }
+
+        @Override
+        public ItemStack extractItem(int slot, int amount, boolean simulate) {
+            if (slot < 0 || slot >= totalSlots) return ItemStack.EMPTY;
+            int i = handlerIndex(slot);
+            return handlers[i].extractItem(slot - slotOffsets[i], amount, simulate);
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            if (slot < 0 || slot >= totalSlots) return 0;
+            int i = handlerIndex(slot);
+            return handlers[i].getSlotLimit(slot - slotOffsets[i]);
+        }
+
+        @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            if (slot < 0 || slot >= totalSlots) return false;
+            int i = handlerIndex(slot);
+            return handlers[i].isItemValid(slot - slotOffsets[i], stack);
+        }
+    }
+
+    private static final class CombinedFluidHandler implements IFluidHandler {
+        private final IFluidHandler[] handlers;
+        private final int[] tankOffsets;
+        private final int totalTanks;
+
+        CombinedFluidHandler(IFluidHandler[] handlers) {
+            this.handlers = handlers;
+            this.tankOffsets = new int[handlers.length];
+            int running = 0;
+            for (int i = 0; i < handlers.length; i++) {
+                tankOffsets[i] = running;
+                running += handlers[i].getTanks();
+            }
+            this.totalTanks = running;
+        }
+
+        private int handlerIndex(int tank) {
+            for (int i = handlers.length - 1; i >= 0; i--) {
+                if (tank >= tankOffsets[i]) return i;
+            }
+            return 0;
+        }
+
+        @Override
+        public int getTanks() {
+            return totalTanks;
+        }
+
+        @Override
+        public FluidStack getFluidInTank(int tank) {
+            if (tank < 0 || tank >= totalTanks) return FluidStack.EMPTY;
+            int i = handlerIndex(tank);
+            return handlers[i].getFluidInTank(tank - tankOffsets[i]);
+        }
+
+        @Override
+        public int getTankCapacity(int tank) {
+            if (tank < 0 || tank >= totalTanks) return 0;
+            int i = handlerIndex(tank);
+            return handlers[i].getTankCapacity(tank - tankOffsets[i]);
+        }
+
+        @Override
+        public boolean isFluidValid(int tank, FluidStack stack) {
+            if (tank < 0 || tank >= totalTanks) return false;
+            int i = handlerIndex(tank);
+            return handlers[i].isFluidValid(tank - tankOffsets[i], stack);
+        }
+
+        @Override
+        public int fill(FluidStack resource, FluidAction action) {
+            if (resource.isEmpty()) return 0;
+            int remaining = resource.getAmount();
+            int filled = 0;
+            for (IFluidHandler h : handlers) {
+                if (remaining <= 0) break;
+                int accepted = h.fill(resource.copyWithAmount(remaining), action);
+                if (accepted > 0) {
+                    filled += accepted;
+                    remaining -= accepted;
+                }
+            }
+            return filled;
+        }
+
+        @Override
+        public FluidStack drain(FluidStack resource, FluidAction action) {
+            if (resource.isEmpty()) return FluidStack.EMPTY;
+            int remaining = resource.getAmount();
+            int totalAmount = 0;
+            FluidStack template = FluidStack.EMPTY;
+            for (IFluidHandler h : handlers) {
+                if (remaining <= 0) break;
+                FluidStack drained = h.drain(resource.copyWithAmount(remaining), action);
+                if (drained.isEmpty()) continue;
+                if (template.isEmpty()) template = drained;
+                totalAmount += drained.getAmount();
+                remaining -= drained.getAmount();
+            }
+            return template.isEmpty() ? FluidStack.EMPTY : template.copyWithAmount(totalAmount);
+        }
+
+        @Override
+        public FluidStack drain(int maxDrain, FluidAction action) {
+            if (maxDrain <= 0) return FluidStack.EMPTY;
+            int remaining = maxDrain;
+            int totalAmount = 0;
+            FluidStack template = FluidStack.EMPTY;
+            for (IFluidHandler h : handlers) {
+                if (remaining <= 0) break;
+                FluidStack drained;
+                if (template.isEmpty()) {
+                    drained = h.drain(remaining, action);
+                } else {
+                    drained = h.drain(template.copyWithAmount(remaining), action);
+                }
+                if (drained.isEmpty()) continue;
+                if (template.isEmpty()) template = drained;
+                totalAmount += drained.getAmount();
+                remaining -= drained.getAmount();
+            }
+            return template.isEmpty() ? FluidStack.EMPTY : template.copyWithAmount(totalAmount);
+        }
+    }
+
+    private static final class CombinedEnergyStorage implements IEnergyStorage {
+        private final IEnergyStorage[] handlers;
+
+        CombinedEnergyStorage(IEnergyStorage[] handlers) {
+            this.handlers = handlers;
+        }
+
+        @Override
+        public int receiveEnergy(int maxReceive, boolean simulate) {
+            if (maxReceive <= 0) return 0;
+            int remaining = maxReceive;
+            int total = 0;
+            for (IEnergyStorage h : handlers) {
+                if (remaining <= 0) break;
+                if (!h.canReceive()) continue;
+                int accepted = h.receiveEnergy(remaining, simulate);
+                if (accepted > 0) {
+                    total += accepted;
+                    remaining -= accepted;
+                }
+            }
+            return total;
+        }
+
+        @Override
+        public int extractEnergy(int maxExtract, boolean simulate) {
+            if (maxExtract <= 0) return 0;
+            int remaining = maxExtract;
+            int total = 0;
+            for (IEnergyStorage h : handlers) {
+                if (remaining <= 0) break;
+                if (!h.canExtract()) continue;
+                int extracted = h.extractEnergy(remaining, simulate);
+                if (extracted > 0) {
+                    total += extracted;
+                    remaining -= extracted;
+                }
+            }
+            return total;
+        }
+
+        @Override
+        public int getEnergyStored() {
+            long sum = 0;
+            for (IEnergyStorage h : handlers) sum += h.getEnergyStored();
+            return sum > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sum;
+        }
+
+        @Override
+        public int getMaxEnergyStored() {
+            long sum = 0;
+            for (IEnergyStorage h : handlers) sum += h.getMaxEnergyStored();
+            return sum > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sum;
+        }
+
+        @Override
+        public boolean canExtract() {
+            for (IEnergyStorage h : handlers) if (h.canExtract()) return true;
+            return false;
+        }
+
+        @Override
+        public boolean canReceive() {
+            for (IEnergyStorage h : handlers) if (h.canReceive()) return true;
+            return false;
+        }
     }
 }

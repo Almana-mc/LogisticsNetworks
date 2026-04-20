@@ -40,11 +40,90 @@ public final class ChemicalTransferHelper {
     public static IChemicalHandler getHandler(ServerLevel level, BlockPos pos, @Nullable Direction side) {
         if (side != null)
             return level.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.block(), pos, side);
+        List<IChemicalHandler> found = new ArrayList<>(6);
         for (Direction d : Direction.values()) {
             IChemicalHandler h = level.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.block(), pos, d);
-            if (h != null) return h;
+            if (h == null) continue;
+            boolean dup = false;
+            for (IChemicalHandler existing : found) {
+                if (existing == h) { dup = true; break; }
+            }
+            if (!dup) found.add(h);
         }
-        return null;
+        if (found.isEmpty()) return null;
+        if (found.size() == 1) return found.get(0);
+        return new CombinedChemicalHandler(found.toArray(new IChemicalHandler[0]));
+    }
+
+    private static final class CombinedChemicalHandler implements IChemicalHandler {
+        private final IChemicalHandler[] handlers;
+        private final int[] tankOffsets;
+        private final int totalTanks;
+
+        CombinedChemicalHandler(IChemicalHandler[] handlers) {
+            this.handlers = handlers;
+            this.tankOffsets = new int[handlers.length];
+            int running = 0;
+            for (int i = 0; i < handlers.length; i++) {
+                tankOffsets[i] = running;
+                running += handlers[i].getChemicalTanks();
+            }
+            this.totalTanks = running;
+        }
+
+        private int handlerIndex(int tank) {
+            for (int i = handlers.length - 1; i >= 0; i--) {
+                if (tank >= tankOffsets[i]) return i;
+            }
+            return 0;
+        }
+
+        @Override
+        public int getChemicalTanks() {
+            return totalTanks;
+        }
+
+        @Override
+        public ChemicalStack getChemicalInTank(int tank) {
+            if (tank < 0 || tank >= totalTanks) return ChemicalStack.EMPTY;
+            int i = handlerIndex(tank);
+            return handlers[i].getChemicalInTank(tank - tankOffsets[i]);
+        }
+
+        @Override
+        public void setChemicalInTank(int tank, ChemicalStack stack) {
+            if (tank < 0 || tank >= totalTanks) return;
+            int i = handlerIndex(tank);
+            handlers[i].setChemicalInTank(tank - tankOffsets[i], stack);
+        }
+
+        @Override
+        public long getChemicalTankCapacity(int tank) {
+            if (tank < 0 || tank >= totalTanks) return 0;
+            int i = handlerIndex(tank);
+            return handlers[i].getChemicalTankCapacity(tank - tankOffsets[i]);
+        }
+
+        @Override
+        public boolean isValid(int tank, ChemicalStack stack) {
+            if (tank < 0 || tank >= totalTanks) return false;
+            int i = handlerIndex(tank);
+            return handlers[i].isValid(tank - tankOffsets[i], stack);
+        }
+
+        @Override
+        public ChemicalStack insertChemical(int tank, ChemicalStack stack, Action action) {
+            if (tank < 0 || tank >= totalTanks) return stack;
+            int i = handlerIndex(tank);
+            return handlers[i].insertChemical(tank - tankOffsets[i], stack, action);
+        }
+
+        @Override
+        public ChemicalStack extractChemical(int tank, long amount, Action action) {
+            if (tank < 0 || tank >= totalTanks) return ChemicalStack.EMPTY;
+            int i = handlerIndex(tank);
+            return handlers[i].extractChemical(tank - tankOffsets[i], amount, action);
+        }
     }
 
     public static boolean hasHandler(ServerLevel level, BlockPos pos) {

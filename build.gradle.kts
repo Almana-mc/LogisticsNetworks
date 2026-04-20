@@ -26,6 +26,7 @@ val ars_nouveau_version: String by project
 val ae2_version: String by project
 val ftb_teams_version: String by project
 val emi_version: String by project
+val guideme_version: String by project
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -104,6 +105,9 @@ dependencies {
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
 
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+
+    compileOnly("org.appliedenergistics:guideme:${guideme_version}:api")
+    runtimeOnly("org.appliedenergistics:guideme:${guideme_version}")
 
     compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftb_teams_version}") {
         isTransitive = false
