@@ -538,6 +538,7 @@ public class TransferEngine {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitMb;
         boolean anyReachable = false;
+        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
 
         for (ImportTarget target : targets) {
             if (remaining <= 0)
@@ -562,7 +563,7 @@ public class TransferEngine {
             int filled = executeFluidMove(sourceHandler, targetHandler, remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel.getFilterItems(), target.channel.getFilterMode(),
-                    sourceLevel.registryAccess());
+                    sourceLevel.registryAccess(), filterReadCache);
             if (filled > 0)
                 remaining -= filled;
         }
@@ -640,6 +641,7 @@ public class TransferEngine {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
+        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
 
         for (ImportTarget target : targets) {
             if (remaining <= 0)
@@ -662,7 +664,8 @@ public class TransferEngine {
                     targetLevel, targetPos, target.channel().getIoDirection(),
                     remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
-                    target.channel().getFilterItems(), target.channel().getFilterMode());
+                    target.channel().getFilterItems(), target.channel().getFilterMode(),
+                    filterReadCache);
             if (Config.debugMode)
                 LOGGER.debug("[Chemical] Transfer {} -> {}: moved={}, batch={}",
                         sourcePos, targetPos, moved, remaining);
@@ -1193,10 +1196,10 @@ public class TransferEngine {
     private static int executeFluidMove(IFluidHandler source, IFluidHandler target, int limitMb,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            HolderLookup.Provider provider) {
+            HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache) {
 
         int remaining = limitMb;
-        AmountConstraints amountConstraints = collectAmountConstraints(exportFilters, importFilters);
+        AmountConstraints amountConstraints = collectAmountConstraints(exportFilters, importFilters, filterReadCache);
 
         for (int tank = 0; tank < source.getTanks() && remaining > 0; tank++) {
             FluidStack tankFluid = source.getFluidInTank(tank);
@@ -1212,16 +1215,17 @@ public class TransferEngine {
                 continue;
 
             if (provider != null) {
-                if (!FilterLogic.matchesFluid(exportFilters, exportFilterMode, simulated, provider))
+                if (!FilterLogic.matchesFluid(exportFilters, exportFilterMode, simulated, provider, filterReadCache))
                     continue;
-                if (!FilterLogic.matchesFluid(importFilters, importFilterMode, simulated, provider))
+                if (!FilterLogic.matchesFluid(importFilters, importFilterMode, simulated, provider, filterReadCache))
                     continue;
             }
 
             int allowedByAmount = getAllowedTransferByFluidAmountConstraints(source, target, simulated,
                     amountConstraints);
             if (amountConstraints.hasPerEntryAmounts) {
-                int perEntry = getPerEntryFluidAmountLimit(simulated, exportFilters, importFilters, source, target);
+                int perEntry = getPerEntryFluidAmountLimit(simulated, exportFilters, importFilters, source, target,
+                        filterReadCache);
                 if (perEntry >= 0) {
                     allowedByAmount = Math.min(allowedByAmount, perEntry);
                 }
@@ -1230,7 +1234,7 @@ public class TransferEngine {
                 continue;
 
             int request = Math.min(simulated.getAmount(), Math.min(remaining, allowedByAmount));
-            int perEntryBatch = getPerEntryFluidBatchLimit(simulated, exportFilters, importFilters);
+            int perEntryBatch = getPerEntryFluidBatchLimit(simulated, exportFilters, importFilters, filterReadCache);
             if (perEntryBatch > 0) {
                 request = Math.min(request, perEntryBatch);
             }
@@ -1238,12 +1242,7 @@ public class TransferEngine {
             if (accepted <= 0)
                 continue;
 
-            int toMove = Math.min(accepted,
-                    source.drain(simulated.copyWithAmount(accepted), IFluidHandler.FluidAction.SIMULATE).getAmount());
-            if (toMove <= 0)
-                continue;
-
-            FluidStack drained = source.drain(simulated.copyWithAmount(toMove), IFluidHandler.FluidAction.EXECUTE);
+            FluidStack drained = source.drain(simulated.copyWithAmount(accepted), IFluidHandler.FluidAction.EXECUTE);
             if (drained.isEmpty())
                 continue;
 
@@ -1295,6 +1294,11 @@ public class TransferEngine {
     }
 
     private static AmountConstraints collectAmountConstraints(ItemStack[] exportFilters, ItemStack[] importFilters) {
+        return collectAmountConstraints(exportFilters, importFilters, null);
+    }
+
+    private static AmountConstraints collectAmountConstraints(ItemStack[] exportFilters, ItemStack[] importFilters,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
         int exportThreshold = 0;
         boolean hasExportThreshold = false;
         boolean hasPerEntryAmounts = false;
@@ -1305,7 +1309,7 @@ public class TransferEngine {
                     hasExportThreshold = true;
                     exportThreshold = Math.max(exportThreshold, AmountFilterData.getAmount(filter));
                 }
-                if (FilterItemData.hasAnyAmountEntries(filter)) {
+                if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
                     hasPerEntryAmounts = true;
                 }
             }
@@ -1320,7 +1324,7 @@ public class TransferEngine {
                     hasImportThreshold = true;
                     importThreshold = Math.min(importThreshold, AmountFilterData.getAmount(filter));
                 }
-                if (FilterItemData.hasAnyAmountEntries(filter)) {
+                if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
                     hasPerEntryAmounts = true;
                 }
             }
@@ -1439,12 +1443,13 @@ public class TransferEngine {
     }
 
     private static int getPerEntryFluidAmountLimit(FluidStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, IFluidHandler source, IFluidHandler target) {
+            ItemStack[] importFilters, IFluidHandler source, IFluidHandler target,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
         int allowed = Integer.MAX_VALUE;
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null);
+                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
                 if (threshold > 0) {
                     int sourceAmount = countMatchingFluid(source, candidate);
                     int exportCap = sourceAmount - threshold;
@@ -1457,7 +1462,7 @@ public class TransferEngine {
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null);
+                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
                 if (threshold > 0) {
                     int targetAmount = countMatchingFluid(target, candidate);
                     int importCap = threshold - targetAmount;
@@ -1472,12 +1477,12 @@ public class TransferEngine {
     }
 
     private static int getPerEntryFluidBatchLimit(FluidStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters) {
+            ItemStack[] importFilters, @Nullable FilterItemData.ReadCache filterReadCache) {
         int limit = Integer.MAX_VALUE;
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate);
+                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate, filterReadCache);
                 if (batch > 0) {
                     limit = Math.min(limit, batch);
                 }
@@ -1486,7 +1491,7 @@ public class TransferEngine {
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate);
+                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate, filterReadCache);
                 if (batch > 0) {
                     limit = Math.min(limit, batch);
                 }

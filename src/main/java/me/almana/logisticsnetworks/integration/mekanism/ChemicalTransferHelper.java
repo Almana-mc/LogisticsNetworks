@@ -132,7 +132,8 @@ public final class ChemicalTransferHelper {
     public static long transferBetween(ServerLevel sourceLevel, BlockPos sourcePos, @Nullable Direction sourceSide,
             ServerLevel targetLevel, BlockPos targetPos, @Nullable Direction targetSide, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
-            ItemStack[] importFilters, FilterMode importFilterMode) {
+            ItemStack[] importFilters, FilterMode importFilterMode,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
         IChemicalHandler source = getHandler(sourceLevel, sourcePos, sourceSide);
         if (source == null) {
             if (Config.debugMode)
@@ -149,12 +150,13 @@ public final class ChemicalTransferHelper {
             LOGGER.debug("[Chemical] Transferring {} -> {}, limit={}, srcTanks={}, tgtTanks={}",
                     sourcePos, targetPos, limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
-                importFilters, importFilterMode);
+                importFilters, importFilterMode, filterReadCache);
     }
 
     private static long executeChemicalMove(IChemicalHandler source, IChemicalHandler target, long limitAmount,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
-            ItemStack[] importFilters, FilterMode importFilterMode) {
+            ItemStack[] importFilters, FilterMode importFilterMode,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
         long remaining = limitAmount;
 
         for (int tank = 0; tank < source.getChemicalTanks(); tank++) {
@@ -169,15 +171,16 @@ public final class ChemicalTransferHelper {
 
             String chemId = getChemicalId(tankChemical);
             if (chemId != null) {
-                if (!FilterLogic.matchesChemical(exportFilters, exportFilterMode, chemId))
+                if (!FilterLogic.matchesChemical(exportFilters, exportFilterMode, chemId, filterReadCache))
                     continue;
-                if (!FilterLogic.matchesChemical(importFilters, importFilterMode, chemId))
+                if (!FilterLogic.matchesChemical(importFilters, importFilterMode, chemId, filterReadCache))
                     continue;
             }
 
             long allowedByAmount = remaining;
             if (chemId != null) {
-                long stockAllowed = getPerEntryChemicalAmountLimit(chemId, exportFilters, importFilters, source, target);
+                long stockAllowed = getPerEntryChemicalAmountLimit(chemId, exportFilters, importFilters, source, target,
+                        filterReadCache);
                 if (stockAllowed == 0) continue;
                 if (stockAllowed > 0) allowedByAmount = Math.min(allowedByAmount, stockAllowed);
             }
@@ -193,7 +196,7 @@ public final class ChemicalTransferHelper {
 
             long request = Math.min(simulated.getAmount(), allowedByAmount);
             if (chemId != null) {
-                int perEntryBatch = getPerEntryChemicalBatchLimit(chemId, exportFilters, importFilters);
+                int perEntryBatch = getPerEntryChemicalBatchLimit(chemId, exportFilters, importFilters, filterReadCache);
                 if (perEntryBatch > 0) {
                     request = Math.min(request, perEntryBatch);
                 }
@@ -272,12 +275,13 @@ public final class ChemicalTransferHelper {
     }
 
     private static long getPerEntryChemicalAmountLimit(String chemicalId, ItemStack[] exportFilters,
-            ItemStack[] importFilters, IChemicalHandler source, IChemicalHandler target) {
+            ItemStack[] importFilters, IChemicalHandler source, IChemicalHandler target,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
         long allowed = Long.MAX_VALUE;
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                int threshold = FilterItemData.getChemicalAmountThresholdFull(filter, chemicalId);
+                int threshold = FilterItemData.getChemicalAmountThresholdFull(filter, chemicalId, filterReadCache);
                 if (threshold > 0) {
                     long sourceAmount = countMatchingChemical(source, chemicalId);
                     long exportCap = sourceAmount - threshold;
@@ -289,7 +293,7 @@ public final class ChemicalTransferHelper {
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                int threshold = FilterItemData.getChemicalAmountThresholdFull(filter, chemicalId);
+                int threshold = FilterItemData.getChemicalAmountThresholdFull(filter, chemicalId, filterReadCache);
                 if (threshold > 0) {
                     long targetAmount = countMatchingChemical(target, chemicalId);
                     long importCap = threshold - targetAmount;
@@ -303,12 +307,12 @@ public final class ChemicalTransferHelper {
     }
 
     private static int getPerEntryChemicalBatchLimit(String chemicalId, ItemStack[] exportFilters,
-            ItemStack[] importFilters) {
+            ItemStack[] importFilters, @Nullable FilterItemData.ReadCache filterReadCache) {
         int limit = Integer.MAX_VALUE;
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                int batch = FilterItemData.getChemicalBatchLimitFull(filter, chemicalId);
+                int batch = FilterItemData.getChemicalBatchLimitFull(filter, chemicalId, filterReadCache);
                 if (batch > 0) {
                     limit = Math.min(limit, batch);
                 }
@@ -317,7 +321,7 @@ public final class ChemicalTransferHelper {
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                int batch = FilterItemData.getChemicalBatchLimitFull(filter, chemicalId);
+                int batch = FilterItemData.getChemicalBatchLimitFull(filter, chemicalId, filterReadCache);
                 if (batch > 0) {
                     limit = Math.min(limit, batch);
                 }
