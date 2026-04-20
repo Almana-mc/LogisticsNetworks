@@ -129,50 +129,6 @@ public class TransferEngine {
             boolean hasPerEntryAmounts) {
     }
 
-    private record RecipeEntry(ItemStack item, String tag, int batch) {
-    }
-
-    private record RecipeCursorResult(int moved, int entryIndex, int entryRemaining, boolean completed) {
-    }
-
-    private static List<RecipeEntry> buildRecipe(ItemStack[] exportFilters, HolderLookup.Provider provider) {
-        List<RecipeEntry> recipe = new ArrayList<>();
-        if (exportFilters == null)
-            return recipe;
-
-        for (ItemStack filter : exportFilters) {
-            if (!FilterItemData.isFilterItem(filter))
-                continue;
-            int cap = FilterItemData.getCapacity(filter);
-            for (int slot = 0; slot < cap; slot++) {
-                int batch = FilterItemData.getEntryBatch(filter, slot);
-                if (batch <= 0)
-                    continue;
-
-                String tag = FilterItemData.getEntryTag(filter, slot);
-                if (tag != null) {
-                    recipe.add(new RecipeEntry(ItemStack.EMPTY, tag, batch));
-                    continue;
-                }
-
-                ItemStack entry = FilterItemData.getEntry(filter, slot, provider);
-                if (!entry.isEmpty()) {
-                    recipe.add(new RecipeEntry(entry, null, batch));
-                }
-            }
-        }
-        return recipe;
-    }
-
-    private static boolean matchesRecipeEntry(RecipeEntry entry, ItemStack candidate) {
-        if (entry.tag != null) {
-            return candidate.getTags()
-                    .map(t -> t.location().toString())
-                    .anyMatch(entry.tag::equals);
-        }
-        return !entry.item.isEmpty() && ItemStack.isSameItem(entry.item, candidate);
-    }
-
     public static boolean processNetwork(LogisticsNetwork network, MinecraftServer server) {
         if (network == null || server == null)
             return false;
@@ -440,7 +396,7 @@ public class TransferEngine {
                         (a, b) -> Double.compare(b.node.distanceToSqr(sx, sy, sz), a.node.distanceToSqr(sx, sy, sz)));
                 return targets;
             }
-            case ROUND_ROBIN, RECIPE_ROBIN -> {
+            case ROUND_ROBIN -> {
                 int startIdx = sourceNode.getRoundRobinIndex(channelIndex) % targets.size();
                 if (startIdx == 0)
                     return targets;
@@ -510,18 +466,10 @@ public class TransferEngine {
         if (reachableTargets.isEmpty())
             return 0;
 
-        int moved;
-        if (exportChannel.getDistributionMode() == DistributionMode.RECIPE_ROBIN) {
-            moved = executeMoveRecipeWithCursor(sourceNode, channelIndex, sourceHandler,
-                    reachableTargets, batchLimit, exportFilters, exportChannel.getFilterMode(),
-                    sourceAllowedSlots, sourceLevel.registryAccess());
-        } else {
-            moved = executeMove(sourceHandler, reachableTargets, batchLimit,
-                    exportFilters, exportChannel.getFilterMode(),
-                    sourceAllowedSlots,
-                    sourceLevel.registryAccess());
-        }
-        return moved;
+        return executeMove(sourceHandler, reachableTargets, batchLimit,
+                exportFilters, exportChannel.getFilterMode(),
+                sourceAllowedSlots,
+                sourceLevel.registryAccess());
     }
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -928,166 +876,6 @@ public class TransferEngine {
             }
         }
         return limit - remaining;
-    }
-
-    private static RecipeCursorResult executeMoveRecipeToTargetWithCursor(IItemHandler source, ItemTransferTarget target,
-            int limit, List<RecipeEntry> recipe, boolean[] sourceAllowedSlots,
-            HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache,
-            int startEntryIndex, int startEntryRemaining) {
-
-        int totalMoved = 0;
-        int currentEntryIdx = startEntryIndex;
-        int currentRemaining = startEntryRemaining;
-
-        while (currentEntryIdx < recipe.size()) {
-            RecipeEntry entry = recipe.get(currentEntryIdx);
-
-            int wantToMove = Math.min(currentRemaining, limit - totalMoved);
-            if (wantToMove <= 0)
-                break;
-
-            int movedForEntry = 0;
-
-            for (int slot = 0; slot < source.getSlots() && movedForEntry < wantToMove; slot++) {
-                if (sourceAllowedSlots != null
-                        && (slot >= sourceAllowedSlots.length || !sourceAllowedSlots[slot])) {
-                    continue;
-                }
-
-                int needed = wantToMove - movedForEntry;
-                ItemStack extracted = source.extractItem(slot, needed, true);
-                if (extracted.isEmpty() || extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
-                    continue;
-                }
-
-                if (!matchesRecipeEntry(entry, extracted)) {
-                    continue;
-                }
-
-                if (provider != null && !FilterLogic.matchesItem(target.importFilters(),
-                        target.importFilterMode(), extracted, provider, null, filterReadCache)) {
-                    continue;
-                }
-
-                int toExtract = Math.min(extracted.getCount(), needed);
-
-                ItemStack simulatedInsert = extracted.copyWithCount(toExtract);
-                ItemStack simRemainder = insertItemWithAllowedSlots(
-                        target.handler(), simulatedInsert, true, target.allowedSlots());
-                int acceptableCount = toExtract - simRemainder.getCount();
-                if (acceptableCount <= 0)
-                    continue;
-
-                ItemStack toMove = source.extractItem(slot, acceptableCount, false);
-                if (toMove.isEmpty())
-                    continue;
-
-                ItemStack uninserted = insertItemWithAllowedSlots(
-                        target.handler(), toMove, false, target.allowedSlots());
-                int moved = toMove.getCount() - uninserted.getCount();
-
-                if (!uninserted.isEmpty()) {
-                    ItemStack stillLeft = source.insertItem(slot, uninserted, false);
-                    if (!stillLeft.isEmpty()) {
-                        for (int fb = 0; fb < source.getSlots() && !stillLeft.isEmpty(); fb++) {
-                            stillLeft = source.insertItem(fb, stillLeft, false);
-                        }
-                        if (!stillLeft.isEmpty()) {
-                            LOGGER.error(
-                                    "ITEM VOIDING PREVENTED in recipe robin: Could not return {} to source handler {}. "
-                                            + "Forcing back into target as last resort.",
-                                    stillLeft, source.getClass().getSimpleName());
-                            insertItemWithAllowedSlots(target.handler(), stillLeft, false, null);
-                        }
-                    }
-                }
-
-                movedForEntry += moved;
-            }
-
-            totalMoved += movedForEntry;
-            currentRemaining -= movedForEntry;
-
-            if (currentRemaining <= 0) {
-                currentEntryIdx++;
-                if (currentEntryIdx < recipe.size()) {
-                    currentRemaining = recipe.get(currentEntryIdx).batch();
-                } else {
-                    return new RecipeCursorResult(totalMoved, 0, 0, true);
-                }
-            } else {
-                break;
-            }
-        }
-
-        if (currentEntryIdx >= recipe.size()) {
-            return new RecipeCursorResult(totalMoved, 0, 0, true);
-        }
-
-        return new RecipeCursorResult(totalMoved, currentEntryIdx, currentRemaining, false);
-    }
-
-    private static int executeMoveRecipeWithCursor(
-            LogisticsNodeEntity sourceNode, int channelIndex,
-            IItemHandler source, List<ItemTransferTarget> targets, int limit,
-            ItemStack[] exportFilters, FilterMode exportFilterMode,
-            boolean[] sourceAllowedSlots, HolderLookup.Provider provider) {
-
-        List<RecipeEntry> recipe = buildRecipe(exportFilters, provider);
-
-        if (recipe.isEmpty()) {
-            return executeMove(source, targets, limit, exportFilters, exportFilterMode,
-                    sourceAllowedSlots, provider);
-        }
-
-        if (targets.isEmpty())
-            return 0;
-
-        int cursorEntry = sourceNode.getRecipeCursorEntry(channelIndex);
-        int cursorRemaining = sourceNode.getRecipeCursorRemaining(channelIndex);
-
-        if (cursorEntry >= recipe.size() || cursorEntry < 0) {
-            cursorEntry = 0;
-            cursorRemaining = 0;
-        }
-        if (cursorRemaining <= 0) {
-            cursorRemaining = recipe.get(cursorEntry).batch();
-        }
-
-        int totalMoved = 0;
-        int remaining = limit;
-        int targetsCompleted = 0;
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
-
-        for (int t = 0; t < targets.size() && remaining > 0; t++) {
-            ItemTransferTarget target = targets.get(t);
-
-            RecipeCursorResult result = executeMoveRecipeToTargetWithCursor(
-                    source, target, remaining, recipe,
-                    sourceAllowedSlots, provider, filterReadCache,
-                    cursorEntry, cursorRemaining);
-
-            totalMoved += result.moved();
-            remaining -= result.moved();
-
-            if (result.completed()) {
-                targetsCompleted++;
-                cursorEntry = 0;
-                cursorRemaining = recipe.get(0).batch();
-            } else {
-                cursorEntry = result.entryIndex();
-                cursorRemaining = result.entryRemaining();
-                break;
-            }
-        }
-
-        sourceNode.setRecipeCursor(channelIndex, cursorEntry, cursorRemaining);
-
-        if (targetsCompleted > 0) {
-            sourceNode.advanceRoundRobin(channelIndex, targets.size(), targetsCompleted);
-        }
-
-        return totalMoved;
     }
 
     private static ItemStack insertItemWithAllowedSlots(IItemHandler handler, ItemStack stack, boolean simulate,

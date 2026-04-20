@@ -788,7 +788,6 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         return switch (mode) {
             case PRIORITY -> Theme.Variant.INFO;
             case ROUND_ROBIN -> Theme.Variant.ACCENT;
-            case RECIPE_ROBIN -> Theme.Variant.INFO;
             case NEAREST_FIRST -> Theme.Variant.WARN;
             case FARTHEST_FIRST -> Theme.Variant.WARN;
         };

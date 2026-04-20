@@ -79,8 +79,6 @@ public class LogisticsNodeEntity extends Entity {
     private final long[] channelCooldowns = new long[CHANNEL_COUNT];
     private final int[] roundRobinIndex = new int[CHANNEL_COUNT];
     private final float[] backoffTicks = new float[CHANNEL_COUNT];
-    private final int[] recipeCursorEntry = new int[CHANNEL_COUNT];
-    private final int[] recipeCursorRemaining = new int[CHANNEL_COUNT];
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
@@ -405,42 +403,12 @@ public class LogisticsNodeEntity extends Entity {
         }
     }
 
-    public void advanceRoundRobin(int channelIndex, int targetCount, int steps) {
-        if (targetCount > 0 && steps > 0) {
-            roundRobinIndex[channelIndex] = (roundRobinIndex[channelIndex] + steps) % targetCount;
-        }
-    }
-
     public float getBackoffTicks(int channelIndex) {
         return backoffTicks[channelIndex];
     }
 
     public void setBackoffTicks(int channelIndex, float value) {
         backoffTicks[channelIndex] = value;
-    }
-
-    public int getRecipeCursorEntry(int channelIndex) {
-        if (channelIndex < 0 || channelIndex >= CHANNEL_COUNT) return 0;
-        return recipeCursorEntry[channelIndex];
-    }
-
-    public int getRecipeCursorRemaining(int channelIndex) {
-        if (channelIndex < 0 || channelIndex >= CHANNEL_COUNT) return 0;
-        return recipeCursorRemaining[channelIndex];
-    }
-
-    public void setRecipeCursor(int channelIndex, int entryIndex, int remaining) {
-        if (channelIndex >= 0 && channelIndex < CHANNEL_COUNT) {
-            recipeCursorEntry[channelIndex] = entryIndex;
-            recipeCursorRemaining[channelIndex] = remaining;
-        }
-    }
-
-    public void resetRecipeCursor(int channelIndex) {
-        if (channelIndex >= 0 && channelIndex < CHANNEL_COUNT) {
-            recipeCursorEntry[channelIndex] = 0;
-            recipeCursorRemaining[channelIndex] = 0;
-        }
     }
 
     public void dropUpgrades() {
