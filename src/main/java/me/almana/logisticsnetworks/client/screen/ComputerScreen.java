@@ -1421,15 +1421,12 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     private String formatPosition(SyncNetworkNodesPayload.NodeInfo nodeInfo) {
         String dimension = nodeInfo.dimension().getPath();
-        if (dimension.equals("overworld")) {
-            dimension = line("gui.logisticsnetworks.computer.dimension.overworld");
-        } else if (dimension.equals("the_nether")) {
-            dimension = line("gui.logisticsnetworks.computer.dimension.nether");
-        } else if (dimension.equals("the_end")) {
-            dimension = line("gui.logisticsnetworks.computer.dimension.end");
-        } else {
-            dimension = trimText(dimension.toUpperCase(Locale.ROOT), 10);
-        }
+        dimension = switch (dimension) {
+            case "overworld" -> line("gui.logisticsnetworks.computer.dimension.overworld");
+            case "the_nether" -> line("gui.logisticsnetworks.computer.dimension.nether");
+            case "the_end" -> line("gui.logisticsnetworks.computer.dimension.end");
+            default -> trimText(dimension.toUpperCase(Locale.ROOT), 10);
+        };
         return line("gui.logisticsnetworks.computer.position", dimension,
                 nodeInfo.attachedPos().getX(),
                 nodeInfo.attachedPos().getY(),

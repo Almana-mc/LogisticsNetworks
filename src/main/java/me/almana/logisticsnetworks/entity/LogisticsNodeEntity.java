@@ -28,7 +28,6 @@ import java.util.UUID;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.server.level.ServerLevel;
 import com.mojang.logging.LogUtils;
@@ -41,7 +40,6 @@ public class LogisticsNodeEntity extends Entity {
     public static final int UPGRADE_SLOT_COUNT = 4;
     public static final int CHANNEL_COUNT = 9;
 
-    // NBT Keys
     private static final String KEY_ATTACHED_POS = "AttachedPos";
     private static final String KEY_VALID = "Valid";
     private static final String KEY_NETWORK_ID = "NetworkId";
@@ -381,7 +379,7 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setUpgradeItem(int slot, ItemStack stack) {
         if (slot >= 0 && slot < UPGRADE_SLOT_COUNT) {
-            upgradeItems[slot] = (stack == null || stack.isEmpty()) ? ItemStack.EMPTY : stack.copyWithCount(1);
+            upgradeItems[slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
         }
     }
 
@@ -424,9 +422,6 @@ public class LogisticsNodeEntity extends Entity {
     public void dropFilters() {
         for (int channelIndex = 0; channelIndex < CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = channels[channelIndex];
-            if (channel == null) {
-                continue;
-            }
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                 ItemStack stack = channel.getFilterItem(slot);
                 if (!stack.isEmpty()) {

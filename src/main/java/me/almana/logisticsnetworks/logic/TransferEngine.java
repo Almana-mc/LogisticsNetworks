@@ -3,8 +3,6 @@ package me.almana.logisticsnetworks.logic;
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.*;
-import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.data.NodeRef;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.AmountFilterData;
 import me.almana.logisticsnetworks.filter.FilterItemData;
@@ -730,7 +728,6 @@ public class TransferEngine {
         }
         boolean hasNbtFilter = hasExportNbtFilter || hasAnyImportNbtFilter;
 
-        // Build amount constraint caches to avoid repeated full-inventory scans
         boolean anyAmountConstraints = false;
         for (ItemTransferTarget t : targets) {
             if (t.constraints().hasExportThreshold || t.constraints().hasImportThreshold
@@ -799,8 +796,7 @@ public class TransferEngine {
                     if (!anyAmountConstraints
                             || (!target.constraints().hasExportThreshold && !target.constraints().hasImportThreshold
                                     && !target.constraints().hasPerEntryAmounts)) {
-                        allowedByAmount = extracted.getCount(); // extracted.getCount() is bounded by 'remaining'
-                                                                // already
+                        allowedByAmount = extracted.getCount();
                     } else {
                         allowedByAmount = getAllowedTransferCached(extracted, target.constraints(),
                                 sourceItemCounts, targetItemCounts.get(targetIndex));
@@ -829,7 +825,6 @@ public class TransferEngine {
                         continue;
                     }
 
-                    // Simulate insertion first to determine how many the target can actually accept
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
                     ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), simulatedInsert, true,
                             target.allowedSlots());
@@ -848,10 +843,8 @@ public class TransferEngine {
                     int moved = toMove.getCount() - uninserted.getCount();
 
                     if (!uninserted.isEmpty()) {
-                        // Put back what couldn't be inserted
                         ItemStack stillLeft = source.insertItem(slot, uninserted, false);
                         if (!stillLeft.isEmpty()) {
-                            // Source rejected the put-back; try all source slots as a safety net
                             for (int fallback = 0; fallback < source.getSlots() && !stillLeft.isEmpty(); fallback++) {
                                 stillLeft = source.insertItem(fallback, stillLeft, false);
                             }
@@ -859,7 +852,6 @@ public class TransferEngine {
                                 LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source handler {}. " +
                                         "Forcing back into target as last resort.",
                                         stillLeft, source.getClass().getSimpleName());
-                                // Last resort: we cannot void items. Re-insert into target to undo.
                                 insertItemWithAllowedSlots(target.handler(), stillLeft, false, null);
                             }
                         }
@@ -882,9 +874,6 @@ public class TransferEngine {
                             batchMoved.merge(movedItem, moved, Integer::sum);
                         }
 
-                        // We successfully transferred an item to this target.
-                        // Break out of the slot loop to allow the next target in the Round Robin queue
-                        // to get a turn.
                         break;
                     }
                 }

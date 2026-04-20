@@ -5,6 +5,7 @@ import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.neoforge.NeoForgeTypes;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import net.minecraft.client.renderer.Rect2i;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 
@@ -16,7 +17,6 @@ import java.util.function.Consumer;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import mekanism.api.chemical.ChemicalStack;
-import mezz.jei.api.ingredients.IIngredientType;
 
 public class FilterGhostIngredientHandler implements IGhostIngredientHandler<FilterScreen> {
 
@@ -85,7 +85,7 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
 
     private List<Target<FluidStack>> buildFluidTargets(FilterScreen screen, FluidStack fluidStack) {
         int slotCount = screen.getGhostFilterSlotCount();
-        if (slotCount <= 0 || fluidStack == null || fluidStack.isEmpty()) {
+        if (slotCount <= 0 || fluidStack.isEmpty()) {
             return List.of();
         }
 
@@ -100,7 +100,7 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
 
     private List<Target<ChemicalStack>> buildChemicalTargets(FilterScreen screen, ChemicalStack chemStack) {
         int slotCount = screen.getGhostFilterSlotCount();
-        if (slotCount <= 0 || chemStack == null || chemStack.isEmpty()) {
+        if (slotCount <= 0 || chemStack.isEmpty()) {
             return List.of();
         }
 
@@ -114,7 +114,7 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
     }
 
     private List<Target<FluidStack>> buildSelectorFluidTarget(FilterScreen screen, FluidStack fluidStack) {
-        if (!screen.acceptsFluidSelectorGhostIngredient() || fluidStack == null || fluidStack.isEmpty()) {
+        if (!screen.acceptsFluidSelectorGhostIngredient() || fluidStack.isEmpty()) {
             return List.of();
         }
         return List.of(
@@ -150,13 +150,12 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
     }
 
     private List<Target<ChemicalStack>> buildSelectorChemicalTarget(FilterScreen screen, ChemicalStack chemStack) {
-        if (!screen.acceptsItemSelectorGhostIngredient() || chemStack == null || chemStack.isEmpty()) {
+        if (!screen.acceptsItemSelectorGhostIngredient() || chemStack.isEmpty()) {
             return List.of();
         }
         String id = ChemicalTransferHelper.getChemicalId(chemStack);
         List<String> tags = chemStack.getTags().map(t -> t.location().toString()).toList();
-        net.minecraft.network.chat.Component name = ChemicalTransferHelper
-                .getChemicalTextComponent(id);
+        Component name = ChemicalTransferHelper.getChemicalTextComponent(id);
         return List.of(new FilterTarget<>(screen.getSelectorGhostArea(),
                 ignored -> screen.setSelectorGhostChemical(id, tags, name)));
     }

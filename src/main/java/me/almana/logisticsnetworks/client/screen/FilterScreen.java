@@ -16,7 +16,6 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.util.Mth;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.tags.TagKey;
 
 import me.almana.logisticsnetworks.menu.FilterMenu;
@@ -29,7 +28,6 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -71,7 +69,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private static final int COL_BTN_HOVER = 0xFF3A3A3A;
     private static final int COL_BTN_BORDER = 0xFF4A4A4A;
 
-    // State
     private EditBox manualInputBox;
     private boolean isDropdownOpen = false;
     private int listScrollOffset = 0;
@@ -82,7 +79,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private boolean flushedTextOnClose = false;
     private boolean wasManualInputFocused = false;
 
-    // Sub-mode state
     private int tagEditSlot = -1;
     private int nbtEditSlot = -1;
     private List<String> cachedSlotTags = new ArrayList<>();
@@ -92,12 +88,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private String nbtPendingOperator = "=";
     private EditBox tagInputBox;
 
-    // NBT sub-mode state
     private int nbtListScrollOffset = 0;
     private int nbtEditingRuleIndex = -1;
     private EditBox nbtValueEditBox;
 
-    // Detail page state
     private int detailEditSlot = -1;
     private List<String> detailCachedTags = new ArrayList<>();
     private List<String> detailAllTags = new ArrayList<>();
@@ -158,13 +152,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private List<NbtRow> nbtRows = new ArrayList<>();
     private Set<String> nbtCollapsedGroups = new HashSet<>();
 
-    // Cached Data
     private List<String> cachedTags = new ArrayList<>();
     private List<String> cachedMods = new ArrayList<>();
     private ItemStack lastExtractorItem = ItemStack.EMPTY;
     private FilterTargetType lastTargetType = null;
 
-    // Animation
     private int textTick = 0;
     private String currentSlotExpr;
     private Component selectorGhostChemicalName = null;
@@ -479,7 +471,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        // Labels are rendered manually in renderBg to support custom layouts per mode.
     }
 
     private void renderStandardFilterGrid(GuiGraphics g, int mx, int my) {
@@ -656,7 +647,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         // Background
         g.pose().pushPose();
-        g.pose().translate(0, 0, 200); // Render on top
+        g.pose().translate(0, 0, 200);
         g.fill(x, y, x + w, y + listH, COL_BG);
         g.renderOutline(x, y, w, listH, COL_BORDER);
 
@@ -1308,7 +1299,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 return true;
             }
 
-            // Click outside info panel = close it
             amountInfoOpen = false;
             return true;
         }
@@ -1383,7 +1373,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 return true;
             }
 
-            // Click outside info panel = close it
             slotInfoOpen = false;
             return true;
         }
@@ -2045,7 +2034,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             this.selectorGhostChemicalId = chemId;
             this.selectorGhostChemicalTags = tags;
             this.selectorGhostChemicalName = name;
-            // Force tag list refresh
             this.cachedTags.clear();
             this.cachedMods.clear();
             this.lastExtractorItem = ItemStack.EMPTY;
@@ -2475,7 +2463,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             else if (hovered)
                 g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_HOVER);
 
-            // Toggle indicator
             int dotX = listX + 2;
             int dotY = rowY + (LIST_ROW_H - 5) / 2;
             if (active) {
@@ -2487,19 +2474,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             FilterItemData.SlotNbtRule activeRule = active ? activeRules.get(ruleIdx) : null;
             String op = active ? activeRule.operator() : "=";
 
-            // Layout: [indicator] [path col] [op col] [value col]
             int pathX = listX + NBT_INDICATOR_W;
             int opX = pathX + colW + 1;
             int valX = opX + NBT_OP_BTN_W + 1;
 
-            // Path column
             String displayPath = formatNbtPath(entry.path());
             g.fill(pathX, rowY, pathX + colW, rowY + LIST_ROW_H, 0xFF080808);
             g.renderOutline(pathX, rowY, colW, LIST_ROW_H, active ? COL_BTN_BORDER : 0xFF222222);
             g.drawString(font, font.plainSubstrByWidth(displayPath, colW - 4),
                     pathX + 2, rowY + 1, active ? COL_ACCENT : COL_WHITE, false);
 
-            // Operator column
             boolean opHover = active && isHovering(opX, rowY, NBT_OP_BTN_W, LIST_ROW_H, mx, my);
             g.fill(opX, rowY, opX + NBT_OP_BTN_W, rowY + LIST_ROW_H,
                     opHover ? COL_BTN_HOVER : COL_BTN_BG);
@@ -2507,7 +2491,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             g.drawCenteredString(font, op, opX + NBT_OP_BTN_W / 2, rowY + 1,
                     active ? (opHover ? COL_WHITE : 0xFFFFAA00) : COL_GRAY);
 
-            // Value column
             String displayVal = active
                     ? formatNbtValue(activeRule.value().toString())
                     : formatNbtValue(entry.valueDisplay());
@@ -2866,8 +2849,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
         return areas;
     }
-
-    // ── Detail Page ──
 
     private void enterDetailPage(int slot) {
         detailEditSlot = slot;

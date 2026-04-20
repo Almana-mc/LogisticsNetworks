@@ -5,7 +5,6 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -48,7 +47,6 @@ public class LogisticsNodeItem extends Item {
             return InteractionResult.FAIL;
         }
 
-        // Place new node
         return placeNode(level, clickedPos, context);
     }
 

@@ -1,7 +1,6 @@
 package me.almana.logisticsnetworks.integration.jade;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
-import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -21,7 +20,6 @@ public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, ISe
 
     @Override
     public void appendServerData(CompoundTag data, EntityAccessor accessor) {
-        // no extra data needed
     }
 
     @Override

@@ -20,7 +20,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.gui.Font;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.LightLayer;
 
 import org.joml.Matrix4f;
 
@@ -108,7 +107,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         poseStack.scale(-scaleXZ, -scaleY, scaleXZ);
         poseStack.translate(0.0, -17.0f / 16.0f - (8.0f / 18.0f), 0.0);
 
-        int color = isVisible ? -1 : 0x55FFFFFF; // Semi transparent
+        int color = isVisible ? -1 : 0x55FFFFFF;
 
         VertexConsumer consumer = buffer
                 .getBuffer(RenderType.entityCutoutNoCull(getTextureLocation(entity)));
@@ -206,8 +205,6 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         float x = (float) (-font.width(text) / 2);
         int fullbright = 15728880;
 
-        // Two-pass rendering like vanilla nametags: SEE_THROUGH for visibility behind
-        // geometry, NORMAL for solid text
         font.drawInBatch(text, x, 0, 0x20FFFFFF, false, poseStack.last().pose(), buffer,
                 Font.DisplayMode.SEE_THROUGH, 0x40000000, fullbright);
         font.drawInBatch(text, x, 0, 0xFFFFFFFF, false, poseStack.last().pose(), buffer,
@@ -272,8 +269,6 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     @Override
     protected int getBlockLightLevel(LogisticsNodeEntity entity, BlockPos pos) {
-        // Return max lighting (15) because the model otherwise goes pitch black
-        // when placed inside a solid block (e.g. Barrel) whose light level is 0.
         return 15;
     }
 

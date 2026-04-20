@@ -6,13 +6,13 @@ import mekanism.api.MekanismAPI;
 import mekanism.api.chemical.Chemical;
 import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.chemical.IChemicalHandler;
+import mekanism.common.capabilities.Capabilities;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
@@ -22,8 +22,10 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public final class ChemicalTransferHelper {
 
@@ -39,10 +41,10 @@ public final class ChemicalTransferHelper {
     @Nullable
     public static IChemicalHandler getHandler(ServerLevel level, BlockPos pos, @Nullable Direction side) {
         if (side != null)
-            return level.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.block(), pos, side);
+            return level.getCapability(Capabilities.CHEMICAL.block(), pos, side);
         List<IChemicalHandler> found = new ArrayList<>(6);
         for (Direction d : Direction.values()) {
-            IChemicalHandler h = level.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.block(), pos, d);
+            IChemicalHandler h = level.getCapability(Capabilities.CHEMICAL.block(), pos, d);
             if (h == null) continue;
             boolean dup = false;
             for (IChemicalHandler existing : found) {
@@ -180,7 +182,7 @@ public final class ChemicalTransferHelper {
     public static String getChemicalIdFromItem(ItemStack itemStack) {
         if (itemStack.isEmpty())
             return null;
-        var handler = itemStack.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.item());
+        var handler = itemStack.getCapability(Capabilities.CHEMICAL.item());
         if (handler == null)
             return null;
         for (int tank = 0; tank < handler.getChemicalTanks(); tank++) {
@@ -196,7 +198,7 @@ public final class ChemicalTransferHelper {
     public static List<String> getChemicalTagsFromItem(ItemStack itemStack) {
         if (itemStack.isEmpty())
             return null;
-        var handler = itemStack.getCapability(mekanism.common.capabilities.Capabilities.CHEMICAL.item());
+        var handler = itemStack.getCapability(Capabilities.CHEMICAL.item());
         if (handler == null)
             return null;
         for (int tank = 0; tank < handler.getChemicalTanks(); tank++) {
@@ -332,7 +334,7 @@ public final class ChemicalTransferHelper {
     }
 
     public static List<String> getAllChemicalTags() {
-        java.util.Set<String> tags = new java.util.LinkedHashSet<>();
+        Set<String> tags = new LinkedHashSet<>();
         for (Chemical chemical : MekanismAPI.CHEMICAL_REGISTRY) {
             MekanismAPI.CHEMICAL_REGISTRY.wrapAsHolder(chemical).tags().forEach(t -> tags.add(t.location().toString()));
         }
