@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.PatternSetterScreen;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraftforge.api.distmarker.Dist;
@@ -39,5 +40,10 @@ public class ClientEventHandler {
     @SubscribeEvent
     public static void registerLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(NodeModel.LAYER_LOCATION, NodeModel::createBodyLayer);
+    }
+
+    @SubscribeEvent
+    public static void clientSetup(FMLClientSetupEvent event) {
+        event.enqueueWork(ThemeState::load);
     }
 }

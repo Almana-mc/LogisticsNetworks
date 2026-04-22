@@ -71,7 +71,7 @@ public final class NodeClipboardConfig {
         INVENTORY_FULL
     }
 
-    private record Requirement(ItemStack stack, int count) {
+    private record Requirement(ItemStack stack, int count, boolean looseMatch) {
     }
 
     public record RequiredItem(ItemStack stack, int count) {
@@ -669,7 +669,7 @@ public final class NodeClipboardConfig {
         ServerLevel level = player.level() instanceof ServerLevel sl ? sl : null;
         for (Requirement requirement : requirements) {
             if (!AE2Compat.hasCombinedStock(inventory, requirement.stack(), requirement.count(),
-                    protectedSlot, ae2Link, level)) {
+                    protectedSlot, ae2Link, level, requirement.looseMatch())) {
                 return PasteResult.MISSING_ITEMS;
             }
         }
@@ -679,7 +679,7 @@ public final class NodeClipboardConfig {
 
         for (Requirement requirement : requirements) {
             AE2Compat.consumeCombined(inventory, requirement.stack(), requirement.count(),
-                    protectedSlot, ae2Link, player);
+                    protectedSlot, ae2Link, player, requirement.looseMatch());
         }
         applyToNode(node);
         applyNetworkToNode(node);
@@ -857,14 +857,15 @@ public final class NodeClipboardConfig {
     }
 
     private static void addRequirement(List<Requirement> requirements, ItemStack stack) {
+        boolean loose = stack.is(ModTags.FILTERS);
         for (int i = 0; i < requirements.size(); i++) {
             Requirement requirement = requirements.get(i);
-            if (ItemStack.isSameItem(requirement.stack(), stack)) {
-                requirements.set(i, new Requirement(requirement.stack(), requirement.count() + 1));
+            if (requirement.looseMatch() == loose && ItemStack.isSameItem(requirement.stack(), stack)) {
+                requirements.set(i, new Requirement(requirement.stack(), requirement.count() + 1, loose));
                 return;
             }
         }
-        requirements.add(new Requirement(ItemStackCompat.copyWithCount(stack, 1), 1));
+        requirements.add(new Requirement(ItemStackCompat.copyWithCount(stack, 1), 1, loose));
     }
 
     private static int findProtectedSlot(Inventory inventory, ItemStack protectedStack) {
@@ -1088,6 +1089,5 @@ public final class NodeClipboardConfig {
         return fallback;
     }
 }
-
 
 

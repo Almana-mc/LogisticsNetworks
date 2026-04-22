@@ -229,7 +229,7 @@ public class ModConfigScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    public void renderBackground(GuiGraphics g) {
     }
 
     @Override

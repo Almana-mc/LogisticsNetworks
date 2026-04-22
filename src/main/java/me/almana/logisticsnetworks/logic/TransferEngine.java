@@ -14,6 +14,7 @@ import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.util.ItemStackCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -23,14 +24,15 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.BlockEntity;
 
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.energy.IEnergyStorage;
-import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.items.IItemHandlerModifiable;
-import net.neoforged.neoforge.items.ItemHandlerHelper;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
+import net.minecraftforge.energy.IEnergyStorage;
+import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fluids.capability.IFluidHandler;
+import net.minecraftforge.items.IItemHandler;
+import net.minecraftforge.items.IItemHandlerModifiable;
+import net.minecraftforge.items.ItemHandlerHelper;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -61,7 +63,8 @@ public class TransferEngine {
             Object cached = items.get(key);
             if (cached == ABSENT) return null;
             if (cached != null) return (IItemHandler) cached;
-            IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, dir);
+            BlockEntity be = level.getBlockEntity(pos);
+            IItemHandler handler = be != null ? be.getCapability(ForgeCapabilities.ITEM_HANDLER, dir).orElse(null) : null;
             items.put(key, handler != null ? handler : ABSENT);
             return handler;
         }
@@ -71,7 +74,8 @@ public class TransferEngine {
             Object cached = fluids.get(key);
             if (cached == ABSENT) return null;
             if (cached != null) return (IFluidHandler) cached;
-            IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, dir);
+            BlockEntity be = level.getBlockEntity(pos);
+            IFluidHandler handler = be != null ? be.getCapability(ForgeCapabilities.FLUID_HANDLER, dir).orElse(null) : null;
             fluids.put(key, handler != null ? handler : ABSENT);
             return handler;
         }
@@ -81,7 +85,8 @@ public class TransferEngine {
             Object cached = energy.get(key);
             if (cached == ABSENT) return null;
             if (cached != null) return (IEnergyStorage) cached;
-            IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, dir);
+            BlockEntity be = level.getBlockEntity(pos);
+            IEnergyStorage handler = be != null ? be.getCapability(ForgeCapabilities.ENERGY, dir).orElse(null) : null;
             energy.put(key, handler != null ? handler : ABSENT);
             return handler;
         }
@@ -913,7 +918,7 @@ public class TransferEngine {
             if (slotStack.isEmpty()) {
                 continue;
             }
-            if (!ItemStack.isSameItemSameComponents(slotStack, remaining)) {
+            if (!ItemStackCompat.isSameItemSameComponents(slotStack, remaining)) {
                 continue;
             }
             remaining = handler.insertItem(slot, remaining, simulate);
@@ -954,7 +959,7 @@ public class TransferEngine {
                 if (!mergePass && !slotEmpty) {
                     continue;
                 }
-                if (!slotEmpty && !ItemStack.isSameItemSameComponents(slotStack, remaining)) {
+                if (!slotEmpty && !ItemStackCompat.isSameItemSameComponents(slotStack, remaining)) {
                     continue;
                 }
                 if (!handler.isItemValid(slot, remaining)) {
@@ -1010,7 +1015,7 @@ public class TransferEngine {
                 continue;
 
             int requestFromTank = Math.min(remaining, tankFluid.getAmount());
-            FluidStack simulated = source.drain(tankFluid.copyWithAmount(requestFromTank),
+            FluidStack simulated = source.drain(copyFluidWithAmount(tankFluid, requestFromTank),
                     IFluidHandler.FluidAction.SIMULATE);
             if (simulated.isEmpty())
                 continue;
@@ -1039,17 +1044,17 @@ public class TransferEngine {
             if (perEntryBatch > 0) {
                 request = Math.min(request, perEntryBatch);
             }
-            int accepted = target.fill(simulated.copyWithAmount(request), IFluidHandler.FluidAction.SIMULATE);
+            int accepted = target.fill(copyFluidWithAmount(simulated, request), IFluidHandler.FluidAction.SIMULATE);
             if (accepted <= 0)
                 continue;
 
-            FluidStack drained = source.drain(simulated.copyWithAmount(accepted), IFluidHandler.FluidAction.EXECUTE);
+            FluidStack drained = source.drain(copyFluidWithAmount(simulated, accepted), IFluidHandler.FluidAction.EXECUTE);
             if (drained.isEmpty())
                 continue;
 
             int filled = target.fill(drained, IFluidHandler.FluidAction.EXECUTE);
             if (filled < drained.getAmount()) {
-                source.fill(drained.copyWithAmount(drained.getAmount() - filled), IFluidHandler.FluidAction.EXECUTE);
+                source.fill(copyFluidWithAmount(drained, drained.getAmount() - filled), IFluidHandler.FluidAction.EXECUTE);
             }
 
             if (filled > 0) {
@@ -1306,7 +1311,7 @@ public class TransferEngine {
         int amount = 0;
         for (int i = 0; i < handler.getTanks(); i++) {
             FluidStack stack = handler.getFluidInTank(i);
-            if (!stack.isEmpty() && FluidStack.isSameFluidSameComponents(stack, candidate)) {
+            if (!stack.isEmpty() && sameFluid(stack, candidate)) {
                 amount += stack.getAmount();
             }
         }
@@ -1505,7 +1510,7 @@ public class TransferEngine {
             int filled = 0;
             for (IFluidHandler h : handlers) {
                 if (remaining <= 0) break;
-                int accepted = h.fill(resource.copyWithAmount(remaining), action);
+                int accepted = h.fill(copyFluidWithAmount(resource, remaining), action);
                 if (accepted > 0) {
                     filled += accepted;
                     remaining -= accepted;
@@ -1522,13 +1527,13 @@ public class TransferEngine {
             FluidStack template = FluidStack.EMPTY;
             for (IFluidHandler h : handlers) {
                 if (remaining <= 0) break;
-                FluidStack drained = h.drain(resource.copyWithAmount(remaining), action);
+                FluidStack drained = h.drain(copyFluidWithAmount(resource, remaining), action);
                 if (drained.isEmpty()) continue;
                 if (template.isEmpty()) template = drained;
                 totalAmount += drained.getAmount();
                 remaining -= drained.getAmount();
             }
-            return template.isEmpty() ? FluidStack.EMPTY : template.copyWithAmount(totalAmount);
+            return template.isEmpty() ? FluidStack.EMPTY : copyFluidWithAmount(template, totalAmount);
         }
 
         @Override
@@ -1543,15 +1548,28 @@ public class TransferEngine {
                 if (template.isEmpty()) {
                     drained = h.drain(remaining, action);
                 } else {
-                    drained = h.drain(template.copyWithAmount(remaining), action);
+                    drained = h.drain(copyFluidWithAmount(template, remaining), action);
                 }
                 if (drained.isEmpty()) continue;
                 if (template.isEmpty()) template = drained;
                 totalAmount += drained.getAmount();
                 remaining -= drained.getAmount();
             }
-            return template.isEmpty() ? FluidStack.EMPTY : template.copyWithAmount(totalAmount);
+            return template.isEmpty() ? FluidStack.EMPTY : copyFluidWithAmount(template, totalAmount);
         }
+    }
+
+    private static FluidStack copyFluidWithAmount(FluidStack stack, int amount) {
+        if (stack.isEmpty()) {
+            return FluidStack.EMPTY;
+        }
+        FluidStack copy = stack.copy();
+        copy.setAmount(amount);
+        return copy;
+    }
+
+    private static boolean sameFluid(FluidStack left, FluidStack right) {
+        return left.isFluidEqual(right);
     }
 
     private static final class CombinedEnergyStorage implements IEnergyStorage {

@@ -9,7 +9,6 @@ import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.IEntityComponentProvider;
 import snownee.jade.api.IServerDataProvider;
 import snownee.jade.api.ITooltip;
-import snownee.jade.api.JadeIds;
 import snownee.jade.api.config.IPluginConfig;
 
 public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, IServerDataProvider<EntityAccessor> {
@@ -27,7 +26,7 @@ public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, ISe
         ItemStack main = accessor.getPlayer().getMainHandItem();
         ItemStack off = accessor.getPlayer().getOffhandItem();
         if (main.getItem() instanceof WrenchItem || off.getItem() instanceof WrenchItem) {
-            tooltip.remove(JadeIds.CORE_MOD_NAME);
+            tooltip.remove(ResourceLocation.fromNamespaceAndPath("jade", "mod_name"));
             return;
         }
         tooltip.clear();

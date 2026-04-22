@@ -59,6 +59,13 @@ ordering = "NONE"
 side = "BOTH"
 
 [[dependencies."${mod_id}"]]
+modId = "guideme"
+mandatory = false
+versionRange = "[20.1.11,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies."${mod_id}"]]
 modId = "ftbteams"
 mandatory = false
 versionRange = "[2001.3.2,)"

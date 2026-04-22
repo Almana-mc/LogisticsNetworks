@@ -3,10 +3,12 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
+import me.almana.logisticsnetworks.util.ItemStackCompat;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
@@ -19,8 +21,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.network.PacketDistributor;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -86,7 +86,7 @@ public class NodeMenu extends AbstractContainerMenu {
         for (int i = 0; i < UPGRADE_SLOTS; i++) {
             CompoundTag tag = buf.readNbt();
             if (tag != null) {
-                node.setUpgradeItem(i, ItemStack.parseOptional(provider, tag));
+                node.setUpgradeItem(i, ItemStackCompat.parseOptional(provider, tag));
             }
         }
     }
@@ -141,10 +141,6 @@ public class NodeMenu extends AbstractContainerMenu {
         broadcastChanges();
     }
 
-    /**
-     * Toggle filter and upgrade slot activity to hide them on the network selection
-     * page.
-     */
     public void setNodeSlotsVisible(boolean visible) {
         this.nodeSlotsActive = visible;
     }
@@ -173,14 +169,10 @@ public class NodeMenu extends AbstractContainerMenu {
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {
-            entries.add(new SyncNetworkListPayload.NetworkEntry(
-                    net.getId(),
-                    net.getName(),
-                    net.getNodeUuids().size(),
-                    false));
+            entries.add(new SyncNetworkListPayload.NetworkEntry(net.getId(), net.getName(), net.getNodeUuids().size()));
         }
 
-        PacketDistributor.sendToPlayer(player, new SyncNetworkListPayload(entries));
+        NetworkHandler.sendToPlayer(player, new SyncNetworkListPayload(entries));
     }
 
     private void markDirty() {

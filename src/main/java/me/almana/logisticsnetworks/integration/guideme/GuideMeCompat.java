@@ -3,7 +3,7 @@ package me.almana.logisticsnetworks.integration.guideme;
 import guideme.GuidesCommon;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 
 public final class GuideMeCompat {
 

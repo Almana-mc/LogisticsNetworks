@@ -17,6 +17,7 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.AssignNetworkPayload;
+import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
@@ -37,7 +38,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.*;
 
@@ -1029,7 +1029,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (commit) {
             String newName = renameEditBox.getValue().trim();
             if (!newName.isEmpty()) {
-                PacketDistributor.sendToServer(new RenameNetworkPayload(renamingNetworkId, newName));
+                NetworkHandler.sendToServer(new RenameNetworkPayload(renamingNetworkId, newName));
             }
         }
 
@@ -1058,7 +1058,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         // Request existing labels from server
         if (node.getNetworkId() != null) {
-            PacketDistributor.sendToServer(new RequestNetworkLabelsPayload(node.getNetworkId()));
+            NetworkHandler.sendToServer(new RequestNetworkLabelsPayload(node.getNetworkId()));
         }
     }
 
@@ -1075,7 +1075,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         LogisticsNodeEntity node = getMenu().getNode();
         if (node != null) {
             node.setNodeLabel(label);
-            PacketDistributor.sendToServer(new SetNodeLabelPayload(node.getId(), label));
+            NetworkHandler.sendToServer(new SetNodeLabelPayload(node.getId(), label));
         }
         closeLabelPicker();
     }
@@ -1140,7 +1140,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         String visibilityLabel = getVisibilityLabel(node.isRenderVisible());
         if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(visibilityLabel) + 16, 12, mx, my)) {
             node.setRenderVisible(!node.isRenderVisible());
-            PacketDistributor.sendToServer(new ToggleNodeVisibilityPayload(node.getId()));
+            NetworkHandler.sendToServer(new ToggleNodeVisibilityPayload(node.getId()));
             return true;
         }
 
@@ -1168,7 +1168,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                     selectedChannel = i;
                     settingsScrollOffset = 0;
                     getMenu().setSelectedChannel(i);
-                    PacketDistributor.sendToServer(new SelectNodeChannelPayload(node.getId(), i));
+                    NetworkHandler.sendToServer(new SelectNodeChannelPayload(node.getId(), i));
                 }
                 return true;
             }
@@ -1354,7 +1354,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private void commitChannelUpdate(LogisticsNodeEntity node, ChannelData ch) {
         validateChannelConfigs(node);
-        PacketDistributor.sendToServer(new UpdateChannelPayload(
+        NetworkHandler.sendToServer(new UpdateChannelPayload(
                 node.getId(), selectedChannel, ch.isEnabled(),
                 ch.getMode().ordinal(), ch.getType().ordinal(),
                 ch.getBatchSize(), ch.getTickDelay(),
@@ -1368,7 +1368,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private void sendNetworkAssign(Optional<UUID> id, String name) {
         LogisticsNodeEntity node = getMenu().getNode();
         if (node != null) {
-            PacketDistributor.sendToServer(new AssignNetworkPayload(node.getId(), id, name));
+            NetworkHandler.sendToServer(new AssignNetworkPayload(node.getId(), id, name));
         }
     }
 
@@ -1418,7 +1418,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 ChannelData ch = node.getChannel(editingChannelIndex);
                 if (ch != null) {
                     ch.setName(name);
-                    PacketDistributor.sendToServer(new SetChannelNamePayload(node.getId(), editingChannelIndex, name));
+                    NetworkHandler.sendToServer(new SetChannelNamePayload(node.getId(), editingChannelIndex, name));
                 }
             }
         }
@@ -1557,7 +1557,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double sx, double sy) {
+    public boolean mouseScrolled(double mx, double my, double sy) {
         if (labelPickerOpen && networkLabels.size() > LABEL_PICKER_MAX_VISIBLE) {
             int pickerW = getLabelPickerWidth();
             int pickerX = leftPos + 10 + (148 - pickerW) / 2;
@@ -1599,7 +1599,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 networkScrollOffset++;
             return true;
         }
-        return super.mouseScrolled(mx, my, sx, sy);
+        return super.mouseScrolled(mx, my, sy);
     }
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {

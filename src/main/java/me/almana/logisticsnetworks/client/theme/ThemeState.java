@@ -3,7 +3,7 @@ package me.almana.logisticsnetworks.client.theme;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -78,5 +78,6 @@ public final class ThemeState {
         return FMLPaths.CONFIGDIR.get().resolve(FILE_NAME);
     }
 
-    private ThemeState() {}
+    private ThemeState() {
+    }
 }

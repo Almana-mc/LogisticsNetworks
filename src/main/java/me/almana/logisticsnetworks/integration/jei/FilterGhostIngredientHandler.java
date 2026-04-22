@@ -2,12 +2,12 @@ package me.almana.logisticsnetworks.integration.jei;
 
 import mezz.jei.api.gui.handlers.IGhostIngredientHandler;
 import mezz.jei.api.ingredients.ITypedIngredient;
-import mezz.jei.api.neoforge.NeoForgeTypes;
+import mezz.jei.api.forge.ForgeTypes;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.fluids.FluidStack;
+import net.minecraftforge.fluids.FluidStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,7 +22,7 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
 
     @Override
     public <I> List<Target<I>> getTargetsTyped(FilterScreen screen, ITypedIngredient<I> ingredient, boolean doStart) {
-        Optional<FluidStack> fluid = ingredient.getIngredient(NeoForgeTypes.FLUID_STACK);
+        Optional<FluidStack> fluid = ingredient.getIngredient(ForgeTypes.FLUID_STACK);
         if (fluid.isPresent()) {
             if (screen.acceptsFluidSelectorGhostIngredient()) {
                 return castTargets(buildSelectorFluidTarget(screen, fluid.get()));
@@ -64,7 +64,7 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
 
     private <I> List<Target<I>> getChemicalTargets(FilterScreen screen, ITypedIngredient<I> ingredient) {
         Object underlying = ingredient.getIngredient();
-        if (underlying instanceof ChemicalStack chemStack) {
+        if (underlying instanceof ChemicalStack<?> chemStack) {
             if (!chemStack.isEmpty()) {
                 if (screen.acceptsItemSelectorGhostIngredient()) {
                     return castTargets(buildSelectorChemicalTarget(screen, chemStack));
@@ -72,7 +72,7 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
                 if (!screen.supportsGhostIngredientTargets()) {
                     return List.of();
                 }
-                List<Target<ChemicalStack>> targets = buildChemicalTargets(screen, chemStack);
+                List<Target<ChemicalStack<?>>> targets = buildChemicalTargets(screen, chemStack);
                 return castTargets(targets);
             }
         }
@@ -98,17 +98,21 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
         return targets;
     }
 
-    private List<Target<ChemicalStack>> buildChemicalTargets(FilterScreen screen, ChemicalStack chemStack) {
+    private List<Target<ChemicalStack<?>>> buildChemicalTargets(FilterScreen screen, ChemicalStack<?> chemStack) {
         int slotCount = screen.getGhostFilterSlotCount();
         if (slotCount <= 0 || chemStack.isEmpty()) {
             return List.of();
         }
 
-        List<Target<ChemicalStack>> targets = new ArrayList<>(slotCount);
+        List<Target<ChemicalStack<?>>> targets = new ArrayList<>(slotCount);
         for (int slot = 0; slot < slotCount; slot++) {
             int slotIndex = slot;
-            targets.add(new FilterTarget<>(screen.getGhostFilterSlotArea(slotIndex), ignored -> screen
-                    .setGhostChemicalFilterEntry(slotIndex, chemStack.getChemical().getRegistryName().toString())));
+            targets.add(new FilterTarget<>(screen.getGhostFilterSlotArea(slotIndex), ignored -> {
+                String id = ChemicalTransferHelper.getChemicalId(chemStack);
+                if (id != null) {
+                    screen.setGhostChemicalFilterEntry(slotIndex, id);
+                }
+            }));
         }
         return targets;
     }
@@ -149,12 +153,12 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
         return (List<Target<I>>) (List<?>) targets;
     }
 
-    private List<Target<ChemicalStack>> buildSelectorChemicalTarget(FilterScreen screen, ChemicalStack chemStack) {
+    private List<Target<ChemicalStack<?>>> buildSelectorChemicalTarget(FilterScreen screen, ChemicalStack<?> chemStack) {
         if (!screen.acceptsItemSelectorGhostIngredient() || chemStack.isEmpty()) {
             return List.of();
         }
         String id = ChemicalTransferHelper.getChemicalId(chemStack);
-        List<String> tags = chemStack.getTags().map(t -> t.location().toString()).toList();
+        List<String> tags = chemStack.getType().getTags().map(t -> t.location().toString()).toList();
         Component name = ChemicalTransferHelper.getChemicalTextComponent(id);
         return List.of(new FilterTarget<>(screen.getSelectorGhostArea(),
                 ignored -> screen.setSelectorGhostChemical(id, tags, name)));

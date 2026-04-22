@@ -73,7 +73,7 @@ public class LogisticsNodeItem extends Item {
             return;
         }
 
-        NodeClipboardConfig clipboard = WrenchItem.getClipboard(offhand, serverPlayer.registryAccess());
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(offhand, serverPlayer.level().registryAccess());
         if (clipboard == null || clipboard.isEffectivelyEmpty()) {
             return;
         }
