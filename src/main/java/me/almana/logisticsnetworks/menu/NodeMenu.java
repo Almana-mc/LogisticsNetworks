@@ -3,12 +3,10 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
-import me.almana.logisticsnetworks.util.ItemStackCompat;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
@@ -21,6 +19,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -29,14 +28,14 @@ import java.util.List;
 public class NodeMenu extends AbstractContainerMenu {
 
     private static final int PLAYER_INV_X = 47;
-    private static final int PLAYER_INV_Y = 176;
+    private static final int PLAYER_INV_Y = 218;
 
     // Grid Layout constants
     private static final int FILTER_GRID_X = 168;
-    private static final int FILTER_GRID_Y = 54;
+    private static final int FILTER_GRID_Y = 68;
     private static final int FILTER_SLOTS = 9;
 
-    private static final int UPGRADE_GRID_Y = 123;
+    private static final int UPGRADE_GRID_Y = 137;
     private static final int UPGRADE_SLOTS = LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
     private static final int GRID_STEP = 19;
 
@@ -87,7 +86,7 @@ public class NodeMenu extends AbstractContainerMenu {
         for (int i = 0; i < UPGRADE_SLOTS; i++) {
             CompoundTag tag = buf.readNbt();
             if (tag != null) {
-                node.setUpgradeItem(i, ItemStackCompat.parseOptional(provider, tag));
+                node.setUpgradeItem(i, ItemStack.parseOptional(provider, tag));
             }
         }
     }
@@ -142,6 +141,10 @@ public class NodeMenu extends AbstractContainerMenu {
         broadcastChanges();
     }
 
+    /**
+     * Toggle filter and upgrade slot activity to hide them on the network selection
+     * page.
+     */
     public void setNodeSlotsVisible(boolean visible) {
         this.nodeSlotsActive = visible;
     }
@@ -170,10 +173,14 @@ public class NodeMenu extends AbstractContainerMenu {
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {
-            entries.add(new SyncNetworkListPayload.NetworkEntry(net.getId(), net.getName(), net.getNodeUuids().size()));
+            entries.add(new SyncNetworkListPayload.NetworkEntry(
+                    net.getId(),
+                    net.getName(),
+                    net.getNodeUuids().size(),
+                    false));
         }
 
-        NetworkHandler.sendToPlayer(player, new SyncNetworkListPayload(entries));
+        PacketDistributor.sendToPlayer(player, new SyncNetworkListPayload(entries));
     }
 
     private void markDirty() {

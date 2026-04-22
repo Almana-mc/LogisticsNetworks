@@ -1,18 +1,14 @@
 package me.almana.logisticsnetworks.logic;
 
-import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.filter.*;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 public final class FilterLogic {
-
-    private static final Logger LOGGER = LogUtils.getLogger();
 
     private FilterLogic() {
     }
@@ -20,6 +16,90 @@ public final class FilterLogic {
     public static boolean matchesItem(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
             HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt) {
         return matchesItem(filters, filterMode, candidate, provider, candidateNbt, null);
+    }
+
+    public static boolean matchesItemInSlot(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
+            HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt,
+            @Nullable FilterItemData.ReadCache filterReadCache, int inventorySlot) {
+        if (inventorySlot < 0)
+            return matchesItem(filters, filterMode, candidate, provider, candidateNbt, filterReadCache);
+
+        if (filters == null || filters.length == 0)
+            return true;
+        if (candidate.isEmpty())
+            return false;
+
+        boolean matchAll = filterMode == FilterMode.MATCH_ALL;
+        boolean hasConfiguredFilter = false;
+        boolean anyWhitelistMatched = false;
+        boolean allWhitelistsMatched = true;
+        boolean hasWhitelist = false;
+
+        for (ItemStack filter : filters) {
+            if (filter.isEmpty())
+                continue;
+
+            boolean isFilter = false;
+            boolean matched = false;
+            boolean isBlacklist = false;
+
+            if (FilterItemData.isFilterItem(filter)
+                    && FilterItemData.hasAnyItemMatchEntries(filter, filterReadCache)) {
+                isFilter = true;
+                matched = FilterItemData.containsItemFullInSlot(filter, candidate, provider, candidateNbt,
+                        filterReadCache, inventorySlot);
+                isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
+            } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
+                    && TagFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
+                isFilter = true;
+                matched = TagFilterData.containsTag(filter, candidate);
+                isBlacklist = TagFilterData.isBlacklist(filter);
+            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
+                    && ModFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
+                isFilter = true;
+                matched = ModFilterData.containsMod(filter, candidate);
+                isBlacklist = ModFilterData.isBlacklist(filter);
+            } else if (NbtFilterData.isNbtFilter(filter)
+                    && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
+                if (NbtFilterData.hasEnabledRules(filter)) {
+                    isFilter = true;
+                    matched = NbtFilterData.matches(filter, candidateNbt);
+                    isBlacklist = NbtFilterData.isBlacklist(filter);
+                }
+            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
+                    && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
+                isFilter = true;
+                matched = NameFilterData.containsName(filter, candidate);
+                isBlacklist = NameFilterData.isBlacklist(filter);
+            } else if (DurabilityFilterData.isDurabilityFilterItem(filter)) {
+                isFilter = true;
+                if (!DurabilityFilterData.matches(filter, candidate))
+                    return false;
+                hasConfiguredFilter = true;
+                continue;
+            }
+
+            if (isFilter) {
+                hasConfiguredFilter = true;
+                if (isBlacklist) {
+                    if (matched)
+                        return false;
+                } else {
+                    hasWhitelist = true;
+                    if (matched)
+                        anyWhitelistMatched = true;
+                    else
+                        allWhitelistsMatched = false;
+                }
+            }
+        }
+
+        if (!hasConfiguredFilter)
+            return true;
+        if (!hasWhitelist)
+            return true;
+
+        return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
     }
 
     public static boolean matchesItem(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
@@ -106,94 +186,13 @@ public final class FilterLogic {
         return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
     }
 
-    public static boolean matchesItemInSlot(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
-            int inventorySlot, HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        if (filters == null || filters.length == 0)
-            return true;
-        if (candidate.isEmpty())
-            return false;
-
-        boolean matchAll = filterMode == FilterMode.MATCH_ALL;
-        boolean hasConfiguredFilter = false;
-        boolean anyWhitelistMatched = false;
-        boolean allWhitelistsMatched = true;
-        boolean hasWhitelist = false;
-
-        for (ItemStack filter : filters) {
-            if (filter.isEmpty())
-                continue;
-
-            boolean isFilter = false;
-            boolean matched = false;
-            boolean isBlacklist = false;
-
-            if (FilterItemData.isFilterItem(filter)
-                    && FilterItemData.hasAnyItemMatchEntries(filter, filterReadCache)) {
-                isFilter = true;
-                if (inventorySlot >= 0 && FilterItemData.hasAnySlotMappings(filter, filterReadCache)) {
-                    matched = FilterItemData.containsItemFullInSlot(filter, candidate, inventorySlot,
-                            provider, candidateNbt, filterReadCache);
-                } else {
-                    matched = FilterItemData.containsItemFull(filter, candidate, provider, candidateNbt,
-                            filterReadCache);
-                }
-                isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
-            } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
-                    && TagFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                isFilter = true;
-                matched = TagFilterData.containsTag(filter, candidate);
-                isBlacklist = TagFilterData.isBlacklist(filter);
-            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
-                    && ModFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                isFilter = true;
-                matched = ModFilterData.containsMod(filter, candidate);
-                isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NbtFilterData.isNbtFilter(filter)
-                    && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                if (NbtFilterData.hasEnabledRules(filter)) {
-                    isFilter = true;
-                    matched = NbtFilterData.matches(filter, candidateNbt);
-                    isBlacklist = NbtFilterData.isBlacklist(filter);
-                }
-            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
-                    && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                isFilter = true;
-                matched = NameFilterData.containsName(filter, candidate);
-                isBlacklist = NameFilterData.isBlacklist(filter);
-            } else if (DurabilityFilterData.isDurabilityFilterItem(filter)) {
-                isFilter = true;
-                if (!DurabilityFilterData.matches(filter, candidate)) {
-                    return false;
-                }
-                hasConfiguredFilter = true;
-                continue;
-            }
-
-            if (isFilter) {
-                hasConfiguredFilter = true;
-                if (isBlacklist) {
-                    if (matched) return false;
-                } else {
-                    hasWhitelist = true;
-                    if (matched) anyWhitelistMatched = true;
-                    else allWhitelistsMatched = false;
-                }
-            }
-        }
-
-        boolean result;
-        if (!hasConfiguredFilter) result = true;
-        else if (!hasWhitelist) result = true;
-        else result = matchAll ? allWhitelistsMatched : anyWhitelistMatched;
-        LOGGER.debug("[matchesItemInSlot] candidate={}, slot={}, hasConfigured={}, hasWhitelist={}, anyMatched={}, allMatched={}, matchAll={}, result={}",
-                candidate.getItem(), inventorySlot, hasConfiguredFilter, hasWhitelist,
-                anyWhitelistMatched, allWhitelistsMatched, matchAll, result);
-        return result;
+    public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
+            HolderLookup.Provider provider) {
+        return matchesFluid(filters, filterMode, candidate, provider, null);
     }
 
     public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
-            HolderLookup.Provider provider) {
+            HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache) {
         if (filters == null || filters.length == 0)
             return true;
         if (candidate.isEmpty())
@@ -215,10 +214,11 @@ public final class FilterLogic {
             boolean isBlacklist = false;
 
             if (FilterItemData.isFilterItem(filter)
-                    && (FilterItemData.hasAnyFluidEntries(filter) || FilterItemData.hasAnyTagEntries(filter))) {
+                    && (FilterItemData.hasAnyFluidEntries(filter, filterReadCache)
+                            || FilterItemData.hasAnyTagEntries(filter, filterReadCache))) {
                 isFilter = true;
-                matched = FilterItemData.containsFluidFull(filter, candidate, provider);
-                isBlacklist = FilterItemData.isBlacklist(filter);
+                matched = FilterItemData.containsFluidFull(filter, candidate, provider, filterReadCache);
+                isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
             } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
                     && TagFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
                 isFilter = true;
@@ -268,6 +268,11 @@ public final class FilterLogic {
     }
 
     public static boolean matchesChemical(ItemStack[] filters, FilterMode filterMode, String chemicalId) {
+        return matchesChemical(filters, filterMode, chemicalId, null);
+    }
+
+    public static boolean matchesChemical(ItemStack[] filters, FilterMode filterMode, String chemicalId,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
         if (filters == null || filters.length == 0)
             return true;
         if (chemicalId == null || chemicalId.isEmpty())
@@ -289,10 +294,11 @@ public final class FilterLogic {
             boolean isBlacklist = false;
 
             if (FilterItemData.isFilterItem(filter)
-                    && (FilterItemData.hasAnyChemicalEntries(filter) || FilterItemData.hasAnyTagEntries(filter))) {
+                    && (FilterItemData.hasAnyChemicalEntries(filter, filterReadCache)
+                            || FilterItemData.hasAnyTagEntries(filter, filterReadCache))) {
                 isFilter = true;
-                matched = FilterItemData.containsChemicalFull(filter, chemicalId);
-                isBlacklist = FilterItemData.isBlacklist(filter);
+                matched = FilterItemData.containsChemicalFull(filter, chemicalId, filterReadCache);
+                isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
             } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
                     && TagFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
                 isFilter = true;
@@ -350,4 +356,3 @@ public final class FilterLogic {
         return false;
     }
 }
-

@@ -7,16 +7,23 @@ import appeng.api.networking.IGridNode;
 import appeng.api.networking.IInWorldGridNodeHost;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 final class AE2StorageHelper {
 
@@ -65,6 +72,44 @@ final class AE2StorageHelper {
         MEStorage storage = grid.getStorageService().getInventory();
         long extracted = storage.extract(key, amount, Actionable.MODULATE, IActionSource.ofPlayer(player));
         return (int) Math.min(extracted, Integer.MAX_VALUE);
+    }
+
+    static long countAvailableByItem(ServerLevel callerLevel, GlobalPos linkPos, Item target) {
+        IGrid grid = resolveGrid(callerLevel, linkPos);
+        if (grid == null) return 0;
+        MEStorage storage = grid.getStorageService().getInventory();
+        KeyCounter counter = storage.getAvailableStacks();
+        long total = 0;
+        for (Object2LongMap.Entry<AEKey> entry : counter) {
+            AEKey what = entry.getKey();
+            if (what instanceof AEItemKey itemKey && itemKey.getItem() == target) {
+                total += entry.getLongValue();
+                if (total < 0) return Long.MAX_VALUE;
+            }
+        }
+        return total;
+    }
+
+    static int extractItemsByItem(ServerLevel callerLevel, GlobalPos linkPos, Item target, int amount, ServerPlayer player) {
+        IGrid grid = resolveGrid(callerLevel, linkPos);
+        if (grid == null) return 0;
+        MEStorage storage = grid.getStorageService().getInventory();
+        KeyCounter counter = storage.getAvailableStacks();
+        List<AEItemKey> candidates = new ArrayList<>();
+        for (Object2LongMap.Entry<AEKey> entry : counter) {
+            AEKey what = entry.getKey();
+            if (what instanceof AEItemKey itemKey && itemKey.getItem() == target) {
+                candidates.add(itemKey);
+            }
+        }
+        int remaining = amount;
+        IActionSource src = IActionSource.ofPlayer(player);
+        for (AEItemKey itemKey : candidates) {
+            if (remaining <= 0) break;
+            long extracted = storage.extract(itemKey, remaining, Actionable.MODULATE, src);
+            remaining -= (int) Math.min(extracted, remaining);
+        }
+        return amount - remaining;
     }
 
     static void registerWrenchLinkable() {

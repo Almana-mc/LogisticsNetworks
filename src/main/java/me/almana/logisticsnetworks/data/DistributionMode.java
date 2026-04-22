@@ -4,6 +4,5 @@ public enum DistributionMode {
     PRIORITY,
     NEAREST_FIRST,
     FARTHEST_FIRST,
-    ROUND_ROBIN,
-    RECIPE_ROBIN
+    ROUND_ROBIN
 }

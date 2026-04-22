@@ -1,7 +1,6 @@
 package me.almana.logisticsnetworks.integration.jade;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
-import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -10,6 +9,7 @@ import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.IEntityComponentProvider;
 import snownee.jade.api.IServerDataProvider;
 import snownee.jade.api.ITooltip;
+import snownee.jade.api.JadeIds;
 import snownee.jade.api.config.IPluginConfig;
 
 public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, IServerDataProvider<EntityAccessor> {
@@ -27,7 +27,7 @@ public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, ISe
         ItemStack main = accessor.getPlayer().getMainHandItem();
         ItemStack off = accessor.getPlayer().getOffhandItem();
         if (main.getItem() instanceof WrenchItem || off.getItem() instanceof WrenchItem) {
-            tooltip.remove(ResourceLocation.fromNamespaceAndPath("jade", "mod_name"));
+            tooltip.remove(JadeIds.CORE_MOD_NAME);
             return;
         }
         tooltip.clear();

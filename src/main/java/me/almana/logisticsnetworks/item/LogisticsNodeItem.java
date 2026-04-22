@@ -5,7 +5,6 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -31,8 +30,7 @@ public class LogisticsNodeItem extends Item {
         if (level.isClientSide)
             return InteractionResult.SUCCESS;
 
-        boolean creative = player != null && player.isCreative();
-        NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(level, clickedPos, creative);
+        NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(level, clickedPos);
         if (validation != NodePlacementHelper.ValidationResult.OK) {
             if (player != null) {
                 switch (validation) {
@@ -49,12 +47,12 @@ public class LogisticsNodeItem extends Item {
             return InteractionResult.FAIL;
         }
 
-        // Place new node
         return placeNode(level, clickedPos, context);
     }
 
     private InteractionResult placeNode(Level level, BlockPos pos, UseOnContext context) {
-        LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, pos);
+        Player player = context.getPlayer();
+        LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, pos, player != null ? player.getUUID() : null);
         if (node == null)
             return InteractionResult.FAIL;
 
@@ -75,7 +73,7 @@ public class LogisticsNodeItem extends Item {
             return;
         }
 
-        NodeClipboardConfig clipboard = WrenchItem.getClipboard(offhand, serverPlayer.level().registryAccess());
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(offhand, serverPlayer.registryAccess());
         if (clipboard == null || clipboard.isEffectivelyEmpty()) {
             return;
         }
