@@ -56,7 +56,7 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
 
     private List<Target<FluidStack>> buildFluidTargets(FilterScreen screen, FluidStack fluidStack) {
         int slotCount = screen.getGhostFilterSlotCount();
-        if (slotCount <= 0 || fluidStack == null || fluidStack.isEmpty()) {
+        if (slotCount <= 0 || fluidStack.isEmpty()) {
             return List.of();
         }
 
@@ -70,7 +70,7 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
     }
 
     private List<Target<FluidStack>> buildSelectorFluidTarget(FilterScreen screen, FluidStack fluidStack) {
-        if (!screen.acceptsFluidSelectorGhostIngredient() || fluidStack == null || fluidStack.isEmpty()) {
+        if (!screen.acceptsFluidSelectorGhostIngredient() || fluidStack.isEmpty()) {
             return List.of();
         }
         return List.of(

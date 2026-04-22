@@ -16,16 +16,14 @@ public class LogisticsJadePlugin implements IWailaPlugin {
 
     @Override
     public void register(IWailaCommonRegistration registration) {
-        registration.registerBlockDataProvider(NodeAttachedComponentProvider.INSTANCE, Block.class);
-        registration.registerEntityDataProvider(LogisticsNodeEntityProvider.INSTANCE, LogisticsNodeEntity.class);
+        registration.registerBlockDataProvider(NodeAttachedDataProvider.INSTANCE, Block.class);
+        registration.entityTypeOperations().hide(Registration.LOGISTICS_NODE.getKey());
     }
 
     @Override
     public void registerClient(IWailaClientRegistration registration) {
         registration.registerBlockComponent(NodeAttachedComponentProvider.INSTANCE, Block.class);
         registration.registerEntityComponent(LogisticsNodeEntityProvider.INSTANCE, LogisticsNodeEntity.class);
-
-        registration.hideTarget(Registration.LOGISTICS_NODE.get());
 
         registration.addRayTraceCallback((hit, accessor, originalAccessor) -> {
             if (hit instanceof EntityHitResult entityHit

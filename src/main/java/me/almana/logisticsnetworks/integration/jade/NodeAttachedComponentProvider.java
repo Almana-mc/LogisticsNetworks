@@ -1,45 +1,25 @@
 package me.almana.logisticsnetworks.integration.jade;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
-import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.item.WrenchItem;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.AABB;
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.IBlockComponentProvider;
-import snownee.jade.api.IServerDataProvider;
 import snownee.jade.api.ITooltip;
 import snownee.jade.api.config.IPluginConfig;
 
-import java.util.List;
-
-public enum NodeAttachedComponentProvider implements IBlockComponentProvider, IServerDataProvider<BlockAccessor> {
+public enum NodeAttachedComponentProvider implements IBlockComponentProvider {
     INSTANCE;
 
     private static final Identifier UID = Identifier.fromNamespaceAndPath(
             Logisticsnetworks.MOD_ID, "node_attached");
-    private static final String KEY_HAS_NODE = "has_node";
-
-    @Override
-    public void appendServerData(CompoundTag data, BlockAccessor accessor) {
-        List<LogisticsNodeEntity> nodes = accessor.getLevel().getEntitiesOfClass(
-                LogisticsNodeEntity.class,
-                new AABB(accessor.getPosition()).inflate(0.5));
-        for (LogisticsNodeEntity node : nodes) {
-            if (node.getAttachedPos().equals(accessor.getPosition()) && node.isActive()) {
-                data.putBoolean(KEY_HAS_NODE, true);
-                return;
-            }
-        }
-    }
 
     @Override
     public void appendTooltip(ITooltip tooltip, BlockAccessor accessor, IPluginConfig config) {
-        if (!accessor.getServerData().getBoolean(KEY_HAS_NODE)) {
+        if (!accessor.getServerData().getBoolean(NodeAttachedDataProvider.KEY_HAS_NODE).orElse(false)) {
             return;
         }
         Player player = accessor.getPlayer();

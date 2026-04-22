@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
+import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
 import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
 import me.almana.logisticsnetworks.item.PatternSetterItem;
@@ -154,6 +155,10 @@ public class Registration {
                                                 ITEMS.getEntries().stream()
                                                                 .map(Supplier::get)
                                                                 .forEach(output::accept);
+                                                ItemStack guideItem = GuideMeCompat.createGuideItem();
+                                                if (!guideItem.isEmpty()) {
+                                                        output.accept(guideItem);
+                                                }
                                         })
                                         .build());
 

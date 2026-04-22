@@ -74,7 +74,7 @@ side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "jei"
-type = "required"
+type = "optional"
 versionRange = "[29.5.0,)"
 ordering = "NONE"
 side = "CLIENT"
@@ -103,7 +103,14 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "jade"
 type = "optional"
-versionRange = "[15.0.0,)"
+versionRange = "[21.1.0,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies."${mod_id}"]]
+modId = "guideme"
+type = "optional"
+versionRange = "[26.1.0,)"
 ordering = "NONE"
 side = "CLIENT"
 

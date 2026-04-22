@@ -71,6 +71,7 @@ public class Logisticsnetworks {
                         modBus.addListener(LogisticsClientEvents::registerRenderers);
                         modBus.addListener(LogisticsClientEvents::registerLayers);
                         modBus.addListener(LogisticsClientEvents::registerScreens);
+                        modBus.addListener(LogisticsClientEvents::clientSetup);
                         modBus.addListener(LogisticsClientEvents::registerKeyMappings);
                         ConfigScreenRegistrar.register();
                 }

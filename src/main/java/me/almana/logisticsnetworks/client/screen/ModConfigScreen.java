@@ -2,6 +2,11 @@ package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.ClientConfig;
+import me.almana.logisticsnetworks.client.GuiGraphics;
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
+import me.almana.logisticsnetworks.client.theme.Themes;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig.TierLimits;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -104,6 +109,7 @@ public class ModConfigScreen extends Screen {
     private int pendingMaxVisibleNodes;
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
+    private String pendingTheme;
 
     private TierLimits[] pendingTiers;
     private int expandedTier = -1;
@@ -135,6 +141,7 @@ public class ModConfigScreen extends Screen {
         pendingBackoffMaxTicks = Config.backoffMaxTicksSpec.get();
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
+        pendingTheme = ClientConfig.themeSpec.get();
         pendingTiers = UpgradeLimitsConfig.getAll();
 
         buildTab();
@@ -345,6 +352,52 @@ public class ModConfigScreen extends Screen {
 
         g.text(font, TEXT_MAX_VISIBLE, cx, cy + 27, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 24 + 14, 80);
+
+        int themeY = cy + 48;
+        g.text(font, Component.translatable("gui.logisticsnetworks.config.client.theme"), cx, themeY, COL_INK, false);
+
+        int cols = 4;
+        int swatchGap = 4;
+        int swatchW = (cw - (cols - 1) * swatchGap) / cols;
+        int swatchH = 22;
+        int startY = themeY + 12;
+        GuiGraphics graphics = new GuiGraphics(g);
+        Theme frame = ThemeState.active();
+        for (int i = 0; i < Themes.ALL.size(); i++) {
+            Theme preview = Themes.ALL.get(i);
+            int col = i % cols;
+            int row = i / cols;
+            int sx = cx + col * (swatchW + swatchGap);
+            int sy = startY + row * (swatchH + swatchGap);
+            boolean active = preview.id().equals(pendingTheme);
+            boolean hovered = mx >= sx && mx <= sx + swatchW && my >= sy && my <= sy + swatchH;
+            ThemePaint.swatchPreview(graphics, sx, sy, swatchW, 12, preview, frame);
+            int fg = active ? 0xFF000000 : (hovered ? COL_INK : COL_INK_FADED);
+            ThemePaint.drawCentered(graphics, font, preview.label(), sx + swatchW / 2, sy + 13, fg);
+            if (active) {
+                g.outline(sx - 1, sy - 1, swatchW + 2, swatchH + 2, COL_BORDER);
+            }
+        }
+    }
+
+    private boolean handleClientClick(double mouseX, double mouseY, int cx, int cy, int cw) {
+        int themeY = cy + 48;
+        int cols = 4;
+        int swatchGap = 4;
+        int swatchW = (cw - (cols - 1) * swatchGap) / cols;
+        int swatchH = 22;
+        int startY = themeY + 12;
+        for (int i = 0; i < Themes.ALL.size(); i++) {
+            int col = i % cols;
+            int row = i / cols;
+            int sx = cx + col * (swatchW + swatchGap);
+            int sy = startY + row * (swatchH + swatchGap);
+            if (mouseX >= sx && mouseX <= sx + swatchW && mouseY >= sy && mouseY <= sy + swatchH) {
+                pendingTheme = Themes.ALL.get(i).id();
+                return true;
+            }
+        }
+        return false;
     }
 
     private void renderUpgradesTab(GuiGraphicsExtractor g, int cx, int cy, int cw, int mx, int my) {
@@ -435,7 +488,13 @@ public class ModConfigScreen extends Screen {
                 switch (currentTab) {
                     case COMMON -> { if (handleCommonClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
                     case UPGRADES -> { if (handleUpgradesClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
+                    case CLIENT -> { }
                 }
+            }
+
+            if (currentTab == Tab.CLIENT && handleClientClick(mouseX, mouseY, contentX, contentY, contentW)) {
+                unfocusEditBoxes();
+                return true;
             }
         }
 
@@ -579,7 +638,9 @@ public class ModConfigScreen extends Screen {
 
         ClientConfig.maxRenderedNodesSpec.set(pendingMaxRenderedNodes);
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
+        ClientConfig.themeSpec.set(pendingTheme);
         ClientConfig.refresh();
+        ThemeState.setTheme(Themes.byId(pendingTheme));
         ClientConfig.SPEC.save();
 
         minecraft.setScreen(parent);

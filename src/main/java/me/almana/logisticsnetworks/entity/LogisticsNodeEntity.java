@@ -75,8 +75,6 @@ public class LogisticsNodeEntity extends Entity {
     private final long[] channelCooldowns = new long[CHANNEL_COUNT];
     private final int[] roundRobinIndex = new int[CHANNEL_COUNT];
     private final float[] backoffTicks = new float[CHANNEL_COUNT];
-    private final int[] recipeCursorEntry = new int[CHANNEL_COUNT];
-    private final int[] recipeCursorRemaining = new int[CHANNEL_COUNT];
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
@@ -354,7 +352,7 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setUpgradeItem(int slot, ItemStack stack) {
         if (slot >= 0 && slot < UPGRADE_SLOT_COUNT) {
-            upgradeItems[slot] = (stack == null || stack.isEmpty()) ? ItemStack.EMPTY : stack.copyWithCount(1);
+            upgradeItems[slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
         }
     }
 
@@ -390,30 +388,6 @@ public class LogisticsNodeEntity extends Entity {
         backoffTicks[channelIndex] = value;
     }
 
-    public int getRecipeCursorEntry(int channelIndex) {
-        if (channelIndex < 0 || channelIndex >= CHANNEL_COUNT) return 0;
-        return recipeCursorEntry[channelIndex];
-    }
-
-    public int getRecipeCursorRemaining(int channelIndex) {
-        if (channelIndex < 0 || channelIndex >= CHANNEL_COUNT) return 0;
-        return recipeCursorRemaining[channelIndex];
-    }
-
-    public void setRecipeCursor(int channelIndex, int entryIndex, int remaining) {
-        if (channelIndex >= 0 && channelIndex < CHANNEL_COUNT) {
-            recipeCursorEntry[channelIndex] = entryIndex;
-            recipeCursorRemaining[channelIndex] = remaining;
-        }
-    }
-
-    public void resetRecipeCursor(int channelIndex) {
-        if (channelIndex >= 0 && channelIndex < CHANNEL_COUNT) {
-            recipeCursorEntry[channelIndex] = 0;
-            recipeCursorRemaining[channelIndex] = 0;
-        }
-    }
-
     public void dropUpgrades() {
         if (!(level() instanceof ServerLevel serverLevel)) {
             return;
@@ -433,9 +407,6 @@ public class LogisticsNodeEntity extends Entity {
         }
         for (int channelIndex = 0; channelIndex < CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = channels[channelIndex];
-            if (channel == null) {
-                continue;
-            }
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                 ItemStack stack = channel.getFilterItem(slot);
                 if (!stack.isEmpty()) {

@@ -164,6 +164,11 @@ public final class FilterLogic {
 
     public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
             HolderLookup.Provider provider) {
+        return matchesFluid(filters, filterMode, candidate, provider, null);
+    }
+
+    public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
+            HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache) {
         if (filters == null || filters.length == 0)
             return true;
         if (candidate.isEmpty())
@@ -185,10 +190,11 @@ public final class FilterLogic {
             boolean isBlacklist = false;
 
             if (FilterItemData.isFilterItem(filter)
-                    && (FilterItemData.hasAnyFluidEntries(filter) || FilterItemData.hasAnyTagEntries(filter))) {
+                    && (FilterItemData.hasAnyFluidEntries(filter, filterReadCache)
+                            || FilterItemData.hasAnyTagEntries(filter, filterReadCache))) {
                 isFilter = true;
-                matched = FilterItemData.containsFluidFull(filter, candidate, provider);
-                isBlacklist = FilterItemData.isBlacklist(filter);
+                matched = FilterItemData.containsFluidFull(filter, candidate, provider, filterReadCache);
+                isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
             } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
                     && ModFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
                 isFilter = true;

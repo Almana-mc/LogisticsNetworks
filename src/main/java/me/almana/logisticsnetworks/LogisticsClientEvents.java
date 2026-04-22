@@ -7,9 +7,11 @@ import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.PatternSetterScreen;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.render.LogisticsNodeRenderer;
 import me.almana.logisticsnetworks.render.NodeModel;
 import me.almana.logisticsnetworks.registration.Registration;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
@@ -34,6 +36,10 @@ public final class LogisticsClientEvents {
         event.register(Registration.MASS_PLACEMENT_MENU.get(), MassPlacementScreen::new);
         event.register(Registration.PATTERN_SETTER_MENU.get(), PatternSetterScreen::new);
         event.register(Registration.COMPUTER_MENU.get(), ComputerScreen::new);
+    }
+
+    public static void clientSetup(FMLClientSetupEvent event) {
+        event.enqueueWork(ThemeState::load);
     }
 
     public static void registerKeyMappings(RegisterKeyMappingsEvent event) {

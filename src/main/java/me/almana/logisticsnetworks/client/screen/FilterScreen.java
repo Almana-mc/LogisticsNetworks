@@ -18,7 +18,6 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.util.Mth;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.tags.TagKey;
 
 import me.almana.logisticsnetworks.menu.FilterMenu;
@@ -76,7 +75,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private static final int COL_BTN_HOVER = 0xFF3A3A3A;
     private static final int COL_BTN_BORDER = 0xFF4A4A4A;
 
-    // State
     private EditBox manualInputBox;
     private boolean isDropdownOpen = false;
     private int listScrollOffset = 0;
@@ -87,7 +85,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private boolean flushedTextOnClose = false;
     private boolean wasManualInputFocused = false;
 
-    // Sub-mode state
     private int tagEditSlot = -1;
     private int nbtEditSlot = -1;
     private List<String> cachedSlotTags = new ArrayList<>();
@@ -97,12 +94,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private String nbtPendingOperator = "=";
     private EditBox tagInputBox;
 
-    // NBT sub-mode state
     private int nbtListScrollOffset = 0;
     private int nbtEditingRuleIndex = -1;
     private EditBox nbtValueEditBox;
 
-    // Detail page state
     private int detailEditSlot = -1;
     private List<String> detailCachedTags = new ArrayList<>();
     private List<String> detailAllTags = new ArrayList<>();
@@ -163,12 +158,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private List<NbtRow> nbtRows = new ArrayList<>();
     private Set<String> nbtCollapsedGroups = new HashSet<>();
 
-    // Cached Data
     private List<String> cachedMods = new ArrayList<>();
     private ItemStack lastExtractorItem = ItemStack.EMPTY;
     private FilterTargetType lastTargetType = null;
 
-    // Animation
     private int textTick = 0;
     private String currentSlotExpr;
     private Component selectorGhostChemicalName = null;
@@ -444,7 +437,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        // Labels are rendered manually in renderBg to support custom layouts per mode.
     }
 
     private void renderStandardFilterGrid(GuiGraphics g, int mx, int my) {
@@ -614,9 +606,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int maxScroll = Math.max(0, items.size() - DROPDOWN_ROWS);
         listScrollOffset = Math.max(0, Math.min(listScrollOffset, maxScroll));
 
-        // Background
         g.pose().pushPose();
-        g.pose().translate(0, 0, 200); // Render on top
+        g.pose().translate(0, 0, 200);
         g.fill(x, y, x + w, y + listH, COL_BG);
         g.renderOutline(x, y, w, listH, COL_BORDER);
 

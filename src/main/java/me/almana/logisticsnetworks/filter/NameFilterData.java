@@ -168,7 +168,7 @@ public final class NameFilterData {
     }
 
     public static boolean containsName(ItemStack filter, FluidStack candidate) {
-        if (candidate == null || candidate.isEmpty())
+        if (candidate.isEmpty())
             return false;
         if (getTargetType(filter) != FilterTargetType.FLUIDS)
             return false;
@@ -184,7 +184,6 @@ public final class NameFilterData {
             return false;
         }
 
-        // Fluids don't have rich tooltips, match against display name for all scopes
         String candidateName = candidate.getHoverName().getString();
         return pattern.matcher(candidateName).find();
     }
