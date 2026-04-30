@@ -24,6 +24,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -165,9 +166,9 @@ public class TransferEngine {
             boolean hasPerEntryAmounts) {
     }
 
-    public static boolean processNetwork(LogisticsNetwork network, MinecraftServer server) {
+    public static long processNetwork(LogisticsNetwork network, MinecraftServer server) {
         if (network == null || server == null)
-            return false;
+            return Long.MAX_VALUE;
 
         NetworkRegistry registry = NetworkRegistry.get((ServerLevel) server.overworld());
         if (network.isCacheDirty()) {
@@ -177,7 +178,7 @@ public class TransferEngine {
 
         Set<UUID> nodeUuids = network.getNodeUuids();
         if (nodeUuids.isEmpty())
-            return false;
+            return Long.MAX_VALUE;
 
         // Deterministic order
         List<UUID> sortedUuids = new ArrayList<>(nodeUuids);
@@ -203,30 +204,31 @@ public class TransferEngine {
         }
 
         if (sortedNodes.isEmpty())
-            return false;
+            return Long.MAX_VALUE;
 
         Map<UUID, Integer> signalCache = buildSignalCache(sortedNodes);
         if (signalCache.isEmpty())
-            return false;
+            return Long.MAX_VALUE;
 
-        List<ImportTarget>[] itemImports = resolveCache(network.getItemImports(), nodeCache);
-        List<ImportTarget>[] fluidImports = resolveCache(network.getFluidImports(), nodeCache);
-        List<ImportTarget>[] energyImports = resolveCache(network.getEnergyImports(), nodeCache);
-        List<ImportTarget>[] chemicalImports = resolveCache(network.getChemicalImports(), nodeCache);
-        List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache);
+        List<ImportTarget>[] itemImports = resolveCache(network.getItemImports(), nodeCache, signalCache);
+        List<ImportTarget>[] fluidImports = resolveCache(network.getFluidImports(), nodeCache, signalCache);
+        List<ImportTarget>[] energyImports = resolveCache(network.getEnergyImports(), nodeCache, signalCache);
+        List<ImportTarget>[] chemicalImports = resolveCache(network.getChemicalImports(), nodeCache, signalCache);
+        List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache, signalCache);
 
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
         CapCache capCache = new CapCache();
 
-        boolean anyActivePotential = false;
+        long minWakeDelta = Long.MAX_VALUE;
         for (LogisticsNodeEntity sourceNode : sortedNodes) {
-            if (processNode(sourceNode, itemImports, fluidImports, energyImports, chemicalImports,
-                    sourceImports, signalCache, dimensionalCache, tierCache, telemetryActive, capCache)) {
-                anyActivePotential = true;
+            long delta = processNode(sourceNode, itemImports, fluidImports, energyImports, chemicalImports,
+                    sourceImports, signalCache, dimensionalCache, tierCache, telemetryActive, capCache);
+            if (delta < minWakeDelta) {
+                minWakeDelta = delta;
             }
         }
 
-        return anyActivePotential;
+        return minWakeDelta;
     }
 
     private static Map<UUID, Integer> buildSignalCache(List<LogisticsNodeEntity> nodes) {
@@ -242,7 +244,8 @@ public class TransferEngine {
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 ChannelData ch = node.getChannel(i);
                 if (ch != null && ch.isEnabled()) {
-                    if (ch.getRedstoneMode() != RedstoneMode.ALWAYS_ON) {
+                    RedstoneMode rm = ch.getRedstoneMode();
+                    if (rm == RedstoneMode.HIGH || rm == RedstoneMode.LOW) {
                         needsSignal = true;
                     }
                     if (ch.getMode() == ChannelMode.EXPORT) {
@@ -264,7 +267,8 @@ public class TransferEngine {
 
     @SuppressWarnings("unchecked")
     private static List<ImportTarget>[] resolveCache(List<NodeRef>[] cache,
-            Map<UUID, LogisticsNodeEntity> nodeCache) {
+            Map<UUID, LogisticsNodeEntity> nodeCache,
+            Map<UUID, Integer> signalCache) {
         List<ImportTarget>[] resolved = new List[9];
         for (int i = 0; i < 9; i++) {
             List<NodeRef> cachedNodes = cache[i];
@@ -274,16 +278,19 @@ public class TransferEngine {
                 if (node == null)
                     continue;
                 ChannelData cd = node.getChannel(i);
-                if (cd != null) {
-                    targets.add(new ImportTarget(node, cd, i));
-                }
+                if (cd == null)
+                    continue;
+                int sig = signalCache.getOrDefault(ref.nodeId(), 0);
+                if (!isRedstoneActive(cd.getRedstoneMode(), sig))
+                    continue;
+                targets.add(new ImportTarget(node, cd, i));
             }
             resolved[i] = targets;
         }
         return resolved;
     }
 
-    private static boolean processNode(LogisticsNodeEntity sourceNode,
+    private static long processNode(LogisticsNodeEntity sourceNode,
             List<ImportTarget>[] itemImports,
             List<ImportTarget>[] fluidImports,
             List<ImportTarget>[] energyImports,
@@ -296,13 +303,13 @@ public class TransferEngine {
             CapCache capCache) {
 
         if (!sourceNode.isValidNode())
-            return false;
+            return Long.MAX_VALUE;
 
         ServerLevel sourceLevel = (ServerLevel) sourceNode.level();
         long gameTime = sourceLevel.getGameTime();
         int redstoneSignal = signalCache.getOrDefault(sourceNode.getUUID(), 0);
-        boolean hasActivePotential = false;
         int sourceTier = tierCache.getOrDefault(sourceNode.getUUID(), 0);
+        long minWakeDelta = Long.MAX_VALUE;
 
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
             ChannelData channel = sourceNode.getChannel(i);
@@ -324,11 +331,11 @@ public class TransferEngine {
             if (targets == null || targets.isEmpty())
                 continue;
 
-            hasActivePotential = true;
-
-            // Backoff/Cool-down Check
-            if (isOnCooldown(sourceNode, channel, i, sourceTier, gameTime))
+            long cooldown = cooldownRemaining(sourceNode, channel, i, sourceTier, gameTime);
+            if (cooldown > 0) {
+                if (cooldown < minWakeDelta) minWakeDelta = cooldown;
                 continue;
+            }
 
             targets = orderTargets(targets, channel.getDistributionMode(), sourceNode, i);
 
@@ -356,12 +363,20 @@ public class TransferEngine {
             }
 
             updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier, targets.size());
+
+            if (result > 0) {
+                minWakeDelta = 0;
+            } else {
+                long postCooldown = cooldownRemaining(sourceNode, channel, i, sourceTier, gameTime);
+                long wakeAt = Math.max(1L, postCooldown);
+                if (wakeAt < minWakeDelta) minWakeDelta = wakeAt;
+            }
         }
 
-        return hasActivePotential;
+        return minWakeDelta;
     }
 
-    private static boolean isOnCooldown(LogisticsNodeEntity node, ChannelData channel, int index, int tier,
+    private static long cooldownRemaining(LogisticsNodeEntity node, ChannelData channel, int index, int tier,
             long gameTime) {
         long lastRun = node.getLastExecution(index);
         boolean isInstantType = channel.getType() == ChannelType.ENERGY;
@@ -370,8 +385,8 @@ public class TransferEngine {
         float backoff = node.getBackoffTicks(index);
         boolean useBackoff = Config.backoffEnabled[channel.getType().ordinal()];
         long effectiveDelay = useBackoff ? Math.max(configuredDelay, (long) backoff) : configuredDelay;
-
-        return gameTime - lastRun < effectiveDelay;
+        long elapsed = gameTime - lastRun;
+        return Math.max(0L, effectiveDelay - elapsed);
     }
 
     private static int getBatchLimit(ChannelType type, int tier) {
@@ -505,7 +520,8 @@ public class TransferEngine {
         return executeMove(sourceHandler, reachableTargets, batchLimit,
                 exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
-                sourceLevel.registryAccess());
+                sourceLevel.registryAccess(),
+                sourceLevel, sourcePos);
     }
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -726,7 +742,8 @@ public class TransferEngine {
     private static int executeMove(ResourceHandler<ItemResource> source, List<ItemTransferTarget> targets, int limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             boolean[] sourceAllowedSlots,
-            HolderLookup.Provider provider) {
+            HolderLookup.Provider provider,
+            ServerLevel sourceLevel, BlockPos sourcePos) {
 
         int remaining = limit;
         FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
@@ -852,7 +869,8 @@ public class TransferEngine {
 
                     ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, false,
                             target.allowedSlots());
-                    int moved = toMove.getCount() - uninserted.getCount();
+                    int targetAccepted = toMove.getCount() - uninserted.getCount();
+                    int droppedToWorld = 0;
 
                     if (!uninserted.isEmpty()) {
                         ItemStack stillLeft = insertItem(source, slot, uninserted, false);
@@ -861,29 +879,37 @@ public class TransferEngine {
                                 stillLeft = insertItem(source, fallback, stillLeft, false);
                             }
                             if (!stillLeft.isEmpty()) {
-                                LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source handler {}. " +
-                                        "Forcing back into target as last resort.",
-                                        stillLeft, source.getClass().getSimpleName());
-                                insertItemWithAllowedSlots(target.handler(), stillLeft, false, null);
+                                ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(), stillLeft,
+                                        false, target.allowedSlots());
+                                int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
+                                targetAccepted += forcedIn;
+                                if (!forcedRemainder.isEmpty()) {
+                                    LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
+                                            + "target slot mask. Dropping at source pos {}.",
+                                            forcedRemainder, sourcePos);
+                                    droppedToWorld = forcedRemainder.getCount();
+                                    Block.popResource(sourceLevel, sourcePos, forcedRemainder);
+                                }
                             }
                         }
                     }
 
-                    if (moved > 0) {
+                    int sourceLost = targetAccepted + droppedToWorld;
+                    if (sourceLost > 0) {
                         movedAny = true;
                         movedForTarget = true;
-                        remaining -= moved;
+                        remaining -= sourceLost;
 
                         if (anyAmountConstraints) {
                             Item movedItem = extracted.getItem();
                             if (sourceItemCounts != null) {
-                                sourceItemCounts.merge(movedItem, -moved, Integer::sum);
+                                sourceItemCounts.merge(movedItem, -sourceLost, Integer::sum);
                             }
                             Map<Item, Integer> tgtCache = targetItemCounts.get(targetIndex);
-                            if (tgtCache != null) {
-                                tgtCache.merge(movedItem, moved, Integer::sum);
+                            if (tgtCache != null && targetAccepted > 0) {
+                                tgtCache.merge(movedItem, targetAccepted, Integer::sum);
                             }
-                            batchMoved.merge(movedItem, moved, Integer::sum);
+                            batchMoved.merge(movedItem, sourceLost, Integer::sum);
                         }
 
                         break;
@@ -1061,7 +1087,12 @@ public class TransferEngine {
 
             int filled = fillFluid(target, drained, false);
             if (filled < drained.getAmount()) {
-                fillFluid(source, drained.copyWithAmount(drained.getAmount() - filled), false);
+                int rollbackAmount = drained.getAmount() - filled;
+                int returned = fillFluid(source, drained.copyWithAmount(rollbackAmount), false);
+                if (returned < rollbackAmount) {
+                    LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
+                            rollbackAmount - returned, drained.getFluid(), rollbackAmount - returned);
+                }
             }
 
             if (filled > 0) {
