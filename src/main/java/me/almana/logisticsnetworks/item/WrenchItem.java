@@ -144,6 +144,11 @@ public class WrenchItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
+        if (!node.isOwnedBy(player)) {
+            player.displayClientMessage(Component.translatable("message.logisticsnetworks.not_owner"), true);
+            return InteractionResult.FAIL;
+        }
+
         ItemStack wrenchStack = context.getItemInHand();
         return isSecondaryUse(player)
                 ? pasteToNode(node, player, wrenchStack)
@@ -292,7 +297,7 @@ public class WrenchItem extends Item {
             }
 
             LogisticsNodeEntity node = findNodeAt(level, current);
-            if (node != null) {
+            if (node != null && node.isOwnedBy(player)) {
                 targets.add(node);
             }
 

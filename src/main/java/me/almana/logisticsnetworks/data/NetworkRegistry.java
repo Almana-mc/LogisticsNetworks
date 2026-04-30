@@ -30,6 +30,8 @@ public class NetworkRegistry extends SavedData {
 
     private final Map<UUID, LogisticsNetwork> networks = new HashMap<>();
     private final Set<UUID> dirtyNetworks = new HashSet<>();
+    private final TreeMap<Long, Set<UUID>> wakeBuckets = new TreeMap<>();
+    private final Map<UUID, Long> scheduledWake = new HashMap<>();
     private final TelemetryManager telemetryManager = new TelemetryManager();
 
     public NetworkRegistry() {
@@ -44,6 +46,9 @@ public class NetworkRegistry extends SavedData {
     }
 
     public void processDirtyNetworks(MinecraftServer server) {
+        long now = server.overworld().getGameTime();
+        promoteDueWakes(now);
+
         if (dirtyNetworks.isEmpty())
             return;
 
@@ -60,13 +65,55 @@ public class NetworkRegistry extends SavedData {
                 continue;
 
             try {
-                boolean moreWork = TransferEngine.processNetwork(network, server);
-                if (moreWork) {
+                long delta = TransferEngine.processNetwork(network, server);
+                if (delta == 0L) {
                     dirtyNetworks.add(id);
+                } else if (delta != Long.MAX_VALUE) {
+                    scheduleWake(id, now + delta);
                 }
             } catch (Exception e) {
                 LOGGER.error("Error processing network {}: {}", id, e.getMessage(), e);
             }
+        }
+    }
+
+    private void promoteDueWakes(long now) {
+        while (!wakeBuckets.isEmpty()) {
+            Map.Entry<Long, Set<UUID>> entry = wakeBuckets.firstEntry();
+            if (entry.getKey() > now)
+                break;
+            for (UUID id : entry.getValue()) {
+                scheduledWake.remove(id);
+                if (networks.containsKey(id)) {
+                    dirtyNetworks.add(id);
+                }
+            }
+            wakeBuckets.pollFirstEntry();
+        }
+    }
+
+    private void scheduleWake(UUID id, long tick) {
+        Long existing = scheduledWake.get(id);
+        if (existing != null) {
+            if (existing <= tick)
+                return;
+            Set<UUID> bucket = wakeBuckets.get(existing);
+            if (bucket != null) {
+                bucket.remove(id);
+                if (bucket.isEmpty()) wakeBuckets.remove(existing);
+            }
+        }
+        scheduledWake.put(id, tick);
+        wakeBuckets.computeIfAbsent(tick, k -> new HashSet<>()).add(id);
+    }
+
+    private void cancelWake(UUID id) {
+        Long tick = scheduledWake.remove(id);
+        if (tick == null) return;
+        Set<UUID> bucket = wakeBuckets.get(tick);
+        if (bucket != null) {
+            bucket.remove(id);
+            if (bucket.isEmpty()) wakeBuckets.remove(tick);
         }
     }
 
@@ -104,6 +151,7 @@ public class NetworkRegistry extends SavedData {
     public void deleteNetwork(UUID id) {
         if (networks.remove(id) != null) {
             dirtyNetworks.remove(id);
+            cancelWake(id);
             setDirty();
         }
     }
@@ -122,6 +170,7 @@ public class NetworkRegistry extends SavedData {
 
     public void markNetworkDirty(UUID networkId) {
         if (networks.containsKey(networkId)) {
+            cancelWake(networkId);
             dirtyNetworks.add(networkId);
             networks.get(networkId).markCacheDirty();
         }

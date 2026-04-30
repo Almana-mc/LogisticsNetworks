@@ -503,20 +503,21 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         boolean hoveredRow = mx >= x && mx <= x + w && my >= y && my <= y + 17;
         boolean hoveredRename = mx >= renameBtnX && mx <= renameBtnX + renameBtnW && my >= y && my <= y + 17;
+        int hoverFg = (cBorderStrong() == cText()) ? theme().bg() : cText();
 
         g.fill(x, y, x + w, y + 17, hoveredRow ? cBorderStrong() : cPanel());
         g.renderOutline(x, y, w, 17, hoveredRow ? cAccent() : cBorder());
-        g.drawString(font, entry.name(), x + 5, y + 4, hoveredRow ? cText() : cMuted(), false);
+        g.drawString(font, entry.name(), x + 5, y + 4, hoveredRow ? hoverFg : cMuted(), false);
 
         String info = tr("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
         int infoX = renameBtnX - font.width(info) - 4;
-        g.drawString(font, info, infoX, y + 4, cSubtle(), false);
+        g.drawString(font, info, infoX, y + 4, hoveredRow ? hoverFg : cSubtle(), false);
 
         // Rename button
         g.fill(renameBtnX, y, renameBtnX + renameBtnW, y + 17, hoveredRename ? cBorderStrong() : cPanel());
         g.renderOutline(renameBtnX, y, renameBtnW, 17, hoveredRename ? cAccent() : cBorder());
         ThemePaint.drawCentered(g, font, tr("gui.logisticsnetworks.rename"), renameBtnX + renameBtnW / 2, y + 4,
-                hoveredRename ? cText() : cMuted());
+                hoveredRename ? hoverFg : cMuted());
     }
 
     private void renderChannelConfigPage(GuiGraphics g, int mx, int my) {
@@ -927,7 +928,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private boolean isSettingDisabled(ChannelData ch, int row) {
         if (ch.getMode() == ChannelMode.IMPORT) {
-            return row == 4 || row == 5 || row == 7 || row == 8;
+            return row == 5 || row == 7 || row == 8;
         }
         return (ch.getType() == ChannelType.ENERGY) && row == 8;
     }
@@ -1150,14 +1151,16 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             return true;
         }
 
-        String nodeLabel = node.getNodeLabel();
-        String labelDisplay = nodeLabel.isEmpty() ? tr("gui.logisticsnetworks.node.label.set") : nodeLabel;
-        int labelW = font.width(labelDisplay) + 14;
-        int labelX = leftPos + 10 + (148 - labelW) / 2;
-        int labelY = topPos + 40;
-        if (isHoveringAbs(labelX, labelY, labelW, 12, mx, my)) {
-            openLabelPicker(node);
-            return true;
+        if (!channelNameEditing) {
+            String nodeLabel = node.getNodeLabel();
+            String labelDisplay = nodeLabel.isEmpty() ? tr("gui.logisticsnetworks.node.label.set") : nodeLabel;
+            int labelW = font.width(labelDisplay) + 14;
+            int labelX = leftPos + 10 + (148 - labelW) / 2;
+            int labelY = topPos + 40;
+            if (isHoveringAbs(labelX, labelY, labelW, 12, mx, my)) {
+                openLabelPicker(node);
+                return true;
+            }
         }
 
         for (int i = 0; i < 9; i++) {
@@ -1397,10 +1400,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         int tabX = leftPos + 10 + channelIndex * 26;
         int editX = Math.max(leftPos + 4, Math.min(tabX - 20, leftPos + GUI_WIDTH - 84));
 
-        channelNameEditBox = new EditBox(font, editX, topPos + 40, 80, 12, Component.empty());
+        channelNameEditBox = new FlatEditBox(font, editX, topPos + 40, 80, 12, Component.empty());
         channelNameEditBox.setMaxLength(24);
         channelNameEditBox.setValue(ch.getName());
-        channelNameEditBox.setBordered(true);
         channelNameEditBox.setTextColor(cText());
         channelNameEditBox.setFocused(true);
         addRenderableWidget(channelNameEditBox);
