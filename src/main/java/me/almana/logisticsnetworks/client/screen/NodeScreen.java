@@ -927,7 +927,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private boolean isSettingDisabled(ChannelData ch, int row) {
         if (ch.getMode() == ChannelMode.IMPORT) {
-            return row == 4 || row == 5 || row == 7 || row == 8;
+            return row == 5 || row == 7 || row == 8;
         }
         return (ch.getType() == ChannelType.ENERGY) && row == 8;
     }

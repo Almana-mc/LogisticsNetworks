@@ -56,7 +56,7 @@ public class ServerPayloadHandler {
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
 
@@ -158,7 +158,7 @@ public class ServerPayloadHandler {
     public static void handleAssignNetwork(AssignNetworkPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             ServerPlayer player = (ServerPlayer) context.player();
-            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
 
@@ -269,7 +269,7 @@ public class ServerPayloadHandler {
 
     public static void handleToggleVisibility(ToggleNodeVisibilityPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node != null)
                 node.setRenderVisible(!node.isRenderVisible());
         });
@@ -330,7 +330,7 @@ public class ServerPayloadHandler {
 
     public static void handleSetFilter(SetFilterPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
             ChannelData channel = node.getChannel(payload.channelIndex());
@@ -344,7 +344,7 @@ public class ServerPayloadHandler {
 
     public static void handleSetChannelFilterItem(SetChannelFilterItemPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
             ChannelData channel = node.getChannel(payload.channelIndex());
@@ -360,7 +360,7 @@ public class ServerPayloadHandler {
 
     public static void handleSetNodeUpgradeItem(SetNodeUpgradeItemPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
 
@@ -591,6 +591,12 @@ public class ServerPayloadHandler {
         return (entity instanceof LogisticsNodeEntity node && node.isValidNode()) ? node : null;
     }
 
+    private static LogisticsNodeEntity getAuthorizedNode(IPayloadContext context, int entityId) {
+        LogisticsNodeEntity node = getNode(context, entityId);
+        if (node == null) return null;
+        return node.isOwnedBy(context.player()) ? node : null;
+    }
+
     private static void markNetworkDirty(LogisticsNodeEntity node) {
         if (node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
             NetworkRegistry.get(level).markNetworkDirty(node.getNetworkId());
@@ -651,7 +657,7 @@ public class ServerPayloadHandler {
                 return;
 
             Entity entity = serverPlayer.level().getEntity(payload.entityId());
-            if (!(entity instanceof LogisticsNodeEntity node))
+            if (!(entity instanceof LogisticsNodeEntity node) || !node.isOwnedBy(serverPlayer))
                 return;
 
             int channel = payload.channel();
@@ -799,7 +805,7 @@ public class ServerPayloadHandler {
 
     public static void handleSetNodeLabel(SetNodeLabelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
 
@@ -848,7 +854,7 @@ public class ServerPayloadHandler {
 
     public static void handleSetChannelName(SetChannelNamePayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getNode(context, payload.entityId());
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
 

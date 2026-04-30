@@ -326,9 +326,6 @@ public class LogisticsNetwork {
             if (ch.getMode() != ChannelMode.IMPORT) {
                 continue;
             }
-            if (ch.getRedstoneMode() != RedstoneMode.ALWAYS_ON) {
-                continue;
-            }
 
             switch (ch.getType()) {
                 case ITEM -> this.itemImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));

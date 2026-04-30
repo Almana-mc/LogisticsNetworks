@@ -4,7 +4,6 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.command.LogisticsCommand;
 import me.almana.logisticsnetworks.data.ChannelData;
-import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.RedstoneMode;
@@ -126,7 +125,7 @@ public class EventHandler {
     private static boolean hasRedstoneSensitiveChannel(LogisticsNodeEntity node) {
         ChannelData[] channels = node.getChannels();
         for (ChannelData ch : channels) {
-            if (ch.isEnabled() && ch.getMode() == ChannelMode.EXPORT) {
+            if (ch.isEnabled()) {
                 RedstoneMode mode = ch.getRedstoneMode();
                 if (mode == RedstoneMode.HIGH || mode == RedstoneMode.LOW) {
                     return true;
