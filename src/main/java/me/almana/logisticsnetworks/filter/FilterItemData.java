@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.filter;
 
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.util.ItemDataUtil;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
@@ -1143,8 +1144,9 @@ public final class FilterItemData {
             return false;
 
         ItemFilterView view = getItemFilterView(filter, readCache);
-        LOGGER.debug("[containsItemFull] hasItemEntries={}, hasTagEntries={}, candidate={}",
-                view.hasItemEntries(), view.hasTagEntries(), candidate.getItem());
+        if (Config.debugMode)
+            LOGGER.debug("[containsItemFull] hasItemEntries={}, hasTagEntries={}, candidate={}",
+                    view.hasItemEntries(), view.hasTagEntries(), candidate.getItem());
         CompoundTag resolvedCandidateComponents = candidateComponents;
         boolean candidateComponentsResolved = candidateComponents != null;
         for (ItemFilterSlot entry : view.entriesBySlot()) {
@@ -1171,9 +1173,10 @@ public final class FilterItemData {
             }
 
             if (entry.nbtOnly()) {
-                LOGGER.debug("[nbtOnly] candidate={}, hasNbt={}, constraints={}, rawNbt={}",
-                        candidate.getItem(), entry.hasNbt(), entry.nbtRules().size(),
-                        entry.rawNbt());
+                if (Config.debugMode)
+                    LOGGER.debug("[nbtOnly] candidate={}, hasNbt={}, constraints={}, rawNbt={}",
+                            candidate.getItem(), entry.hasNbt(), entry.nbtRules().size(),
+                            entry.rawNbt());
                 if (entry.hasNbt()) {
                     if (!candidateComponentsResolved) {
                         resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
@@ -1186,7 +1189,8 @@ public final class FilterItemData {
                     continue;
                 if (!checkEnchantedConstraint(entry, candidate))
                     continue;
-                LOGGER.debug("[nbtOnly] MATCHED");
+                if (Config.debugMode)
+                    LOGGER.debug("[nbtOnly] MATCHED");
                 return true;
             }
 
@@ -1251,9 +1255,10 @@ public final class FilterItemData {
             }
 
             if (entry.nbtOnly()) {
-                LOGGER.debug("[nbtOnlySlot] candidate={}, slot={}, hasNbt={}, constraints={}, slotMap={}",
-                        candidate.getItem(), inventorySlot, entry.hasNbt(), entry.nbtRules().size(),
-                        entry.slotMapping() != null ? java.util.Arrays.toString(entry.slotMapping()) : "none");
+                if (Config.debugMode)
+                    LOGGER.debug("[nbtOnlySlot] candidate={}, slot={}, hasNbt={}, constraints={}, slotMap={}",
+                            candidate.getItem(), inventorySlot, entry.hasNbt(), entry.nbtRules().size(),
+                            entry.slotMapping() != null ? java.util.Arrays.toString(entry.slotMapping()) : "none");
                 if (entry.hasNbt()) {
                     if (!candidateComponentsResolved) {
                         resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
@@ -1266,7 +1271,8 @@ public final class FilterItemData {
                     continue;
                 if (!checkEnchantedConstraint(entry, candidate))
                     continue;
-                LOGGER.debug("[nbtOnlySlot] MATCHED");
+                if (Config.debugMode)
+                    LOGGER.debug("[nbtOnlySlot] MATCHED");
                 return true;
             }
 

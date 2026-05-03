@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import mekanism.api.chemical.IChemicalHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
@@ -57,6 +58,7 @@ public class TransferEngine {
         private final Map<Long, Object> items = new HashMap<>();
         private final Map<Long, Object> fluids = new HashMap<>();
         private final Map<Long, Object> energy = new HashMap<>();
+        private final Map<Long, Object> chemicals = new HashMap<>();
         private static final Object ABSENT = new Object();
 
         IItemHandler getItemHandler(ServerLevel level, BlockPos pos, Direction dir) {
@@ -141,6 +143,18 @@ public class TransferEngine {
             if (found.isEmpty()) return null;
             if (found.size() == 1) return found.get(0);
             return new CombinedEnergyStorage(found.toArray(new IEnergyStorage[0]));
+        }
+
+        @SuppressWarnings("rawtypes")
+        IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+            long key = capKey(level, pos, dir == null ? Direction.DOWN : dir);
+            if (dir == null) key ^= 0x1L << 62;
+            Object cached = chemicals.get(key);
+            if (cached == ABSENT) return null;
+            if (cached != null) return (IChemicalHandler) cached;
+            IChemicalHandler handler = ChemicalTransferHelper.getHandler(level, pos, dir);
+            chemicals.put(key, handler != null ? handler : ABSENT);
+            return handler;
         }
     }
 
@@ -339,7 +353,7 @@ public class TransferEngine {
                 case ENERGY ->
                     transferEnergy(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache, capCache);
                 case CHEMICAL ->
-                    transferChemicals(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
+                    transferChemicals(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache, capCache);
                 case SOURCE ->
                     transferSource(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
                 default ->
@@ -611,7 +625,7 @@ public class TransferEngine {
 
     private static int transferChemicals(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimit,
-            Map<UUID, Boolean> dimensionalCache) {
+            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
 
         if (!MekanismCompat.isLoaded()) {
             if (Config.debugMode)
@@ -629,6 +643,12 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
+        @SuppressWarnings("rawtypes")
+        IChemicalHandler sourceHandler = capCache.findChemicalHandler(sourceLevel, sourcePos,
+                exportChannel.getIoDirection());
+        if (sourceHandler == null)
+            return -1;
+
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
@@ -644,16 +664,20 @@ public class TransferEngine {
             if (!canReach(sourceNode, target.node(), sourceDimensional, dimensionalCache))
                 continue;
 
-            anyReachable = true;
             ServerLevel targetLevel = (ServerLevel) target.node().level();
             BlockPos targetPos = target.node().getAttachedPos();
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
+            @SuppressWarnings("rawtypes")
+            IChemicalHandler targetHandler = capCache.findChemicalHandler(targetLevel, targetPos,
+                    target.channel().getIoDirection());
+            if (targetHandler == null)
+                continue;
+
+            anyReachable = true;
             long moved = ChemicalTransferHelper.transferBetween(
-                    sourceLevel, sourcePos, exportChannel.getIoDirection(),
-                    targetLevel, targetPos, target.channel().getIoDirection(),
-                    remaining,
+                    sourceHandler, targetHandler, remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel().getFilterItems(), target.channel().getFilterMode(),
                     filterReadCache);
