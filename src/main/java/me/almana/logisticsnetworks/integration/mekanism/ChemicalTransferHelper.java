@@ -121,6 +121,19 @@ public final class ChemicalTransferHelper {
         }
 
         @Override
+        public ChemicalStack insertChemical(ChemicalStack stack, Action action) {
+            if (stack.isEmpty()) return stack;
+            ChemicalStack remainder = stack;
+            for (IChemicalHandler handler : handlers) {
+                remainder = handler.insertChemical(remainder, action);
+                if (remainder.isEmpty()) {
+                    return remainder;
+                }
+            }
+            return remainder;
+        }
+
+        @Override
         public ChemicalStack extractChemical(int tank, long amount, Action action) {
             if (tank < 0 || tank >= totalTanks) return ChemicalStack.EMPTY;
             int i = handlerIndex(tank);
@@ -230,6 +243,20 @@ public final class ChemicalTransferHelper {
         if (Config.debugMode)
             LOGGER.debug("[Chemical] Transferring {} -> {}, limit={}, srcTanks={}, tgtTanks={}",
                     sourcePos, targetPos, limit, source.getChemicalTanks(), target.getChemicalTanks());
+        return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
+                importFilters, importFilterMode, filterReadCache);
+    }
+
+    public static long transferBetween(IChemicalHandler source, IChemicalHandler target, long limit,
+            ItemStack[] exportFilters, FilterMode exportFilterMode,
+            ItemStack[] importFilters, FilterMode importFilterMode,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        if (source == null || target == null) {
+            return 0;
+        }
+        if (Config.debugMode)
+            LOGGER.debug("[Chemical] Transferring limit={}, srcTanks={}, tgtTanks={}",
+                    limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
                 importFilters, importFilterMode, filterReadCache);
     }
