@@ -14,6 +14,10 @@ public class ClientConfig {
 
     private static final ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
+    public static final ModConfigSpec.BooleanValue defaultNodeVisibilitySpec = builder
+            .comment("Whether newly placed nodes should be visible by default.")
+            .define("defaultNodeVisibility", true);
+
     public static final ModConfigSpec.IntValue maxRenderedNodesSpec = builder
             .comment("Maximum number of nodes rendered when holding a wrench. Nearest nodes are prioritized.")
             .defineInRange("maxRenderedNodes", 200, 1, Integer.MAX_VALUE);
@@ -31,6 +35,7 @@ public class ClientConfig {
 
     static final ModConfigSpec SPEC = builder.build();
 
+    public static boolean defaultNodeVisibility = true;
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
 
@@ -41,6 +46,7 @@ public class ClientConfig {
     }
 
     public static void refresh() {
+        defaultNodeVisibility = defaultNodeVisibilitySpec.get();
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());

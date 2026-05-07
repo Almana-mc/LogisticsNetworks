@@ -384,6 +384,7 @@
   "gui.logisticsnetworks.config.common.backoffEnergy": "Energy Backoff",
   "gui.logisticsnetworks.config.common.backoffChemical": "Chemical Backoff",
   "gui.logisticsnetworks.config.common.backoffSource": "Source Backoff",
+  "gui.logisticsnetworks.config.client.defaultNodeVisibility": "Default Node Visibility",
   "gui.logisticsnetworks.config.client.maxRenderedNodes": "Max Rendered Nodes",
   "gui.logisticsnetworks.config.client.maxVisibleNodes": "Max Visible Nodes",
   "gui.logisticsnetworks.config.upgrades.tier.none": "No Upgrade",
