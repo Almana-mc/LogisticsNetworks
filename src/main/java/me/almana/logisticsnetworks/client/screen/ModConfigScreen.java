@@ -69,6 +69,7 @@ public class ModConfigScreen extends Screen {
 
     private static final Component TEXT_MAX_RENDERED = Component.translatable("gui.logisticsnetworks.config.client.maxRenderedNodes");
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
+    private static final Component TEXT_CONNECTED_NODE_TEXTURES = Component.translatable("gui.logisticsnetworks.config.client.connectedNodeTextures");
 
     private static final Component[] TIER_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.upgrades.tier.none"),
@@ -107,6 +108,7 @@ public class ModConfigScreen extends Screen {
 
     private int pendingMaxRenderedNodes;
     private int pendingMaxVisibleNodes;
+    private boolean pendingConnectedNodeTextures;
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
     private String pendingTheme;
@@ -117,6 +119,8 @@ public class ModConfigScreen extends Screen {
 
     private String editStartValue = "";
     private boolean canEditServerConfig;
+    private boolean saved;
+    private boolean discarding;
 
     public ModConfigScreen(Screen parent) {
         super(Component.translatable("gui.logisticsnetworks.config.title"));
@@ -141,6 +145,7 @@ public class ModConfigScreen extends Screen {
         pendingBackoffMaxTicks = Config.backoffMaxTicksSpec.get();
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
+        pendingConnectedNodeTextures = ClientConfig.connectedNodeTexturesSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
         pendingTiers = UpgradeLimitsConfig.getAll();
 
@@ -353,7 +358,9 @@ public class ModConfigScreen extends Screen {
         g.text(font, TEXT_MAX_VISIBLE, cx, cy + 27, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 24 + 14, 80);
 
-        int themeY = cy + 48;
+        renderCheckbox(g, cx, cy + 44, cw, TEXT_CONNECTED_NODE_TEXTURES, pendingConnectedNodeTextures, mx, my, false);
+
+        int themeY = cy + 68;
         g.text(font, Component.translatable("gui.logisticsnetworks.config.client.theme"), cx, themeY, COL_INK, false);
 
         int cols = 4;
@@ -381,7 +388,14 @@ public class ModConfigScreen extends Screen {
     }
 
     private boolean handleClientClick(double mouseX, double mouseY, int cx, int cy, int cw) {
-        int themeY = cy + 48;
+        int boxX = cx + cw - 14;
+        int boxSize = 9;
+        if (inBox(mouseX, mouseY, boxX, cy + 46, boxSize)) {
+            pendingConnectedNodeTextures = !pendingConnectedNodeTextures;
+            return true;
+        }
+
+        int themeY = cy + 68;
         int cols = 4;
         int swatchGap = 4;
         int swatchW = (cw - (cols - 1) * swatchGap) / cols;
@@ -606,7 +620,9 @@ public class ModConfigScreen extends Screen {
         pendingTiers[expandedTier] = new TierLimits(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
     }
 
-    private void save() {
+    private void saveChanges() {
+        if (saved) return;
+        saved = true;
         stashCurrentTab();
 
         if (canEditServerConfig) {
@@ -638,16 +654,35 @@ public class ModConfigScreen extends Screen {
 
         ClientConfig.maxRenderedNodesSpec.set(pendingMaxRenderedNodes);
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
+        ClientConfig.connectedNodeTexturesSpec.set(pendingConnectedNodeTextures);
         ClientConfig.themeSpec.set(pendingTheme);
         ClientConfig.refresh();
         ThemeState.setTheme(Themes.byId(pendingTheme));
         ClientConfig.SPEC.save();
+    }
+
+    private void save() {
+        saveChanges();
 
         minecraft.setScreen(parent);
     }
 
     private void cancel() {
+        discarding = true;
         minecraft.setScreen(parent);
+    }
+
+    @Override
+    public void onClose() {
+        save();
+    }
+
+    @Override
+    public void removed() {
+        if (!saved && !discarding) {
+            saveChanges();
+        }
+        super.removed();
     }
 
     private int parseIntOr(String s, int fallback) {
@@ -680,7 +715,7 @@ public class ModConfigScreen extends Screen {
             return focused.keyPressed(event);
         }
         if (keyCode == 256) {
-            cancel();
+            save();
             return true;
         }
         return super.keyPressed(event);

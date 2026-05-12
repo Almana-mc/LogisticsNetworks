@@ -15,33 +15,45 @@ import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, LogisticsNodeRenderState> {
 
     private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID,
             "textures/entity/node.png");
+    private static final float BOUNDS_OFFSET = 0.5f;
+    private static final float BLOCK_MIN = -0.5f;
+    private static final float BLOCK_MAX = 0.5f;
+    private static final float BLOCK_BOTTOM = 0.0f;
+    private static final float BLOCK_TOP = 1.0f;
+    private static final float HIGHLIGHT_EPS = 0.001f;
+    private static final double SHAPE_SIDE_EPS = 1.0E-4;
 
     private static Set<Integer> allowedNodeIds;
     private static long lastComputeTick = Long.MIN_VALUE;
-
-    private final NodeModel model;
+    private static final Map<BlockPos, LogisticsNodeEntity> nodesByAttachedPos = new HashMap<>();
+    private static long lastLookupTick = Long.MIN_VALUE;
 
     public LogisticsNodeRenderer(EntityRendererProvider.Context context) {
         super(context);
-        this.model = new NodeModel(context.bakeLayer(NodeModel.LAYER_LOCATION));
     }
 
     @Override
@@ -56,8 +68,10 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         state.highlighted = entity.isHighlighted();
         state.wrenchVisible = isWrenchVisible(entity);
         state.debugMode = Config.debugMode;
+        state.connections = ClientConfig.connectedNodeTextures ? getConnectionMask(entity) : NodeConnectionMask.NONE;
         state.debugNodeId = "";
         state.debugChannels = "";
+        updateRenderBounds(entity, state);
 
         if (state.wrenchVisible && state.debugMode) {
             state.debugNodeId = "Node: " + entity.getUUID().toString().substring(0, 8);
@@ -72,12 +86,12 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
             return;
         }
 
-        submitModel(state, poseStack, submitNodeCollector);
+        submitNodeGeometry(state, poseStack, submitNodeCollector);
 
         if (state.highlighted) {
-            submitHighlightBox(poseStack, submitNodeCollector, 0.15f, 0.45f, 1.0f, 0.35f, true);
+            submitHighlightBox(state, poseStack, submitNodeCollector, 0.15f, 0.45f, 1.0f, 0.35f, true);
         } else if (state.wrenchVisible) {
-            submitHighlightBox(poseStack, submitNodeCollector, 0.0f, 1.0f, 0.0f, 0.35f, false);
+            submitHighlightBox(state, poseStack, submitNodeCollector, 0.0f, 1.0f, 0.0f, 0.35f, false);
             if (state.debugMode) {
                 submitDebugLabels(state, poseStack, submitNodeCollector);
             }
@@ -103,34 +117,26 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         return 15;
     }
 
-    private void submitModel(LogisticsNodeRenderState state, PoseStack poseStack, SubmitNodeCollector submitNodeCollector) {
-        poseStack.pushPose();
-        float scaleXZ = 17.0f / 16.0f;
-        float scaleY = 18.0f / 16.0f;
-        poseStack.scale(-scaleXZ, -scaleY, scaleXZ);
-        poseStack.translate(0.0, -17.0f / 16.0f - (8.0f / 18.0f), 0.0);
-
+    private void submitNodeGeometry(LogisticsNodeRenderState state, PoseStack poseStack,
+            SubmitNodeCollector submitNodeCollector) {
         int color = state.renderVisible ? -1 : 0x55FFFFFF;
-        submitNodeCollector.submitModel(
-                this.model,
-                state,
+        submitNodeCollector.submitCustomGeometry(
                 poseStack,
-                this.model.renderType(TEXTURE),
-                state.lightCoords,
-                OverlayTexture.NO_OVERLAY,
-                color,
-                null,
-                state.outlineColor,
-                null);
-        poseStack.popPose();
+                NodeRenderTypes.node(TEXTURE),
+                (pose, buffer) -> {
+                    NodeGeometry.emit(pose.pose(), buffer, state.connections, state.lightCoords, color,
+                            state.minX, state.minY, state.minZ, state.maxX, state.maxY, state.maxZ);
+                    NodeGeometry.emitBridges(pose.pose(), buffer, state.bridgeConnections, state.lightCoords, color,
+                            state.minX, state.minY, state.minZ, state.maxX, state.maxY, state.maxZ);
+                });
     }
 
-    private void submitHighlightBox(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, float r, float g,
-            float b, float a, boolean xray) {
+    private void submitHighlightBox(LogisticsNodeRenderState state, PoseStack poseStack,
+            SubmitNodeCollector submitNodeCollector, float r, float g, float b, float a, boolean xray) {
         submitNodeCollector.submitCustomGeometry(
                 poseStack,
                 xray ? NodeRenderTypes.overlayXray() : NodeRenderTypes.overlay(),
-                (pose, buffer) -> addHighlightBox(pose.pose(), buffer, r, g, b, a));
+                (pose, buffer) -> addHighlightBox(pose.pose(), buffer, state, r, g, b, a));
     }
 
     private void submitDebugLabels(LogisticsNodeRenderState state, PoseStack poseStack, SubmitNodeCollector submitNodeCollector) {
@@ -168,6 +174,74 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         }
         updateAllowedNodes(mc);
         return allowedNodeIds == null || allowedNodeIds.contains(entity.getId());
+    }
+
+    private static void updateRenderBounds(LogisticsNodeEntity entity, LogisticsNodeRenderState state) {
+        state.resetBounds();
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) {
+            return;
+        }
+
+        BlockPos attachedPos = entity.getAttachedPos();
+        BlockState blockState = mc.level.getBlockState(attachedPos);
+        VoxelShape shape = blockState.getShape(mc.level, attachedPos, CollisionContext.empty());
+        if (shape.isEmpty()) {
+            return;
+        }
+
+        AABB bounds = shape.bounds();
+        state.bridgeConnections = bridgeConnectionsForBounds(state.connections, bounds);
+        int boundsConnections = trimConnectionsToBounds(state.connections, bounds);
+        float minX = (float) bounds.minX - BOUNDS_OFFSET;
+        float minY = (float) bounds.minY;
+        float minZ = (float) bounds.minZ - BOUNDS_OFFSET;
+        float maxX = (float) bounds.maxX - BOUNDS_OFFSET;
+        float maxY = (float) bounds.maxY;
+        float maxZ = (float) bounds.maxZ - BOUNDS_OFFSET;
+
+        if (NodeConnectionMask.has(boundsConnections, Direction.WEST)) minX = BLOCK_MIN;
+        if (NodeConnectionMask.has(boundsConnections, Direction.EAST)) maxX = BLOCK_MAX;
+        if (NodeConnectionMask.has(boundsConnections, Direction.DOWN)) minY = BLOCK_BOTTOM;
+        if (NodeConnectionMask.has(boundsConnections, Direction.UP)) maxY = BLOCK_TOP;
+        if (NodeConnectionMask.has(boundsConnections, Direction.NORTH)) minZ = BLOCK_MIN;
+        if (NodeConnectionMask.has(boundsConnections, Direction.SOUTH)) maxZ = BLOCK_MAX;
+
+        if (maxX > minX && maxY > minY && maxZ > minZ) {
+            state.setBounds(minX, minY, minZ, maxX, maxY, maxZ);
+        }
+    }
+
+    private static int bridgeConnectionsForBounds(int connections, AABB bounds) {
+        int bridges = NodeConnectionMask.NONE;
+        for (Direction direction : Direction.values()) {
+            if (NodeConnectionMask.has(connections, direction) && !touchesSide(bounds, direction)) {
+                bridges = NodeConnectionMask.add(bridges, direction);
+            }
+        }
+        return bridges;
+    }
+
+    private static int trimConnectionsToBounds(int connections, AABB bounds) {
+        int trimmed = connections;
+        for (Direction direction : Direction.values()) {
+            if (NodeConnectionMask.has(trimmed, direction) && !touchesSide(bounds, direction)) {
+                trimmed = NodeConnectionMask.remove(trimmed, direction);
+            }
+        }
+        return trimmed;
+    }
+
+    private static boolean touchesSide(AABB bounds, Direction direction) {
+        return switch (direction) {
+            case WEST -> bounds.minX <= SHAPE_SIDE_EPS;
+            case EAST -> bounds.maxX >= 1.0 - SHAPE_SIDE_EPS;
+            case DOWN -> bounds.minY <= SHAPE_SIDE_EPS;
+            case UP -> bounds.maxY >= 1.0 - SHAPE_SIDE_EPS;
+            case NORTH -> bounds.minZ <= SHAPE_SIDE_EPS;
+            case SOUTH -> bounds.maxZ >= 1.0 - SHAPE_SIDE_EPS;
+        };
     }
 
     private static void updateAllowedNodes(Minecraft mc) {
@@ -208,6 +282,58 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         allowedNodeIds = ids;
     }
 
+    private static int getConnectionMask(LogisticsNodeEntity entity) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) {
+            return NodeConnectionMask.NONE;
+        }
+
+        updateNodeLookup(mc);
+
+        int mask = NodeConnectionMask.NONE;
+        BlockPos attachedPos = entity.getAttachedPos();
+        for (Direction direction : Direction.values()) {
+            LogisticsNodeEntity neighbor = nodesByAttachedPos.get(attachedPos.relative(direction));
+            if (neighbor != null && neighbor != entity && isRenderableNeighbor(neighbor)) {
+                mask = NodeConnectionMask.add(mask, direction);
+            }
+        }
+        for (Direction first : Direction.values()) {
+            for (Direction second : Direction.values()) {
+                if (first.ordinal() >= second.ordinal() || !NodeConnectionMask.isCornerPair(first, second)) {
+                    continue;
+                }
+                if (!NodeConnectionMask.has(mask, first) || !NodeConnectionMask.has(mask, second)) {
+                    continue;
+                }
+                LogisticsNodeEntity corner = nodesByAttachedPos.get(attachedPos.relative(first).relative(second));
+                if (corner == null || !isRenderableNeighbor(corner)) {
+                    mask = NodeConnectionMask.addCorner(mask, first, second);
+                }
+            }
+        }
+        return mask;
+    }
+
+    private static boolean isRenderableNeighbor(LogisticsNodeEntity node) {
+        return node.isAlive() && (node.isRenderVisible() || node.isHighlighted() || isWrenchVisible(node));
+    }
+
+    private static void updateNodeLookup(Minecraft mc) {
+        long tick = mc.level.getGameTime();
+        if (tick == lastLookupTick) {
+            return;
+        }
+        lastLookupTick = tick;
+
+        nodesByAttachedPos.clear();
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (entity instanceof LogisticsNodeEntity node && node.isActive()) {
+                nodesByAttachedPos.put(node.getAttachedPos(), node);
+            }
+        }
+    }
+
     private static String buildChannelDebugText(LogisticsNodeEntity entity) {
         StringBuilder channels = new StringBuilder("Ch: ");
         for (int i = 0; i < entity.getChannels().length; i++) {
@@ -219,13 +345,14 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         return channels.toString();
     }
 
-    private static void addHighlightBox(Matrix4f matrix, VertexConsumer buffer, float r, float g, float b, float a) {
-        float minX = -0.501f;
-        float maxX = 0.501f;
-        float minY = -0.001f;
-        float maxY = 1.001f;
-        float minZ = -0.501f;
-        float maxZ = 0.501f;
+    private static void addHighlightBox(Matrix4f matrix, VertexConsumer buffer, LogisticsNodeRenderState state, float r,
+            float g, float b, float a) {
+        float minX = state.minX - HIGHLIGHT_EPS;
+        float maxX = state.maxX + HIGHLIGHT_EPS;
+        float minY = state.minY - HIGHLIGHT_EPS;
+        float maxY = state.maxY + HIGHLIGHT_EPS;
+        float minZ = state.minZ - HIGHLIGHT_EPS;
+        float maxZ = state.maxZ + HIGHLIGHT_EPS;
 
         buffer.addVertex(matrix, minX, maxY, minZ).setColor(r, g, b, a);
         buffer.addVertex(matrix, minX, maxY, maxZ).setColor(r, g, b, a);

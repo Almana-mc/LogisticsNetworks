@@ -9,7 +9,6 @@ import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.PatternSetterScreen;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.render.LogisticsNodeRenderer;
-import me.almana.logisticsnetworks.render.NodeModel;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
@@ -23,10 +22,6 @@ public final class LogisticsClientEvents {
 
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(Registration.LOGISTICS_NODE.get(), LogisticsNodeRenderer::new);
-    }
-
-    public static void registerLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
-        event.registerLayerDefinition(NodeModel.LAYER_LOCATION, NodeModel::createBodyLayer);
     }
 
     public static void registerScreens(RegisterMenuScreensEvent event) {

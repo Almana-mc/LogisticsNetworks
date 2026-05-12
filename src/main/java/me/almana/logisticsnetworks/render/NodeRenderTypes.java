@@ -32,4 +32,8 @@ public final class NodeRenderTypes {
     public static RenderType overlayXray() {
         return OVERLAY_XRAY;
     }
+
+    public static RenderType node(Identifier texture) {
+        return RenderTypes.entityCutout(texture);
+    }
 }
