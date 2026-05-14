@@ -10,7 +10,6 @@ import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
 import java.util.List;
 
 public final class AE2Compat {
@@ -32,42 +31,41 @@ public final class AE2Compat {
     }
 
     public static List<PatternEntry> readPatternInputs(ItemStack pattern) {
-        // 26.1 AE2 API pending
-        return Collections.emptyList();
+        if (!isLoaded()) return List.of();
+        return AE2PatternHelper.readInputs(pattern);
     }
 
     public static List<PatternEntry> readPatternOutputs(ItemStack pattern) {
-        // 26.1 AE2 API pending
-        return Collections.emptyList();
+        if (!isLoaded()) return List.of();
+        return AE2PatternHelper.readOutputs(pattern);
     }
 
     public static boolean isPattern(ItemStack stack) {
-        // 26.1 AE2 API pending
-        return false;
+        return isLoaded() && AE2PatternHelper.isPattern(stack);
     }
 
     public static boolean isGridHost(Level level, BlockPos pos) {
-        // 26.1 AE2 API pending
-        return false;
+        return isLoaded() && AE2StorageHelper.isGridHost(level, pos);
     }
 
     public static boolean isGridAccessible(ServerLevel level, GlobalPos linkPos) {
-        // 26.1 AE2 API pending
-        return false;
+        return isLoaded() && AE2StorageHelper.isGridAccessible(level, linkPos);
     }
 
     public static long countAvailable(ServerLevel level, GlobalPos linkPos, ItemStack pattern) {
-        // 26.1 AE2 API pending
-        return 0;
+        if (!isLoaded()) return 0;
+        return AE2StorageHelper.countAvailable(level, linkPos, pattern);
     }
 
     public static int extractItems(ServerLevel level, GlobalPos linkPos, ItemStack pattern, int amount, ServerPlayer player) {
-        // 26.1 AE2 API pending
-        return 0;
+        if (!isLoaded()) return 0;
+        return AE2StorageHelper.extractItems(level, linkPos, pattern, amount, player);
     }
 
     public static void registerLinkable() {
-        // 26.1 AE2 API pending
+        if (isLoaded()) {
+            AE2StorageHelper.registerWrenchLinkable();
+        }
     }
 
     public static int countInInventory(Inventory inventory, ItemStack pattern, int protectedSlot) {

@@ -292,9 +292,14 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
 
         int mask = NodeConnectionMask.NONE;
         BlockPos attachedPos = entity.getAttachedPos();
+        AABB bounds = shapeBounds(mc, attachedPos);
+        if (bounds == null) {
+            return NodeConnectionMask.NONE;
+        }
+
         for (Direction direction : Direction.values()) {
             LogisticsNodeEntity neighbor = nodesByAttachedPos.get(attachedPos.relative(direction));
-            if (neighbor != null && neighbor != entity && isRenderableNeighbor(neighbor)) {
+            if (neighbor != null && neighbor != entity && hasMatchingBounds(mc, neighbor, bounds)) {
                 mask = NodeConnectionMask.add(mask, direction);
             }
         }
@@ -307,12 +312,39 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
                     continue;
                 }
                 LogisticsNodeEntity corner = nodesByAttachedPos.get(attachedPos.relative(first).relative(second));
-                if (corner == null || !isRenderableNeighbor(corner)) {
+                if (corner == null || !hasMatchingBounds(mc, corner, bounds)) {
                     mask = NodeConnectionMask.addCorner(mask, first, second);
                 }
             }
         }
         return mask;
+    }
+
+    private static AABB shapeBounds(Minecraft mc, BlockPos pos) {
+        BlockState blockState = mc.level.getBlockState(pos);
+        VoxelShape shape = blockState.getShape(mc.level, pos, CollisionContext.empty());
+        return shape.isEmpty() ? null : shape.bounds();
+    }
+
+    private static boolean hasMatchingBounds(Minecraft mc, LogisticsNodeEntity node, AABB bounds) {
+        if (!isRenderableNeighbor(node)) {
+            return false;
+        }
+        AABB otherBounds = shapeBounds(mc, node.getAttachedPos());
+        return otherBounds != null && sameBounds(bounds, otherBounds);
+    }
+
+    private static boolean sameBounds(AABB first, AABB second) {
+        return close(first.minX, second.minX)
+                && close(first.minY, second.minY)
+                && close(first.minZ, second.minZ)
+                && close(first.maxX, second.maxX)
+                && close(first.maxY, second.maxY)
+                && close(first.maxZ, second.maxZ);
+    }
+
+    private static boolean close(double first, double second) {
+        return Math.abs(first - second) <= SHAPE_SIDE_EPS;
     }
 
     private static boolean isRenderableNeighbor(LogisticsNodeEntity node) {

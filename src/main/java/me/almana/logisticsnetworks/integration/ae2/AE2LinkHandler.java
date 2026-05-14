@@ -1,7 +1,5 @@
 package me.almana.logisticsnetworks.integration.ae2;
 
-// 26.1 AE2 API pending
-/*
 import appeng.api.features.IGridLinkableHandler;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.core.GlobalPos;
@@ -26,4 +24,3 @@ final class AE2LinkHandler implements IGridLinkableHandler {
         WrenchItem.clearAE2Link(itemStack);
     }
 }
-*/

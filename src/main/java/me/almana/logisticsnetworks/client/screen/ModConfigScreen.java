@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.client.screen;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.client.GuiGraphics;
+import me.almana.logisticsnetworks.client.DefaultNodeVisibilitySync;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
@@ -69,6 +70,7 @@ public class ModConfigScreen extends Screen {
 
     private static final Component TEXT_MAX_RENDERED = Component.translatable("gui.logisticsnetworks.config.client.maxRenderedNodes");
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
+    private static final Component TEXT_DEFAULT_NODE_VISIBILITY = Component.translatable("gui.logisticsnetworks.config.client.defaultNodeVisibility");
     private static final Component TEXT_CONNECTED_NODE_TEXTURES = Component.translatable("gui.logisticsnetworks.config.client.connectedNodeTextures");
 
     private static final Component[] TIER_LABELS = {
@@ -108,6 +110,7 @@ public class ModConfigScreen extends Screen {
 
     private int pendingMaxRenderedNodes;
     private int pendingMaxVisibleNodes;
+    private boolean pendingDefaultNodeVisibility;
     private boolean pendingConnectedNodeTextures;
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
@@ -143,6 +146,7 @@ public class ModConfigScreen extends Screen {
         pendingBackoffChemical = Config.backoffChemicalSpec.get();
         pendingBackoffSource = Config.backoffSourceSpec.get();
         pendingBackoffMaxTicks = Config.backoffMaxTicksSpec.get();
+        pendingDefaultNodeVisibility = ClientConfig.defaultNodeVisibilitySpec.get();
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
         pendingConnectedNodeTextures = ClientConfig.connectedNodeTexturesSpec.get();
@@ -194,14 +198,14 @@ public class ModConfigScreen extends Screen {
     }
 
     private void buildClientTab(int cx, int cy, int cw) {
-        maxRenderedNodesBox = new EditBox(font, cx + 150, cy + 4, 80, 14, Component.empty());
+        maxRenderedNodesBox = new EditBox(font, cx + 150, cy + 24, 80, 14, Component.empty());
         maxRenderedNodesBox.setMaxLength(10);
         maxRenderedNodesBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
         maxRenderedNodesBox.setValue(String.valueOf(pendingMaxRenderedNodes));
         maxRenderedNodesBox.setBordered(false);
         addWidget(maxRenderedNodesBox);
 
-        maxVisibleNodesBox = new EditBox(font, cx + 150, cy + 24, 80, 14, Component.empty());
+        maxVisibleNodesBox = new EditBox(font, cx + 150, cy + 44, 80, 14, Component.empty());
         maxVisibleNodesBox.setMaxLength(10);
         maxVisibleNodesBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
         maxVisibleNodesBox.setValue(String.valueOf(pendingMaxVisibleNodes));
@@ -352,15 +356,17 @@ public class ModConfigScreen extends Screen {
     }
 
     private void renderClientTab(GuiGraphicsExtractor g, int cx, int cy, int cw, int mx, int my) {
-        g.text(font, TEXT_MAX_RENDERED, cx, cy + 7, COL_INK, false);
-        renderUnderline(g, cx + 150, cy + 4 + 14, 80);
+        renderCheckbox(g, cx, cy, cw, TEXT_DEFAULT_NODE_VISIBILITY, pendingDefaultNodeVisibility, mx, my, false);
 
-        g.text(font, TEXT_MAX_VISIBLE, cx, cy + 27, COL_INK, false);
+        g.text(font, TEXT_MAX_RENDERED, cx, cy + 27, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 24 + 14, 80);
 
-        renderCheckbox(g, cx, cy + 44, cw, TEXT_CONNECTED_NODE_TEXTURES, pendingConnectedNodeTextures, mx, my, false);
+        g.text(font, TEXT_MAX_VISIBLE, cx, cy + 47, COL_INK, false);
+        renderUnderline(g, cx + 150, cy + 44 + 14, 80);
 
-        int themeY = cy + 68;
+        renderCheckbox(g, cx, cy + 64, cw, TEXT_CONNECTED_NODE_TEXTURES, pendingConnectedNodeTextures, mx, my, false);
+
+        int themeY = cy + 88;
         g.text(font, Component.translatable("gui.logisticsnetworks.config.client.theme"), cx, themeY, COL_INK, false);
 
         int cols = 4;
@@ -390,12 +396,16 @@ public class ModConfigScreen extends Screen {
     private boolean handleClientClick(double mouseX, double mouseY, int cx, int cy, int cw) {
         int boxX = cx + cw - 14;
         int boxSize = 9;
-        if (inBox(mouseX, mouseY, boxX, cy + 46, boxSize)) {
+        if (inBox(mouseX, mouseY, boxX, cy + 2, boxSize)) {
+            pendingDefaultNodeVisibility = !pendingDefaultNodeVisibility;
+            return true;
+        }
+        if (inBox(mouseX, mouseY, boxX, cy + 66, boxSize)) {
             pendingConnectedNodeTextures = !pendingConnectedNodeTextures;
             return true;
         }
 
-        int themeY = cy + 68;
+        int themeY = cy + 88;
         int cols = 4;
         int swatchGap = 4;
         int swatchW = (cw - (cols - 1) * swatchGap) / cols;
@@ -652,11 +662,13 @@ public class ModConfigScreen extends Screen {
             Config.SPEC.save();
         }
 
+        ClientConfig.defaultNodeVisibilitySpec.set(pendingDefaultNodeVisibility);
         ClientConfig.maxRenderedNodesSpec.set(pendingMaxRenderedNodes);
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
         ClientConfig.connectedNodeTexturesSpec.set(pendingConnectedNodeTextures);
         ClientConfig.themeSpec.set(pendingTheme);
         ClientConfig.refresh();
+        DefaultNodeVisibilitySync.send();
         ThemeState.setTheme(Themes.byId(pendingTheme));
         ClientConfig.SPEC.save();
     }
