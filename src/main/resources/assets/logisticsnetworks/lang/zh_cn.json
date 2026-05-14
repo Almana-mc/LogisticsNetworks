@@ -187,7 +187,7 @@
     "gui.logisticsnetworks.filter.amount.info.export.p3": "较低值会更激进地导出. 较高值会保留更多库存.",
     "gui.logisticsnetworks.filter.name.input_hint": "输入正则表达式 ( 例如 .*stone.* )",
     "gui.logisticsnetworks.filter.name.active": "匹配: %s",
-    "gui.logisticsnetworks.filter.name.none": "未设置正则",
+    "gui.logisticsnetworks.filter.name.none": "未设置正则表达式",
     "gui.logisticsnetworks.compatibility_blacklist": "该方块来自不兼容的模组",
     "gui.logisticsnetworks.blacklist": "该方块已被列入黑名单",
     "gui.logisticsnetworks.config.client.theme": "主题",
