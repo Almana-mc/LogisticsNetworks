@@ -799,6 +799,10 @@ public class TransferEngine {
         boolean[] openTargets = new boolean[targets.size()];
         Arrays.fill(openTargets, true);
         int openTargetCount = targets.size();
+        List<List<ItemStack>> rejectedInserts = new ArrayList<>(targets.size());
+        for (int i = 0; i < targets.size(); i++) {
+            rejectedInserts.add(null);
+        }
 
         while (remaining > 0 && openTargetCount > 0) {
             movedAny = false;
@@ -870,12 +874,16 @@ public class TransferEngine {
                     if (allowed <= 0) {
                         continue;
                     }
+                    if (hasRejectedInsert(rejectedInserts.get(targetIndex), extracted)) {
+                        continue;
+                    }
 
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
                     ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), simulatedInsert, true,
                             target.allowedSlots());
                     int acceptableCount = allowed - simRemainder.getCount();
                     if (acceptableCount <= 0) {
+                        rememberRejectedInsert(rejectedInserts, targetIndex, extracted);
                         continue;
                     }
 
@@ -913,6 +921,7 @@ public class TransferEngine {
 
                     int sourceLost = targetAccepted + droppedToWorld;
                     if (sourceLost > 0) {
+                        rejectedInserts.set(targetIndex, null);
                         movedAny = true;
                         movedForTarget = true;
                         remaining -= sourceLost;
@@ -944,6 +953,27 @@ public class TransferEngine {
             }
         }
         return limit - remaining;
+    }
+
+    private static boolean hasRejectedInsert(@Nullable List<ItemStack> rejected, ItemStack stack) {
+        if (rejected == null) {
+            return false;
+        }
+        for (ItemStack rejectedStack : rejected) {
+            if (ItemStackCompat.isSameItemSameComponents(rejectedStack, stack)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void rememberRejectedInsert(List<List<ItemStack>> rejectedInserts, int targetIndex, ItemStack stack) {
+        List<ItemStack> rejected = rejectedInserts.get(targetIndex);
+        if (rejected == null) {
+            rejected = new ArrayList<>();
+            rejectedInserts.set(targetIndex, rejected);
+        }
+        rejected.add(stack.copyWithCount(1));
     }
 
     private static ItemStack insertItemWithAllowedSlots(IItemHandler handler, ItemStack stack, boolean simulate,
