@@ -1151,29 +1151,54 @@ public class TransferEngine {
     }
 
     private static int executeEnergyMove(IEnergyStorage source, IEnergyStorage target, int limitRF) {
-        int extracted = source.extractEnergy(limitRF, true);
+        int toMove = getEnergyMoveAmount(source, target, limitRF);
+        if (toMove <= 0)
+            return 0;
+
+        int extracted = source.extractEnergy(toMove, false);
         if (extracted <= 0)
             return 0;
 
-        int accepted = target.receiveEnergy(extracted, true);
-        if (accepted <= 0)
-            return 0;
+        int received = target.receiveEnergy(extracted, false);
+        if (received == extracted)
+            return received;
 
-        int toMove = Math.min(extracted, accepted);
-        int actuallyExtracted = source.extractEnergy(toMove, false);
-        if (actuallyExtracted <= 0)
-            return 0;
-
-        int received = target.receiveEnergy(actuallyExtracted, false);
-        if (received < actuallyExtracted) {
-            int rollbackAmount = actuallyExtracted - received;
+        int rollbackAmount = extracted - received;
+        if (source.canReceive()) {
             int returned = source.receiveEnergy(rollbackAmount, false);
-            if (returned < rollbackAmount) {
-                LOGGER.error("ENERGY VOIDING: Source rejected rollback of {} RF. {} RF lost.",
-                        rollbackAmount - returned, rollbackAmount - returned);
-            }
+            rollbackAmount -= returned;
         }
+
+        if (rollbackAmount > 0 && Config.debugMode) {
+            LOGGER.warn("ENERGY TRANSFER MISMATCH: {} RF could not be inserted or returned.", rollbackAmount);
+        }
+
         return received;
+    }
+
+    private static int getEnergyMoveAmount(IEnergyStorage source, IEnergyStorage target, int limitRF) {
+        if (limitRF <= 0)
+            return 0;
+
+        int sourceStored = Math.max(0, source.getEnergyStored());
+        int targetSpace = getEnergySpace(target);
+        int limit = Math.min(limitRF, Math.min(sourceStored, targetSpace));
+        if (limit <= 0)
+            return 0;
+
+        int extracted = source.extractEnergy(limit, true);
+        if (extracted <= 0)
+            return 0;
+
+        int accepted = target.receiveEnergy(Math.min(limit, extracted), true);
+        return Math.max(0, Math.min(limit, Math.min(extracted, accepted)));
+    }
+
+    private static int getEnergySpace(IEnergyStorage target) {
+        long space = (long) target.getMaxEnergyStored() - target.getEnergyStored();
+        if (space <= 0)
+            return 0;
+        return space > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) space;
     }
 
     private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
