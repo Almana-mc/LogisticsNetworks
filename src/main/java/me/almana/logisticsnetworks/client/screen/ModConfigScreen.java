@@ -69,6 +69,7 @@ public class ModConfigScreen extends Screen {
     private static final Component TEXT_MAX_RENDERED = Component.translatable("gui.logisticsnetworks.config.client.maxRenderedNodes");
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
     private static final Component TEXT_DEFAULT_NODE_VISIBILITY = Component.translatable("gui.logisticsnetworks.config.client.defaultNodeVisibility");
+    private static final Component TEXT_CONNECTED_NODE_TEXTURES = Component.translatable("gui.logisticsnetworks.config.client.connectedNodeTextures");
 
     private static final Component[] TIER_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.upgrades.tier.none"),
@@ -106,6 +107,7 @@ public class ModConfigScreen extends Screen {
     private boolean pendingDefaultNodeVisibility;
     private int pendingMaxRenderedNodes;
     private int pendingMaxVisibleNodes;
+    private boolean pendingConnectedNodeTextures;
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
 
@@ -143,6 +145,7 @@ public class ModConfigScreen extends Screen {
         pendingDefaultNodeVisibility = ClientConfig.defaultNodeVisibilitySpec.get();
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
+        pendingConnectedNodeTextures = ClientConfig.connectedNodeTexturesSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
         pendingTiers = UpgradeLimitsConfig.getAll();
 
@@ -393,7 +396,9 @@ public class ModConfigScreen extends Screen {
         g.drawString(font, TEXT_MAX_VISIBLE, cx, cy + 47, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 44 + 14, 80);
 
-        int themeY = cy + 68;
+        renderCheckbox(g, cx, cy + 64, cw, TEXT_CONNECTED_NODE_TEXTURES, pendingConnectedNodeTextures, mx, my, false);
+
+        int themeY = cy + 88;
         g.drawString(font, Component.translatable("gui.logisticsnetworks.config.client.theme"), cx, themeY, COL_INK, false);
 
         int cols = 4;
@@ -426,8 +431,12 @@ public class ModConfigScreen extends Screen {
             pendingDefaultNodeVisibility = !pendingDefaultNodeVisibility;
             return true;
         }
+        if (inBox(mx, my, boxX, cy + 66, 9)) {
+            pendingConnectedNodeTextures = !pendingConnectedNodeTextures;
+            return true;
+        }
 
-        int themeY = cy + 68;
+        int themeY = cy + 88;
         int cols = 4;
         int swatchGap = 4;
         int swatchW = (cw - (cols - 1) * swatchGap) / cols;
@@ -682,6 +691,7 @@ public class ModConfigScreen extends Screen {
         ClientConfig.maxRenderedNodesSpec.set(pendingMaxRenderedNodes);
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
         ClientConfig.defaultNodeVisibilitySpec.set(pendingDefaultNodeVisibility);
+        ClientConfig.connectedNodeTexturesSpec.set(pendingConnectedNodeTextures);
         ClientConfig.themeSpec.set(pendingTheme);
         ClientConfig.refresh();
         DefaultNodeVisibilitySync.send();

@@ -49,12 +49,6 @@ public final class FilterItemData {
     private static final String KEY_RULE_V = "v";
     private static final int MAX_NBT_RULES_PER_SLOT = 6;
     private static final String NBT_OP_EQUALS = "=";
-    private static final String NBT_OP_NOT_EQUALS = "!=";
-    private static final String NBT_OP_GT = ">";
-    private static final String NBT_OP_LT = "<";
-    private static final String NBT_OP_GTE = ">=";
-    private static final String NBT_OP_LTE = "<=";
-    private static final String[] NBT_OPS = { "=", "!=", ">", "<", ">=", "<=" };
 
     public static final class ReadCache {
         private final IdentityHashMap<ItemStack, ItemFilterView> itemViews = new IdentityHashMap<>();
@@ -1687,7 +1681,7 @@ public final class FilterItemData {
 
         CompoundTag rawNbt = entry.rawNbt();
         if (rawNbt != null) {
-            return compoundContains(components, rawNbt);
+            return NbtRuleMatcher.compoundContains(components, rawNbt);
         }
         if (entry.invalidRawNbt()) {
             return false;
@@ -1723,7 +1717,7 @@ public final class FilterItemData {
         if (raw != null) {
             try {
                 CompoundTag expected = TagParser.parseTag(raw);
-                return compoundContains(components, expected);
+                return NbtRuleMatcher.compoundContains(components, expected);
             } catch (Exception e) {
                 return false;
             }
@@ -1735,22 +1729,6 @@ public final class FilterItemData {
             return true;
         Tag actual = NbtFilterData.resolvePathValue(components, nbtPath);
         return matchesNbtValue(getEntryNbtOperator(entry), nbtExpected, actual);
-    }
-
-    private static boolean compoundContains(CompoundTag actual, CompoundTag expected) {
-        for (String key : expected.getAllKeys()) {
-            Tag expectedVal = expected.get(key);
-            Tag actualVal = actual.get(key);
-            if (actualVal == null || expectedVal == null)
-                return false;
-            if (expectedVal instanceof CompoundTag ec && actualVal instanceof CompoundTag ac) {
-                if (!compoundContains(ac, ec))
-                    return false;
-            } else if (!expectedVal.equals(actualVal)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static boolean checkDurabilityConstraint(ItemStack filter, int slot, ItemStack candidate) {
@@ -2122,46 +2100,15 @@ public final class FilterItemData {
     }
 
     private static String normalizeNbtOperator(@Nullable String operator) {
-        if (operator == null) return NBT_OP_EQUALS;
-        return switch (operator) {
-            case "!=", ">", "<", ">=", "<=" -> operator;
-            default -> NBT_OP_EQUALS;
-        };
+        return NbtRuleMatcher.normalizeOperator(operator);
     }
 
     public static String nextNbtOperator(String current) {
-        for (int i = 0; i < NBT_OPS.length; i++) {
-            if (NBT_OPS[i].equals(current)) return NBT_OPS[(i + 1) % NBT_OPS.length];
-        }
-        return NBT_OPS[0];
+        return NbtRuleMatcher.nextOperator(current);
     }
 
     private static boolean matchesNbtValue(@Nullable String operator, Tag expected, @Nullable Tag actual) {
-        if (actual == null) return NBT_OP_NOT_EQUALS.equals(operator);
-        String op = operator != null ? operator : NBT_OP_EQUALS;
-        return switch (op) {
-            case "!=" -> !expected.equals(actual);
-            case ">", "<", ">=", "<=" -> compareNumericNbt(op, expected, actual);
-            default -> expected.equals(actual);
-        };
-    }
-
-    private static boolean compareNumericNbt(String op, Tag expected, Tag actual) {
-        double exp = tagToDouble(expected);
-        double act = tagToDouble(actual);
-        if (Double.isNaN(exp) || Double.isNaN(act)) return false;
-        return switch (op) {
-            case ">" -> act > exp;
-            case "<" -> act < exp;
-            case ">=" -> act >= exp;
-            case "<=" -> act <= exp;
-            default -> false;
-        };
-    }
-
-    private static double tagToDouble(Tag tag) {
-        if (tag instanceof net.minecraft.nbt.NumericTag nt) return nt.getAsDouble();
-        try { return Double.parseDouble(tag.getAsString()); } catch (Exception e) { return Double.NaN; }
+        return NbtRuleMatcher.matchesValue(operator, expected, actual);
     }
 
     private static boolean hasEntryDurability(CompoundTag entry) {

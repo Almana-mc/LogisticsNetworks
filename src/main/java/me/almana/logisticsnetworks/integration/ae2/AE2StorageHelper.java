@@ -57,20 +57,29 @@ final class AE2StorageHelper {
 
     static long countAvailable(ServerLevel callerLevel, GlobalPos linkPos, ItemStack pattern) {
         IGrid grid = resolveGrid(callerLevel, linkPos);
-        if (grid == null) return 0;
-        AEItemKey key = AEItemKey.of(pattern);
-        if (key == null) return 0;
+        if (grid == null || pattern.isEmpty()) return 0;
         MEStorage storage = grid.getStorageService().getInventory();
-        return storage.extract(key, Long.MAX_VALUE, Actionable.SIMULATE, IActionSource.empty());
+        long total = 0;
+        for (AEItemKey key : matchingItemKeys(storage, pattern)) {
+            total = saturatingAdd(total, storage.extract(key, Long.MAX_VALUE, Actionable.SIMULATE,
+                    IActionSource.empty()));
+        }
+        return total;
     }
 
     static int extractItems(ServerLevel callerLevel, GlobalPos linkPos, ItemStack pattern, int amount, ServerPlayer player) {
         IGrid grid = resolveGrid(callerLevel, linkPos);
-        if (grid == null) return 0;
-        AEItemKey key = AEItemKey.of(pattern);
-        if (key == null) return 0;
+        if (grid == null || pattern.isEmpty() || amount <= 0) return 0;
         MEStorage storage = grid.getStorageService().getInventory();
-        long extracted = storage.extract(key, amount, Actionable.MODULATE, IActionSource.ofPlayer(player));
+        IActionSource source = IActionSource.ofPlayer(player);
+        long remaining = amount;
+        long extracted = 0;
+        for (AEItemKey key : matchingItemKeys(storage, pattern)) {
+            if (remaining <= 0) break;
+            long moved = storage.extract(key, remaining, Actionable.MODULATE, source);
+            remaining -= moved;
+            extracted += moved;
+        }
         return (int) Math.min(extracted, Integer.MAX_VALUE);
     }
 
@@ -114,5 +123,22 @@ final class AE2StorageHelper {
 
     static void registerWrenchLinkable() {
         GridLinkables.register(Registration.WRENCH.get(), AE2LinkHandler.INSTANCE);
+    }
+
+    private static List<AEItemKey> matchingItemKeys(MEStorage storage, ItemStack pattern) {
+        KeyCounter counter = storage.getAvailableStacks();
+        List<AEItemKey> candidates = new ArrayList<>();
+        for (Object2LongMap.Entry<AEKey> entry : counter) {
+            AEKey what = entry.getKey();
+            if (what instanceof AEItemKey itemKey && ItemStack.isSameItem(itemKey.toStack(), pattern)) {
+                candidates.add(itemKey);
+            }
+        }
+        return candidates;
+    }
+
+    private static long saturatingAdd(long left, long right) {
+        long result = left + right;
+        return result < 0 ? Long.MAX_VALUE : result;
     }
 }

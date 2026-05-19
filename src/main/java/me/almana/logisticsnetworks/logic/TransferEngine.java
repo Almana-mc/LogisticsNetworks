@@ -4,10 +4,8 @@ import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.filter.AmountFilterData;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
-import me.almana.logisticsnetworks.filter.SlotFilterData;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
@@ -16,7 +14,6 @@ import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
@@ -25,8 +22,10 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.ChestType;
 
-import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -45,124 +44,12 @@ public class TransferEngine {
     private static final float BACKOFF_DECAY_DIVISOR = 3f;
     private static final float BACKOFF_MAX_TICKS_ENERGY = 5f;
 
-    private static long capKey(ServerLevel level, BlockPos pos, Direction dir) {
-        long packed = pos.asLong();
-        packed ^= ((long) dir.ordinal()) << 58;
-        packed ^= ((long) level.dimension().location().hashCode()) << 32;
-        return packed;
-    }
-
-    private static class CapCache {
-        private final Map<Long, Object> items = new HashMap<>();
-        private final Map<Long, Object> fluids = new HashMap<>();
-        private final Map<Long, Object> energy = new HashMap<>();
-        private final Map<Long, Object> chemicals = new HashMap<>();
-        private static final Object ABSENT = new Object();
-
-        IItemHandler getItemHandler(ServerLevel level, BlockPos pos, Direction dir) {
-            long key = capKey(level, pos, dir);
-            Object cached = items.get(key);
-            if (cached == ABSENT) return null;
-            if (cached != null) return (IItemHandler) cached;
-            IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, dir);
-            items.put(key, handler != null ? handler : ABSENT);
-            return handler;
-        }
-
-        IFluidHandler getFluidHandler(ServerLevel level, BlockPos pos, Direction dir) {
-            long key = capKey(level, pos, dir);
-            Object cached = fluids.get(key);
-            if (cached == ABSENT) return null;
-            if (cached != null) return (IFluidHandler) cached;
-            IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, dir);
-            fluids.put(key, handler != null ? handler : ABSENT);
-            return handler;
-        }
-
-        IEnergyStorage getEnergyHandler(ServerLevel level, BlockPos pos, Direction dir) {
-            long key = capKey(level, pos, dir);
-            Object cached = energy.get(key);
-            if (cached == ABSENT) return null;
-            if (cached != null) return (IEnergyStorage) cached;
-            IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, dir);
-            energy.put(key, handler != null ? handler : ABSENT);
-            return handler;
-        }
-
-        IItemHandler findItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            if (dir != null) return getItemHandler(level, pos, dir);
-            List<IItemHandler> found = new ArrayList<>(6);
-            for (Direction d : Direction.values()) {
-                IItemHandler h = getItemHandler(level, pos, d);
-                if (h == null) continue;
-                boolean dup = false;
-                for (IItemHandler existing : found) {
-                    if (existing == h) { dup = true; break; }
-                }
-                if (!dup) found.add(h);
-            }
-            if (found.isEmpty()) return null;
-            if (found.size() == 1) return found.get(0);
-            return new CombinedItemHandler(found.toArray(new IItemHandler[0]));
-        }
-
-        IFluidHandler findFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            if (dir != null) return getFluidHandler(level, pos, dir);
-            List<IFluidHandler> found = new ArrayList<>(6);
-            for (Direction d : Direction.values()) {
-                IFluidHandler h = getFluidHandler(level, pos, d);
-                if (h == null) continue;
-                boolean dup = false;
-                for (IFluidHandler existing : found) {
-                    if (existing == h) { dup = true; break; }
-                }
-                if (!dup) found.add(h);
-            }
-            if (found.isEmpty()) return null;
-            if (found.size() == 1) return found.get(0);
-            return new CombinedFluidHandler(found.toArray(new IFluidHandler[0]));
-        }
-
-        IEnergyStorage findEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            if (dir != null) return getEnergyHandler(level, pos, dir);
-            List<IEnergyStorage> found = new ArrayList<>(6);
-            for (Direction d : Direction.values()) {
-                IEnergyStorage h = getEnergyHandler(level, pos, d);
-                if (h == null) continue;
-                boolean dup = false;
-                for (IEnergyStorage existing : found) {
-                    if (existing == h) { dup = true; break; }
-                }
-                if (!dup) found.add(h);
-            }
-            if (found.isEmpty()) return null;
-            if (found.size() == 1) return found.get(0);
-            return new CombinedEnergyStorage(found.toArray(new IEnergyStorage[0]));
-        }
-
-        IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            long key = capKey(level, pos, dir == null ? Direction.DOWN : dir);
-            if (dir == null) key ^= 0x1L << 62;
-            Object cached = chemicals.get(key);
-            if (cached == ABSENT) return null;
-            if (cached != null) return (IChemicalHandler) cached;
-            IChemicalHandler handler = ChemicalTransferHelper.getHandler(level, pos, dir);
-            chemicals.put(key, handler != null ? handler : ABSENT);
-            return handler;
-        }
-    }
-
     private record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
     }
 
     private record ItemTransferTarget(IItemHandler handler, ItemStack[] importFilters,
-            FilterMode importFilterMode, AmountConstraints constraints, boolean hasItemNbtFilter,
+            FilterMode importFilterMode, TransferAmountRules.Constraints constraints, boolean hasItemNbtFilter,
             boolean[] allowedSlots) {
-    }
-
-    private record AmountConstraints(boolean hasExportThreshold, int exportThreshold,
-            boolean hasImportThreshold, int importThreshold,
-            boolean hasPerEntryAmounts) {
     }
 
     public static long processNetwork(LogisticsNetwork network, MinecraftServer server) {
@@ -216,7 +103,7 @@ public class TransferEngine {
         List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache, signalCache);
 
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
-        CapCache capCache = new CapCache();
+        TransferCapabilityCache capCache = new TransferCapabilityCache();
 
         long minWakeDelta = Long.MAX_VALUE;
         for (LogisticsNodeEntity sourceNode : sortedNodes) {
@@ -299,7 +186,7 @@ public class TransferEngine {
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache,
             boolean telemetryActive,
-            CapCache capCache) {
+            TransferCapabilityCache capCache) {
 
         if (!sourceNode.isValidNode())
             return Long.MAX_VALUE;
@@ -464,7 +351,7 @@ public class TransferEngine {
 
     private static int transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
-            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
@@ -477,7 +364,7 @@ public class TransferEngine {
         boolean anyReachable = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
         ItemStack[] exportFilters = exportChannel.getFilterItems();
-        boolean[] sourceAllowedSlots = buildSlotAccessMask(sourceHandler, exportFilters);
+        boolean[] sourceAllowedSlots = TransferSlotAccess.build(sourceHandler, exportFilters);
 
         for (ImportTarget target : targets) {
             if (target.node.getUUID().equals(sourceNode.getUUID()))
@@ -492,14 +379,16 @@ public class TransferEngine {
             BlockPos targetPos = target.node.getAttachedPos();
             if (!targetLevel.isLoaded(targetPos))
                 continue;
+            if (isSameItemStorage(sourceLevel, sourcePos, targetLevel, targetPos))
+                continue;
 
             IItemHandler targetHandler = capCache.findItemHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null)
                 continue;
 
             ItemStack[] importFilters = target.channel.getFilterItems();
-            boolean[] targetAllowedSlots = buildSlotAccessMask(targetHandler, importFilters);
-            if (targetAllowedSlots != null && !hasAnyAllowedSlots(targetAllowedSlots)) {
+            boolean[] targetAllowedSlots = TransferSlotAccess.build(targetHandler, importFilters);
+            if (targetAllowedSlots != null && !TransferSlotAccess.hasAny(targetAllowedSlots)) {
                 continue;
             }
 
@@ -507,7 +396,7 @@ public class TransferEngine {
                     targetHandler,
                     importFilters,
                     target.channel.getFilterMode(),
-                    collectAmountConstraints(exportFilters, importFilters),
+                    TransferAmountRules.collect(exportFilters, importFilters),
                     FilterLogic.hasConfiguredItemNbtFilter(importFilters),
                     targetAllowedSlots));
         }
@@ -525,7 +414,7 @@ public class TransferEngine {
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimitMb,
-            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
@@ -574,7 +463,7 @@ public class TransferEngine {
 
     private static int transferEnergy(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimitRF,
-            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
@@ -619,7 +508,7 @@ public class TransferEngine {
 
     private static int transferChemicals(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimit,
-            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         if (!MekanismCompat.isLoaded()) {
             if (Config.debugMode)
@@ -748,6 +637,25 @@ public class TransferEngine {
         return sourceDim && dimCache.getOrDefault(target.getUUID(), false);
     }
 
+    private static boolean isSameItemStorage(ServerLevel sourceLevel, BlockPos sourcePos,
+            ServerLevel targetLevel, BlockPos targetPos) {
+        if (!sourceLevel.dimension().equals(targetLevel.dimension()))
+            return false;
+        if (sourcePos.equals(targetPos))
+            return true;
+
+        BlockState sourceState = sourceLevel.getBlockState(sourcePos);
+        BlockState targetState = targetLevel.getBlockState(targetPos);
+        if (!(sourceState.getBlock() instanceof ChestBlock) || !(targetState.getBlock() instanceof ChestBlock))
+            return false;
+        if (sourceState.getValue(ChestBlock.TYPE) == ChestType.SINGLE
+                || targetState.getValue(ChestBlock.TYPE) == ChestType.SINGLE)
+            return false;
+
+        return sourcePos.relative(ChestBlock.getConnectedDirection(sourceState)).equals(targetPos)
+                && targetPos.relative(ChestBlock.getConnectedDirection(targetState)).equals(sourcePos);
+    }
+
     private static int executeMove(IItemHandler source, List<ItemTransferTarget> targets, int limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             boolean[] sourceAllowedSlots,
@@ -768,21 +676,21 @@ public class TransferEngine {
 
         boolean anyAmountConstraints = false;
         for (ItemTransferTarget t : targets) {
-            if (t.constraints().hasExportThreshold || t.constraints().hasImportThreshold
-                    || t.constraints().hasPerEntryAmounts) {
+            if (t.constraints().hasExportThreshold() || t.constraints().hasImportThreshold()
+                    || t.constraints().hasPerEntryAmounts()) {
                 anyAmountConstraints = true;
                 break;
             }
         }
-        Map<Item, Integer> sourceItemCounts = anyAmountConstraints ? buildItemCountCache(source) : null;
+        Map<Item, Integer> sourceItemCounts = anyAmountConstraints ? TransferAmountRules.countItems(source) : null;
         Map<Item, Integer> batchMoved = anyAmountConstraints ? new HashMap<>() : null;
         List<Map<Item, Integer>> targetItemCounts = null;
         if (anyAmountConstraints) {
             targetItemCounts = new ArrayList<>(targets.size());
             for (ItemTransferTarget t : targets) {
                 targetItemCounts.add(
-                        (t.constraints().hasImportThreshold || t.constraints().hasPerEntryAmounts)
-                                ? buildItemCountCache(t.handler())
+                        (t.constraints().hasImportThreshold() || t.constraints().hasPerEntryAmounts())
+                                ? TransferAmountRules.countItems(t.handler())
                                 : null);
             }
         }
@@ -832,21 +740,21 @@ public class TransferEngine {
 
                     int allowedByAmount;
                     if (!anyAmountConstraints
-                            || (!target.constraints().hasExportThreshold && !target.constraints().hasImportThreshold
-                                    && !target.constraints().hasPerEntryAmounts)) {
+                            || (!target.constraints().hasExportThreshold() && !target.constraints().hasImportThreshold()
+                                    && !target.constraints().hasPerEntryAmounts())) {
                         allowedByAmount = extracted.getCount();
                     } else {
-                        allowedByAmount = getAllowedTransferCached(extracted, target.constraints(),
+                        allowedByAmount = TransferAmountRules.allowedItems(extracted, target.constraints(),
                                 sourceItemCounts, targetItemCounts.get(targetIndex));
-                        if (target.constraints().hasPerEntryAmounts && provider != null) {
-                            int perEntry = getPerEntryItemAmountLimit(extracted, exportFilters,
+                        if (target.constraints().hasPerEntryAmounts() && provider != null) {
+                            int perEntry = TransferAmountRules.perEntryItemAmount(extracted, exportFilters,
                                     target.importFilters(), sourceItemCounts,
                                     targetItemCounts.get(targetIndex), provider, candidateComponents,
                                     filterReadCache);
                             if (perEntry >= 0) {
                                 allowedByAmount = Math.min(allowedByAmount, perEntry);
                             }
-                            int batchLimit = getPerEntryBatchLimit(extracted, exportFilters, provider,
+                            int batchLimit = TransferAmountRules.perEntryItemBatch(extracted, exportFilters, provider,
                                     candidateComponents, filterReadCache);
                             if (batchLimit > 0) {
                                 int alreadyMoved = batchMoved.getOrDefault(extracted.getItem(), 0);
@@ -1047,7 +955,8 @@ public class TransferEngine {
             HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache) {
 
         int remaining = limitMb;
-        AmountConstraints amountConstraints = collectAmountConstraints(exportFilters, importFilters, filterReadCache);
+        TransferAmountRules.Constraints amountConstraints = TransferAmountRules.collect(exportFilters, importFilters,
+                filterReadCache);
 
         for (int tank = 0; tank < source.getTanks() && remaining > 0; tank++) {
             FluidStack tankFluid = source.getFluidInTank(tank);
@@ -1069,11 +978,11 @@ public class TransferEngine {
                     continue;
             }
 
-            int allowedByAmount = getAllowedTransferByFluidAmountConstraints(source, target, simulated,
+            int allowedByAmount = TransferAmountRules.allowedFluids(source, target, simulated,
                     amountConstraints);
-            if (amountConstraints.hasPerEntryAmounts) {
-                int perEntry = getPerEntryFluidAmountLimit(simulated, exportFilters, importFilters, source, target,
-                        filterReadCache);
+            if (amountConstraints.hasPerEntryAmounts()) {
+                int perEntry = TransferAmountRules.perEntryFluidAmount(simulated, exportFilters, importFilters,
+                        source, target, filterReadCache);
                 if (perEntry >= 0) {
                     allowedByAmount = Math.min(allowedByAmount, perEntry);
                 }
@@ -1082,7 +991,8 @@ public class TransferEngine {
                 continue;
 
             int request = Math.min(simulated.getAmount(), Math.min(remaining, allowedByAmount));
-            int perEntryBatch = getPerEntryFluidBatchLimit(simulated, exportFilters, importFilters, filterReadCache);
+            int perEntryBatch = TransferAmountRules.perEntryFluidBatch(simulated, exportFilters, importFilters,
+                    filterReadCache);
             if (perEntryBatch > 0) {
                 request = Math.min(request, perEntryBatch);
             }
@@ -1154,533 +1064,5 @@ public class TransferEngine {
             case HIGH -> signalStrength > 0;
             case LOW -> signalStrength == 0;
         };
-    }
-
-    private static AmountConstraints collectAmountConstraints(ItemStack[] exportFilters, ItemStack[] importFilters) {
-        return collectAmountConstraints(exportFilters, importFilters, null);
-    }
-
-    private static AmountConstraints collectAmountConstraints(ItemStack[] exportFilters, ItemStack[] importFilters,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        int exportThreshold = 0;
-        boolean hasExportThreshold = false;
-        boolean hasPerEntryAmounts = false;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                if (AmountFilterData.isAmountFilterItem(filter)) {
-                    hasExportThreshold = true;
-                    exportThreshold = Math.max(exportThreshold, AmountFilterData.getAmount(filter));
-                }
-                if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
-                    hasPerEntryAmounts = true;
-                }
-            }
-        }
-
-        int importThreshold = Integer.MAX_VALUE;
-        boolean hasImportThreshold = false;
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                if (AmountFilterData.isAmountFilterItem(filter)) {
-                    hasImportThreshold = true;
-                    importThreshold = Math.min(importThreshold, AmountFilterData.getAmount(filter));
-                }
-                if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
-                    hasPerEntryAmounts = true;
-                }
-            }
-        }
-
-        return new AmountConstraints(hasExportThreshold, exportThreshold, hasImportThreshold, importThreshold,
-                hasPerEntryAmounts);
-    }
-
-    private static Map<Item, Integer> buildItemCountCache(IItemHandler handler) {
-        Map<Item, Integer> counts = new HashMap<>();
-        for (int i = 0; i < handler.getSlots(); i++) {
-            ItemStack stack = handler.getStackInSlot(i);
-            if (!stack.isEmpty()) {
-                counts.merge(stack.getItem(), stack.getCount(), Integer::sum);
-            }
-        }
-        return counts;
-    }
-
-    private static int getAllowedTransferCached(ItemStack candidate, AmountConstraints constraints,
-            Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (constraints.hasExportThreshold) {
-            int sourceCount = sourceCounts != null ? sourceCounts.getOrDefault(candidate.getItem(), 0) : 0;
-            int exportCap = sourceCount - constraints.exportThreshold;
-            if (exportCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, exportCap);
-        }
-
-        if (constraints.hasImportThreshold) {
-            int targetCount = targetCounts != null ? targetCounts.getOrDefault(candidate.getItem(), 0) : 0;
-            int importCap = constraints.importThreshold - targetCount;
-            if (importCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, importCap);
-        }
-
-        return allowed == Integer.MAX_VALUE ? candidate.getCount() : Math.max(0, allowed);
-    }
-
-    private static int getAllowedTransferByFluidAmountConstraints(IFluidHandler source, IFluidHandler target,
-            FluidStack candidate, AmountConstraints constraints) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (constraints.hasExportThreshold) {
-            int sourceAmount = countMatchingFluid(source, candidate);
-            int exportCap = sourceAmount - constraints.exportThreshold;
-            if (exportCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, exportCap);
-        }
-
-        if (constraints.hasImportThreshold) {
-            int targetAmount = countMatchingFluid(target, candidate);
-            int importCap = constraints.importThreshold - targetAmount;
-            if (importCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, importCap);
-        }
-
-        return allowed == Integer.MAX_VALUE ? candidate.getAmount() : Math.max(0, allowed);
-    }
-
-    private static int getPerEntryItemAmountLimit(ItemStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                int threshold = FilterItemData.getItemAmountThresholdFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache);
-                if (threshold > 0) {
-                    int sourceCount = sourceCounts != null ? sourceCounts.getOrDefault(candidate.getItem(), 0) : 0;
-                    int exportCap = sourceCount - threshold;
-                    if (exportCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, exportCap);
-                }
-            }
-        }
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                int threshold = FilterItemData.getItemAmountThresholdFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache);
-                if (threshold > 0) {
-                    int targetCount = targetCounts != null ? targetCounts.getOrDefault(candidate.getItem(), 0) : 0;
-                    int importCap = threshold - targetCount;
-                    if (importCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, importCap);
-                }
-            }
-        }
-
-        return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
-    }
-
-    private static int getPerEntryBatchLimit(ItemStack candidate, ItemStack[] exportFilters,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        if (exportFilters == null) return -1;
-        int limit = Integer.MAX_VALUE;
-        for (ItemStack filter : exportFilters) {
-            int batch = FilterItemData.getItemBatchLimitFull(filter, candidate, provider,
-                    candidateComponents, filterReadCache);
-            if (batch > 0)
-                limit = Math.min(limit, batch);
-        }
-        return limit == Integer.MAX_VALUE ? -1 : limit;
-    }
-
-    private static int getPerEntryFluidAmountLimit(FluidStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, IFluidHandler source, IFluidHandler target,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
-                if (threshold > 0) {
-                    int sourceAmount = countMatchingFluid(source, candidate);
-                    int exportCap = sourceAmount - threshold;
-                    if (exportCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, exportCap);
-                }
-            }
-        }
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
-                if (threshold > 0) {
-                    int targetAmount = countMatchingFluid(target, candidate);
-                    int importCap = threshold - targetAmount;
-                    if (importCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, importCap);
-                }
-            }
-        }
-
-        return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
-    }
-
-    private static int getPerEntryFluidBatchLimit(FluidStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, @Nullable FilterItemData.ReadCache filterReadCache) {
-        int limit = Integer.MAX_VALUE;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate, filterReadCache);
-                if (batch > 0) {
-                    limit = Math.min(limit, batch);
-                }
-            }
-        }
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate, filterReadCache);
-                if (batch > 0) {
-                    limit = Math.min(limit, batch);
-                }
-            }
-        }
-
-        return limit == Integer.MAX_VALUE ? -1 : limit;
-    }
-
-    private static int countMatchingFluid(IFluidHandler handler, FluidStack candidate) {
-        int amount = 0;
-        for (int i = 0; i < handler.getTanks(); i++) {
-            FluidStack stack = handler.getFluidInTank(i);
-            if (!stack.isEmpty() && FluidStack.isSameFluidSameComponents(stack, candidate)) {
-                amount += stack.getAmount();
-            }
-        }
-        return amount;
-    }
-
-    private static boolean[] buildSlotAccessMask(IItemHandler handler, ItemStack[] filters) {
-        if (handler == null || filters == null || filters.length == 0) {
-            return null;
-        }
-
-        int slotCount = handler.getSlots();
-        if (slotCount <= 0) {
-            return null;
-        }
-
-        boolean[] allowed = new boolean[slotCount];
-        boolean[] blacklistMask = new boolean[slotCount];
-
-        boolean hasConfiguredSlotFilter = false;
-        boolean hasWhitelist = false;
-
-        for (ItemStack filter : filters) {
-            if (!SlotFilterData.isSlotFilterItem(filter) || !SlotFilterData.hasAnySlots(filter)) {
-                continue;
-            }
-
-            hasConfiguredSlotFilter = true;
-            List<Integer> slots = SlotFilterData.getSlots(filter);
-            if (slots.isEmpty()) {
-                continue;
-            }
-
-            if (SlotFilterData.isBlacklist(filter)) {
-                for (int slot : slots) {
-                    if (slot >= 0 && slot < slotCount) {
-                        blacklistMask[slot] = true;
-                    }
-                }
-            } else {
-                hasWhitelist = true;
-                for (int slot : slots) {
-                    if (slot >= 0 && slot < slotCount) {
-                        allowed[slot] = true;
-                    }
-                }
-            }
-        }
-
-        if (!hasConfiguredSlotFilter) {
-            return null;
-        }
-
-        if (!hasWhitelist) {
-            Arrays.fill(allowed, true);
-        }
-
-        for (int i = 0; i < slotCount; i++) {
-            if (blacklistMask[i]) {
-                allowed[i] = false;
-            }
-        }
-
-        return allowed;
-    }
-
-    private static boolean hasAnyAllowedSlots(boolean[] allowedSlots) {
-        if (allowedSlots == null) {
-            return true;
-        }
-        for (boolean allowed : allowedSlots) {
-            if (allowed) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static final class CombinedItemHandler implements IItemHandler {
-        private final IItemHandler[] handlers;
-        private final int[] slotOffsets;
-        private final int totalSlots;
-
-        CombinedItemHandler(IItemHandler[] handlers) {
-            this.handlers = handlers;
-            this.slotOffsets = new int[handlers.length];
-            int running = 0;
-            for (int i = 0; i < handlers.length; i++) {
-                slotOffsets[i] = running;
-                running += handlers[i].getSlots();
-            }
-            this.totalSlots = running;
-        }
-
-        private int handlerIndex(int slot) {
-            for (int i = handlers.length - 1; i >= 0; i--) {
-                if (slot >= slotOffsets[i]) return i;
-            }
-            return 0;
-        }
-
-        @Override
-        public int getSlots() {
-            return totalSlots;
-        }
-
-        @Override
-        public ItemStack getStackInSlot(int slot) {
-            if (slot < 0 || slot >= totalSlots) return ItemStack.EMPTY;
-            int i = handlerIndex(slot);
-            return handlers[i].getStackInSlot(slot - slotOffsets[i]);
-        }
-
-        @Override
-        public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-            if (slot < 0 || slot >= totalSlots) return stack;
-            int i = handlerIndex(slot);
-            return handlers[i].insertItem(slot - slotOffsets[i], stack, simulate);
-        }
-
-        @Override
-        public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            if (slot < 0 || slot >= totalSlots) return ItemStack.EMPTY;
-            int i = handlerIndex(slot);
-            return handlers[i].extractItem(slot - slotOffsets[i], amount, simulate);
-        }
-
-        @Override
-        public int getSlotLimit(int slot) {
-            if (slot < 0 || slot >= totalSlots) return 0;
-            int i = handlerIndex(slot);
-            return handlers[i].getSlotLimit(slot - slotOffsets[i]);
-        }
-
-        @Override
-        public boolean isItemValid(int slot, ItemStack stack) {
-            if (slot < 0 || slot >= totalSlots) return false;
-            int i = handlerIndex(slot);
-            return handlers[i].isItemValid(slot - slotOffsets[i], stack);
-        }
-    }
-
-    private static final class CombinedFluidHandler implements IFluidHandler {
-        private final IFluidHandler[] handlers;
-        private final int[] tankOffsets;
-        private final int totalTanks;
-
-        CombinedFluidHandler(IFluidHandler[] handlers) {
-            this.handlers = handlers;
-            this.tankOffsets = new int[handlers.length];
-            int running = 0;
-            for (int i = 0; i < handlers.length; i++) {
-                tankOffsets[i] = running;
-                running += handlers[i].getTanks();
-            }
-            this.totalTanks = running;
-        }
-
-        private int handlerIndex(int tank) {
-            for (int i = handlers.length - 1; i >= 0; i--) {
-                if (tank >= tankOffsets[i]) return i;
-            }
-            return 0;
-        }
-
-        @Override
-        public int getTanks() {
-            return totalTanks;
-        }
-
-        @Override
-        public FluidStack getFluidInTank(int tank) {
-            if (tank < 0 || tank >= totalTanks) return FluidStack.EMPTY;
-            int i = handlerIndex(tank);
-            return handlers[i].getFluidInTank(tank - tankOffsets[i]);
-        }
-
-        @Override
-        public int getTankCapacity(int tank) {
-            if (tank < 0 || tank >= totalTanks) return 0;
-            int i = handlerIndex(tank);
-            return handlers[i].getTankCapacity(tank - tankOffsets[i]);
-        }
-
-        @Override
-        public boolean isFluidValid(int tank, FluidStack stack) {
-            if (tank < 0 || tank >= totalTanks) return false;
-            int i = handlerIndex(tank);
-            return handlers[i].isFluidValid(tank - tankOffsets[i], stack);
-        }
-
-        @Override
-        public int fill(FluidStack resource, FluidAction action) {
-            if (resource.isEmpty()) return 0;
-            int remaining = resource.getAmount();
-            int filled = 0;
-            for (IFluidHandler h : handlers) {
-                if (remaining <= 0) break;
-                int accepted = h.fill(resource.copyWithAmount(remaining), action);
-                if (accepted > 0) {
-                    filled += accepted;
-                    remaining -= accepted;
-                }
-            }
-            return filled;
-        }
-
-        @Override
-        public FluidStack drain(FluidStack resource, FluidAction action) {
-            if (resource.isEmpty()) return FluidStack.EMPTY;
-            int remaining = resource.getAmount();
-            int totalAmount = 0;
-            FluidStack template = FluidStack.EMPTY;
-            for (IFluidHandler h : handlers) {
-                if (remaining <= 0) break;
-                FluidStack drained = h.drain(resource.copyWithAmount(remaining), action);
-                if (drained.isEmpty()) continue;
-                if (template.isEmpty()) template = drained;
-                totalAmount += drained.getAmount();
-                remaining -= drained.getAmount();
-            }
-            return template.isEmpty() ? FluidStack.EMPTY : template.copyWithAmount(totalAmount);
-        }
-
-        @Override
-        public FluidStack drain(int maxDrain, FluidAction action) {
-            if (maxDrain <= 0) return FluidStack.EMPTY;
-            int remaining = maxDrain;
-            int totalAmount = 0;
-            FluidStack template = FluidStack.EMPTY;
-            for (IFluidHandler h : handlers) {
-                if (remaining <= 0) break;
-                FluidStack drained;
-                if (template.isEmpty()) {
-                    drained = h.drain(remaining, action);
-                } else {
-                    drained = h.drain(template.copyWithAmount(remaining), action);
-                }
-                if (drained.isEmpty()) continue;
-                if (template.isEmpty()) template = drained;
-                totalAmount += drained.getAmount();
-                remaining -= drained.getAmount();
-            }
-            return template.isEmpty() ? FluidStack.EMPTY : template.copyWithAmount(totalAmount);
-        }
-    }
-
-    private static final class CombinedEnergyStorage implements IEnergyStorage {
-        private final IEnergyStorage[] handlers;
-
-        CombinedEnergyStorage(IEnergyStorage[] handlers) {
-            this.handlers = handlers;
-        }
-
-        @Override
-        public int receiveEnergy(int maxReceive, boolean simulate) {
-            if (maxReceive <= 0) return 0;
-            int remaining = maxReceive;
-            int total = 0;
-            for (IEnergyStorage h : handlers) {
-                if (remaining <= 0) break;
-                if (!h.canReceive()) continue;
-                int accepted = h.receiveEnergy(remaining, simulate);
-                if (accepted > 0) {
-                    total += accepted;
-                    remaining -= accepted;
-                }
-            }
-            return total;
-        }
-
-        @Override
-        public int extractEnergy(int maxExtract, boolean simulate) {
-            if (maxExtract <= 0) return 0;
-            int remaining = maxExtract;
-            int total = 0;
-            for (IEnergyStorage h : handlers) {
-                if (remaining <= 0) break;
-                if (!h.canExtract()) continue;
-                int extracted = h.extractEnergy(remaining, simulate);
-                if (extracted > 0) {
-                    total += extracted;
-                    remaining -= extracted;
-                }
-            }
-            return total;
-        }
-
-        @Override
-        public int getEnergyStored() {
-            long sum = 0;
-            for (IEnergyStorage h : handlers) sum += h.getEnergyStored();
-            return sum > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sum;
-        }
-
-        @Override
-        public int getMaxEnergyStored() {
-            long sum = 0;
-            for (IEnergyStorage h : handlers) sum += h.getMaxEnergyStored();
-            return sum > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sum;
-        }
-
-        @Override
-        public boolean canExtract() {
-            for (IEnergyStorage h : handlers) if (h.canExtract()) return true;
-            return false;
-        }
-
-        @Override
-        public boolean canReceive() {
-            for (IEnergyStorage h : handlers) if (h.canReceive()) return true;
-            return false;
-        }
     }
 }

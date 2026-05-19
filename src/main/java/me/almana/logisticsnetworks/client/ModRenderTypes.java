@@ -22,6 +22,7 @@ public class ModRenderTypes extends RenderStateShard {
             true,
             RenderType.CompositeState.builder()
                     .setShaderState(POSITION_COLOR_SHADER)
+                    .setLayeringState(VIEW_OFFSET_Z_LAYERING)
                     .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
                     .setDepthTestState(LEQUAL_DEPTH_TEST)
                     .setWriteMaskState(COLOR_WRITE)
@@ -37,6 +38,7 @@ public class ModRenderTypes extends RenderStateShard {
             true,
             RenderType.CompositeState.builder()
                     .setShaderState(POSITION_COLOR_SHADER)
+                    .setLayeringState(VIEW_OFFSET_Z_LAYERING)
                     .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
                     .setDepthTestState(NO_DEPTH_TEST)
                     .setWriteMaskState(COLOR_WRITE)

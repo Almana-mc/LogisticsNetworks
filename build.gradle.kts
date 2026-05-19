@@ -105,6 +105,7 @@ dependencies {
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
 
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+    runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
 
     compileOnly("org.appliedenergistics:guideme:${guideme_version}:api")
     runtimeOnly("org.appliedenergistics:guideme:${guideme_version}")
@@ -133,7 +134,8 @@ val generateModMetadata by tasks.registering(ProcessResources::class) {
         "mod_license" to mod_license,
         "mod_version" to mod_version,
         "mod_authors" to mod_authors,
-        "mod_description" to mod_description
+        "mod_description" to mod_description,
+        "ae2_version" to ae2_version
     )
     inputs.properties(replaceProperties)
     expand(replaceProperties)
@@ -175,4 +177,3 @@ if (copyJarDest.isDirectory) {
         finalizedBy("copyJar")
     }
 }
-

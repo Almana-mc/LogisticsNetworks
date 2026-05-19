@@ -26,6 +26,10 @@ public class ClientConfig {
             .comment("Maximum number of visible node models rendered. Nearest nodes are prioritized. 0 = unlimited.")
             .defineInRange("maxVisibleNodes", 500, 0, Integer.MAX_VALUE);
 
+    public static final ModConfigSpec.BooleanValue connectedNodeTexturesSpec = builder
+            .comment("Whether adjacent visible nodes should render as connected.")
+            .define("connectedNodeTextures", true);
+
     private static final List<String> THEMES = List.of(
             "light", "dark", "redstone", "nebula", "glass", "terminal", "pastel", "brutalist");
 
@@ -38,6 +42,7 @@ public class ClientConfig {
     public static boolean defaultNodeVisibility = true;
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
+    public static boolean connectedNodeTextures = true;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -49,6 +54,7 @@ public class ClientConfig {
         defaultNodeVisibility = defaultNodeVisibilitySpec.get();
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
+        connectedNodeTextures = connectedNodeTexturesSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());
     }
 }
