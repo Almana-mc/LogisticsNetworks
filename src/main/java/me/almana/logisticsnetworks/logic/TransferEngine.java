@@ -750,36 +750,47 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack toMove = extractItem(source, slot, acceptableCount, false);
-                    if (toMove.isEmpty()) {
-                        continue;
-                    }
-
-                    ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, false,
-                            target.allowedSlots());
-                    int targetAccepted = toMove.getCount() - uninserted.getCount();
+                    int targetAccepted;
                     int droppedToWorld = 0;
+                    ItemStack dropStack = ItemStack.EMPTY;
 
-                    if (!uninserted.isEmpty()) {
-                        ItemStack stillLeft = insertItem(source, slot, uninserted, false);
-                        if (!stillLeft.isEmpty()) {
-                            for (int fallback = 0; fallback < source.size() && !stillLeft.isEmpty(); fallback++) {
-                                stillLeft = insertItem(source, fallback, stillLeft, false);
-                            }
+                    try (var tx = Transaction.openRoot()) {
+                        ItemStack toMove = extractItem(source, slot, acceptableCount, tx);
+                        if (toMove.isEmpty()) {
+                            continue;
+                        }
+
+                        ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, tx,
+                                target.allowedSlots());
+                        targetAccepted = toMove.getCount() - uninserted.getCount();
+
+                        if (!uninserted.isEmpty()) {
+                            ItemStack stillLeft = insertItem(source, slot, uninserted, tx);
                             if (!stillLeft.isEmpty()) {
-                                ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(), stillLeft,
-                                        false, target.allowedSlots());
-                                int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
-                                targetAccepted += forcedIn;
-                                if (!forcedRemainder.isEmpty()) {
-                                    LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
-                                            + "target slot mask. Dropping at source pos {}.",
-                                            forcedRemainder, sourcePos);
-                                    droppedToWorld = forcedRemainder.getCount();
-                                    Block.popResource(sourceLevel, sourcePos, forcedRemainder);
+                                for (int fallback = 0; fallback < source.size() && !stillLeft.isEmpty(); fallback++) {
+                                    stillLeft = insertItem(source, fallback, stillLeft, tx);
+                                }
+                                if (!stillLeft.isEmpty()) {
+                                    ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(), stillLeft,
+                                            tx, target.allowedSlots());
+                                    int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
+                                    targetAccepted += forcedIn;
+                                    if (!forcedRemainder.isEmpty()) {
+                                        LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
+                                                + "target slot mask. Dropping at source pos {}.",
+                                                forcedRemainder, sourcePos);
+                                        droppedToWorld = forcedRemainder.getCount();
+                                        dropStack = forcedRemainder.copy();
+                                    }
                                 }
                             }
                         }
+
+                        tx.commit();
+                    }
+
+                    if (!dropStack.isEmpty()) {
+                        Block.popResource(sourceLevel, sourcePos, dropStack);
                     }
 
                     int sourceLost = targetAccepted + droppedToWorld;
