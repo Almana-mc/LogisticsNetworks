@@ -318,6 +318,7 @@
   "tooltip.logisticsnetworks.upgrade.source": "Source/batch: %s",
   "jade.logisticsnetworks.node_attached": "Logistics Node Attached",
   "config.jade.plugin_logisticsnetworks.node_attached": "Node Attached Hint",
+  "config.jade.plugin_logisticsnetworks.logistics_node_entity": "Logistics Node Entity",
   "item.logisticsnetworks.pattern_setter": "Pattern Setter",
   "gui.logisticsnetworks.pattern_setter.title": "Pattern Setter",
   "gui.logisticsnetworks.pattern_setter.input": "Input",
