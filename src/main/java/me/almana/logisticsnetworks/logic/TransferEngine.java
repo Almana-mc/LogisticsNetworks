@@ -1049,32 +1049,7 @@ public class TransferEngine {
     }
 
     private static int executeEnergyMove(EnergyHandler source, EnergyHandler target, int limitRF) {
-        int toMove;
-        try (var tx = Transaction.openRoot()) {
-            int extracted = source.extract(limitRF, tx);
-            if (extracted <= 0) {
-                return 0;
-            }
-            int accepted = target.insert(extracted, tx);
-            toMove = Math.min(extracted, accepted);
-        }
-
-        if (toMove <= 0) {
-            return 0;
-        }
-
-        try (var tx = Transaction.openRoot()) {
-            int extracted = source.extract(toMove, tx);
-            if (extracted <= 0) {
-                return 0;
-            }
-            int inserted = target.insert(extracted, tx);
-            if (inserted != extracted) {
-                return 0;
-            }
-            tx.commit();
-            return inserted;
-        }
+        return EnergyHandlerUtil.move(source, target, limitRF, null);
     }
 
     private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
