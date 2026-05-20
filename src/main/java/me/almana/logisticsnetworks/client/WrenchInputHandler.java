@@ -4,7 +4,6 @@ import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
-import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
@@ -64,7 +63,7 @@ public class WrenchInputHandler {
         }
 
         WrenchItem.Mode mode = WrenchItem.getMode(player.getItemInHand(hand));
-        if (mode != WrenchItem.Mode.MASS_PLACEMENT && mode != WrenchItem.Mode.COPY_PASTE) {
+        if (mode != WrenchItem.Mode.COPY_PASTE) {
             return;
         }
 
@@ -73,11 +72,7 @@ public class WrenchInputHandler {
             return;
         }
 
-        if (mode == WrenchItem.Mode.MASS_PLACEMENT) {
-            ClientPacketDistributor.sendToServer(new MassSelectConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
-        } else {
-            ClientPacketDistributor.sendToServer(new CopyPasteConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
-        }
+        ClientPacketDistributor.sendToServer(new CopyPasteConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
         event.setSwingHand(false);
         event.setCanceled(true);
     }
