@@ -27,11 +27,13 @@ import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.energy.EnergyHandler;
+import net.neoforged.neoforge.transfer.energy.EnergyHandlerUtil;
 import net.neoforged.neoforge.transfer.fluid.FluidResource;
 import net.neoforged.neoforge.transfer.fluid.FluidUtil;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemUtil;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
+import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -820,23 +822,48 @@ public class TransferEngine {
             return ItemStack.EMPTY;
         }
 
+        try (var tx = Transaction.openRoot()) {
+            ItemStack extracted = extractItem(handler, slot, amount, tx);
+            if (!simulate) {
+                tx.commit();
+            }
+            return extracted;
+        }
+    }
+
+    private static ItemStack extractItem(ResourceHandler<ItemResource> handler, int slot, int amount,
+            TransactionContext transaction) {
+        if (amount <= 0) {
+            return ItemStack.EMPTY;
+        }
+
         ItemResource resource = handler.getResource(slot);
         if (resource.isEmpty()) {
             return ItemStack.EMPTY;
         }
 
         int request = Math.min(amount, resource.getMaxStackSize());
-        try (var tx = Transaction.openRoot()) {
-            int extracted = handler.extract(slot, resource, request, tx);
-            if (!simulate) {
-                tx.commit();
-            }
-            return extracted <= 0 ? ItemStack.EMPTY : resource.toStack(extracted);
-        }
+        int extracted = handler.extract(slot, resource, request, transaction);
+        return extracted <= 0 ? ItemStack.EMPTY : resource.toStack(extracted);
     }
 
     private static ItemStack insertItem(ResourceHandler<ItemResource> handler, int slot, ItemStack stack, boolean simulate) {
-        return ItemUtil.insertItemReturnRemaining(handler, slot, stack, simulate, null);
+        if (stack.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+
+        try (var tx = Transaction.openRoot()) {
+            ItemStack remaining = insertItem(handler, slot, stack, tx);
+            if (!simulate) {
+                tx.commit();
+            }
+            return remaining;
+        }
+    }
+
+    private static ItemStack insertItem(ResourceHandler<ItemResource> handler, int slot, ItemStack stack,
+            TransactionContext transaction) {
+        return ItemUtil.insertItemReturnRemaining(handler, slot, stack, false, transaction);
     }
 
     private static int fillFluid(ResourceHandler<FluidResource> handler, FluidStack stack, boolean simulate) {
@@ -844,9 +871,8 @@ public class TransferEngine {
             return 0;
         }
 
-        FluidResource resource = FluidResource.of(stack);
         try (var tx = Transaction.openRoot()) {
-            int inserted = handler.insert(resource, stack.getAmount(), tx);
+            int inserted = fillFluid(handler, stack, tx);
             if (!simulate) {
                 tx.commit();
             }
@@ -854,19 +880,38 @@ public class TransferEngine {
         }
     }
 
+    private static int fillFluid(ResourceHandler<FluidResource> handler, FluidStack stack,
+            TransactionContext transaction) {
+        if (stack.isEmpty()) {
+            return 0;
+        }
+
+        return handler.insert(FluidResource.of(stack), stack.getAmount(), transaction);
+    }
+
     private static FluidStack drainFluid(ResourceHandler<FluidResource> handler, FluidStack stack, boolean simulate) {
         if (stack.isEmpty()) {
             return FluidStack.EMPTY;
         }
 
-        FluidResource resource = FluidResource.of(stack);
         try (var tx = Transaction.openRoot()) {
-            int extracted = handler.extract(resource, stack.getAmount(), tx);
+            FluidStack extracted = drainFluid(handler, stack, tx);
             if (!simulate) {
                 tx.commit();
             }
-            return extracted <= 0 ? FluidStack.EMPTY : resource.toStack(extracted);
+            return extracted;
         }
+    }
+
+    private static FluidStack drainFluid(ResourceHandler<FluidResource> handler, FluidStack stack,
+            TransactionContext transaction) {
+        if (stack.isEmpty()) {
+            return FluidStack.EMPTY;
+        }
+
+        FluidResource resource = FluidResource.of(stack);
+        int extracted = handler.extract(resource, stack.getAmount(), transaction);
+        return extracted <= 0 ? FluidStack.EMPTY : resource.toStack(extracted);
     }
 
     private static ItemStack insertItemWithAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack stack, boolean simulate,
@@ -874,8 +919,23 @@ public class TransferEngine {
         if (stack.isEmpty()) {
             return ItemStack.EMPTY;
         }
+
+        try (var tx = Transaction.openRoot()) {
+            ItemStack remaining = insertItemWithAllowedSlots(handler, stack, tx, allowedSlots);
+            if (!simulate) {
+                tx.commit();
+            }
+            return remaining;
+        }
+    }
+
+    private static ItemStack insertItemWithAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack stack,
+            TransactionContext transaction, boolean[] allowedSlots) {
+        if (stack.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
         if (allowedSlots == null) {
-            return ItemUtil.insertItemReturnRemaining(handler, stack, simulate, null);
+            return ItemUtil.insertItemReturnRemaining(handler, stack, false, transaction);
         }
 
         ItemStack remaining = stack.copy();
@@ -894,7 +954,7 @@ public class TransferEngine {
             if (!handler.isValid(slot, ItemResource.of(remaining))) {
                 continue;
             }
-            remaining = insertItem(handler, slot, remaining, simulate);
+            remaining = insertItem(handler, slot, remaining, transaction);
         }
 
         for (int slot = 0; slot < handler.size() && !remaining.isEmpty(); slot++) {
@@ -908,7 +968,7 @@ public class TransferEngine {
             if (!handler.isValid(slot, ItemResource.of(remaining))) {
                 continue;
             }
-            remaining = insertItem(handler, slot, remaining, simulate);
+            remaining = insertItem(handler, slot, remaining, transaction);
         }
 
         return remaining;
