@@ -1027,18 +1027,24 @@ public class TransferEngine {
             if (toMove <= 0)
                 continue;
 
-            FluidStack drained = drainFluid(source, simulated.copyWithAmount(toMove), false);
-            if (drained.isEmpty())
-                continue;
-
-            int filled = fillFluid(target, drained, false);
-            if (filled < drained.getAmount()) {
-                int rollbackAmount = drained.getAmount() - filled;
-                int returned = fillFluid(source, drained.copyWithAmount(rollbackAmount), false);
-                if (returned < rollbackAmount) {
-                    LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
-                            rollbackAmount - returned, drained.getFluid(), rollbackAmount - returned);
+            int filled;
+            try (var tx = Transaction.openRoot()) {
+                FluidStack drained = drainFluid(source, simulated.copyWithAmount(toMove), tx);
+                if (drained.isEmpty()) {
+                    continue;
                 }
+
+                filled = fillFluid(target, drained, tx);
+                if (filled < drained.getAmount()) {
+                    int rollbackAmount = drained.getAmount() - filled;
+                    int returned = fillFluid(source, drained.copyWithAmount(rollbackAmount), tx);
+                    if (returned < rollbackAmount) {
+                        LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
+                                rollbackAmount - returned, drained.getFluid(), rollbackAmount - returned);
+                    }
+                }
+
+                tx.commit();
             }
 
             if (filled > 0) {
