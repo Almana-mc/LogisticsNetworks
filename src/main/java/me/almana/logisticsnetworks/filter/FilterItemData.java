@@ -8,8 +8,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.NumericTag;
-import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.RegistryOps;
@@ -53,12 +51,6 @@ public final class FilterItemData {
     private static final String KEY_RULE_V = "v";
     private static final int MAX_NBT_RULES_PER_SLOT = 6;
     private static final String NBT_OP_EQUALS = "=";
-    private static final String NBT_OP_NOT_EQUALS = "!=";
-    private static final String NBT_OP_GT = ">";
-    private static final String NBT_OP_LT = "<";
-    private static final String NBT_OP_GTE = ">=";
-    private static final String NBT_OP_LTE = "<=";
-    private static final String[] NBT_OPS = { "=", "!=", ">", "<", ">=", "<=" };
 
     public static final class ReadCache {
         private final IdentityHashMap<ItemStack, ItemFilterView> itemViews = new IdentityHashMap<>();
@@ -831,7 +823,7 @@ public final class FilterItemData {
         if (slot < 0 || slot >= getCapacity(stack))
             return;
 
-        String normalizedOperator = normalizeNbtOperator(operator);
+        String normalizedOperator = NbtRuleMatcher.normalizeOperator(operator);
 
         updateRoot(stack, root -> {
             ListTag list = getItemEntries(root);
@@ -970,7 +962,7 @@ public final class FilterItemData {
         if (slot < 0 || slot >= getCapacity(stack))
             return false;
 
-        String op = normalizeNbtOperator(operator);
+        String op = NbtRuleMatcher.normalizeOperator(operator);
         boolean[] result = { false };
 
         updateRoot(stack, root -> {
@@ -1138,7 +1130,7 @@ public final class FilterItemData {
                     String o = r.contains(KEY_RULE_O) ? r.getStringOr(KEY_RULE_O, NBT_OP_EQUALS) : NBT_OP_EQUALS;
                     Tag v = r.get(KEY_RULE_V);
                     if (!p.isEmpty() && v != null) {
-                        result.add(new SlotNbtRule(p, normalizeNbtOperator(o), v.copy()));
+                        result.add(new SlotNbtRule(p, NbtRuleMatcher.normalizeOperator(o), v.copy()));
                     }
                 }
             }
@@ -1149,7 +1141,7 @@ public final class FilterItemData {
         Tag value = getEntryNbtValue(entry);
         if (path != null && value != null) {
             String op = getEntryNbtOperator(entry);
-            return List.of(new SlotNbtRule(path, normalizeNbtOperator(op), value.copy()));
+            return List.of(new SlotNbtRule(path, NbtRuleMatcher.normalizeOperator(op), value.copy()));
         }
 
         return List.of();
@@ -1171,7 +1163,7 @@ public final class FilterItemData {
             ListTag rules = new ListTag();
             CompoundTag rule = new CompoundTag();
             rule.putString(KEY_RULE_P, path);
-            rule.putString(KEY_RULE_O, normalizeNbtOperator(op));
+            rule.putString(KEY_RULE_O, NbtRuleMatcher.normalizeOperator(op));
             rule.put(KEY_RULE_V, value.copy());
             rules.add(rule);
             entry.put(KEY_NBT_RULES, rules);
@@ -1690,7 +1682,7 @@ public final class FilterItemData {
             boolean matchAny = entry.nbtMatchAny();
             for (SlotNbtRule rule : rules) {
                 Tag actual = NbtFilterData.resolvePathValue(components, rule.path());
-                boolean matches = matchesNbtValue(rule.operator(), rule.value(), actual);
+                boolean matches = NbtRuleMatcher.matchesValue(rule.operator(), rule.value(), actual);
                 if (matchAny && matches) return true;
                 if (!matchAny && !matches) return false;
             }
@@ -1699,7 +1691,7 @@ public final class FilterItemData {
 
         CompoundTag rawNbt = entry.rawNbt();
         if (rawNbt != null) {
-            return compoundContains(components, rawNbt);
+            return NbtRuleMatcher.compoundContains(components, rawNbt);
         }
         if (entry.invalidRawNbt()) {
             return false;
@@ -1710,7 +1702,7 @@ public final class FilterItemData {
         if (nbtPath == null || nbtExpected == null)
             return true;
         Tag actual = NbtFilterData.resolvePathValue(components, nbtPath);
-        return matchesNbtValue(entry.nbtOp(), nbtExpected, actual);
+        return NbtRuleMatcher.matchesValue(entry.nbtOp(), nbtExpected, actual);
     }
 
     private static boolean checkNbtConstraint(CompoundTag entry, @Nullable CompoundTag components) {
@@ -1724,7 +1716,7 @@ public final class FilterItemData {
             boolean matchAny = entry.getBooleanOr(KEY_NBT_MATCH_ANY, false);
             for (SlotNbtRule rule : rules) {
                 Tag actual = NbtFilterData.resolvePathValue(components, rule.path());
-                boolean matches = matchesNbtValue(rule.operator(), rule.value(), actual);
+                boolean matches = NbtRuleMatcher.matchesValue(rule.operator(), rule.value(), actual);
                 if (matchAny && matches) return true;
                 if (!matchAny && !matches) return false;
             }
@@ -1735,7 +1727,7 @@ public final class FilterItemData {
         if (raw != null) {
             try {
                 CompoundTag expected = TagParser.parseCompoundFully(raw);
-                return compoundContains(components, expected);
+                return NbtRuleMatcher.compoundContains(components, expected);
             } catch (Exception e) {
                 return false;
             }
@@ -1746,23 +1738,7 @@ public final class FilterItemData {
         if (nbtPath == null || nbtExpected == null)
             return true;
         Tag actual = NbtFilterData.resolvePathValue(components, nbtPath);
-        return matchesNbtValue(getEntryNbtOperator(entry), nbtExpected, actual);
-    }
-
-    private static boolean compoundContains(CompoundTag actual, CompoundTag expected) {
-        for (String key : expected.keySet()) {
-            Tag expectedVal = expected.get(key);
-            Tag actualVal = actual.get(key);
-            if (actualVal == null || expectedVal == null)
-                return false;
-            if (expectedVal instanceof CompoundTag ec && actualVal instanceof CompoundTag ac) {
-                if (!compoundContains(ac, ec))
-                    return false;
-            } else if (!expectedVal.equals(actualVal)) {
-                return false;
-            }
-        }
-        return true;
+        return NbtRuleMatcher.matchesValue(getEntryNbtOperator(entry), nbtExpected, actual);
     }
 
     private static boolean checkDurabilityConstraint(ItemStack filter, int slot, ItemStack candidate) {
@@ -2090,7 +2066,7 @@ public final class FilterItemData {
     private static String getEntryNbtOperator(CompoundTag entry) {
         if (!entry.contains(KEY_NBT_OP))
             return NBT_OP_EQUALS;
-        return normalizeNbtOperator(entry.getStringOr(KEY_NBT_OP, NBT_OP_EQUALS));
+        return NbtRuleMatcher.normalizeOperator(entry.getStringOr(KEY_NBT_OP, NBT_OP_EQUALS));
     }
 
     @Nullable
@@ -2134,54 +2110,8 @@ public final class FilterItemData {
                 || getEntryNbtRaw(entry) != null;
     }
 
-    private static String normalizeNbtOperator(@Nullable String operator) {
-        if (operator == null) return NBT_OP_EQUALS;
-        return switch (operator) {
-            case "!=", ">", "<", ">=", "<=" -> operator;
-            default -> NBT_OP_EQUALS;
-        };
-    }
-
     public static String nextNbtOperator(String current) {
-        for (int i = 0; i < NBT_OPS.length; i++) {
-            if (NBT_OPS[i].equals(current)) return NBT_OPS[(i + 1) % NBT_OPS.length];
-        }
-        return NBT_OPS[0];
-    }
-
-    private static boolean matchesNbtValue(@Nullable String operator, Tag expected, @Nullable Tag actual) {
-        if (actual == null) return NBT_OP_NOT_EQUALS.equals(operator);
-        String op = operator != null ? operator : NBT_OP_EQUALS;
-        return switch (op) {
-            case "!=" -> !expected.equals(actual);
-            case ">", "<", ">=", "<=" -> compareNumericNbt(op, expected, actual);
-            default -> expected.equals(actual);
-        };
-    }
-
-    private static boolean compareNumericNbt(String op, Tag expected, Tag actual) {
-        double exp = tagToDouble(expected);
-        double act = tagToDouble(actual);
-        if (Double.isNaN(exp) || Double.isNaN(act)) return false;
-        return switch (op) {
-            case ">" -> act > exp;
-            case "<" -> act < exp;
-            case ">=" -> act >= exp;
-            case "<=" -> act <= exp;
-            default -> false;
-        };
-    }
-
-    private static double tagToDouble(Tag tag) {
-        if (tag instanceof NumericTag nt) return nt.doubleValue();
-        if (tag instanceof StringTag st) {
-            try {
-                return Double.parseDouble(st.value());
-            } catch (Exception e) {
-                return Double.NaN;
-            }
-        }
-        try { return Double.parseDouble(tag.toString()); } catch (Exception e) { return Double.NaN; }
+        return NbtRuleMatcher.nextOperator(current);
     }
 
     private static boolean hasEntryDurability(CompoundTag entry) {

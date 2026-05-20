@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks;
 
 import me.almana.logisticsnetworks.client.WrenchHudOverlay;
+import me.almana.logisticsnetworks.client.DefaultNodeVisibilitySync;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
@@ -9,13 +10,17 @@ import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.PatternSetterScreen;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.render.LogisticsNodeRenderer;
-import me.almana.logisticsnetworks.render.NodeModel;
 import me.almana.logisticsnetworks.registration.Registration;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
+@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
 public final class LogisticsClientEvents {
 
     private LogisticsClientEvents() {
@@ -23,10 +28,6 @@ public final class LogisticsClientEvents {
 
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(Registration.LOGISTICS_NODE.get(), LogisticsNodeRenderer::new);
-    }
-
-    public static void registerLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
-        event.registerLayerDefinition(NodeModel.LAYER_LOCATION, NodeModel::createBodyLayer);
     }
 
     public static void registerScreens(RegisterMenuScreensEvent event) {
@@ -39,10 +40,18 @@ public final class LogisticsClientEvents {
     }
 
     public static void clientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(ThemeState::load);
+        event.enqueueWork(() -> {
+            ThemeState.load();
+            DefaultNodeVisibilitySync.send();
+        });
     }
 
     public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         WrenchHudOverlay.registerKeys(event);
+    }
+
+    @SubscribeEvent
+    public static void clientLogin(ClientPlayerNetworkEvent.LoggingIn event) {
+        DefaultNodeVisibilitySync.send();
     }
 }

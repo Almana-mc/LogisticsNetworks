@@ -15,6 +15,7 @@ import me.almana.logisticsnetworks.network.SetFilterEntryEnchantedPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryNbtPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntrySlotMappingPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryTagPayload;
+import me.almana.logisticsnetworks.network.SetDefaultNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.SetChannelNamePayload;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
@@ -37,6 +38,7 @@ import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncChannelDataPayload;
 import me.almana.logisticsnetworks.network.SyncChannelListPayload;
+import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
@@ -69,7 +71,6 @@ public class Logisticsnetworks {
                 modBus.addListener(this::commonSetup);
                 if (FMLEnvironment.getDist() == Dist.CLIENT) {
                         modBus.addListener(LogisticsClientEvents::registerRenderers);
-                        modBus.addListener(LogisticsClientEvents::registerLayers);
                         modBus.addListener(LogisticsClientEvents::registerScreens);
                         modBus.addListener(LogisticsClientEvents::clientSetup);
                         modBus.addListener(LogisticsClientEvents::registerKeyMappings);
@@ -139,6 +140,9 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleOpenFilterInSlot);
                 registrar.playToServer(ToggleNodeVisibilityPayload.TYPE, ToggleNodeVisibilityPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleToggleVisibility);
+                registrar.playToServer(SetDefaultNodeVisibilityPayload.TYPE,
+                                SetDefaultNodeVisibilityPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetDefaultNodeVisibility);
                 registrar.playToServer(CycleWrenchModePayload.TYPE, CycleWrenchModePayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleCycleWrenchMode);
                 registrar.playToServer(MassSelectConnectedPayload.TYPE, MassSelectConnectedPayload.STREAM_CODEC,
@@ -178,6 +182,9 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleToggleComputerPinnedNetwork);
 
                 // Server -> Client
+                registrar.playToClient(SyncMassPlacementChoicesPayload.TYPE,
+                                SyncMassPlacementChoicesPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncMassPlacementChoices);
                 registrar.playToClient(SyncNetworkListPayload.TYPE, SyncNetworkListPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkList);
                 registrar.playToClient(SyncNetworkNodesPayload.TYPE, SyncNetworkNodesPayload.STREAM_CODEC,

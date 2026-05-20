@@ -21,11 +21,10 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
 public final class MassPlacementSelectionRenderer {
 
-    private static final float OUTLINE_RED = 1.0F;
-    private static final float OUTLINE_GREEN = 0.55F;
-    private static final float OUTLINE_BLUE = 0.0F;
     private static final float OUTLINE_ALPHA = 1.0F;
-    private static final double OUTLINE_INFLATE = 0.002D;
+    private static final double OUTLINE_INFLATE = 0.004D;
+    private static final double OUTLINE_STEP = 0.006D;
+    private static final int OUTLINE_PASSES = 4;
     private static final double MAX_RENDER_DISTANCE_SQR = 128.0D * 128.0D;
 
     private MassPlacementSelectionRenderer() {
@@ -44,8 +43,8 @@ public final class MassPlacementSelectionRenderer {
             return;
         }
 
-        var selections = WrenchItem.getMassSelections(wrenchStack, player.level().dimension());
-        if (selections.isEmpty()) {
+        WrenchItem.MassSelectionArea area = WrenchItem.getMassSelectionArea(wrenchStack, player.level().dimension());
+        if (area == null) {
             return;
         }
 
@@ -54,24 +53,28 @@ public final class MassPlacementSelectionRenderer {
         MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
         VertexConsumer consumer = bufferSource.getBuffer(RenderTypes.lines());
 
-        for (WrenchItem.MassSelectionTarget selection : selections) {
-            double centerX = selection.pos().getX() + 0.5D;
-            double centerY = selection.pos().getY() + 0.5D;
-            double centerZ = selection.pos().getZ() + 0.5D;
-            double dx = centerX - cameraPos.x;
-            double dy = centerY - cameraPos.y;
-            double dz = centerZ - cameraPos.z;
-            if ((dx * dx) + (dy * dy) + (dz * dz) > MAX_RENDER_DISTANCE_SQR) {
-                continue;
-            }
-
-            AABB box = new AABB(0.0D, 0.0D, 0.0D, 1.0D, 1.0D, 1.0D).inflate(OUTLINE_INFLATE);
-            Vec3 offset = Vec3.atLowerCornerOf(selection.pos()).subtract(cameraPos);
+        var min = area.min();
+        var max = area.max();
+        double centerX = (min.getX() + max.getX() + 1.0D) * 0.5D;
+        double centerY = (min.getY() + max.getY() + 1.0D) * 0.5D;
+        double centerZ = (min.getZ() + max.getZ() + 1.0D) * 0.5D;
+        double dx = centerX - cameraPos.x;
+        double dy = centerY - cameraPos.y;
+        double dz = centerZ - cameraPos.z;
+        if ((dx * dx) + (dy * dy) + (dz * dz) <= MAX_RENDER_DISTANCE_SQR) {
+            AABB baseBox = new AABB(0.0D, 0.0D, 0.0D,
+                    max.getX() - min.getX() + 1.0D,
+                    max.getY() - min.getY() + 1.0D,
+                    max.getZ() - min.getZ() + 1.0D);
+            Vec3 offset = Vec3.atLowerCornerOf(min).subtract(cameraPos);
 
             poseStack.pushPose();
             poseStack.translate(offset.x, offset.y, offset.z);
-            ShapeRenderer.renderShape(poseStack, consumer, Shapes.create(box),
-                    0.0D, 0.0D, 0.0D, 0xFFFF8C00, OUTLINE_ALPHA);
+            for (int i = 0; i < OUTLINE_PASSES; i++) {
+                AABB box = baseBox.inflate(OUTLINE_INFLATE + OUTLINE_STEP * i);
+                ShapeRenderer.renderShape(poseStack, consumer, Shapes.create(box),
+                        0.0D, 0.0D, 0.0D, 0xFF33DD55, OUTLINE_ALPHA);
+            }
             poseStack.popPose();
         }
 

@@ -8,7 +8,6 @@ import me.almana.logisticsnetworks.data.NodeRef;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
-import me.almana.logisticsnetworks.filter.SlotFilterData;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
@@ -16,7 +15,6 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
@@ -26,11 +24,10 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 
-import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.transfer.CombinedResourceHandler;
 import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.energy.EnergyHandler;
+import net.neoforged.neoforge.transfer.energy.EnergyHandlerUtil;
 import net.neoforged.neoforge.transfer.fluid.FluidResource;
 import net.neoforged.neoforge.transfer.fluid.FluidUtil;
 import net.neoforged.neoforge.transfer.item.ItemResource;
@@ -49,121 +46,12 @@ public class TransferEngine {
     private static final float BACKOFF_DECAY_DIVISOR = 3f;
     private static final float BACKOFF_MAX_TICKS_ENERGY = 5f;
 
-    private static long capKey(ServerLevel level, BlockPos pos, Direction dir) {
-        long packed = pos.asLong();
-        packed ^= ((long) dir.ordinal()) << 58;
-        packed ^= ((long) level.dimension().identifier().hashCode()) << 32;
-        return packed;
-    }
-
-    private static class CapCache {
-        private final Map<Long, Object> items = new HashMap<>();
-        private final Map<Long, Object> fluids = new HashMap<>();
-        private final Map<Long, Object> energy = new HashMap<>();
-        private static final Object ABSENT = new Object();
-
-        ResourceHandler<ItemResource> getItemHandler(ServerLevel level, BlockPos pos, Direction dir) {
-            long key = capKey(level, pos, dir);
-            Object cached = items.get(key);
-            if (cached == ABSENT) return null;
-            if (cached != null) return (ResourceHandler<ItemResource>) cached;
-            ResourceHandler<ItemResource> handler = level.getCapability(Capabilities.Item.BLOCK, pos, dir);
-            items.put(key, handler != null ? handler : ABSENT);
-            return handler;
-        }
-
-        ResourceHandler<FluidResource> getFluidHandler(ServerLevel level, BlockPos pos, Direction dir) {
-            long key = capKey(level, pos, dir);
-            Object cached = fluids.get(key);
-            if (cached == ABSENT) return null;
-            if (cached != null) return (ResourceHandler<FluidResource>) cached;
-            ResourceHandler<FluidResource> handler = level.getCapability(Capabilities.Fluid.BLOCK, pos, dir);
-            fluids.put(key, handler != null ? handler : ABSENT);
-            return handler;
-        }
-
-        EnergyHandler getEnergyHandler(ServerLevel level, BlockPos pos, Direction dir) {
-            long key = capKey(level, pos, dir);
-            Object cached = energy.get(key);
-            if (cached == ABSENT) return null;
-            if (cached != null) return (EnergyHandler) cached;
-            EnergyHandler handler = level.getCapability(Capabilities.Energy.BLOCK, pos, dir);
-            energy.put(key, handler != null ? handler : ABSENT);
-            return handler;
-        }
-
-        ResourceHandler<ItemResource> findItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            if (dir != null) return getItemHandler(level, pos, dir);
-            List<ResourceHandler<ItemResource>> found = new ArrayList<>(6);
-            for (Direction d : Direction.values()) {
-                ResourceHandler<ItemResource> h = getItemHandler(level, pos, d);
-                if (h == null) continue;
-                boolean dup = false;
-                for (ResourceHandler<ItemResource> existing : found) {
-                    if (existing == h) {
-                        dup = true;
-                        break;
-                    }
-                }
-                if (!dup) found.add(h);
-            }
-            if (found.isEmpty()) return null;
-            if (found.size() == 1) return found.get(0);
-            return new CombinedResourceHandler<>(found);
-        }
-
-        ResourceHandler<FluidResource> findFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            if (dir != null) return getFluidHandler(level, pos, dir);
-            List<ResourceHandler<FluidResource>> found = new ArrayList<>(6);
-            for (Direction d : Direction.values()) {
-                ResourceHandler<FluidResource> h = getFluidHandler(level, pos, d);
-                if (h == null) continue;
-                boolean dup = false;
-                for (ResourceHandler<FluidResource> existing : found) {
-                    if (existing == h) {
-                        dup = true;
-                        break;
-                    }
-                }
-                if (!dup) found.add(h);
-            }
-            if (found.isEmpty()) return null;
-            if (found.size() == 1) return found.get(0);
-            return new CombinedResourceHandler<>(found);
-        }
-
-        EnergyHandler findEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            if (dir != null) return getEnergyHandler(level, pos, dir);
-            List<EnergyHandler> found = new ArrayList<>(6);
-            for (Direction d : Direction.values()) {
-                EnergyHandler h = getEnergyHandler(level, pos, d);
-                if (h == null) continue;
-                boolean dup = false;
-                for (EnergyHandler existing : found) {
-                    if (existing == h) {
-                        dup = true;
-                        break;
-                    }
-                }
-                if (!dup) found.add(h);
-            }
-            if (found.isEmpty()) return null;
-            if (found.size() == 1) return found.get(0);
-            return new CombinedEnergyHandler(found.toArray(EnergyHandler[]::new));
-        }
-    }
-
     private record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
     }
 
     private record ItemTransferTarget(ResourceHandler<ItemResource> handler, ItemStack[] importFilters,
-            FilterMode importFilterMode, AmountConstraints constraints, boolean hasItemNbtFilter,
+            FilterMode importFilterMode, TransferAmountRules.Constraints constraints, boolean hasItemNbtFilter,
             boolean[] allowedSlots) {
-    }
-
-    private record AmountConstraints(boolean hasExportThreshold, int exportThreshold,
-            boolean hasImportThreshold, int importThreshold,
-            boolean hasPerEntryAmounts) {
     }
 
     public static long processNetwork(LogisticsNetwork network, MinecraftServer server) {
@@ -217,7 +105,7 @@ public class TransferEngine {
         List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache, signalCache);
 
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
-        CapCache capCache = new CapCache();
+        TransferCapabilityCache capCache = new TransferCapabilityCache();
 
         long minWakeDelta = Long.MAX_VALUE;
         for (LogisticsNodeEntity sourceNode : sortedNodes) {
@@ -300,7 +188,7 @@ public class TransferEngine {
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache,
             boolean telemetryActive,
-            CapCache capCache) {
+            TransferCapabilityCache capCache) {
 
         if (!sourceNode.isValidNode())
             return Long.MAX_VALUE;
@@ -465,7 +353,7 @@ public class TransferEngine {
 
     private static int transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
-            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
@@ -478,7 +366,7 @@ public class TransferEngine {
         boolean anyReachable = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
         ItemStack[] exportFilters = exportChannel.getFilterItems();
-        boolean[] sourceAllowedSlots = buildSlotAccessMask(sourceHandler, exportFilters);
+        boolean[] sourceAllowedSlots = TransferSlotAccess.build(sourceHandler, exportFilters);
 
         for (ImportTarget target : targets) {
             if (target.node.getUUID().equals(sourceNode.getUUID()))
@@ -499,8 +387,8 @@ public class TransferEngine {
                 continue;
 
             ItemStack[] importFilters = target.channel.getFilterItems();
-            boolean[] targetAllowedSlots = buildSlotAccessMask(targetHandler, importFilters);
-            if (targetAllowedSlots != null && !hasAnyAllowedSlots(targetAllowedSlots)) {
+            boolean[] targetAllowedSlots = TransferSlotAccess.build(targetHandler, importFilters);
+            if (targetAllowedSlots != null && !TransferSlotAccess.hasAny(targetAllowedSlots)) {
                 continue;
             }
 
@@ -508,7 +396,7 @@ public class TransferEngine {
                     targetHandler,
                     importFilters,
                     target.channel.getFilterMode(),
-                    collectAmountConstraints(exportFilters, importFilters),
+                    TransferAmountRules.collect(exportFilters, importFilters),
                     FilterLogic.hasConfiguredItemNbtFilter(importFilters),
                     targetAllowedSlots));
         }
@@ -526,7 +414,7 @@ public class TransferEngine {
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimitMb,
-            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
@@ -575,7 +463,7 @@ public class TransferEngine {
 
     private static int transferEnergy(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimitRF,
-            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
@@ -759,21 +647,21 @@ public class TransferEngine {
 
         boolean anyAmountConstraints = false;
         for (ItemTransferTarget t : targets) {
-            if (t.constraints().hasExportThreshold || t.constraints().hasImportThreshold
-                    || t.constraints().hasPerEntryAmounts) {
+            if (t.constraints().hasExportThreshold() || t.constraints().hasImportThreshold()
+                    || t.constraints().hasPerEntryAmounts()) {
                 anyAmountConstraints = true;
                 break;
             }
         }
-        Map<Item, Integer> sourceItemCounts = anyAmountConstraints ? buildItemCountCache(source) : null;
+        Map<Item, Integer> sourceItemCounts = anyAmountConstraints ? TransferAmountRules.countItems(source) : null;
         Map<Item, Integer> batchMoved = anyAmountConstraints ? new HashMap<>() : null;
         List<Map<Item, Integer>> targetItemCounts = null;
         if (anyAmountConstraints) {
             targetItemCounts = new ArrayList<>(targets.size());
             for (ItemTransferTarget t : targets) {
                 targetItemCounts.add(
-                        (t.constraints().hasImportThreshold || t.constraints().hasPerEntryAmounts)
-                                ? buildItemCountCache(t.handler())
+                        (t.constraints().hasImportThreshold() || t.constraints().hasPerEntryAmounts())
+                                ? TransferAmountRules.countItems(t.handler())
                                 : null);
             }
         }
@@ -823,21 +711,21 @@ public class TransferEngine {
 
                     int allowedByAmount;
                     if (!anyAmountConstraints
-                            || (!target.constraints().hasExportThreshold && !target.constraints().hasImportThreshold
-                                    && !target.constraints().hasPerEntryAmounts)) {
+                            || (!target.constraints().hasExportThreshold() && !target.constraints().hasImportThreshold()
+                                    && !target.constraints().hasPerEntryAmounts())) {
                         allowedByAmount = extracted.getCount();
                     } else {
-                        allowedByAmount = getAllowedTransferCached(extracted, target.constraints(),
+                        allowedByAmount = TransferAmountRules.allowedItems(extracted, target.constraints(),
                                 sourceItemCounts, targetItemCounts.get(targetIndex));
-                        if (target.constraints().hasPerEntryAmounts && provider != null) {
-                            int perEntry = getPerEntryItemAmountLimit(extracted, exportFilters,
+                        if (target.constraints().hasPerEntryAmounts() && provider != null) {
+                            int perEntry = TransferAmountRules.perEntryItemAmount(extracted, exportFilters,
                                     target.importFilters(), sourceItemCounts,
                                     targetItemCounts.get(targetIndex), provider, candidateComponents,
                                     filterReadCache);
                             if (perEntry >= 0) {
                                 allowedByAmount = Math.min(allowedByAmount, perEntry);
                             }
-                            int batchLimit = getPerEntryBatchLimit(extracted, exportFilters, provider,
+                            int batchLimit = TransferAmountRules.perEntryItemBatch(extracted, exportFilters, provider,
                                     candidateComponents, filterReadCache);
                             if (batchLimit > 0) {
                                 int alreadyMoved = batchMoved.getOrDefault(extracted.getItem(), 0);
@@ -862,36 +750,47 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack toMove = extractItem(source, slot, acceptableCount, false);
-                    if (toMove.isEmpty()) {
-                        continue;
-                    }
-
-                    ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, false,
-                            target.allowedSlots());
-                    int targetAccepted = toMove.getCount() - uninserted.getCount();
+                    int targetAccepted;
                     int droppedToWorld = 0;
+                    ItemStack dropStack = ItemStack.EMPTY;
 
-                    if (!uninserted.isEmpty()) {
-                        ItemStack stillLeft = insertItem(source, slot, uninserted, false);
-                        if (!stillLeft.isEmpty()) {
-                            for (int fallback = 0; fallback < source.size() && !stillLeft.isEmpty(); fallback++) {
-                                stillLeft = insertItem(source, fallback, stillLeft, false);
-                            }
+                    try (var tx = Transaction.openRoot()) {
+                        ItemStack toMove = extractItem(source, slot, acceptableCount, tx);
+                        if (toMove.isEmpty()) {
+                            continue;
+                        }
+
+                        ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, tx,
+                                target.allowedSlots());
+                        targetAccepted = toMove.getCount() - uninserted.getCount();
+
+                        if (!uninserted.isEmpty()) {
+                            ItemStack stillLeft = insertItem(source, slot, uninserted, tx);
                             if (!stillLeft.isEmpty()) {
-                                ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(), stillLeft,
-                                        false, target.allowedSlots());
-                                int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
-                                targetAccepted += forcedIn;
-                                if (!forcedRemainder.isEmpty()) {
-                                    LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
-                                            + "target slot mask. Dropping at source pos {}.",
-                                            forcedRemainder, sourcePos);
-                                    droppedToWorld = forcedRemainder.getCount();
-                                    Block.popResource(sourceLevel, sourcePos, forcedRemainder);
+                                for (int fallback = 0; fallback < source.size() && !stillLeft.isEmpty(); fallback++) {
+                                    stillLeft = insertItem(source, fallback, stillLeft, tx);
+                                }
+                                if (!stillLeft.isEmpty()) {
+                                    ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(), stillLeft,
+                                            tx, target.allowedSlots());
+                                    int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
+                                    targetAccepted += forcedIn;
+                                    if (!forcedRemainder.isEmpty()) {
+                                        LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
+                                                + "target slot mask. Dropping at source pos {}.",
+                                                forcedRemainder, sourcePos);
+                                        droppedToWorld = forcedRemainder.getCount();
+                                        dropStack = forcedRemainder.copy();
+                                    }
                                 }
                             }
                         }
+
+                        tx.commit();
+                    }
+
+                    if (!dropStack.isEmpty()) {
+                        Block.popResource(sourceLevel, sourcePos, dropStack);
                     }
 
                     int sourceLost = targetAccepted + droppedToWorld;
@@ -934,23 +833,48 @@ public class TransferEngine {
             return ItemStack.EMPTY;
         }
 
+        try (var tx = Transaction.openRoot()) {
+            ItemStack extracted = extractItem(handler, slot, amount, tx);
+            if (!simulate) {
+                tx.commit();
+            }
+            return extracted;
+        }
+    }
+
+    private static ItemStack extractItem(ResourceHandler<ItemResource> handler, int slot, int amount,
+            TransactionContext transaction) {
+        if (amount <= 0) {
+            return ItemStack.EMPTY;
+        }
+
         ItemResource resource = handler.getResource(slot);
         if (resource.isEmpty()) {
             return ItemStack.EMPTY;
         }
 
         int request = Math.min(amount, resource.getMaxStackSize());
-        try (var tx = Transaction.openRoot()) {
-            int extracted = handler.extract(slot, resource, request, tx);
-            if (!simulate) {
-                tx.commit();
-            }
-            return extracted <= 0 ? ItemStack.EMPTY : resource.toStack(extracted);
-        }
+        int extracted = handler.extract(slot, resource, request, transaction);
+        return extracted <= 0 ? ItemStack.EMPTY : resource.toStack(extracted);
     }
 
     private static ItemStack insertItem(ResourceHandler<ItemResource> handler, int slot, ItemStack stack, boolean simulate) {
-        return ItemUtil.insertItemReturnRemaining(handler, slot, stack, simulate, null);
+        if (stack.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+
+        try (var tx = Transaction.openRoot()) {
+            ItemStack remaining = insertItem(handler, slot, stack, tx);
+            if (!simulate) {
+                tx.commit();
+            }
+            return remaining;
+        }
+    }
+
+    private static ItemStack insertItem(ResourceHandler<ItemResource> handler, int slot, ItemStack stack,
+            TransactionContext transaction) {
+        return ItemUtil.insertItemReturnRemaining(handler, slot, stack, false, transaction);
     }
 
     private static int fillFluid(ResourceHandler<FluidResource> handler, FluidStack stack, boolean simulate) {
@@ -958,9 +882,8 @@ public class TransferEngine {
             return 0;
         }
 
-        FluidResource resource = FluidResource.of(stack);
         try (var tx = Transaction.openRoot()) {
-            int inserted = handler.insert(resource, stack.getAmount(), tx);
+            int inserted = fillFluid(handler, stack, tx);
             if (!simulate) {
                 tx.commit();
             }
@@ -968,19 +891,38 @@ public class TransferEngine {
         }
     }
 
+    private static int fillFluid(ResourceHandler<FluidResource> handler, FluidStack stack,
+            TransactionContext transaction) {
+        if (stack.isEmpty()) {
+            return 0;
+        }
+
+        return handler.insert(FluidResource.of(stack), stack.getAmount(), transaction);
+    }
+
     private static FluidStack drainFluid(ResourceHandler<FluidResource> handler, FluidStack stack, boolean simulate) {
         if (stack.isEmpty()) {
             return FluidStack.EMPTY;
         }
 
-        FluidResource resource = FluidResource.of(stack);
         try (var tx = Transaction.openRoot()) {
-            int extracted = handler.extract(resource, stack.getAmount(), tx);
+            FluidStack extracted = drainFluid(handler, stack, tx);
             if (!simulate) {
                 tx.commit();
             }
-            return extracted <= 0 ? FluidStack.EMPTY : resource.toStack(extracted);
+            return extracted;
         }
+    }
+
+    private static FluidStack drainFluid(ResourceHandler<FluidResource> handler, FluidStack stack,
+            TransactionContext transaction) {
+        if (stack.isEmpty()) {
+            return FluidStack.EMPTY;
+        }
+
+        FluidResource resource = FluidResource.of(stack);
+        int extracted = handler.extract(resource, stack.getAmount(), transaction);
+        return extracted <= 0 ? FluidStack.EMPTY : resource.toStack(extracted);
     }
 
     private static ItemStack insertItemWithAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack stack, boolean simulate,
@@ -988,8 +930,23 @@ public class TransferEngine {
         if (stack.isEmpty()) {
             return ItemStack.EMPTY;
         }
+
+        try (var tx = Transaction.openRoot()) {
+            ItemStack remaining = insertItemWithAllowedSlots(handler, stack, tx, allowedSlots);
+            if (!simulate) {
+                tx.commit();
+            }
+            return remaining;
+        }
+    }
+
+    private static ItemStack insertItemWithAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack stack,
+            TransactionContext transaction, boolean[] allowedSlots) {
+        if (stack.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
         if (allowedSlots == null) {
-            return ItemUtil.insertItemReturnRemaining(handler, stack, simulate, null);
+            return ItemUtil.insertItemReturnRemaining(handler, stack, false, transaction);
         }
 
         ItemStack remaining = stack.copy();
@@ -1008,7 +965,7 @@ public class TransferEngine {
             if (!handler.isValid(slot, ItemResource.of(remaining))) {
                 continue;
             }
-            remaining = insertItem(handler, slot, remaining, simulate);
+            remaining = insertItem(handler, slot, remaining, transaction);
         }
 
         for (int slot = 0; slot < handler.size() && !remaining.isEmpty(); slot++) {
@@ -1022,7 +979,7 @@ public class TransferEngine {
             if (!handler.isValid(slot, ItemResource.of(remaining))) {
                 continue;
             }
-            remaining = insertItem(handler, slot, remaining, simulate);
+            remaining = insertItem(handler, slot, remaining, transaction);
         }
 
         return remaining;
@@ -1034,7 +991,7 @@ public class TransferEngine {
             HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache) {
 
         int remaining = limitMb;
-        AmountConstraints amountConstraints = collectAmountConstraints(exportFilters, importFilters);
+        TransferAmountRules.Constraints amountConstraints = TransferAmountRules.collect(exportFilters, importFilters);
 
         for (int tank = 0; tank < source.size() && remaining > 0; tank++) {
             FluidStack tankFluid = FluidUtil.getStack(source, tank);
@@ -1055,10 +1012,10 @@ public class TransferEngine {
                     continue;
             }
 
-            int allowedByAmount = getAllowedTransferByFluidAmountConstraints(source, target, simulated,
+            int allowedByAmount = TransferAmountRules.allowedFluids(source, target, simulated,
                     amountConstraints);
-            if (amountConstraints.hasPerEntryAmounts) {
-                int perEntry = getPerEntryFluidAmountLimit(simulated, exportFilters, importFilters, source, target,
+            if (amountConstraints.hasPerEntryAmounts()) {
+                int perEntry = TransferAmountRules.perEntryFluidAmount(simulated, exportFilters, importFilters, source, target,
                         filterReadCache);
                 if (perEntry >= 0) {
                     allowedByAmount = Math.min(allowedByAmount, perEntry);
@@ -1068,7 +1025,7 @@ public class TransferEngine {
                 continue;
 
             int request = Math.min(simulated.getAmount(), Math.min(remaining, allowedByAmount));
-            int perEntryBatch = getPerEntryFluidBatchLimit(simulated, exportFilters, importFilters, filterReadCache);
+            int perEntryBatch = TransferAmountRules.perEntryFluidBatch(simulated, exportFilters, importFilters, filterReadCache);
             if (perEntryBatch > 0) {
                 request = Math.min(request, perEntryBatch);
             }
@@ -1081,18 +1038,24 @@ public class TransferEngine {
             if (toMove <= 0)
                 continue;
 
-            FluidStack drained = drainFluid(source, simulated.copyWithAmount(toMove), false);
-            if (drained.isEmpty())
-                continue;
-
-            int filled = fillFluid(target, drained, false);
-            if (filled < drained.getAmount()) {
-                int rollbackAmount = drained.getAmount() - filled;
-                int returned = fillFluid(source, drained.copyWithAmount(rollbackAmount), false);
-                if (returned < rollbackAmount) {
-                    LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
-                            rollbackAmount - returned, drained.getFluid(), rollbackAmount - returned);
+            int filled;
+            try (var tx = Transaction.openRoot()) {
+                FluidStack drained = drainFluid(source, simulated.copyWithAmount(toMove), tx);
+                if (drained.isEmpty()) {
+                    continue;
                 }
+
+                filled = fillFluid(target, drained, tx);
+                if (filled < drained.getAmount()) {
+                    int rollbackAmount = drained.getAmount() - filled;
+                    int returned = fillFluid(source, drained.copyWithAmount(rollbackAmount), tx);
+                    if (returned < rollbackAmount) {
+                        LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
+                                rollbackAmount - returned, drained.getFluid(), rollbackAmount - returned);
+                    }
+                }
+
+                tx.commit();
             }
 
             if (filled > 0) {
@@ -1103,32 +1066,7 @@ public class TransferEngine {
     }
 
     private static int executeEnergyMove(EnergyHandler source, EnergyHandler target, int limitRF) {
-        int toMove;
-        try (var tx = Transaction.openRoot()) {
-            int extracted = source.extract(limitRF, tx);
-            if (extracted <= 0) {
-                return 0;
-            }
-            int accepted = target.insert(extracted, tx);
-            toMove = Math.min(extracted, accepted);
-        }
-
-        if (toMove <= 0) {
-            return 0;
-        }
-
-        try (var tx = Transaction.openRoot()) {
-            int extracted = source.extract(toMove, tx);
-            if (extracted <= 0) {
-                return 0;
-            }
-            int inserted = target.insert(extracted, tx);
-            if (inserted != extracted) {
-                return 0;
-            }
-            tx.commit();
-            return inserted;
-        }
+        return EnergyHandlerUtil.move(source, target, limitRF, null);
     }
 
     private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
@@ -1147,349 +1085,5 @@ public class TransferEngine {
             case HIGH -> signalStrength > 0;
             case LOW -> signalStrength == 0;
         };
-    }
-
-    private static AmountConstraints collectAmountConstraints(ItemStack[] exportFilters, ItemStack[] importFilters) {
-        int exportThreshold = 0;
-        boolean hasExportThreshold = false;
-        boolean hasPerEntryAmounts = false;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                if (FilterItemData.hasAnyAmountEntries(filter)) {
-                    hasPerEntryAmounts = true;
-                }
-            }
-        }
-
-        int importThreshold = Integer.MAX_VALUE;
-        boolean hasImportThreshold = false;
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                if (FilterItemData.hasAnyAmountEntries(filter)) {
-                    hasPerEntryAmounts = true;
-                }
-            }
-        }
-
-        return new AmountConstraints(hasExportThreshold, exportThreshold, hasImportThreshold, importThreshold,
-                hasPerEntryAmounts);
-    }
-
-    private static Map<Item, Integer> buildItemCountCache(ResourceHandler<ItemResource> handler) {
-        Map<Item, Integer> counts = new HashMap<>();
-        for (int i = 0; i < handler.size(); i++) {
-            ItemStack stack = ItemUtil.getStack(handler, i);
-            if (!stack.isEmpty()) {
-                counts.merge(stack.getItem(), stack.getCount(), Integer::sum);
-            }
-        }
-        return counts;
-    }
-
-    private static int getAllowedTransferCached(ItemStack candidate, AmountConstraints constraints,
-            Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (constraints.hasExportThreshold) {
-            int sourceCount = sourceCounts != null ? sourceCounts.getOrDefault(candidate.getItem(), 0) : 0;
-            int exportCap = sourceCount - constraints.exportThreshold;
-            if (exportCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, exportCap);
-        }
-
-        if (constraints.hasImportThreshold) {
-            int targetCount = targetCounts != null ? targetCounts.getOrDefault(candidate.getItem(), 0) : 0;
-            int importCap = constraints.importThreshold - targetCount;
-            if (importCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, importCap);
-        }
-
-        return allowed == Integer.MAX_VALUE ? candidate.getCount() : Math.max(0, allowed);
-    }
-
-    private static int getAllowedTransferByFluidAmountConstraints(ResourceHandler<FluidResource> source, ResourceHandler<FluidResource> target,
-            FluidStack candidate, AmountConstraints constraints) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (constraints.hasExportThreshold) {
-            int sourceAmount = countMatchingFluid(source, candidate);
-            int exportCap = sourceAmount - constraints.exportThreshold;
-            if (exportCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, exportCap);
-        }
-
-        if (constraints.hasImportThreshold) {
-            int targetAmount = countMatchingFluid(target, candidate);
-            int importCap = constraints.importThreshold - targetAmount;
-            if (importCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, importCap);
-        }
-
-        return allowed == Integer.MAX_VALUE ? candidate.getAmount() : Math.max(0, allowed);
-    }
-
-    private static int getPerEntryItemAmountLimit(ItemStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                int threshold = FilterItemData.getItemAmountThresholdFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache);
-                if (threshold > 0) {
-                    int sourceCount = sourceCounts != null ? sourceCounts.getOrDefault(candidate.getItem(), 0) : 0;
-                    int exportCap = sourceCount - threshold;
-                    if (exportCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, exportCap);
-                }
-            }
-        }
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                int threshold = FilterItemData.getItemAmountThresholdFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache);
-                if (threshold > 0) {
-                    int targetCount = targetCounts != null ? targetCounts.getOrDefault(candidate.getItem(), 0) : 0;
-                    int importCap = threshold - targetCount;
-                    if (importCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, importCap);
-                }
-            }
-        }
-
-        return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
-    }
-
-    private static int getPerEntryBatchLimit(ItemStack candidate, ItemStack[] exportFilters,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        if (exportFilters == null) return -1;
-        int limit = Integer.MAX_VALUE;
-        for (ItemStack filter : exportFilters) {
-            int batch = FilterItemData.getItemBatchLimitFull(filter, candidate, provider,
-                    candidateComponents, filterReadCache);
-            if (batch > 0)
-                limit = Math.min(limit, batch);
-        }
-        return limit == Integer.MAX_VALUE ? -1 : limit;
-    }
-
-    private static int getPerEntryFluidAmountLimit(FluidStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, ResourceHandler<FluidResource> source, ResourceHandler<FluidResource> target,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
-                if (threshold > 0) {
-                    int sourceAmount = countMatchingFluid(source, candidate);
-                    int exportCap = sourceAmount - threshold;
-                    if (exportCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, exportCap);
-                }
-            }
-        }
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
-                if (threshold > 0) {
-                    int targetAmount = countMatchingFluid(target, candidate);
-                    int importCap = threshold - targetAmount;
-                    if (importCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, importCap);
-                }
-            }
-        }
-
-        return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
-    }
-
-    private static int getPerEntryFluidBatchLimit(FluidStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, @Nullable FilterItemData.ReadCache filterReadCache) {
-        int limit = Integer.MAX_VALUE;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate, filterReadCache);
-                if (batch > 0) {
-                    limit = Math.min(limit, batch);
-                }
-            }
-        }
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate, filterReadCache);
-                if (batch > 0) {
-                    limit = Math.min(limit, batch);
-                }
-            }
-        }
-
-        return limit == Integer.MAX_VALUE ? -1 : limit;
-    }
-
-    private static int countMatchingFluid(ResourceHandler<FluidResource> handler, FluidStack candidate) {
-        int amount = 0;
-        for (int i = 0; i < handler.size(); i++) {
-            FluidResource resource = handler.getResource(i);
-            if (!resource.isEmpty() && resource.matches(candidate)) {
-                amount += handler.getAmountAsInt(i);
-            }
-        }
-        return amount;
-    }
-
-    private static boolean[] buildSlotAccessMask(ResourceHandler<ItemResource> handler, ItemStack[] filters) {
-        if (handler == null || filters == null || filters.length == 0) {
-            return null;
-        }
-
-        int slotCount = handler.size();
-        if (slotCount <= 0) {
-            return null;
-        }
-
-        boolean[] allowed = new boolean[slotCount];
-        boolean[] blacklistMask = new boolean[slotCount];
-
-        boolean hasConfiguredSlotFilter = false;
-        boolean hasWhitelist = false;
-
-        for (ItemStack filter : filters) {
-            if (!SlotFilterData.isSlotFilterItem(filter) || !SlotFilterData.hasAnySlots(filter)) {
-                continue;
-            }
-
-            hasConfiguredSlotFilter = true;
-            List<Integer> slots = SlotFilterData.getSlots(filter);
-            if (slots.isEmpty()) {
-                continue;
-            }
-
-            if (SlotFilterData.isBlacklist(filter)) {
-                for (int slot : slots) {
-                    if (slot >= 0 && slot < slotCount) {
-                        blacklistMask[slot] = true;
-                    }
-                }
-            } else {
-                hasWhitelist = true;
-                for (int slot : slots) {
-                    if (slot >= 0 && slot < slotCount) {
-                        allowed[slot] = true;
-                    }
-                }
-            }
-        }
-
-        if (!hasConfiguredSlotFilter) {
-            return null;
-        }
-
-        if (!hasWhitelist) {
-            Arrays.fill(allowed, true);
-        }
-
-        for (int i = 0; i < slotCount; i++) {
-            if (blacklistMask[i]) {
-                allowed[i] = false;
-            }
-        }
-
-        return allowed;
-    }
-
-    private static final class CombinedEnergyHandler implements EnergyHandler {
-        private final EnergyHandler[] handlers;
-
-        CombinedEnergyHandler(EnergyHandler[] handlers) {
-            this.handlers = handlers;
-        }
-
-        @Override
-        public long getAmountAsLong() {
-            long sum = 0;
-            for (EnergyHandler handler : handlers) {
-                sum += handler.getAmountAsLong();
-            }
-            return sum;
-        }
-
-        @Override
-        public long getCapacityAsLong() {
-            long sum = 0;
-            for (EnergyHandler handler : handlers) {
-                sum += handler.getCapacityAsLong();
-            }
-            return sum;
-        }
-
-        @Override
-        public int insert(int amount, TransactionContext transaction) {
-            if (amount <= 0) {
-                return 0;
-            }
-            int remaining = amount;
-            int total = 0;
-            for (EnergyHandler handler : handlers) {
-                if (remaining <= 0) {
-                    break;
-                }
-                int accepted = handler.insert(remaining, transaction);
-                if (accepted > 0) {
-                    total += accepted;
-                    remaining -= accepted;
-                }
-            }
-            return total;
-        }
-
-        @Override
-        public int extract(int amount, TransactionContext transaction) {
-            if (amount <= 0) {
-                return 0;
-            }
-            int remaining = amount;
-            int total = 0;
-            for (EnergyHandler handler : handlers) {
-                if (remaining <= 0) {
-                    break;
-                }
-                int extracted = handler.extract(remaining, transaction);
-                if (extracted > 0) {
-                    total += extracted;
-                    remaining -= extracted;
-                }
-            }
-            return total;
-        }
-    }
-
-    private static boolean hasAnyAllowedSlots(boolean[] allowedSlots) {
-        if (allowedSlots == null) {
-            return true;
-        }
-        for (boolean allowed : allowedSlots) {
-            if (allowed) {
-                return true;
-            }
-        }
-        return false;
     }
 }

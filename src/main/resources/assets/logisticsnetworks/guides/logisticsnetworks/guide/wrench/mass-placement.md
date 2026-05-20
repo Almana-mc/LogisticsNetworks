@@ -7,55 +7,66 @@ navigation:
 
 # Mass Placement Mode
 
-The mode for building out large, repetitive setups in one action. You walk around flagging blocks, then open the placement screen and place a pre-configured node on every flagged block in one click.
+The mode for building out large, repetitive setups in one action. You mark a rectangular area with two corners, choose which block type inside that area should receive nodes, then place configured nodes on every valid matching block.
 
-Switch to Mass Placement with **Shift + mouse wheel**. The HUD overlay shows the mode and the current selection count.
+Switch to Mass Placement with **Shift + mouse wheel**. The HUD overlay shows the current wrench mode.
 
-## Select Blocks
+## Select an Area
 
-**Right-click a block** to add it to the wrench's selection set. Right-click the same block again to remove it.
+**Right-click a block** to set the first corner. **Right-click another block** to set the second corner. The wrench draws a green cuboid border around the selected area so you can see exactly what will be scanned.
 
-- Selections persist on the wrench until you clear them or place, so you can walk around, load a new chunk, come back — the selection is still there.
-- Selections are **per-dimension**: blocks you flag in the Overworld are tracked separately from blocks flagged in the Nether, so a selection made in one dimension does not accidentally carry into another.
-- Maximum **2048 selections per wrench**. Beyond that the newest selection is rejected.
+- The selected area is stored on the wrench until you clear it or place nodes.
+- Selections are **per-dimension**: an area selected in the Overworld does not apply in the Nether.
+- The selected area can contain up to **10,000 blocks**.
+- Starting a new area is simple: right-click again after both corners are set, and that click becomes the new first corner.
 
-## Flood-Fill Select
+## Open the Placement Menu
 
-**Ctrl + right-click a block** to select every connected block of the **same block type** in one go. This is how you light up a long row of furnaces, a storage wall of chests, or a branching line of machines without clicking each one by hand.
+Open the Mass Placement menu with **Shift + right-click**. This works on blocks and in air, so you do not have to aim away from your build.
 
-Same 2048 cap applies.
+Once two corners are selected, the menu lists block types inside the area that can accept a node. Pick the block type you want, such as chests, barrels, furnaces, or machines. Blocks without item, fluid, energy, chemical, or source capability are not shown.
 
-## Placement Menu
+Only the chosen block type receives nodes. Other blocks inside the green cuboid are ignored.
 
-Once you have your selection, **right-click air** (no block in front of you) to open the Mass Placement menu. The menu shows:
+## Placement Limits
 
-- Total selections.
-- Valid selections (selections that can actually accept a node — blocks that still exist, have storage, and have not been built over).
-- Required items — the Logistics Node items, plus any filter and upgrade items the clipboard template needs.
+The area can be large, but a single placement run creates at most **2048 nodes**. If more than 2048 matching capability blocks exist, the menu count shows the cap and placement stops at 2048.
 
-The menu also has a **Place Nodes** button. Click it and the wrench:
+The menu shows:
 
-1. Pays the required items out of your inventory.
-2. Places a node on every valid selection.
-3. Applies the clipboard template to every newly placed node — same channels, filters, upgrades, label, and network as the template.
+- Selected area size.
+- Nodes required for the chosen target block.
+- Required Logistics Node items.
+- Required filters and upgrades from the clipboard template.
+- Whether the placement can currently run.
 
-Invalid selections are skipped with no charge; valid selections that fail mid-run (inventory ran out, chunk unloaded, etc.) are reported so you know exactly how many landed.
+## Place Nodes
+
+Click **Place Nodes** and the wrench:
+
+1. Pays the required items out of your inventory or linked AE2 network.
+2. Places a node on every valid matching target block, up to 2048 nodes.
+3. Applies the clipboard template to every newly placed node: channels, filters, upgrades, label, and network.
+
+If a selected target block changes before placement, the menu re-checks it. Invalid blocks are skipped and no node item is consumed for them.
 
 ## Template + Label Sync
 
-Every node placed in a Mass Placement run inherits the clipboard template **including its label**. That means the whole batch lands already in the same label group — no post-configuration needed.
+Every node placed in a Mass Placement run inherits the clipboard template **including its label**. That means the whole batch lands already in the same label group, with no post-configuration needed.
 
 Typical workflow:
 
-1. Build a template in the [Clipboard Editor](copy-paste.md#clipboard-editor) (or copy from a working node).
+1. Build a template in the [Clipboard Editor](copy-paste.md#clipboard-editor) or copy from a working node.
 2. Give the template a label like `furnace_row`.
-3. Switch to Mass Placement, select every target block.
-4. Open the menu and click Place Nodes.
+3. Switch to Mass Placement and right-click two corners around the build area.
+4. Shift + right-click to open the menu.
+5. Choose the target block type.
+6. Click Place Nodes.
 
-Every node that pops into existence already has nine configured channels, the right filters, the right upgrades, and the shared label. Future edits to any one of them propagate to all the others automatically.
+Every node that appears already has nine configured channels, the right filters, the right upgrades, and the shared label. Future edits to any one of them propagate to all the others automatically.
 
 ## Good to Know
 
-- Mass Placement does nothing without a clipboard template. If the wrench is empty, the menu's Place Nodes button is disabled. Copy something first.
-- Clearing selections: the in-menu **Clear Selection** button wipes the entire selection set without placing anything.
-- You do not have to place everything at once — close the menu and keep collecting more selections; the wrench remembers the list.
+- Mass Placement can place bare nodes without a clipboard template, but copied templates are what make it useful.
+- The in-menu **Clear** button wipes the selected area and target block without placing anything.
+- The target block choice is recalculated from the current world when the menu opens, so broken or replaced blocks are handled before placement.
