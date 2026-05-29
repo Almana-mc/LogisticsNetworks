@@ -49,7 +49,7 @@ This permission may be revoked at any time by AlmanaX21 aka Kanishq, with or wit
 
 You may not upload, mirror, repost, redistribute, rehost, share, package, bundle, or otherwise make available the Mod, in whole or in part, on any website, launcher, file host, mod platform, marketplace, server, repository, archive, Discord server, GitHub repository, GitLab repository, forum, social media platform, or any other distribution channel.
 
-This restriction applies whether the redistribution is free, paid, private, public, modified, unmodified, credited, uncredited, bundled, or standalone, except for modpack inclusion of the unmodified, official Mod file as permitted under Section 4.
+This restriction applies whether the redistribution is free, paid, private, public, modified, unmodified, credited, uncredited, bundled, or standalone, except for modpack inclusion of the unmodified, official Mod file as permitted under Section 4 and forks created to submit a pull request as permitted under Section 11.
 
 You may not distribute:
 
@@ -77,7 +77,7 @@ You may create and distribute add-ons that extend, integrate with, or add conten
 
 ## 5. No Modification
 
-You may not modify, edit, adapt, translate, transform, patch, decompile, disassemble, reverse engineer, recompile, port, backport, update, fork, merge, or otherwise alter the Mod or any part of the Mod without prior written permission from AlmanaX21 aka Kanishq.
+Except as permitted under Section 11 (Contributions), you may not modify, edit, adapt, translate, transform, patch, decompile, disassemble, reverse engineer, recompile, port, backport, update, fork, merge, or otherwise alter the Mod or any part of the Mod without prior written permission from AlmanaX21 aka Kanishq.
 
 This includes, but is not limited to:
 
@@ -125,7 +125,7 @@ No asset from the Mod may be used in another mod, game, resource pack, texture p
 
 ## 7. No Code Use
 
-You may not copy, reuse, extract, modify, redistribute, publish, sublicense, or incorporate any source code or compiled code from the Mod into any other project.
+Except as permitted under Section 11 (Contributions), you may not copy, reuse, extract, modify, redistribute, publish, sublicense, or incorporate any source code or compiled code from the Mod into any other project.
 
 This restriction applies to all code, including but not limited to:
 
@@ -152,7 +152,7 @@ No part of the Mod’s code may be used as a template, base, library, dependency
 
 ## 8. No Derivative Works
 
-You may not create derivative works based on the Mod.
+Except as permitted under Section 11 (Contributions), you may not create derivative works based on the Mod.
 
 Derivative works include, but are not limited to:
 
@@ -187,6 +187,10 @@ You may not bypass, remove, alter, disable, interfere with, or circumvent any te
 You may not remove or alter copyright notices, license notices, author credits, watermarks, metadata, package names, signatures, or identifying information.
 
 ## 11. Contributions
+
+Notwithstanding Sections 3, 5, 7, and 8, you may freely fork, clone, copy, modify, create branches, and push to your own fork of the Mod, strictly and solely for the purpose of preparing and submitting a pull request to an official Mod repository authorized by AlmanaX21 aka Kanishq. This permission is granted without charge and without prior approval.
+
+Forks, branches, and copies created under this permission may not be redistributed, published, released, hosted, advertised, or used as an independent, continued, or competing project, and may not be used for any purpose other than submitting a pull request. Once a pull request is closed, merged, or abandoned, the corresponding fork and copies should be deleted, except where a platform requires the fork to remain for the pull request to stay accessible.
 
 Unless a separate written agreement states otherwise, any contribution, suggestion, issue report, pull request, code submission, asset submission, idea, feedback, concept, design, or other material submitted to AlmanaX21 aka Kanishq in connection with the Mod may be used, modified, rejected, or incorporated by AlmanaX21 aka Kanishq without creating any ownership, licensing, royalty, payment, credit, or compensation obligation.
 
@@ -278,7 +282,7 @@ No decompilation.
 No reverse engineering.  
 No porting.  
 No backporting.  
-No forking.  
+No forking, except to submit a pull request (Section 11).  
 No asset extraction.  
 No code reuse.  
 No derivative works.  
