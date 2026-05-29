@@ -39,9 +39,9 @@ No ownership rights are transferred to any user, downloader, contributor, server
 
 ## 2. Limited Personal Use Permission
 
-If the Mod has been officially released by AlmanaX21 aka Kanishq, users may download and use the Mod only from an official source authorized by AlmanaX21 aka Kanishq, and only for personal, non-commercial gameplay purposes.
+If the Mod has been officially released by AlmanaX21 aka Kanishq, users may download and use the Mod only from an official source authorized by AlmanaX21 aka Kanishq.
 
-This limited permission does not grant any right to redistribute, upload, modify, sell, copy, extract, reuse, reverse engineer, or include the Mod or any part of the Mod in any other project.
+This limited permission does not grant any right to redistribute, upload, modify, copy, extract, reuse, reverse engineer, or include the Mod or any part of the Mod in any other project.
 
 This permission may be revoked at any time by AlmanaX21 aka Kanishq, with or without notice.
 
@@ -71,34 +71,11 @@ You may not distribute:
 
 You may include the Mod in any modpack, launcher pack, server pack, client pack, curated collection, public mod list, private distribution bundle, marketplace bundle, or automated installer. This applies to both public and private modpacks.
 
-When the Mod is included in a modpack, it must be the unmodified, official Mod file obtained from an official source authorized by AlmanaX21 aka Kanishq, and all copyright notices, license notices, and author credits must remain intact. Inclusion in a modpack does not grant any ownership, modification, asset, or code rights, and does not permit charging for, paywalling, or otherwise monetizing access to the Mod itself.
+When the Mod is included in a modpack, it must be the unmodified, official Mod file obtained from an official source authorized by AlmanaX21 aka Kanishq, and all copyright notices, license notices, and author credits must remain intact. Inclusion in a modpack does not grant any ownership, modification, asset, or code rights.
 
-You may create and distribute add-ons that extend, integrate with, or add content to the Mod, provided that such add-ons do not copy, extract, repackage, or redistribute the Mod's source code, compiled code, or assets, and instead depend on the Mod through its public, runtime-accessible behavior. Add-ons remain subject to Section 7 (No Asset Use) and Section 8 (No Code Use).
+You may create and distribute add-ons that extend, integrate with, or add content to the Mod, provided that such add-ons do not copy, extract, repackage, or redistribute the Mod's source code, compiled code, or assets, and instead depend on the Mod through its public, runtime-accessible behavior. Add-ons remain subject to Section 6 (No Asset Use) and Section 7 (No Code Use).
 
-## 5. No Sale or Commercial Use
-
-You may not sell, license, sublicense, rent, lease, monetize, commercially exploit, or otherwise profit from the Mod or any part of the Mod.
-
-You may not sell or monetize:
-
-- The Mod itself
-- Modified versions of the Mod
-- Access to the Mod
-- Assets from the Mod
-- Code from the Mod
-- Textures from the Mod
-- Models from the Mod
-- Sounds from the Mod
-- Music from the Mod
-- Animations from the Mod
-- Concepts from the Mod
-- Derivative works based on the Mod
-- Services based on the Mod
-- Server access that depends on unauthorized use or distribution of the Mod
-
-You may not use the Mod or any part of the Mod in any commercial product, paid server package, marketplace listing, paid download, subscription service, donation-locked system, paywalled feature, advertisement-supported download, or revenue-generating project without explicit written permission from AlmanaX21 aka Kanishq.
-
-## 6. No Modification
+## 5. No Modification
 
 You may not modify, edit, adapt, translate, transform, patch, decompile, disassemble, reverse engineer, recompile, port, backport, update, fork, merge, or otherwise alter the Mod or any part of the Mod without prior written permission from AlmanaX21 aka Kanishq.
 
@@ -119,7 +96,7 @@ This includes, but is not limited to:
 - Creating unofficial ports
 - Creating unofficial versions for other loaders, platforms, or game versions
 
-## 7. No Asset Use
+## 6. No Asset Use
 
 You may not use, copy, extract, recreate, trace, edit, resell, redistribute, upload, or include any asset from the Mod in any other work.
 
@@ -146,9 +123,9 @@ This includes, without limitation:
 
 No asset from the Mod may be used in another mod, game, resource pack, texture pack, datapack, plugin, website, video project, marketplace product, NFT, merchandise, AI training dataset, or any other project without prior written permission from AlmanaX21 aka Kanishq.
 
-## 8. No Code Use
+## 7. No Code Use
 
-You may not copy, reuse, extract, modify, redistribute, publish, sell, sublicense, or incorporate any source code or compiled code from the Mod into any other project.
+You may not copy, reuse, extract, modify, redistribute, publish, sublicense, or incorporate any source code or compiled code from the Mod into any other project.
 
 This restriction applies to all code, including but not limited to:
 
@@ -173,7 +150,7 @@ This restriction applies to all code, including but not limited to:
 
 No part of the Mod’s code may be used as a template, base, library, dependency, reference implementation, or foundation for another project without prior written permission from AlmanaX21 aka Kanishq.
 
-## 9. No Derivative Works
+## 8. No Derivative Works
 
 You may not create derivative works based on the Mod.
 
@@ -197,19 +174,19 @@ Derivative works include, but are not limited to:
 - Projects using extracted code
 - Projects that substantially copy the structure, expression, assets, or implementation of the Mod
 
-## 10. No Reverse Engineering
+## 9. No Reverse Engineering
 
 You may not reverse engineer, decompile, disassemble, inspect, analyze, decode, dump, unpack, or otherwise attempt to derive the source code, structure, implementation, or internal logic of the Mod except where such restriction is expressly prohibited by applicable law.
 
 You may not use tools, scripts, automated systems, or manual processes to extract, inspect, or reproduce the Mod’s code, assets, or internal implementation.
 
-## 11. No Circumvention
+## 10. No Circumvention
 
 You may not bypass, remove, alter, disable, interfere with, or circumvent any technical, legal, attribution, access-control, licensing, verification, update, or protection mechanism included in or associated with the Mod.
 
 You may not remove or alter copyright notices, license notices, author credits, watermarks, metadata, package names, signatures, or identifying information.
 
-## 12. Contributions
+## 11. Contributions
 
 Unless a separate written agreement states otherwise, any contribution, suggestion, issue report, pull request, code submission, asset submission, idea, feedback, concept, design, or other material submitted to AlmanaX21 aka Kanishq in connection with the Mod may be used, modified, rejected, or incorporated by AlmanaX21 aka Kanishq without creating any ownership, licensing, royalty, payment, credit, or compensation obligation.
 
@@ -217,7 +194,7 @@ By submitting any contribution, you represent that you have the legal right to s
 
 Submission of a contribution does not grant you ownership of the Mod or any part of the Mod.
 
-## 13. Third-Party Materials
+## 12. Third-Party Materials
 
 The Mod may depend on or interact with third-party libraries, APIs, tools, platforms, games, loaders, frameworks, or software. Such third-party materials remain subject to their own respective licenses and ownership terms.
 
@@ -225,7 +202,7 @@ This license does not grant any rights to third-party materials.
 
 Nothing in this license should be interpreted as claiming ownership over third-party trademarks, game assets, engines, APIs, libraries, or platforms that are not owned by AlmanaX21 aka Kanishq.
 
-## 14. Trademarks and Branding
+## 13. Trademarks and Branding
 
 The names, associated logos, branding, visual identity, project identity, and related marks are owned by AlmanaX21 aka Kanishq unless otherwise stated.
 
@@ -233,7 +210,7 @@ You may not use the name, branding, logos, or identity of the Mod in a way that 
 
 You may not create unofficial pages, repositories, downloads, forks, or projects using the Mod’s name or confusingly similar names.
 
-## 15. No Implied Rights
+## 14. No Implied Rights
 
 No rights are granted except those expressly stated in this document.
 
@@ -243,7 +220,7 @@ Access to the Mod, possession of a copy of the Mod, downloading the Mod, viewing
 
 Silence, lack of enforcement, delayed enforcement, or failure to object to any unauthorized use does not constitute permission, waiver, consent, or license.
 
-## 16. Permission Requests
+## 15. Permission Requests
 
 Any request for permission must be made in writing to:
 
@@ -255,21 +232,13 @@ Verbal permission, informal discussion, comments, messages, assumptions, or lack
 
 AlmanaX21 aka Kanishq may deny, revoke, limit, or condition permission at any time.
 
-## 17. Termination
-
-Any violation of this license immediately terminates any permission you may have had to access, download, use, or possess the Mod.
-
-Upon termination, you must immediately stop using the Mod and delete all copies of the Mod and any materials derived from it, including copies stored locally, online, in backups, in repositories, in modpacks, on servers, or on distribution platforms.
-
-Termination does not limit any legal rights or remedies available to AlmanaX21 aka Kanishq.
-
-## 18. Enforcement
+## 16. Enforcement
 
 Unauthorized use of the Mod may constitute copyright infringement, breach of license, unfair competition, misappropriation, or violation of other applicable laws.
 
-AlmanaX21 aka Kanishq reserves the right to pursue takedowns, platform reports, repository removals, marketplace removals, server removals, legal claims, damages, injunctive relief, and any other available remedies against unauthorized users, distributors, sellers, uploaders, or infringers.
+AlmanaX21 aka Kanishq reserves the right to pursue takedowns, platform reports, repository removals, marketplace removals, server removals, legal claims, damages, injunctive relief, and any other available remedies against unauthorized users, distributors, uploaders, or infringers.
 
-## 19. Disclaimer of Warranty
+## 17. Disclaimer of Warranty
 
 The Mod is provided “as is” and “as available”, without warranty of any kind, express or implied.
 
@@ -277,32 +246,31 @@ To the maximum extent permitted by law, AlmanaX21 aka Kanishq disclaims all warr
 
 AlmanaX21 aka Kanishq does not guarantee that the Mod will function with any particular game version, loader version, operating system, server, client, modpack, dependency, or third-party software.
 
-## 20. Limitation of Liability
+## 18. Limitation of Liability
 
 To the maximum extent permitted by law, AlmanaX21 aka Kanishq shall not be liable for any direct, indirect, incidental, special, consequential, exemplary, punitive, or other damages arising out of or related to the Mod, including but not limited to loss of data, crashes, corruption, server issues, client issues, account issues, security issues, business interruption, lost profits, or incompatibility with other software.
 
 Use of the Mod is at your own risk.
 
-## 21. Severability
+## 19. Severability
 
 If any provision of this license is found to be invalid, unlawful, or unenforceable, the remaining provisions shall remain in full force and effect.
 
 Any invalid or unenforceable provision shall be interpreted as closely as possible to its original intent while remaining valid and enforceable under applicable law.
 
-## 22. Entire Terms
+## 20. Entire Terms
 
 This document represents the complete proprietary terms governing the Mod unless replaced or supplemented by a separate written agreement signed or expressly approved by AlmanaX21 aka Kanishq.
 
 No other permissions, licenses, rights, or grants are provided.
 
-## 23. Reservation of Rights
+## 21. Reservation of Rights
 
 All rights are reserved.
 
 No copying.  
 No redistribution.  
 No reuploading.  
-No resale.  
 No relicensing.  
 No sublicensing.  
 No modification.  
@@ -313,7 +281,6 @@ No backporting.
 No forking.  
 No asset extraction.  
 No code reuse.  
-No commercial use.  
 No derivative works.  
 No unauthorized use of any part of the Mod.
 
