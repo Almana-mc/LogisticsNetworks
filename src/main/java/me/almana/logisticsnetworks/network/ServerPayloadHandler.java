@@ -766,6 +766,73 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleRequestNetworkExport(RequestNetworkExportPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+            if (!(player.containerMenu instanceof ComputerMenu))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network)) {
+                sendNetworkExportError(player, payload.networkId(), "", "not_found");
+                return;
+            }
+
+            List<SyncNetworkExportPayload.NodeExportInfo> entries = new ArrayList<>();
+            Map<String, Integer> labelCounts = new HashMap<>();
+            int missingLabels = 0;
+
+            for (UUID nodeId : network.getNodeUuids()) {
+                LogisticsNodeEntity node = findNode(player, nodeId);
+                if (node == null) {
+                    missingLabels++;
+                    continue;
+                }
+
+                String label = node.getNodeLabel().trim();
+                if (label.isEmpty()) {
+                    missingLabels++;
+                    continue;
+                }
+
+                labelCounts.put(label, labelCounts.getOrDefault(label, 0) + 1);
+                CompoundTag clipboardTag = NodeClipboardConfig.fromNode(node).save(player.registryAccess());
+                entries.add(new SyncNetworkExportPayload.NodeExportInfo(label, node.isRenderVisible(), clipboardTag));
+            }
+
+            if (missingLabels > 0) {
+                sendNetworkExportError(player, network.getId(), network.getName(), "missing_labels|" + missingLabels);
+                return;
+            }
+
+            List<String> duplicates = new ArrayList<>();
+            for (Map.Entry<String, Integer> entry : labelCounts.entrySet()) {
+                if (entry.getValue() > 1) {
+                    duplicates.add(entry.getKey());
+                }
+            }
+            if (!duplicates.isEmpty()) {
+                sendNetworkExportError(player, network.getId(), network.getName(),
+                        trimExportError("duplicate_labels|" + String.join(", ", duplicates)));
+                return;
+            }
+
+            PacketDistributor.sendToPlayer(player,
+                    new SyncNetworkExportPayload(network.getId(), network.getName(), entries, ""));
+        });
+    }
+
+    private static void sendNetworkExportError(ServerPlayer player, UUID networkId, String networkName, String errorKey) {
+        PacketDistributor.sendToPlayer(player,
+                new SyncNetworkExportPayload(networkId, networkName, List.of(), trimExportError(errorKey)));
+    }
+
+    private static String trimExportError(String errorKey) {
+        return errorKey.length() > 256 ? errorKey.substring(0, 256) : errorKey;
+    }
+
     public static void handleSetNodeLabel(SetNodeLabelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
@@ -1057,6 +1124,29 @@ public class ServerPayloadHandler {
             } else {
                 telemetry.unsubscribe(player);
             }
+        });
+    }
+
+    public static void handleSetComputerWrenchClipboard(SetComputerWrenchClipboardPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+            if (!(player.containerMenu instanceof ComputerMenu menu))
+                return;
+
+            NodeClipboardConfig config = NodeClipboardConfig.load(payload.clipboardTag(), player.registryAccess());
+            if (config == null || !config.isStructurallyValid()) {
+                player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.invalid_clipboard"), true);
+                return;
+            }
+
+            if (!menu.setWrenchClipboard(config, player.registryAccess())) {
+                player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.no_wrench"), true);
+                return;
+            }
+
+            player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.copied_to_wrench"), true);
         });
     }
 

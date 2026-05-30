@@ -26,9 +26,11 @@ import me.almana.logisticsnetworks.network.SetNodeUpgradeItemPayload;
 import me.almana.logisticsnetworks.network.ApplyPatternPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.RequestChannelListPayload;
+import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
+import me.almana.logisticsnetworks.network.SetComputerWrenchClipboardPayload;
 import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
@@ -39,6 +41,7 @@ import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncChannelDataPayload;
 import me.almana.logisticsnetworks.network.SyncChannelListPayload;
 import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
+import me.almana.logisticsnetworks.network.SyncNetworkExportPayload;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
@@ -180,6 +183,12 @@ public class Logisticsnetworks {
                 registrar.playToServer(ToggleComputerPinnedNetworkPayload.TYPE,
                                 ToggleComputerPinnedNetworkPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleToggleComputerPinnedNetwork);
+                registrar.playToServer(RequestNetworkExportPayload.TYPE,
+                                RequestNetworkExportPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleRequestNetworkExport);
+                registrar.playToServer(SetComputerWrenchClipboardPayload.TYPE,
+                                SetComputerWrenchClipboardPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetComputerWrenchClipboard);
 
                 // Server -> Client
                 registrar.playToClient(SyncMassPlacementChoicesPayload.TYPE,
@@ -197,5 +206,7 @@ public class Logisticsnetworks {
                                 ClientPayloadHandler::handleSyncTelemetry);
                 registrar.playToClient(SyncChannelListPayload.TYPE, SyncChannelListPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncChannelList);
+                registrar.playToClient(SyncNetworkExportPayload.TYPE, SyncNetworkExportPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncNetworkExport);
         }
 }
