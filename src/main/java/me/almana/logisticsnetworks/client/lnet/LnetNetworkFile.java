@@ -26,7 +26,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
     }
 
     public static Path directory() {
-        return FMLPaths.GAMEDIR.get().resolve("logisticsnetworks").resolve("networks");
+        return FMLPaths.CONFIGDIR.get().resolve("logistics-network").resolve("networks");
     }
 
     public static List<Path> listFiles() throws IOException {
@@ -55,7 +55,6 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
 
     public String writeString() {
         StringBuilder out = new StringBuilder();
-        out.append(FORMAT_LINE).append('\n');
         out.append("version=").append(FILE_VERSION).append('\n');
         out.append("network=").append(escape(networkName)).append('\n');
         for (NodeEntry node : nodes) {
@@ -64,7 +63,6 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
                 out.append("visible=false\n");
             }
             out.append("clipboard=").append(compactClipboard(node.clipboardTag())).append('\n');
-            out.append("end\n");
         }
         return out.toString();
     }
@@ -72,6 +70,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
     private static CompoundTag compactClipboard(CompoundTag source) {
         CompoundTag root = source.copy();
         root.remove("version");
+        root.remove("network_id");
         if (root.getBooleanOr("renderVisible", true)) {
             root.remove("renderVisible");
         }
@@ -219,7 +218,9 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
     }
 
     private static boolean hasValidHeader(String line) {
-        return FORMAT_LINE.equals(line) || LEGACY_VERSION_LINE.equals(line);
+        return line.equals("version=" + FILE_VERSION)
+                || FORMAT_LINE.equals(line)
+                || LEGACY_VERSION_LINE.equals(line);
     }
 
     private static NodeEntry createNode(String label, boolean visible, CompoundTag clipboard) throws IOException {

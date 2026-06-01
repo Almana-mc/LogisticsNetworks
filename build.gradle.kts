@@ -53,10 +53,12 @@ neoForge {
     runs {
         create("client") {
             client()
+            gameDirectory = file("run/${minecraft_version}/client")
             systemProperty("neoforge.enabledGameTestNamespaces", mod_id)
         }
         create("server") {
             server()
+            gameDirectory = file("run/${minecraft_version}/server")
             programArgument("--nogui")
             systemProperty("neoforge.enabledGameTestNamespaces", mod_id)
         }
