@@ -37,6 +37,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -781,7 +782,7 @@ public class ServerPayloadHandler {
             }
 
             List<SyncNetworkExportPayload.NodeExportInfo> entries = new ArrayList<>();
-            Map<String, Integer> labelCounts = new HashMap<>();
+            Set<String> seenLabels = new HashSet<>();
             int missingLabels = 0;
 
             for (UUID nodeId : network.getNodeUuids()) {
@@ -797,25 +798,15 @@ public class ServerPayloadHandler {
                     continue;
                 }
 
-                labelCounts.put(label, labelCounts.getOrDefault(label, 0) + 1);
+                if (!seenLabels.add(label)) {
+                    continue;
+                }
                 CompoundTag clipboardTag = NodeClipboardConfig.fromNode(node).save(player.registryAccess());
                 entries.add(new SyncNetworkExportPayload.NodeExportInfo(label, node.isRenderVisible(), clipboardTag));
             }
 
             if (missingLabels > 0) {
                 sendNetworkExportError(player, network.getId(), network.getName(), "missing_labels|" + missingLabels);
-                return;
-            }
-
-            List<String> duplicates = new ArrayList<>();
-            for (Map.Entry<String, Integer> entry : labelCounts.entrySet()) {
-                if (entry.getValue() > 1) {
-                    duplicates.add(entry.getKey());
-                }
-            }
-            if (!duplicates.isEmpty()) {
-                sendNetworkExportError(player, network.getId(), network.getName(),
-                        trimExportError("duplicate_labels|" + String.join(", ", duplicates)));
                 return;
             }
 

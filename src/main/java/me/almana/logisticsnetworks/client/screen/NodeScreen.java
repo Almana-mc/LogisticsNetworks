@@ -49,6 +49,23 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         NETWORK_SELECT, CHANNEL_CONFIG
     }
 
+    private enum SortMode {
+        NAME_ASC, NAME_DESC, OLD_NEW, NEW_OLD;
+
+        SortMode next() {
+            return values()[(ordinal() + 1) % values().length];
+        }
+
+        String labelKey() {
+            return switch (this) {
+                case NAME_ASC -> "gui.logisticsnetworks.node.sort.az";
+                case NAME_DESC -> "gui.logisticsnetworks.node.sort.za";
+                case OLD_NEW -> "gui.logisticsnetworks.node.sort.old_new";
+                case NEW_OLD -> "gui.logisticsnetworks.node.sort.new_old";
+            };
+        }
+    }
+
     // Constants
     private static final int GUI_WIDTH = 256;
     private static final int GUI_HEIGHT = 298;
@@ -93,6 +110,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
     private List<SyncNetworkListPayload.NetworkEntry> networkList = new ArrayList<>();
     private String lastNetworkFilter = "";
     private int networkScrollOffset = 0;
+    private SortMode sortMode = SortMode.NAME_ASC;
 
     // Rename state
     private UUID renamingNetworkId = null;
@@ -458,6 +476,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         g.fill(leftPos + 12, topPos + 76, leftPos + GUI_WIDTH - 12, topPos + 77, cBorder());
         g.drawString(font, Component.translatable("gui.logisticsnetworks.node.existing_networks"), leftPos + 14,
                 topPos + 82, cSubtle(), false);
+        drawSortButton(g, mx, my);
 
         String currentFilter = networkNameField != null ? networkNameField.getValue().trim() : "";
         if (!currentFilter.equals(lastNetworkFilter)) {
@@ -491,6 +510,41 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
     private void drawButton(GuiGraphics g, int x, int y, int w, int h, String label, int mx, int my) {
         boolean hovered = !labelPickerOpen && mx >= x && mx <= x + w && my >= y && my <= y + h;
         ThemePaint.button(g, font, x, y, w, h, label, hovered, theme());
+    }
+
+    private static final int SORT_ICON_W = 5;
+    private static final int SORT_ICON_GAP = 4;
+
+    private int[] sortButtonBounds() {
+        String label = tr(sortMode.labelKey());
+        int w = font.width(label) + 12 + SORT_ICON_W + SORT_ICON_GAP;
+        int h = 13;
+        int x = leftPos + GUI_WIDTH - 14 - w;
+        int y = topPos + 79;
+        return new int[] { x, y, w, h };
+    }
+
+    private void drawSortButton(GuiGraphics g, int mx, int my) {
+        String label = tr(sortMode.labelKey());
+        int[] b = sortButtonBounds();
+        boolean hovered = mx >= b[0] && mx <= b[0] + b[2] && my >= b[1] && my <= b[1] + b[3];
+        int fg = hovered ? ((cBorderStrong() == cText()) ? theme().bg() : cText()) : cMuted();
+        g.fill(b[0], b[1], b[0] + b[2], b[1] + b[3], hovered ? cBorderStrong() : cPanel());
+        g.renderOutline(b[0], b[1], b[2], b[3], hovered ? cAccent() : cBorder());
+
+        int iconX = b[0] + 5;
+        int iconY = b[1] + 3;
+        drawSortIcon(g, iconX, iconY, fg);
+        g.drawString(font, label, iconX + SORT_ICON_W + SORT_ICON_GAP, b[1] + 3, fg, false);
+    }
+
+    private void drawSortIcon(GuiGraphics g, int x, int y, int color) {
+        g.fill(x + 2, y, x + 3, y + 1, color);
+        g.fill(x + 1, y + 1, x + 4, y + 2, color);
+        g.fill(x, y + 2, x + 5, y + 3, color);
+        g.fill(x, y + 4, x + 5, y + 5, color);
+        g.fill(x + 1, y + 5, x + 4, y + 6, color);
+        g.fill(x + 2, y + 6, x + 3, y + 7, color);
     }
 
     private void drawNetworkListEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, int x, int y, int w,
@@ -980,6 +1034,13 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         // Cancel rename if clicking outside the rename edit box
         if (renamingNetworkId != null && renameEditBox != null && !renameEditBox.isMouseOver(mx, my)) {
             stopRenameEdit(false);
+        }
+
+        int[] sb = sortButtonBounds();
+        if (isHoveringAbs(sb[0], sb[1], sb[2], sb[3], mx, my)) {
+            sortMode = sortMode.next();
+            networkScrollOffset = 0;
+            return true;
         }
 
         if (isHoveringAbs(leftPos + GUI_WIDTH / 2 - 45, topPos + 54, 90, 16, mx, my)) {
@@ -1626,15 +1687,27 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
     }
 
     private List<SyncNetworkListPayload.NetworkEntry> getFilteredNetworks() {
-        if (networkNameField == null) return networkList;
-        String filter = networkNameField.getValue().trim().toLowerCase();
-        if (filter.isEmpty()) return networkList;
         List<SyncNetworkListPayload.NetworkEntry> filtered = new ArrayList<>();
+        String filter = networkNameField != null ? networkNameField.getValue().trim().toLowerCase() : "";
         for (SyncNetworkListPayload.NetworkEntry entry : networkList) {
-            if (entry.name().toLowerCase().contains(filter))
+            if (filter.isEmpty() || entry.name().toLowerCase().contains(filter))
                 filtered.add(entry);
         }
+        sortNetworks(filtered);
         return filtered;
+    }
+
+    private void sortNetworks(List<SyncNetworkListPayload.NetworkEntry> list) {
+        Comparator<SyncNetworkListPayload.NetworkEntry> byName =
+                Comparator.comparing(e -> e.name().toLowerCase());
+        switch (sortMode) {
+            case NAME_ASC -> list.sort(byName);
+            case NAME_DESC -> list.sort(byName.reversed());
+            case OLD_NEW -> list.sort(Comparator.comparingLong(
+                    SyncNetworkListPayload.NetworkEntry::createdAt).thenComparing(byName));
+            case NEW_OLD -> list.sort(Comparator.comparingLong(
+                    SyncNetworkListPayload.NetworkEntry::createdAt).reversed().thenComparing(byName));
+        }
     }
 
     private String tr(String key, Object... args) {
