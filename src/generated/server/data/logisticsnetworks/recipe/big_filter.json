@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "M": "logisticsnetworks:medium_filter",
+    "P": "minecraft:paper"
+  },
+  "pattern": [
+    "PPP",
+    " M ",
+    "PPP"
+  ],
+  "result": {
+    "id": "logisticsnetworks:big_filter"
+  }
+}

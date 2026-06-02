@@ -51,6 +51,7 @@ import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
+import me.almana.logisticsnetworks.datagen.ModDataGenerators;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
@@ -70,6 +71,8 @@ public class Logisticsnetworks {
 
         public Logisticsnetworks(IEventBus modBus) {
                 Registration.init(modBus);
+                modBus.addListener(ModDataGenerators::gather);
+                modBus.addListener(ModDataGenerators::gatherServer);
                 modBus.addListener(this::registerPayloads);
                 modBus.addListener(this::commonSetup);
                 if (FMLEnvironment.getDist() == Dist.CLIENT) {

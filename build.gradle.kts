@@ -68,10 +68,21 @@ neoForge {
         }
         create("data") {
             clientData()
+            gameDirectory = file("run/${minecraft_version}/data")
             programArguments.addAll(
                 "--mod", mod_id,
                 "--all",
-                "--output", file("src/generated/resources/").absolutePath,
+                "--output", file("src/generated/client/").absolutePath,
+                "--existing", file("src/main/resources/").absolutePath
+            )
+        }
+        create("serverData") {
+            serverData()
+            gameDirectory = file("run/${minecraft_version}/serverData")
+            programArguments.addAll(
+                "--mod", mod_id,
+                "--all",
+                "--output", file("src/generated/server/").absolutePath,
                 "--existing", file("src/main/resources/").absolutePath
             )
         }
@@ -88,7 +99,8 @@ neoForge {
     }
 }
 
-sourceSets.main.get().resources.srcDir("src/generated/resources")
+sourceSets.main.get().resources.srcDir("src/generated/client")
+sourceSets.main.get().resources.srcDir("src/generated/server")
 // 26.1 compile triage
 sourceSets.main.get().java.exclude(
     "me/almana/logisticsnetworks/client/ClientEventHandler.java",
