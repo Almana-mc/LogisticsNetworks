@@ -105,10 +105,10 @@ public class EventHandler {
         data.putInt(JUNE_MESSAGE_TAG, today.getYear());
 
         player.sendSystemMessage(Component.literal("— June Awareness —").withStyle(ChatFormatting.BOLD));
-        player.sendSystemMessage(rainbow("Happy Pride Month! 🌈"));
+        player.sendSystemMessage(rainbow("Happy Pride Month!"));
         player.sendSystemMessage(Component.literal("You matter. Be proud, take care of yourself.")
                 .withStyle(ChatFormatting.GRAY));
-        player.sendSystemMessage(Component.literal("Happy Men's Mental Health Month. 💙")
+        player.sendSystemMessage(Component.literal("Happy Men's Mental Health Month.")
                 .withStyle(ChatFormatting.AQUA));
         player.sendSystemMessage(Component.literal("Reach out, talk to your friends. If nothing, else, join our discord and talk.")
                 .withStyle(ChatFormatting.GOLD));
