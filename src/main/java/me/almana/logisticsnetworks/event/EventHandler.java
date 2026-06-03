@@ -112,6 +112,16 @@ public class EventHandler {
                 .withStyle(ChatFormatting.AQUA));
         player.sendSystemMessage(Component.literal("Reach out, talk to your friends. If nothing, else, join our discord and talk.")
                 .withStyle(ChatFormatting.GOLD));
+
+        MutableComponent from = Component.literal("From AlmanaX21 ").withStyle(ChatFormatting.GRAY);
+        from.append(Component.literal("[Discord]").withStyle(style -> style
+                .withColor(ChatFormatting.BLUE)
+                .withUnderlined(true)
+                .withClickEvent(new net.minecraft.network.chat.ClickEvent.OpenUrl(
+                        java.net.URI.create("https://discord.gg/xTeHR2tdYh")))
+                .withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(
+                        Component.literal("Join the Logistics Networks Discord")))));
+        player.sendSystemMessage(from);
     }
 
     private static MutableComponent rainbow(String text) {
