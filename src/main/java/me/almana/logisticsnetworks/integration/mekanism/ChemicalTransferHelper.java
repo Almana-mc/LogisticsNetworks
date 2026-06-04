@@ -54,21 +54,19 @@ public final class ChemicalTransferHelper {
             return getSideHandler(blockEntity, side);
         }
 
-        List<IChemicalHandler> found = new ArrayList<>(6);
+        List<IChemicalHandler> found = new ArrayList<>(8);
         for (Direction dir : Direction.values()) {
-            IChemicalHandler handler = getSideHandler(blockEntity, dir);
-            if (handler == null) {
-                continue;
-            }
-            boolean duplicate = false;
-            for (IChemicalHandler existing : found) {
-                if (existing == handler) {
-                    duplicate = true;
-                    break;
+            for (IChemicalHandler raw : collectSideHandlers(blockEntity, dir)) {
+                boolean duplicate = false;
+                for (IChemicalHandler existing : found) {
+                    if (existing == raw) {
+                        duplicate = true;
+                        break;
+                    }
                 }
-            }
-            if (!duplicate) {
-                found.add(handler);
+                if (!duplicate) {
+                    found.add(raw);
+                }
             }
         }
         if (found.isEmpty()) {
@@ -83,37 +81,46 @@ public final class ChemicalTransferHelper {
     @Nullable
     @SuppressWarnings("rawtypes")
     private static IChemicalHandler getSideHandler(BlockEntity blockEntity, @Nullable Direction side) {
+        List<IChemicalHandler> handlers = collectSideHandlers(blockEntity, side);
+        if (handlers.isEmpty()) {
+            return null;
+        }
+        if (handlers.size() == 1) {
+            return handlers.get(0);
+        }
+        return new CombinedChemicalHandler(handlers.toArray(new IChemicalHandler[0]));
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static List<IChemicalHandler> collectSideHandlers(BlockEntity blockEntity, @Nullable Direction side) {
+        List<IChemicalHandler> out = new ArrayList<>(4);
         IChemicalHandler gas = blockEntity.getCapability(Capabilities.GAS_HANDLER, side).orElse(null);
-        if (gas != null) {
-            return gas;
-        }
-
+        if (gas != null) out.add(gas);
         IChemicalHandler infusion = blockEntity.getCapability(Capabilities.INFUSION_HANDLER, side).orElse(null);
-        if (infusion != null) {
-            return infusion;
-        }
-
+        if (infusion != null) out.add(infusion);
         IChemicalHandler pigment = blockEntity.getCapability(Capabilities.PIGMENT_HANDLER, side).orElse(null);
-        if (pigment != null) {
-            return pigment;
-        }
-
-        return blockEntity.getCapability(Capabilities.SLURRY_HANDLER, side).orElse(null);
+        if (pigment != null) out.add(pigment);
+        IChemicalHandler slurry = blockEntity.getCapability(Capabilities.SLURRY_HANDLER, side).orElse(null);
+        if (slurry != null) out.add(slurry);
+        return out;
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private static final class CombinedChemicalHandler implements IChemicalHandler {
         private final IChemicalHandler[] handlers;
+        private final Class<?>[] stackClasses;
         private final int[] tankOffsets;
         private final int totalTanks;
 
         CombinedChemicalHandler(IChemicalHandler[] handlers) {
             this.handlers = handlers;
+            this.stackClasses = new Class<?>[handlers.length];
             this.tankOffsets = new int[handlers.length];
             int running = 0;
             for (int i = 0; i < handlers.length; i++) {
                 tankOffsets[i] = running;
                 running += handlers[i].getTanks();
+                stackClasses[i] = handlers[i].getEmptyStack().getClass();
             }
             this.totalTanks = running;
         }
@@ -125,6 +132,10 @@ public final class ChemicalTransferHelper {
                 }
             }
             return 0;
+        }
+
+        private boolean accepts(int index, ChemicalStack stack) {
+            return stack != null && stackClasses[index] == stack.getClass();
         }
 
         @Override
@@ -152,6 +163,9 @@ public final class ChemicalTransferHelper {
                 return;
             }
             int index = handlerIndex(tank);
+            if (!accepts(index, stack)) {
+                return;
+            }
             handlers[index].setChemicalInTank(tank - tankOffsets[index], stack);
         }
 
@@ -170,6 +184,9 @@ public final class ChemicalTransferHelper {
                 return false;
             }
             int index = handlerIndex(tank);
+            if (!accepts(index, stack)) {
+                return false;
+            }
             return handlers[index].isValid(tank - tankOffsets[index], stack);
         }
 
@@ -179,7 +196,28 @@ public final class ChemicalTransferHelper {
                 return stack;
             }
             int index = handlerIndex(tank);
+            if (!accepts(index, stack)) {
+                return stack;
+            }
             return handlers[index].insertChemical(tank - tankOffsets[index], stack, action);
+        }
+
+        @Override
+        public ChemicalStack insertChemical(ChemicalStack stack, Action action) {
+            if (stack == null || stack.isEmpty()) {
+                return stack;
+            }
+            ChemicalStack remainder = stack;
+            for (int i = 0; i < handlers.length; i++) {
+                if (stackClasses[i] != stack.getClass()) {
+                    continue;
+                }
+                remainder = handlers[i].insertChemical(remainder, action);
+                if (remainder == null || remainder.isEmpty()) {
+                    return remainder;
+                }
+            }
+            return remainder;
         }
 
         @Override
@@ -309,9 +347,21 @@ public final class ChemicalTransferHelper {
             }
             return 0;
         }
+        return transferBetween(source, target, limit, exportFilters, exportFilterMode, importFilters,
+                importFilterMode, filterReadCache);
+    }
+
+    @SuppressWarnings("rawtypes")
+    public static long transferBetween(IChemicalHandler source, IChemicalHandler target, long limit,
+            ItemStack[] exportFilters, FilterMode exportFilterMode,
+            ItemStack[] importFilters, FilterMode importFilterMode,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        if (source == null || target == null) {
+            return 0;
+        }
         if (Config.debugMode) {
-            LOGGER.debug("[Chemical] Transferring {} -> {}, limit={}, srcTanks={}, tgtTanks={}",
-                    sourcePos, targetPos, limit, source.getTanks(), target.getTanks());
+            LOGGER.debug("[Chemical] Transferring limit={}, srcTanks={}, tgtTanks={}",
+                    limit, source.getTanks(), target.getTanks());
         }
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode, importFilters,
                 importFilterMode, filterReadCache);
@@ -437,22 +487,22 @@ public final class ChemicalTransferHelper {
     @Nullable
     @SuppressWarnings("rawtypes")
     private static IChemicalHandler getItemHandler(ItemStack itemStack) {
+        List<IChemicalHandler> found = new ArrayList<>(4);
         IChemicalHandler gas = itemStack.getCapability(Capabilities.GAS_HANDLER).orElse(null);
-        if (gas != null) {
-            return gas;
-        }
-
+        if (gas != null) found.add(gas);
         IChemicalHandler infusion = itemStack.getCapability(Capabilities.INFUSION_HANDLER).orElse(null);
-        if (infusion != null) {
-            return infusion;
-        }
-
+        if (infusion != null) found.add(infusion);
         IChemicalHandler pigment = itemStack.getCapability(Capabilities.PIGMENT_HANDLER).orElse(null);
-        if (pigment != null) {
-            return pigment;
+        if (pigment != null) found.add(pigment);
+        IChemicalHandler slurry = itemStack.getCapability(Capabilities.SLURRY_HANDLER).orElse(null);
+        if (slurry != null) found.add(slurry);
+        if (found.isEmpty()) {
+            return null;
         }
-
-        return itemStack.getCapability(Capabilities.SLURRY_HANDLER).orElse(null);
+        if (found.size() == 1) {
+            return found.get(0);
+        }
+        return new CombinedChemicalHandler(found.toArray(new IChemicalHandler[0]));
     }
 
     @Nullable

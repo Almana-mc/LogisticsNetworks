@@ -287,6 +287,7 @@
   "gui.logisticsnetworks.node.label.clear": "Clear Label",
   "jade.logisticsnetworks.node_attached": "Logistics Node Attached",
   "config.jade.plugin_logisticsnetworks.node_attached": "Node Attached Hint",
+  "config.jade.plugin_logisticsnetworks.logistics_node_entity": "Logistics Node Entity",
   "block.logisticsnetworks.computer": "Computer",
   "container.logisticsnetworks.computer": "Network Manager",
   "gui.logisticsnetworks.computer.no_networks": "No networks available",

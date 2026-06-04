@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import mekanism.api.chemical.IChemicalHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
@@ -57,6 +58,7 @@ public class TransferEngine {
         private final Map<Long, Object> items = new HashMap<>();
         private final Map<Long, Object> fluids = new HashMap<>();
         private final Map<Long, Object> energy = new HashMap<>();
+        private final Map<Long, Object> chemicals = new HashMap<>();
         private static final Object ABSENT = new Object();
 
         IItemHandler getItemHandler(ServerLevel level, BlockPos pos, Direction dir) {
@@ -141,6 +143,18 @@ public class TransferEngine {
             if (found.isEmpty()) return null;
             if (found.size() == 1) return found.get(0);
             return new CombinedEnergyStorage(found.toArray(new IEnergyStorage[0]));
+        }
+
+        @SuppressWarnings("rawtypes")
+        IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+            long key = capKey(level, pos, dir == null ? Direction.DOWN : dir);
+            if (dir == null) key ^= 0x1L << 62;
+            Object cached = chemicals.get(key);
+            if (cached == ABSENT) return null;
+            if (cached != null) return (IChemicalHandler) cached;
+            IChemicalHandler handler = ChemicalTransferHelper.getHandler(level, pos, dir);
+            chemicals.put(key, handler != null ? handler : ABSENT);
+            return handler;
         }
     }
 
@@ -339,7 +353,7 @@ public class TransferEngine {
                 case ENERGY ->
                     transferEnergy(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache, capCache);
                 case CHEMICAL ->
-                    transferChemicals(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
+                    transferChemicals(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache, capCache);
                 case SOURCE ->
                     transferSource(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
                 default ->
@@ -611,7 +625,7 @@ public class TransferEngine {
 
     private static int transferChemicals(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimit,
-            Map<UUID, Boolean> dimensionalCache) {
+            Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
 
         if (!MekanismCompat.isLoaded()) {
             if (Config.debugMode)
@@ -629,6 +643,12 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
+        @SuppressWarnings("rawtypes")
+        IChemicalHandler sourceHandler = capCache.findChemicalHandler(sourceLevel, sourcePos,
+                exportChannel.getIoDirection());
+        if (sourceHandler == null)
+            return -1;
+
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
@@ -644,16 +664,20 @@ public class TransferEngine {
             if (!canReach(sourceNode, target.node(), sourceDimensional, dimensionalCache))
                 continue;
 
-            anyReachable = true;
             ServerLevel targetLevel = (ServerLevel) target.node().level();
             BlockPos targetPos = target.node().getAttachedPos();
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
+            @SuppressWarnings("rawtypes")
+            IChemicalHandler targetHandler = capCache.findChemicalHandler(targetLevel, targetPos,
+                    target.channel().getIoDirection());
+            if (targetHandler == null)
+                continue;
+
+            anyReachable = true;
             long moved = ChemicalTransferHelper.transferBetween(
-                    sourceLevel, sourcePos, exportChannel.getIoDirection(),
-                    targetLevel, targetPos, target.channel().getIoDirection(),
-                    remaining,
+                    sourceHandler, targetHandler, remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel().getFilterItems(), target.channel().getFilterMode(),
                     filterReadCache);
@@ -775,6 +799,10 @@ public class TransferEngine {
         boolean[] openTargets = new boolean[targets.size()];
         Arrays.fill(openTargets, true);
         int openTargetCount = targets.size();
+        List<List<ItemStack>> rejectedInserts = new ArrayList<>(targets.size());
+        for (int i = 0; i < targets.size(); i++) {
+            rejectedInserts.add(null);
+        }
 
         while (remaining > 0 && openTargetCount > 0) {
             movedAny = false;
@@ -846,12 +874,16 @@ public class TransferEngine {
                     if (allowed <= 0) {
                         continue;
                     }
+                    if (hasRejectedInsert(rejectedInserts.get(targetIndex), extracted)) {
+                        continue;
+                    }
 
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
                     ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), simulatedInsert, true,
                             target.allowedSlots());
                     int acceptableCount = allowed - simRemainder.getCount();
                     if (acceptableCount <= 0) {
+                        rememberRejectedInsert(rejectedInserts, targetIndex, extracted);
                         continue;
                     }
 
@@ -889,6 +921,7 @@ public class TransferEngine {
 
                     int sourceLost = targetAccepted + droppedToWorld;
                     if (sourceLost > 0) {
+                        rejectedInserts.set(targetIndex, null);
                         movedAny = true;
                         movedForTarget = true;
                         remaining -= sourceLost;
@@ -920,6 +953,27 @@ public class TransferEngine {
             }
         }
         return limit - remaining;
+    }
+
+    private static boolean hasRejectedInsert(@Nullable List<ItemStack> rejected, ItemStack stack) {
+        if (rejected == null) {
+            return false;
+        }
+        for (ItemStack rejectedStack : rejected) {
+            if (ItemStackCompat.isSameItemSameComponents(rejectedStack, stack)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void rememberRejectedInsert(List<List<ItemStack>> rejectedInserts, int targetIndex, ItemStack stack) {
+        List<ItemStack> rejected = rejectedInserts.get(targetIndex);
+        if (rejected == null) {
+            rejected = new ArrayList<>();
+            rejectedInserts.set(targetIndex, rejected);
+        }
+        rejected.add(stack.copyWithCount(1));
     }
 
     private static ItemStack insertItemWithAllowedSlots(IItemHandler handler, ItemStack stack, boolean simulate,
@@ -1097,29 +1151,54 @@ public class TransferEngine {
     }
 
     private static int executeEnergyMove(IEnergyStorage source, IEnergyStorage target, int limitRF) {
-        int extracted = source.extractEnergy(limitRF, true);
+        int toMove = getEnergyMoveAmount(source, target, limitRF);
+        if (toMove <= 0)
+            return 0;
+
+        int extracted = source.extractEnergy(toMove, false);
         if (extracted <= 0)
             return 0;
 
-        int accepted = target.receiveEnergy(extracted, true);
-        if (accepted <= 0)
-            return 0;
+        int received = target.receiveEnergy(extracted, false);
+        if (received == extracted)
+            return received;
 
-        int toMove = Math.min(extracted, accepted);
-        int actuallyExtracted = source.extractEnergy(toMove, false);
-        if (actuallyExtracted <= 0)
-            return 0;
-
-        int received = target.receiveEnergy(actuallyExtracted, false);
-        if (received < actuallyExtracted) {
-            int rollbackAmount = actuallyExtracted - received;
+        int rollbackAmount = extracted - received;
+        if (source.canReceive()) {
             int returned = source.receiveEnergy(rollbackAmount, false);
-            if (returned < rollbackAmount) {
-                LOGGER.error("ENERGY VOIDING: Source rejected rollback of {} RF. {} RF lost.",
-                        rollbackAmount - returned, rollbackAmount - returned);
-            }
+            rollbackAmount -= returned;
         }
+
+        if (rollbackAmount > 0 && Config.debugMode) {
+            LOGGER.warn("ENERGY TRANSFER MISMATCH: {} RF could not be inserted or returned.", rollbackAmount);
+        }
+
         return received;
+    }
+
+    private static int getEnergyMoveAmount(IEnergyStorage source, IEnergyStorage target, int limitRF) {
+        if (limitRF <= 0)
+            return 0;
+
+        int sourceStored = Math.max(0, source.getEnergyStored());
+        int targetSpace = getEnergySpace(target);
+        int limit = Math.min(limitRF, Math.min(sourceStored, targetSpace));
+        if (limit <= 0)
+            return 0;
+
+        int extracted = source.extractEnergy(limit, true);
+        if (extracted <= 0)
+            return 0;
+
+        int accepted = target.receiveEnergy(Math.min(limit, extracted), true);
+        return Math.max(0, Math.min(limit, Math.min(extracted, accepted)));
+    }
+
+    private static int getEnergySpace(IEnergyStorage target) {
+        long space = (long) target.getMaxEnergyStored() - target.getEnergyStored();
+        if (space <= 0)
+            return 0;
+        return space > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) space;
     }
 
     private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
