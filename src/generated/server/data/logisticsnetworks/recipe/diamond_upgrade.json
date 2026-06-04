@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": "minecraft:chest",
+    "H": "minecraft:hopper",
+    "S": "minecraft:smooth_stone",
+    "X": "minecraft:diamond"
+  },
+  "pattern": [
+    "XHX",
+    "CSC",
+    "XHX"
+  ],
+  "result": {
+    "id": "logisticsnetworks:diamond_upgrade"
+  }
+}

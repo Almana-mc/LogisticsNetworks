@@ -9,7 +9,6 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NameFilterData;
-import me.almana.logisticsnetworks.filter.NameMatchScope;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.filter.SlotFilterData;
 import net.minecraft.core.registries.Registries;
@@ -1284,20 +1283,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int btnH = 12;
         int leftEdge = leftPos + 8;
 
-        // Scope button
-        NameMatchScope scope = menu.getNameMatchScope();
-        String scopeLabel;
-        if (scope == NameMatchScope.TOOLTIP) {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.tooltip");
-        } else if (scope == NameMatchScope.BOTH) {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.both");
-        } else {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.name");
-        }
-        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
-        drawButton(g, leftEdge, btnY, scopeBtnW, btnH, scopeLabel, mx, my, true);
-
-        // Target type button
         String typeLabel;
         if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
             typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
@@ -1307,7 +1292,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             typeLabel = tr("gui.logisticsnetworks.filter.target.items");
         }
         int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-        int typeBtnX = leftEdge + scopeBtnW + 4;
+        int typeBtnX = leftEdge;
         drawButton(g, typeBtnX, btnY, typeBtnW, btnH, typeLabel, mx, my, true);
 
         // Whitelist/Blacklist button
@@ -1345,26 +1330,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int btnY = topPos + 20;
         int leftEdge = leftPos + 8;
 
-        // Scope button
-        NameMatchScope scope = menu.getNameMatchScope();
-        String scopeLabel;
-        if (scope == NameMatchScope.TOOLTIP) {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.tooltip");
-        } else if (scope == NameMatchScope.BOTH) {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.both");
-        } else {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.name");
-        }
-        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
-
-        if (isHovering(leftEdge, btnY, scopeBtnW, btnH, (int) mx, (int) my)) {
-            if (minecraft != null && minecraft.gameMode != null) {
-                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
-            }
-            return true;
-        }
-
-        // Target type button
         String typeLabel;
         if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
             typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
@@ -1374,7 +1339,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             typeLabel = tr("gui.logisticsnetworks.filter.target.items");
         }
         int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-        int typeBtnX = leftEdge + scopeBtnW + 4;
+        int typeBtnX = leftEdge;
 
         if (isHovering(typeBtnX, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
             if (minecraft != null && minecraft.gameMode != null) {

@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "E": "minecraft:ender_eye",
+    "H": "minecraft:hopper",
+    "O": "minecraft:obsidian",
+    "R": "minecraft:redstone_block",
+    "T": "minecraft:redstone_torch"
+  },
+  "pattern": [
+    "ORO",
+    "HEH",
+    "OTO"
+  ],
+  "result": {
+    "id": "logisticsnetworks:logistics_node"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "logisticsnetworks:small_filter",
+    "minecraft:book"
+  ],
+  "result": {
+    "id": "logisticsnetworks:mod_filter"
+  }
+}

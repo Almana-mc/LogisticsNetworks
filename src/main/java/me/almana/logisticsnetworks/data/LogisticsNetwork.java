@@ -27,10 +27,12 @@ public class LogisticsNetwork {
     private static final String KEY_NODE_UUID = "Node";
     private static final String KEY_OWNER_UUID = "OwnerUUID";
     private static final String KEY_CHANNEL_NAMES = "ChannelNames";
+    private static final String KEY_CREATED = "CreatedAt";
 
     private final UUID id;
     private String name;
     private UUID ownerUuid;
+    private long createdAt = System.currentTimeMillis();
     private final Set<UUID> nodeUuids = new HashSet<>();
     private boolean sleeping = true;
 
@@ -76,6 +78,7 @@ public class LogisticsNetwork {
         tag.putString(KEY_ID, id.toString());
         tag.putString(KEY_NAME, name);
         tag.putBoolean(KEY_SLEEPING, sleeping);
+        tag.putLong(KEY_CREATED, createdAt);
         if (ownerUuid != null) {
             tag.putString(KEY_OWNER_UUID, ownerUuid.toString());
         }
@@ -112,6 +115,7 @@ public class LogisticsNetwork {
         if (tag.contains(KEY_OWNER_UUID)) {
             network.ownerUuid = parseOptionalUuid(tag.getStringOr(KEY_OWNER_UUID, null));
         }
+        network.createdAt = tag.getLongOr(KEY_CREATED, 0L);
 
         if (tag.contains(KEY_NODES)) {
             ListTag nodesTag = tag.getListOrEmpty(KEY_NODES);
@@ -150,6 +154,10 @@ public class LogisticsNetwork {
 
     public UUID getId() {
         return id;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
     }
 
     public String getName() {

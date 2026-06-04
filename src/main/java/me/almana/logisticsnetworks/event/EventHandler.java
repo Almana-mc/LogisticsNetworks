@@ -18,6 +18,7 @@ import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
@@ -41,6 +42,8 @@ import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.transfer.fluid.FluidResource;
 import net.neoforged.neoforge.transfer.item.ItemResource;
+import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -83,6 +86,55 @@ public class EventHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             ServerPayloadHandler.clearDefaultNodeVisibility(player);
         }
+    }
+
+    private static final String JUNE_MESSAGE_TAG = "logisticsnetworks_june_message_year";
+
+    @SubscribeEvent
+    public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+
+        LocalDate today = LocalDate.now();
+        if (today.getMonth() != Month.JUNE)
+            return;
+
+        CompoundTag data = player.getPersistentData();
+        if (data.getIntOr(JUNE_MESSAGE_TAG, 0) == today.getYear())
+            return;
+        data.putInt(JUNE_MESSAGE_TAG, today.getYear());
+
+        player.sendSystemMessage(Component.literal("— June Awareness —").withStyle(ChatFormatting.BOLD));
+        player.sendSystemMessage(rainbow("Happy Pride Month!"));
+        player.sendSystemMessage(Component.literal("You matter. Be proud, take care of yourself.")
+                .withStyle(ChatFormatting.GRAY));
+        player.sendSystemMessage(Component.literal("Happy Men's Mental Health Month.")
+                .withStyle(ChatFormatting.AQUA));
+        player.sendSystemMessage(Component.literal("Reach out, talk to your friends. If nothing, else, join our discord and talk.")
+                .withStyle(ChatFormatting.GOLD));
+
+        MutableComponent from = Component.literal("From AlmanaX21 ").withStyle(ChatFormatting.GRAY);
+        from.append(Component.literal("[Discord]").withStyle(style -> style
+                .withColor(ChatFormatting.BLUE)
+                .withUnderlined(true)
+                .withClickEvent(new net.minecraft.network.chat.ClickEvent.OpenUrl(
+                        java.net.URI.create("https://discord.gg/xTeHR2tdYh")))
+                .withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(
+                        Component.literal("Join the Logistics Networks Discord")))));
+        player.sendSystemMessage(from);
+    }
+
+    private static MutableComponent rainbow(String text) {
+        ChatFormatting[] colors = {
+                ChatFormatting.RED, ChatFormatting.GOLD, ChatFormatting.YELLOW,
+                ChatFormatting.GREEN, ChatFormatting.AQUA, ChatFormatting.LIGHT_PURPLE
+        };
+        MutableComponent out = Component.empty();
+        for (int i = 0; i < text.length(); i++) {
+            out.append(Component.literal(String.valueOf(text.charAt(i)))
+                    .withStyle(colors[i % colors.length]));
+        }
+        return out;
     }
 
     @SubscribeEvent

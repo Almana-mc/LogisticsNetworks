@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "B": "minecraft:dragon_breath",
+    "C": "minecraft:crying_obsidian",
+    "E": "minecraft:end_crystal",
+    "S": "minecraft:nether_star"
+  },
+  "pattern": [
+    "CEC",
+    "BSB",
+    "CEC"
+  ],
+  "result": {
+    "id": "logisticsnetworks:dimensional_upgrade"
+  }
+}

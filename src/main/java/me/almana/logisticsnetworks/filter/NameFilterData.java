@@ -5,15 +5,11 @@ import me.almana.logisticsnetworks.item.NameFilterItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
 
-import java.util.List;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -146,25 +142,8 @@ public final class NameFilterData {
             return false;
         }
 
-        NameMatchScope scope = getMatchScope(filter);
-
-        if (scope == NameMatchScope.NAME || scope == NameMatchScope.BOTH) {
-            String candidateName = candidate.getHoverName().getString();
-            if (pattern.matcher(candidateName).find())
-                return true;
-        }
-
-        if (scope == NameMatchScope.TOOLTIP || scope == NameMatchScope.BOTH) {
-            List<Component> tooltipLines = candidate.getTooltipLines(
-                    Item.TooltipContext.EMPTY, null, TooltipFlag.NORMAL);
-            for (int i = (scope == NameMatchScope.BOTH ? 1 : 0); i < tooltipLines.size(); i++) {
-                String line = tooltipLines.get(i).getString();
-                if (pattern.matcher(line).find())
-                    return true;
-            }
-        }
-
-        return false;
+        String candidateName = candidate.getHoverName().getString();
+        return pattern.matcher(candidateName).find();
     }
 
     public static boolean containsName(ItemStack filter, FluidStack candidate) {
