@@ -23,7 +23,7 @@ Currently, it can transport items, fluids and energy. In future, I plan to add s
 
 ## Official Partners
 
-We are partnered with [Kinetic Host](https://billing.kinetichosting.com/aff.php?aff=128) who help support the continuous development of this mod. Truly, a great host with really good prices and support.
+We are partnered with [Kinetic Host](https://billing.kinetichosting.com/aff.php?aff=1285) who help support the continuous development of this mod. Truly, a great host with really good prices and support.
 
 [![image](https://media.forgecdn.net/attachments/description/1448257/description_9c39c92c-3a05-48d8-bf69-e0576dc4c2e5.png)](https://billing.kinetichosting.com/aff.php?aff=1285)
 
