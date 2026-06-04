@@ -15,6 +15,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
@@ -42,6 +43,14 @@ public class ClientEventHandler {
 
     @SubscribeEvent
     public static void clientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(ThemeState::load);
+        event.enqueueWork(() -> {
+            ThemeState.load();
+            DefaultNodeVisibilitySync.send();
+        });
+    }
+
+    @SubscribeEvent
+    public static void clientLogin(ClientPlayerNetworkEvent.LoggingIn event) {
+        DefaultNodeVisibilitySync.send();
     }
 }

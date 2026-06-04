@@ -108,57 +108,42 @@ final class AE2PatternHelper {
 
     private static List<AE2Compat.PatternEntry> fromGenericStacks(List<GenericStack> stacks) {
         Map<ItemStack, Integer> merged = new LinkedHashMap<>();
-        for (GenericStack gs : stacks) {
-            if (gs == null) continue;
-            AEKey what = gs.what();
+        for (GenericStack stack : stacks) {
+            if (stack == null) continue;
+            AEKey what = stack.what();
             if (!(what instanceof AEItemKey itemKey)) continue;
             ItemStack item = itemKey.toStack();
-            int amount = (int) Math.min(gs.amount(), Integer.MAX_VALUE);
+            int amount = (int) Math.min(stack.amount(), Integer.MAX_VALUE);
             if (amount <= 0) amount = 1;
-
-            boolean found = false;
-            for (Map.Entry<ItemStack, Integer> e : merged.entrySet()) {
-                if (ItemStack.isSameItemSameComponents(e.getKey(), item)) {
-                    e.setValue(e.getValue() + amount);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                merged.put(item, amount);
-            }
+            mergeStack(merged, item, amount);
         }
-
-        List<AE2Compat.PatternEntry> result = new ArrayList<>(merged.size());
-        for (Map.Entry<ItemStack, Integer> e : merged.entrySet()) {
-            result.add(new AE2Compat.PatternEntry(e.getKey().copy(), e.getValue()));
-        }
-        return result;
+        return toEntries(merged);
     }
 
     private static List<AE2Compat.PatternEntry> fromItemStacks(List<ItemStack> stacks) {
         Map<ItemStack, Integer> merged = new LinkedHashMap<>();
         for (ItemStack stack : stacks) {
             if (stack == null || stack.isEmpty()) continue;
-            int amount = stack.getCount();
-            if (amount <= 0) amount = 1;
+            int amount = Math.max(1, stack.getCount());
+            mergeStack(merged, stack.copyWithCount(1), amount);
+        }
+        return toEntries(merged);
+    }
 
-            boolean found = false;
-            for (Map.Entry<ItemStack, Integer> e : merged.entrySet()) {
-                if (ItemStack.isSameItemSameComponents(e.getKey(), stack)) {
-                    e.setValue(e.getValue() + amount);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                merged.put(stack.copyWithCount(1), amount);
+    private static void mergeStack(Map<ItemStack, Integer> merged, ItemStack stack, int amount) {
+        for (Map.Entry<ItemStack, Integer> entry : merged.entrySet()) {
+            if (ItemStack.isSameItemSameComponents(entry.getKey(), stack)) {
+                entry.setValue(entry.getValue() + amount);
+                return;
             }
         }
+        merged.put(stack.copyWithCount(1), amount);
+    }
 
+    private static List<AE2Compat.PatternEntry> toEntries(Map<ItemStack, Integer> merged) {
         List<AE2Compat.PatternEntry> result = new ArrayList<>(merged.size());
-        for (Map.Entry<ItemStack, Integer> e : merged.entrySet()) {
-            result.add(new AE2Compat.PatternEntry(e.getKey().copy(), e.getValue()));
+        for (Map.Entry<ItemStack, Integer> entry : merged.entrySet()) {
+            result.add(new AE2Compat.PatternEntry(entry.getKey().copy(), entry.getValue()));
         }
         return result;
     }

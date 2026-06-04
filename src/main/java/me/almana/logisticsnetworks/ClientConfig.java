@@ -14,6 +14,10 @@ public class ClientConfig {
 
     private static final ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
+    public static final ModConfigSpec.BooleanValue defaultNodeVisibilitySpec = builder
+            .comment("Whether newly placed nodes should be visible by default.")
+            .define("defaultNodeVisibility", true);
+
     public static final ModConfigSpec.IntValue maxRenderedNodesSpec = builder
             .comment("Maximum number of nodes rendered when holding a wrench. Nearest nodes are prioritized.")
             .defineInRange("maxRenderedNodes", 200, 1, Integer.MAX_VALUE);
@@ -21,6 +25,10 @@ public class ClientConfig {
     public static final ModConfigSpec.IntValue maxVisibleNodesSpec = builder
             .comment("Maximum number of visible node models rendered. Nearest nodes are prioritized. 0 = unlimited.")
             .defineInRange("maxVisibleNodes", 500, 0, Integer.MAX_VALUE);
+
+    public static final ModConfigSpec.BooleanValue connectedNodeTexturesSpec = builder
+            .comment("Whether adjacent visible nodes should render as connected.")
+            .define("connectedNodeTextures", true);
 
     private static final List<String> THEMES = List.of(
             "light", "dark", "redstone", "nebula", "glass", "terminal", "pastel", "brutalist");
@@ -31,8 +39,10 @@ public class ClientConfig {
 
     static final ModConfigSpec SPEC = builder.build();
 
+    public static boolean defaultNodeVisibility = true;
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
+    public static boolean connectedNodeTextures = true;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -41,8 +51,10 @@ public class ClientConfig {
     }
 
     public static void refresh() {
+        defaultNodeVisibility = defaultNodeVisibilitySpec.get();
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
+        connectedNodeTextures = connectedNodeTexturesSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());
     }
 }
