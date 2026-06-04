@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -10,7 +10,7 @@ public record SetDefaultNodeVisibilityPayload(boolean visible) implements Custom
 
     public static final CustomPacketPayload.Type<SetDefaultNodeVisibilityPayload> TYPE =
             new CustomPacketPayload.Type<>(
-                    ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_default_node_visibility"));
+                    ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "set_default_node_visibility"));
 
     public static final StreamCodec<FriendlyByteBuf, SetDefaultNodeVisibilityPayload> STREAM_CODEC =
             StreamCodec.of(SetDefaultNodeVisibilityPayload::write, SetDefaultNodeVisibilityPayload::read);

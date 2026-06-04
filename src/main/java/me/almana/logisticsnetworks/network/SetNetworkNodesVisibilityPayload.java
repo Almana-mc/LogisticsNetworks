@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -11,7 +11,7 @@ import java.util.UUID;
 public record SetNetworkNodesVisibilityPayload(UUID networkId, boolean visible) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SetNetworkNodesVisibilityPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_network_nodes_visibility"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "set_network_nodes_visibility"));
 
     public static final StreamCodec<FriendlyByteBuf, SetNetworkNodesVisibilityPayload> STREAM_CODEC = StreamCodec
             .of(SetNetworkNodesVisibilityPayload::write, SetNetworkNodesVisibilityPayload::read);

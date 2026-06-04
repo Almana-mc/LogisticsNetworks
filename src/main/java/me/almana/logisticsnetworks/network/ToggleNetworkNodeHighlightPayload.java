@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -11,7 +11,7 @@ import java.util.UUID;
 public record ToggleNetworkNodeHighlightPayload(UUID networkId, UUID nodeId) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<ToggleNetworkNodeHighlightPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "toggle_network_node_highlight"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "toggle_network_node_highlight"));
 
     public static final StreamCodec<FriendlyByteBuf, ToggleNetworkNodeHighlightPayload> STREAM_CODEC = StreamCodec
             .of(ToggleNetworkNodeHighlightPayload::write, ToggleNetworkNodeHighlightPayload::read);

@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -20,7 +20,7 @@ public record SyncNetworkNodesPayload(
     }
 
     public static final CustomPacketPayload.Type<SyncNetworkNodesPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_network_nodes"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "sync_network_nodes"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncNetworkNodesPayload> STREAM_CODEC = StreamCodec
             .of(SyncNetworkNodesPayload::write, SyncNetworkNodesPayload::read);

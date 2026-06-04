@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.registration;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.item.AmountFilterItem;
@@ -49,19 +49,19 @@ import java.util.function.Supplier;
 public class Registration {
 
         public static final DeferredRegister<EntityType<?>> ENTITIES = DeferredRegister.create(Registries.ENTITY_TYPE,
-                        Logisticsnetworks.MOD_ID);
+                        LogisticsNetworks.MOD_ID);
         public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(Registries.BLOCK,
-                        Logisticsnetworks.MOD_ID);
+                        LogisticsNetworks.MOD_ID);
         public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Registries.ITEM,
-                        Logisticsnetworks.MOD_ID);
+                        LogisticsNetworks.MOD_ID);
         public static final DeferredRegister<CreativeModeTab> CREATIVE_TABS = DeferredRegister
-                        .create(Registries.CREATIVE_MODE_TAB, Logisticsnetworks.MOD_ID);
+                        .create(Registries.CREATIVE_MODE_TAB, LogisticsNetworks.MOD_ID);
         public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU,
-                        Logisticsnetworks.MOD_ID);
+                        LogisticsNetworks.MOD_ID);
         public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES = DeferredRegister
-                        .create(Registries.BLOCK_ENTITY_TYPE, Logisticsnetworks.MOD_ID);
+                        .create(Registries.BLOCK_ENTITY_TYPE, LogisticsNetworks.MOD_ID);
         public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS = DeferredRegister
-                        .create(Registries.RECIPE_SERIALIZER, Logisticsnetworks.MOD_ID);
+                        .create(Registries.RECIPE_SERIALIZER, LogisticsNetworks.MOD_ID);
 
         // Some ugly shit I have done here....
         public static final DeferredHolder<EntityType<?>, EntityType<LogisticsNodeEntity>> LOGISTICS_NODE = ENTITIES
@@ -168,7 +168,7 @@ public class Registration {
         public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = CREATIVE_TABS.register(
                         "logistics_tab",
                         () -> CreativeModeTab.builder()
-                                        .title(Component.translatable("itemGroup." + Logisticsnetworks.MOD_ID))
+                                        .title(Component.translatable("itemGroup." + LogisticsNetworks.MOD_ID))
                                         .icon(() -> new ItemStack(WRENCH.get()))
                                         .displayItems((params, output) -> {
                                                 ITEMS.getEntries().stream()

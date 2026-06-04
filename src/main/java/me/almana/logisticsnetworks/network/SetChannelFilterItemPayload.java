@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -14,7 +14,7 @@ public record SetChannelFilterItemPayload(
         ItemStack filterItem) implements CustomPacketPayload {
 
     public static final Type<SetChannelFilterItemPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_channel_filter_item"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "set_channel_filter_item"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetChannelFilterItemPayload> STREAM_CODEC = StreamCodec
             .of(SetChannelFilterItemPayload::write, SetChannelFilterItemPayload::read);

@@ -9,7 +9,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.List;
 
-@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
 public class ClientConfig {
 
     private static final ModConfigSpec.Builder builder = new ModConfigSpec.Builder();

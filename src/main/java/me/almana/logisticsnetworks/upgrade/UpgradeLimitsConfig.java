@@ -5,7 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.neoforged.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +18,7 @@ import java.nio.file.Path;
 
 public final class UpgradeLimitsConfig {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(Logisticsnetworks.MOD_ID);
+    private static final Logger LOGGER = LoggerFactory.getLogger(LogisticsNetworks.MOD_ID);
     private static final String FILE_NAME = "upgrades.json";
     private static final String DIR_NAME = "logistics-network";
     private static final String[] TIER_KEYS = { "none", "iron", "gold", "diamond", "netherite" };

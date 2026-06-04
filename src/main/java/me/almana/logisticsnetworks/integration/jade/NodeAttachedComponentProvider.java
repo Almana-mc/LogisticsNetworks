@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.integration.jade;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.nbt.CompoundTag;
@@ -21,7 +21,7 @@ public enum NodeAttachedComponentProvider implements IBlockComponentProvider, IS
     INSTANCE;
 
     private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath(
-            Logisticsnetworks.MOD_ID, "node_attached");
+            LogisticsNetworks.MOD_ID, "node_attached");
     private static final String KEY_HAS_NODE = "has_node";
 
     @Override
@@ -48,7 +48,7 @@ public enum NodeAttachedComponentProvider implements IBlockComponentProvider, IS
         if (main.getItem() instanceof WrenchItem || off.getItem() instanceof WrenchItem) {
             return;
         }
-        tooltip.add(Component.translatable("jade." + Logisticsnetworks.MOD_ID + ".node_attached"));
+        tooltip.add(Component.translatable("jade." + LogisticsNetworks.MOD_ID + ".node_attached"));
     }
 
     @Override
