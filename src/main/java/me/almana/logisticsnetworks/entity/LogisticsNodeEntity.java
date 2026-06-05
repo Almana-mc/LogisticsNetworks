@@ -263,7 +263,7 @@ public class LogisticsNodeEntity extends Entity {
     @Override
     public void kill() {
         LOGGER.warn(
-                "Attempt to kill LogisticsNodeEntity ignored. Please use '/logisticsnetworks removeNodes' or '/ln removeNodes' instead to safely remove nodes.");
+                "Attempt to kill LogisticsNodeEntity ignored. Please use '/logisticsnetworks removeInvalidNodes' for invalid nodes or '/logisticsnetworks removeNodes' to safely remove all nodes.");
     }
 
     @Override
