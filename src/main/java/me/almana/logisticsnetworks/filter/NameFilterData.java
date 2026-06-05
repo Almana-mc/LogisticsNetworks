@@ -9,6 +9,8 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.fluids.FluidStack;
 
 import java.util.List;
@@ -153,7 +155,8 @@ public final class NameFilterData {
                 return true;
         }
 
-        if (scope == NameMatchScope.TOOLTIP || scope == NameMatchScope.BOTH) {
+        if ((scope == NameMatchScope.TOOLTIP || scope == NameMatchScope.BOTH)
+                && FMLEnvironment.dist != Dist.DEDICATED_SERVER) {
             List<Component> tooltipLines = candidate.getTooltipLines(
                     null, TooltipFlag.NORMAL);
             for (int i = (scope == NameMatchScope.BOTH ? 1 : 0); i < tooltipLines.size(); i++) {
@@ -236,7 +239,6 @@ public final class NameFilterData {
         });
     }
 }
-
 
 
 
