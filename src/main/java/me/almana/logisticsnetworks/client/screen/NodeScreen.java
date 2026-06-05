@@ -10,7 +10,7 @@ import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.data.RedstoneMode;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
@@ -942,7 +942,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (currentPage == Page.CHANNEL_CONFIG && btn == 0 && isInDocsFab(mx, my)) {
             if (minecraft != null && minecraft.player != null) {
                 GuideMeCompat.openGuide(minecraft.player,
-                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "guide"));
+                        ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "guide"));
             }
             return true;
         }

@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.client;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
@@ -16,7 +16,7 @@ import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.world.entity.player.Inventory;
 
-@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
 public class FilterClickHandler {
 
     @SubscribeEvent

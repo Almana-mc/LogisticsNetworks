@@ -63,12 +63,12 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
-@Mod(Logisticsnetworks.MOD_ID)
-public class Logisticsnetworks {
+@Mod(LogisticsNetworks.MOD_ID)
+public class LogisticsNetworks {
 
         public static final String MOD_ID = "logisticsnetworks";
 
-        public Logisticsnetworks(IEventBus modBus) {
+        public LogisticsNetworks(IEventBus modBus) {
                 Registration.init(modBus);
                 modBus.addListener(this::registerPayloads);
                 modBus.addListener(this::commonSetup);

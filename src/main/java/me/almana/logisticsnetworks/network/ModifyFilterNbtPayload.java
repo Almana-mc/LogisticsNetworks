@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -27,7 +27,7 @@ public record ModifyFilterNbtPayload(
         }
 
         public static final Type<ModifyFilterNbtPayload> TYPE = new Type<>(
-                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "modify_filter_nbt"));
+                        ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "modify_filter_nbt"));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, ModifyFilterNbtPayload> STREAM_CODEC = StreamCodec
                         .composite(

@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.client;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.model.NodeModel;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
@@ -18,7 +18,7 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
-@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
 public class ClientEventHandler {
 
     @SubscribeEvent
