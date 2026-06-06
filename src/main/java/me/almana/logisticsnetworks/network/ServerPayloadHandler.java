@@ -490,12 +490,20 @@ public class ServerPayloadHandler {
             ChannelData channel = node.getChannel(ch);
             if (channel == null) return;
 
+            FilterTargetType desired = targetForChannel(channel.getType());
+            if (desired == null) return;
+
             ItemStack stack = channel.getFilterItem(fs);
             VirtualFilterType requested = payload.requestedType();
-            if (requested != VirtualFilterType.EXISTING || stack.isEmpty() || !stack.is(ModTags.FILTERS)) {
-                stack = requested == VirtualFilterType.EXISTING
-                        ? VirtualFilterType.SMALL.createStack()
-                        : requested.createStack();
+            boolean needFresh = requested != VirtualFilterType.EXISTING
+                    || stack.isEmpty() || !stack.is(ModTags.FILTERS)
+                    || currentTarget(stack) != desired;
+            if (needFresh) {
+                VirtualFilterType role = requested != VirtualFilterType.EXISTING
+                        ? requested
+                        : roleForSlot(fs);
+                stack = role.createStack();
+                applyTarget(stack, desired);
                 channel.setFilterItem(fs, stack);
                 propagateToLabelGroup(node, ch);
                 markNetworkDirty(node);
@@ -527,6 +535,42 @@ public class ServerPayloadHandler {
                         buf.writeBoolean(isName);
                     });
         });
+    }
+
+    private static FilterTargetType targetForChannel(ChannelType type) {
+        return switch (type) {
+            case ITEM -> FilterTargetType.ITEMS;
+            case FLUID -> FilterTargetType.FLUIDS;
+            case CHEMICAL -> FilterTargetType.CHEMICALS;
+            case ENERGY, SOURCE -> null;
+        };
+    }
+
+    private static VirtualFilterType roleForSlot(int fs) {
+        return fs >= 2 ? VirtualFilterType.NAME : VirtualFilterType.SMALL;
+    }
+
+    private static FilterTargetType currentTarget(ItemStack stack) {
+        if (FilterItemData.isFilterItem(stack)) {
+            return FilterItemData.getTargetType(stack);
+        }
+        if (NameFilterData.isNameFilter(stack)) {
+            return NameFilterData.getTargetType(stack);
+        }
+        if (ModFilterData.isModFilter(stack)) {
+            return ModFilterData.getTargetType(stack);
+        }
+        return FilterTargetType.ITEMS;
+    }
+
+    private static void applyTarget(ItemStack stack, FilterTargetType target) {
+        if (FilterItemData.isFilterItem(stack)) {
+            FilterItemData.setTargetType(stack, target);
+        } else if (NameFilterData.isNameFilter(stack)) {
+            NameFilterData.setTargetType(stack, target);
+        } else if (ModFilterData.isModFilter(stack)) {
+            ModFilterData.setTargetType(stack, target);
+        }
     }
 
     public static void handleOpenNodeMenu(OpenNodeMenuPayload payload, IPayloadContext context) {
