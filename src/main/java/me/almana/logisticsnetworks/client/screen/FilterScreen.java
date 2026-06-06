@@ -520,7 +520,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             renderChemicalGhostItems(g);
         }
 
-        renderModeControls(g, mx, my, true);
+        renderModeControls(g, mx, my, !menu.isNodeFilter());
     }
 
     private void renderEntryIndicatorOverlays(GuiGraphics g) {
@@ -1060,7 +1060,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 return true;
             }
 
-            handled = handleModeControlClick(mx, my, true);
+            handled = handleModeControlClick(mx, my, !menu.isNodeFilter());
         }
 
         if (!handled) {
@@ -1319,25 +1319,27 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private void renderNameButtons(GuiGraphics g, int mx, int my, int btnY) {
         int btnH = 12;
         int leftEdge = leftPos + 8;
+        boolean node = menu.isNodeFilter();
 
-        String typeLabel;
-        if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
-        } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
-        } else {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.items");
+        int modeBtnX = leftEdge;
+        if (!node) {
+            String typeLabel;
+            if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
+            } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
+            } else {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.items");
+            }
+            int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
+            drawButton(g, leftEdge, btnY, typeBtnW, btnH, typeLabel, mx, my, true);
+            modeBtnX = leftEdge + typeBtnW + 4;
         }
-        int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-        int typeBtnX = leftEdge;
-        drawButton(g, typeBtnX, btnY, typeBtnW, btnH, typeLabel, mx, my, true);
 
-        // Whitelist/Blacklist button
         String modeLabel = menu.isBlacklistMode()
                 ? tr("gui.logisticsnetworks.filter.mode.blacklist")
                 : tr("gui.logisticsnetworks.filter.mode.whitelist");
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
-        int modeBtnX = typeBtnX + typeBtnW + 4;
         drawButton(g, modeBtnX, btnY, modeBtnW, btnH, modeLabel, mx, my, true);
     }
 
@@ -1366,32 +1368,32 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int btnH = 12;
         int btnY = topPos + 20;
         int leftEdge = leftPos + 8;
+        boolean node = menu.isNodeFilter();
 
-        String typeLabel;
-        if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
-        } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
-        } else {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.items");
-        }
-        int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-        int typeBtnX = leftEdge;
-
-        if (isHovering(typeBtnX, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
-            if (minecraft != null && minecraft.gameMode != null) {
-                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
+        int modeBtnX = leftEdge;
+        if (!node) {
+            String typeLabel;
+            if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
+            } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
+            } else {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.items");
             }
-            return true;
+            int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
+            if (isHovering(leftEdge, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
+                if (minecraft != null && minecraft.gameMode != null) {
+                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
+                }
+                return true;
+            }
+            modeBtnX = leftEdge + typeBtnW + 4;
         }
 
-        // Whitelist/Blacklist button
         String modeLabel = menu.isBlacklistMode()
                 ? tr("gui.logisticsnetworks.filter.mode.blacklist")
                 : tr("gui.logisticsnetworks.filter.mode.whitelist");
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
-        int modeBtnX = typeBtnX + typeBtnW + 4;
-
         if (isHovering(modeBtnX, btnY, modeBtnW, btnH, (int) mx, (int) my)) {
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
