@@ -30,15 +30,17 @@ public enum VirtualFilterType {
         if (SlotFilterData.isSlotFilterItem(stack)) {
             return SLOT;
         }
-        if (stack.getItem() instanceof BaseFilterItem base) {
-            int slots = base.getSlotCount();
-            if (slots >= 27) {
-                return BIG;
-            }
-            if (slots >= 18) {
-                return MEDIUM;
-            }
+        if (stack.is(Registration.BIG_FILTER.get())) {
+            return BIG;
+        }
+        if (stack.is(Registration.MEDIUM_FILTER.get())) {
+            return MEDIUM;
+        }
+        if (stack.is(Registration.SMALL_FILTER.get())) {
             return SMALL;
+        }
+        if (stack.getItem() instanceof BaseFilterItem) {
+            return BIG;
         }
         if (stack.getItem() instanceof ModFilterItem) {
             return MOD;

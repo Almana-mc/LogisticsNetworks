@@ -24,7 +24,7 @@ The right-hand panel of the node configuration screen holds four things: a 3x3 g
 **Available filter types:**
 
 - Small, Medium, Big, Mod, Slot, and Regex filters are available from the virtual filter buttons. Advanced item, fluid, chemical, tag, NBT, durability, enchanted, batch, and stock rules are configured inside the simple filter menus.
-- For detail on each filter type and how to configure them, see [Filters](../filters.md).
+- For detail on each filter type and how to configure them, see [Filters](../filters/index.md).
 
 **Empty slots = pass everything.** If all 9 slots are empty, the channel transfers any matching resource (subject to Type — an Item channel still only moves items, obviously). Filters are an optional narrowing, not a requirement.
 
