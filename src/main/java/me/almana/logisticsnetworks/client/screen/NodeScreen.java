@@ -15,12 +15,14 @@ import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
+import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.AssignNetworkPayload;
+import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
@@ -39,6 +41,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 import java.util.*;
@@ -901,7 +904,13 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         int gridY = y + 12;
         int gridW = 3 * 19 - 1;
         ThemePaint.sunkPanel(g, x - 2, gridY - 2, gridW + 4, 3 * 19 + 2, t);
-        drawSlotGrid(g, x, gridY, 3, 3, mx, my);
+        for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
+            int bx = x + (i % 3) * 19;
+            int by = gridY + (i / 3) * 19;
+            boolean hovered = !labelPickerOpen && mx >= bx - 1 && mx <= bx + 17 && my >= by - 1 && my <= by + 17;
+            ItemStack stack = ch.getFilterItem(i);
+            ThemePaint.button(g, font, bx - 1, by - 1, 18, 18, filterButtonText(stack), hovered, t);
+        }
 
         int upgY = gridY + 3 * 19 + 2;
         String upgradesLabel = Component.translatable("gui.logisticsnetworks.node.upgrades").getString();
@@ -920,6 +929,42 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
                 drawSlot(g, x - 1, y - 1);
             }
         }
+    }
+
+    private int filterButtonX(int slot) {
+        return leftPos + 168 + (slot % 3) * 19;
+    }
+
+    private int filterButtonY(int slot) {
+        return topPos + 68 + (slot / 3) * 19;
+    }
+
+    private boolean isHoveringFilterButton(int slot, double mx, double my) {
+        int x = filterButtonX(slot);
+        int y = filterButtonY(slot);
+        return mx >= x - 1 && mx <= x + 17 && my >= y - 1 && my <= y + 17;
+    }
+
+    private String filterButtonText(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return "+";
+        }
+        VirtualFilterType type = VirtualFilterType.fromStack(stack);
+        return switch (type) {
+            case EXISTING, SMALL -> "S";
+            case MEDIUM -> "M";
+            case BIG -> "B";
+            case MOD -> "Mo";
+            case NAME -> "Rx";
+            case SLOT -> "Sl";
+        };
+    }
+
+    private VirtualFilterType nextFilterType(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return VirtualFilterType.SMALL;
+        }
+        return VirtualFilterType.fromStack(stack).next();
     }
 
     private void drawSettingRow(GuiGraphics g, int x, int y, int w, int rowH, String label, String value,
@@ -1240,6 +1285,26 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
                     ClientPacketDistributor.sendToServer(new SelectNodeChannelPayload(node.getId(), i));
                 }
                 return true;
+            }
+        }
+
+        if (btn == 0 || btn == 1) {
+            ChannelData channel = node.getChannel(selectedChannel);
+            if (channel != null) {
+                for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
+                    if (isHoveringFilterButton(i, mx, my)) {
+                        ItemStack current = channel.getFilterItem(i);
+                        VirtualFilterType type = btn == 0
+                                ? (current.isEmpty() ? VirtualFilterType.SMALL : VirtualFilterType.EXISTING)
+                                : nextFilterType(current);
+                        if (type != VirtualFilterType.EXISTING) {
+                            channel.setFilterItem(i, type.createStack());
+                        }
+                        ClientPacketDistributor.sendToServer(new OpenNodeFilterPayload(
+                                node.getId(), selectedChannel, i, type));
+                        return true;
+                    }
+                }
             }
         }
 
