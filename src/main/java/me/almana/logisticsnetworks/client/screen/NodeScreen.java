@@ -906,17 +906,17 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         ThemePaint.button(g, font, btnX, y - 1, btnW, 10, modeLabel, modeHover, t);
 
         int gridY = y + 12;
-        int gridW = 3 * 19 - 1;
-        ThemePaint.sunkPanel(g, x - 2, gridY - 2, gridW + 4, 3 * 19 + 2, t);
+        int gridW = 2 * 19 - 1;
+        ThemePaint.sunkPanel(g, x - 2, gridY - 2, gridW + 4, 2 * 19 + 2, t);
         for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
-            int bx = x + (i % 3) * 19;
-            int by = gridY + (i / 3) * 19;
+            int bx = x + (i % 2) * 19;
+            int by = gridY + (i / 2) * 19;
             boolean hovered = !labelPickerOpen && mx >= bx - 1 && mx <= bx + 17 && my >= by - 1 && my <= by + 17;
             ItemStack stack = ch.getFilterItem(i);
-            ThemePaint.button(g, font, bx - 1, by - 1, 18, 18, filterButtonText(stack), hovered, t);
+            ThemePaint.button(g, font, bx - 1, by - 1, 18, 18, filterButtonText(stack, i), hovered, t);
         }
 
-        int upgY = gridY + 3 * 19 + 2;
+        int upgY = gridY + 2 * 19 + 2;
         String upgradesLabel = Component.translatable("gui.logisticsnetworks.node.upgrades").getString();
         g.drawString(font, upgradesLabel, x, upgY, cMuted(), false);
 
@@ -936,11 +936,11 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
     }
 
     private int filterButtonX(int slot) {
-        return leftPos + 168 + (slot % 3) * 19;
+        return leftPos + 168 + (slot % 2) * 19;
     }
 
     private int filterButtonY(int slot) {
-        return topPos + 68 + (slot / 3) * 19;
+        return topPos + 68 + (slot / 2) * 19;
     }
 
     private boolean isHoveringFilterButton(int slot, double mx, double my) {
@@ -949,19 +949,11 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         return mx >= x - 1 && mx <= x + 17 && my >= y - 1 && my <= y + 17;
     }
 
-    private String filterButtonText(ItemStack stack) {
+    private String filterButtonText(ItemStack stack, int slot) {
         if (isFilterButtonEmpty(stack)) {
             return "+";
         }
-        VirtualFilterType type = VirtualFilterType.fromStack(stack);
-        return switch (type) {
-            case EXISTING, SMALL -> "S";
-            case MEDIUM -> "M";
-            case BIG -> "B";
-            case MOD -> "Mo";
-            case NAME -> "Rx";
-            case SLOT -> "Sl";
-        };
+        return slot >= 2 ? "Rx" : "N";
     }
 
     private boolean isFilterButtonEmpty(ItemStack stack) {
