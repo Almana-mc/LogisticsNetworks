@@ -15,6 +15,10 @@ import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.filter.ModFilterData;
+import me.almana.logisticsnetworks.filter.NameFilterData;
+import me.almana.logisticsnetworks.filter.SlotFilterData;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
@@ -946,7 +950,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
     }
 
     private String filterButtonText(ItemStack stack) {
-        if (stack.isEmpty()) {
+        if (isFilterButtonEmpty(stack)) {
             return "+";
         }
         VirtualFilterType type = VirtualFilterType.fromStack(stack);
@@ -957,6 +961,20 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             case MOD -> "Mo";
             case NAME -> "Rx";
             case SLOT -> "Sl";
+        };
+    }
+
+    private boolean isFilterButtonEmpty(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return true;
+        }
+        VirtualFilterType type = VirtualFilterType.fromStack(stack);
+        return switch (type) {
+            case EXISTING -> false;
+            case SMALL, MEDIUM, BIG -> !FilterItemData.hasAnyEntries(stack);
+            case MOD -> !ModFilterData.hasAnyMods(stack);
+            case NAME -> !NameFilterData.hasNameFilter(stack);
+            case SLOT -> !SlotFilterData.hasAnySlots(stack);
         };
     }
 

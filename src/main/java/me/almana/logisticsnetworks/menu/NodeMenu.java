@@ -57,6 +57,7 @@ public class NodeMenu extends AbstractContainerMenu {
     public NodeMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
         super(Registration.NODE_MENU.get(), containerId);
         int entityId = buf.readVarInt();
+        this.selectedChannel = Math.max(0, Math.min(8, buf.readVarInt()));
         Entity entity = playerInv.player.level().getEntity(entityId);
         this.node = (entity instanceof LogisticsNodeEntity n) ? n : null;
 

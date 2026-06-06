@@ -529,6 +529,47 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleOpenNodeMenu(OpenNodeMenuPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) return;
+
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            if (node == null) return;
+
+            int selectedChannel = Math.max(0, Math.min(LogisticsNodeEntity.CHANNEL_COUNT - 1, payload.selectedChannel()));
+            player.openMenu(new MenuProvider() {
+                @Override
+                public Component getDisplayName() {
+                    return Component.translatable("gui.logisticsnetworks.node_config");
+                }
+
+                @Override
+                public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
+                    NodeMenu menu = new NodeMenu(containerId, playerInv, node);
+                    menu.setSelectedChannel(selectedChannel);
+                    return menu;
+                }
+            }, buf -> {
+                buf.writeVarInt(node.getId());
+                buf.writeVarInt(selectedChannel);
+                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                    ChannelData ch = node.getChannel(i);
+                    buf.writeNbt(ch != null ? ch.save(player.level().registryAccess()) : new CompoundTag());
+                }
+                for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
+                    CompoundTag entry = new CompoundTag();
+                    entry.store("Item", ItemStack.OPTIONAL_CODEC, node.getUpgradeItem(i));
+                    buf.writeNbt(entry);
+                }
+            });
+
+            if (player.containerMenu instanceof NodeMenu menu) {
+                menu.setSelectedChannel(selectedChannel);
+                menu.sendNetworkListToClient(player);
+            }
+        });
+    }
+
     public static void handleSetFilterEntryTag(SetFilterEntryTagPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
@@ -1014,6 +1055,7 @@ public class ServerPayloadHandler {
                 }
             }, buf -> {
                 buf.writeVarInt(node.getId());
+                buf.writeVarInt(0);
                 for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                     ChannelData ch = node.getChannel(i);
                     buf.writeNbt(ch != null ? ch.save(player.level().registryAccess()) : new CompoundTag());

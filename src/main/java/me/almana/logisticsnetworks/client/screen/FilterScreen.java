@@ -55,6 +55,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     // Layout Constants
     private static final int GUI_WIDTH = 176;
     private static final int FILTER_SLOT_SIZE = 18;
+    private static final int BACK_BUTTON_W = 18;
+    private static final int BACK_BUTTON_H = 12;
 
     // Control Constants
     private static final int LIST_ROW_H = 10;
@@ -415,7 +417,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return;
         }
 
-        g.drawString(font, title, leftPos + 8, topPos + 6, COL_ACCENT, false);
+        int titleX = leftPos + 8;
+        if (menu.isNodeFilter()) {
+            drawButton(g, backButtonX(), backButtonY(), BACK_BUTTON_W, BACK_BUTTON_H, "<", mx, my, true);
+            titleX += BACK_BUTTON_W + 4;
+        }
+        g.drawString(font, filterTitle(), titleX, topPos + 6, COL_ACCENT, false);
 
         if (menu.isModMode())
             renderModMode(g, mx, my);
@@ -952,6 +959,33 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return mx >= x && mx < x + w && my >= y && my < y + h;
     }
 
+    private Component filterTitle() {
+        return menu.isSpecialMode() ? title : Component.translatable("gui.logisticsnetworks.filter.title");
+    }
+
+    private int backButtonX() {
+        return leftPos + 8;
+    }
+
+    private int backButtonY() {
+        return topPos + 5;
+    }
+
+    private boolean isHoveringBackButton(double mx, double my) {
+        return menu.isNodeFilter()
+                && isHovering(backButtonX(), backButtonY(), BACK_BUTTON_W, BACK_BUTTON_H, (int) mx, (int) my);
+    }
+
+    private boolean returnToNodeScreen() {
+        if (!menu.isNodeFilter()) {
+            return false;
+        }
+        flushManualInputToServer();
+        ClientPacketDistributor.sendToServer(new OpenNodeMenuPayload(
+                menu.getNodeSource().getId(), menu.getNodeChannel()));
+        return true;
+    }
+
     private boolean hasControlDown() {
         return minecraft != null
                 && (InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LCONTROL)
@@ -973,6 +1007,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
         blurManualInputIfNeeded(mx, my);
+        if (btn == 0 && isHoveringBackButton(mx, my)) {
+            return returnToNodeScreen();
+        }
         boolean handled = false;
         if (menu.isModMode())
             handled = handleModClick(mx, my, btn);
@@ -1442,6 +1479,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             if (manualInputBox != null && manualInputBox.isFocused()) {
                 flushManualInputToServer();
                 manualInputBox.setFocused(false);
+                if (returnToNodeScreen()) {
+                    return true;
+                }
                 return super.keyPressed(key, scan, modifiers);
             }
             if (nbtEditingRuleIndex >= 0) {
@@ -1454,6 +1494,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             }
             if (nbtEditSlot >= 0) {
                 closeNbtSubMode();
+                return true;
+            }
+            if (returnToNodeScreen()) {
                 return true;
             }
             return super.keyPressed(key, scan, modifiers);

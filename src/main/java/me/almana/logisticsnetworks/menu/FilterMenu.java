@@ -395,6 +395,10 @@ public class FilterMenu extends AbstractContainerMenu {
         return isNameMode;
     }
 
+    public boolean isSpecialMode() {
+        return isSpecialMode;
+    }
+
     public boolean isNodeFilter() {
         return nodeSource != null;
     }
@@ -454,7 +458,7 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public int getPlayerInventoryY() {
-        return isSpecialMode ? 122 : 96 + rows * 18;
+        return isSpecialMode ? 122 : FILTER_Y + rows * 18 + 18;
     }
 
     public boolean isPlayerInventorySlot(int menuSlotIndex) {
@@ -1132,9 +1136,29 @@ public class FilterMenu extends AbstractContainerMenu {
             saveFilterItems(getOpenedStack(), player.level().registryAccess());
         }
         if (!player.level().isClientSide() && nodeSource != null) {
+            if (!hasConfiguredRules()) {
+                ChannelData channel = nodeSource.getChannel(nodeChannel);
+                if (channel != null) {
+                    channel.setFilterItem(nodeFilterSlot, ItemStack.EMPTY);
+                }
+            }
             ServerPayloadHandler.propagateToLabelGroup(nodeSource, nodeChannel);
             ServerPayloadHandler.markNetworkDirty(nodeSource);
         }
+    }
+
+    private boolean hasConfiguredRules() {
+        ItemStack stack = getOpenedStack();
+        if (isModMode) {
+            return ModFilterData.hasAnyMods(stack);
+        }
+        if (isNameMode) {
+            return NameFilterData.hasNameFilter(stack);
+        }
+        if (isSlotMode) {
+            return SlotFilterData.hasAnySlots(stack);
+        }
+        return FilterItemData.hasAnyEntries(stack);
     }
 
     private void loadFilterItems(ItemStack stack, HolderLookup.Provider provider) {
