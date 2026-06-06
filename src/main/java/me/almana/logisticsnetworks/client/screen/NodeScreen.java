@@ -130,6 +130,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     private int settingsHoverRow = -1;
     private long settingsHoverStartTime = 0;
+    private boolean filterDisabledHover = false;
     private static final long TOOLTIP_DELAY = 1000L;
 
     private long lastTabClickTime = 0;
@@ -271,6 +272,10 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             LogisticsNodeEntity node = getMenu().getNode();
             List<Component> tip = getSettingTooltip(node.getChannel(selectedChannel), settingsHoverRow);
             g.renderTooltip(font, tip, mx, my);
+        }
+        if (filterDisabledHover && currentPage == Page.CHANNEL_CONFIG) {
+            g.renderTooltip(font,
+                    Component.translatable("gui.logisticsnetworks.node.filter.unfilterable"), mx, my);
         }
     }
 
@@ -894,6 +899,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
     }
 
     private void drawFilterGrid(GuiGraphics g, ChannelData ch, int x, int y, int mx, int my) {
+        filterDisabledHover = false;
         Theme t = theme();
         String filtersLabel = tr("gui.logisticsnetworks.node.filters");
         g.drawString(font, filtersLabel, x, y, cMuted(), false);
@@ -907,13 +913,22 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
         int gridY = y + 12;
         int gridW = 2 * 19 - 1;
+        boolean filterable = ch.getType() != ChannelType.ENERGY && ch.getType() != ChannelType.SOURCE;
         ThemePaint.sunkPanel(g, x - 2, gridY - 2, gridW + 4, 2 * 19 + 2, t);
         for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
             int bx = x + (i % 2) * 19;
             int by = gridY + (i / 2) * 19;
-            boolean hovered = !labelPickerOpen && mx >= bx - 1 && mx <= bx + 17 && my >= by - 1 && my <= by + 17;
+            boolean hovered = filterable && !labelPickerOpen
+                    && mx >= bx - 1 && mx <= bx + 17 && my >= by - 1 && my <= by + 17;
             ItemStack stack = ch.getFilterItem(i);
-            ThemePaint.button(g, font, bx - 1, by - 1, 18, 18, filterButtonText(stack, i), hovered, t);
+            String label = filterable ? filterButtonText(stack, i) : "";
+            ThemePaint.button(g, font, bx - 1, by - 1, 18, 18, label, hovered, t);
+        }
+        if (!filterable) {
+            g.fill(x - 2, gridY - 2, x - 2 + gridW + 4, gridY - 2 + 2 * 19 + 2, 0x99202020);
+            if (!labelPickerOpen && mx >= x - 2 && mx <= x + gridW && my >= gridY - 2 && my <= gridY + 2 * 19) {
+                filterDisabledHover = true;
+            }
         }
 
         int upgY = gridY + 2 * 19 + 2;
@@ -1297,7 +1312,9 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
         if (btn == 0 || btn == 1) {
             ChannelData channel = node.getChannel(selectedChannel);
-            if (channel != null) {
+            if (channel != null
+                    && channel.getType() != ChannelType.ENERGY
+                    && channel.getType() != ChannelType.SOURCE) {
                 for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
                     if (isHoveringFilterButton(i, mx, my)) {
                         ItemStack current = channel.getFilterItem(i);
