@@ -15,7 +15,7 @@ import java.util.Arrays;
 
 public class ChannelData {
 
-    public static final int FILTER_SIZE = 9;
+    public static final int FILTER_SIZE = 4;
     private static final String KEY_ENABLED = "Enabled";
     private static final String KEY_MODE = "Mode";
     private static final String KEY_TYPE = "Type";
