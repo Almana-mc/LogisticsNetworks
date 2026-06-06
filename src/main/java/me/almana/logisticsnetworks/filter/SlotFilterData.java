@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 public final class SlotFilterData {
 
     private static final String KEY_ROOT = "ln_slot_filter";
+    private static final String KEY_IS_SLOT_FILTER = "slot_filter";
     private static final String KEY_IS_BLACKLIST = "blacklist";
     private static final String KEY_SLOTS = "slots";
 
@@ -26,7 +27,14 @@ public final class SlotFilterData {
     }
 
     public static boolean isSlotFilterItem(ItemStack stack) {
-        return false;
+        return !stack.isEmpty() && getRoot(stack).getBooleanOr(KEY_IS_SLOT_FILTER, false);
+    }
+
+    public static void markSlotFilter(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return;
+        }
+        updateRoot(stack, root -> root.putBoolean(KEY_IS_SLOT_FILTER, true));
     }
 
     public static boolean isBlacklist(ItemStack stack) {
