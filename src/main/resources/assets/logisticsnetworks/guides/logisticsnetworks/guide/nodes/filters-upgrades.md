@@ -15,15 +15,15 @@ The right-hand panel of the node configuration screen holds four things: a 3x3 g
 
 ![Filters 3x3 grid with Any button](images/filters-upgrades-filters.png)
 
-**What it is:** a 3x3 grid of 9 filter slots plus a toggle button (labelled **Any** or **All**) above the grid.
+**What it is:** a 3x3 grid of 9 virtual filter buttons plus a toggle button (labelled **Any** or **All**) above the grid.
 
-**What it does:** the filter slots decide which resources this channel is allowed to move. Drop filter items into the 9 slots to build a rule set for the current channel.
+**What it does:** the filter buttons decide which resources this channel is allowed to move. Click an empty button to create a simple filter and open its configuration. Click an existing button to edit it. Right-click a button to cycle to another filter type.
 
 **Per-channel, not per-node.** The filter slots belong to **one channel at a time** — whichever channel is selected in the [Header](header.md). Switch to a different channel number and the 9 slots re-fill with that channel's filters. This means every channel has its own independent set of 9 filter slots, so a single node can run 9 completely different filter configurations.
 
-**What fits in the slots:**
+**Available filter types:**
 
-- Only filter items (Small Filter, Medium Filter, Big Filter, Tag Filter, Mod Filter, Amount Filter, Durability Filter, NBT Filter, Slot Filter, Regex Filter). Regular items and blocks are rejected.
+- Small, Medium, Big, Mod, Slot, and Regex filters are available from the virtual filter buttons. Advanced item, fluid, chemical, tag, NBT, durability, enchanted, batch, and stock rules are configured inside the simple filter menus.
 - For detail on each filter type and how to configure them, see [Filters](../filters.md).
 
 **Empty slots = pass everything.** If all 9 slots are empty, the channel transfers any matching resource (subject to Type — an Item channel still only moves items, obviously). Filters are an optional narrowing, not a requirement.

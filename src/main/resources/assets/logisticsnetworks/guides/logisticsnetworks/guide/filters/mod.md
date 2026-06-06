@@ -17,7 +17,7 @@ Any resource whose registry namespace equals the configured mod id. For example,
 
 ## Config
 
-- Right-click the filter in-hand to open the menu.
+- Open it from a node's virtual filter button.
 - Set the **mod id** (e.g. `minecraft`, `create`, `mekanism`, `ae2`).
 - That is the only field — one Mod Filter = one mod.
 
@@ -30,10 +30,6 @@ Any resource whose registry namespace equals the configured mod id. For example,
 
 - Send every Create item to the Create-only storage.
 - Blacklist a mod you do not want clogging a general sorting network.
-
-## Crafting Recipe
-
-<RecipeFor id="logisticsnetworks:mod_filter" />
 
 ## Stacking Mod Filters
 

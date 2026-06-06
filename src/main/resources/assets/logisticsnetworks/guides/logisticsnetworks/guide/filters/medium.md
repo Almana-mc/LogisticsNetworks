@@ -18,7 +18,7 @@ Any resource whose item id or fluid id is in the filter's entry list. Matching i
 ## Entry Slots
 
 - **18 slots** (arranged as a 3x6 grid inside the filter menu).
-- Right-click the filter in-hand to open the menu.
+- Open it from a node's virtual filter button.
 - Empty slots are ignored.
 
 Each entry has a hidden **Detail** page with per-entry options — see [Advanced Filtering](advanced-filtering.md).
@@ -32,7 +32,3 @@ Each entry has a hidden **Detail** page with per-entry options — see [Advanced
 
 - Route all common ores (coal, iron, gold, copper, diamond, emerald, redstone, lapis — plus their deepslate variants) through one channel.
 - Blacklist a medium set of buffer-only items you never want leaving storage.
-
-## Crafting Recipe
-
-<RecipeFor id="logisticsnetworks:medium_filter" />

@@ -17,7 +17,7 @@ Any item whose chosen text (name, tooltip, or both) matches the regex pattern yo
 
 ## Config
 
-Right-click the filter in-hand to open the menu. You will see:
+Open it from a node's virtual filter button. You will see:
 
 - **Regex pattern** — the regular expression to test against the item's text. Standard Java regex syntax.
 - **Scope** — what text to match against:
@@ -26,7 +26,7 @@ Right-click the filter in-hand to open the menu. You will see:
   - **Both** — name and every tooltip line.
 - **Whitelist / Blacklist** toggle.
 
-The item's own tooltip shows the current scope, the pattern, and the mode at a glance.
+The filter menu shows the current scope, the pattern, and the mode.
 
 ## Whitelist vs Blacklist
 
@@ -87,7 +87,3 @@ Tools to build and test patterns before pasting them into the filter:
 - **Cost** — every resource the channel tries to move runs through the regex. On a Sender with a big batch size and lots of matching items, that is a lot of regex evaluations every tick. Keep patterns simple and anchored when you can (`^`, `$`, no greedy `.*` where not needed).
 - **Display name only** — some items translate differently depending on language. A regex tuned for English may not match the same item on a non-English client.
 - **Escape special characters** — if you want to match a literal `.`, `(`, or `[`, escape it with `\`.
-
-## Crafting Recipe
-
-<RecipeFor id="logisticsnetworks:name_filter" />

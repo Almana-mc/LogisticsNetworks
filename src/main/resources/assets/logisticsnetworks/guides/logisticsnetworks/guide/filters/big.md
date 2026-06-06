@@ -18,7 +18,7 @@ Any resource whose item id or fluid id is in the filter's entry list. Matching i
 ## Entry Slots
 
 - **27 slots** (3x9 grid inside the filter menu — one full double-chest row's worth of entries).
-- Right-click the filter in-hand to open the menu.
+- Open it from a node's virtual filter button.
 - Empty slots are ignored.
 
 Each entry has a hidden **Detail** page with per-entry options — see [Advanced Filtering](advanced-filtering.md).
@@ -32,7 +32,3 @@ Each entry has a hidden **Detail** page with per-entry options — see [Advanced
 
 - One big explicit whitelist of every building block you want sent to a builder's chest.
 - A single-channel setup that needs to name-check a large batch of crafting ingredients.
-
-## Crafting Recipe
-
-<RecipeFor id="logisticsnetworks:big_filter" />
