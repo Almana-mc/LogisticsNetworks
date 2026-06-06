@@ -970,11 +970,8 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         };
     }
 
-    private VirtualFilterType nextFilterType(ItemStack stack) {
-        if (stack.isEmpty()) {
-            return VirtualFilterType.SMALL;
-        }
-        return VirtualFilterType.fromStack(stack).next();
+    private VirtualFilterType roleForSlot(int slot) {
+        return slot >= 2 ? VirtualFilterType.NAME : VirtualFilterType.SMALL;
     }
 
     private void drawSettingRow(GuiGraphics g, int x, int y, int w, int rowH, String label, String value,
@@ -1304,9 +1301,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
                 for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
                     if (isHoveringFilterButton(i, mx, my)) {
                         ItemStack current = channel.getFilterItem(i);
-                        VirtualFilterType type = btn == 0
-                                ? (current.isEmpty() ? VirtualFilterType.SMALL : VirtualFilterType.EXISTING)
-                                : nextFilterType(current);
+                        VirtualFilterType type = current.isEmpty() ? roleForSlot(i) : VirtualFilterType.EXISTING;
                         if (type != VirtualFilterType.EXISTING) {
                             channel.setFilterItem(i, type.createStack());
                         }
