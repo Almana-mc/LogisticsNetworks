@@ -169,6 +169,7 @@
   "gui.logisticsnetworks.node.value.batch.energy": "%s RF/t",
   "gui.logisticsnetworks.node.value.batch.chemical": "%s mB",
   "gui.logisticsnetworks.node.filters": "Filters",
+  "gui.logisticsnetworks.node.filter.unfilterable": "This channel type can't be filtered",
   "gui.logisticsnetworks.node.filter.type.small": "Small",
   "gui.logisticsnetworks.node.filter.type.medium": "Medium",
   "gui.logisticsnetworks.node.filter.type.big": "Big",
