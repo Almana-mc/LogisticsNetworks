@@ -154,6 +154,9 @@ public class Registration {
                                         .displayItems((params, output) -> {
                                                 ITEMS.getEntries().stream()
                                                                 .map(Supplier::get)
+                                                                .filter(item -> !(item instanceof BaseFilterItem))
+                                                                .filter(item -> !(item instanceof ModFilterItem))
+                                                                .filter(item -> !(item instanceof NameFilterItem))
                                                                 .forEach(output::accept);
                                                 ItemStack guideItem = GuideMeCompat.createGuideItem();
                                                 if (!guideItem.isEmpty()) {
