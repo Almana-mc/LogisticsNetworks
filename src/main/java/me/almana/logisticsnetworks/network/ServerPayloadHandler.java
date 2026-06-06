@@ -485,27 +485,40 @@ public class ServerPayloadHandler {
 
             int ch = payload.channel();
             int fs = payload.filterSlot();
-            if (ch < 0 || ch >= 9 || fs < 0 || fs >= 9) return;
+            if (ch < 0 || ch >= LogisticsNodeEntity.CHANNEL_COUNT || fs < 0 || fs >= ChannelData.FILTER_SIZE) return;
 
             ChannelData channel = node.getChannel(ch);
             if (channel == null) return;
 
             ItemStack stack = channel.getFilterItem(fs);
-            if (stack.isEmpty() || !stack.is(ModTags.FILTERS)) return;
+            VirtualFilterType requested = payload.requestedType();
+            if (requested != VirtualFilterType.EXISTING || stack.isEmpty() || !stack.is(ModTags.FILTERS)) {
+                stack = requested == VirtualFilterType.EXISTING
+                        ? VirtualFilterType.SMALL.createStack()
+                        : requested.createStack();
+                channel.setFilterItem(fs, stack);
+                propagateToLabelGroup(node, ch);
+                markNetworkDirty(node);
+            }
 
-            boolean isMod = stack.getItem() instanceof ModFilterItem;
-            boolean isSlot = false;
-            boolean isName = stack.getItem() instanceof NameFilterItem;
-            boolean isSpecial = isMod || isSlot || isName;
+            VirtualFilterType type = VirtualFilterType.fromStack(stack);
+            boolean isMod = type == VirtualFilterType.MOD;
+            boolean isSlot = type == VirtualFilterType.SLOT;
+            boolean isName = type == VirtualFilterType.NAME;
+            boolean isSpecial = type.isSpecial();
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
+            ItemStack openedStack = stack.copyWithCount(1);
+            CompoundTag stackTag = new CompoundTag();
+            stackTag.store("Item", ItemStack.OPTIONAL_CODEC, openedStack);
 
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new FilterMenu(id, inv, node, ch, fs),
-                    stack.getHoverName()), buf -> {
+                    openedStack.getHoverName()), buf -> {
                         buf.writeVarInt(-2);
                         buf.writeVarInt(payload.entityId());
                         buf.writeVarInt(ch);
                         buf.writeVarInt(fs);
+                        buf.writeNbt(stackTag);
                         buf.writeVarInt(slotCount);
                         buf.writeBoolean(false);
                         buf.writeBoolean(false);
@@ -650,7 +663,7 @@ public class ServerPayloadHandler {
                 return;
 
             boolean isMod = stack.getItem() instanceof ModFilterItem;
-            boolean isSlot = false;
+            boolean isSlot = SlotFilterData.isSlotFilterItem(stack);
             boolean isName = stack.getItem() instanceof NameFilterItem;
             boolean isSpecial = isMod || isSlot || isName;
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));

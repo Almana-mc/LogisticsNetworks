@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -116,7 +117,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.isNbtMode = false;
         this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = false;
+        this.isSlotMode = SlotFilterData.isSlotFilterItem(stack);
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
         this.isSpecialMode = isModMode || isSlotMode || isNameMode;
 
@@ -148,7 +149,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.isNbtMode = false;
         this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = false;
+        this.isSlotMode = SlotFilterData.isSlotFilterItem(stack);
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
         this.isSpecialMode = isModMode || isSlotMode || isNameMode;
 
@@ -180,7 +181,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.isNbtMode = false;
         this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = false;
+        this.isSlotMode = SlotFilterData.isSlotFilterItem(stack);
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
         this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
                 || isNameMode;
@@ -209,6 +210,16 @@ public class FilterMenu extends AbstractContainerMenu {
             this.lockedSlot = -1;
             var entity = playerInv.player.level().getEntity(entityId);
             this.nodeSource = (entity instanceof LogisticsNodeEntity node) ? node : null;
+            CompoundTag stackTag = buf.readNbt();
+            ItemStack openedStack = stackTag != null
+                    ? stackTag.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY)
+                    : ItemStack.EMPTY;
+            if (this.nodeSource != null && !openedStack.isEmpty()) {
+                ChannelData channel = this.nodeSource.getChannel(this.nodeChannel);
+                if (channel != null) {
+                    channel.setFilterItem(this.nodeFilterSlot, openedStack);
+                }
+            }
         } else if (handOrdinal == -1) {
             this.inventorySlotIndex = buf.readVarInt();
             this.hand = InteractionHand.MAIN_HAND;
