@@ -673,6 +673,8 @@ public class ServerPayloadHandler {
                     case SetFilterEntryNbtPayload.ACTION_SET_RAW ->
                         menu.setEntryNbtRaw((Player) context.player(), payload.slot(),
                                 payload.path(), payload.value());
+                    case SetFilterEntryNbtPayload.ACTION_SET_STRICT ->
+                        menu.setEntryNbtStrict(payload.slot(), Boolean.parseBoolean(payload.value()));
                 }
             }
         });
