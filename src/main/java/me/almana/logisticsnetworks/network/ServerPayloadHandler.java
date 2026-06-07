@@ -501,7 +501,7 @@ public class ServerPayloadHandler {
             if (needFresh) {
                 VirtualFilterType role = requested != VirtualFilterType.EXISTING
                         ? requested
-                        : roleForSlot(fs);
+                        : (stack.isEmpty() ? VirtualFilterType.SMALL : VirtualFilterType.fromStack(stack));
                 stack = role.createStack();
                 applyTarget(stack, desired);
                 channel.setFilterItem(fs, stack);
@@ -544,10 +544,6 @@ public class ServerPayloadHandler {
             case CHEMICAL -> FilterTargetType.CHEMICALS;
             case ENERGY, SOURCE -> null;
         };
-    }
-
-    private static VirtualFilterType roleForSlot(int fs) {
-        return fs >= 2 ? VirtualFilterType.NAME : VirtualFilterType.SMALL;
     }
 
     private static FilterTargetType currentTarget(ItemStack stack) {
