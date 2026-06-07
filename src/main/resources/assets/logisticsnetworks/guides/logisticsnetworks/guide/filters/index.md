@@ -7,11 +7,11 @@ navigation:
 
 # Filters
 
-Filters are virtual channel rules that decide exactly which resources a channel is allowed to move. Open them from the 3x3 filter grid on the right side of the node screen; see [Filters & Upgrades](../nodes/filters-upgrades.md).
+Filters are virtual channel rules that decide exactly which resources a channel is allowed to move. Open them from the 3x2 filter grid on the right side of the node screen; see [Filters & Upgrades](../nodes/filters-upgrades.md).
 
 Without any filters the channel transfers everything that matches its Type. Add a filter and only resources that pass the filter's rules get through.
 
-Filter slots are **per-channel**. Every channel on a node keeps its own independent set of 9 filter buttons, so one node can run 9 totally different filter configurations at once.
+Filter slots are **per-channel**. Every channel on a node keeps its own independent set of 6 filter buttons, so one node can run 6 totally different filter configurations at once.
 
 ## Sender vs Receiver
 
@@ -80,7 +80,7 @@ Common examples:
 | `Ingot$` | Names ending with "Ingot" |
 | `^Iron Ingot$` | Exactly "Iron Ingot" |
 | `(?i)iron` | Case-insensitive "iron" |
-| `Iron|Gold` | Names containing "Iron" or "Gold" |
+| `Iron\|Gold` | Names containing "Iron" or "Gold" |
 | `Silk Touch` | Tooltip text containing "Silk Touch" |
 
 Regex filters run against every candidate resource the channel checks, so keep patterns simple on high-traffic channels.

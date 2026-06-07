@@ -173,7 +173,7 @@
   "gui.logisticsnetworks.node.filter.pick.normal": "Normal",
   "gui.logisticsnetworks.node.filter.pick.mod": "Mod",
   "gui.logisticsnetworks.node.filter.pick.regex": "Regex",
-  "gui.logisticsnetworks.node.filter.add.hint": "Click to add item in",
+  "gui.logisticsnetworks.node.filter.add.hint": "Click to add item to filter",
   "gui.logisticsnetworks.node.filter.add.done": "Item added to filter",
   "gui.logisticsnetworks.node.filter.type.small": "Small",
   "gui.logisticsnetworks.node.filter.type.medium": "Medium",

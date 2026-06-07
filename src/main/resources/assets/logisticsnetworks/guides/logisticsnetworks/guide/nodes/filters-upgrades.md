@@ -7,26 +7,26 @@ navigation:
 
 # Filters & Upgrades
 
-![Right-side panel — Filters 3x3 grid, Upgrades 2x2 grid, Docs button, Tweaks button](images/filters-upgrades-full.png)
+![Right-side panel — Filters 3x2 grid, Upgrades 2x2 grid, Docs button, Tweaks button](images/filters-upgrades-full.png)
 
-The right-hand panel of the node configuration screen holds four things: a 3x3 grid of filter slots, a 2x2 grid of upgrade slots, a **Docs** button, and a **Tweaks** button. Each one is covered below.
+The right-hand panel of the node configuration screen holds four things: a 3x2 grid of filter slots, a 2x2 grid of upgrade slots, a **Docs** button, and a **Tweaks** button. Each one is covered below.
 
 ## Filters
 
-![Filters 3x3 grid with Any button](images/filters-upgrades-filters.png)
+![Filters 3x2 grid with Any button](images/filters-upgrades-filters.png)
 
-**What it is:** a 3x3 grid of 9 virtual filter buttons plus a toggle button (labelled **Any** or **All**) above the grid.
+**What it is:** a 3x2 grid of 6 virtual filter buttons plus a toggle button (labelled **Any** or **All**) above the grid.
 
 **What it does:** the filter buttons decide which resources this channel is allowed to move. Click an empty button to create a simple filter and open its configuration. Click an existing button to edit it. Right-click a button to cycle to another filter type.
 
-**Per-channel, not per-node.** The filter slots belong to **one channel at a time** — whichever channel is selected in the [Header](header.md). Switch to a different channel number and the 9 slots re-fill with that channel's filters. This means every channel has its own independent set of 9 filter slots, so a single node can run 9 completely different filter configurations.
+**Per-channel, not per-node.** The filter slots belong to **one channel at a time** — whichever channel is selected in the [Header](header.md). Switch to a different channel number and the 6 slots re-fill with that channel's filters. This means every channel has its own independent set of 6 filter slots, so a single node can run 6 completely different filter configurations.
 
 **Available filter types:**
 
 - Small, Medium, Big, Mod, Slot, and Regex filters are available from the virtual filter buttons. Advanced item, fluid, chemical, tag, NBT, durability, enchanted, batch, and stock rules are configured inside the simple filter menus.
 - For detail on each filter type and how to configure them, see [Filters](../filters/index.md).
 
-**Empty slots = pass everything.** If all 9 slots are empty, the channel transfers any matching resource (subject to Type — an Item channel still only moves items, obviously). Filters are an optional narrowing, not a requirement.
+**Empty slots = pass everything.** If all 6 slots are empty, the channel transfers any matching resource (subject to Type — an Item channel still only moves items, obviously). Filters are an optional narrowing, not a requirement.
 
 ### The Any / All button
 
