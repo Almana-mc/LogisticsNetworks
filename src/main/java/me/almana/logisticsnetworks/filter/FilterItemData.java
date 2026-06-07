@@ -242,7 +242,8 @@ public final class FilterItemData {
                     && getFluidEntry(filter, i).isEmpty()
                     && getChemicalEntry(filter, i) == null
                     && getEntryTag(filter, i) == null
-                    && !isNbtOnlySlot(filter, i)) {
+                    && !isNbtOnlySlot(filter, i)
+                    && getEntrySlotMapping(filter, i) == null) {
                 setEntry(filter, i, entry, provider);
                 return true;
             }
