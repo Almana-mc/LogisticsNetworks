@@ -118,7 +118,7 @@ dependencies {
         isTransitive = false
     }
 
-    compileOnly("org.appliedenergistics:guideme:${guideme_version}:api")
+    compileOnly("org.appliedenergistics:guideme:${guideme_version}")
     runtimeOnly("org.appliedenergistics:guideme:${guideme_version}")
 
     compileOnly("maven.modrinth:jade:${jade_version}")
