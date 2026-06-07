@@ -295,7 +295,7 @@ public final class NodeClipboardConfig {
 
     public List<RequiredItem> getRequiredItemsPreview() {
         List<RequiredItem> result = new ArrayList<>();
-        for (Requirement requirement : buildRequirements(null)) {
+        for (Requirement requirement : buildUpgradeRequirements(null)) {
             result.add(new RequiredItem(requirement.stack().copyWithCount(1), requirement.count()));
         }
         return result;
@@ -522,7 +522,7 @@ public final class NodeClipboardConfig {
         }
 
         ListTag requiredTag = new ListTag();
-        for (Requirement requirement : buildRequirements(null)) {
+        for (Requirement requirement : buildUpgradeRequirements(null)) {
             CompoundTag entry = new CompoundTag();
             entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, requirement.stack());
             entry.putInt(KEY_COUNT, requirement.count());
@@ -664,7 +664,7 @@ public final class NodeClipboardConfig {
 
         Inventory inventory = player.getInventory();
         int protectedSlot = findProtectedSlot(inventory, protectedStack);
-        List<Requirement> requirements = buildRequirements(node);
+        List<Requirement> requirements = buildUpgradeRequirements(node);
         List<ItemStack> returnedItems = collectReturnedItems(node);
 
         ServerLevel level = player.level() instanceof ServerLevel sl ? sl : null;
@@ -728,20 +728,6 @@ public final class NodeClipboardConfig {
             ItemStack current = node.getUpgradeItem(slot);
             if (shouldReturnReplacedItem(expected, current)) {
                 returnedItems.add(current.copy());
-            }
-        }
-
-        for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
-            ChannelData channelData = node.getChannel(channel);
-            if (channelData == null) {
-                continue;
-            }
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack expected = filterItems[channel][slot];
-                ItemStack current = channelData.getFilterItem(slot);
-                if (shouldReturnReplacedItem(expected, current)) {
-                    returnedItems.add(current.copy());
-                }
             }
         }
 
@@ -823,7 +809,7 @@ public final class NodeClipboardConfig {
         return null;
     }
 
-    private List<Requirement> buildRequirements(LogisticsNodeEntity node) {
+    private List<Requirement> buildUpgradeRequirements(LogisticsNodeEntity node) {
         List<Requirement> requirements = new ArrayList<>();
 
         for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
@@ -836,22 +822,6 @@ public final class NodeClipboardConfig {
                 continue;
             }
             addRequirement(requirements, required);
-        }
-
-        for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
-            ChannelData channelData = node == null ? null : node.getChannel(channel);
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack required = filterItems[channel][slot];
-                if (required.isEmpty()) {
-                    continue;
-                }
-
-                if (channelData != null
-                        && ItemStack.isSameItem(required, channelData.getFilterItem(slot))) {
-                    continue;
-                }
-                addRequirement(requirements, required);
-            }
         }
 
         return requirements;
