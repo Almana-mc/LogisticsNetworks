@@ -538,12 +538,7 @@ public class ServerPayloadHandler {
     }
 
     private static FilterTargetType targetForChannel(ChannelType type) {
-        return switch (type) {
-            case ITEM -> FilterTargetType.ITEMS;
-            case FLUID -> FilterTargetType.FLUIDS;
-            case CHEMICAL -> FilterTargetType.CHEMICALS;
-            case ENERGY, SOURCE -> null;
-        };
+        return FilterTargetType.forChannel(type);
     }
 
     private static FilterTargetType currentTarget(ItemStack stack) {
