@@ -1,24 +1,34 @@
 package me.almana.logisticsnetworks.datagen;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
+import me.almana.logisticsnetworks.recipe.GuideRecipe;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.PackOutput;
+import net.minecraft.data.recipes.RecipeBuilder;
 import net.minecraft.data.recipes.RecipeCategory;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.data.recipes.SpecialRecipeBuilder;
 import net.minecraft.resources.Identifier;
-import net.minecraft.tags.ItemTags;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.neoforged.neoforge.common.conditions.ModLoadedCondition;
 
 public class ModRecipeProvider extends RecipeProvider {
 
-    private static final TagKey<Item> C_STRINGS = commonTag("strings");
     private static final TagKey<Item> C_GLASS_PANES = commonTag("glass_panes");
 
     protected ModRecipeProvider(HolderLookup.Provider registries, RecipeOutput output) {
@@ -54,40 +64,6 @@ public class ModRecipeProvider extends RecipeProvider {
                 .unlockedBy("has_blackstone", has(Items.POLISHED_BLACKSTONE))
                 .save(output);
 
-        shaped(RecipeCategory.MISC, Registration.SMALL_FILTER.get())
-                .pattern("PSP").pattern("AAA").pattern("PSP")
-                .define('P', ItemTags.PLANKS)
-                .define('S', C_STRINGS)
-                .define('A', Items.PAPER)
-                .unlockedBy("has_paper", has(Items.PAPER))
-                .save(output);
-
-        shaped(RecipeCategory.MISC, Registration.MEDIUM_FILTER.get())
-                .pattern("PPP").pattern(" S ").pattern("PPP")
-                .define('P', Items.PAPER)
-                .define('S', Registration.SMALL_FILTER.get())
-                .unlockedBy("has_small_filter", has(Registration.SMALL_FILTER.get()))
-                .save(output);
-
-        shaped(RecipeCategory.MISC, Registration.BIG_FILTER.get())
-                .pattern("PPP").pattern(" M ").pattern("PPP")
-                .define('P', Items.PAPER)
-                .define('M', Registration.MEDIUM_FILTER.get())
-                .unlockedBy("has_medium_filter", has(Registration.MEDIUM_FILTER.get()))
-                .save(output);
-
-        shapeless(RecipeCategory.MISC, Registration.MOD_FILTER.get())
-                .requires(Registration.SMALL_FILTER.get())
-                .requires(Items.BOOK)
-                .unlockedBy("has_small_filter", has(Registration.SMALL_FILTER.get()))
-                .save(output);
-
-        shapeless(RecipeCategory.MISC, Registration.NAME_FILTER.get())
-                .requires(Registration.SMALL_FILTER.get())
-                .requires(Items.NAME_TAG)
-                .unlockedBy("has_small_filter", has(Registration.SMALL_FILTER.get()))
-                .save(output);
-
         upgrade(Registration.IRON_UPGRADE.get(), Items.IRON_INGOT);
         upgrade(Registration.GOLD_UPGRADE.get(), Items.GOLD_INGOT);
         upgrade(Registration.DIAMOND_UPGRADE.get(), Items.DIAMOND);
@@ -104,6 +80,37 @@ public class ModRecipeProvider extends RecipeProvider {
 
         SpecialRecipeBuilder.special(() -> FilterCopyClearRecipe.INSTANCE)
                 .save(output, "logisticsnetworks:filter_copy_clear");
+
+        guideRecipe();
+    }
+
+    private void guideRecipe() {
+        Item guideItem = BuiltInRegistries.ITEM
+                .getOptional(Identifier.fromNamespaceAndPath("guideme", "guide")).orElse(null);
+        DataComponentType<?> guideIdType = BuiltInRegistries.DATA_COMPONENT_TYPE
+                .getOptional(Identifier.fromNamespaceAndPath("guideme", "guide_id")).orElse(null);
+        if (guideItem == null || guideIdType == null) {
+            return;
+        }
+
+        @SuppressWarnings("unchecked")
+        DataComponentType<Identifier> idType = (DataComponentType<Identifier>) guideIdType;
+        DataComponentPatch patch = DataComponentPatch.builder()
+                .set(idType, Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "guide"))
+                .build();
+        ItemStackTemplate result = new ItemStackTemplate(guideItem, patch);
+
+        RecipeOutput guideOutput = output.withConditions(new ModLoadedCondition("guideme"));
+        ResourceKey<Recipe<?>> id = ResourceKey.create(Registries.RECIPE,
+                Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "guide"));
+
+        GuideRecipe recipe = new GuideRecipe(
+                RecipeBuilder.createCraftingCommonInfo(true),
+                RecipeBuilder.createCraftingBookInfo(RecipeCategory.MISC, null),
+                result,
+                List.of(Ingredient.of(Items.PAPER), Ingredient.of(Registration.WRENCH.get())));
+
+        guideOutput.accept(id, recipe, null);
     }
 
     private void upgrade(Item result, Item corner) {

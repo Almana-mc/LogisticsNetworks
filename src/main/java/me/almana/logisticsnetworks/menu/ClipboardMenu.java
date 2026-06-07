@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
@@ -49,7 +50,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
     public static final int ID_DELAY_DEC = 118;
     public static final int ID_CLEAR_CLIPBOARD = 119;
 
-    private static final int FILTER_SLOTS = 9;
+    private static final int FILTER_SLOTS = ChannelData.FILTER_SIZE;
     private static final int UPGRADE_SLOTS = LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
     private static final int VISUAL_SLOTS = FILTER_SLOTS + UPGRADE_SLOTS;
 

@@ -43,6 +43,7 @@ public final class FilterItemData {
     private static final String KEY_DUR_VAL = "dur_val";
     private static final String KEY_NBT_RAW = "nbt_raw";
     private static final String KEY_SLOT_MAPPING = "slot_map";
+    private static final String KEY_SLOT_MAPPING_EXPR = "slot_map_expr";
     private static final String KEY_ENCHANTED = "enchanted";
     private static final String KEY_NBT_RULES = "nbt_rules";
     private static final String KEY_NBT_MATCH_ANY = "nbt_match_any";
@@ -78,6 +79,7 @@ public final class FilterItemData {
             List<SlotNbtRule> nbtRules,
             boolean nbtMatchAny,
             @Nullable int[] slotMapping,
+            boolean slotOnly,
             @Nullable Boolean enchanted) {
     }
 
@@ -89,6 +91,7 @@ public final class FilterItemData {
             boolean hasTagEntries,
             boolean hasNbtEntries,
             boolean hasAmountEntries,
+            boolean hasSlotOnlyEntries,
             ItemFilterSlot[] entriesBySlot) {
     }
 
@@ -222,6 +225,32 @@ public final class FilterItemData {
         });
     }
 
+    public static boolean addItem(ItemStack filter, ItemStack item, @Nullable HolderLookup.Provider provider) {
+        if (!isFilterItem(filter) || item == null || item.isEmpty() || provider == null) {
+            return false;
+        }
+        int cap = getCapacity(filter);
+        ItemStack entry = item.copyWithCount(1);
+        for (int i = 0; i < cap; i++) {
+            ItemStack existing = getEntry(filter, i, provider);
+            if (!existing.isEmpty() && ItemStack.isSameItemSameComponents(existing, entry)) {
+                return false;
+            }
+        }
+        for (int i = 0; i < cap; i++) {
+            if (getEntry(filter, i, provider).isEmpty()
+                    && getFluidEntry(filter, i).isEmpty()
+                    && getChemicalEntry(filter, i) == null
+                    && getEntryTag(filter, i) == null
+                    && !isNbtOnlySlot(filter, i)
+                    && getEntrySlotMapping(filter, i) == null) {
+                setEntry(filter, i, entry, provider);
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void clearEntryItem(ItemStack stack, int slot) {
         if (!isFilterItem(stack)) return;
         if (slot < 0 || slot >= getCapacity(stack)) return;
@@ -310,7 +339,7 @@ public final class FilterItemData {
         if (!isFilterItem(stack))
             return false;
         ItemFilterView view = getItemFilterView(stack, readCache);
-        return view.hasItemEntries() || view.hasTagEntries();
+        return view.hasItemEntries() || view.hasTagEntries() || view.hasSlotOnlyEntries();
     }
 
     public static boolean hasAnyFluidEntries(ItemStack stack) {
@@ -663,6 +692,18 @@ public final class FilterItemData {
     }
 
     public static String getEntrySlotMappingExpression(ItemStack stack, int slot) {
+        if (!isFilterItem(stack)) return "";
+        CompoundTag root = getRoot(stack);
+        ListTag list = getItemEntries(root);
+        for (Tag t : list) {
+            if (t instanceof CompoundTag entry && getSlotIndex(entry) == slot) {
+                String stored = entry.getStringOr(KEY_SLOT_MAPPING_EXPR, "");
+                if (!stored.isEmpty()) {
+                    return stored;
+                }
+                break;
+            }
+        }
         int[] mapping = getEntrySlotMapping(stack, slot);
         if (mapping == null) return "";
         List<Integer> sorted = new ArrayList<>();
@@ -671,26 +712,41 @@ public final class FilterItemData {
     }
 
     public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots) {
+        setEntrySlotMapping(stack, slot, slots, null);
+    }
+
+    public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots, @Nullable String expression) {
         if (!isFilterItem(stack)) return;
         if (slot < 0 || slot >= getCapacity(stack)) return;
 
+        boolean hasSlots = slots != null && slots.length > 0;
+        boolean hasExpr = expression != null && !expression.isEmpty();
         updateRoot(stack, root -> {
             ListTag list = getItemEntries(root);
             for (Tag t : list) {
                 if (t instanceof CompoundTag entry && getSlotIndex(entry) == slot) {
-                    if (slots != null && slots.length > 0) {
+                    if (hasSlots) {
                         entry.putIntArray(KEY_SLOT_MAPPING, slots);
+                        if (hasExpr) {
+                            entry.putString(KEY_SLOT_MAPPING_EXPR, expression);
+                        } else {
+                            entry.remove(KEY_SLOT_MAPPING_EXPR);
+                        }
                     } else {
                         entry.remove(KEY_SLOT_MAPPING);
+                        entry.remove(KEY_SLOT_MAPPING_EXPR);
                     }
                     root.put(KEY_ITEMS, list);
                     return;
                 }
             }
-            if (slots != null && slots.length > 0) {
+            if (hasSlots) {
                 CompoundTag entry = new CompoundTag();
                 entry.putInt(KEY_SLOT, slot);
                 entry.putIntArray(KEY_SLOT_MAPPING, slots);
+                if (hasExpr) {
+                    entry.putString(KEY_SLOT_MAPPING_EXPR, expression);
+                }
                 list.add(entry);
                 root.put(KEY_ITEMS, list);
             }
@@ -1254,6 +1310,10 @@ public final class FilterItemData {
             if (entry == null)
                 continue;
 
+            if (entry.slotOnly()) {
+                return true;
+            }
+
             String tag = entry.tag();
             if (tag != null) {
                 if (candidate.typeHolder().tags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
@@ -1321,11 +1381,15 @@ public final class FilterItemData {
                 continue;
 
             if (inventorySlot >= 0 && entry.slotMapping() != null) {
-                boolean found = false;
+                boolean inSet = false;
                 for (int s : entry.slotMapping()) {
-                    if (s == inventorySlot) { found = true; break; }
+                    if (s == inventorySlot) { inSet = true; break; }
                 }
-                if (!found) continue;
+                if (!inSet) continue;
+            }
+
+            if (entry.slotOnly()) {
+                return true;
             }
 
             String tag = entry.tag();
@@ -1919,7 +1983,7 @@ public final class FilterItemData {
         int cap = getCapacity(stack);
         ItemFilterSlot[] entriesBySlot = new ItemFilterSlot[Math.max(cap, 0)];
         if (!isFilterItem(stack) || cap <= 0) {
-            return new ItemFilterView(false, false, false, false, false, false, false, entriesBySlot);
+            return new ItemFilterView(false, false, false, false, false, false, false, false, entriesBySlot);
         }
 
         CompoundTag root = getRoot(stack);
@@ -1932,6 +1996,7 @@ public final class FilterItemData {
         boolean hasTagEntries = false;
         boolean hasNbtEntries = false;
         boolean hasAmountEntries = false;
+        boolean hasSlotOnlyEntries = false;
 
         for (Tag t : list) {
             if (!(t instanceof CompoundTag entry))
@@ -1986,10 +2051,13 @@ public final class FilterItemData {
                 int[] arr = entry.getIntArray(KEY_SLOT_MAPPING).orElse(new int[0]);
                 if (arr.length > 0) slotMapping = arr;
             }
+            boolean slotOnly = slotMapping != null && tag == null && item == null && !hasFluid
+                    && !hasChemical && !hasNbt && !hasDur && enchanted == null;
+            hasSlotOnlyEntries |= slotOnly;
 
             entriesBySlot[slot] = new ItemFilterSlot(tag, item, chemicalId, fluidEntry, batch, stock, nbtPath,
                     nbtValue, nbtOp, rawNbt, invalidRawNbt, durOp, durVal, hasNbt, nbtOnly, nbtRules,
-                    nbtMatchAny, slotMapping, enchanted);
+                    nbtMatchAny, slotMapping, slotOnly, enchanted);
 
             hasItemEntries |= item != null;
             hasFluidEntries |= hasFluid;
@@ -2000,7 +2068,7 @@ public final class FilterItemData {
         }
 
         return new ItemFilterView(blacklist, hasItemEntries, hasFluidEntries, hasChemicalEntries,
-                hasTagEntries, hasNbtEntries, hasAmountEntries, entriesBySlot);
+                hasTagEntries, hasNbtEntries, hasAmountEntries, hasSlotOnlyEntries, entriesBySlot);
     }
 
     private static CompoundTag[] getEntriesBySlot(ItemStack stack, int cap) {

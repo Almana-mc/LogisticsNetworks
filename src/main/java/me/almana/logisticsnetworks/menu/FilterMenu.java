@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -50,7 +51,6 @@ public class FilterMenu extends AbstractContainerMenu {
     private final boolean isNbtMode;
     private final boolean isDurabilityMode;
     private final boolean isModMode;
-    private final boolean isSlotMode;
     private final boolean isNameMode;
     private final boolean isSpecialMode;
 
@@ -116,9 +116,8 @@ public class FilterMenu extends AbstractContainerMenu {
         this.isNbtMode = false;
         this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
-        this.isSpecialMode = isModMode || isSlotMode || isNameMode;
+        this.isSpecialMode = isModMode || isNameMode;
 
         this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
         this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
@@ -148,9 +147,8 @@ public class FilterMenu extends AbstractContainerMenu {
         this.isNbtMode = false;
         this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
-        this.isSpecialMode = isModMode || isSlotMode || isNameMode;
+        this.isSpecialMode = isModMode || isNameMode;
 
         this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
         this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
@@ -180,9 +178,8 @@ public class FilterMenu extends AbstractContainerMenu {
         this.isNbtMode = false;
         this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
-        this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
+        this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode
                 || isNameMode;
 
         this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
@@ -209,6 +206,16 @@ public class FilterMenu extends AbstractContainerMenu {
             this.lockedSlot = -1;
             var entity = playerInv.player.level().getEntity(entityId);
             this.nodeSource = (entity instanceof LogisticsNodeEntity node) ? node : null;
+            CompoundTag stackTag = buf.readNbt();
+            ItemStack openedStack = stackTag != null
+                    ? stackTag.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY)
+                    : ItemStack.EMPTY;
+            if (this.nodeSource != null && !openedStack.isEmpty()) {
+                ChannelData channel = this.nodeSource.getChannel(this.nodeChannel);
+                if (channel != null) {
+                    channel.setFilterItem(this.nodeFilterSlot, openedStack);
+                }
+            }
         } else if (handOrdinal == -1) {
             this.inventorySlotIndex = buf.readVarInt();
             this.hand = InteractionHand.MAIN_HAND;
@@ -237,9 +244,9 @@ public class FilterMenu extends AbstractContainerMenu {
         this.isDurabilityMode = false;
         buf.readBoolean();
         this.isModMode = buf.readBoolean();
-        this.isSlotMode = buf.readBoolean();
+        buf.readBoolean();
         this.isNameMode = buf.readBoolean();
-        this.isSpecialMode = isModMode || isSlotMode || isNameMode;
+        this.isSpecialMode = isModMode || isNameMode;
 
         this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
         this.filterInventory = new SimpleContainer(slotCount);
@@ -268,10 +275,6 @@ public class FilterMenu extends AbstractContainerMenu {
             data.set(0, NameFilterData.isBlacklist(stack) ? 1 : 0);
             data.set(1, NameFilterData.getTargetType(stack).ordinal());
             data.set(2, NameFilterData.getMatchScope(stack).ordinal());
-        } else if (isSlotMode) {
-            data.set(0, SlotFilterData.isBlacklist(stack) ? 1 : 0);
-            data.set(1, 0);
-            data.set(2, 0);
         } else {
             loadFilterItems(stack, provider);
             data.set(0, FilterItemData.isBlacklist(stack) ? 1 : 0);
@@ -376,12 +379,12 @@ public class FilterMenu extends AbstractContainerMenu {
         return false;
     }
 
-    public boolean isSlotMode() {
-        return isSlotMode;
-    }
-
     public boolean isNameMode() {
         return isNameMode;
+    }
+
+    public boolean isSpecialMode() {
+        return isSpecialMode;
     }
 
     public boolean isNodeFilter() {
@@ -427,13 +430,6 @@ public class FilterMenu extends AbstractContainerMenu {
         return NameMatchScope.fromOrdinal(data.get(2));
     }
 
-    public String getSlotExpression() {
-        if (!isSlotMode) {
-            return "";
-        }
-        return SlotFilterData.getSlotExpression(getOpenedStack());
-    }
-
     public int getFilterSlots() {
         return slotCount;
     }
@@ -443,7 +439,7 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public int getPlayerInventoryY() {
-        return isSpecialMode ? 122 : 96 + rows * 18;
+        return isSpecialMode ? 122 : FILTER_Y + rows * 18 + 18;
     }
 
     public boolean isPlayerInventorySlot(int menuSlotIndex) {
@@ -528,9 +524,12 @@ public class FilterMenu extends AbstractContainerMenu {
     public void setEntrySlotMapping(Player player, int slot, String expression) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
-        java.util.BitSet parsed = SlotExpressionUtil.parseSlots(expression);
-        FilterItemData.setEntrySlotMapping(getOpenedStack(), slot,
-                parsed != null ? SlotExpressionUtil.bitSetToList(parsed).stream().mapToInt(Integer::intValue).toArray() : null);
+        java.util.BitSet parsed = SlotExpressionUtil.parseMask(expression);
+        int[] slots = parsed != null
+                ? SlotExpressionUtil.bitSetToList(parsed).stream().mapToInt(Integer::intValue).toArray()
+                : null;
+        String expr = (slots != null && slots.length > 0) ? expression.trim() : null;
+        FilterItemData.setEntrySlotMapping(getOpenedStack(), slot, slots, expr);
         broadcastChanges();
     }
 
@@ -753,21 +752,6 @@ public class FilterMenu extends AbstractContainerMenu {
     public void setDurabilityValue(Player player, int value) {
     }
 
-    public boolean setSlotExpression(Player player, String expression) {
-        if (!isSlotMode) {
-            return false;
-        }
-
-        SlotFilterData.ParseResult result = SlotFilterData.setSlotsFromExpression(getOpenedStack(), expression);
-        if (!result.valid()) {
-            return false;
-        }
-        if (result.changed()) {
-            broadcastChanges();
-        }
-        return true;
-    }
-
     public ItemStack getOpenedFilterStack(Player player) {
         return getOpenedStack();
     }
@@ -808,8 +792,6 @@ public class FilterMenu extends AbstractContainerMenu {
             ModFilterData.setBlacklist(stack, newState);
         else if (isNameMode)
             NameFilterData.setBlacklist(stack, newState);
-        else if (isSlotMode)
-            SlotFilterData.setBlacklist(stack, newState);
         else
             FilterItemData.setBlacklist(stack, newState);
 
@@ -826,7 +808,7 @@ public class FilterMenu extends AbstractContainerMenu {
             ModFilterData.setTargetType(stack, next);
         else if (isNameMode)
             NameFilterData.setTargetType(stack, next);
-        else if (!isSlotMode)
+        else
             FilterItemData.setTargetType(stack, next);
 
         broadcastChanges();
@@ -1121,9 +1103,27 @@ public class FilterMenu extends AbstractContainerMenu {
             saveFilterItems(getOpenedStack(), player.level().registryAccess());
         }
         if (!player.level().isClientSide() && nodeSource != null) {
+            ChannelData channel = nodeSource.getChannel(nodeChannel);
+            if (channel != null && !hasConfiguredRules()) {
+                channel.setFilterItem(nodeFilterSlot, ItemStack.EMPTY);
+            }
             ServerPayloadHandler.propagateToLabelGroup(nodeSource, nodeChannel);
+            if (channel != null) {
+                ServerPayloadHandler.sendChannelSyncToViewers(nodeSource, nodeChannel, channel);
+            }
             ServerPayloadHandler.markNetworkDirty(nodeSource);
         }
+    }
+
+    private boolean hasConfiguredRules() {
+        ItemStack stack = getOpenedStack();
+        if (isModMode) {
+            return ModFilterData.hasAnyMods(stack);
+        }
+        if (isNameMode) {
+            return NameFilterData.hasNameFilter(stack);
+        }
+        return FilterItemData.hasAnyEntries(stack);
     }
 
     private void loadFilterItems(ItemStack stack, HolderLookup.Provider provider) {
@@ -1162,6 +1162,8 @@ public class FilterMenu extends AbstractContainerMenu {
                 // data lives in NBT already
             } else if (FilterItemData.isNbtOnlySlot(stack, i)) {
                 // nbt-only entries preserved in-place
+            } else if (filterInventory.getItem(i).isEmpty() && FilterItemData.hasEntrySlotMapping(stack, i)) {
+                // slot-only entries preserved in-place
             } else if (isFluidSlot[i]) {
                 FluidStack fluid = FilterItemData.getFluidEntry(stack, i);
                 FilterItemData.setFluidEntry(stack, i, fluid);

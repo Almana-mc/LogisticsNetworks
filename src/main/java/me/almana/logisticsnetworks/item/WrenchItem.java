@@ -1313,6 +1313,7 @@ public class WrenchItem extends Item {
         static void writeNodeSyncData(FriendlyByteBuf buf, LogisticsNodeEntity node,
                 HolderLookup.Provider provider) {
             buf.writeVarInt(node.getId());
+            buf.writeVarInt(0);
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 buf.writeNbt(node.getChannel(i).save(provider));
             }

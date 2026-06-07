@@ -22,6 +22,7 @@ import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
+import me.almana.logisticsnetworks.recipe.GuideRecipe;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -82,11 +83,11 @@ public class Registration {
                         id -> new WrenchItem(itemProperties(id).stacksTo(1)));
 
         public static final DeferredItem<BaseFilterItem> SMALL_FILTER = ITEMS.register("small_filter",
-                        id -> new BaseFilterItem(itemProperties(id), 9));
+                        id -> new BaseFilterItem(itemProperties(id), 45));
         public static final DeferredItem<BaseFilterItem> MEDIUM_FILTER = ITEMS.register("medium_filter",
-                        id -> new BaseFilterItem(itemProperties(id), 18));
+                        id -> new BaseFilterItem(itemProperties(id), 45));
         public static final DeferredItem<BaseFilterItem> BIG_FILTER = ITEMS.register("big_filter",
-                        id -> new BaseFilterItem(itemProperties(id), 27));
+                        id -> new BaseFilterItem(itemProperties(id), 45));
 
         public static final DeferredItem<ModFilterItem> MOD_FILTER = ITEMS.register("mod_filter",
                         id -> new ModFilterItem(itemProperties(id)));
@@ -146,6 +147,10 @@ public class Registration {
                         .register("filter_copy_clear",
                                         () -> FilterCopyClearRecipe.SERIALIZER);
 
+        public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<GuideRecipe>> GUIDE_RECIPE = RECIPE_SERIALIZERS
+                        .register("guide",
+                                        () -> new RecipeSerializer<>(GuideRecipe.MAP_CODEC, GuideRecipe.STREAM_CODEC));
+
         public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = CREATIVE_TABS.register(
                         "logistics_tab",
                         () -> CreativeModeTab.builder()
@@ -154,6 +159,9 @@ public class Registration {
                                         .displayItems((params, output) -> {
                                                 ITEMS.getEntries().stream()
                                                                 .map(Supplier::get)
+                                                                .filter(item -> !(item instanceof BaseFilterItem))
+                                                                .filter(item -> !(item instanceof ModFilterItem))
+                                                                .filter(item -> !(item instanceof NameFilterItem))
                                                                 .forEach(output::accept);
                                                 ItemStack guideItem = GuideMeCompat.createGuideItem();
                                                 if (!guideItem.isEmpty()) {
