@@ -1103,13 +1103,14 @@ public class FilterMenu extends AbstractContainerMenu {
             saveFilterItems(getOpenedStack(), player.level().registryAccess());
         }
         if (!player.level().isClientSide() && nodeSource != null) {
-            if (!hasConfiguredRules()) {
-                ChannelData channel = nodeSource.getChannel(nodeChannel);
-                if (channel != null) {
-                    channel.setFilterItem(nodeFilterSlot, ItemStack.EMPTY);
-                }
+            ChannelData channel = nodeSource.getChannel(nodeChannel);
+            if (channel != null && !hasConfiguredRules()) {
+                channel.setFilterItem(nodeFilterSlot, ItemStack.EMPTY);
             }
             ServerPayloadHandler.propagateToLabelGroup(nodeSource, nodeChannel);
+            if (channel != null) {
+                ServerPayloadHandler.sendChannelSyncToViewers(nodeSource, nodeChannel, channel);
+            }
             ServerPayloadHandler.markNetworkDirty(nodeSource);
         }
     }

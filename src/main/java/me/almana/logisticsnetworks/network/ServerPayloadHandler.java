@@ -542,6 +542,7 @@ public class ServerPayloadHandler {
                 stack = role.createStack();
                 applyTarget(stack, desired);
                 channel.setFilterItem(fs, stack);
+                sendChannelSyncToViewers(node, ch, channel);
                 propagateToLabelGroup(node, ch);
                 markNetworkDirty(node);
             }
@@ -1317,7 +1318,7 @@ public class ServerPayloadHandler {
         return null;
     }
 
-    private static void sendChannelSyncToViewers(LogisticsNodeEntity node, int channelIndex, ChannelData channel) {
+    public static void sendChannelSyncToViewers(LogisticsNodeEntity node, int channelIndex, ChannelData channel) {
         if (!(node.level() instanceof ServerLevel level))
             return;
         CompoundTag tag = channel.save(level.registryAccess());
