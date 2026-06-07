@@ -362,6 +362,43 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleAddNodeFilterItem(AddNodeFilterItemPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            if (node == null)
+                return;
+            ChannelData channel = node.getChannel(payload.channel());
+            if (channel == null)
+                return;
+            int fs = payload.filterSlot();
+            if (fs < 0 || fs >= ChannelData.FILTER_SIZE)
+                return;
+            ItemStack item = payload.item();
+            if (item.isEmpty() || item.is(ModTags.FILTERS))
+                return;
+            FilterTargetType desired = FilterTargetType.forChannel(channel.getType());
+            if (desired == null)
+                return;
+
+            ItemStack filter = channel.getFilterItem(fs);
+            if (filter.isEmpty()) {
+                filter = VirtualFilterType.SMALL.createStack();
+                FilterItemData.setTargetType(filter, desired);
+            } else if (!FilterItemData.isFilterItem(filter)) {
+                return;
+            } else {
+                filter = filter.copy();
+            }
+
+            if (!FilterItemData.addItem(filter, item, node.level().registryAccess())) {
+                return;
+            }
+            channel.setFilterItem(fs, filter);
+            propagateToLabelGroup(node, payload.channel());
+            markNetworkDirty(node);
+        });
+    }
+
     public static void handleSetNodeUpgradeItem(SetNodeUpgradeItemPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());

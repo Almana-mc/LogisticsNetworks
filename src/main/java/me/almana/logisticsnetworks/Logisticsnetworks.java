@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
+import me.almana.logisticsnetworks.network.AddNodeFilterItemPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryAmountPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryDurabilityPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryEnchantedPayload;
@@ -108,6 +109,8 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleSetFilter);
                 registrar.playToServer(SetChannelFilterItemPayload.TYPE, SetChannelFilterItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetChannelFilterItem);
+                registrar.playToServer(AddNodeFilterItemPayload.TYPE, AddNodeFilterItemPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleAddNodeFilterItem);
                 registrar.playToServer(SetNodeUpgradeItemPayload.TYPE, SetNodeUpgradeItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetNodeUpgradeItem);
                 registrar.playToServer(SelectNodeChannelPayload.TYPE, SelectNodeChannelPayload.STREAM_CODEC,
