@@ -19,6 +19,7 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.ModFilterData;
 import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.filter.SlotFilterData;
+import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
@@ -26,6 +27,7 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.AssignNetworkPayload;
+import me.almana.logisticsnetworks.network.AddNodeFilterItemPayload;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
@@ -42,6 +44,9 @@ import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.client.theme.Themes;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.client.gui.components.EditBox;
+import me.almana.logisticsnetworks.registration.ModTags;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
@@ -134,6 +139,8 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
     private boolean filterDisabledHover = false;
     private boolean filterPickerOpen = false;
     private int filterPickerSlot = -1;
+    private boolean filterAddHover = false;
+    private long filterAddedToastUntil = 0;
     private static final long TOOLTIP_DELAY = 1000L;
 
     private long lastTabClickTime = 0;
@@ -282,6 +289,15 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         if (filterDisabledHover && currentPage == Page.CHANNEL_CONFIG) {
             g.renderTooltip(font,
                     Component.translatable("gui.logisticsnetworks.node.filter.unfilterable"), mx, my);
+        }
+        if (filterAddHover && currentPage == Page.CHANNEL_CONFIG) {
+            g.renderTooltip(font,
+                    Component.translatable("gui.logisticsnetworks.node.filter.add.hint"), mx, my);
+        }
+        if (System.currentTimeMillis() < filterAddedToastUntil && currentPage == Page.CHANNEL_CONFIG) {
+            g.renderTooltip(font,
+                    Component.translatable("gui.logisticsnetworks.node.filter.add.done")
+                            .withStyle(ChatFormatting.GREEN), mx, my);
         }
     }
 
@@ -906,6 +922,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     private void drawFilterGrid(GuiGraphics g, ChannelData ch, int x, int y, int mx, int my) {
         filterDisabledHover = false;
+        filterAddHover = false;
         Theme t = theme();
         String filtersLabel = tr("gui.logisticsnetworks.node.filters");
         g.drawString(font, filtersLabel, x, y, cMuted(), false);
@@ -929,6 +946,10 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             ItemStack stack = ch.getFilterItem(i);
             String label = filterable ? filterButtonText(stack) : "";
             ThemePaint.button(g, font, bx - 1, by - 1, 18, 18, label, hovered, t);
+            if (hovered && !menu.getCarried().isEmpty() && !menu.getCarried().is(ModTags.FILTERS)
+                    && isFilterSlotItemAddable(i)) {
+                filterAddHover = true;
+            }
         }
         if (!filterable) {
             g.fill(x - 2, gridY - 2, x - 2 + gridW + 4, gridY - 2 + 2 * 19 + 2, 0x99202020);
@@ -962,6 +983,54 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     private int filterButtonY(int slot) {
         return topPos + 68 + (slot / 3) * 19;
+    }
+
+    public int getFilterSlotCount() {
+        return ChannelData.FILTER_SIZE;
+    }
+
+    public boolean isFilterSlotItemAddable(int slot) {
+        LogisticsNodeEntity node = getMenu().getNode();
+        if (node == null) {
+            return false;
+        }
+        ChannelData ch = node.getChannel(selectedChannel);
+        if (ch == null || ch.getType() == ChannelType.ENERGY || ch.getType() == ChannelType.SOURCE) {
+            return false;
+        }
+        ItemStack filter = ch.getFilterItem(slot);
+        return filter.isEmpty() || FilterItemData.isFilterItem(filter);
+    }
+
+    public Rect2i getFilterSlotArea(int slot) {
+        return new Rect2i(filterButtonX(slot) - 1, filterButtonY(slot) - 1, 18, 18);
+    }
+
+    public void addItemToFilterSlot(int slot, ItemStack item) {
+        LogisticsNodeEntity node = getMenu().getNode();
+        if (node == null || item.isEmpty() || item.is(ModTags.FILTERS)) {
+            return;
+        }
+        ChannelData ch = node.getChannel(selectedChannel);
+        if (ch == null || ch.getType() == ChannelType.ENERGY || ch.getType() == ChannelType.SOURCE) {
+            return;
+        }
+        ItemStack filter = ch.getFilterItem(slot);
+        if (filter.isEmpty()) {
+            filter = VirtualFilterType.SMALL.createStack();
+            FilterItemData.setTargetType(filter, FilterTargetType.forChannel(ch.getType()));
+        } else if (!FilterItemData.isFilterItem(filter)) {
+            return;
+        } else {
+            filter = filter.copy();
+        }
+        if (!FilterItemData.addItem(filter, item, minecraft.level.registryAccess())) {
+            return;
+        }
+        ch.setFilterItem(slot, filter);
+        ClientPacketDistributor.sendToServer(new AddNodeFilterItemPayload(
+                node.getId(), selectedChannel, slot, item.copyWithCount(1)));
+        filterAddedToastUntil = System.currentTimeMillis() + 1500;
     }
 
     private boolean isHoveringFilterButton(int slot, double mx, double my) {
@@ -1403,6 +1472,12 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
                     && channel.getType() != ChannelType.SOURCE) {
                 for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
                     if (isHoveringFilterButton(i, mx, my)) {
+                        ItemStack carried = menu.getCarried();
+                        if (!carried.isEmpty() && !carried.is(ModTags.FILTERS)
+                                && isFilterSlotItemAddable(i)) {
+                            addItemToFilterSlot(i, carried);
+                            return true;
+                        }
                         ItemStack current = channel.getFilterItem(i);
                         if (isFilterButtonEmpty(current)) {
                             if (btn == 0) {
