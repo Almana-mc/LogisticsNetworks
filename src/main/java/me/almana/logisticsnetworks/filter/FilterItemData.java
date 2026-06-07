@@ -43,7 +43,7 @@ public final class FilterItemData {
     private static final String KEY_DUR_VAL = "dur_val";
     private static final String KEY_NBT_RAW = "nbt_raw";
     private static final String KEY_SLOT_MAPPING = "slot_map";
-    private static final String KEY_SLOT_MAPPING_INVERT = "slot_map_inv";
+    private static final String KEY_SLOT_MAPPING_EXPR = "slot_map_expr";
     private static final String KEY_ENCHANTED = "enchanted";
     private static final String KEY_NBT_RULES = "nbt_rules";
     private static final String KEY_NBT_MATCH_ANY = "nbt_match_any";
@@ -79,7 +79,6 @@ public final class FilterItemData {
             List<SlotNbtRule> nbtRules,
             boolean nbtMatchAny,
             @Nullable int[] slotMapping,
-            boolean slotInvert,
             boolean slotOnly,
             @Nullable Boolean enchanted) {
     }
@@ -691,50 +690,50 @@ public final class FilterItemData {
         return null;
     }
 
-    public static boolean getEntrySlotMappingInvert(ItemStack stack, int slot) {
-        if (!isFilterItem(stack)) return false;
+    public static String getEntrySlotMappingExpression(ItemStack stack, int slot) {
+        if (!isFilterItem(stack)) return "";
         CompoundTag root = getRoot(stack);
         ListTag list = getItemEntries(root);
         for (Tag t : list) {
             if (t instanceof CompoundTag entry && getSlotIndex(entry) == slot) {
-                return entry.getBooleanOr(KEY_SLOT_MAPPING_INVERT, false);
+                String stored = entry.getStringOr(KEY_SLOT_MAPPING_EXPR, "");
+                if (!stored.isEmpty()) {
+                    return stored;
+                }
+                break;
             }
         }
-        return false;
-    }
-
-    public static String getEntrySlotMappingExpression(ItemStack stack, int slot) {
         int[] mapping = getEntrySlotMapping(stack, slot);
         if (mapping == null) return "";
         List<Integer> sorted = new ArrayList<>();
         for (int s : mapping) sorted.add(s);
-        String expr = SlotExpressionUtil.formatSlots(sorted);
-        return getEntrySlotMappingInvert(stack, slot) ? "!" + expr : expr;
+        return SlotExpressionUtil.formatSlots(sorted);
     }
 
     public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots) {
-        setEntrySlotMapping(stack, slot, slots, false);
+        setEntrySlotMapping(stack, slot, slots, null);
     }
 
-    public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots, boolean invert) {
+    public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots, @Nullable String expression) {
         if (!isFilterItem(stack)) return;
         if (slot < 0 || slot >= getCapacity(stack)) return;
 
         boolean hasSlots = slots != null && slots.length > 0;
+        boolean hasExpr = expression != null && !expression.isEmpty();
         updateRoot(stack, root -> {
             ListTag list = getItemEntries(root);
             for (Tag t : list) {
                 if (t instanceof CompoundTag entry && getSlotIndex(entry) == slot) {
                     if (hasSlots) {
                         entry.putIntArray(KEY_SLOT_MAPPING, slots);
-                        if (invert) {
-                            entry.putBoolean(KEY_SLOT_MAPPING_INVERT, true);
+                        if (hasExpr) {
+                            entry.putString(KEY_SLOT_MAPPING_EXPR, expression);
                         } else {
-                            entry.remove(KEY_SLOT_MAPPING_INVERT);
+                            entry.remove(KEY_SLOT_MAPPING_EXPR);
                         }
                     } else {
                         entry.remove(KEY_SLOT_MAPPING);
-                        entry.remove(KEY_SLOT_MAPPING_INVERT);
+                        entry.remove(KEY_SLOT_MAPPING_EXPR);
                     }
                     root.put(KEY_ITEMS, list);
                     return;
@@ -744,8 +743,8 @@ public final class FilterItemData {
                 CompoundTag entry = new CompoundTag();
                 entry.putInt(KEY_SLOT, slot);
                 entry.putIntArray(KEY_SLOT_MAPPING, slots);
-                if (invert) {
-                    entry.putBoolean(KEY_SLOT_MAPPING_INVERT, true);
+                if (hasExpr) {
+                    entry.putString(KEY_SLOT_MAPPING_EXPR, expression);
                 }
                 list.add(entry);
                 root.put(KEY_ITEMS, list);
@@ -1385,8 +1384,7 @@ public final class FilterItemData {
                 for (int s : entry.slotMapping()) {
                     if (s == inventorySlot) { inSet = true; break; }
                 }
-                boolean allowed = entry.slotInvert() ? !inSet : inSet;
-                if (!allowed) continue;
+                if (!inSet) continue;
             }
 
             if (entry.slotOnly()) {
@@ -2048,11 +2046,9 @@ public final class FilterItemData {
             boolean nbtOnly = (hasNbt || hasDur || enchanted != null) && tag == null && item == null && !hasFluid && !hasChemical;
 
             int[] slotMapping = null;
-            boolean slotInvert = false;
             if (entry.contains(KEY_SLOT_MAPPING)) {
                 int[] arr = entry.getIntArray(KEY_SLOT_MAPPING).orElse(new int[0]);
                 if (arr.length > 0) slotMapping = arr;
-                slotInvert = entry.getBooleanOr(KEY_SLOT_MAPPING_INVERT, false);
             }
             boolean slotOnly = slotMapping != null && tag == null && item == null && !hasFluid
                     && !hasChemical && !hasNbt && !hasDur && enchanted == null;
@@ -2060,7 +2056,7 @@ public final class FilterItemData {
 
             entriesBySlot[slot] = new ItemFilterSlot(tag, item, chemicalId, fluidEntry, batch, stock, nbtPath,
                     nbtValue, nbtOp, rawNbt, invalidRawNbt, durOp, durVal, hasNbt, nbtOnly, nbtRules,
-                    nbtMatchAny, slotMapping, slotInvert, slotOnly, enchanted);
+                    nbtMatchAny, slotMapping, slotOnly, enchanted);
 
             hasItemEntries |= item != null;
             hasFluidEntries |= hasFluid;

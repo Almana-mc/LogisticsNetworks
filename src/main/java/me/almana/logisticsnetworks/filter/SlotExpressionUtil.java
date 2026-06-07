@@ -88,16 +88,65 @@ public final class SlotExpressionUtil {
         return slots;
     }
 
-    public static boolean isInverted(String expression) {
-        return expression != null && expression.trim().startsWith("!");
-    }
-
-    public static String stripInvert(String expression) {
+    @Nullable
+    public static BitSet parseMask(String expression) {
         if (expression == null) {
-            return "";
+            return null;
         }
-        String s = expression.trim();
-        return s.startsWith("!") ? s.substring(1) : s;
+
+        BitSet include = new BitSet(MAX_SLOT + 1);
+        BitSet exclude = new BitSet(MAX_SLOT + 1);
+        boolean anyInclude = false;
+        boolean anyToken = false;
+
+        for (String rawToken : expression.split("[,;\\s]+")) {
+            if (rawToken == null) {
+                continue;
+            }
+            String token = rawToken.trim();
+            boolean negate = token.startsWith("!");
+            if (negate) {
+                token = token.substring(1).trim();
+            }
+            if (token.isEmpty()) {
+                continue;
+            }
+            anyToken = true;
+            BitSet target = negate ? exclude : include;
+            if (!negate) {
+                anyInclude = true;
+            }
+
+            int dash = token.indexOf('-');
+            if (dash >= 0) {
+                Integer a = parseSlot(token.substring(0, dash).trim());
+                Integer b = parseSlot(token.substring(dash + 1).trim());
+                if (a == null || b == null) {
+                    return null;
+                }
+                target.set(Math.min(a, b), Math.max(a, b) + 1);
+            } else {
+                Integer slot = parseSlot(token);
+                if (slot == null) {
+                    return null;
+                }
+                target.set(slot);
+            }
+        }
+
+        if (!anyToken) {
+            return new BitSet(0);
+        }
+
+        BitSet result;
+        if (anyInclude) {
+            result = include;
+        } else {
+            result = new BitSet(MAX_SLOT + 1);
+            result.set(MIN_SLOT, MAX_SLOT + 1);
+        }
+        result.andNot(exclude);
+        return result;
     }
 
     @Nullable
