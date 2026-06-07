@@ -3071,7 +3071,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
             int nbtBtnX = strictToggleX + 14 + font.width(strictLabel) + 8;
             String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
-            int nbtBtnW = Math.max(70, font.width(nbtBtnLabel) + 8);
+            int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
             drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, !strictNbt);
 
             if (isHovering(strictToggleX, y, 54, 14, mx, my)) {
@@ -3080,7 +3080,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                         : "gui.logisticsnetworks.filter.detail.nbt.strict.off"), mx, my);
             }
 
-            if (!strictNbt && isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
+            if (strictNbt && isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
+                g.renderTooltip(font,
+                        Component.translatable("gui.logisticsnetworks.filter.detail.nbt.edit.disabled"), mx, my);
+            } else if (isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
                 List<FilterItemData.SlotNbtRule> hoverRules = menu.getSlotNbtRules(detailEditSlot);
                 if (!hoverRules.isEmpty()) {
                     List<Component> tipLines = new ArrayList<>();
@@ -3542,7 +3545,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
             int nbtBtnX = strictToggleX + 14 + font.width(strictLabel) + 8;
             String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
-            int nbtBtnW = Math.max(70, font.width(nbtBtnLabel) + 8);
+            int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
             if (!strictNbt && isHovering(nbtBtnX, nbtY, nbtBtnW, 14, (int) mx, (int) my)) {
                 detailNbtPageOpen = true;
                 detailNbtScrollOffset = 0;
