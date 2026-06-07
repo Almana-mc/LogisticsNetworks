@@ -22,6 +22,7 @@ import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
+import me.almana.logisticsnetworks.recipe.GuideRecipe;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -145,6 +146,10 @@ public class Registration {
         public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
                                         () -> FilterCopyClearRecipe.SERIALIZER);
+
+        public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<GuideRecipe>> GUIDE_RECIPE = RECIPE_SERIALIZERS
+                        .register("guide",
+                                        () -> new RecipeSerializer<>(GuideRecipe.MAP_CODEC, GuideRecipe.STREAM_CODEC));
 
         public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = CREATIVE_TABS.register(
                         "logistics_tab",
