@@ -132,7 +132,7 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
         int filterY = topPos + 52;
         graphics.drawString(font, Component.translatable("gui.logisticsnetworks.node.filters"), filterX, topPos + 40,
                 COLOR_DIM, false);
-        drawSlotGrid(graphics, filterX, filterY, 2, 2);
+        drawSlotGrid(graphics, filterX, filterY, 2, 3);
 
         int upgradeX = leftPos + 170;
         int upgradeY = topPos + 130;

@@ -107,8 +107,8 @@ public class ClipboardMenu extends AbstractContainerMenu {
         int filterStartX = 170;
         int filterStartY = 52;
         for (int i = 0; i < FILTER_SLOTS; i++) {
-            int row = i / 2;
-            int col = i % 2;
+            int row = i / 3;
+            int col = i % 3;
             addSlot(new VisualSlot(filterContainer, i, filterStartX + col * 19, filterStartY + row * 19));
         }
 
