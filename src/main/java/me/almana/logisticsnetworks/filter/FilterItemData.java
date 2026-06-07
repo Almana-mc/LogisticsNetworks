@@ -691,35 +691,62 @@ public final class FilterItemData {
         return null;
     }
 
+    public static boolean getEntrySlotMappingInvert(ItemStack stack, int slot) {
+        if (!isFilterItem(stack)) return false;
+        CompoundTag root = getRoot(stack);
+        ListTag list = getItemEntries(root);
+        for (Tag t : list) {
+            if (t instanceof CompoundTag entry && getSlotIndex(entry) == slot) {
+                return entry.getBooleanOr(KEY_SLOT_MAPPING_INVERT, false);
+            }
+        }
+        return false;
+    }
+
     public static String getEntrySlotMappingExpression(ItemStack stack, int slot) {
         int[] mapping = getEntrySlotMapping(stack, slot);
         if (mapping == null) return "";
         List<Integer> sorted = new ArrayList<>();
         for (int s : mapping) sorted.add(s);
-        return SlotExpressionUtil.formatSlots(sorted);
+        String expr = SlotExpressionUtil.formatSlots(sorted);
+        return getEntrySlotMappingInvert(stack, slot) ? "!" + expr : expr;
     }
 
     public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots) {
+        setEntrySlotMapping(stack, slot, slots, false);
+    }
+
+    public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots, boolean invert) {
         if (!isFilterItem(stack)) return;
         if (slot < 0 || slot >= getCapacity(stack)) return;
 
+        boolean hasSlots = slots != null && slots.length > 0;
         updateRoot(stack, root -> {
             ListTag list = getItemEntries(root);
             for (Tag t : list) {
                 if (t instanceof CompoundTag entry && getSlotIndex(entry) == slot) {
-                    if (slots != null && slots.length > 0) {
+                    if (hasSlots) {
                         entry.putIntArray(KEY_SLOT_MAPPING, slots);
+                        if (invert) {
+                            entry.putBoolean(KEY_SLOT_MAPPING_INVERT, true);
+                        } else {
+                            entry.remove(KEY_SLOT_MAPPING_INVERT);
+                        }
                     } else {
                         entry.remove(KEY_SLOT_MAPPING);
+                        entry.remove(KEY_SLOT_MAPPING_INVERT);
                     }
                     root.put(KEY_ITEMS, list);
                     return;
                 }
             }
-            if (slots != null && slots.length > 0) {
+            if (hasSlots) {
                 CompoundTag entry = new CompoundTag();
                 entry.putInt(KEY_SLOT, slot);
                 entry.putIntArray(KEY_SLOT_MAPPING, slots);
+                if (invert) {
+                    entry.putBoolean(KEY_SLOT_MAPPING_INVERT, true);
+                }
                 list.add(entry);
                 root.put(KEY_ITEMS, list);
             }
