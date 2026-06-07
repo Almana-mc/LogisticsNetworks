@@ -261,22 +261,28 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (menu.isModMode()) {
             manualInputBox.setVisible(true);
-            manualInputBox.setHint(Component.translatable("gui.logisticsnetworks.filter.mod.input_full_hint"));
             manualInputBox.setX(getSelectorInputX());
             manualInputBox.setY(getSelectorInputY());
             manualInputBox.setWidth(getSelectorInputWidth());
+            manualInputBox.setHint(fitHint(
+                    Component.translatable("gui.logisticsnetworks.filter.mod.input_full_hint"),
+                    getSelectorInputWidth()));
             if (!manualInputBox.isFocused() && !manualInputBox.getValue().equals(getCurrentTargetValue())) {
                 manualInputBox.setValue(getCurrentTargetValue());
             }
         } else if (menu.isNameMode()) {
             manualInputBox.setVisible(true);
-            manualInputBox.setHint(Component.translatable("gui.logisticsnetworks.filter.name.input_hint"));
+            manualInputBox.setHint(fitHint(
+                    Component.translatable("gui.logisticsnetworks.filter.name.input_hint"),
+                    imageWidth - 16));
             if (!manualInputBox.isFocused() && !manualInputBox.getValue().equals(getCurrentTargetValue())) {
                 manualInputBox.setValue(getCurrentTargetValue());
             }
         } else if (menu.isSlotMode()) {
             manualInputBox.setVisible(true);
-            manualInputBox.setHint(Component.translatable("gui.logisticsnetworks.filter.slot.input_hint"));
+            manualInputBox.setHint(fitHint(
+                    Component.translatable("gui.logisticsnetworks.filter.slot.input_hint"),
+                    imageWidth - 16));
             if (!manualInputBox.isFocused() && !manualInputBox.getValue().equals(getCurrentTargetValue())) {
                 manualInputBox.setValue(getCurrentTargetValue());
             }
@@ -581,7 +587,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         g.drawString(font, Component.translatable("gui.logisticsnetworks.filter.selector.selected", displayValue),
                 leftPos + 8, topPos + 22, COL_GRAY, false);
 
-        manualInputBox.setHint(hint);
+        manualInputBox.setHint(fitHint(hint, getSelectorInputWidth()));
 
         boolean hoveringDropdown = isHovering(x, y, w, 14, mx, my);
         g.renderOutline(x, y, w, 14, (hoveringDropdown || isDropdownOpen) ? COL_WHITE : COL_BORDER);
@@ -1873,6 +1879,16 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     private int getSelectorArrowX() {
         return getSelectorInputX() + getSelectorInputWidth() + 4;
+    }
+
+    private Component fitHint(Component hint, int boxWidth) {
+        int inner = Math.max(0, boxWidth - 8);
+        String s = hint.getString();
+        if (font.width(s) <= inner) {
+            return hint;
+        }
+        int ellipsis = font.width("...");
+        return Component.literal(font.plainSubstrByWidth(s, Math.max(0, inner - ellipsis)) + "...");
     }
 
     private int[] getExtractorRect() {
