@@ -11,11 +11,13 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class ChannelData {
 
-    public static final int FILTER_SIZE = 9;
+    public static final int FILTER_SIZE = 6;
     private static final String KEY_ENABLED = "Enabled";
     private static final String KEY_MODE = "Mode";
     private static final String KEY_TYPE = "Type";
@@ -124,14 +126,25 @@ public class ChannelData {
         Arrays.fill(filterItems, ItemStack.EMPTY);
         if (provider != null && tag.contains(KEY_FILTERS)) {
             ListTag list = tag.getListOrEmpty(KEY_FILTERS);
+            List<ItemStack> overflow = new ArrayList<>(); // Filter Upper Fixer
             for (Tag t : list) {
                 if (t instanceof CompoundTag ct) {
                     int slot = ct.getIntOr("Slot", -1);
-                    if (slot >= 0 && slot < FILTER_SIZE) {
-                        filterItems[slot] = ct.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+                    if (slot < 0) {
+                        continue;
+                    }
+                    ItemStack stack = ct.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+                    if (stack.isEmpty()) {
+                        continue;
+                    }
+                    if (slot < FILTER_SIZE) {
+                        filterItems[slot] = stack;
+                    } else {
+                        overflow.add(stack); // Filter Upper Fixer
                     }
                 }
             }
+            placeOverflowFilters(overflow); // Filter Upper Fixer
         } else if (provider != null && tag.contains("FilterItem")) {
             filterItems[0] = tag.read("FilterItem", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
         }
@@ -184,15 +197,43 @@ public class ChannelData {
         priority = Math.max(-99, Math.min(99, tag.getIntOr(KEY_PRIORITY, priority)));
 
         Arrays.fill(filterItems, ItemStack.EMPTY);
+        List<ItemStack> overflow = new ArrayList<>(); // Filter Upper Fixer
         for (ValueInput entry : tag.childrenListOrEmpty(KEY_FILTERS)) {
             int slot = entry.getIntOr("Slot", -1);
-            if (slot < 0 || slot >= FILTER_SIZE) {
+            if (slot < 0) {
                 continue;
             }
-            filterItems[slot] = entry.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+            ItemStack stack = entry.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+            if (stack.isEmpty()) {
+                continue;
+            }
+            if (slot < FILTER_SIZE) {
+                filterItems[slot] = stack;
+            } else {
+                overflow.add(stack); // Filter Upper Fixer
+            }
         }
+        placeOverflowFilters(overflow); // Filter Upper Fixer
         if (filterItems[0].isEmpty()) {
             filterItems[0] = tag.read("FilterItem", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+        }
+    }
+
+    // Filter Upper Fixer: relocate legacy slots >= FILTER_SIZE into free slots
+    private void placeOverflowFilters(List<ItemStack> overflow) {
+        if (overflow.isEmpty()) {
+            return;
+        }
+        int next = 0;
+        for (ItemStack stack : overflow) {
+            while (next < FILTER_SIZE && !filterItems[next].isEmpty()) {
+                next++;
+            }
+            if (next >= FILTER_SIZE) {
+                break;
+            }
+            filterItems[next] = stack;
+            next++;
         }
     }
 

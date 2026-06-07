@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
+import me.almana.logisticsnetworks.network.AddNodeFilterItemPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryAmountPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryDurabilityPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryEnchantedPayload;
@@ -17,6 +18,7 @@ import me.almana.logisticsnetworks.network.SetFilterEntrySlotMappingPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryTagPayload;
 import me.almana.logisticsnetworks.network.SetDefaultNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.SetChannelNamePayload;
+import me.almana.logisticsnetworks.network.OpenNodeMenuPayload;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
@@ -35,7 +37,6 @@ import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
 import me.almana.logisticsnetworks.network.SetNameFilterPayload;
-import me.almana.logisticsnetworks.network.SetSlotFilterSlotsPayload;
 import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncChannelDataPayload;
@@ -107,6 +108,8 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleSetFilter);
                 registrar.playToServer(SetChannelFilterItemPayload.TYPE, SetChannelFilterItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetChannelFilterItem);
+                registrar.playToServer(AddNodeFilterItemPayload.TYPE, AddNodeFilterItemPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleAddNodeFilterItem);
                 registrar.playToServer(SetNodeUpgradeItemPayload.TYPE, SetNodeUpgradeItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetNodeUpgradeItem);
                 registrar.playToServer(SelectNodeChannelPayload.TYPE, SelectNodeChannelPayload.STREAM_CODEC,
@@ -124,6 +127,8 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleSetChannelName);
                 registrar.playToServer(OpenNodeFilterPayload.TYPE, OpenNodeFilterPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleOpenNodeFilter);
+                registrar.playToServer(OpenNodeMenuPayload.TYPE, OpenNodeMenuPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleOpenNodeMenu);
                 registrar.playToServer(SetFilterEntryTagPayload.TYPE, SetFilterEntryTagPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterEntryTag);
                 registrar.playToServer(SetFilterEntryNbtPayload.TYPE, SetFilterEntryNbtPayload.STREAM_CODEC,
@@ -138,8 +143,6 @@ public class Logisticsnetworks {
                                                 context));
                 registrar.playToServer(SetFilterItemEntryPayload.TYPE, SetFilterItemEntryPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterItemEntry);
-                registrar.playToServer(SetSlotFilterSlotsPayload.TYPE, SetSlotFilterSlotsPayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleSetSlotFilterSlots);
                 registrar.playToServer(SetNameFilterPayload.TYPE, SetNameFilterPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetNameFilter);
                 registrar.playToServer(OpenFilterInSlotPayload.TYPE, OpenFilterInSlotPayload.STREAM_CODEC,

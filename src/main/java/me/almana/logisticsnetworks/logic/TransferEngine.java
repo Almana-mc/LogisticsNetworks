@@ -366,7 +366,7 @@ public class TransferEngine {
         boolean anyReachable = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
         ItemStack[] exportFilters = exportChannel.getFilterItems();
-        boolean[] sourceAllowedSlots = TransferSlotAccess.build(sourceHandler, exportFilters);
+        boolean[] sourceAllowedSlots = null;
 
         for (ImportTarget target : targets) {
             if (target.node.getUUID().equals(sourceNode.getUUID()))
@@ -387,10 +387,7 @@ public class TransferEngine {
                 continue;
 
             ItemStack[] importFilters = target.channel.getFilterItems();
-            boolean[] targetAllowedSlots = TransferSlotAccess.build(targetHandler, importFilters);
-            if (targetAllowedSlots != null && !TransferSlotAccess.hasAny(targetAllowedSlots)) {
-                continue;
-            }
+            boolean[] targetAllowedSlots = null;
 
             reachableTargets.add(new ItemTransferTarget(
                     targetHandler,

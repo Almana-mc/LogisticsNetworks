@@ -11,14 +11,12 @@ import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.data.recipes.SpecialRecipeBuilder;
 import net.minecraft.resources.Identifier;
-import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 
 public class ModRecipeProvider extends RecipeProvider {
 
-    private static final TagKey<Item> C_STRINGS = commonTag("strings");
     private static final TagKey<Item> C_GLASS_PANES = commonTag("glass_panes");
 
     protected ModRecipeProvider(HolderLookup.Provider registries, RecipeOutput output) {
@@ -52,40 +50,6 @@ public class ModRecipeProvider extends RecipeProvider {
                 .define('G', C_GLASS_PANES)
                 .define('P', Items.POLISHED_BLACKSTONE)
                 .unlockedBy("has_blackstone", has(Items.POLISHED_BLACKSTONE))
-                .save(output);
-
-        shaped(RecipeCategory.MISC, Registration.SMALL_FILTER.get())
-                .pattern("PSP").pattern("AAA").pattern("PSP")
-                .define('P', ItemTags.PLANKS)
-                .define('S', C_STRINGS)
-                .define('A', Items.PAPER)
-                .unlockedBy("has_paper", has(Items.PAPER))
-                .save(output);
-
-        shaped(RecipeCategory.MISC, Registration.MEDIUM_FILTER.get())
-                .pattern("PPP").pattern(" S ").pattern("PPP")
-                .define('P', Items.PAPER)
-                .define('S', Registration.SMALL_FILTER.get())
-                .unlockedBy("has_small_filter", has(Registration.SMALL_FILTER.get()))
-                .save(output);
-
-        shaped(RecipeCategory.MISC, Registration.BIG_FILTER.get())
-                .pattern("PPP").pattern(" M ").pattern("PPP")
-                .define('P', Items.PAPER)
-                .define('M', Registration.MEDIUM_FILTER.get())
-                .unlockedBy("has_medium_filter", has(Registration.MEDIUM_FILTER.get()))
-                .save(output);
-
-        shapeless(RecipeCategory.MISC, Registration.MOD_FILTER.get())
-                .requires(Registration.SMALL_FILTER.get())
-                .requires(Items.BOOK)
-                .unlockedBy("has_small_filter", has(Registration.SMALL_FILTER.get()))
-                .save(output);
-
-        shapeless(RecipeCategory.MISC, Registration.NAME_FILTER.get())
-                .requires(Registration.SMALL_FILTER.get())
-                .requires(Items.NAME_TAG)
-                .unlockedBy("has_small_filter", has(Registration.SMALL_FILTER.get()))
                 .save(output);
 
         upgrade(Registration.IRON_UPGRADE.get(), Items.IRON_INGOT);

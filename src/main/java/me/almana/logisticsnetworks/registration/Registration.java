@@ -82,11 +82,11 @@ public class Registration {
                         id -> new WrenchItem(itemProperties(id).stacksTo(1)));
 
         public static final DeferredItem<BaseFilterItem> SMALL_FILTER = ITEMS.register("small_filter",
-                        id -> new BaseFilterItem(itemProperties(id), 9));
+                        id -> new BaseFilterItem(itemProperties(id), 45));
         public static final DeferredItem<BaseFilterItem> MEDIUM_FILTER = ITEMS.register("medium_filter",
-                        id -> new BaseFilterItem(itemProperties(id), 18));
+                        id -> new BaseFilterItem(itemProperties(id), 45));
         public static final DeferredItem<BaseFilterItem> BIG_FILTER = ITEMS.register("big_filter",
-                        id -> new BaseFilterItem(itemProperties(id), 27));
+                        id -> new BaseFilterItem(itemProperties(id), 45));
 
         public static final DeferredItem<ModFilterItem> MOD_FILTER = ITEMS.register("mod_filter",
                         id -> new ModFilterItem(itemProperties(id)));
@@ -154,6 +154,9 @@ public class Registration {
                                         .displayItems((params, output) -> {
                                                 ITEMS.getEntries().stream()
                                                                 .map(Supplier::get)
+                                                                .filter(item -> !(item instanceof BaseFilterItem))
+                                                                .filter(item -> !(item instanceof ModFilterItem))
+                                                                .filter(item -> !(item instanceof NameFilterItem))
                                                                 .forEach(output::accept);
                                                 ItemStack guideItem = GuideMeCompat.createGuideItem();
                                                 if (!guideItem.isEmpty()) {
