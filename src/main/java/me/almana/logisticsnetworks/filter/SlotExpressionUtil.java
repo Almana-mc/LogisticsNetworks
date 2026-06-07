@@ -88,6 +88,18 @@ public final class SlotExpressionUtil {
         return slots;
     }
 
+    public static boolean isInverted(String expression) {
+        return expression != null && expression.trim().startsWith("!");
+    }
+
+    public static String stripInvert(String expression) {
+        if (expression == null) {
+            return "";
+        }
+        String s = expression.trim();
+        return s.startsWith("!") ? s.substring(1) : s;
+    }
+
     @Nullable
     private static Integer parseSlot(String raw) {
         if (raw == null || raw.isEmpty()) {
