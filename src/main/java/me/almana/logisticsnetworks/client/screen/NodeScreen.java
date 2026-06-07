@@ -1815,6 +1815,10 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
                 stopChannelNameEdit(false);
                 return true;
             }
+            if (filterPickerOpen) {
+                closeFilterPicker();
+                return true;
+            }
             if (labelPickerOpen) {
                 closeLabelPicker();
                 return true;
