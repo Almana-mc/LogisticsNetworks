@@ -1229,6 +1229,11 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             stopChannelNameEdit(true);
         }
 
+        if (currentPage == Page.CHANNEL_CONFIG && (labelPickerOpen || filterPickerOpen)
+                && handleChannelPageClick(mx, my, btn)) {
+            return true;
+        }
+
         if (isHoveringMenuSlot(mx, my)) {
             return super.mouseClicked(mx, my, btn);
         }
