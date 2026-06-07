@@ -3062,12 +3062,28 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (!isFluidOrChemical) {
             g.drawString(font, tr("gui.logisticsnetworks.filter.detail.nbt"), contentX, y + 3, DETAIL_NBT_COLOR, false);
-            int nbtBtnX = contentX + labelW;
-            String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
-            int nbtBtnW = Math.max(70, font.width(nbtBtnLabel) + 8);
-            drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, true);
+            boolean strictNbt = menu.isEntryNbtStrict(detailEditSlot);
+            int strictToggleX = contentX + labelW;
+            String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
+            drawToggle(g, strictToggleX, y + 2, strictNbt);
+            g.drawString(font, strictLabel, strictToggleX + 14, y + 3,
+                    strictNbt ? COL_ACCENT : COL_GRAY, false);
 
-            if (isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
+            int nbtBtnX = strictToggleX + 14 + font.width(strictLabel) + 8;
+            String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
+            int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
+            drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, !strictNbt);
+
+            if (isHovering(strictToggleX, y, 54, 14, mx, my)) {
+                g.renderTooltip(font, Component.translatable(strictNbt
+                        ? "gui.logisticsnetworks.filter.detail.nbt.strict.on"
+                        : "gui.logisticsnetworks.filter.detail.nbt.strict.off"), mx, my);
+            }
+
+            if (strictNbt && isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
+                g.renderTooltip(font,
+                        Component.translatable("gui.logisticsnetworks.filter.detail.nbt.edit.disabled"), mx, my);
+            } else if (isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
                 List<FilterItemData.SlotNbtRule> hoverRules = menu.getSlotNbtRules(detailEditSlot);
                 if (!hoverRules.isEmpty()) {
                     List<Component> tipLines = new ArrayList<>();
@@ -3517,10 +3533,20 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (!isFluidOrChemical) {
             int nbtY = stockY + DETAIL_SECTION_H;
 
-            int nbtBtnX = contentX + labelW;
+            int strictToggleX = contentX + labelW;
+            boolean strictNbt = menu.isEntryNbtStrict(detailEditSlot);
+            if (isHovering(strictToggleX, nbtY, 54, 14, (int) mx, (int) my)) {
+                boolean next = !strictNbt;
+                ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, next));
+                menu.setEntryNbtStrict(detailEditSlot, next);
+                return true;
+            }
+
+            String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
+            int nbtBtnX = strictToggleX + 14 + font.width(strictLabel) + 8;
             String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
-            int nbtBtnW = Math.max(70, font.width(nbtBtnLabel) + 8);
-            if (isHovering(nbtBtnX, nbtY, nbtBtnW, 14, (int) mx, (int) my)) {
+            int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
+            if (!strictNbt && isHovering(nbtBtnX, nbtY, nbtBtnW, 14, (int) mx, (int) my)) {
                 detailNbtPageOpen = true;
                 detailNbtScrollOffset = 0;
                 detailNbtInputBox.active = true;
@@ -3803,6 +3829,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         String valueOverride = detailNbtValueBox.getValue().trim();
         String fallbackValue = valueOverride.isEmpty() ? entry.valueDisplay() : valueOverride;
+        if (menu.isEntryNbtStrict(detailEditSlot)) {
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, false));
+            menu.setEntryNbtStrict(detailEditSlot, false);
+        }
         ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(detailEditSlot, entry.path(), opSymbol, fallbackValue));
         menu.addSlotNbtRule(minecraft.player, detailEditSlot, entry.path(), opSymbol, fallbackValue);
 
@@ -3903,6 +3933,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             String nbtVal = detailNbtInputBox.getValue().replace("\n", " ").trim();
             String existingRaw = FilterItemData.getEntryNbtRaw(menu.getOpenedStack(), detailEditSlot);
             if (!nbtVal.isEmpty() && !nbtVal.equals(existingRaw)) {
+                if (menu.isEntryNbtStrict(detailEditSlot)) {
+                    ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, false));
+                    menu.setEntryNbtStrict(detailEditSlot, false);
+                }
                 ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setRaw(detailEditSlot, nbtVal));
             } else if (nbtVal.isEmpty() && existingRaw != null) {
                 ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(detailEditSlot));
