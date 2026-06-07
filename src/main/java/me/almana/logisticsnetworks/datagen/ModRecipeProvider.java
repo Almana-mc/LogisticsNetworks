@@ -1,19 +1,31 @@
 package me.almana.logisticsnetworks.datagen;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
+import me.almana.logisticsnetworks.recipe.GuideRecipe;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.PackOutput;
+import net.minecraft.data.recipes.RecipeBuilder;
 import net.minecraft.data.recipes.RecipeCategory;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.data.recipes.SpecialRecipeBuilder;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.neoforged.neoforge.common.conditions.ModLoadedCondition;
 
 public class ModRecipeProvider extends RecipeProvider {
 
@@ -68,6 +80,37 @@ public class ModRecipeProvider extends RecipeProvider {
 
         SpecialRecipeBuilder.special(() -> FilterCopyClearRecipe.INSTANCE)
                 .save(output, "logisticsnetworks:filter_copy_clear");
+
+        guideRecipe();
+    }
+
+    private void guideRecipe() {
+        Item guideItem = BuiltInRegistries.ITEM
+                .getOptional(Identifier.fromNamespaceAndPath("guideme", "guide")).orElse(null);
+        DataComponentType<?> guideIdType = BuiltInRegistries.DATA_COMPONENT_TYPE
+                .getOptional(Identifier.fromNamespaceAndPath("guideme", "guide_id")).orElse(null);
+        if (guideItem == null || guideIdType == null) {
+            return;
+        }
+
+        @SuppressWarnings("unchecked")
+        DataComponentType<Identifier> idType = (DataComponentType<Identifier>) guideIdType;
+        DataComponentPatch patch = DataComponentPatch.builder()
+                .set(idType, Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "guide"))
+                .build();
+        ItemStackTemplate result = new ItemStackTemplate(guideItem, patch);
+
+        RecipeOutput guideOutput = output.withConditions(new ModLoadedCondition("guideme"));
+        ResourceKey<Recipe<?>> id = ResourceKey.create(Registries.RECIPE,
+                Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "guide"));
+
+        GuideRecipe recipe = new GuideRecipe(
+                RecipeBuilder.createCraftingCommonInfo(true),
+                RecipeBuilder.createCraftingBookInfo(RecipeCategory.MISC, null),
+                result,
+                List.of(Ingredient.of(Items.PAPER), Ingredient.of(Registration.WRENCH.get())));
+
+        guideOutput.accept(id, recipe, null);
     }
 
     private void upgrade(Item result, Item corner) {

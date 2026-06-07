@@ -1,0 +1,20 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "neoforge:mod_loaded",
+      "modid": "guideme"
+    }
+  ],
+  "type": "logisticsnetworks:guide",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:paper",
+    "logisticsnetworks:wrench"
+  ],
+  "result": {
+    "components": {
+      "guideme:guide_id": "logisticsnetworks:guide"
+    },
+    "id": "guideme:guide"
+  }
+}
