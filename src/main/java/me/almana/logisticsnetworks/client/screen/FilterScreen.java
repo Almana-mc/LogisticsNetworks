@@ -10,7 +10,6 @@ import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
-import me.almana.logisticsnetworks.filter.SlotFilterData;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
@@ -79,8 +78,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private EditBox manualInputBox;
     private boolean isDropdownOpen = false;
     private int listScrollOffset = 0;
-    private boolean slotInfoOpen = false;
-    private int slotInfoPage = 0;
     private boolean amountInfoOpen = false;
     private int amountInfoPage = 0;
     private boolean flushedTextOnClose = false;
@@ -278,14 +275,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             if (!manualInputBox.isFocused() && !manualInputBox.getValue().equals(getCurrentTargetValue())) {
                 manualInputBox.setValue(getCurrentTargetValue());
             }
-        } else if (menu.isSlotMode()) {
-            manualInputBox.setVisible(true);
-            manualInputBox.setHint(fitHint(
-                    Component.translatable("gui.logisticsnetworks.filter.slot.input_hint"),
-                    imageWidth - 16));
-            if (!manualInputBox.isFocused() && !manualInputBox.getValue().equals(getCurrentTargetValue())) {
-                manualInputBox.setValue(getCurrentTargetValue());
-            }
         } else {
             manualInputBox.setVisible(false);
             if (manualInputBox.isFocused()) {
@@ -293,10 +282,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             }
         }
 
-        if (!menu.isSlotMode()) {
-            slotInfoOpen = false;
-            slotInfoPage = 0;
-        }
         amountInfoOpen = false;
         amountInfoPage = 0;
 
@@ -321,8 +306,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return Objects.requireNonNullElse(menu.getSelectedMod(), "");
         if (menu.isNameMode())
             return Objects.requireNonNullElse(menu.getNameFilter(), "");
-        if (menu.isSlotMode())
-            return Objects.requireNonNullElse(menu.getSlotExpression(), "");
         return "";
     }
 
@@ -432,8 +415,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (menu.isModMode())
             renderModMode(g, mx, my);
-        else if (menu.isSlotMode())
-            renderSlotMode(g, mx, my);
         else if (menu.isNameMode())
             renderNameMode(g, mx, my);
         else
@@ -633,98 +614,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             String text = scrollText(item, w - 4, i);
             g.drawString(font, text, x + 2, rowY + 2, isSelected ? COL_ACCENT : COL_WHITE, false);
         }
-        g.pose().popPose();
-    }
-
-    private void renderSlotMode(GuiGraphics g, int mx, int my) {
-        int contentX = leftPos + 8;
-        int contentW = imageWidth - 16;
-        int inputY = topPos + 34;
-        int activeY = topPos + 52;
-        int hintY = topPos + 62;
-        int infoBtnX = leftPos + imageWidth - 8 - 12;
-        int infoBtnY = topPos + 6;
-        int infoBtnSize = 12;
-
-        drawButton(g, infoBtnX, infoBtnY, infoBtnSize, infoBtnSize,
-                Component.translatable("gui.logisticsnetworks.filter.info.icon").getString(), mx, my, true);
-
-        renderModeControls(g, mx, my, false);
-
-        manualInputBox.setX(contentX);
-        manualInputBox.setY(inputY);
-        manualInputBox.setWidth(contentW);
-
-        String value = menu.getSlotExpression();
-        String display = value.isEmpty()
-                ? Component.translatable("gui.logisticsnetworks.filter.slot.none").getString()
-                : value;
-        String activeLine = Component.translatable("gui.logisticsnetworks.filter.slot.active", display).getString();
-        g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, COL_ACCENT, false);
-
-        String hintLine = Component
-                .translatable("gui.logisticsnetworks.filter.slot.hint", SlotFilterData.MIN_SLOT,
-                        SlotFilterData.MAX_SLOT)
-                .getString();
-        g.drawString(font, font.plainSubstrByWidth(hintLine, contentW), contentX, hintY, COL_GRAY, false);
-
-        if (slotInfoOpen) {
-            renderSlotInfoOverlay(g, mx, my);
-        }
-    }
-
-    private void renderSlotInfoOverlay(GuiGraphics g, int mx, int my) {
-        int x = leftPos + 8;
-        int y = topPos + 16;
-        int w = imageWidth - 16;
-        int maxBottom = topPos + menu.getPlayerInventoryY() - 14;
-        int h = Math.max(68, maxBottom - y);
-        if (y + h > maxBottom) {
-            h = Math.max(40, maxBottom - y);
-        }
-        int pad = 4;
-
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 300);
-        g.fill(x, y, x + w, y + h, 0xF0101010);
-        g.renderOutline(x, y, w, h, COL_BORDER);
-
-        String titleKey = slotInfoPage == 0
-                ? "gui.logisticsnetworks.filter.slot.info.export.title"
-                : "gui.logisticsnetworks.filter.slot.info.import.title";
-        g.drawString(font, Component.translatable(titleKey), x + pad, y + pad, COL_WHITE, false);
-
-        Component line1 = Component.translatable(slotInfoPage == 0
-                ? "gui.logisticsnetworks.filter.slot.info.export.p1"
-                : "gui.logisticsnetworks.filter.slot.info.import.p1");
-        Component line2 = Component.translatable(slotInfoPage == 0
-                ? "gui.logisticsnetworks.filter.slot.info.export.p2"
-                : "gui.logisticsnetworks.filter.slot.info.import.p2");
-
-        int navY = y + h - 16;
-        int textY = y + pad + 11;
-        int textW = w - pad * 2;
-        int maxTextBottom = navY - 2;
-        for (var part : font.split(line1, textW)) {
-            if (textY + 8 > maxTextBottom) {
-                break;
-            }
-            g.drawString(font, part, x + pad, textY, COL_GRAY, false);
-            textY += 9;
-        }
-        for (var part : font.split(line2, textW)) {
-            if (textY + 8 > maxTextBottom) {
-                break;
-            }
-            g.drawString(font, part, x + pad, textY, COL_GRAY, false);
-            textY += 9;
-        }
-
-        int prevX = x + w - 40;
-        int nextX = x + w - 22;
-        drawButton(g, prevX, navY, 14, 12, "<", mx, my, slotInfoPage > 0);
-        drawButton(g, nextX, navY, 14, 12, ">", mx, my, slotInfoPage < 1);
-
         g.pose().popPose();
     }
 
@@ -1019,8 +908,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         boolean handled = false;
         if (menu.isModMode())
             handled = handleModClick(mx, my, btn);
-        else if (menu.isSlotMode())
-            handled = handleSlotClick(mx, my, btn);
         else if (menu.isNameMode())
             handled = handleNameClick(mx, my, btn);
         else {
@@ -1092,9 +979,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private boolean isHoveringManualInput(double mx, double my) {
         if (menu.isModMode()) {
             return isHovering(getSelectorInputX(), getSelectorInputY(), getSelectorInputWidth(), 14, (int) mx, (int) my);
-        }
-        if (menu.isSlotMode()) {
-            return isHovering(leftPos + 8, topPos + 34, imageWidth - 16, 14, (int) mx, (int) my);
         }
         if (menu.isNameMode()) {
             return isHovering(leftPos + 8, topPos + 38, imageWidth - 16, 14, (int) mx, (int) my);
@@ -1200,66 +1084,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return false;
     }
 
-    private boolean handleSlotClick(double mx, double my, int btn) {
-        int contentX = leftPos + 8;
-        int inputY = topPos + 34;
-        int contentW = imageWidth - 16;
-        int infoBtnX = leftPos + imageWidth - 8 - 12;
-        int infoBtnY = topPos + 6;
-        int infoBtnSize = 12;
-
-        if (isHovering(infoBtnX, infoBtnY, infoBtnSize, infoBtnSize, (int) mx, (int) my)) {
-            slotInfoOpen = !slotInfoOpen;
-            return true;
-        }
-
-        if (handleModeControlClick(mx, my, false))
-            return true;
-
-        if (slotInfoOpen) {
-            int x = leftPos + 8;
-            int y = topPos + 16;
-            int w = imageWidth - 16;
-            int maxBottom = topPos + menu.getPlayerInventoryY() - 14;
-            int h = Math.max(68, maxBottom - y);
-            if (y + h > maxBottom) {
-                h = Math.max(40, maxBottom - y);
-            }
-            int navY = y + h - 16;
-            int prevX = x + w - 40;
-            int nextX = x + w - 22;
-
-            if (isHovering(prevX, navY, 14, 12, (int) mx, (int) my) && slotInfoPage > 0) {
-                slotInfoPage--;
-                return true;
-            }
-            if (isHovering(nextX, navY, 14, 12, (int) mx, (int) my) && slotInfoPage < 1) {
-                slotInfoPage++;
-                return true;
-            }
-
-            if (isHovering(x, y, w, h, (int) mx, (int) my)) {
-                return true;
-            }
-
-            // Click outside info panel = close it
-            slotInfoOpen = false;
-            return true;
-        }
-
-        if (handleManualInputClick(mx, my, btn)) {
-            return true;
-        }
-
-        if (btn == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
-            manualInputBox.setValue("");
-            sendSlotUpdate("");
-            return true;
-        }
-
-        return false;
-    }
-
     private boolean handleDurabilityClick(double mx, double my, int btn) {
         return false;
     }
@@ -1277,10 +1101,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private void sendModRemove(String mod) {
         menu.setSelectedMod(null);
         ClientPacketDistributor.sendToServer(new ModifyFilterModPayload(mod == null ? "" : mod, true));
-    }
-
-    private void sendSlotUpdate(String expression) {
-        ClientPacketDistributor.sendToServer(new SetSlotFilterSlotsPayload(expression == null ? "" : expression));
     }
 
     private void sendNameUpdate(String name) {
@@ -1453,8 +1273,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             }
         } else if (menu.isNameMode()) {
             sendNameUpdate(val);
-        } else if (menu.isSlotMode()) {
-            sendSlotUpdate(val);
         }
     }
 
@@ -1606,7 +1424,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return true;
         }
 
-        if (!menu.isModMode() && !menu.isSlotMode() && !menu.isNameMode()) {
+        if (!menu.isModMode() && !menu.isNameMode()) {
             int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
             if (hoveredSlot >= 0 && hasEntryInSlot(hoveredSlot)) {
                 int current = menu.getEntryAmount(hoveredSlot);
@@ -1752,7 +1570,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     public boolean supportsGhostIngredientTargets() {
         if (detailEditSlot >= 0) return false;
-        return !menu.isModMode() && !menu.isSlotMode() && !menu.isNameMode();
+        return !menu.isModMode() && !menu.isNameMode();
     }
 
     public int getGhostFilterSlotCount() {

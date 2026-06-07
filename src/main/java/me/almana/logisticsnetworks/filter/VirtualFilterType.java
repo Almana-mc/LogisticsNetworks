@@ -12,8 +12,7 @@ public enum VirtualFilterType {
     MEDIUM,
     BIG,
     MOD,
-    NAME,
-    SLOT;
+    NAME;
 
     public static VirtualFilterType fromOrdinal(int ordinal) {
         VirtualFilterType[] values = values();
@@ -26,9 +25,6 @@ public enum VirtualFilterType {
     public static VirtualFilterType fromStack(ItemStack stack) {
         if (stack.isEmpty()) {
             return SMALL;
-        }
-        if (SlotFilterData.isSlotFilterItem(stack)) {
-            return SLOT;
         }
         if (stack.is(Registration.BIG_FILTER.get())) {
             return BIG;
@@ -57,8 +53,7 @@ public enum VirtualFilterType {
             case MEDIUM -> BIG;
             case BIG -> MOD;
             case MOD -> NAME;
-            case NAME -> SLOT;
-            case SLOT -> SMALL;
+            case NAME -> SMALL;
         };
     }
 
@@ -69,16 +64,12 @@ public enum VirtualFilterType {
             case BIG -> new ItemStack(Registration.BIG_FILTER.get());
             case MOD -> new ItemStack(Registration.MOD_FILTER.get());
             case NAME -> new ItemStack(Registration.NAME_FILTER.get());
-            case SLOT -> new ItemStack(Registration.SMALL_FILTER.get());
         };
-        if (this == SLOT) {
-            SlotFilterData.markSlotFilter(stack);
-        }
         return stack;
     }
 
     public boolean isSpecial() {
-        return this == MOD || this == NAME || this == SLOT;
+        return this == MOD || this == NAME;
     }
 
     public String translationKey() {
@@ -88,7 +79,6 @@ public enum VirtualFilterType {
             case BIG -> "gui.logisticsnetworks.node.filter.type.big";
             case MOD -> "gui.logisticsnetworks.node.filter.type.mod";
             case NAME -> "gui.logisticsnetworks.node.filter.type.name";
-            case SLOT -> "gui.logisticsnetworks.node.filter.type.slot";
         };
     }
 }

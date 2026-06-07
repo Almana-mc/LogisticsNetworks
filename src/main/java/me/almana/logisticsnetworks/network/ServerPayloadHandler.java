@@ -548,7 +548,6 @@ public class ServerPayloadHandler {
 
             VirtualFilterType type = VirtualFilterType.fromStack(stack);
             boolean isMod = type == VirtualFilterType.MOD;
-            boolean isSlot = type == VirtualFilterType.SLOT;
             boolean isName = type == VirtualFilterType.NAME;
             boolean isSpecial = type.isSpecial();
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
@@ -568,7 +567,7 @@ public class ServerPayloadHandler {
                         buf.writeBoolean(false);
                         buf.writeBoolean(false);
                         buf.writeBoolean(isMod);
-                        buf.writeBoolean(isSlot);
+                        buf.writeBoolean(false);
                         buf.writeBoolean(isName);
                     });
         });
@@ -692,18 +691,6 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleSetSlotFilterSlots(SetSlotFilterSlotsPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof FilterMenu menu && menu.isSlotMode()) {
-                boolean ok = menu.setSlotExpression((Player) context.player(), payload.expression());
-                if (!ok && context.player() instanceof ServerPlayer player) {
-                    WrenchItem.sendPlayerMessage(player,
-                            Component.translatable("message.logisticsnetworks.filter.slot.invalid"), true);
-                }
-            }
-        });
-    }
-
     public static void handleSetFilterFluidEntry(SetFilterFluidEntryPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
@@ -776,15 +763,14 @@ public class ServerPayloadHandler {
                 return;
 
             boolean isMod = stack.getItem() instanceof ModFilterItem;
-            boolean isSlot = SlotFilterData.isSlotFilterItem(stack);
             boolean isName = stack.getItem() instanceof NameFilterItem;
-            boolean isSpecial = isMod || isSlot || isName;
+            boolean isSpecial = isMod || isName;
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
 
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new FilterMenu(id, inv, slotIndex),
                     stack.getHoverName()),
-                    buf -> FilterMenu.writeMenuData(buf, slotIndex, slotCount, isMod, isSlot, isName));
+                    buf -> FilterMenu.writeMenuData(buf, slotIndex, slotCount, isMod, false, isName));
         });
     }
 
@@ -798,7 +784,7 @@ public class ServerPayloadHandler {
     }
 
     private static boolean isSpecialMode(FilterMenu menu) {
-        return menu.isModMode() || menu.isSlotMode() || menu.isNameMode();
+        return menu.isModMode() || menu.isNameMode();
     }
 
     private static ItemStack findOpenFilterStack(Player player, java.util.function.Predicate<ItemStack> matcher) {

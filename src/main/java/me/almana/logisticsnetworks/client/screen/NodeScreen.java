@@ -18,7 +18,6 @@ import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.ModFilterData;
 import me.almana.logisticsnetworks.filter.NameFilterData;
-import me.almana.logisticsnetworks.filter.SlotFilterData;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
@@ -1060,7 +1059,6 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             case SMALL, MEDIUM, BIG -> !FilterItemData.hasAnyEntries(stack);
             case MOD -> !ModFilterData.hasAnyMods(stack);
             case NAME -> !NameFilterData.hasNameFilter(stack);
-            case SLOT -> !SlotFilterData.hasAnySlots(stack);
         };
     }
 
