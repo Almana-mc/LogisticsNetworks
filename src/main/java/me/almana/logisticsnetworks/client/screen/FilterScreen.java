@@ -4061,7 +4061,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (slot >= menu.slots.size()) return false;
         if (!menu.slots.get(slot).getItem().isEmpty()) return false;
         if (menu.isTagSlot(slot)) return false;
-        return menu.getEntryBatch(slot) > 0 || menu.getEntryStock(slot) > 0;
+        return menu.getEntryBatch(slot) > 0 || menu.getEntryStock(slot) > 0
+                || FilterItemData.hasEntrySlotMapping(menu.getOpenedStack(), slot);
     }
 
     private void cycleDurabilityOp() {
@@ -4135,7 +4136,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         } else if (!slotItem.isEmpty()) {
             Identifier itemId = BuiltInRegistries.ITEM.getKey(slotItem.getItem());
             lines.add(Component.literal(itemId.toString()).withStyle(ChatFormatting.WHITE));
-        } else if (isNbtOnly || batch > 0 || stock > 0) {
+        } else if (isNbtOnly || batch > 0 || stock > 0
+                || FilterItemData.hasEntrySlotMapping(filterStack, slot)) {
             lines.add(Component.literal("Any Item").withStyle(ChatFormatting.AQUA));
         } else {
             return lines;
