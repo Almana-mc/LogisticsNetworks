@@ -543,9 +543,12 @@ public class FilterMenu extends AbstractContainerMenu {
     public void setEntrySlotMapping(Player player, int slot, String expression) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
-        java.util.BitSet parsed = SlotExpressionUtil.parseSlots(expression);
-        FilterItemData.setEntrySlotMapping(getOpenedStack(), slot,
-                parsed != null ? SlotExpressionUtil.bitSetToList(parsed).stream().mapToInt(Integer::intValue).toArray() : null);
+        boolean invert = SlotExpressionUtil.isInverted(expression);
+        java.util.BitSet parsed = SlotExpressionUtil.parseSlots(SlotExpressionUtil.stripInvert(expression));
+        int[] slots = parsed != null
+                ? SlotExpressionUtil.bitSetToList(parsed).stream().mapToInt(Integer::intValue).toArray()
+                : null;
+        FilterItemData.setEntrySlotMapping(getOpenedStack(), slot, slots, invert);
         broadcastChanges();
     }
 
