@@ -546,6 +546,16 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 g.drawString(font, "E", bx, by, 0xFFDD88FF, true);
                 g.pose().popPose();
             }
+
+            if (FilterItemData.hasEntrySlotMapping(openedStack, i)) {
+                g.pose().pushPose();
+                g.pose().translate(0, 0, 300);
+                g.pose().scale(0.5f, 0.5f, 1.0f);
+                int bx = (int) ((sx + 12) / 0.5f);
+                int by = (int) ((sy + 12) / 0.5f);
+                g.drawString(font, "S", bx, by, 0xFFAA88FF, true);
+                g.pose().popPose();
+            }
         }
     }
 

@@ -1161,6 +1161,8 @@ public class FilterMenu extends AbstractContainerMenu {
                 // data lives in NBT already
             } else if (FilterItemData.isNbtOnlySlot(stack, i)) {
                 // nbt-only entries preserved in-place
+            } else if (filterInventory.getItem(i).isEmpty() && FilterItemData.hasEntrySlotMapping(stack, i)) {
+                // slot-only entries preserved in-place
             } else if (isFluidSlot[i]) {
                 FluidStack fluid = FilterItemData.getFluidEntry(stack, i);
                 FilterItemData.setFluidEntry(stack, i, fluid);
