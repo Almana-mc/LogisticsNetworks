@@ -1734,6 +1734,174 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 menu.isSlotNbtMatchAny(slot), rules);
     }
 
+    private boolean pasteOpenFilter() {
+        flushOpenEditors();
+
+        if (copiedFilter == null) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.empty");
+            return true;
+        }
+
+        if (menu.isModMode()) {
+            return pasteModFilter();
+        }
+
+        if (menu.isNameMode()) {
+            return pasteNameFilter();
+        }
+
+        if (copiedFilter.modMode() || copiedFilter.nameMode()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
+
+        pasteStandardFilter();
+        return true;
+    }
+
+    private boolean pasteModFilter() {
+        if (!copiedFilter.modMode()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
+        syncHeaderModes(copiedFilter.blacklist(), copiedFilter.targetType());
+        String current = menu.getSelectedMod();
+        if (current != null && !current.isBlank()) {
+            sendModRemove(current);
+        }
+        if (copiedFilter.selectedMod() != null && !copiedFilter.selectedMod().isBlank()) {
+            sendModUpdate(copiedFilter.selectedMod());
+            manualInputBox.setValue(copiedFilter.selectedMod());
+        } else {
+            manualInputBox.setValue("");
+        }
+        showFilterMessage("message.logisticsnetworks.filter.paste.success");
+        return true;
+    }
+
+    private boolean pasteNameFilter() {
+        if (!copiedFilter.nameMode()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
+        syncHeaderModes(copiedFilter.blacklist(), copiedFilter.targetType());
+        sendNameUpdate(copiedFilter.nameFilter());
+        menu.setNameFilter(copiedFilter.nameFilter());
+        manualInputBox.setValue(copiedFilter.nameFilter());
+        syncNameScope(copiedFilter.nameScope());
+        showFilterMessage("message.logisticsnetworks.filter.paste.success");
+        return true;
+    }
+
+    private void pasteStandardFilter() {
+        syncHeaderModes(copiedFilter.blacklist(), copiedFilter.targetType());
+
+        int copied = Math.min(menu.getFilterSlots(), copiedFilter.entries().size());
+        for (int slot = 0; slot < menu.getFilterSlots(); slot++) {
+            menu.clearFilterEntry(slot);
+            ClientPacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, ItemStack.EMPTY));
+            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, ""));
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(slot));
+            ClientPacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
+            ClientPacketDistributor.sendToServer(new SetFilterEntryEnchantedPayload(slot, false, false));
+            ClientPacketDistributor.sendToServer(new SetFilterEntrySlotMappingPayload(slot, ""));
+            ClientPacketDistributor.sendToServer(new SetFilterEntryAmountPayload(slot, 0, 0));
+        }
+
+        for (int slot = 0; slot < copied; slot++) {
+            pasteEntry(slot, copiedFilter.entries().get(slot));
+        }
+
+        if (copied < copiedFilter.sourceSlots()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.partial", copied, copiedFilter.sourceSlots());
+        } else {
+            showFilterMessage("message.logisticsnetworks.filter.paste.success");
+        }
+    }
+
+    private void pasteEntry(int slot, FilterEntrySnapshot entry) {
+        if (entry.tag() != null) {
+            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, entry.tag()));
+            menu.setEntryTag(minecraft.player, slot, entry.tag());
+        } else if (!entry.fluid().isEmpty()) {
+            setFluidFilterEntry(minecraft.player, slot, entry.fluid());
+        } else if (entry.chemicalId() != null && !entry.chemicalId().isBlank()) {
+            setChemicalFilterEntry(minecraft.player, slot, entry.chemicalId());
+        } else if (!entry.item().isEmpty()) {
+            setItemFilterEntry(minecraft.player, slot, entry.item());
+        }
+
+        if (entry.batch() > 0 || entry.stock() > 0) {
+            menu.setEntryBatch(minecraft.player, slot, entry.batch());
+            menu.setEntryStock(minecraft.player, slot, entry.stock());
+            ClientPacketDistributor.sendToServer(new SetFilterEntryAmountPayload(slot, entry.batch(), entry.stock()));
+        }
+
+        if (entry.slotExpression() != null && !entry.slotExpression().isBlank()) {
+            menu.setEntrySlotMapping(minecraft.player, slot, entry.slotExpression());
+            ClientPacketDistributor.sendToServer(new SetFilterEntrySlotMappingPayload(slot, entry.slotExpression()));
+        }
+
+        if (entry.enchanted() != null) {
+            menu.setEntryEnchanted(minecraft.player, slot, entry.enchanted());
+            ClientPacketDistributor.sendToServer(new SetFilterEntryEnchantedPayload(slot, true, entry.enchanted()));
+        }
+
+        if (entry.durabilityOp() != null && !entry.durabilityOp().isBlank()) {
+            menu.setEntryDurability(minecraft.player, slot, entry.durabilityOp(), entry.durabilityValue());
+            ClientPacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, entry.durabilityOp(),
+                    entry.durabilityValue()));
+        }
+
+        pasteNbt(slot, entry);
+    }
+
+    private void pasteNbt(int slot, FilterEntrySnapshot entry) {
+        if (entry.strictNbt()) {
+            menu.setEntryNbtStrict(slot, true);
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(slot, true));
+        }
+
+        if (entry.rawNbt() != null && !entry.rawNbt().isBlank()) {
+            menu.setEntryNbtRaw(minecraft.player, slot, "", entry.rawNbt());
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setRaw(slot, entry.rawNbt()));
+        }
+
+        for (FilterItemData.SlotNbtRule rule : entry.nbtRules()) {
+            String value = rule.value() == null ? "" : rule.value().toString();
+            menu.addSlotNbtRule(minecraft.player, slot, rule.path(), rule.operator(), value);
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(slot, rule.path(), rule.operator(), value));
+        }
+
+        if (entry.nbtMatchAny() != menu.isSlotNbtMatchAny(slot)) {
+            menu.toggleSlotNbtMatchMode(slot);
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.toggleMatch(slot));
+        }
+    }
+
+    private void syncHeaderModes(boolean blacklist, FilterTargetType targetType) {
+        if (minecraft == null || minecraft.gameMode == null) {
+            return;
+        }
+        if (menu.isBlacklistMode() != blacklist) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
+        }
+        FilterTargetType[] types = FilterTargetType.values();
+        int presses = ((targetType.ordinal() - menu.getTargetType().ordinal()) % types.length + types.length)
+                % types.length;
+        for (int i = 0; i < presses; i++) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
+        }
+    }
+
+    private void syncNameScope(NameMatchScope scope) {
+        int guard = 0;
+        while (menu.getNameMatchScope() != scope && guard++ < NameMatchScope.values().length
+                && minecraft != null && minecraft.gameMode != null) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
+        }
+    }
+
     public boolean isDetailPageOpen() {
         return detailEditSlot >= 0 && !detailNbtPageOpen;
     }
