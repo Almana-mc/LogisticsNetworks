@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.client.screen;
 
 import com.mojang.blaze3d.platform.InputConstants;
 
+import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
@@ -9,6 +10,7 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NameFilterData;
+import me.almana.logisticsnetworks.filter.NameMatchScope;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.ChatFormatting;
@@ -16,6 +18,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.util.Mth;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.tags.TagKey;
 
 import me.almana.logisticsnetworks.menu.FilterMenu;
@@ -74,6 +77,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private static final int COL_BTN_BG = 0xFF2A2A2A;
     private static final int COL_BTN_HOVER = 0xFF3A3A3A;
     private static final int COL_BTN_BORDER = 0xFF4A4A4A;
+
+    private static final Identifier COPY_ICON = Identifier.fromNamespaceAndPath(
+            Logisticsnetworks.MOD_ID, "textures/gui/filter_copy.png");
+    private static final Identifier PASTE_ICON = Identifier.fromNamespaceAndPath(
+            Logisticsnetworks.MOD_ID, "textures/gui/filter_paste.png");
+    private static final int CLIPBOARD_BUTTON_SIZE = 12;
+    private static final int CLIPBOARD_BUTTON_GAP = 2;
+    private static FilterClipboardSnapshot copiedFilter;
 
     private EditBox manualInputBox;
     private boolean isDropdownOpen = false;
@@ -153,6 +164,35 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private static final int DETAIL_SLOT_COLOR = 0xFFBB88FF;
 
     private record NbtRow(boolean heading, String display, int entryIdx, String group) {}
+
+    private record FilterClipboardSnapshot(
+            boolean modMode,
+            boolean nameMode,
+            boolean blacklist,
+            FilterTargetType targetType,
+            String selectedMod,
+            String nameFilter,
+            NameMatchScope nameScope,
+            List<FilterEntrySnapshot> entries,
+            int sourceSlots) {
+    }
+
+    private record FilterEntrySnapshot(
+            ItemStack item,
+            FluidStack fluid,
+            String chemicalId,
+            String tag,
+            int batch,
+            int stock,
+            String slotExpression,
+            String durabilityOp,
+            int durabilityValue,
+            Boolean enchanted,
+            String rawNbt,
+            boolean strictNbt,
+            boolean nbtMatchAny,
+            List<FilterItemData.SlotNbtRule> nbtRules) {
+    }
     private List<NbtRow> nbtRows = new ArrayList<>();
     private Set<String> nbtCollapsedGroups = new HashSet<>();
 
@@ -352,6 +392,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return;
         }
 
+        if (renderClipboardTooltip(g, mx, my)) {
+            return;
+        }
+
         renderEntryIndicatorOverlays(g);
 
         if (tagEditSlot >= 0) {
@@ -412,6 +456,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             titleX += BACK_BUTTON_W + 4;
         }
         g.drawString(font, filterTitle(), titleX, topPos + 6, COL_ACCENT, false);
+
+        renderClipboardButtons(g, mx, my);
 
         if (menu.isModMode())
             renderModMode(g, mx, my);
@@ -787,6 +833,54 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, hovered ? COL_WHITE : COL_GRAY);
     }
 
+    private void renderClipboardButtons(GuiGraphics g, int mx, int my) {
+        drawIconButton(g, copyButtonX(), clipboardButtonY(), COPY_ICON, mx, my, true);
+        drawIconButton(g, pasteButtonX(), clipboardButtonY(), PASTE_ICON, mx, my, copiedFilter != null);
+    }
+
+    private void drawIconButton(GuiGraphics g, int x, int y, Identifier icon, int mx, int my, boolean active) {
+        boolean hovered = active && isHovering(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my);
+        g.fill(x, y, x + CLIPBOARD_BUTTON_SIZE, y + CLIPBOARD_BUTTON_SIZE, hovered ? COL_BTN_HOVER : COL_BTN_BG);
+        g.renderOutline(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, hovered ? COL_WHITE : COL_BTN_BORDER);
+        g.blit(icon, x + 2, y + 2, 0f, 0f, 8, 8, 8, 8);
+    }
+
+    private int copyButtonX() {
+        return pasteButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
+    }
+
+    private int pasteButtonX() {
+        return clipboardRightEdge() - CLIPBOARD_BUTTON_SIZE;
+    }
+
+    private int clipboardButtonY() {
+        return topPos + 6;
+    }
+
+    private int clipboardRightEdge() {
+        if (menu.isSpecialMode()) {
+            return leftPos + imageWidth - 8;
+        }
+
+        int rightEdge = leftPos + imageWidth - 8;
+        String modeLabel = menu.isBlacklistMode()
+                ? tr("gui.logisticsnetworks.filter.mode.blacklist")
+                : tr("gui.logisticsnetworks.filter.mode.whitelist");
+        int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
+        int left = rightEdge - modeBtnW;
+
+        if (!menu.isNodeFilter()) {
+            String typeLabel = menu.getTargetType() == FilterTargetType.CHEMICALS
+                    ? tr("gui.logisticsnetworks.filter.target.chemicals")
+                    : menu.getTargetType() == FilterTargetType.FLUIDS
+                            ? tr("gui.logisticsnetworks.filter.target.fluids")
+                            : tr("gui.logisticsnetworks.filter.target.items");
+            left -= Math.max(40, font.width(typeLabel) + 8) + 4;
+        }
+
+        return left - CLIPBOARD_BUTTON_GAP;
+    }
+
     private void drawAmountButton(GuiGraphics g, int x, int y, String label, int mx, int my) {
         int w = Math.max(24, font.width(label) + 10);
         drawButton(g, x - w / 2, y, w, 14, label, mx, my, true);
@@ -881,6 +975,19 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 && isHovering(backButtonX(), backButtonY(), BACK_BUTTON_W, BACK_BUTTON_H, (int) mx, (int) my);
     }
 
+    private boolean handleClipboardButtonClick(double mx, double my, int btn) {
+        if (btn != 0) {
+            return false;
+        }
+        if (isHovering(copyButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, (int) mx, (int) my)) {
+            return copyOpenFilter();
+        }
+        if (isHovering(pasteButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, (int) mx, (int) my)) {
+            return pasteOpenFilter();
+        }
+        return false;
+    }
+
     private boolean returnToNodeScreen() {
         if (!menu.isNodeFilter()) {
             return false;
@@ -895,6 +1002,32 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return minecraft != null
                 && (InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LCONTROL)
                         || InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_RCONTROL));
+    }
+
+    private boolean handleClipboardShortcut(int key) {
+        if (!hasControlDown() || isTextInputFocused()) {
+            return false;
+        }
+        if (key == InputConstants.KEY_C) {
+            return copyOpenFilter();
+        }
+        if (key == InputConstants.KEY_V) {
+            return pasteOpenFilter();
+        }
+        return false;
+    }
+
+    private boolean isTextInputFocused() {
+        return manualInputBox != null && manualInputBox.isFocused()
+                || tagInputBox != null && tagInputBox.isFocused()
+                || nbtValueEditBox != null && nbtValueEditBox.isFocused()
+                || detailIdInputBox != null && detailIdInputBox.isFocused()
+                || detailBatchInputBox != null && detailBatchInputBox.isFocused()
+                || detailStockInputBox != null && detailStockInputBox.isFocused()
+                || detailSlotMappingInputBox != null && detailSlotMappingInputBox.isFocused()
+                || detailDurabilityValueBox != null && detailDurabilityValueBox.isFocused()
+                || detailNbtValueBox != null && detailNbtValueBox.isFocused()
+                || detailNbtInputBox != null && detailNbtInputBox.isFocused();
     }
 
     private boolean hasAltDown() {
@@ -914,6 +1047,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         blurManualInputIfNeeded(mx, my);
         if (btn == 0 && isHoveringBackButton(mx, my)) {
             return returnToNodeScreen();
+        }
+        if (detailEditSlot < 0 && handleClipboardButtonClick(mx, my, btn)) {
+            return true;
         }
         boolean handled = false;
         if (menu.isModMode())
@@ -1249,6 +1385,28 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         wasManualInputFocused = false;
     }
 
+    private void flushOpenEditors() {
+        if (detailEditSlot >= 0) {
+            flushDetailPageInputs();
+        }
+        if (detailNbtPageOpen) {
+            flushNbtSubPage();
+        }
+        if (tagInputBox != null && tagInputBox.isFocused()) {
+            commitTagInput();
+        }
+        if (nbtValueEditBox != null && nbtValueEditBox.isFocused()) {
+            commitNbtValueEdit();
+        }
+        commitManualInput();
+    }
+
+    private void showFilterMessage(String key, Object... args) {
+        if (minecraft != null && minecraft.gui != null) {
+            minecraft.gui.setOverlayMessage(Component.translatable(key, args), false);
+        }
+    }
+
     private boolean handleManualInputClick(double mx, double my, int btn) {
         if (btn != 0 || manualInputBox == null || !manualInputBox.isVisible() || !isHoveringManualInput(mx, my)) {
             return false;
@@ -1301,6 +1459,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (minecraft.options.keyInventory.matches(new net.minecraft.client.input.KeyEvent(key, scan, modifiers))) {
+            return true;
+        }
+        if (handleClipboardShortcut(key)) {
             return true;
         }
         if (key == 256) {
@@ -1509,6 +1670,21 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return 1024;
     }
 
+    private boolean renderClipboardTooltip(GuiGraphics g, int mx, int my) {
+        if (isHovering(copyButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my)) {
+            g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.copy"), mx, my);
+            return true;
+        }
+        if (isHovering(pasteButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my)) {
+            String key = copiedFilter == null
+                    ? "gui.logisticsnetworks.filter.paste.empty"
+                    : "gui.logisticsnetworks.filter.paste";
+            g.renderTooltip(font, Component.translatable(key), mx, my);
+            return true;
+        }
+        return false;
+    }
+
     private void renderModTooltip(GuiGraphics g, int mx, int my) {
         if (isHovering(getSelectorArrowX(), getSelectorInputY(), 12, 14, mx, my)) {
             g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.mod.select_from_item"), mx, my);
@@ -1614,6 +1790,230 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     public void setGhostItemFilterEntry(int slot, ItemStack stack) {
         setItemFilterEntry(minecraft.player, slot, stack);
+    }
+
+    private boolean copyOpenFilter() {
+        flushOpenEditors();
+
+        if (menu.isModMode()) {
+            copiedFilter = new FilterClipboardSnapshot(true, false, menu.isBlacklistMode(), menu.getTargetType(),
+                    menu.getSelectedMod(), "", NameMatchScope.NAME, List.of(), 0);
+            showFilterMessage("message.logisticsnetworks.filter.copy.success");
+            return true;
+        }
+
+        if (menu.isNameMode()) {
+            copiedFilter = new FilterClipboardSnapshot(false, true, menu.isBlacklistMode(), menu.getTargetType(),
+                    null, menu.getNameFilter(), menu.getNameMatchScope(), List.of(), 0);
+            showFilterMessage("message.logisticsnetworks.filter.copy.success");
+            return true;
+        }
+
+        List<FilterEntrySnapshot> entries = new ArrayList<>();
+        ItemStack opened = menu.getOpenedStack();
+        for (int slot = 0; slot < menu.getFilterSlots(); slot++) {
+            entries.add(copyEntry(opened, slot));
+        }
+
+        if (entries.isEmpty()) {
+            showFilterMessage("message.logisticsnetworks.filter.copy.empty");
+            return true;
+        }
+
+        copiedFilter = new FilterClipboardSnapshot(false, false, menu.isBlacklistMode(), menu.getTargetType(),
+                null, "", NameMatchScope.NAME, entries, menu.getFilterSlots());
+        showFilterMessage("message.logisticsnetworks.filter.copy.success");
+        return true;
+    }
+
+    private FilterEntrySnapshot copyEntry(ItemStack opened, int slot) {
+        ItemStack item = slot < menu.slots.size() ? menu.slots.get(slot).getItem().copy() : ItemStack.EMPTY;
+        FluidStack fluid = menu.getFluidFilter(slot).copy();
+        String chemicalId = menu.getChemicalFilter(slot);
+        String tag = menu.getEntryTag(slot);
+        String slotExpression = menu.getEntrySlotMappingExpression(slot);
+        String durabilityOp = FilterItemData.getEntryDurabilityOp(opened, slot);
+        int durabilityValue = FilterItemData.getEntryDurabilityValue(opened, slot);
+        Boolean enchanted = FilterItemData.getEntryEnchanted(opened, slot);
+        String rawNbt = FilterItemData.getEntryNbtRaw(opened, slot);
+        List<FilterItemData.SlotNbtRule> rules = new ArrayList<>();
+
+        for (FilterItemData.SlotNbtRule rule : menu.getSlotNbtRules(slot)) {
+            Tag value = rule.value() == null ? null : rule.value().copy();
+            rules.add(new FilterItemData.SlotNbtRule(rule.path(), rule.operator(), value));
+        }
+
+        return new FilterEntrySnapshot(item, fluid, chemicalId, tag, menu.getEntryBatch(slot), menu.getEntryStock(slot),
+                slotExpression, durabilityOp, durabilityValue, enchanted, rawNbt, menu.isEntryNbtStrict(slot),
+                menu.isSlotNbtMatchAny(slot), rules);
+    }
+
+    private boolean pasteOpenFilter() {
+        flushOpenEditors();
+
+        if (copiedFilter == null) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.empty");
+            return true;
+        }
+
+        if (menu.isModMode()) {
+            return pasteModFilter();
+        }
+
+        if (menu.isNameMode()) {
+            return pasteNameFilter();
+        }
+
+        if (copiedFilter.modMode() || copiedFilter.nameMode()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
+
+        pasteStandardFilter();
+        return true;
+    }
+
+    private boolean pasteModFilter() {
+        if (!copiedFilter.modMode()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
+        syncHeaderModes(copiedFilter.blacklist(), copiedFilter.targetType());
+        String current = menu.getSelectedMod();
+        if (current != null && !current.isBlank()) {
+            sendModRemove(current);
+        }
+        if (copiedFilter.selectedMod() != null && !copiedFilter.selectedMod().isBlank()) {
+            sendModUpdate(copiedFilter.selectedMod());
+            manualInputBox.setValue(copiedFilter.selectedMod());
+        } else {
+            manualInputBox.setValue("");
+        }
+        showFilterMessage("message.logisticsnetworks.filter.paste.success");
+        return true;
+    }
+
+    private boolean pasteNameFilter() {
+        if (!copiedFilter.nameMode()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
+        syncHeaderModes(copiedFilter.blacklist(), copiedFilter.targetType());
+        sendNameUpdate(copiedFilter.nameFilter());
+        menu.setNameFilter(copiedFilter.nameFilter());
+        manualInputBox.setValue(copiedFilter.nameFilter());
+        syncNameScope(copiedFilter.nameScope());
+        showFilterMessage("message.logisticsnetworks.filter.paste.success");
+        return true;
+    }
+
+    private void pasteStandardFilter() {
+        syncHeaderModes(copiedFilter.blacklist(), copiedFilter.targetType());
+
+        int copied = Math.min(menu.getFilterSlots(), copiedFilter.entries().size());
+        for (int slot = 0; slot < menu.getFilterSlots(); slot++) {
+            menu.clearFilterEntry(slot);
+            ClientPacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, ItemStack.EMPTY));
+            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, ""));
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(slot));
+            ClientPacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
+            ClientPacketDistributor.sendToServer(new SetFilterEntryEnchantedPayload(slot, false, false));
+            ClientPacketDistributor.sendToServer(new SetFilterEntrySlotMappingPayload(slot, ""));
+            ClientPacketDistributor.sendToServer(new SetFilterEntryAmountPayload(slot, 0, 0));
+        }
+
+        for (int slot = 0; slot < copied; slot++) {
+            pasteEntry(slot, copiedFilter.entries().get(slot));
+        }
+
+        if (copied < copiedFilter.sourceSlots()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.partial", copied, copiedFilter.sourceSlots());
+        } else {
+            showFilterMessage("message.logisticsnetworks.filter.paste.success");
+        }
+    }
+
+    private void pasteEntry(int slot, FilterEntrySnapshot entry) {
+        if (entry.tag() != null) {
+            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, entry.tag()));
+            menu.setEntryTag(minecraft.player, slot, entry.tag());
+        } else if (!entry.fluid().isEmpty()) {
+            setFluidFilterEntry(minecraft.player, slot, entry.fluid());
+        } else if (entry.chemicalId() != null && !entry.chemicalId().isBlank()) {
+            setChemicalFilterEntry(minecraft.player, slot, entry.chemicalId());
+        } else if (!entry.item().isEmpty()) {
+            setItemFilterEntry(minecraft.player, slot, entry.item());
+        }
+
+        if (entry.batch() > 0 || entry.stock() > 0) {
+            menu.setEntryBatch(minecraft.player, slot, entry.batch());
+            menu.setEntryStock(minecraft.player, slot, entry.stock());
+            ClientPacketDistributor.sendToServer(new SetFilterEntryAmountPayload(slot, entry.batch(), entry.stock()));
+        }
+
+        if (entry.slotExpression() != null && !entry.slotExpression().isBlank()) {
+            menu.setEntrySlotMapping(minecraft.player, slot, entry.slotExpression());
+            ClientPacketDistributor.sendToServer(new SetFilterEntrySlotMappingPayload(slot, entry.slotExpression()));
+        }
+
+        if (entry.enchanted() != null) {
+            menu.setEntryEnchanted(minecraft.player, slot, entry.enchanted());
+            ClientPacketDistributor.sendToServer(new SetFilterEntryEnchantedPayload(slot, true, entry.enchanted()));
+        }
+
+        if (entry.durabilityOp() != null && !entry.durabilityOp().isBlank()) {
+            menu.setEntryDurability(minecraft.player, slot, entry.durabilityOp(), entry.durabilityValue());
+            ClientPacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, entry.durabilityOp(),
+                    entry.durabilityValue()));
+        }
+
+        pasteNbt(slot, entry);
+    }
+
+    private void pasteNbt(int slot, FilterEntrySnapshot entry) {
+        if (entry.strictNbt()) {
+            menu.setEntryNbtStrict(slot, true);
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(slot, true));
+        }
+
+        if (entry.rawNbt() != null && !entry.rawNbt().isBlank()) {
+            menu.setEntryNbtRaw(minecraft.player, slot, "", entry.rawNbt());
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setRaw(slot, entry.rawNbt()));
+        }
+
+        for (FilterItemData.SlotNbtRule rule : entry.nbtRules()) {
+            String value = rule.value() == null ? "" : rule.value().toString();
+            menu.addSlotNbtRule(minecraft.player, slot, rule.path(), rule.operator(), value);
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(slot, rule.path(), rule.operator(), value));
+        }
+
+        if (entry.nbtMatchAny() != menu.isSlotNbtMatchAny(slot)) {
+            menu.toggleSlotNbtMatchMode(slot);
+            ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.toggleMatch(slot));
+        }
+    }
+
+    private void syncHeaderModes(boolean blacklist, FilterTargetType targetType) {
+        if (minecraft == null || minecraft.gameMode == null) {
+            return;
+        }
+        if (menu.isBlacklistMode() != blacklist) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
+        }
+        FilterTargetType[] types = FilterTargetType.values();
+        int presses = ((targetType.ordinal() - menu.getTargetType().ordinal()) % types.length + types.length)
+                % types.length;
+        for (int i = 0; i < presses; i++) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
+        }
+    }
+
+    private void syncNameScope(NameMatchScope scope) {
+        int guard = 0;
+        while (menu.getNameMatchScope() != scope && guard++ < NameMatchScope.values().length
+                && minecraft != null && minecraft.gameMode != null) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
+        }
     }
 
     public boolean isDetailPageOpen() {

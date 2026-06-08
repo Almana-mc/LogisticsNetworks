@@ -106,6 +106,27 @@ Every slot in a Small, Medium, or Big filter's main grid is more than a single-i
 
 Leave Batch or Stock at `0` to fall back to the channel settings or disable the threshold.
 
-## Copying Filters
+## Copy & Paste a Filter
 
-Filter configurations are copied with node copy/paste, labelled-node sync, and `.lnet` save/load workflows. To clear a virtual filter, clear its entries inside the filter menu.
+While a filter screen is open you can copy its whole configuration and paste it into another open filter. Use **Ctrl + C** to copy and **Ctrl + V** to paste, or click the **copy** and **paste** icon buttons in the top-right of the filter header. Hover either button for a tooltip; the paste button is dimmed until something has been copied.
+
+This clipboard lives only in your current game session. It is **not** saved to the filter item, to a config, or to your operating system clipboard, and it is cleared when you leave the game. It is separate from the wrench [Copy / Paste](../wrench/copy-paste.md) clipboard.
+
+What gets copied depends on the filter type:
+
+- **Small / Medium / Big**: every entry plus its per-entry rules — item, fluid, chemical, or `#tag`, batch and stock amounts, slot mapping, NBT (strict flag, raw SNBT, rules, and Match Any/All mode), durability, and enchanted state — along with the filter's Whitelist/Blacklist mode and Type.
+- **Mod**: Whitelist/Blacklist mode, Type, and the selected mod id.
+- **Regex**: Whitelist/Blacklist mode, Type, the regex pattern, and the match scope.
+
+A short overlay message confirms each action (`Filter copied`, `Filter pasted`, and so on).
+
+Notes:
+
+- Pasting **replaces** the destination filter. Standard-filter slots are cleared first, then filled from the clipboard.
+- If the copied filter has more entries than the destination can hold, paste fills the destination to capacity and reports the truncation, for example `Filter pasted: 6/8 slots copied`.
+- Pasting into a different filter type (a standard filter into a Regex filter, for example) is rejected with an incompatible-type message.
+- Ctrl + C and Ctrl + V are ignored while a text box such as the regex or mod-id field is focused, so typing is never hijacked.
+
+## Copying Filters Between Nodes
+
+Filter configurations are also copied with node copy/paste, labelled-node sync, and `.lnet` save/load workflows. To clear a virtual filter, clear its entries inside the filter menu.
