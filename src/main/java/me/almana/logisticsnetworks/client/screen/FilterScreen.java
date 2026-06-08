@@ -1402,8 +1402,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private void showFilterMessage(String key, Object... args) {
-        if (minecraft != null && minecraft.player != null) {
-            minecraft.player.sendSystemMessage(Component.translatable(key, args), true);
+        if (minecraft != null && minecraft.gui != null) {
+            minecraft.gui.setOverlayMessage(Component.translatable(key, args), false);
         }
     }
 
