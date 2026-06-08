@@ -595,7 +595,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         int renameBtnW = font.width(tr("gui.logisticsnetworks.rename")) + 14;
         int renameBtnX = x + w - renameBtnW;
         int paletteBtnW = 17;
-        int paletteBtnX = renameBtnX - 4 - paletteBtnW;
+        int paletteBtnX = renameBtnX - paletteBtnW;
 
         if (isRenaming && renameEditBox != null) {
             g.fill(x, y, x + w, y + 17, cPanel());
@@ -603,9 +603,10 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             return;
         }
 
-        boolean hoveredRow = mx >= x && mx <= x + w && my >= y && my <= y + 17;
         boolean hoveredRename = mx >= renameBtnX && mx <= renameBtnX + renameBtnW && my >= y && my <= y + 17;
         boolean hoveredPalette = mx >= paletteBtnX && mx <= paletteBtnX + paletteBtnW && my >= y && my <= y + 17;
+        boolean hoveredRow = mx >= x && mx <= x + w && my >= y && my <= y + 17
+                && !hoveredRename && !hoveredPalette;
         int hoverFg = (cBorderStrong() == cText()) ? theme().bg() : cText();
 
         g.fill(x, y, x + w, y + 17, hoveredRow ? cBorderStrong() : cPanel());
@@ -619,7 +620,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         g.drawString(font, entry.name(), x + 17, y + 4, hoveredRow ? hoverFg : cMuted(), false);
 
         String info = tr("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
-        int infoX = paletteBtnX - font.width(info) - 4;
+        int infoX = paletteBtnX - font.width(info) - 6;
         g.drawString(font, info, infoX, y + 4, hoveredRow ? hoverFg : cSubtle(), false);
 
         g.fill(paletteBtnX, y, paletteBtnX + paletteBtnW, y + 17, hoveredPalette ? cBorderStrong() : cPanel());
@@ -1321,7 +1322,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             int renameBtnW = font.width(tr("gui.logisticsnetworks.rename")) + 14;
             int renameBtnX = leftPos + 14 + entryW - renameBtnW;
             int paletteBtnW = 17;
-            int paletteBtnX = renameBtnX - 4 - paletteBtnW;
+            int paletteBtnX = renameBtnX - paletteBtnW;
 
             // Check palette button click
             if (isHoveringAbs(paletteBtnX, y, paletteBtnW, 17, mx, my)) {
