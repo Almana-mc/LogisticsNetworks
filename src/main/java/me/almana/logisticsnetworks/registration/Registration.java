@@ -183,7 +183,7 @@ public class Registration {
         private static EntityType<LogisticsNodeEntity> createLogisticsNodeType(Identifier id) {
                 return net.minecraft.world.entity.EntityType.Builder
                                 .<LogisticsNodeEntity>of(LogisticsNodeEntity::new, MobCategory.MISC)
-                                .sized(1.0f, 1.0f)
+                                .sized(0.05f, 0.05f)
                                 .clientTrackingRange(4)
                                 .updateInterval(40)
                                 .build(net.minecraft.resources.ResourceKey.create(Registries.ENTITY_TYPE, id));
