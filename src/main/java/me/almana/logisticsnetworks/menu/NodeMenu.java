@@ -162,7 +162,8 @@ public class NodeMenu extends AbstractContainerMenu {
                     net.getName(),
                     net.getNodeUuids().size(),
                     false,
-                    net.getCreatedAt()));
+                    net.getCreatedAt(),
+                    net.getColor()));
         }
 
         PacketDistributor.sendToPlayer(player, new SyncNetworkListPayload(entries));
