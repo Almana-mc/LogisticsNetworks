@@ -137,6 +137,7 @@ public class ServerPayloadHandler {
             UUID oldNetworkId = node.getNetworkId();
             if (oldNetworkId != null && oldNetworkId.equals(targetNetwork.getId())) {
                 node.setNetworkName(targetNetwork.getName());
+                node.setNetworkColor(targetNetwork.getColor());
                 if (player.containerMenu instanceof NodeMenu menu) {
                     menu.sendNetworkListToClient(player);
                 }
@@ -153,6 +154,7 @@ public class ServerPayloadHandler {
 
             node.setNetworkId(targetNetwork.getId());
             node.setNetworkName(targetNetwork.getName());
+            node.setNetworkColor(targetNetwork.getColor());
             registry.addNodeToNetwork(targetNetwork.getId(), node.getUUID());
 
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
