@@ -93,6 +93,10 @@ public final class GuiGraphics {
         raw.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, u, v, width, height, textureWidth, textureHeight);
     }
 
+    public void blit(Identifier texture, int x, int y, float u, float v, int width, int height, int textureWidth, int textureHeight, int color) {
+        raw.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, u, v, width, height, textureWidth, textureHeight, color);
+    }
+
     public void blit(Identifier texture, int x, int y, int width, int height, float u0, float u1, float v0, float v1) {
         raw.blit(texture, x, y, x + width, y + height, u0, u1, v0, v1);
     }
