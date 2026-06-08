@@ -392,6 +392,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return;
         }
 
+        if (renderClipboardTooltip(g, mx, my)) {
+            return;
+        }
+
         renderEntryIndicatorOverlays(g);
 
         if (tagEditSlot >= 0) {
@@ -452,6 +456,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             titleX += BACK_BUTTON_W + 4;
         }
         g.drawString(font, filterTitle(), titleX, topPos + 6, COL_ACCENT, false);
+
+        renderClipboardButtons(g, mx, my);
 
         if (menu.isModMode())
             renderModMode(g, mx, my);
@@ -827,6 +833,54 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, hovered ? COL_WHITE : COL_GRAY);
     }
 
+    private void renderClipboardButtons(GuiGraphics g, int mx, int my) {
+        drawIconButton(g, copyButtonX(), clipboardButtonY(), COPY_ICON, mx, my, true);
+        drawIconButton(g, pasteButtonX(), clipboardButtonY(), PASTE_ICON, mx, my, copiedFilter != null);
+    }
+
+    private void drawIconButton(GuiGraphics g, int x, int y, Identifier icon, int mx, int my, boolean active) {
+        boolean hovered = active && isHovering(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my);
+        g.fill(x, y, x + CLIPBOARD_BUTTON_SIZE, y + CLIPBOARD_BUTTON_SIZE, hovered ? COL_BTN_HOVER : COL_BTN_BG);
+        g.renderOutline(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, hovered ? COL_WHITE : COL_BTN_BORDER);
+        g.blit(icon, x + 2, y + 2, 0f, 0f, 8, 8, 8, 8);
+    }
+
+    private int copyButtonX() {
+        return pasteButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
+    }
+
+    private int pasteButtonX() {
+        return clipboardRightEdge() - CLIPBOARD_BUTTON_SIZE;
+    }
+
+    private int clipboardButtonY() {
+        return topPos + 6;
+    }
+
+    private int clipboardRightEdge() {
+        if (menu.isSpecialMode()) {
+            return leftPos + imageWidth - 8;
+        }
+
+        int rightEdge = leftPos + imageWidth - 8;
+        String modeLabel = menu.isBlacklistMode()
+                ? tr("gui.logisticsnetworks.filter.mode.blacklist")
+                : tr("gui.logisticsnetworks.filter.mode.whitelist");
+        int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
+        int left = rightEdge - modeBtnW;
+
+        if (!menu.isNodeFilter()) {
+            String typeLabel = menu.getTargetType() == FilterTargetType.CHEMICALS
+                    ? tr("gui.logisticsnetworks.filter.target.chemicals")
+                    : menu.getTargetType() == FilterTargetType.FLUIDS
+                            ? tr("gui.logisticsnetworks.filter.target.fluids")
+                            : tr("gui.logisticsnetworks.filter.target.items");
+            left -= Math.max(40, font.width(typeLabel) + 8) + 4;
+        }
+
+        return left - CLIPBOARD_BUTTON_GAP;
+    }
+
     private void drawAmountButton(GuiGraphics g, int x, int y, String label, int mx, int my) {
         int w = Math.max(24, font.width(label) + 10);
         drawButton(g, x - w / 2, y, w, 14, label, mx, my, true);
@@ -921,6 +975,19 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 && isHovering(backButtonX(), backButtonY(), BACK_BUTTON_W, BACK_BUTTON_H, (int) mx, (int) my);
     }
 
+    private boolean handleClipboardButtonClick(double mx, double my, int btn) {
+        if (btn != 0) {
+            return false;
+        }
+        if (isHovering(copyButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, (int) mx, (int) my)) {
+            return copyOpenFilter();
+        }
+        if (isHovering(pasteButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, (int) mx, (int) my)) {
+            return pasteOpenFilter();
+        }
+        return false;
+    }
+
     private boolean returnToNodeScreen() {
         if (!menu.isNodeFilter()) {
             return false;
@@ -935,6 +1002,32 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return minecraft != null
                 && (InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LCONTROL)
                         || InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_RCONTROL));
+    }
+
+    private boolean handleClipboardShortcut(int key) {
+        if (!hasControlDown() || isTextInputFocused()) {
+            return false;
+        }
+        if (key == InputConstants.KEY_C) {
+            return copyOpenFilter();
+        }
+        if (key == InputConstants.KEY_V) {
+            return pasteOpenFilter();
+        }
+        return false;
+    }
+
+    private boolean isTextInputFocused() {
+        return manualInputBox != null && manualInputBox.isFocused()
+                || tagInputBox != null && tagInputBox.isFocused()
+                || nbtValueEditBox != null && nbtValueEditBox.isFocused()
+                || detailIdInputBox != null && detailIdInputBox.isFocused()
+                || detailBatchInputBox != null && detailBatchInputBox.isFocused()
+                || detailStockInputBox != null && detailStockInputBox.isFocused()
+                || detailSlotMappingInputBox != null && detailSlotMappingInputBox.isFocused()
+                || detailDurabilityValueBox != null && detailDurabilityValueBox.isFocused()
+                || detailNbtValueBox != null && detailNbtValueBox.isFocused()
+                || detailNbtInputBox != null && detailNbtInputBox.isFocused();
     }
 
     private boolean hasAltDown() {
@@ -954,6 +1047,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         blurManualInputIfNeeded(mx, my);
         if (btn == 0 && isHoveringBackButton(mx, my)) {
             return returnToNodeScreen();
+        }
+        if (detailEditSlot < 0 && handleClipboardButtonClick(mx, my, btn)) {
+            return true;
         }
         boolean handled = false;
         if (menu.isModMode())
@@ -1365,6 +1461,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (minecraft.options.keyInventory.matches(new net.minecraft.client.input.KeyEvent(key, scan, modifiers))) {
             return true;
         }
+        if (handleClipboardShortcut(key)) {
+            return true;
+        }
         if (key == 256) {
             if (detailEditSlot >= 0 && detailNbtPageOpen) {
                 closeNbtSubPage();
@@ -1569,6 +1668,21 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return 1_000_000;
         }
         return 1024;
+    }
+
+    private boolean renderClipboardTooltip(GuiGraphics g, int mx, int my) {
+        if (isHovering(copyButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my)) {
+            g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.copy"), mx, my);
+            return true;
+        }
+        if (isHovering(pasteButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my)) {
+            String key = copiedFilter == null
+                    ? "gui.logisticsnetworks.filter.paste.empty"
+                    : "gui.logisticsnetworks.filter.paste";
+            g.renderTooltip(font, Component.translatable(key), mx, my);
+            return true;
+        }
+        return false;
     }
 
     private void renderModTooltip(GuiGraphics g, int mx, int my) {
