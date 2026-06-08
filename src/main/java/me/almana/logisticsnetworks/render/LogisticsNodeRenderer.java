@@ -68,6 +68,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         state.highlighted = entity.isHighlighted();
         state.wrenchVisible = isWrenchVisible(entity);
         state.debugMode = Config.debugMode;
+        state.networkColor = entity.getNetworkColor();
         state.connections = ClientConfig.connectedNodeTextures ? getConnectionMask(entity) : NodeConnectionMask.NONE;
         state.debugNodeId = "";
         state.debugChannels = "";
@@ -91,7 +92,10 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         if (state.highlighted) {
             submitHighlightBox(state, poseStack, submitNodeCollector, 0.15f, 0.45f, 1.0f, 0.35f, true);
         } else if (state.wrenchVisible) {
-            submitHighlightBox(state, poseStack, submitNodeCollector, 0.0f, 1.0f, 0.0f, 0.35f, false);
+            float wr = ((state.networkColor >> 16) & 0xFF) / 255f;
+            float wg = ((state.networkColor >> 8) & 0xFF) / 255f;
+            float wb = (state.networkColor & 0xFF) / 255f;
+            submitHighlightBox(state, poseStack, submitNodeCollector, wr, wg, wb, 0.35f, false);
             if (state.debugMode) {
                 submitDebugLabels(state, poseStack, submitNodeCollector);
             }
