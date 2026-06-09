@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.client.Shaders;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -15,6 +16,7 @@ import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -46,6 +48,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
     private static final float BLOCK_TOP = 1.0f;
     private static final float HIGHLIGHT_EPS = 0.001f;
     private static final double SHAPE_SIDE_EPS = 1.0E-4;
+    private static final int FULL_BRIGHT = 15728880;
 
     private static Set<Integer> allowedNodeIds;
     private static long lastComputeTick = Long.MIN_VALUE;
@@ -68,6 +71,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         state.highlighted = entity.isHighlighted();
         state.wrenchVisible = isWrenchVisible(entity);
         state.debugMode = Config.debugMode;
+        state.shadersActive = Shaders.shadersActive();
         state.networkColor = entity.getNetworkColor();
         state.connections = ClientConfig.connectedNodeTextures ? getConnectionMask(entity) : NodeConnectionMask.NONE;
         state.debugNodeId = "";
@@ -137,6 +141,13 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
 
     private void submitHighlightBox(LogisticsNodeRenderState state, PoseStack poseStack,
             SubmitNodeCollector submitNodeCollector, float r, float g, float b, float a, boolean xray) {
+        if (state.shadersActive) {
+            submitNodeCollector.submitCustomGeometry(
+                    poseStack,
+                    NodeRenderTypes.overlayShader(),
+                    (pose, buffer) -> addHighlightBoxEntity(pose.pose(), buffer, state, r, g, b, a));
+            return;
+        }
         submitNodeCollector.submitCustomGeometry(
                 poseStack,
                 xray ? NodeRenderTypes.overlayXray() : NodeRenderTypes.overlay(),
@@ -419,5 +430,42 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         buffer.addVertex(matrix, minX, minY, maxZ).setColor(r, g, b, a);
         buffer.addVertex(matrix, maxX, minY, maxZ).setColor(r, g, b, a);
         buffer.addVertex(matrix, maxX, maxY, maxZ).setColor(r, g, b, a);
+    }
+
+    private static void addHighlightBoxEntity(Matrix4f matrix, VertexConsumer buffer, LogisticsNodeRenderState state,
+            float r, float g, float b, float a) {
+        float minX = state.minX - HIGHLIGHT_EPS;
+        float maxX = state.maxX + HIGHLIGHT_EPS;
+        float minY = state.minY - HIGHLIGHT_EPS;
+        float maxY = state.maxY + HIGHLIGHT_EPS;
+        float minZ = state.minZ - HIGHLIGHT_EPS;
+        float maxZ = state.maxZ + HIGHLIGHT_EPS;
+
+        faceEntity(buffer, matrix, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, minX, maxY, minZ, r, g, b, a, 0f, 1f, 0f);
+        faceEntity(buffer, matrix, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, r, g, b, a, 0f, -1f, 0f);
+        faceEntity(buffer, matrix, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ, maxX, minY, minZ, r, g, b, a, 0f, 0f, -1f);
+        faceEntity(buffer, matrix, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, minX, minY, maxZ, r, g, b, a, 0f, 0f, 1f);
+        faceEntity(buffer, matrix, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, minX, minY, minZ, r, g, b, a, -1f, 0f, 0f);
+        faceEntity(buffer, matrix, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, maxX, minY, maxZ, r, g, b, a, 1f, 0f, 0f);
+    }
+
+    private static void faceEntity(VertexConsumer buffer, Matrix4f matrix,
+            float x0, float y0, float z0, float x1, float y1, float z1,
+            float x2, float y2, float z2, float x3, float y3, float z3,
+            float r, float g, float b, float a, float nx, float ny, float nz) {
+        vertexEntity(buffer, matrix, x0, y0, z0, r, g, b, a, nx, ny, nz);
+        vertexEntity(buffer, matrix, x1, y1, z1, r, g, b, a, nx, ny, nz);
+        vertexEntity(buffer, matrix, x2, y2, z2, r, g, b, a, nx, ny, nz);
+        vertexEntity(buffer, matrix, x3, y3, z3, r, g, b, a, nx, ny, nz);
+    }
+
+    private static void vertexEntity(VertexConsumer buffer, Matrix4f matrix, float x, float y, float z,
+            float r, float g, float b, float a, float nx, float ny, float nz) {
+        buffer.addVertex(matrix, x, y, z)
+                .setColor(r, g, b, a)
+                .setUv(0.0f, 0.0f)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(FULL_BRIGHT)
+                .setNormal(nx, ny, nz);
     }
 }
