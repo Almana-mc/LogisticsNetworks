@@ -49,6 +49,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
     private static final float HIGHLIGHT_EPS = 0.001f;
     private static final double SHAPE_SIDE_EPS = 1.0E-4;
     private static final int FULL_BRIGHT = 15728880;
+    private static final float SHADER_ALPHA_SCALE = 2.0f;
 
     private static Set<Integer> allowedNodeIds;
     private static long lastComputeTick = Long.MIN_VALUE;
@@ -440,13 +441,14 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         float maxY = state.maxY + HIGHLIGHT_EPS;
         float minZ = state.minZ - HIGHLIGHT_EPS;
         float maxZ = state.maxZ + HIGHLIGHT_EPS;
+        float alpha = Math.min(1.0f, a * SHADER_ALPHA_SCALE);
 
-        faceEntity(buffer, matrix, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, minX, maxY, minZ, r, g, b, a, 0f, 1f, 0f);
-        faceEntity(buffer, matrix, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, r, g, b, a, 0f, -1f, 0f);
-        faceEntity(buffer, matrix, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ, maxX, minY, minZ, r, g, b, a, 0f, 0f, -1f);
-        faceEntity(buffer, matrix, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, minX, minY, maxZ, r, g, b, a, 0f, 0f, 1f);
-        faceEntity(buffer, matrix, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, minX, minY, minZ, r, g, b, a, -1f, 0f, 0f);
-        faceEntity(buffer, matrix, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, maxX, minY, maxZ, r, g, b, a, 1f, 0f, 0f);
+        faceEntity(buffer, matrix, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, minX, maxY, minZ, r, g, b, alpha, 0f, 1f, 0f);
+        faceEntity(buffer, matrix, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, r, g, b, alpha, 0f, -1f, 0f);
+        faceEntity(buffer, matrix, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ, maxX, minY, minZ, r, g, b, alpha, 0f, 0f, -1f);
+        faceEntity(buffer, matrix, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, minX, minY, maxZ, r, g, b, alpha, 0f, 0f, 1f);
+        faceEntity(buffer, matrix, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, minX, minY, minZ, r, g, b, alpha, -1f, 0f, 0f);
+        faceEntity(buffer, matrix, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, maxX, minY, maxZ, r, g, b, alpha, 1f, 0f, 0f);
     }
 
     private static void faceEntity(VertexConsumer buffer, Matrix4f matrix,
