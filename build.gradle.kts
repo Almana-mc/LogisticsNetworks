@@ -127,6 +127,11 @@ dependencies {
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
     runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
 
+    // Iris API — compile-only; shaders are an optional runtime dependency.
+    compileOnly("maven.modrinth:iris:1.10.9+26.1-neoforge") {
+        isTransitive = false
+    }
+
     // 26.1 compat deps pending
     /*
     compileOnly("mekanism:Mekanism:${mekanism_version}")
