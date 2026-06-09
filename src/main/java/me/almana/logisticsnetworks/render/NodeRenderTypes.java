@@ -22,6 +22,9 @@ public final class NodeRenderTypes {
             "logisticsnetworks_node_overlay_xray",
             RenderSetup.builder(OVERLAY_XRAY_PIPELINE).sortOnUpload().createRenderSetup());
 
+    private static final Identifier HIGHLIGHT_TEXTURE =
+            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "textures/entity/highlight.png");
+
     private NodeRenderTypes() {
     }
 
@@ -31,6 +34,10 @@ public final class NodeRenderTypes {
 
     public static RenderType overlayXray() {
         return OVERLAY_XRAY;
+    }
+
+    public static RenderType overlayShader() {
+        return RenderTypes.entityTranslucent(HIGHLIGHT_TEXTURE);
     }
 
     public static RenderType node(Identifier texture) {
