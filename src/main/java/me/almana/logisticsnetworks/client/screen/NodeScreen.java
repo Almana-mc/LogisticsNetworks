@@ -126,13 +126,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
     private int networkScrollOffset = 0;
     private SortMode sortMode = SortMode.NAME_ASC;
 
-    // Rename state
-    private UUID renamingNetworkId = null;
-    private EditBox renameEditBox = null;
-
-    private ColorPicker colorPicker;
-    private static final Identifier PALETTE_ICON = Identifier.fromNamespaceAndPath(
-            Logisticsnetworks.MOD_ID, "textures/gui/color_palette.png");
+    private NetworkEditor editor;
 
     // Settings scroll state
     private int settingsScrollOffset = 0;
@@ -204,7 +198,6 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     private void rebuildPageLayout() {
         stopNumericEdit(false);
-        stopRenameEdit(false);
         clearWidgets();
         getMenu().setNodeSlotsVisible(currentPage == Page.CHANNEL_CONFIG);
         if (currentPage == Page.NETWORK_SELECT) {
@@ -281,8 +274,8 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         if (tweaksOpen) {
             renderTweaksPanel(g, mx, my);
         }
-        if (colorPicker != null) {
-            colorPicker.render(g, mx, my, theme());
+        if (editor != null) {
+            editor.render(g, mx, my, pt, theme());
         }
         this.renderTooltip(g, mx, my);
         if (hoveredChannelName != null && currentPage == Page.CHANNEL_CONFIG) {
@@ -591,22 +584,11 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     private void drawNetworkListEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, int x, int y, int w,
             int mx, int my) {
-        boolean isRenaming = entry.id().equals(renamingNetworkId);
-        int renameBtnW = font.width(tr("gui.logisticsnetworks.rename")) + 14;
-        int renameBtnX = x + w - renameBtnW;
-        int paletteBtnW = 17;
-        int paletteBtnX = renameBtnX - paletteBtnW;
+        int editBtnW = font.width(tr("gui.logisticsnetworks.node.edit")) + 14;
+        int editBtnX = x + w - editBtnW;
 
-        if (isRenaming && renameEditBox != null) {
-            g.fill(x, y, x + w, y + 17, cPanel());
-            g.renderOutline(x, y, w, 17, cAccent());
-            return;
-        }
-
-        boolean hoveredRename = mx >= renameBtnX && mx <= renameBtnX + renameBtnW && my >= y && my <= y + 17;
-        boolean hoveredPalette = mx >= paletteBtnX && mx <= paletteBtnX + paletteBtnW && my >= y && my <= y + 17;
-        boolean hoveredRow = mx >= x && mx <= x + w && my >= y && my <= y + 17
-                && !hoveredRename && !hoveredPalette;
+        boolean hoveredEdit = mx >= editBtnX && mx <= editBtnX + editBtnW && my >= y && my <= y + 17;
+        boolean hoveredRow = mx >= x && mx <= x + w && my >= y && my <= y + 17 && !hoveredEdit;
         int hoverFg = (cBorderStrong() == cText()) ? theme().bg() : cText();
 
         g.fill(x, y, x + w, y + 17, hoveredRow ? cBorderStrong() : cPanel());
@@ -620,19 +602,13 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         g.drawString(font, entry.name(), x + 17, y + 4, hoveredRow ? hoverFg : cMuted(), false);
 
         String info = tr("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
-        int infoX = paletteBtnX - font.width(info) - 6;
+        int infoX = editBtnX - font.width(info) - 6;
         g.drawString(font, info, infoX, y + 4, hoveredRow ? hoverFg : cSubtle(), false);
 
-        g.fill(paletteBtnX, y, paletteBtnX + paletteBtnW, y + 17, hoveredPalette ? cBorderStrong() : cPanel());
-        g.renderOutline(paletteBtnX, y, paletteBtnW, 17, hoveredPalette ? cAccent() : cBorder());
-        int iconColor = 0xFF000000 | (hoveredPalette ? hoverFg : cMuted());
-        g.blit(PALETTE_ICON, paletteBtnX + 1, y + 1, 0f, 0f, 15, 15, 16, 16, iconColor);
-
-        // Rename button
-        g.fill(renameBtnX, y, renameBtnX + renameBtnW, y + 17, hoveredRename ? cBorderStrong() : cPanel());
-        g.renderOutline(renameBtnX, y, renameBtnW, 17, hoveredRename ? cAccent() : cBorder());
-        ThemePaint.drawCentered(g, font, tr("gui.logisticsnetworks.rename"), renameBtnX + renameBtnW / 2, y + 4,
-                hoveredRename ? hoverFg : cMuted());
+        g.fill(editBtnX, y, editBtnX + editBtnW, y + 17, hoveredEdit ? cBorderStrong() : cPanel());
+        g.renderOutline(editBtnX, y, editBtnW, 17, hoveredEdit ? cAccent() : cBorder());
+        ThemePaint.drawCentered(g, font, tr("gui.logisticsnetworks.node.edit"), editBtnX + editBtnW / 2, y + 4,
+                hoveredEdit ? hoverFg : cMuted());
     }
 
     private void renderChannelConfigPage(GuiGraphics g, int mx, int my) {
@@ -1247,8 +1223,8 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
-        if (colorPicker != null) {
-            return colorPicker.mouseClicked(mx, my, btn);
+        if (editor != null) {
+            return editor.mouseClicked(mx, my, btn);
         }
         if (tweaksOpen) {
             if (btn == 0) return handleTweaksClick(mx, my);
@@ -1292,11 +1268,6 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
     }
 
     private boolean handleNetworkPageClick(double mx, double my) {
-        // Cancel rename if clicking outside the rename edit box
-        if (renamingNetworkId != null && renameEditBox != null && !renameEditBox.isMouseOver(mx, my)) {
-            stopRenameEdit(false);
-        }
-
         int[] sb = sortButtonBounds();
         if (isHoveringAbs(sb[0], sb[1], sb[2], sb[3], mx, my)) {
             sortMode = sortMode.next();
@@ -1319,24 +1290,14 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         for (int i = networkScrollOffset; i < endIdx; i++) {
             SyncNetworkListPayload.NetworkEntry entry = filtered.get(i);
             int y = listY + (i - networkScrollOffset) * 20;
-            int renameBtnW = font.width(tr("gui.logisticsnetworks.rename")) + 14;
-            int renameBtnX = leftPos + 14 + entryW - renameBtnW;
-            int paletteBtnW = 17;
-            int paletteBtnX = renameBtnX - paletteBtnW;
+            int editBtnW = font.width(tr("gui.logisticsnetworks.node.edit")) + 14;
+            int editBtnX = leftPos + 14 + entryW - editBtnW;
 
-            // Check palette button click
-            if (isHoveringAbs(paletteBtnX, y, paletteBtnW, 17, mx, my)) {
-                openColorPicker(entry.id(), entry.color());
+            if (isHoveringAbs(editBtnX, y, editBtnW, 17, mx, my)) {
+                openEditor(entry);
                 return true;
             }
 
-            // Check rename button click
-            if (isHoveringAbs(renameBtnX, y, renameBtnW, 17, mx, my)) {
-                startRenameEdit(entry, leftPos + 14 + 3, y + 1, entryW - 6);
-                return true;
-            }
-
-            // Check row click (select network) - only if not in the rename button area
             if (isHoveringAbs(leftPos + 14, y, entryW, 17, mx, my)) {
                 sendNetworkAssign(Optional.of(entry.id()), "");
                 return true;
@@ -1345,41 +1306,20 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         return false;
     }
 
-    private void openColorPicker(UUID networkId, int initialColor) {
-        stopRenameEdit(false);
-        colorPicker = new ColorPicker(font, width, height, initialColor,
-                rgb -> net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(
-                        new SetNetworkColorPayload(networkId, rgb)),
-                () -> colorPicker = null);
-    }
-
-    private void startRenameEdit(SyncNetworkListPayload.NetworkEntry entry, int x, int y, int w) {
-        stopRenameEdit(false);
-        renamingNetworkId = entry.id();
-        renameEditBox = new EditBox(font, x, y, w, 15, Component.empty());
-        renameEditBox.setMaxLength(32);
-        renameEditBox.setValue(entry.name());
-        renameEditBox.setBordered(false);
-        renameEditBox.setTextColor(cText());
-        renameEditBox.setFocused(true);
-        addRenderableWidget(renameEditBox);
-        setFocused(renameEditBox);
-    }
-
-    private void stopRenameEdit(boolean commit) {
-        if (renamingNetworkId == null || renameEditBox == null)
-            return;
-
-        if (commit) {
-            String newName = renameEditBox.getValue().trim();
-            if (!newName.isEmpty()) {
-                ClientPacketDistributor.sendToServer(new RenameNetworkPayload(renamingNetworkId, newName));
-            }
-        }
-
-        removeWidget(renameEditBox);
-        renameEditBox = null;
-        renamingNetworkId = null;
+    private void openEditor(SyncNetworkListPayload.NetworkEntry entry) {
+        UUID id = entry.id();
+        String oldName = entry.name();
+        int oldColor = entry.color();
+        editor = new NetworkEditor(font, width, height, oldName, oldColor,
+                (name, rgb) -> {
+                    if (!name.isEmpty() && !name.equals(oldName)) {
+                        ClientPacketDistributor.sendToServer(new RenameNetworkPayload(id, name));
+                    }
+                    if (rgb != oldColor) {
+                        ClientPacketDistributor.sendToServer(new SetNetworkColorPayload(id, rgb));
+                    }
+                },
+                () -> editor = null);
     }
 
     private void openLabelPicker(LogisticsNodeEntity node) {
@@ -1874,7 +1814,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     @Override
     public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
-        if (colorPicker != null && colorPicker.mouseDragged(mx, my, btn)) {
+        if (editor != null && editor.mouseDragged(mx, my, btn)) {
             return true;
         }
         return super.mouseDragged(mx, my, btn, dx, dy);
@@ -1882,7 +1822,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     @Override
     public boolean mouseReleased(double mx, double my, int btn) {
-        if (colorPicker != null && colorPicker.mouseReleased(mx, my, btn)) {
+        if (editor != null && editor.mouseReleased(mx, my, btn)) {
             return true;
         }
         return super.mouseReleased(mx, my, btn);
@@ -1890,12 +1830,12 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
-        if (colorPicker != null) {
+        if (editor != null) {
             if (key == 256) {
-                colorPicker = null;
+                editor = null;
                 return true;
             }
-            if (colorPicker.keyPressed(key)) {
+            if (editor.keyPressed(key, scan, modifiers)) {
                 return true;
             }
         }
@@ -1910,10 +1850,6 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             }
             if (labelPickerOpen) {
                 closeLabelPicker();
-                return true;
-            }
-            if (renamingNetworkId != null) {
-                stopRenameEdit(false);
                 return true;
             }
             return super.keyPressed(key, scan, modifiers);
@@ -1936,14 +1872,6 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             }
             return true;
         }
-        if (renamingNetworkId != null && renameEditBox != null) {
-            if (key == 257 || key == 335) {
-                stopRenameEdit(true);
-            } else {
-                renameEditBox.keyPressed(ClientInput.key(key, scan, modifiers));
-            }
-            return true;
-        }
         if (editingRow != -1) {
             if (key == 257 || key == 335)
                 stopNumericEdit(true);
@@ -1963,17 +1891,14 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     @Override
     public boolean charTyped(char ch, int modifiers) {
-        if (colorPicker != null) {
-            return colorPicker.charTyped(ch);
+        if (editor != null) {
+            return editor.charTyped(ch);
         }
         if (channelNameEditing && channelNameEditBox != null) {
             return channelNameEditBox.charTyped(ClientInput.character(ch));
         }
         if (labelPickerOpen && labelEditBox != null) {
             return labelEditBox.charTyped(ClientInput.character(ch));
-        }
-        if (renamingNetworkId != null && renameEditBox != null) {
-            return renameEditBox.charTyped(ClientInput.character(ch));
         }
         if (editingRow != -1 && numericEditBox != null) {
             if (Character.isDigit(ch) || ch == '-')

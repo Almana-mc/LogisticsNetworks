@@ -1,21 +1,25 @@
 package me.almana.logisticsnetworks.client.screen;
 
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
+import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 
-public class ColorPicker {
+public class NetworkEditor {
 
     private static final int W = 140;
     private static final int SQ = 100;
     private static final int SQ_H = 76;
     private static final int HUE_H = 10;
     private static final int PAD = 10;
+    private static final int NAME_H = 16;
+    private static final int NAME_GAP = 8;
     private static final int SV_COLS = 25;
     private static final int SV_ROWS = 19;
     private static final int HUE_CELLS = 50;
@@ -23,7 +27,8 @@ public class ColorPicker {
     private final Font font;
     private final int x;
     private final int y;
-    private final Consumer<Integer> onApply;
+    private final EditBox nameField;
+    private final BiConsumer<String, Integer> onApply;
     private final Runnable onClose;
 
     private float hue;
@@ -33,18 +38,23 @@ public class ColorPicker {
     private boolean hexFocused;
     private int drag = -1;
 
-    public ColorPicker(Font font, int screenW, int screenH, int initialColor,
-            Consumer<Integer> onApply, Runnable onClose) {
+    public NetworkEditor(Font font, int screenW, int screenH, String initialName, int initialColor,
+            BiConsumer<String, Integer> onApply, Runnable onClose) {
         this.font = font;
         this.x = (screenW - W) / 2;
         this.y = (screenH - height()) / 2;
         this.onApply = onApply;
         this.onClose = onClose;
         setColor(initialColor);
+        this.nameField = new EditBox(font, x + PAD, y + PAD + 10, W - 2 * PAD, NAME_H, Component.empty());
+        this.nameField.setMaxLength(32);
+        this.nameField.setValue(initialName);
+        this.nameField.setBordered(true);
+        this.nameField.setFocused(true);
     }
 
     private int height() {
-        return PAD + 10 + SQ_H + 6 + HUE_H + 8 + 14 + 8 + 14 + PAD;
+        return PAD + 10 + NAME_H + NAME_GAP + SQ_H + 6 + HUE_H + 8 + 14 + 8 + 14 + PAD;
     }
 
     private int current() {
@@ -60,19 +70,21 @@ public class ColorPicker {
     }
 
     private int svX() { return x + (W - SQ) / 2; }
-    private int svY() { return y + PAD + 10; }
+    private int svY() { return y + PAD + 10 + NAME_H + NAME_GAP; }
     private int hueX() { return svX(); }
     private int hueY() { return svY() + SQ_H + 6; }
     private int rowY() { return hueY() + HUE_H + 8; }
     private int btnY() { return rowY() + 14 + 8; }
 
-    public void render(GuiGraphics g, int mx, int my, Theme t) {
+    public void render(GuiGraphics g, int mx, int my, float pt, Theme t) {
         g.pose().pushPose();
         g.pose().translate(0, 0, 300);
 
         ThemePaint.window(g, x, y, W, height(), t);
         ThemePaint.drawCentered(g, font, Component.translatable("gui.logisticsnetworks.node.color.title"),
                 x + W / 2, y + PAD, t.accent());
+
+        nameField.extractRenderState(g.raw(), mx, my, pt);
 
         renderSvSquare(g);
         renderHueStrip(g);
@@ -141,16 +153,23 @@ public class ColorPicker {
         if (button != 0) {
             return isInside(mx, my);
         }
+        if (nameField.isMouseOver(mx, my)) {
+            nameField.setFocused(true);
+            hexFocused = false;
+            return true;
+        }
         if (inRect(mx, my, svX(), svY(), SQ, SQ_H)) {
             drag = 0;
             updateSv(mx, my);
             hexFocused = false;
+            nameField.setFocused(false);
             return true;
         }
         if (inRect(mx, my, hueX(), hueY(), SQ, HUE_H)) {
             drag = 1;
             updateHue(mx);
             hexFocused = false;
+            nameField.setFocused(false);
             return true;
         }
         int rx = svX();
@@ -158,6 +177,7 @@ public class ColorPicker {
         int hexW = SQ - 16 - 6;
         if (inRect(mx, my, hexX, rowY(), hexW, 12)) {
             hexFocused = true;
+            nameField.setFocused(false);
             return true;
         }
         int half = (SQ - 6) / 2;
@@ -167,8 +187,7 @@ public class ColorPicker {
             return true;
         }
         if (inRect(mx, my, rx + half + 6, btnY(), half, 12)) {
-            onApply.accept(current());
-            onClose.run();
+            apply();
             return true;
         }
         if (!isInside(mx, my)) {
@@ -176,6 +195,7 @@ public class ColorPicker {
             return true;
         }
         hexFocused = false;
+        nameField.setFocused(false);
         return true;
     }
 
@@ -200,6 +220,9 @@ public class ColorPicker {
     }
 
     public boolean charTyped(char c) {
+        if (nameField.isFocused()) {
+            return nameField.charTyped(ClientInput.character(c));
+        }
         if (!hexFocused || hex.length() >= 6) {
             return hexFocused;
         }
@@ -210,20 +233,36 @@ public class ColorPicker {
         return true;
     }
 
-    public boolean keyPressed(int keyCode) {
+    public boolean keyPressed(int key, int scan, int modifiers) {
+        if (nameField.isFocused()) {
+            if (key == 257 || key == 335) {
+                apply();
+                return true;
+            }
+            if (key == 256) {
+                return false;
+            }
+            nameField.keyPressed(ClientInput.key(key, scan, modifiers));
+            return true;
+        }
         if (!hexFocused) {
             return false;
         }
-        if (keyCode == 259 && !hex.isEmpty()) {
+        if (key == 259 && !hex.isEmpty()) {
             hex = hex.substring(0, hex.length() - 1);
             syncFromHex();
             return true;
         }
-        if (keyCode == 257 || keyCode == 335) {
+        if (key == 257 || key == 335) {
             hexFocused = false;
             return true;
         }
         return true;
+    }
+
+    private void apply() {
+        onApply.accept(nameField.getValue().trim(), current());
+        onClose.run();
     }
 
     private void syncFromHex() {
