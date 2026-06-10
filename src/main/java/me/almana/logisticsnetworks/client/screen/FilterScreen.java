@@ -4577,7 +4577,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return lines;
         }
         if (batch > 0 || stock > 0) {
-            lines.add(Component.literal("Batch | Stock: " + batch + " | " + stock).withStyle(ChatFormatting.GRAY));
+            lines.add(Component.literal("Batch " + batch + " | Stock " + stock).withStyle(ChatFormatting.GRAY));
         }
 
         List<FilterItemData.SlotNbtRule> nbtRules = menu.getSlotNbtRules(slot);
