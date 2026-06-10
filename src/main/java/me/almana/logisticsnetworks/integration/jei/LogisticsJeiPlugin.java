@@ -4,7 +4,7 @@ import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.gui.handlers.IGuiContainerHandler;
 import mezz.jei.api.registration.IGuiHandlerRegistration;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import net.minecraft.client.renderer.Rect2i;
@@ -15,7 +15,7 @@ import java.util.List;
 @JeiPlugin
 public class LogisticsJeiPlugin implements IModPlugin {
 
-    private static final Identifier UID = Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID,
+    private static final Identifier UID = Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID,
             "jei_plugin");
     private static final FilterGhostIngredientHandler FILTER_GHOST_HANDLER = new FilterGhostIngredientHandler();
     private static final NodeGhostIngredientHandler NODE_GHOST_HANDLER = new NodeGhostIngredientHandler();

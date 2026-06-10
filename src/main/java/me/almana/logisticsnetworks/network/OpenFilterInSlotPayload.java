@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -10,7 +10,7 @@ import net.minecraft.resources.Identifier;
 public record OpenFilterInSlotPayload(int slotIndex) implements CustomPacketPayload {
 
     public static final Type<OpenFilterInSlotPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "open_filter_in_slot"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "open_filter_in_slot"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, OpenFilterInSlotPayload> STREAM_CODEC = StreamCodec
             .composite(

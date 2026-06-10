@@ -2,7 +2,7 @@ package me.almana.logisticsnetworks.client.screen;
 
 import com.mojang.blaze3d.platform.InputConstants;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
@@ -79,9 +79,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private static final int COL_BTN_BORDER = 0xFF4A4A4A;
 
     private static final Identifier COPY_ICON = Identifier.fromNamespaceAndPath(
-            Logisticsnetworks.MOD_ID, "textures/gui/filter_copy.png");
+            LogisticsNetworks.MOD_ID, "textures/gui/filter_copy.png");
     private static final Identifier PASTE_ICON = Identifier.fromNamespaceAndPath(
-            Logisticsnetworks.MOD_ID, "textures/gui/filter_paste.png");
+            LogisticsNetworks.MOD_ID, "textures/gui/filter_paste.png");
     private static final int CLIPBOARD_BUTTON_SIZE = 12;
     private static final int CLIPBOARD_BUTTON_GAP = 2;
     private static FilterClipboardSnapshot copiedFilter;

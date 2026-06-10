@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.Config;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.Shaders;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -39,7 +39,7 @@ import java.util.Set;
 
 public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, LogisticsNodeRenderState> {
 
-    private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID,
+    private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID,
             "textures/entity/node.png");
     private static final float BOUNDS_OFFSET = 0.5f;
     private static final float BLOCK_MIN = -0.5f;

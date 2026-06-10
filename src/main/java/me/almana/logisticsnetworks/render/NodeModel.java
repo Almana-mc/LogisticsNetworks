@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.render;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.ModelPart;
@@ -12,7 +12,7 @@ import net.minecraft.resources.Identifier;
 public class NodeModel extends EntityModel<LogisticsNodeRenderState> {
 
     public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "node"), "main");
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "node"), "main");
 
     private static final String MODEL_PATH = "/assets/logisticsnetworks/models/entity/node.json";
 

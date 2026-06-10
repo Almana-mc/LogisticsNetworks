@@ -4,7 +4,7 @@ import net.minecraft.core.Direction;
 import org.jetbrains.annotations.Nullable;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.data.ChannelMode;
@@ -1240,7 +1240,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         if (currentPage == Page.CHANNEL_CONFIG && btn == 0 && isInDocsFab(mx, my)) {
             if (minecraft != null && minecraft.player != null) {
                 GuideMeCompat.openGuide(minecraft.player,
-                        Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "guide"));
+                        Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "guide"));
             }
             return true;
         }

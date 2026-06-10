@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.integration.jade;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -15,7 +15,7 @@ public enum NodeAttachedComponentProvider implements IBlockComponentProvider {
     INSTANCE;
 
     private static final Identifier UID = Identifier.fromNamespaceAndPath(
-            Logisticsnetworks.MOD_ID, "node_attached");
+            LogisticsNetworks.MOD_ID, "node_attached");
 
     @Override
     public void appendTooltip(ITooltip tooltip, BlockAccessor accessor, IPluginConfig config) {
@@ -28,7 +28,7 @@ public enum NodeAttachedComponentProvider implements IBlockComponentProvider {
         if (main.getItem() instanceof WrenchItem || off.getItem() instanceof WrenchItem) {
             return;
         }
-        tooltip.add(Component.translatable("jade." + Logisticsnetworks.MOD_ID + ".node_attached"));
+        tooltip.add(Component.translatable("jade." + LogisticsNetworks.MOD_ID + ".node_attached"));
     }
 
     @Override

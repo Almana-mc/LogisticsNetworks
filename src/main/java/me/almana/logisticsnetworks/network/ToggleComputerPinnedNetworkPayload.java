@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -12,7 +12,7 @@ import java.util.UUID;
 public record ToggleComputerPinnedNetworkPayload(BlockPos computerPos, UUID networkId) implements CustomPacketPayload {
 
     public static final Type<ToggleComputerPinnedNetworkPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "toggle_computer_pinned_network"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "toggle_computer_pinned_network"));
 
     public static final StreamCodec<FriendlyByteBuf, ToggleComputerPinnedNetworkPayload> STREAM_CODEC = StreamCodec
             .of(ToggleComputerPinnedNetworkPayload::write, ToggleComputerPinnedNetworkPayload::read);

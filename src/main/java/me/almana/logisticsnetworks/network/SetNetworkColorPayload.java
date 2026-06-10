@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -12,7 +12,7 @@ public record SetNetworkColorPayload(
         UUID networkId, int color) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SetNetworkColorPayload> TYPE = new CustomPacketPayload.Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_network_color"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "set_network_color"));
 
     public static final StreamCodec<FriendlyByteBuf, SetNetworkColorPayload> STREAM_CODEC = StreamCodec
             .of(SetNetworkColorPayload::write, SetNetworkColorPayload::read);

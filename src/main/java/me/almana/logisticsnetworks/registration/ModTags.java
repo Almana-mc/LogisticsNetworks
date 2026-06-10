@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.registration;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
@@ -44,6 +44,6 @@ public final class ModTags {
     }
 
     private static Identifier id(String path) {
-        return Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, path);
+        return Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, path);
     }
 }

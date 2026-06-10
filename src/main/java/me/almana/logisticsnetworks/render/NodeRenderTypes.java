@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks.render;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.rendertype.LayeringTransform;
 import net.minecraft.client.renderer.rendertype.RenderSetup;
@@ -14,7 +14,7 @@ import java.util.Optional;
 public final class NodeRenderTypes {
 
     private static final RenderPipeline OVERLAY_XRAY_PIPELINE = RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
-            .withLocation(Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "pipeline/node_overlay_xray"))
+            .withLocation(Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "pipeline/node_overlay_xray"))
             .withCull(false)
             .withDepthStencilState(Optional.empty())
             .build();
@@ -24,7 +24,7 @@ public final class NodeRenderTypes {
             RenderSetup.builder(OVERLAY_XRAY_PIPELINE).sortOnUpload().createRenderSetup());
 
     private static final Identifier HIGHLIGHT_TEXTURE =
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "textures/entity/highlight.png");
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "textures/entity/highlight.png");
 
     private static final RenderType OVERLAY_SHADER = RenderType.create(
             "logisticsnetworks_node_overlay_shader",

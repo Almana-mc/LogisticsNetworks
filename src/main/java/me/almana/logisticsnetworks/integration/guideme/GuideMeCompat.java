@@ -2,7 +2,7 @@ package me.almana.logisticsnetworks.integration.guideme;
 
 import guideme.Guides;
 import guideme.GuidesCommon;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -11,7 +11,7 @@ import net.neoforged.fml.ModList;
 public final class GuideMeCompat {
 
     private static final String GUIDEME_MOD_ID = "guideme";
-    private static final Identifier GUIDE_ID = Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "guide");
+    private static final Identifier GUIDE_ID = Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "guide");
     private static Boolean loaded = null;
 
     private GuideMeCompat() {

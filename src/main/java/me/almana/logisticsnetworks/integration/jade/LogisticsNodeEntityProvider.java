@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.integration.jade;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
@@ -14,7 +14,7 @@ public enum LogisticsNodeEntityProvider implements IEntityComponentProvider {
     INSTANCE;
 
     private static final Identifier UID = Identifier.fromNamespaceAndPath(
-            Logisticsnetworks.MOD_ID, "logistics_node_entity");
+            LogisticsNetworks.MOD_ID, "logistics_node_entity");
 
     @Override
     public void appendTooltip(ITooltip tooltip, EntityAccessor accessor, IPluginConfig config) {

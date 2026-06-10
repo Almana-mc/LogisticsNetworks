@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -10,7 +10,7 @@ import net.minecraft.resources.Identifier;
 public record CopyPasteConnectedPayload(int handOrdinal, BlockPos pos) implements CustomPacketPayload {
 
     public static final Type<CopyPasteConnectedPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "copy_paste_connected"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "copy_paste_connected"));
 
     public static final StreamCodec<FriendlyByteBuf, CopyPasteConnectedPayload> STREAM_CODEC = StreamCodec
             .of(CopyPasteConnectedPayload::write, CopyPasteConnectedPayload::read);

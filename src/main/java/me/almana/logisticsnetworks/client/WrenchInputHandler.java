@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.client;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
@@ -17,7 +17,7 @@ import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
-@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
 public class WrenchInputHandler {
 
     @SubscribeEvent

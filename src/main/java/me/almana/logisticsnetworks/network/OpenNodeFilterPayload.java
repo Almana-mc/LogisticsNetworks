@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -11,7 +11,7 @@ public record OpenNodeFilterPayload(int entityId, int channel, int filterSlot,
         VirtualFilterType requestedType) implements CustomPacketPayload {
 
     public static final Type<OpenNodeFilterPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "open_node_filter"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "open_node_filter"));
 
     public static final StreamCodec<FriendlyByteBuf, OpenNodeFilterPayload> STREAM_CODEC = StreamCodec
             .of(OpenNodeFilterPayload::write, OpenNodeFilterPayload::read);
