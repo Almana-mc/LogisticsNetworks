@@ -7,6 +7,8 @@ public class LogisticsNodeRenderState extends EntityRenderState {
     public boolean wrenchVisible;
     public boolean highlighted;
     public boolean debugMode;
+    public boolean shadersActive;
+    public int networkColor = me.almana.logisticsnetworks.data.NetworkColors.DEFAULT;
     public int connections = NodeConnectionMask.NONE;
     public int bridgeConnections = NodeConnectionMask.NONE;
     public float minX = -0.5f;

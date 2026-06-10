@@ -28,11 +28,13 @@ public class LogisticsNetwork {
     private static final String KEY_OWNER_UUID = "OwnerUUID";
     private static final String KEY_CHANNEL_NAMES = "ChannelNames";
     private static final String KEY_CREATED = "CreatedAt";
+    private static final String KEY_COLOR = "Color";
 
     private final UUID id;
     private String name;
     private UUID ownerUuid;
     private long createdAt = System.currentTimeMillis();
+    private int color = NetworkColors.randomColor();
     private final Set<UUID> nodeUuids = new HashSet<>();
     private boolean sleeping = true;
 
@@ -79,6 +81,7 @@ public class LogisticsNetwork {
         tag.putString(KEY_NAME, name);
         tag.putBoolean(KEY_SLEEPING, sleeping);
         tag.putLong(KEY_CREATED, createdAt);
+        tag.putInt(KEY_COLOR, color);
         if (ownerUuid != null) {
             tag.putString(KEY_OWNER_UUID, ownerUuid.toString());
         }
@@ -116,6 +119,9 @@ public class LogisticsNetwork {
             network.ownerUuid = parseOptionalUuid(tag.getStringOr(KEY_OWNER_UUID, null));
         }
         network.createdAt = tag.getLongOr(KEY_CREATED, 0L);
+        if (tag.contains(KEY_COLOR)) {
+            network.color = NetworkColors.mask(tag.getIntOr(KEY_COLOR, network.color));
+        }
 
         if (tag.contains(KEY_NODES)) {
             ListTag nodesTag = tag.getListOrEmpty(KEY_NODES);
@@ -166,6 +172,14 @@ public class LogisticsNetwork {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public int getColor() {
+        return color;
+    }
+
+    public void setColor(int color) {
+        this.color = NetworkColors.mask(color);
     }
 
     public String getChannelName(int index) {
