@@ -817,7 +817,8 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             int x = startX + i * 26;
             boolean hovered = !labelPickerOpen && mx >= x && mx <= x + 24 && my >= y && my <= y + 12;
             boolean hasDot = !isSelected && isEnabled;
-            ThemePaint.tab(g, font, x, y, 24, 12, String.valueOf(i), isSelected, hasDot, hovered, t);
+            ChannelType type = ch != null ? ch.getType() : null;
+            ThemePaint.channelTab(g, font, x, y, 24, 12, String.valueOf(i), type, isSelected, hasDot, hovered, t);
             if (isSelected && !isEnabled) {
                 ThemePaint.roundOutline(g, x, y, 24, 12, 2, cDanger(), t.sharpCorners());
             }
