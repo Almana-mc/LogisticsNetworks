@@ -400,18 +400,25 @@ jobs:
             --arg name "$DISPLAY_NAME" \
             --argjson gv "$game_versions" \
             --argjson dependencies "$CURSEFORGE_DEPENDENCIES" \
-            '{changelog:$changelog, changelogType:$changelog_type, displayName:$name, gameVersions:$gv, releaseType:"release"} + (if ($dependencies | length) > 0 then {relations:{projects:$dependencies}} else {} end)')"
+            '{changelog:$changelog, changelogType:$changelog_type, displayName:$name, gameVersions:$gv, releaseType:"release"} + (if ($dependencies | length) > 0 then {relations:{projects:($dependencies | map({slug, type}))}} else {} end)')"
 
           jar="$(find build/libs -maxdepth 1 -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n1)"
           if [[ -z "$jar" ]]; then echo "No jar found in build/libs"; exit 1; fi
 
-          response="$(curl -fsSL \
+          body_file="$(mktemp)"
+          http_code="$(curl -sS -o "$body_file" -w '%{http_code}' \
             -H "X-Api-Token: $CURSEFORGE_TOKEN" \
             -F "metadata=$metadata" \
             -F "file=@${jar}" \
             "https://minecraft.curseforge.com/api/projects/${PROJECT_ID}/upload-file")"
 
-          file_id="$(jq -r '.id' <<<"$response")"
+          if [[ "$http_code" != "200" ]]; then
+            echo "CurseForge upload failed (HTTP $http_code):"
+            cat "$body_file"
+            exit 1
+          fi
+
+          file_id="$(jq -r '.id' <"$body_file")"
           echo "curseforge-url=https://www.curseforge.com/projects/${PROJECT_ID}/files/${file_id}" >> "$GITHUB_OUTPUT"
 
   publish-modrinth:
