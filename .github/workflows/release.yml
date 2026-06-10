@@ -394,13 +394,15 @@ jobs:
 
           game_versions="$(printf '%s\n' "${ids[@]}" | jq -R 'tonumber' | jq -sc '.')"
 
+          changelog_body="${CHANGELOG//$'\r'/}"
+
           metadata="$(jq -nc \
-            --arg changelog "$CHANGELOG" \
+            --arg changelog "$changelog_body" \
             --arg changelog_type "$CHANGELOG_TYPE" \
             --arg name "$DISPLAY_NAME" \
             --argjson gv "$game_versions" \
             --argjson dependencies "$CURSEFORGE_DEPENDENCIES" \
-            '{changelog:$changelog, changelogType:$changelog_type, displayName:$name, gameVersions:$gv, releaseType:"release"} + (if ($dependencies | length) > 0 then {relations:{projects:($dependencies | map({slug, type}))}} else {} end)')"
+            '{changelog:$changelog, changelogType:$changelog_type, displayName:$name, gameVersions:$gv, releaseType:"release"} + (if ($dependencies | length) > 0 then {relations:{projects:$dependencies}} else {} end)')"
 
           jar="$(find build/libs -maxdepth 1 -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n1)"
           if [[ -z "$jar" ]]; then echo "No jar found in build/libs"; exit 1; fi
