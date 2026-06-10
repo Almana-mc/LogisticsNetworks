@@ -902,6 +902,12 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         if (settingsScrollOffset < maxScroll) {
             g.drawString(font, "\u25BC", x + w + 2, y + h - 9, cSubtle(), false);
         }
+
+        if (editingRow != -1 && numericEditBox != null) {
+            int bx = numericEditBox.getX();
+            int by = numericEditBox.getY();
+            g.fill(bx - 2, by, bx + numericEditBox.getWidth(), by + numericEditBox.getHeight(), t.surfaceSunken());
+        }
     }
 
     private Theme.Variant getModeVariant(ChannelMode mode) {
@@ -1644,10 +1650,9 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             default -> "";
         };
 
-        numericEditBox = new EditBox(font, x, y, 70, 11, Component.empty());
+        numericEditBox = new FlatEditBox(font, x, y, 70, 11, Component.empty());
         numericEditBox.setMaxLength(10);
         numericEditBox.setValue(val);
-        numericEditBox.setBordered(true);
         numericEditBox.setTextColor(cText());
         numericEditBox.setFocused(true);
         addRenderableWidget(numericEditBox);
