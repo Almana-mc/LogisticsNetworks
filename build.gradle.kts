@@ -101,13 +101,6 @@ neoForge {
 
 sourceSets.main.get().resources.srcDir("src/generated/client")
 sourceSets.main.get().resources.srcDir("src/generated/server")
-// 26.1 compile triage
-sourceSets.main.get().java.exclude(
-    "me/almana/logisticsnetworks/client/ClientEventHandler.java",
-    "me/almana/logisticsnetworks/client/LogisticsNodeRenderer.java",
-    "me/almana/logisticsnetworks/client/model/**",
-    "me/almana/logisticsnetworks/integration/emi/**"
-)
 
 dependencies {
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
