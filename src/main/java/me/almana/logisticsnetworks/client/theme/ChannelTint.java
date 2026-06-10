@@ -28,7 +28,8 @@ public final class ChannelTint {
     }
 
     public static int selectedBg(ChannelType type, Theme theme) {
-        return shade(hue(type), theme);
+        int base = hue(type);
+        return isLight(theme.surface2()) ? blend(base, 0xFF000000, 0.28f) : blend(base, 0xFF000000, 0.18f);
     }
 
     public static int selectedFg(ChannelType type, Theme theme) {
