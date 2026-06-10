@@ -1,0 +1,49 @@
+name: Build Check
+
+on:
+  push:
+    branches-ignore:
+      - "dependabot/**"
+  pull_request:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Java version
+        id: java
+        shell: bash
+        run: |
+          java_version="$(grep -oE 'JavaLanguageVersion\.of\([0-9]+\)' build.gradle.kts | head -n1 | grep -oE '[0-9]+' || true)"
+          if [[ -z "$java_version" ]]; then
+            java_version="21"
+          fi
+          echo "version=$java_version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.java.outputs.version }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
+      - name: Compile
+        run: ./gradlew compileJava --console=plain
+        env:
+          CI: true
