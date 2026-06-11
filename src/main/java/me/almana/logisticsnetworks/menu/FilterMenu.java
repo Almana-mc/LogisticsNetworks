@@ -614,6 +614,19 @@ public class FilterMenu extends AbstractContainerMenu {
         return FilterItemData.isSlotNbtMatchAny(getOpenedStack(), slot);
     }
 
+    public boolean isEntryNbtStrict(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return false;
+        return FilterItemData.isEntryNbtStrict(getOpenedStack(), slot);
+    }
+
+    public void setEntryNbtStrict(int slot, boolean strict) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.setEntryNbtStrict(getOpenedStack(), slot, strict);
+        broadcastChanges();
+    }
+
     public void addSlotNbtRule(Player player, int slot, String path, String operator) {
         addSlotNbtRule(player, slot, path, operator, "");
     }

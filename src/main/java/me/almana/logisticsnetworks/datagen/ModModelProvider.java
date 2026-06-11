@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.datagen;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.data.models.BlockModelGenerators;
 import net.minecraft.client.data.models.ItemModelGenerators;
@@ -14,7 +14,7 @@ import net.minecraft.world.item.Item;
 
 public class ModModelProvider extends ModelProvider {
     public ModModelProvider(PackOutput output) {
-        super(output, Logisticsnetworks.MOD_ID);
+        super(output, LogisticsNetworks.MOD_ID);
     }
 
     @Override
@@ -39,13 +39,13 @@ public class ModModelProvider extends ModelProvider {
             itemModels.generateFlatItem(item, ModelTemplates.FLAT_ITEM);
         }
 
-        Identifier laptop = Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "block/laptop");
+        Identifier laptop = Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "block/laptop");
         blockModels.blockStateOutput.accept(
                 MultiVariantGenerator.dispatch(Registration.COMPUTER_BLOCK.get(), BlockModelGenerators.plainVariant(laptop))
                         .with(BlockModelGenerators.ROTATION_HORIZONTAL_FACING));
         itemModels.itemModelOutput.accept(Registration.COMPUTER_ITEM.get(), ItemModelUtils.plainModel(laptop));
 
-        Identifier node = Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "item/logistics_node");
+        Identifier node = Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "item/logistics_node");
         itemModels.itemModelOutput.accept(Registration.LOGISTICS_NODE_ITEM.get(), ItemModelUtils.plainModel(node));
     }
 }

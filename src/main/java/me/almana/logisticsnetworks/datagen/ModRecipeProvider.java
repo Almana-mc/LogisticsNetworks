@@ -2,7 +2,7 @@ package me.almana.logisticsnetworks.datagen;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.GuideRecipe;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -96,13 +96,13 @@ public class ModRecipeProvider extends RecipeProvider {
         @SuppressWarnings("unchecked")
         DataComponentType<Identifier> idType = (DataComponentType<Identifier>) guideIdType;
         DataComponentPatch patch = DataComponentPatch.builder()
-                .set(idType, Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "guide"))
+                .set(idType, Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "guide"))
                 .build();
         ItemStackTemplate result = new ItemStackTemplate(guideItem, patch);
 
         RecipeOutput guideOutput = output.withConditions(new ModLoadedCondition("guideme"));
         ResourceKey<Recipe<?>> id = ResourceKey.create(Registries.RECIPE,
-                Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "guide"));
+                Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "guide"));
 
         GuideRecipe recipe = new GuideRecipe(
                 RecipeBuilder.createCraftingCommonInfo(true),

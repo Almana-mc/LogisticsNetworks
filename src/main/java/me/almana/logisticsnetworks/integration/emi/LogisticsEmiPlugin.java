@@ -1,3 +1,5 @@
+// EMI has no 26.1 build yet; re-enable with the emi-neoforge dependency once available.
+/*
 package me.almana.logisticsnetworks.integration.emi;
 
 import dev.emi.emi.api.EmiEntrypoint;
@@ -19,3 +21,4 @@ public class LogisticsEmiPlugin implements EmiPlugin {
         });
     }
 }
+*/

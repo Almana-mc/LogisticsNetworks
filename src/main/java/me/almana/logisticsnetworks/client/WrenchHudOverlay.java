@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -21,7 +21,7 @@ public class WrenchHudOverlay {
 
     private static boolean hudVisible = true;
     private static final KeyMapping.Category LOGISTICS_CATEGORY = new KeyMapping.Category(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "logisticsnetworks"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "logisticsnetworks"));
 
     public static final KeyMapping TOGGLE_HUD = new KeyMapping(
             "key.logisticsnetworks.toggle_wrench_hud",
@@ -33,7 +33,7 @@ public class WrenchHudOverlay {
         event.register(TOGGLE_HUD);
     }
 
-    @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
+    @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
     public static class GameEvents {
 
         @SubscribeEvent

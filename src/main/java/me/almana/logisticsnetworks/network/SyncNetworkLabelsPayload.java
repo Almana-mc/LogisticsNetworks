@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -12,7 +12,7 @@ import java.util.List;
 public record SyncNetworkLabelsPayload(List<String> labels) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SyncNetworkLabelsPayload> TYPE = new CustomPacketPayload.Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_network_labels"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "sync_network_labels"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncNetworkLabelsPayload> STREAM_CODEC = StreamCodec
             .of(SyncNetworkLabelsPayload::write, SyncNetworkLabelsPayload::read);

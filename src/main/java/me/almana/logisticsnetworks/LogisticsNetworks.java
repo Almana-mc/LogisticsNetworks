@@ -27,6 +27,7 @@ import me.almana.logisticsnetworks.network.SetFilterPayload;
 import me.almana.logisticsnetworks.network.SetNodeUpgradeItemPayload;
 import me.almana.logisticsnetworks.network.ApplyPatternPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
+import me.almana.logisticsnetworks.network.SetNetworkColorPayload;
 import me.almana.logisticsnetworks.network.RequestChannelListPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
@@ -65,12 +66,12 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
-@Mod(Logisticsnetworks.MOD_ID)
-public class Logisticsnetworks {
+@Mod(LogisticsNetworks.MOD_ID)
+public class LogisticsNetworks {
 
         public static final String MOD_ID = "logisticsnetworks";
 
-        public Logisticsnetworks(IEventBus modBus) {
+        public LogisticsNetworks(IEventBus modBus) {
                 Registration.init(modBus);
                 modBus.addListener(ModDataGenerators::gather);
                 modBus.addListener(ModDataGenerators::gatherServer);
@@ -160,6 +161,8 @@ public class Logisticsnetworks {
                                 ServerPayloadHandler::handleCopyPasteConnected);
                 registrar.playToServer(RenameNetworkPayload.TYPE, RenameNetworkPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleRenameNetwork);
+                registrar.playToServer(SetNetworkColorPayload.TYPE, SetNetworkColorPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetNetworkColor);
                 registrar.playToServer(ApplyPatternPayload.TYPE, ApplyPatternPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleApplyPattern);
                 registrar.playToServer(RequestNetworkNodesPayload.TYPE, RequestNetworkNodesPayload.STREAM_CODEC,

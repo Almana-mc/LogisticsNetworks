@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.integration.jade;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
@@ -16,7 +16,7 @@ public enum NodeAttachedDataProvider implements IServerDataProvider<BlockAccesso
     static final String KEY_HAS_NODE = "has_node";
 
     private static final Identifier UID = Identifier.fromNamespaceAndPath(
-            Logisticsnetworks.MOD_ID, "node_attached");
+            LogisticsNetworks.MOD_ID, "node_attached");
 
     @Override
     public void appendServerData(CompoundTag data, BlockAccessor accessor) {

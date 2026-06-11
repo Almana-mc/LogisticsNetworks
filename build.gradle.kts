@@ -101,13 +101,6 @@ neoForge {
 
 sourceSets.main.get().resources.srcDir("src/generated/client")
 sourceSets.main.get().resources.srcDir("src/generated/server")
-// 26.1 compile triage
-sourceSets.main.get().java.exclude(
-    "me/almana/logisticsnetworks/client/ClientEventHandler.java",
-    "me/almana/logisticsnetworks/client/LogisticsNodeRenderer.java",
-    "me/almana/logisticsnetworks/client/model/**",
-    "me/almana/logisticsnetworks/integration/emi/**"
-)
 
 dependencies {
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
@@ -126,6 +119,11 @@ dependencies {
 
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
     runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+
+    // Iris API — compile-only; shaders are an optional runtime dependency.
+    compileOnly("maven.modrinth:iris:1.10.9+26.1-neoforge") {
+        isTransitive = false
+    }
 
     // 26.1 compat deps pending
     /*

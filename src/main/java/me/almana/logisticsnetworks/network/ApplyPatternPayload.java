@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -10,7 +10,7 @@ import net.minecraft.resources.Identifier;
 public record ApplyPatternPayload(boolean useOutputs, int multiplier) implements CustomPacketPayload {
 
     public static final Type<ApplyPatternPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "apply_pattern"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "apply_pattern"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ApplyPatternPayload> STREAM_CODEC = StreamCodec
             .composite(

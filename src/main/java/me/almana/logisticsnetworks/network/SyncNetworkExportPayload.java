@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -21,7 +21,7 @@ public record SyncNetworkExportPayload(
     }
 
     public static final CustomPacketPayload.Type<SyncNetworkExportPayload> TYPE = new CustomPacketPayload.Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_network_export"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "sync_network_export"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncNetworkExportPayload> STREAM_CODEC = StreamCodec
             .of(SyncNetworkExportPayload::write, SyncNetworkExportPayload::read);

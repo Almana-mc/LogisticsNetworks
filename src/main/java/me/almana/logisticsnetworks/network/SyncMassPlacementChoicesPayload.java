@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -18,7 +18,7 @@ public record SyncMassPlacementChoicesPayload(
     }
 
     public static final CustomPacketPayload.Type<SyncMassPlacementChoicesPayload> TYPE = new CustomPacketPayload.Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_mass_placement_choices"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "sync_mass_placement_choices"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncMassPlacementChoicesPayload> STREAM_CODEC = StreamCodec
             .of(SyncMassPlacementChoicesPayload::write, SyncMassPlacementChoicesPayload::read);

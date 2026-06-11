@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -16,6 +16,7 @@ public record SetFilterEntryNbtPayload(int slot, int action, String path, String
     public static final int ACTION_CLEAR = 3;
     public static final int ACTION_SET_VALUE = 4;
     public static final int ACTION_SET_RAW = 5;
+    public static final int ACTION_SET_STRICT = 6;
 
     public static SetFilterEntryNbtPayload add(int slot, String path, String operator, String fallbackValue) {
         return new SetFilterEntryNbtPayload(slot, ACTION_ADD, path, operator, -1, fallbackValue);
@@ -41,8 +42,12 @@ public record SetFilterEntryNbtPayload(int slot, int action, String path, String
         return new SetFilterEntryNbtPayload(slot, ACTION_SET_RAW, "", "=", -1, rawSnbt);
     }
 
+    public static SetFilterEntryNbtPayload setStrict(int slot, boolean strict) {
+        return new SetFilterEntryNbtPayload(slot, ACTION_SET_STRICT, "", "=", -1, Boolean.toString(strict));
+    }
+
     public static final Type<SetFilterEntryNbtPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_entry_nbt"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "set_filter_entry_nbt"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterEntryNbtPayload> STREAM_CODEC = StreamCodec
             .composite(

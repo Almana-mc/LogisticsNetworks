@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks.datagen;
 
 import java.util.concurrent.CompletableFuture;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.registration.ModTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
@@ -11,7 +11,7 @@ import net.minecraft.world.level.material.Fluid;
 
 public class ModFluidTagProvider extends IntrinsicHolderTagsProvider<Fluid> {
     public ModFluidTagProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookup) {
-        super(output, Registries.FLUID, lookup, fluid -> fluid.builtInRegistryHolder().key(), Logisticsnetworks.MOD_ID);
+        super(output, Registries.FLUID, lookup, fluid -> fluid.builtInRegistryHolder().key(), LogisticsNetworks.MOD_ID);
     }
 
     @Override

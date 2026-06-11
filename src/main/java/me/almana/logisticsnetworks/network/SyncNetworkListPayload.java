@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -13,11 +13,11 @@ import java.util.UUID;
 public record SyncNetworkListPayload(
         List<NetworkEntry> networks) implements CustomPacketPayload {
 
-    public record NetworkEntry(UUID id, String name, int nodeCount, boolean pinned, long createdAt) {
+    public record NetworkEntry(UUID id, String name, int nodeCount, boolean pinned, long createdAt, int color) {
     }
 
     public static final CustomPacketPayload.Type<SyncNetworkListPayload> TYPE = new CustomPacketPayload.Type<>(
-            Identifier.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_network_list"));
+            Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "sync_network_list"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncNetworkListPayload> STREAM_CODEC = StreamCodec
             .of(SyncNetworkListPayload::write, SyncNetworkListPayload::read);
@@ -31,7 +31,8 @@ public record SyncNetworkListPayload(
             int nodeCount = buf.readVarInt();
             boolean pinned = buf.readBoolean();
             long createdAt = buf.readLong();
-            entries.add(new NetworkEntry(id, name, nodeCount, pinned, createdAt));
+            int color = buf.readInt();
+            entries.add(new NetworkEntry(id, name, nodeCount, pinned, createdAt, color));
         }
         return new SyncNetworkListPayload(entries);
     }
@@ -44,6 +45,7 @@ public record SyncNetworkListPayload(
             buf.writeVarInt(entry.nodeCount);
             buf.writeBoolean(entry.pinned);
             buf.writeLong(entry.createdAt);
+            buf.writeInt(entry.color);
         }
     }
 

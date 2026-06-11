@@ -20,7 +20,7 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
-@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
 public final class LogisticsClientEvents {
 
     private LogisticsClientEvents() {
