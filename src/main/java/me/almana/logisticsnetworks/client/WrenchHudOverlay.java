@@ -20,7 +20,7 @@ import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 public class WrenchHudOverlay {
 
     private static boolean hudVisible = true;
-    private static final KeyMapping.Category LOGISTICS_CATEGORY = new KeyMapping.Category(
+    public static final KeyMapping.Category LOGISTICS_CATEGORY = new KeyMapping.Category(
             Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "logisticsnetworks"));
 
     public static final KeyMapping TOGGLE_HUD = new KeyMapping(

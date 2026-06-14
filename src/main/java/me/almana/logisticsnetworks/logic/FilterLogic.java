@@ -308,4 +308,16 @@ public final class FilterLogic {
         }
         return false;
     }
+
+    public static boolean hasConfiguredSlotMapping(ItemStack[] filters,
+            @Nullable FilterItemData.ReadCache readCache) {
+        if (filters == null)
+            return false;
+        for (ItemStack filter : filters) {
+            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnySlotMappings(filter, readCache)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

@@ -51,7 +51,7 @@ public class TransferEngine {
 
     private record ItemTransferTarget(ResourceHandler<ItemResource> handler, ItemStack[] importFilters,
             FilterMode importFilterMode, TransferAmountRules.Constraints constraints, boolean hasItemNbtFilter,
-            boolean[] allowedSlots) {
+            boolean[] allowedSlots, boolean hasImportSlotMapping) {
     }
 
     public static long processNetwork(LogisticsNetwork network, MinecraftServer server) {
@@ -395,7 +395,8 @@ public class TransferEngine {
                     target.channel.getFilterMode(),
                     TransferAmountRules.collect(exportFilters, importFilters),
                     FilterLogic.hasConfiguredItemNbtFilter(importFilters),
-                    targetAllowedSlots));
+                    targetAllowedSlots,
+                    FilterLogic.hasConfiguredSlotMapping(importFilters, null)));
         }
         if (!anyReachable)
             return -1;
@@ -701,9 +702,18 @@ public class TransferEngine {
                         }
                     }
 
-                    if (provider != null && !FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(),
-                            extracted, provider, candidateComponents, filterReadCache, -1)) {
-                        continue;
+                    boolean[] importAllowedSlots = target.allowedSlots();
+                    if (provider != null) {
+                        if (target.hasImportSlotMapping()) {
+                            importAllowedSlots = computeImportAllowedSlots(target.handler(), target.importFilters(),
+                                    target.importFilterMode(), extracted, provider, candidateComponents, filterReadCache);
+                            if (importAllowedSlots == null) {
+                                continue;
+                            }
+                        } else if (!FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(),
+                                extracted, provider, candidateComponents, filterReadCache, -1)) {
+                            continue;
+                        }
                     }
 
                     int allowedByAmount;
@@ -741,7 +751,7 @@ public class TransferEngine {
 
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
                     ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), simulatedInsert, true,
-                            target.allowedSlots());
+                            importAllowedSlots);
                     int acceptableCount = allowed - simRemainder.getCount();
                     if (acceptableCount <= 0) {
                         continue;
@@ -758,7 +768,7 @@ public class TransferEngine {
                         }
 
                         ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, tx,
-                                target.allowedSlots());
+                                importAllowedSlots);
                         targetAccepted = toMove.getCount() - uninserted.getCount();
 
                         if (!uninserted.isEmpty()) {
@@ -769,7 +779,7 @@ public class TransferEngine {
                                 }
                                 if (!stillLeft.isEmpty()) {
                                     ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(), stillLeft,
-                                            tx, target.allowedSlots());
+                                            tx, importAllowedSlots);
                                     int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
                                     targetAccepted += forcedIn;
                                     if (!forcedRemainder.isEmpty()) {
@@ -920,6 +930,22 @@ public class TransferEngine {
         FluidResource resource = FluidResource.of(stack);
         int extracted = handler.extract(resource, stack.getAmount(), transaction);
         return extracted <= 0 ? FluidStack.EMPTY : resource.toStack(extracted);
+    }
+
+    private static boolean[] computeImportAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack[] importFilters,
+            FilterMode importFilterMode, ItemStack candidate, HolderLookup.Provider provider,
+            @Nullable CompoundTag candidateComponents, @Nullable FilterItemData.ReadCache filterReadCache) {
+        int size = handler.size();
+        boolean[] mask = new boolean[size];
+        boolean any = false;
+        for (int ds = 0; ds < size; ds++) {
+            if (FilterLogic.matchesItemInSlot(importFilters, importFilterMode, candidate, provider,
+                    candidateComponents, filterReadCache, ds)) {
+                mask[ds] = true;
+                any = true;
+            }
+        }
+        return any ? mask : null;
     }
 
     private static ItemStack insertItemWithAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack stack, boolean simulate,
