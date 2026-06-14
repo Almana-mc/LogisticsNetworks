@@ -419,6 +419,8 @@ public class FilterMenu extends AbstractContainerMenu {
     public boolean setNameExpression(Player player, String name) {
         if (!isNameMode)
             return false;
+        if (!name.isEmpty() && !NameFilterData.validateRegex(name).accepted())
+            return false;
         NameFilterData.setNameFilter(getOpenedStack(), name);
         broadcastChanges();
         return true;

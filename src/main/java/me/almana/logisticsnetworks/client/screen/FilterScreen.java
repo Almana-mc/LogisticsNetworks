@@ -297,6 +297,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         refreshFilterData();
 
         if (menu.isModMode()) {
+            manualInputBox.setMaxLength(256);
             manualInputBox.setVisible(true);
             manualInputBox.setX(getSelectorInputX());
             manualInputBox.setY(getSelectorInputY());
@@ -308,6 +309,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 manualInputBox.setValue(getCurrentTargetValue());
             }
         } else if (menu.isNameMode()) {
+            manualInputBox.setMaxLength(NameFilterData.MAX_EXPRESSION_LENGTH);
             manualInputBox.setVisible(true);
             manualInputBox.setHint(fitHint(
                     Component.translatable("gui.logisticsnetworks.filter.name.input_hint"),
@@ -335,7 +337,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (manualInputBox != null) {
             if (wasManualInputFocused && !manualInputBox.isFocused()) {
-                commitManualInput();
+                if (!commitManualInput()) {
+                    manualInputBox.setFocused(true);
+                    setFocused(manualInputBox);
+                }
             }
             wasManualInputFocused = manualInputBox.isFocused();
         }
@@ -1044,7 +1049,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
-        blurManualInputIfNeeded(mx, my);
+        if (blurManualInputIfNeeded(mx, my))
+            return true;
         if (btn == 0 && isHoveringBackButton(mx, my)) {
             return returnToNodeScreen();
         }
@@ -1112,14 +1118,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return true;
     }
 
-    private void blurManualInputIfNeeded(double mx, double my) {
+    private boolean blurManualInputIfNeeded(double mx, double my) {
         if (manualInputBox == null || !manualInputBox.isVisible() || !manualInputBox.isFocused()) {
-            return;
+            return false;
         }
         if (isHoveringManualInput(mx, my)) {
-            return;
+            return false;
         }
-        saveManualInputAndClearFocus();
+        return !saveManualInputAndClearFocus();
     }
 
     private boolean isHoveringManualInput(double mx, double my) {
@@ -1250,7 +1256,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private void sendNameUpdate(String name) {
-        ClientPacketDistributor.sendToServer(new SetNameFilterPayload(name == null ? "" : name));
+        String expression = name == null ? "" : name;
+        if (expression.length() <= NameFilterData.MAX_EXPRESSION_LENGTH)
+            ClientPacketDistributor.sendToServer(new SetNameFilterPayload(expression));
     }
 
     private void renderNameMode(GuiGraphics g, int mx, int my) {
@@ -1268,7 +1276,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         manualInputBox.setWidth(contentW);
 
         String value = menu.getNameFilter();
-        boolean validRegex = value.isEmpty() || NameFilterData.isValidRegex(value);
+        NameFilterData.ValidationResult validation = NameFilterData.validateRegex(value);
+        boolean validRegex = value.isEmpty() || validation.accepted();
         String display = value.isEmpty()
                 ? Component.translatable("gui.logisticsnetworks.filter.name.none").getString()
                 : value;
@@ -1280,7 +1289,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, activeColor, false);
 
         if (!value.isEmpty() && !validRegex) {
-            String warning = Component.translatable("gui.logisticsnetworks.filter.name.invalid_regex").getString();
+            String warningKey = switch (validation.error()) {
+                case TOO_LONG -> "gui.logisticsnetworks.filter.name.too_long";
+                case UNSUPPORTED -> "gui.logisticsnetworks.filter.name.unsafe_regex";
+                default -> "gui.logisticsnetworks.filter.name.invalid_regex";
+            };
+            String warning = Component.translatable(warningKey).getString();
             g.drawString(font, warning, contentX, hintY, 0xFFFF5555, false);
         } else {
             String hintLine = Component.translatable("gui.logisticsnetworks.filter.name.input_hint").getString();
@@ -1418,18 +1432,20 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return true;
     }
 
-    private void saveManualInputAndClearFocus() {
+    private boolean saveManualInputAndClearFocus() {
         if (manualInputBox == null || !manualInputBox.isVisible()) {
-            return;
+            return false;
         }
-        commitManualInput();
+        if (!commitManualInput())
+            return false;
         manualInputBox.setFocused(false);
         wasManualInputFocused = false;
+        return true;
     }
 
-    private void commitManualInput() {
+    private boolean commitManualInput() {
         if (manualInputBox == null || !manualInputBox.isVisible()) {
-            return;
+            return false;
         }
 
         String val = manualInputBox.getValue() == null ? "" : manualInputBox.getValue().trim();
@@ -1439,9 +1455,29 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             } else {
                 sendModUpdate(val);
             }
+            return true;
         } else if (menu.isNameMode()) {
+            NameFilterData.ValidationResult validation = NameFilterData.validateRegex(val);
+            if (!val.isEmpty() && !validation.accepted()) {
+                showRegexChatMessage(validation.error());
+                return false;
+            }
+            menu.setNameFilter(val);
             sendNameUpdate(val);
+            return true;
         }
+        return false;
+    }
+
+    private void showRegexChatMessage(NameFilterData.ValidationError error) {
+        if (minecraft == null || minecraft.player == null)
+            return;
+        String key = switch (error) {
+            case TOO_LONG -> "message.logisticsnetworks.filter.regex.too_long";
+            case UNSUPPORTED -> "message.logisticsnetworks.filter.regex.unsupported";
+            default -> "message.logisticsnetworks.filter.regex.invalid";
+        };
+        minecraft.player.sendSystemMessage(Component.translatable(key));
     }
 
     @Override

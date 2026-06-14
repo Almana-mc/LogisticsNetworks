@@ -786,6 +786,16 @@ public class ServerPayloadHandler {
     public static void handleSetNameFilter(SetNameFilterPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && menu.isNameMode()) {
+                NameFilterData.ValidationResult validation = NameFilterData.validateRegex(payload.name());
+                if (!payload.name().isEmpty() && !validation.accepted()) {
+                    String key = switch (validation.error()) {
+                        case TOO_LONG -> "message.logisticsnetworks.filter.regex.too_long";
+                        case UNSUPPORTED -> "message.logisticsnetworks.filter.regex.unsupported";
+                        default -> "message.logisticsnetworks.filter.regex.invalid";
+                    };
+                    context.player().sendSystemMessage(Component.translatable(key));
+                    return;
+                }
                 menu.setNameExpression((Player) context.player(), payload.name());
             }
         });
