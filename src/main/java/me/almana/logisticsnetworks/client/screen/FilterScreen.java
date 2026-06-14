@@ -297,6 +297,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         refreshFilterData();
 
         if (menu.isModMode()) {
+            manualInputBox.setMaxLength(256);
             manualInputBox.setVisible(true);
             manualInputBox.setX(getSelectorInputX());
             manualInputBox.setY(getSelectorInputY());
@@ -308,6 +309,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 manualInputBox.setValue(getCurrentTargetValue());
             }
         } else if (menu.isNameMode()) {
+            manualInputBox.setMaxLength(NameFilterData.MAX_EXPRESSION_LENGTH);
             manualInputBox.setVisible(true);
             manualInputBox.setHint(fitHint(
                     Component.translatable("gui.logisticsnetworks.filter.name.input_hint"),
@@ -1250,7 +1252,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private void sendNameUpdate(String name) {
-        ClientPacketDistributor.sendToServer(new SetNameFilterPayload(name == null ? "" : name));
+        String expression = name == null ? "" : name;
+        if (expression.length() <= NameFilterData.MAX_EXPRESSION_LENGTH)
+            ClientPacketDistributor.sendToServer(new SetNameFilterPayload(expression));
     }
 
     private void renderNameMode(GuiGraphics g, int mx, int my) {
@@ -1268,7 +1272,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         manualInputBox.setWidth(contentW);
 
         String value = menu.getNameFilter();
-        boolean validRegex = value.isEmpty() || NameFilterData.isValidRegex(value);
+        NameFilterData.ValidationResult validation = NameFilterData.validateRegex(value);
+        boolean validRegex = value.isEmpty() || validation.accepted();
         String display = value.isEmpty()
                 ? Component.translatable("gui.logisticsnetworks.filter.name.none").getString()
                 : value;
@@ -1280,7 +1285,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, activeColor, false);
 
         if (!value.isEmpty() && !validRegex) {
-            String warning = Component.translatable("gui.logisticsnetworks.filter.name.invalid_regex").getString();
+            String warningKey = switch (validation.error()) {
+                case TOO_LONG -> "gui.logisticsnetworks.filter.name.too_long";
+                case UNSUPPORTED -> "gui.logisticsnetworks.filter.name.unsafe_regex";
+                default -> "gui.logisticsnetworks.filter.name.invalid_regex";
+            };
+            String warning = Component.translatable(warningKey).getString();
             g.drawString(font, warning, contentX, hintY, 0xFFFF5555, false);
         } else {
             String hintLine = Component.translatable("gui.logisticsnetworks.filter.name.input_hint").getString();

@@ -417,7 +417,7 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public boolean setNameExpression(Player player, String name) {
-        if (!isNameMode)
+        if (!isNameMode || name.length() > NameFilterData.MAX_EXPRESSION_LENGTH)
             return false;
         NameFilterData.setNameFilter(getOpenedStack(), name);
         broadcastChanges();
