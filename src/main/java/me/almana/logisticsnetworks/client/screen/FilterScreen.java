@@ -337,7 +337,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (manualInputBox != null) {
             if (wasManualInputFocused && !manualInputBox.isFocused()) {
-                commitManualInput();
+                if (!commitManualInput()) {
+                    manualInputBox.setFocused(true);
+                    setFocused(manualInputBox);
+                }
             }
             wasManualInputFocused = manualInputBox.isFocused();
         }
@@ -1046,7 +1049,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
-        blurManualInputIfNeeded(mx, my);
+        if (blurManualInputIfNeeded(mx, my))
+            return true;
         if (btn == 0 && isHoveringBackButton(mx, my)) {
             return returnToNodeScreen();
         }
@@ -1114,14 +1118,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return true;
     }
 
-    private void blurManualInputIfNeeded(double mx, double my) {
+    private boolean blurManualInputIfNeeded(double mx, double my) {
         if (manualInputBox == null || !manualInputBox.isVisible() || !manualInputBox.isFocused()) {
-            return;
+            return false;
         }
         if (isHoveringManualInput(mx, my)) {
-            return;
+            return false;
         }
-        saveManualInputAndClearFocus();
+        return !saveManualInputAndClearFocus();
     }
 
     private boolean isHoveringManualInput(double mx, double my) {
@@ -1428,18 +1432,20 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return true;
     }
 
-    private void saveManualInputAndClearFocus() {
+    private boolean saveManualInputAndClearFocus() {
         if (manualInputBox == null || !manualInputBox.isVisible()) {
-            return;
+            return false;
         }
-        commitManualInput();
+        if (!commitManualInput())
+            return false;
         manualInputBox.setFocused(false);
         wasManualInputFocused = false;
+        return true;
     }
 
-    private void commitManualInput() {
+    private boolean commitManualInput() {
         if (manualInputBox == null || !manualInputBox.isVisible()) {
-            return;
+            return false;
         }
 
         String val = manualInputBox.getValue() == null ? "" : manualInputBox.getValue().trim();
@@ -1449,9 +1455,29 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             } else {
                 sendModUpdate(val);
             }
+            return true;
         } else if (menu.isNameMode()) {
+            NameFilterData.ValidationResult validation = NameFilterData.validateRegex(val);
+            if (!val.isEmpty() && !validation.accepted()) {
+                showRegexChatMessage(validation.error());
+                return false;
+            }
+            menu.setNameFilter(val);
             sendNameUpdate(val);
+            return true;
         }
+        return false;
+    }
+
+    private void showRegexChatMessage(NameFilterData.ValidationError error) {
+        if (minecraft == null || minecraft.player == null)
+            return;
+        String key = switch (error) {
+            case TOO_LONG -> "message.logisticsnetworks.filter.regex.too_long";
+            case UNSUPPORTED -> "message.logisticsnetworks.filter.regex.unsupported";
+            default -> "message.logisticsnetworks.filter.regex.invalid";
+        };
+        minecraft.player.sendSystemMessage(Component.translatable(key));
     }
 
     @Override
