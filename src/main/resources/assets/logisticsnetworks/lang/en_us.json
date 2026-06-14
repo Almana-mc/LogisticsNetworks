@@ -288,6 +288,7 @@
   "message.logisticsnetworks.node_already_exists": "A node is already attached here",
   "message.logisticsnetworks.not_owner": "You do not own this node",
   "message.logisticsnetworks.node_removed": "Node removed",
+  "message.logisticsnetworks.label.missing_upgrades": "Missing upgrades: %s",
   "message.logisticsnetworks.clipboard.copied": "Configuration copied to wrench clipboard",
   "message.logisticsnetworks.clipboard.empty": "Clipboard is empty",
   "message.logisticsnetworks.clipboard.invalid": "Clipboard data is invalid",

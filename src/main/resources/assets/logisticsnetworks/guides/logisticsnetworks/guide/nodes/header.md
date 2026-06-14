@@ -96,7 +96,11 @@ Names are purely cosmetic — they do not affect transfers. Use them to tag chan
 
 Leave the field empty and confirm to clear the label.
 
-**Why it matters:** when two or more nodes on the same network share the same label, any change to one of them is automatically copied to every other node in the group. This covers channel modes, types, filters, batch sizes, delays, filter items, and filter configurations. Upgrades stay per-node, and batch sizes are clamped to what each node's upgrades allow.
+**Why it matters:** when two or more nodes on the same network share the same label, any channel change to one of them is automatically copied to every other node in the group. This covers channel modes, types, filters, batch sizes, delays, filter items, and filter configurations.
+
+Joining an existing label also matches that group's upgrade layout. Required upgrades are pulled from your inventory first, then from the AE2 network linked to the wrench that opened the node screen. Nodes opened through the Computer use your inventory only. Replaced upgrades return to your inventory or drop beside you when the inventory is full. If the full upgrade set is unavailable, no upgrades move: the label and channel settings still apply, values are clamped to the installed upgrades, and a message lists every missing upgrade.
+
+Upgrades remain per-node after joining. Whenever you close a labeled node screen, matching upgrades are pulled for the other labeled nodes as one operation and its settings are reapplied. If any upgrades are missing, none move and chat lists the total shortage. Adding or removing an upgrade later reapplies the label group's channel settings and clamps them to the new limits.
 
 Typical use: label all 20 of your furnace nodes `furnace`, configure one, and the other 19 copy the setup automatically. Later tweaks to any of them propagate to all.
 

@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.network;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.filter.*;
@@ -15,6 +16,7 @@ import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
@@ -43,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
@@ -445,13 +448,7 @@ public class ServerPayloadHandler {
                 return;
 
             node.setUpgradeItem(payload.upgradeSlot(), payload.upgradeItem());
-
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                ChannelData channel = node.getChannel(i);
-                if (channel != null)
-                    setChannelToUpgradeMax(node, channel);
-            }
-            markNetworkDirty(node);
+            handleNodeUpgradeChanged(node);
         });
     }
 
@@ -555,6 +552,7 @@ public class ServerPayloadHandler {
     public static void handleOpenNodeFilter(OpenNodeFilterPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer serverPlayer)) return;
+            GlobalPos ae2Link = serverPlayer.containerMenu instanceof NodeMenu menu ? menu.getAE2Link() : null;
 
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null) return;
@@ -596,7 +594,7 @@ public class ServerPayloadHandler {
             stackTag.store("Item", ItemStack.OPTIONAL_CODEC, openedStack);
 
             serverPlayer.openMenu(new SimpleMenuProvider(
-                    (id, inv, p) -> new FilterMenu(id, inv, node, ch, fs),
+                    (id, inv, p) -> new FilterMenu(id, inv, node, ch, fs, ae2Link),
                     openedStack.getHoverName()), buf -> {
                         buf.writeVarInt(-2);
                         buf.writeVarInt(payload.entityId());
@@ -643,6 +641,7 @@ public class ServerPayloadHandler {
     public static void handleOpenNodeMenu(OpenNodeMenuPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)) return;
+            GlobalPos ae2Link = player.containerMenu instanceof FilterMenu menu ? menu.getNodeAE2Link() : null;
 
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null) return;
@@ -656,7 +655,7 @@ public class ServerPayloadHandler {
 
                 @Override
                 public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
-                    NodeMenu menu = new NodeMenu(containerId, playerInv, node);
+                    NodeMenu menu = new NodeMenu(containerId, playerInv, node, ae2Link);
                     menu.setSelectedChannel(selectedChannel);
                     return menu;
                 }
@@ -891,6 +890,230 @@ public class ServerPayloadHandler {
         };
     }
 
+    public static void handleNodeUpgradeChanged(LogisticsNodeEntity node) {
+        LogisticsNodeEntity template = findLabelTemplate(node);
+        if (template != null) {
+            copyTemplateChannels(template, node);
+        } else {
+            for (int channelIndex = 0; channelIndex < LogisticsNodeEntity.CHANNEL_COUNT; channelIndex++) {
+                ChannelData channel = node.getChannel(channelIndex);
+                if (channel != null) {
+                    setChannelToUpgradeMax(node, channel);
+                    sendChannelSyncToViewers(node, channelIndex, channel);
+                }
+            }
+        }
+        markNetworkDirty(node);
+    }
+
+    @Nullable
+    private static LogisticsNodeEntity findLabelTemplate(LogisticsNodeEntity target) {
+        String label = target.getNodeLabel();
+        if (label.isEmpty() || target.getNetworkId() == null || !(target.level() instanceof ServerLevel level)) {
+            return null;
+        }
+
+        LogisticsNetwork network = NetworkRegistry.get(level).getNetwork(target.getNetworkId());
+        if (network == null) {
+            return null;
+        }
+
+        LogisticsNodeEntity best = null;
+        int bestTier = -1;
+        for (UUID nodeId : network.getNodeUuids()) {
+            if (nodeId.equals(target.getUUID())) {
+                continue;
+            }
+            LogisticsNodeEntity candidate = findNode(level, nodeId);
+            if (candidate == null || !candidate.isValidNode() || !label.equals(candidate.getNodeLabel())) {
+                continue;
+            }
+
+            int tier = NodeUpgradeData.getUpgradeTier(candidate);
+            if (tier > bestTier || (tier == bestTier
+                    && (best == null || candidate.getUUID().compareTo(best.getUUID()) < 0))) {
+                best = candidate;
+                bestTier = tier;
+            }
+        }
+        return best;
+    }
+
+    @Nullable
+    private static LogisticsNodeEntity findNode(ServerLevel sourceLevel, UUID nodeId) {
+        for (ServerLevel level : sourceLevel.getServer().getAllLevels()) {
+            Entity entity = level.getEntity(nodeId);
+            if (entity instanceof LogisticsNodeEntity node) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private static List<UpgradeRequirement> applyTemplateUpgrades(ServerPlayer player, LogisticsNodeEntity target,
+            LogisticsNodeEntity template, @Nullable GlobalPos ae2Link) {
+        UpgradeChanges changes = getUpgradeChanges(target, template);
+        List<UpgradeRequirement> missing = getMissingUpgrades(player, changes.required(), ae2Link);
+        if (!missing.isEmpty()) {
+            return missing;
+        }
+
+        Inventory inventory = player.getInventory();
+        for (UpgradeRequirement requirement : changes.required()) {
+            AE2Compat.consumeCombined(inventory, requirement.stack(), requirement.count(), -1, ae2Link, player);
+        }
+        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+            target.setUpgradeItem(slot, template.getUpgradeItem(slot));
+        }
+        for (ItemStack stack : changes.returned()) {
+            ItemStack returned = stack.copy();
+            inventory.add(returned);
+            if (!returned.isEmpty()) {
+                player.drop(returned, false);
+            }
+        }
+        inventory.setChanged();
+        return List.of();
+    }
+
+    private static UpgradeChanges getUpgradeChanges(LogisticsNodeEntity target, LogisticsNodeEntity template) {
+        boolean[] reused = new boolean[LogisticsNodeEntity.UPGRADE_SLOT_COUNT];
+        List<UpgradeRequirement> required = new ArrayList<>();
+
+        for (int templateSlot = 0; templateSlot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; templateSlot++) {
+            ItemStack expected = template.getUpgradeItem(templateSlot);
+            if (expected.isEmpty()) {
+                continue;
+            }
+            int reusableSlot = findReusableUpgrade(target, expected, reused);
+            if (reusableSlot >= 0) {
+                reused[reusableSlot] = true;
+            } else {
+                addUpgradeRequirement(required, expected, 1);
+            }
+        }
+
+        List<ItemStack> returned = new ArrayList<>();
+        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+            ItemStack current = target.getUpgradeItem(slot);
+            if (!current.isEmpty() && !reused[slot]) {
+                returned.add(current.copyWithCount(1));
+            }
+        }
+        return new UpgradeChanges(required, returned);
+    }
+
+    private static int findReusableUpgrade(LogisticsNodeEntity target, ItemStack expected, boolean[] reused) {
+        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+            if (!reused[slot] && ItemStack.isSameItem(target.getUpgradeItem(slot), expected)) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private static void addUpgradeRequirement(List<UpgradeRequirement> requirements, ItemStack stack, int count) {
+        for (int index = 0; index < requirements.size(); index++) {
+            UpgradeRequirement requirement = requirements.get(index);
+            if (ItemStack.isSameItem(requirement.stack(), stack)) {
+                requirements.set(index, new UpgradeRequirement(requirement.stack(), requirement.count() + count));
+                return;
+            }
+        }
+        requirements.add(new UpgradeRequirement(stack.copyWithCount(1), count));
+    }
+
+    private static List<UpgradeRequirement> getMissingUpgrades(ServerPlayer player,
+            List<UpgradeRequirement> requirements, @Nullable GlobalPos ae2Link) {
+        List<UpgradeRequirement> missing = new ArrayList<>();
+        Inventory inventory = player.getInventory();
+        ServerLevel level = player.level() instanceof ServerLevel serverLevel ? serverLevel : null;
+
+        for (UpgradeRequirement requirement : requirements) {
+            long available = AE2Compat.countInInventory(inventory, requirement.stack(), -1);
+            if (ae2Link != null && level != null) {
+                available += AE2Compat.countAvailable(level, ae2Link, requirement.stack());
+            }
+            if (available < requirement.count()) {
+                addUpgradeRequirement(missing, requirement.stack(), (int) (requirement.count() - available));
+            }
+        }
+        return missing;
+    }
+
+    private static Component formatUpgradeRequirements(List<UpgradeRequirement> requirements) {
+        var result = Component.empty();
+        for (int index = 0; index < requirements.size(); index++) {
+            if (index > 0) {
+                result.append(", ");
+            }
+            UpgradeRequirement requirement = requirements.get(index);
+            result.append(Component.literal(requirement.count() + "x "));
+            result.append(requirement.stack().getHoverName());
+        }
+        return result;
+    }
+
+    public static void handleNodeMenuClosed(ServerPlayer player, LogisticsNodeEntity source,
+            @Nullable GlobalPos ae2Link) {
+        String label = source.getNodeLabel();
+        if (label.isEmpty() || source.getNetworkId() == null || !(source.level() instanceof ServerLevel level)) {
+            return;
+        }
+
+        LogisticsNetwork network = NetworkRegistry.get(level).getNetwork(source.getNetworkId());
+        if (network == null) {
+            return;
+        }
+
+        List<LogisticsNodeEntity> targets = new ArrayList<>();
+        List<UpgradeRequirement> required = new ArrayList<>();
+        for (UUID nodeId : network.getNodeUuids()) {
+            if (nodeId.equals(source.getUUID())) {
+                continue;
+            }
+            LogisticsNodeEntity target = findNode(level, nodeId);
+            if (target == null || !target.isValidNode() || !label.equals(target.getNodeLabel())) {
+                continue;
+            }
+            targets.add(target);
+            for (UpgradeRequirement requirement : getUpgradeChanges(target, source).required()) {
+                addUpgradeRequirement(required, requirement.stack(), requirement.count());
+            }
+        }
+
+        List<UpgradeRequirement> missing = getMissingUpgrades(player, required, ae2Link);
+        if (!missing.isEmpty()) {
+            player.sendSystemMessage(Component.translatable(
+                    "message.logisticsnetworks.label.missing_upgrades", formatUpgradeRequirements(missing)));
+            return;
+        }
+
+        for (LogisticsNodeEntity target : targets) {
+            applyTemplateUpgrades(player, target, source, ae2Link);
+            copyTemplateChannels(source, target);
+        }
+        markNetworkDirty(source);
+    }
+
+    private static void copyTemplateChannels(LogisticsNodeEntity template, LogisticsNodeEntity target) {
+        for (int channelIndex = 0; channelIndex < LogisticsNodeEntity.CHANNEL_COUNT; channelIndex++) {
+            ChannelData source = template.getChannel(channelIndex);
+            ChannelData destination = target.getChannel(channelIndex);
+            if (source != null && destination != null) {
+                destination.copyFrom(source);
+                clampChannelToUpgradeLimits(target, destination);
+                sendChannelSyncToViewers(target, channelIndex, destination);
+            }
+        }
+    }
+
+    private record UpgradeRequirement(ItemStack stack, int count) {
+    }
+
+    private record UpgradeChanges(List<UpgradeRequirement> required, List<ItemStack> returned) {
+    }
+
     public static void handleRequestNetworkNodes(RequestNetworkNodesPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player))
@@ -990,6 +1213,8 @@ public class ServerPayloadHandler {
 
     public static void handleSetNodeLabel(SetNodeLabelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
@@ -1002,37 +1227,17 @@ public class ServerPayloadHandler {
                     label, node.getUUID(), node.getNetworkId());
             node.setNodeLabel(label);
 
-            if (!label.isEmpty() && node.getNetworkId() != null
-                    && node.level() instanceof ServerLevel level) {
-                NetworkRegistry registry = NetworkRegistry.get(level);
-                LogisticsNetwork network = registry.getNetwork(node.getNetworkId());
-                if (network != null) {
-                    LOGGER.debug("[LabelSync] Searching {} nodes in network for label '{}'",
-                            network.getNodeUuids().size(), label);
-                    for (UUID otherId : network.getNodeUuids()) {
-                        if (otherId.equals(node.getUUID()))
-                            continue;
-                        for (ServerLevel sl : level.getServer().getAllLevels()) {
-                            Entity entity = sl.getEntity(otherId);
-                            if (entity instanceof LogisticsNodeEntity other
-                                    && label.equals(other.getNodeLabel())) {
-                                LOGGER.debug("[LabelSync] Found matching node {}, copying all channels", otherId);
-                                // Copy all channels from the existing labeled node
-                                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                                    ChannelData src = other.getChannel(i);
-                                    ChannelData dst = node.getChannel(i);
-                                    if (src != null && dst != null) {
-                                        dst.copyFrom(src);
-                                        clampChannelToUpgradeLimits(node, dst);
-                                        sendChannelSyncToViewers(node, i, dst);
-                                    }
-                                }
-                                markNetworkDirty(node);
-                                return;
-                            }
-                        }
+            if (!label.isEmpty() && node.getNetworkId() != null) {
+                LogisticsNodeEntity template = findLabelTemplate(node);
+                if (template != null) {
+                    GlobalPos ae2Link = player.containerMenu instanceof NodeMenu menu ? menu.getAE2Link() : null;
+                    List<UpgradeRequirement> missing = applyTemplateUpgrades(player, node, template, ae2Link);
+                    copyTemplateChannels(template, node);
+                    if (!missing.isEmpty()) {
+                        player.sendSystemMessage(Component.translatable(
+                                "message.logisticsnetworks.label.missing_upgrades", formatUpgradeRequirements(missing)));
                     }
-                    LOGGER.debug("[LabelSync] No matching labeled node found in network");
+                    markNetworkDirty(node);
                 }
             }
         });
