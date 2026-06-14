@@ -153,13 +153,13 @@ jobs:
           from pathlib import Path
 
           curseforge_projects = {
-              "ae2": {"slug": "applied-energistics-2", "projectID": "223794"},
-              "ars_nouveau": {"slug": "ars-nouveau", "projectID": "401955"},
-              "ftbteams": {"slug": "ftb-teams-forge", "projectID": "404468"},
-              "guideme": {"slug": "guideme", "projectID": "1173950"},
-              "jade": {"slug": "jade", "projectID": "324717"},
-              "jei": {"slug": "jei", "projectID": "238222"},
-              "mekanism": {"slug": "mekanism", "projectID": "268560"},
+              "ae2": {"slug": "applied-energistics-2", "projectID": 223794},
+              "ars_nouveau": {"slug": "ars-nouveau", "projectID": 401955},
+              "ftbteams": {"slug": "ftb-teams-forge", "projectID": 404468},
+              "guideme": {"slug": "guideme", "projectID": 1173950},
+              "jade": {"slug": "jade", "projectID": 324717},
+              "jei": {"slug": "jei", "projectID": 238222},
+              "mekanism": {"slug": "mekanism", "projectID": 268560},
           }
           modrinth_projects = {
               "ae2": "ae2",
