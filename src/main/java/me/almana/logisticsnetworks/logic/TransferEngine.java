@@ -397,7 +397,8 @@ public class TransferEngine {
                 exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
-                sourceLevel, sourcePos);
+                sourceLevel, sourcePos,
+                exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN);
     }
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -619,7 +620,8 @@ public class TransferEngine {
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             boolean[] sourceAllowedSlots,
             HolderLookup.Provider provider,
-            ServerLevel sourceLevel, BlockPos sourcePos) {
+            ServerLevel sourceLevel, BlockPos sourcePos,
+            boolean roundRobin) {
 
         int remaining = limit;
         FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
@@ -642,11 +644,18 @@ public class TransferEngine {
             }
         }
         Map<Item, Integer> sourceItemCounts = anyAmountConstraints ? TransferAmountRules.countItems(source) : null;
-        Map<Item, Integer> batchMoved = anyAmountConstraints ? new HashMap<>() : null;
+        Map<Item, Integer> batchMoved = anyAmountConstraints && !roundRobin ? new HashMap<>() : null;
+        List<Map<Item, Integer>> targetBatchMoved = null;
         List<Map<Item, Integer>> targetItemCounts = null;
         if (anyAmountConstraints) {
+            if (roundRobin) {
+                targetBatchMoved = new ArrayList<>(targets.size());
+            }
             targetItemCounts = new ArrayList<>(targets.size());
             for (ItemTransferTarget t : targets) {
+                if (roundRobin) {
+                    targetBatchMoved.add(new HashMap<>());
+                }
                 targetItemCounts.add(
                         (t.constraints().hasImportThreshold() || t.constraints().hasPerEntryAmounts())
                                 ? TransferAmountRules.countItems(t.handler())
@@ -725,7 +734,8 @@ public class TransferEngine {
                             int batchLimit = TransferAmountRules.perEntryItemBatch(extracted, exportFilters, provider,
                                     candidateComponents, filterReadCache);
                             if (batchLimit > 0) {
-                                int alreadyMoved = batchMoved.getOrDefault(extracted.getItem(), 0);
+                                Map<Item, Integer> movedByItem = roundRobin ? targetBatchMoved.get(targetIndex) : batchMoved;
+                                int alreadyMoved = movedByItem.getOrDefault(extracted.getItem(), 0);
                                 allowedByAmount = Math.min(allowedByAmount, Math.max(0, batchLimit - alreadyMoved));
                             }
                         }
@@ -805,7 +815,8 @@ public class TransferEngine {
                             if (tgtCache != null && targetAccepted > 0) {
                                 tgtCache.merge(movedItem, targetAccepted, Integer::sum);
                             }
-                            batchMoved.merge(movedItem, sourceLost, Integer::sum);
+                            Map<Item, Integer> movedByItem = roundRobin ? targetBatchMoved.get(targetIndex) : batchMoved;
+                            movedByItem.merge(movedItem, sourceLost, Integer::sum);
                         }
 
                         break;
