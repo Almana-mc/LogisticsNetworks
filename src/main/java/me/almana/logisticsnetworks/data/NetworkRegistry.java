@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.TransferEngine;
@@ -55,7 +56,7 @@ public class NetworkRegistry extends SavedData {
             return;
 
         if (dirtyNetworks.size() > WARNING_DISPATCH_COUNT) {
-            LOGGER.warn("High load: Dispatching {} dirty networks in one tick.", dirtyNetworks.size());
+            if (Config.debugMode) LOGGER.warn("High load: Dispatching {} dirty networks in one tick.", dirtyNetworks.size());
         }
 
         Set<UUID> snapshot = new HashSet<>(dirtyNetworks);
@@ -74,7 +75,7 @@ public class NetworkRegistry extends SavedData {
                     scheduleWake(id, now + delta);
                 }
             } catch (Exception e) {
-                LOGGER.error("Error processing network {}: {}", id, e.getMessage(), e);
+                if (Config.debugMode) LOGGER.error("Error processing network {}: {}", id, e.getMessage(), e);
             }
         }
     }
@@ -183,7 +184,7 @@ public class NetworkRegistry extends SavedData {
         if (network != null) {
             network.addNode(nodeId);
             if (network.getNodeUuids().size() > WARNING_NODE_COUNT) {
-                LOGGER.warn("Network {} has exceeded {} nodes (Count: {}). Performance may degrade.",
+                if (Config.debugMode) LOGGER.warn("Network {} has exceeded {} nodes (Count: {}). Performance may degrade.",
                         networkId, WARNING_NODE_COUNT, network.getNodeUuids().size());
             }
             markNetworkDirty(networkId);
@@ -198,7 +199,7 @@ public class NetworkRegistry extends SavedData {
             markNetworkDirty(networkId);
 
             if (network.getNodeUuids().isEmpty()) {
-                LOGGER.info("Network {} is empty, deleting.", networkId);
+                if (Config.debugMode) LOGGER.info("Network {} is empty, deleting.", networkId);
                 deleteNetwork(networkId);
             }
             setDirty();
@@ -229,14 +230,14 @@ public class NetworkRegistry extends SavedData {
                         LogisticsNetwork network = LogisticsNetwork.load(ct);
                         registry.networks.put(network.getId(), network);
                     } catch (Exception e) {
-                        LOGGER.error("Skipping malformed network: {}", e.getMessage());
+                        if (Config.debugMode) LOGGER.error("Skipping malformed network: {}", e.getMessage());
                     }
                 }
             }
         }
         if (!registry.networks.isEmpty()) {
             registry.dirtyNetworks.addAll(registry.networks.keySet());
-            LOGGER.info("Loaded {} networks.", registry.networks.size());
+            if (Config.debugMode) LOGGER.info("Loaded {} networks.", registry.networks.size());
         }
         if (assignedDefaultColor) {
             registry.setDirty();

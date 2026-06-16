@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
@@ -1316,7 +1317,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                     COLOR_TEXT_SECONDARY);
         } catch (IOException e) {
             setLnetStatus(line("gui.logisticsnetworks.computer.lnet_file_error"), COLOR_WARNING);
-            LOGGER.warn("Failed to list lnet files", e);
+            if (Config.debugMode) LOGGER.warn("Failed to list lnet files", e);
         }
     }
 
@@ -1333,7 +1334,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             selectedLnetFile = null;
             selectedLnetLabelIndex = -1;
             setLnetStatus(line("gui.logisticsnetworks.computer.lnet_invalid_file"), COLOR_WARNING);
-            LOGGER.warn("Failed to read lnet file {}", path, e);
+            if (Config.debugMode) LOGGER.warn("Failed to read lnet file {}", path, e);
         }
     }
 
@@ -1826,14 +1827,16 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     }
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
-        LOGGER.debug("Received network list with {} entries", networks.size());
-        for (SyncNetworkListPayload.NetworkEntry entry : networks) {
-            LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
+        if (Config.debugMode) LOGGER.debug("Received network list with {} entries", networks.size());
+        if (Config.debugMode) {
+            for (SyncNetworkListPayload.NetworkEntry entry : networks) {
+                LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
+            }
         }
         this.networkList = new ArrayList<>(networks);
         this.networkScrollOffset = Math.min(this.networkScrollOffset,
                 Math.max(0, networkList.size() - NETWORKS_PER_PAGE));
-        LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());
+        if (Config.debugMode) LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());
     }
 
     public void receiveNetworkExport(SyncNetworkExportPayload payload) {
@@ -1861,7 +1864,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                     COLOR_ACCENT);
         } catch (IOException e) {
             setLnetStatus(line("gui.logisticsnetworks.computer.lnet_save_failed"), COLOR_WARNING);
-            LOGGER.warn("Failed to save lnet export", e);
+            if (Config.debugMode) LOGGER.warn("Failed to save lnet export", e);
         }
     }
 

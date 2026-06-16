@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -104,12 +105,12 @@ public class ComputerMenu extends AbstractContainerMenu {
         ComputerBlockEntity computer = getComputer(level);
         Set<UUID> starredNetworks = computer != null ? computer.getStarredNetworks() : Set.of();
 
-        LOGGER.debug("Player {} UUID: {}", player.getName().getString(), player.getUUID());
-        LOGGER.debug("Found {} networks for player", networks.size());
+        if (Config.debugMode) LOGGER.debug("Player {} UUID: {}", player.getName().getString(), player.getUUID());
+        if (Config.debugMode) LOGGER.debug("Found {} networks for player", networks.size());
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>();
         for (LogisticsNetwork net : networks) {
-            LOGGER.debug("  Network: {} (ID: {}, Nodes: {}, Owner: {})",
+            if (Config.debugMode) LOGGER.debug("  Network: {} (ID: {}, Nodes: {}, Owner: {})",
                     net.getName(), net.getId(), net.getNodeUuids().size(), net.getOwnerUuid());
             entries.add(new SyncNetworkListPayload.NetworkEntry(
                     net.getId(),
@@ -120,7 +121,7 @@ public class ComputerMenu extends AbstractContainerMenu {
                     net.getColor()));
         }
 
-        LOGGER.debug("Sending {} network entries to client", entries.size());
+        if (Config.debugMode) LOGGER.debug("Sending {} network entries to client", entries.size());
         PacketDistributor.sendToPlayer(player, new SyncNetworkListPayload(entries));
     }
 

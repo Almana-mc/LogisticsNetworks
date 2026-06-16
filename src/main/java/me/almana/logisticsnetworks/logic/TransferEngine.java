@@ -773,7 +773,7 @@ public class TransferEngine {
                                     int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
                                     targetAccepted += forcedIn;
                                     if (!forcedRemainder.isEmpty()) {
-                                        LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
+                                        if (Config.debugMode) LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
                                                 + "target slot mask. Dropping at source pos {}.",
                                                 forcedRemainder, sourcePos);
                                         droppedToWorld = forcedRemainder.getCount();
@@ -1063,7 +1063,7 @@ public class TransferEngine {
                     int rollbackAmount = drained.getAmount() - filled;
                     int returned = fillFluid(source, drained.copyWithAmount(rollbackAmount), tx);
                     if (returned < rollbackAmount) {
-                        LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
+                        if (Config.debugMode) LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
                                 rollbackAmount - returned, drained.getFluid(), rollbackAmount - returned);
                     }
                 }

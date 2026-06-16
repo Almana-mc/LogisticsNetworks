@@ -232,7 +232,7 @@ public class LogisticsNodeEntity extends Entity {
 
     @Override
     public void kill(ServerLevel level) {
-        LOGGER.warn(
+        if (Config.debugMode) LOGGER.warn(
                 "Attempt to kill LogisticsNodeEntity ignored. Please use '/logisticsnetworks removeNodes' or '/ln removeNodes' instead to safely remove nodes.");
     }
 

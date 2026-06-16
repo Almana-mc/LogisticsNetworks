@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.client.theme;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.Config;
 import net.neoforged.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 
@@ -62,7 +63,7 @@ public final class ThemeState {
                 active = Themes.byId(object.get("theme").getAsString());
             }
         } catch (IOException | RuntimeException exception) {
-            LOGGER.warn("failed to load theme state", exception);
+            if (Config.debugMode) LOGGER.warn("failed to load theme state", exception);
         }
     }
 
@@ -72,7 +73,7 @@ public final class ThemeState {
         try {
             Files.writeString(filePath(), object.toString());
         } catch (IOException exception) {
-            LOGGER.warn("failed to save theme state", exception);
+            if (Config.debugMode) LOGGER.warn("failed to save theme state", exception);
         }
     }
 
@@ -81,7 +82,7 @@ public final class ThemeState {
             try {
                 listener.run();
             } catch (Exception exception) {
-                LOGGER.debug("theme listener failed", exception);
+                if (Config.debugMode) LOGGER.debug("theme listener failed", exception);
             }
         }
     }
