@@ -1,11 +1,11 @@
 {
   "parent": "minecraft:recipes/root",
   "criteria": {
-    "has_ender_eye": {
+    "has_ender_pearl": {
       "conditions": {
         "items": [
           {
-            "items": "minecraft:ender_eye"
+            "items": "minecraft:ender_pearl"
           }
         ]
       },
@@ -21,7 +21,7 @@
   "requirements": [
     [
       "has_the_recipe",
-      "has_ender_eye"
+      "has_ender_pearl"
     ]
   ],
   "rewards": {
