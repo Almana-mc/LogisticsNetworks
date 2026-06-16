@@ -2,16 +2,16 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "key": {
-    "E": "minecraft:ender_eye",
+    "B": "minecraft:iron_bars",
+    "D": "minecraft:deepslate",
+    "E": "minecraft:ender_pearl",
     "H": "minecraft:hopper",
-    "O": "minecraft:obsidian",
-    "R": "minecraft:redstone_block",
-    "T": "minecraft:redstone_torch"
+    "R": "minecraft:redstone"
   },
   "pattern": [
-    "ORO",
-    "HEH",
-    "OTO"
+    "DRD",
+    "BHB",
+    "DED"
   ],
   "result": {
     "id": "logisticsnetworks:logistics_node"
