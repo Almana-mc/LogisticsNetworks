@@ -1,10 +1,10 @@
-// 26.1.2	2026-06-07T13:48:06.2897097	LogisticsNetworks Recipes
+// 26.1.2	2026-06-16T20:11:40.0659382	LogisticsNetworks Recipes
 71ab6fed3c6b858a9c2760036d3f4e1e81729c3e data/logisticsnetworks/advancement/recipes/misc/computer.json
 81ab72b6c4526fc175bca86b7c034c7a39e9ddc3 data/logisticsnetworks/advancement/recipes/misc/diamond_upgrade.json
 be1efa79253aa3e65997fe2031c6acc0fea12cfd data/logisticsnetworks/advancement/recipes/misc/dimensional_upgrade.json
 7c12ee3af95fab56011a37f65cb3bc352b18a3ad data/logisticsnetworks/advancement/recipes/misc/gold_upgrade.json
 a89509df22d787be3c98da515b4b37087f9a6209 data/logisticsnetworks/advancement/recipes/misc/iron_upgrade.json
-be80aa919e8c500d9f4cde5c03e3c551363c1e8b data/logisticsnetworks/advancement/recipes/misc/logistics_node.json
+e4f57fd479f5e02bca395bf9bbc54d09910e6ae1 data/logisticsnetworks/advancement/recipes/misc/logistics_node.json
 12eeb4a9a5ec65764a12236d5d79c230f0229e08 data/logisticsnetworks/advancement/recipes/misc/netherite_upgrade.json
 dcb6fc9cf1b02ba24c29c9435088ae27c1c17495 data/logisticsnetworks/advancement/recipes/misc/wrench.json
 b0a5a1222ffdce7c3d638152cf2eac876352e51d data/logisticsnetworks/recipe/computer.json
@@ -14,6 +14,6 @@ af49af63adb9b45d4970dc0070a0855dc6d270bf data/logisticsnetworks/recipe/filter_co
 1f3932cde026e814c9083aa8710e414da661e6a3 data/logisticsnetworks/recipe/gold_upgrade.json
 44e40b1f2cca9424fcc03014375af2bcc1d8d977 data/logisticsnetworks/recipe/guide.json
 f09274785bacc883b58e2a949b41a5bd3d7ed717 data/logisticsnetworks/recipe/iron_upgrade.json
-19ff9cdc6c5e7cde9de8b7e0fade6b86c3cf90bf data/logisticsnetworks/recipe/logistics_node.json
+c345c0b8910aeff3cdc31046d04b98b616bd384d data/logisticsnetworks/recipe/logistics_node.json
 7e271cded6802e4d991d13b4c0f109fbf101f8b8 data/logisticsnetworks/recipe/netherite_upgrade.json
 0e7832863edc45ae3e193cf994aecf34433a5877 data/logisticsnetworks/recipe/wrench.json
