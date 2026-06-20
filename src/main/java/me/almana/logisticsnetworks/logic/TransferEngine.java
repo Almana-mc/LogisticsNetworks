@@ -51,7 +51,7 @@ public class TransferEngine {
 
     private record ItemTransferTarget(ResourceHandler<ItemResource> handler, ItemStack[] importFilters,
             FilterMode importFilterMode, TransferAmountRules.Constraints constraints, boolean hasItemNbtFilter,
-            boolean[] allowedSlots) {
+            boolean[] allowedSlots, boolean hasImportSlotMapping) {
     }
 
     public static long processNetwork(LogisticsNetwork network, MinecraftServer server) {
@@ -225,7 +225,7 @@ public class TransferEngine {
                 continue;
             }
 
-            targets = orderTargets(targets, channel.getDistributionMode(), sourceNode, i);
+            targets = orderTargets(targets, channel.getDistributionMode(), sourceNode);
 
             int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
             int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
@@ -250,7 +250,7 @@ public class TransferEngine {
                 channel.getTelemetry().record(result);
             }
 
-            updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier, targets.size());
+            updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier);
 
             if (result > 0) {
                 minWakeDelta = 0;
@@ -288,7 +288,7 @@ public class TransferEngine {
     }
 
     private static void updateBackoff(LogisticsNodeEntity node, ChannelData channel, int index, boolean success,
-            long gameTime, int tier, int targetCount) {
+            long gameTime, int tier) {
         node.setLastExecution(index, gameTime);
         boolean isInstantType = channel.getType() == ChannelType.ENERGY;
         int configuredDelay = isInstantType ? 1
@@ -298,9 +298,6 @@ public class TransferEngine {
             float curBackoff = node.getBackoffTicks(index);
             if (curBackoff > configuredDelay) {
                 node.setBackoffTicks(index, Math.max(configuredDelay, curBackoff / BACKOFF_DECAY_DIVISOR));
-            }
-            if (channel.getDistributionMode() == DistributionMode.ROUND_ROBIN) {
-                node.advanceRoundRobin(index, targetCount);
             }
         } else if (Config.backoffEnabled[channel.getType().ordinal()]) {
             float maxBackoff = isInstantType ? BACKOFF_MAX_TICKS_ENERGY : (float) Config.backoffMaxTicks;
@@ -315,7 +312,7 @@ public class TransferEngine {
     }
 
     private static List<ImportTarget> orderTargets(List<ImportTarget> targets, DistributionMode mode,
-            LogisticsNodeEntity sourceNode, int channelIndex) {
+            LogisticsNodeEntity sourceNode) {
         if (targets.size() <= 1)
             return targets;
 
@@ -336,14 +333,7 @@ public class TransferEngine {
                 return targets;
             }
             case ROUND_ROBIN -> {
-                int startIdx = sourceNode.getRoundRobinIndex(channelIndex) % targets.size();
-                if (startIdx == 0)
-                    return targets;
-                List<ImportTarget> rotated = new ArrayList<>(targets.size());
-                for (int i = 0; i < targets.size(); i++) {
-                    rotated.add(targets.get((startIdx + i) % targets.size()));
-                }
-                return rotated;
+                return targets;
             }
             default -> {
                 return targets;
@@ -395,7 +385,8 @@ public class TransferEngine {
                     target.channel.getFilterMode(),
                     TransferAmountRules.collect(exportFilters, importFilters),
                     FilterLogic.hasConfiguredItemNbtFilter(importFilters),
-                    targetAllowedSlots));
+                    targetAllowedSlots,
+                    FilterLogic.hasConfiguredSlotMapping(importFilters, null)));
         }
         if (!anyReachable)
             return -1;
@@ -406,7 +397,8 @@ public class TransferEngine {
                 exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
-                sourceLevel, sourcePos);
+                sourceLevel, sourcePos,
+                exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN);
     }
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -628,7 +620,8 @@ public class TransferEngine {
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             boolean[] sourceAllowedSlots,
             HolderLookup.Provider provider,
-            ServerLevel sourceLevel, BlockPos sourcePos) {
+            ServerLevel sourceLevel, BlockPos sourcePos,
+            boolean roundRobin) {
 
         int remaining = limit;
         FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
@@ -651,11 +644,18 @@ public class TransferEngine {
             }
         }
         Map<Item, Integer> sourceItemCounts = anyAmountConstraints ? TransferAmountRules.countItems(source) : null;
-        Map<Item, Integer> batchMoved = anyAmountConstraints ? new HashMap<>() : null;
+        Map<Item, Integer> batchMoved = anyAmountConstraints && !roundRobin ? new HashMap<>() : null;
+        List<Map<Item, Integer>> targetBatchMoved = null;
         List<Map<Item, Integer>> targetItemCounts = null;
         if (anyAmountConstraints) {
+            if (roundRobin) {
+                targetBatchMoved = new ArrayList<>(targets.size());
+            }
             targetItemCounts = new ArrayList<>(targets.size());
             for (ItemTransferTarget t : targets) {
+                if (roundRobin) {
+                    targetBatchMoved.add(new HashMap<>());
+                }
                 targetItemCounts.add(
                         (t.constraints().hasImportThreshold() || t.constraints().hasPerEntryAmounts())
                                 ? TransferAmountRules.countItems(t.handler())
@@ -701,9 +701,18 @@ public class TransferEngine {
                         }
                     }
 
-                    if (provider != null && !FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(),
-                            extracted, provider, candidateComponents, filterReadCache, -1)) {
-                        continue;
+                    boolean[] importAllowedSlots = target.allowedSlots();
+                    if (provider != null) {
+                        if (target.hasImportSlotMapping()) {
+                            importAllowedSlots = computeImportAllowedSlots(target.handler(), target.importFilters(),
+                                    target.importFilterMode(), extracted, provider, candidateComponents, filterReadCache);
+                            if (importAllowedSlots == null) {
+                                continue;
+                            }
+                        } else if (!FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(),
+                                extracted, provider, candidateComponents, filterReadCache, -1)) {
+                            continue;
+                        }
                     }
 
                     int allowedByAmount;
@@ -725,7 +734,8 @@ public class TransferEngine {
                             int batchLimit = TransferAmountRules.perEntryItemBatch(extracted, exportFilters, provider,
                                     candidateComponents, filterReadCache);
                             if (batchLimit > 0) {
-                                int alreadyMoved = batchMoved.getOrDefault(extracted.getItem(), 0);
+                                Map<Item, Integer> movedByItem = roundRobin ? targetBatchMoved.get(targetIndex) : batchMoved;
+                                int alreadyMoved = movedByItem.getOrDefault(extracted.getItem(), 0);
                                 allowedByAmount = Math.min(allowedByAmount, Math.max(0, batchLimit - alreadyMoved));
                             }
                         }
@@ -741,7 +751,7 @@ public class TransferEngine {
 
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
                     ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), simulatedInsert, true,
-                            target.allowedSlots());
+                            importAllowedSlots);
                     int acceptableCount = allowed - simRemainder.getCount();
                     if (acceptableCount <= 0) {
                         continue;
@@ -758,7 +768,7 @@ public class TransferEngine {
                         }
 
                         ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, tx,
-                                target.allowedSlots());
+                                importAllowedSlots);
                         targetAccepted = toMove.getCount() - uninserted.getCount();
 
                         if (!uninserted.isEmpty()) {
@@ -769,11 +779,11 @@ public class TransferEngine {
                                 }
                                 if (!stillLeft.isEmpty()) {
                                     ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(), stillLeft,
-                                            tx, target.allowedSlots());
+                                            tx, importAllowedSlots);
                                     int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
                                     targetAccepted += forcedIn;
                                     if (!forcedRemainder.isEmpty()) {
-                                        LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
+                                        if (Config.debugMode) LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
                                                 + "target slot mask. Dropping at source pos {}.",
                                                 forcedRemainder, sourcePos);
                                         droppedToWorld = forcedRemainder.getCount();
@@ -805,7 +815,8 @@ public class TransferEngine {
                             if (tgtCache != null && targetAccepted > 0) {
                                 tgtCache.merge(movedItem, targetAccepted, Integer::sum);
                             }
-                            batchMoved.merge(movedItem, sourceLost, Integer::sum);
+                            Map<Item, Integer> movedByItem = roundRobin ? targetBatchMoved.get(targetIndex) : batchMoved;
+                            movedByItem.merge(movedItem, sourceLost, Integer::sum);
                         }
 
                         break;
@@ -920,6 +931,22 @@ public class TransferEngine {
         FluidResource resource = FluidResource.of(stack);
         int extracted = handler.extract(resource, stack.getAmount(), transaction);
         return extracted <= 0 ? FluidStack.EMPTY : resource.toStack(extracted);
+    }
+
+    private static boolean[] computeImportAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack[] importFilters,
+            FilterMode importFilterMode, ItemStack candidate, HolderLookup.Provider provider,
+            @Nullable CompoundTag candidateComponents, @Nullable FilterItemData.ReadCache filterReadCache) {
+        int size = handler.size();
+        boolean[] mask = new boolean[size];
+        boolean any = false;
+        for (int ds = 0; ds < size; ds++) {
+            if (FilterLogic.matchesItemInSlot(importFilters, importFilterMode, candidate, provider,
+                    candidateComponents, filterReadCache, ds)) {
+                mask[ds] = true;
+                any = true;
+            }
+        }
+        return any ? mask : null;
     }
 
     private static ItemStack insertItemWithAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack stack, boolean simulate,
@@ -1047,7 +1074,7 @@ public class TransferEngine {
                     int rollbackAmount = drained.getAmount() - filled;
                     int returned = fillFluid(source, drained.copyWithAmount(rollbackAmount), tx);
                     if (returned < rollbackAmount) {
-                        LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
+                        if (Config.debugMode) LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
                                 rollbackAmount - returned, drained.getFluid(), rollbackAmount - returned);
                     }
                 }

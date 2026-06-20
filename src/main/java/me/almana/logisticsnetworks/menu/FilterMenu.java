@@ -11,6 +11,7 @@ import net.minecraft.nbt.Tag;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.Container;
@@ -58,6 +59,8 @@ public class FilterMenu extends AbstractContainerMenu {
     private final SimpleContainer extractorInventory = new SimpleContainer(1);
     private final ContainerData data = new SimpleContainerData(4);
     private final int lockedSlot;
+    @Nullable
+    private final GlobalPos nodeAE2Link;
     private final int inventorySlotIndex;
     private int playerSlotStart = -1;
     private int playerSlotEnd = -1;
@@ -106,6 +109,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.player = playerInv.player;
         this.inventorySlotIndex = inventorySlotIndex;
         this.lockedSlot = inventorySlotIndex;
+        this.nodeAE2Link = null;
         this.nodeSource = null;
         this.nodeChannel = -1;
         this.nodeFilterSlot = -1;
@@ -137,6 +141,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.player = playerInv.player;
         this.inventorySlotIndex = -1;
         this.lockedSlot = (hand == InteractionHand.MAIN_HAND) ? playerInv.getSelectedSlot() : -1;
+        this.nodeAE2Link = null;
         this.nodeSource = null;
         this.nodeChannel = -1;
         this.nodeFilterSlot = -1;
@@ -163,11 +168,17 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public FilterMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node, int channel, int filterSlot) {
+        this(containerId, playerInv, node, channel, filterSlot, null);
+    }
+
+    public FilterMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node, int channel, int filterSlot,
+            @Nullable GlobalPos nodeAE2Link) {
         super(Registration.FILTER_MENU.get(), containerId);
         this.hand = InteractionHand.MAIN_HAND;
         this.player = playerInv.player;
         this.inventorySlotIndex = -1;
         this.lockedSlot = -1;
+        this.nodeAE2Link = nodeAE2Link;
         this.nodeSource = node;
         this.nodeChannel = channel;
         this.nodeFilterSlot = filterSlot;
@@ -204,6 +215,7 @@ public class FilterMenu extends AbstractContainerMenu {
             this.inventorySlotIndex = -1;
             this.hand = InteractionHand.MAIN_HAND;
             this.lockedSlot = -1;
+            this.nodeAE2Link = null;
             var entity = playerInv.player.level().getEntity(entityId);
             this.nodeSource = (entity instanceof LogisticsNodeEntity node) ? node : null;
             CompoundTag stackTag = buf.readNbt();
@@ -220,6 +232,7 @@ public class FilterMenu extends AbstractContainerMenu {
             this.inventorySlotIndex = buf.readVarInt();
             this.hand = InteractionHand.MAIN_HAND;
             this.lockedSlot = inventorySlotIndex;
+            this.nodeAE2Link = null;
             this.nodeSource = null;
             this.nodeChannel = -1;
             this.nodeFilterSlot = -1;
@@ -229,6 +242,7 @@ public class FilterMenu extends AbstractContainerMenu {
                     ? InteractionHand.values()[handOrdinal]
                     : InteractionHand.MAIN_HAND;
             this.lockedSlot = (hand == InteractionHand.MAIN_HAND) ? playerInv.getSelectedSlot() : -1;
+            this.nodeAE2Link = null;
             this.nodeSource = null;
             this.nodeChannel = -1;
             this.nodeFilterSlot = -1;
@@ -418,6 +432,8 @@ public class FilterMenu extends AbstractContainerMenu {
 
     public boolean setNameExpression(Player player, String name) {
         if (!isNameMode)
+            return false;
+        if (!name.isEmpty() && !NameFilterData.validateRegex(name).accepted())
             return false;
         NameFilterData.setNameFilter(getOpenedStack(), name);
         broadcastChanges();
@@ -767,6 +783,11 @@ public class FilterMenu extends AbstractContainerMenu {
 
     public ItemStack getOpenedFilterStack(Player player) {
         return getOpenedStack();
+    }
+
+    @Nullable
+    public GlobalPos getNodeAE2Link() {
+        return nodeAE2Link;
     }
 
     public ItemStack getOpenedStack() {

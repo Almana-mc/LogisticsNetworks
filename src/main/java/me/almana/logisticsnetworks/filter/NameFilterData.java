@@ -8,6 +8,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -15,11 +16,28 @@ import java.util.regex.PatternSyntaxException;
 
 public final class NameFilterData {
 
+    public static final int MAX_EXPRESSION_LENGTH = 128;
+    public static final int MAX_CANDIDATE_LENGTH = 512;
+
     private static final String KEY_ROOT = "ln_name_filter";
     private static final String KEY_IS_BLACKLIST = "blacklist";
     private static final String KEY_NAME = "name";
     private static final String KEY_TARGET_TYPE = "target";
     private static final String KEY_MATCH_SCOPE = "scope";
+
+    public enum ValidationError {
+        NONE,
+        EMPTY,
+        TOO_LONG,
+        UNSUPPORTED,
+        INVALID
+    }
+
+    public record ValidationResult(@Nullable Pattern pattern, ValidationError error) {
+        public boolean accepted() {
+            return error == ValidationError.NONE;
+        }
+    }
 
     private NameFilterData() {
     }
@@ -114,78 +132,171 @@ public final class NameFilterData {
         return !getNameFilter(stack).isEmpty();
     }
 
-    public static boolean isValidRegex(String pattern) {
-        if (pattern == null || pattern.isEmpty())
-            return false;
+    public static boolean isValidRegex(String expression) {
+        return validateRegex(expression).accepted();
+    }
+
+    public static ValidationResult validateRegex(String expression) {
+        if (expression == null || expression.isEmpty())
+            return new ValidationResult(null, ValidationError.EMPTY);
+        if (expression.length() > MAX_EXPRESSION_LENGTH)
+            return new ValidationResult(null, ValidationError.TOO_LONG);
+
+        ValidationError syntaxError = inspectSyntax(expression);
+        if (syntaxError != ValidationError.NONE)
+            return new ValidationResult(null, syntaxError);
+
         try {
-            Pattern.compile(pattern, Pattern.CASE_INSENSITIVE);
-            return true;
+            Pattern pattern = Pattern.compile(expression, Pattern.CASE_INSENSITIVE);
+            return new ValidationResult(pattern, ValidationError.NONE);
         } catch (PatternSyntaxException e) {
-            return false;
+            return new ValidationResult(null, ValidationError.INVALID);
         }
     }
 
     public static boolean containsName(ItemStack filter, ItemStack candidate) {
+        return containsName(filter, candidate, null);
+    }
+
+    public static boolean containsName(ItemStack filter, ItemStack candidate,
+            @Nullable FilterItemData.ReadCache readCache) {
         if (candidate.isEmpty())
             return false;
         if (getTargetType(filter) != FilterTargetType.ITEMS)
             return false;
 
-        String regex = getNameFilter(filter);
-        if (regex.isEmpty())
+        String expression = getNameFilter(filter);
+        if (expression.isEmpty())
             return false;
-
-        Pattern pattern;
-        try {
-            pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
-        } catch (PatternSyntaxException e) {
-            return false;
-        }
 
         String candidateName = candidate.getHoverName().getString();
-        return pattern.matcher(candidateName).find();
+        return matchesExpression(expression, candidateName, readCache);
     }
 
     public static boolean containsName(ItemStack filter, FluidStack candidate) {
+        return containsName(filter, candidate, null);
+    }
+
+    public static boolean containsName(ItemStack filter, FluidStack candidate,
+            @Nullable FilterItemData.ReadCache readCache) {
         if (candidate.isEmpty())
             return false;
         if (getTargetType(filter) != FilterTargetType.FLUIDS)
             return false;
 
-        String regex = getNameFilter(filter);
-        if (regex.isEmpty())
+        String expression = getNameFilter(filter);
+        if (expression.isEmpty())
             return false;
-
-        Pattern pattern;
-        try {
-            pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
-        } catch (PatternSyntaxException e) {
-            return false;
-        }
 
         String candidateName = candidate.getHoverName().getString();
-        return pattern.matcher(candidateName).find();
+        return matchesExpression(expression, candidateName, readCache);
     }
 
     public static boolean containsName(ItemStack filter, String chemicalId) {
+        return containsName(filter, chemicalId, null);
+    }
+
+    public static boolean containsName(ItemStack filter, String chemicalId,
+            @Nullable FilterItemData.ReadCache readCache) {
         if (chemicalId == null || chemicalId.isEmpty())
             return false;
         if (getTargetType(filter) != FilterTargetType.CHEMICALS)
             return false;
 
-        String regex = getNameFilter(filter);
-        if (regex.isEmpty())
+        String expression = getNameFilter(filter);
+        if (expression.isEmpty())
             return false;
 
-        Pattern pattern;
-        try {
-            pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
-        } catch (PatternSyntaxException e) {
-            return false;
-        }
         Component chemName = MekanismCompat.getChemicalTextComponent(chemicalId);
         String displayName = chemName != null ? chemName.getString() : chemicalId;
-        return pattern.matcher(displayName).find();
+        return matchesExpression(expression, displayName, readCache);
+    }
+
+    static ValidationResult resolveRegex(String expression, @Nullable FilterItemData.ReadCache readCache) {
+        if (readCache == null)
+            return validateRegex(expression);
+        return readCache.namePatterns.computeIfAbsent(expression, NameFilterData::validateRegex);
+    }
+
+    static boolean matchesExpression(String expression, String candidate,
+            @Nullable FilterItemData.ReadCache readCache) {
+        if (candidate.length() > MAX_CANDIDATE_LENGTH)
+            return false;
+
+        ValidationResult result = resolveRegex(expression, readCache);
+        return result.accepted() && result.pattern().matcher(candidate).find();
+    }
+
+    private static ValidationError inspectSyntax(String expression) {
+        boolean escaped = false;
+        boolean inClass = false;
+        boolean classHasToken = false;
+        boolean branchHasToken = false;
+
+        for (int i = 0; i < expression.length(); i++) {
+            char c = expression.charAt(i);
+
+            if (escaped) {
+                if (Character.isLetterOrDigit(c))
+                    return ValidationError.UNSUPPORTED;
+                escaped = false;
+                if (inClass) {
+                    classHasToken = true;
+                } else {
+                    branchHasToken = true;
+                }
+                continue;
+            }
+
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (inClass) {
+                if (c == '[' || c == '&' && i + 1 < expression.length() && expression.charAt(i + 1) == '&')
+                    return ValidationError.UNSUPPORTED;
+                if (c == ']') {
+                    if (!classHasToken)
+                        return ValidationError.INVALID;
+                    inClass = false;
+                    branchHasToken = true;
+                    continue;
+                }
+                if (c != '^' || classHasToken)
+                    classHasToken = true;
+                continue;
+            }
+
+            switch (c) {
+                case '[' -> {
+                    inClass = true;
+                    classHasToken = false;
+                }
+                case '(', ')', '*', '+', '?', '{', '}' -> {
+                    return ValidationError.UNSUPPORTED;
+                }
+                case '|' -> {
+                    if (!branchHasToken)
+                        return ValidationError.INVALID;
+                    branchHasToken = false;
+                }
+                case '^' -> {
+                    if (branchHasToken)
+                        return ValidationError.INVALID;
+                }
+                case '$' -> {
+                    if (!branchHasToken
+                            || i + 1 < expression.length() && expression.charAt(i + 1) != '|')
+                        return ValidationError.INVALID;
+                }
+                default -> branchHasToken = true;
+            }
+        }
+
+        if (escaped || inClass || !branchHasToken)
+            return ValidationError.INVALID;
+        return ValidationError.NONE;
     }
 
     private static String normalizeName(String name) {

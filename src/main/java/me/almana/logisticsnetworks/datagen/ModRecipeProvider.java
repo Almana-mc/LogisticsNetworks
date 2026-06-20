@@ -38,13 +38,13 @@ public class ModRecipeProvider extends RecipeProvider {
     @Override
     protected void buildRecipes() {
         shaped(RecipeCategory.MISC, Registration.LOGISTICS_NODE_ITEM.get())
-                .pattern("ORO").pattern("HEH").pattern("OTO")
-                .define('O', Items.OBSIDIAN)
-                .define('R', Items.REDSTONE_BLOCK)
+                .pattern("DRD").pattern("BHB").pattern("DED")
+                .define('D', Items.DEEPSLATE)
+                .define('R', Items.REDSTONE)
+                .define('B', Items.IRON_BARS)
                 .define('H', Items.HOPPER)
-                .define('E', Items.ENDER_EYE)
-                .define('T', Items.REDSTONE_TORCH)
-                .unlockedBy("has_ender_eye", has(Items.ENDER_EYE))
+                .define('E', Items.ENDER_PEARL)
+                .unlockedBy("has_ender_pearl", has(Items.ENDER_PEARL))
                 .save(output);
 
         shaped(RecipeCategory.MISC, Registration.COMPUTER_ITEM.get())

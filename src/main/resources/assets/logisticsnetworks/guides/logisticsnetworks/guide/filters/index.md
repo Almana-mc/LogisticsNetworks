@@ -65,11 +65,13 @@ Mod filters match every item or fluid from one configured mod id.
 
 ### Regex
 
-Regex filters match by display name or tooltip text using Java regex syntax.
+Regex filters match resource display names with restricted, case-insensitive regex syntax.
 
-- Set the regex pattern.
-- Choose the scope: **Name**, **Tooltip**, or **Both**.
-- Use anchors such as `^` and `$` when you want stricter matches.
+- Maximum pattern length is 128 characters.
+- Supported: literals, `.`, character classes such as `[A-Z]`, `^`, `$`, escaped punctuation, and top-level `|` alternatives.
+- Unsupported: groups, lookarounds, backreferences, inline flags, and repetition operators `*`, `+`, `?`, or `{...}`.
+- Matching searches the full name, so `Iron` already matches `Iron Ingot`; `.*Iron.*` is unnecessary and rejected.
+- Unsafe or malformed patterns remain visible for repair but match nothing.
 
 Common examples:
 
@@ -79,11 +81,10 @@ Common examples:
 | `^Iron` | Names starting with "Iron" |
 | `Ingot$` | Names ending with "Ingot" |
 | `^Iron Ingot$` | Exactly "Iron Ingot" |
-| `(?i)iron` | Case-insensitive "iron" |
-| `Iron\|Gold` | Names containing "Iron" or "Gold" |
-| `Silk Touch` | Tooltip text containing "Silk Touch" |
+| `Iron|Gold` | Names containing "Iron" or "Gold" |
+| `[IG]ron` | "Iron" or "Gron" |
 
-Regex filters run against every candidate resource the channel checks, so keep patterns simple on high-traffic channels.
+Compiled patterns are reused during each transfer operation. Keep expressions narrow on high-traffic channels.
 
 ### Slot
 

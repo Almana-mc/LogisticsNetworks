@@ -17,7 +17,9 @@ import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 import net.minecraft.nbt.TagParser;
 import org.jetbrains.annotations.Nullable;
@@ -56,6 +58,7 @@ public final class FilterItemData {
 
     public static final class ReadCache {
         private final IdentityHashMap<ItemStack, ItemFilterView> itemViews = new IdentityHashMap<>();
+        final Map<String, NameFilterData.ValidationResult> namePatterns = new HashMap<>();
 
         private ReadCache() {
         }

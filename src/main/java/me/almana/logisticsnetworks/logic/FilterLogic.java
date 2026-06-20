@@ -64,7 +64,7 @@ public final class FilterLogic {
             } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
                     && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
                 isFilter = true;
-                matched = NameFilterData.containsName(filter, candidate);
+                matched = NameFilterData.containsName(filter, candidate, filterReadCache);
                 isBlacklist = NameFilterData.isBlacklist(filter);
             } else if (DurabilityFilterData.isDurabilityFilterItem(filter)) {
                 isFilter = true;
@@ -134,7 +134,7 @@ public final class FilterLogic {
             } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
                     && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
                 isFilter = true;
-                matched = NameFilterData.containsName(filter, candidate);
+                matched = NameFilterData.containsName(filter, candidate, filterReadCache);
                 isBlacklist = NameFilterData.isBlacklist(filter);
             }
 
@@ -203,7 +203,7 @@ public final class FilterLogic {
             } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
                     && NameFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
                 isFilter = true;
-                matched = NameFilterData.containsName(filter, candidate);
+                matched = NameFilterData.containsName(filter, candidate, filterReadCache);
                 isBlacklist = NameFilterData.isBlacklist(filter);
             }
 
@@ -232,6 +232,11 @@ public final class FilterLogic {
     }
 
     public static boolean matchesChemical(ItemStack[] filters, FilterMode filterMode, String chemicalId) {
+        return matchesChemical(filters, filterMode, chemicalId, null);
+    }
+
+    public static boolean matchesChemical(ItemStack[] filters, FilterMode filterMode, String chemicalId,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
         if (filters == null || filters.length == 0)
             return true;
         if (chemicalId == null || chemicalId.isEmpty())
@@ -265,7 +270,7 @@ public final class FilterLogic {
             } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
                     && NameFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
                 isFilter = true;
-                matched = NameFilterData.containsName(filter, chemicalId);
+                matched = NameFilterData.containsName(filter, chemicalId, filterReadCache);
                 isBlacklist = NameFilterData.isBlacklist(filter);
             }
 
@@ -298,6 +303,18 @@ public final class FilterLogic {
             return false;
         for (ItemStack filter : filters) {
             if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyNbtEntries(filter)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasConfiguredSlotMapping(ItemStack[] filters,
+            @Nullable FilterItemData.ReadCache readCache) {
+        if (filters == null)
+            return false;
+        for (ItemStack filter : filters) {
+            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnySlotMappings(filter, readCache)) {
                 return true;
             }
         }

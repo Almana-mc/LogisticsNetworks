@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.neoforged.fml.loading.FMLPaths;
 import org.slf4j.Logger;
@@ -44,7 +45,7 @@ public final class UpgradeLimitsConfig {
         File configFile = configPath.toFile();
 
         if (!configFile.exists()) {
-            LOGGER.info("Config file not found, generating default at {}", configPath);
+            if (Config.debugMode) LOGGER.info("Config file not found, generating default at {}", configPath);
             loadDefaults();
             generateDefault(configFile);
             return;
@@ -56,7 +57,7 @@ public final class UpgradeLimitsConfig {
             for (int i = 0; i < TIER_KEYS.length; i++) {
                 JsonObject tier = root.getAsJsonObject(TIER_KEYS[i]);
                 if (tier == null) {
-                    LOGGER.warn("Missing tier '{}' in config, using defaults for this tier", TIER_KEYS[i]);
+                    if (Config.debugMode) LOGGER.warn("Missing tier '{}' in config, using defaults for this tier", TIER_KEYS[i]);
                     TIERS[i] = defaultForTier(i);
                 } else {
                     TIERS[i] = parseTier(tier, i);
@@ -64,9 +65,9 @@ public final class UpgradeLimitsConfig {
             }
 
             loaded = true;
-            LOGGER.info("Loaded {} successfully", FILE_NAME);
+            if (Config.debugMode) LOGGER.info("Loaded {} successfully", FILE_NAME);
         } catch (Exception e) {
-            LOGGER.error("Failed to parse {}, using defaults", FILE_NAME, e);
+            if (Config.debugMode) LOGGER.error("Failed to parse {}, using defaults", FILE_NAME, e);
             loadDefaults();
         }
     }
@@ -75,7 +76,7 @@ public final class UpgradeLimitsConfig {
         try {
             writeToFile(file);
         } catch (Exception e) {
-            LOGGER.error("Failed to generate default config {}", FILE_NAME, e);
+            if (Config.debugMode) LOGGER.error("Failed to generate default config {}", FILE_NAME, e);
         }
     }
 
@@ -122,11 +123,11 @@ public final class UpgradeLimitsConfig {
 
     private static TierLimits defaultForTier(int tier) {
         return switch (tier) {
-            case 1 -> new TierLimits(10, 16, 1_000, 10_000, 1_000, 1_000);
-            case 2 -> new TierLimits(5, 32, 5_000, 50_000, 5_000, 5_000);
-            case 3 -> new TierLimits(1, 64, 20_000, 250_000, 20_000, 20_000);
-            case 4 -> new TierLimits(1, 10_000, 1_000_000, Integer.MAX_VALUE, 1_000_000, 1_000_000);
-            default -> new TierLimits(20, 8, 500, 2_000, 500, 500);
+            case 1 -> new TierLimits(10, 32, 10_000, 10_000, 1_000, 1_000);
+            case 2 -> new TierLimits(5, 64, 100_000, 50_000, 5_000, 5_000);
+            case 3 -> new TierLimits(1, 256, 1_000_000, 250_000, 20_000, 20_000);
+            case 4 -> new TierLimits(1, 10_000, 2_100_000_000, Integer.MAX_VALUE, 1_000_000, 1_000_000);
+            default -> new TierLimits(20, 16, 1_000, 2_000, 500, 500);
         };
     }
 
@@ -156,7 +157,7 @@ public final class UpgradeLimitsConfig {
         try {
             writeToFile(file);
         } catch (Exception e) {
-            LOGGER.error("Failed to save {}", FILE_NAME, e);
+            if (Config.debugMode) LOGGER.error("Failed to save {}", FILE_NAME, e);
         }
     }
 
