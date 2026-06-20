@@ -483,6 +483,6 @@
   "tooltip.logisticsnetworks.wrench.ae2_linked": "已链接",
   "tooltip.logisticsnetworks.wrench.ae2_linked_detail": "链接至坐标 [%s, %s, %s] (维度：%s)",
   "tooltip.logisticsnetworks.wrench.ae2_unlinked": "未链接",
-  "message.logisticsnetworks.ae2.linked": "扳手已链接至坐标 [%s, %s, %s] 处的 ME 网络",
-  "message.logisticsnetworks.ae2.unlinked": "扳手已断开与 ME 网络 的链接"
+  "message.logisticsnetworks.ae2.linked": "扳手已链接至坐标 [%s, %s, %s] 处的ME网络",
+  "message.logisticsnetworks.ae2.unlinked": "扳手已断开与ME网络的链接"
 }
