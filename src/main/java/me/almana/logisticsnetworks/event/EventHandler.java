@@ -297,7 +297,6 @@ public class EventHandler {
                     player.sendSystemMessage(msg);
                 }
 
-                // Check filter items for invalid NBT or empty tags
                 List<String> filterWarnings = getFilterWarnings(node);
                 if (!filterWarnings.isEmpty()) {
                     player.sendSystemMessage(Component.translatable("gui.logisticsnetworks.filter_warning")

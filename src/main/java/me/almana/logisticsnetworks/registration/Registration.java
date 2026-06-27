@@ -63,7 +63,6 @@ public class Registration {
         public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS = DeferredRegister
                         .create(Registries.RECIPE_SERIALIZER, LogisticsNetworks.MOD_ID);
 
-        // Some ugly shit I have done here....
         public static final DeferredHolder<EntityType<?>, EntityType<LogisticsNodeEntity>> LOGISTICS_NODE = ENTITIES
                         .register("logistics_node",
                                         Registration::createLogisticsNodeType);
