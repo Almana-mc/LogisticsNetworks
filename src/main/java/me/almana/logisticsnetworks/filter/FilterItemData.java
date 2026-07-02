@@ -52,6 +52,10 @@ public final class FilterItemData {
 
     public static final class ReadCache {
         private final IdentityHashMap<ItemStack, ItemFilterView> itemViews = new IdentityHashMap<>();
+        final IdentityHashMap<ItemStack, TagFilterData.View> tagViews = new IdentityHashMap<>();
+        final IdentityHashMap<ItemStack, ModFilterData.View> modViews = new IdentityHashMap<>();
+        final IdentityHashMap<ItemStack, NameFilterData.View> nameViews = new IdentityHashMap<>();
+        final IdentityHashMap<ItemStack, NbtFilterData.View> nbtViews = new IdentityHashMap<>();
 
         private ReadCache() {
         }

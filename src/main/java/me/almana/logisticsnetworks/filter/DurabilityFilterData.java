@@ -193,7 +193,8 @@ public final class DurabilityFilterData {
     }
 
     private static CompoundTag getRootTag(ItemStack stack) {
-        return getRootTag(stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag());
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
+        return custom.get(ROOT_KEY) instanceof CompoundTag root ? root : new CompoundTag();
     }
 
     private static CompoundTag getRootTag(CompoundTag customTag) {

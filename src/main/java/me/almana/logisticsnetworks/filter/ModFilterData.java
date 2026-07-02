@@ -12,6 +12,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -23,11 +25,55 @@ public final class ModFilterData {
     private static final String KEY_MODS = "mods";
     private static final String KEY_TARGET_TYPE = "target";
 
+    public record View(List<String> mods, FilterTargetType target, boolean blacklist) {
+
+        public boolean matchesNamespace(@Nullable ResourceLocation id) {
+            if (id == null)
+                return false;
+            String namespace = id.getNamespace();
+            for (String mod : mods) {
+                if (mod.equals(namespace))
+                    return true;
+            }
+            return false;
+        }
+    }
+
     private ModFilterData() {
     }
 
     public static boolean isModFilter(ItemStack stack) {
         return !stack.isEmpty() && stack.getItem() instanceof ModFilterItem;
+    }
+
+    public static View view(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        if (cache == null) {
+            return buildView(stack);
+        }
+        View cached = cache.modViews.get(stack);
+        if (cached == null) {
+            cached = buildView(stack);
+            cache.modViews.put(stack, cached);
+        }
+        return cached;
+    }
+
+    private static View buildView(ItemStack stack) {
+        CompoundTag root = getRoot(stack);
+        List<String> mods = List.of();
+        if (root.contains(KEY_MODS, Tag.TAG_LIST)) {
+            ListTag list = root.getList(KEY_MODS, Tag.TAG_STRING);
+            mods = new ArrayList<>(list.size());
+            for (int i = 0; i < list.size(); i++) {
+                String modId = normalizeModId(list.getString(i));
+                if (modId != null) {
+                    mods.add(modId);
+                }
+            }
+        }
+        return new View(mods,
+                FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE)),
+                root.getBoolean(KEY_IS_BLACKLIST));
     }
 
     public static boolean isBlacklist(ItemStack stack) {
@@ -223,8 +269,8 @@ public final class ModFilterData {
     }
 
     private static CompoundTag getRoot(ItemStack stack) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
+        return custom.get(KEY_ROOT) instanceof CompoundTag root ? root : new CompoundTag();
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {

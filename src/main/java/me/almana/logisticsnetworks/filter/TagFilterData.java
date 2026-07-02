@@ -3,13 +3,19 @@ package me.almana.logisticsnetworks.filter;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.TagFilterItem;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -23,11 +29,54 @@ public final class TagFilterData {
     private static final String TAGS_KEY = "tags";
     private static final String TARGET_KEY = "target";
 
+    public record View(@Nullable String tag, @Nullable TagKey<Item> itemTag, @Nullable TagKey<Fluid> fluidTag,
+            FilterTargetType target, boolean blacklist) {
+    }
+
     private TagFilterData() {
     }
 
     public static boolean isTagFilterItem(ItemStack stack) {
         return !stack.isEmpty() && stack.getItem() instanceof TagFilterItem;
+    }
+
+    public static View view(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        if (cache == null) {
+            return buildView(stack);
+        }
+        View cached = cache.tagViews.get(stack);
+        if (cached == null) {
+            cached = buildView(stack);
+            cache.tagViews.put(stack, cached);
+        }
+        return cached;
+    }
+
+    private static View buildView(ItemStack stack) {
+        CompoundTag root = getRootTag(stack);
+        String tag = null;
+        if (root.contains(TAGS_KEY, Tag.TAG_LIST)) {
+            ListTag list = root.getList(TAGS_KEY, Tag.TAG_STRING);
+            for (int i = 0; i < list.size(); i++) {
+                String normalized = normalizeTag(list.getString(i));
+                if (normalized != null) {
+                    tag = normalized;
+                    break;
+                }
+            }
+        }
+        TagKey<Item> itemTag = null;
+        TagKey<Fluid> fluidTag = null;
+        if (tag != null) {
+            ResourceLocation id = ResourceLocation.tryParse(tag);
+            if (id != null) {
+                itemTag = TagKey.create(Registries.ITEM, id);
+                fluidTag = TagKey.create(Registries.FLUID, id);
+            }
+        }
+        return new View(tag, itemTag, fluidTag,
+                FilterTargetType.fromOrdinal(root.getInt(TARGET_KEY)),
+                root.getBoolean(MODE_KEY));
     }
 
     public static boolean isBlacklist(ItemStack stack) {
@@ -228,7 +277,8 @@ public final class TagFilterData {
     }
 
     private static CompoundTag getRootTag(ItemStack stack) {
-        return getRootTag(stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag());
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
+        return custom.get(ROOT_KEY) instanceof CompoundTag root ? root : new CompoundTag();
     }
 
     private static CompoundTag getRootTag(CompoundTag customTag) {

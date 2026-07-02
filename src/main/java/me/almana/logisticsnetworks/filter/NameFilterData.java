@@ -12,6 +12,8 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -25,11 +27,84 @@ public final class NameFilterData {
     private static final String KEY_TARGET_TYPE = "target";
     private static final String KEY_MATCH_SCOPE = "scope";
 
+    public record View(String name, @Nullable Pattern pattern, NameMatchScope scope,
+            FilterTargetType target, boolean blacklist) {
+    }
+
     private NameFilterData() {
     }
 
     public static boolean isNameFilter(ItemStack stack) {
         return !stack.isEmpty() && stack.getItem() instanceof NameFilterItem;
+    }
+
+    public static View view(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        if (cache == null) {
+            return buildView(stack);
+        }
+        View cached = cache.nameViews.get(stack);
+        if (cached == null) {
+            cached = buildView(stack);
+            cache.nameViews.put(stack, cached);
+        }
+        return cached;
+    }
+
+    private static View buildView(ItemStack stack) {
+        CompoundTag root = getRoot(stack);
+        String name = root.contains(KEY_NAME, Tag.TAG_STRING) ? root.getString(KEY_NAME) : "";
+        Pattern pattern = null;
+        if (!name.isEmpty()) {
+            try {
+                pattern = Pattern.compile(name, Pattern.CASE_INSENSITIVE);
+            } catch (PatternSyntaxException ignored) {
+            }
+        }
+        return new View(name, pattern,
+                NameMatchScope.fromOrdinal(root.getInt(KEY_MATCH_SCOPE)),
+                FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE)),
+                root.getBoolean(KEY_IS_BLACKLIST));
+    }
+
+    public static boolean matches(View view, ItemStack candidate) {
+        Pattern pattern = view.pattern();
+        if (pattern == null)
+            return false;
+
+        NameMatchScope scope = view.scope();
+        if (scope == NameMatchScope.NAME || scope == NameMatchScope.BOTH) {
+            String candidateName = candidate.getHoverName().getString();
+            if (pattern.matcher(candidateName).find())
+                return true;
+        }
+
+        if (scope == NameMatchScope.TOOLTIP || scope == NameMatchScope.BOTH) {
+            List<Component> tooltipLines = candidate.getTooltipLines(
+                    Item.TooltipContext.EMPTY, null, TooltipFlag.NORMAL);
+            for (int i = (scope == NameMatchScope.BOTH ? 1 : 0); i < tooltipLines.size(); i++) {
+                String line = tooltipLines.get(i).getString();
+                if (pattern.matcher(line).find())
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static boolean matches(View view, FluidStack candidate) {
+        Pattern pattern = view.pattern();
+        if (pattern == null)
+            return false;
+        return pattern.matcher(candidate.getHoverName().getString()).find();
+    }
+
+    public static boolean matches(View view, String chemicalId) {
+        Pattern pattern = view.pattern();
+        if (pattern == null)
+            return false;
+        Component chemName = MekanismCompat.getChemicalTextComponent(chemicalId);
+        String displayName = chemName != null ? chemName.getString() : chemicalId;
+        return pattern.matcher(displayName).find();
     }
 
     public static boolean isBlacklist(ItemStack stack) {
@@ -217,8 +292,8 @@ public final class NameFilterData {
     }
 
     private static CompoundTag getRoot(ItemStack stack) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
+        return custom.get(KEY_ROOT) instanceof CompoundTag root ? root : new CompoundTag();
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {

@@ -102,7 +102,48 @@ public final class NbtFilterData {
         }
     }
 
+    public record View(List<NbtRule> rules, FilterTargetType target, boolean blacklist, boolean anyEnabled) {
+    }
+
     private NbtFilterData() {
+    }
+
+    public static View view(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        if (cache == null) {
+            return buildView(stack);
+        }
+        View cached = cache.nbtViews.get(stack);
+        if (cached == null) {
+            cached = buildView(stack);
+            cache.nbtViews.put(stack, cached);
+        }
+        return cached;
+    }
+
+    private static View buildView(ItemStack stack) {
+        CompoundTag root = getRoot(stack);
+        List<NbtRule> rules = getRulesFromRoot(root);
+
+        boolean anyEnabled = false;
+        for (NbtRule rule : rules) {
+            if (rule.enabled()) {
+                anyEnabled = true;
+                break;
+            }
+        }
+
+        FilterTargetType target;
+        if (root.get(KEY_TARGET_TYPE) instanceof IntTag targetType) {
+            target = FilterTargetType.fromOrdinal(targetType.getAsInt());
+        } else {
+            String path = root.getString(KEY_PATH);
+            if (path.isEmpty() && !rules.isEmpty()) {
+                path = rules.get(0).path();
+            }
+            target = isFluidPath(path) ? FilterTargetType.FLUIDS : FilterTargetType.ITEMS;
+        }
+
+        return new View(rules, target, root.getBoolean(KEY_IS_BLACKLIST), anyEnabled);
     }
 
     public static boolean isNbtFilter(ItemStack stack) {
