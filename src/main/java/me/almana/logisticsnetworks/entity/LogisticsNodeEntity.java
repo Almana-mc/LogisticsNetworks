@@ -25,6 +25,7 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
+import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import org.slf4j.Logger;
 
 import java.util.Arrays;
@@ -77,6 +78,8 @@ public class LogisticsNodeEntity extends Entity {
 
     private final long[] channelCooldowns = new long[CHANNEL_COUNT];
     private final float[] backoffTicks = new float[CHANNEL_COUNT];
+
+    private TransferCapabilityCache capabilityCache;
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
@@ -248,6 +251,16 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setAttachedPos(BlockPos pos) {
         entityData.set(ATTACHED_POS, pos);
+        if (capabilityCache != null) {
+            capabilityCache.reset();
+        }
+    }
+
+    public TransferCapabilityCache capabilities() {
+        if (capabilityCache == null) {
+            capabilityCache = new me.almana.logisticsnetworks.logic.TransferCapabilityCache(this);
+        }
+        return capabilityCache;
     }
 
     public BlockPos getAttachedPos() {

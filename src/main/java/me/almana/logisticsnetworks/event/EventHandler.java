@@ -18,7 +18,6 @@ import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
@@ -89,21 +88,16 @@ public class EventHandler {
         }
     }
 
-    private static final String JUNE_MESSAGE_TAG = "logisticsnetworks_june_message_year";
-
     @SubscribeEvent
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+        if (!Config.juneAwarenessMessage)
             return;
 
         LocalDate today = LocalDate.now();
         if (today.getMonth() != Month.JUNE)
             return;
-
-        CompoundTag data = player.getPersistentData();
-        if (data.getIntOr(JUNE_MESSAGE_TAG, 0) == today.getYear())
-            return;
-        data.putInt(JUNE_MESSAGE_TAG, today.getYear());
 
         player.sendSystemMessage(Component.literal("— June Awareness —").withStyle(ChatFormatting.BOLD));
         player.sendSystemMessage(rainbow("Happy Pride Month!"));
@@ -123,6 +117,10 @@ public class EventHandler {
                 .withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(
                         Component.literal("Join the Logistics Networks Discord")))));
         player.sendSystemMessage(from);
+
+        Config.juneAwarenessMessageSpec.set(false);
+        Config.refresh();
+        Config.SPEC.save();
     }
 
     private static MutableComponent rainbow(String text) {
