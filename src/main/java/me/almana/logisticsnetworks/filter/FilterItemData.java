@@ -918,6 +918,14 @@ public final class FilterItemData {
                 || hasEntryType(stack, KEY_NBT_RAW);
     }
 
+    public static boolean hasAnyNbtEntries(ItemStack stack, @Nullable ReadCache readCache) {
+        if (!isFilterItem(stack))
+            return false;
+        if (readCache == null)
+            return hasAnyNbtEntries(stack);
+        return getItemFilterView(stack, readCache).hasNbtEntries();
+    }
+
     public static boolean isNbtOnlySlot(ItemStack stack, int slot) {
         if (!hasEntryNbt(stack, slot) && !hasEntryDurability(stack, slot) && !hasEntryEnchanted(stack, slot))
             return false;
@@ -2131,8 +2139,8 @@ public final class FilterItemData {
     }
 
     private static CompoundTag getRoot(ItemStack stack) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
+        return custom.get(KEY_ROOT) instanceof CompoundTag root ? root : new CompoundTag();
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {

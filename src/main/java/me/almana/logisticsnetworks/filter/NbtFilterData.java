@@ -133,8 +133,8 @@ public final class NbtFilterData {
             return FilterTargetType.ITEMS;
 
         CompoundTag root = getRoot(stack);
-        if (root.contains(KEY_TARGET_TYPE, Tag.TAG_INT)) {
-            return FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE));
+        if (root.get(KEY_TARGET_TYPE) instanceof IntTag targetType) {
+            return FilterTargetType.fromOrdinal(targetType.getAsInt());
         }
 
         String path = root.getString(KEY_PATH);
@@ -683,9 +683,8 @@ public final class NbtFilterData {
     }
 
     private static CompoundTag getRoot(ItemStack stack) {
-
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
+        return custom.get(KEY_ROOT) instanceof CompoundTag root ? root : new CompoundTag();
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {

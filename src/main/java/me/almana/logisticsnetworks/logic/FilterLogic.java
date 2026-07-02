@@ -341,6 +341,10 @@ public final class FilterLogic {
     }
 
     public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters) {
+        return hasConfiguredItemNbtFilter(filters, null);
+    }
+
+    public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters, @Nullable FilterItemData.ReadCache readCache) {
         if (filters == null)
             return false;
         for (ItemStack filter : filters) {
@@ -349,7 +353,7 @@ public final class FilterLogic {
                     && NbtFilterData.hasEnabledRules(filter)) {
                 return true;
             }
-            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyNbtEntries(filter)) {
+            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyNbtEntries(filter, readCache)) {
                 return true;
             }
         }
