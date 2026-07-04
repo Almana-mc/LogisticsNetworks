@@ -19,6 +19,10 @@ public class Config {
             .comment("Enable debug overlays and diagnostic logging.")
             .define("debugMode", false);
 
+    public static final ModConfigSpec.BooleanValue juneAwarenessMessageSpec = builder
+            .comment("Send June awareness message.")
+            .define("juneAwarenessMessage", true);
+
     public static final ModConfigSpec.IntValue backoffMaxTicksSpec;
     public static final ModConfigSpec.BooleanValue backoffItemSpec;
     public static final ModConfigSpec.BooleanValue backoffFluidSpec;
@@ -43,6 +47,7 @@ public class Config {
 
     public static boolean dropNodeItem;
     public static boolean debugMode;
+    public static boolean juneAwarenessMessage;
     public static int backoffMaxTicks = 40;
     public static boolean[] backoffEnabled = {true, true, true, true, true};
 
@@ -55,6 +60,7 @@ public class Config {
     public static void refresh() {
         dropNodeItem = dropNodeItemSpec.get();
         debugMode = debugModeSpec.get();
+        juneAwarenessMessage = juneAwarenessMessageSpec.get();
         backoffMaxTicks = backoffMaxTicksSpec.get();
         backoffEnabled[ChannelType.ITEM.ordinal()] = backoffItemSpec.get();
         backoffEnabled[ChannelType.FLUID.ordinal()] = backoffFluidSpec.get();

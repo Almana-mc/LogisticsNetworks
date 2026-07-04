@@ -1,8 +1,9 @@
 package me.almana.logisticsnetworks.logic;
 
-import net.minecraft.core.BlockPos;
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.transfer.CombinedResourceHandler;
 import net.neoforged.neoforge.transfer.ResourceHandler;
@@ -12,31 +13,39 @@ import net.neoforged.neoforge.transfer.item.ItemResource;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
-final class TransferCapabilityCache {
-    private static final Object ABSENT = new Object();
+public final class TransferCapabilityCache {
+    private final LogisticsNodeEntity node;
 
-    private final Map<Long, Object> items = new HashMap<>();
-    private final Map<Long, Object> fluids = new HashMap<>();
-    private final Map<Long, Object> energy = new HashMap<>();
+    @SuppressWarnings("unchecked")
+    private final BlockCapabilityCache<ResourceHandler<ItemResource>, Direction>[] items = new BlockCapabilityCache[6];
+    @SuppressWarnings("unchecked")
+    private final BlockCapabilityCache<ResourceHandler<FluidResource>, Direction>[] fluids = new BlockCapabilityCache[6];
+    @SuppressWarnings("unchecked")
+    private final BlockCapabilityCache<EnergyHandler, Direction>[] energy = new BlockCapabilityCache[6];
 
-    private static long key(ServerLevel level, BlockPos pos, Direction dir) {
-        long packed = pos.asLong();
-        packed ^= ((long) dir.ordinal()) << 58;
-        packed ^= ((long) level.dimension().identifier().hashCode()) << 32;
-        return packed;
+    public TransferCapabilityCache(LogisticsNodeEntity node) {
+        this.node = node;
     }
 
-    ResourceHandler<ItemResource> findItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+    public void reset() {
+        Arrays.fill(items, null);
+        Arrays.fill(fluids, null);
+        Arrays.fill(energy, null);
+    }
+
+    public ResourceHandler<ItemResource> findItemHandler(@Nullable Direction dir) {
+        if (!(node.level() instanceof ServerLevel level)) {
+            return null;
+        }
         if (dir != null) {
-            return getItemHandler(level, pos, dir);
+            return itemSide(level, dir);
         }
         List<ResourceHandler<ItemResource>> found = new ArrayList<>(6);
         for (Direction side : Direction.values()) {
-            ResourceHandler<ItemResource> handler = getItemHandler(level, pos, side);
+            ResourceHandler<ItemResource> handler = itemSide(level, side);
             if (handler != null && !containsIdentity(found, handler)) {
                 found.add(handler);
             }
@@ -47,13 +56,16 @@ final class TransferCapabilityCache {
         return found.size() == 1 ? found.get(0) : new CombinedResourceHandler<>(found);
     }
 
-    ResourceHandler<FluidResource> findFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+    public ResourceHandler<FluidResource> findFluidHandler(@Nullable Direction dir) {
+        if (!(node.level() instanceof ServerLevel level)) {
+            return null;
+        }
         if (dir != null) {
-            return getFluidHandler(level, pos, dir);
+            return fluidSide(level, dir);
         }
         List<ResourceHandler<FluidResource>> found = new ArrayList<>(6);
         for (Direction side : Direction.values()) {
-            ResourceHandler<FluidResource> handler = getFluidHandler(level, pos, side);
+            ResourceHandler<FluidResource> handler = fluidSide(level, side);
             if (handler != null && !containsIdentity(found, handler)) {
                 found.add(handler);
             }
@@ -64,13 +76,16 @@ final class TransferCapabilityCache {
         return found.size() == 1 ? found.get(0) : new CombinedResourceHandler<>(found);
     }
 
-    EnergyHandler findEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+    public EnergyHandler findEnergyHandler(@Nullable Direction dir) {
+        if (!(node.level() instanceof ServerLevel level)) {
+            return null;
+        }
         if (dir != null) {
-            return getEnergyHandler(level, pos, dir);
+            return energySide(level, dir);
         }
         List<EnergyHandler> found = new ArrayList<>(6);
         for (Direction side : Direction.values()) {
-            EnergyHandler handler = getEnergyHandler(level, pos, side);
+            EnergyHandler handler = energySide(level, side);
             if (handler != null && !containsIdentity(found, handler)) {
                 found.add(handler);
             }
@@ -81,48 +96,40 @@ final class TransferCapabilityCache {
         return found.size() == 1 ? found.get(0) : new CombinedEnergyHandler(found.toArray(EnergyHandler[]::new));
     }
 
-    @SuppressWarnings("unchecked")
-    private ResourceHandler<ItemResource> getItemHandler(ServerLevel level, BlockPos pos, Direction dir) {
-        long key = key(level, pos, dir);
-        Object cached = items.get(key);
-        if (cached == ABSENT) {
-            return null;
+    private ResourceHandler<ItemResource> itemSide(ServerLevel level, Direction dir) {
+        int i = dir.ordinal();
+        BlockCapabilityCache<ResourceHandler<ItemResource>, Direction> cache = items[i];
+        if (cache == null) {
+            cache = BlockCapabilityCache.create(Capabilities.Item.BLOCK, level, node.getAttachedPos(), dir,
+                    () -> !node.isRemoved(), () -> {
+                    });
+            items[i] = cache;
         }
-        if (cached != null) {
-            return (ResourceHandler<ItemResource>) cached;
-        }
-        ResourceHandler<ItemResource> handler = level.getCapability(Capabilities.Item.BLOCK, pos, dir);
-        items.put(key, handler != null ? handler : ABSENT);
-        return handler;
+        return cache.getCapability();
     }
 
-    @SuppressWarnings("unchecked")
-    private ResourceHandler<FluidResource> getFluidHandler(ServerLevel level, BlockPos pos, Direction dir) {
-        long key = key(level, pos, dir);
-        Object cached = fluids.get(key);
-        if (cached == ABSENT) {
-            return null;
+    private ResourceHandler<FluidResource> fluidSide(ServerLevel level, Direction dir) {
+        int i = dir.ordinal();
+        BlockCapabilityCache<ResourceHandler<FluidResource>, Direction> cache = fluids[i];
+        if (cache == null) {
+            cache = BlockCapabilityCache.create(Capabilities.Fluid.BLOCK, level, node.getAttachedPos(), dir,
+                    () -> !node.isRemoved(), () -> {
+                    });
+            fluids[i] = cache;
         }
-        if (cached != null) {
-            return (ResourceHandler<FluidResource>) cached;
-        }
-        ResourceHandler<FluidResource> handler = level.getCapability(Capabilities.Fluid.BLOCK, pos, dir);
-        fluids.put(key, handler != null ? handler : ABSENT);
-        return handler;
+        return cache.getCapability();
     }
 
-    private EnergyHandler getEnergyHandler(ServerLevel level, BlockPos pos, Direction dir) {
-        long key = key(level, pos, dir);
-        Object cached = energy.get(key);
-        if (cached == ABSENT) {
-            return null;
+    private EnergyHandler energySide(ServerLevel level, Direction dir) {
+        int i = dir.ordinal();
+        BlockCapabilityCache<EnergyHandler, Direction> cache = energy[i];
+        if (cache == null) {
+            cache = BlockCapabilityCache.create(Capabilities.Energy.BLOCK, level, node.getAttachedPos(), dir,
+                    () -> !node.isRemoved(), () -> {
+                    });
+            energy[i] = cache;
         }
-        if (cached != null) {
-            return (EnergyHandler) cached;
-        }
-        EnergyHandler handler = level.getCapability(Capabilities.Energy.BLOCK, pos, dir);
-        energy.put(key, handler != null ? handler : ABSENT);
-        return handler;
+        return cache.getCapability();
     }
 
     private static <T> boolean containsIdentity(List<T> values, T candidate) {

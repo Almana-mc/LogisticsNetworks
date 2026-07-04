@@ -140,8 +140,7 @@ public class LogisticsNetworks {
                 registrar.playToServer(SetFilterFluidEntryPayload.TYPE, SetFilterFluidEntryPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterFluidEntry);
                 registrar.playToServer(SetFilterChemicalEntryPayload.TYPE, SetFilterChemicalEntryPayload.STREAM_CODEC,
-                                (payload, context) -> ServerPayloadHandler.handleSetFilterChemicalEntry(payload,
-                                                context));
+                                ServerPayloadHandler::handleSetFilterChemicalEntry);
                 registrar.playToServer(SetFilterItemEntryPayload.TYPE, SetFilterItemEntryPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterItemEntry);
                 registrar.playToServer(SetNameFilterPayload.TYPE, SetNameFilterPayload.STREAM_CODEC,
