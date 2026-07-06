@@ -16,11 +16,12 @@ import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -62,27 +63,20 @@ public class TransferEngine {
             network.clearCacheDirty();
         }
 
-        Set<UUID> nodeUuids = network.getNodeUuids();
-        if (nodeUuids.isEmpty())
+        List<UUID> sortedUuids = network.getSortedUuids();
+        if (sortedUuids.isEmpty())
             return Long.MAX_VALUE;
 
-        // Deterministic order
-        List<UUID> sortedUuids = new ArrayList<>(nodeUuids);
-        sortedUuids.sort(Comparator.comparingLong(UUID::getMostSignificantBits)
-                .thenComparingLong(UUID::getLeastSignificantBits));
+        Map<UUID, Boolean> dimensionalCache = network.getDimensionalCache();
+        Map<UUID, Integer> tierCache = network.getTierCache();
 
-        // Cache nodes and upgrades
         List<LogisticsNodeEntity> sortedNodes = new ArrayList<>(sortedUuids.size());
-        Map<UUID, Boolean> dimensionalCache = new HashMap<>(sortedUuids.size());
-        Map<UUID, Integer> tierCache = new HashMap<>(sortedUuids.size());
         Map<UUID, LogisticsNodeEntity> nodeCache = new HashMap<>(sortedUuids.size());
 
         for (UUID nodeId : sortedUuids) {
-            LogisticsNodeEntity node = findNode(server, nodeId);
+            LogisticsNodeEntity node = findNode(server, nodeId, network.getNodeDimension(nodeId));
             if (node != null && node.isValidNode()) {
                 sortedNodes.add(node);
-                dimensionalCache.put(node.getUUID(), NodeUpgradeData.hasDimensionalUpgrade(node));
-                tierCache.put(node.getUUID(), NodeUpgradeData.getUpgradeTier(node));
                 nodeCache.put(node.getUUID(), node);
             } else if (Config.debugMode) {
                 LOGGER.debug("Node {} missing from world, skipping.", nodeId);
@@ -103,7 +97,7 @@ public class TransferEngine {
         List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache, signalCache);
 
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
-        TransferCapabilityCache capCache = new TransferCapabilityCache();
+        TransferCapabilityCache capCache = registry.getCapabilityCache();
 
         long minWakeDelta = Long.MAX_VALUE;
         for (LogisticsNodeEntity sourceNode : sortedNodes) {
@@ -151,13 +145,36 @@ public class TransferEngine {
         return hasAnyExporter ? signalCache : Collections.emptyMap();
     }
 
+    private static final List<ImportTarget>[] EMPTY_RESOLVED = createEmptyResolved();
+
+    @SuppressWarnings("unchecked")
+    private static List<ImportTarget>[] createEmptyResolved() {
+        List<ImportTarget>[] arr = new List[9];
+        Arrays.fill(arr, Collections.emptyList());
+        return arr;
+    }
+
     @SuppressWarnings("unchecked")
     private static List<ImportTarget>[] resolveCache(List<NodeRef>[] cache,
             Map<UUID, LogisticsNodeEntity> nodeCache,
             Map<UUID, Integer> signalCache) {
+        boolean anyNonEmpty = false;
+        for (int i = 0; i < 9; i++) {
+            if (!cache[i].isEmpty()) {
+                anyNonEmpty = true;
+                break;
+            }
+        }
+        if (!anyNonEmpty)
+            return EMPTY_RESOLVED;
+
         List<ImportTarget>[] resolved = new List[9];
         for (int i = 0; i < 9; i++) {
             List<NodeRef> cachedNodes = cache[i];
+            if (cachedNodes.isEmpty()) {
+                resolved[i] = Collections.emptyList();
+                continue;
+            }
             List<ImportTarget> targets = new ArrayList<>(cachedNodes.size());
             for (NodeRef ref : cachedNodes) {
                 LogisticsNodeEntity node = nodeCache.get(ref.nodeId());
@@ -223,20 +240,18 @@ public class TransferEngine {
                 continue;
             }
 
-            targets = orderTargets(targets, channel.getDistributionMode(), sourceNode, i);
-
             int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
             int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
 
             int result = switch (channel.getType()) {
                 case FLUID ->
-                    transferFluids(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache, capCache);
+                    transferFluids(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
                 case ENERGY ->
-                    transferEnergy(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache, capCache);
+                    transferEnergy(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
                 case CHEMICAL ->
-                    transferChemicals(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache, capCache);
+                    transferChemicals(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
                 case SOURCE ->
-                    transferSource(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
+                    transferSource(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache);
                 default ->
                     transferItems(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
             };
@@ -248,7 +263,7 @@ public class TransferEngine {
                 channel.getTelemetry().record(result);
             }
 
-            updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier, targets.size());
+            updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier);
 
             if (result > 0) {
                 minWakeDelta = 0;
@@ -286,7 +301,7 @@ public class TransferEngine {
     }
 
     private static void updateBackoff(LogisticsNodeEntity node, ChannelData channel, int index, boolean success,
-            long gameTime, int tier, int targetCount) {
+            long gameTime, int tier) {
         node.setLastExecution(index, gameTime);
         boolean isInstantType = channel.getType() == ChannelType.ENERGY;
         int configuredDelay = isInstantType ? 1
@@ -296,9 +311,6 @@ public class TransferEngine {
             float curBackoff = node.getBackoffTicks(index);
             if (curBackoff > configuredDelay) {
                 node.setBackoffTicks(index, Math.max(configuredDelay, curBackoff / BACKOFF_DECAY_DIVISOR));
-            }
-            if (channel.getDistributionMode() == DistributionMode.ROUND_ROBIN) {
-                node.advanceRoundRobin(index, targetCount);
             }
         } else if (Config.backoffEnabled[channel.getType().ordinal()]) {
             float maxBackoff = isInstantType ? BACKOFF_MAX_TICKS_ENERGY : (float) Config.backoffMaxTicks;
@@ -313,37 +325,26 @@ public class TransferEngine {
     }
 
     private static List<ImportTarget> orderTargets(List<ImportTarget> targets, DistributionMode mode,
-            LogisticsNodeEntity sourceNode, int channelIndex) {
+            LogisticsNodeEntity sourceNode) {
         if (targets.size() <= 1)
             return targets;
 
         switch (mode) {
-            case PRIORITY -> {
-                targets.sort((a, b) -> Integer.compare(b.channel.getPriority(), a.channel.getPriority()));
-                return targets;
-            }
             case NEAREST_FIRST -> {
                 double sx = sourceNode.getX(), sy = sourceNode.getY(), sz = sourceNode.getZ();
-                targets.sort(Comparator.comparingDouble(t -> t.node.distanceToSqr(sx, sy, sz)));
-                return targets;
+                List<ImportTarget> sorted = new ArrayList<>(targets);
+                sorted.sort(Comparator.comparingDouble(t -> t.node.distanceToSqr(sx, sy, sz)));
+                return sorted;
             }
             case FARTHEST_FIRST -> {
                 double sx = sourceNode.getX(), sy = sourceNode.getY(), sz = sourceNode.getZ();
-                targets.sort(
+                List<ImportTarget> sorted = new ArrayList<>(targets);
+                sorted.sort(
                         (a, b) -> Double.compare(b.node.distanceToSqr(sx, sy, sz), a.node.distanceToSqr(sx, sy, sz)));
-                return targets;
-            }
-            case ROUND_ROBIN -> {
-                int startIdx = sourceNode.getRoundRobinIndex(channelIndex) % targets.size();
-                if (startIdx == 0)
-                    return targets;
-                List<ImportTarget> rotated = new ArrayList<>(targets.size());
-                for (int i = 0; i < targets.size(); i++) {
-                    rotated.add(targets.get((startIdx + i) % targets.size()));
-                }
-                return rotated;
+                return sorted;
             }
             default -> {
+                // PRIORITY: pre-sorted at rebuild. ROUND_ROBIN: fixed order, no cursor.
                 return targets;
             }
         }
@@ -365,9 +366,10 @@ public class TransferEngine {
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
         ItemStack[] exportFilters = exportChannel.getFilterItems();
         boolean[] sourceAllowedSlots = TransferSlotAccess.build(sourceHandler, exportFilters);
+        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
 
         for (ImportTarget target : targets) {
-            if (target.node.getUUID().equals(sourceNode.getUUID()))
+            if (target.node == sourceNode)
                 continue;
             if (!target.node.isValidNode())
                 continue;
@@ -396,8 +398,8 @@ public class TransferEngine {
                     targetHandler,
                     importFilters,
                     target.channel.getFilterMode(),
-                    TransferAmountRules.collect(exportFilters, importFilters),
-                    FilterLogic.hasConfiguredItemNbtFilter(importFilters),
+                    TransferAmountRules.collect(exportFilters, importFilters, filterReadCache),
+                    FilterLogic.hasConfiguredItemNbtFilter(importFilters, filterReadCache),
                     targetAllowedSlots));
         }
         if (!anyReachable)
@@ -409,11 +411,11 @@ public class TransferEngine {
                 exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
-                sourceLevel, sourcePos);
+                sourceLevel, sourcePos, filterReadCache);
     }
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
-            ChannelData exportChannel, List<ImportTarget> targets, int batchLimitMb,
+            ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimitMb,
             Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
@@ -423,6 +425,7 @@ public class TransferEngine {
         if (sourceHandler == null)
             return -1;
 
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitMb;
         boolean anyReachable = false;
@@ -431,7 +434,7 @@ public class TransferEngine {
         for (ImportTarget target : targets) {
             if (remaining <= 0)
                 break;
-            if (target.node.getUUID().equals(sourceNode.getUUID()))
+            if (target.node == sourceNode)
                 continue;
             if (!target.node.isValidNode())
                 continue;
@@ -462,7 +465,7 @@ public class TransferEngine {
     }
 
     private static int transferEnergy(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
-            ChannelData exportChannel, List<ImportTarget> targets, int batchLimitRF,
+            ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimitRF,
             Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
@@ -472,6 +475,7 @@ public class TransferEngine {
         if (sourceHandler == null || !sourceHandler.canExtract())
             return -1;
 
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitRF;
         boolean anyReachable = false;
@@ -479,7 +483,7 @@ public class TransferEngine {
         for (ImportTarget target : targets) {
             if (remaining <= 0)
                 break;
-            if (target.node.getUUID().equals(sourceNode.getUUID()))
+            if (target.node == sourceNode)
                 continue;
             if (!target.node.isValidNode())
                 continue;
@@ -507,7 +511,7 @@ public class TransferEngine {
     }
 
     private static int transferChemicals(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
-            ChannelData exportChannel, List<ImportTarget> targets, int batchLimit,
+            ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
             Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         if (!MekanismCompat.isLoaded()) {
@@ -531,6 +535,7 @@ public class TransferEngine {
         if (sourceHandler == null)
             return -1;
 
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
@@ -539,7 +544,7 @@ public class TransferEngine {
         for (ImportTarget target : targets) {
             if (remaining <= 0)
                 break;
-            if (target.node().getUUID().equals(sourceNode.getUUID()))
+            if (target.node() == sourceNode)
                 continue;
             if (!target.node().isValidNode())
                 continue;
@@ -577,7 +582,7 @@ public class TransferEngine {
     }
 
     private static int transferSource(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
-            ChannelData exportChannel, List<ImportTarget> targets, int batchLimit,
+            ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
             Map<UUID, Boolean> dimensionalCache) {
 
         if (!ArsCompat.isLoaded()) {
@@ -596,6 +601,7 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
@@ -603,7 +609,7 @@ public class TransferEngine {
         for (ImportTarget target : targets) {
             if (remaining <= 0)
                 break;
-            if (target.node().getUUID().equals(sourceNode.getUUID()))
+            if (target.node() == sourceNode)
                 continue;
             if (!target.node().isValidNode())
                 continue;
@@ -660,11 +666,10 @@ public class TransferEngine {
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             boolean[] sourceAllowedSlots,
             HolderLookup.Provider provider,
-            ServerLevel sourceLevel, BlockPos sourcePos) {
+            ServerLevel sourceLevel, BlockPos sourcePos, FilterItemData.ReadCache filterReadCache) {
 
         int remaining = limit;
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
-        boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters);
+        boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, filterReadCache);
         boolean hasAnyImportNbtFilter = false;
         for (ItemTransferTarget target : targets) {
             if (target.hasItemNbtFilter()) {
@@ -700,6 +705,10 @@ public class TransferEngine {
         Arrays.fill(openTargets, true);
         int openTargetCount = targets.size();
 
+        // Serialize each source slot once across the target loop
+        CompoundTag[] slotComponents = hasNbtFilter ? new CompoundTag[source.getSlots()] : null;
+        boolean[] slotComponentsCached = hasNbtFilter ? new boolean[source.getSlots()] : null;
+
         while (remaining > 0 && openTargetCount > 0) {
             movedAny = false;
 
@@ -722,9 +731,14 @@ public class TransferEngine {
                         continue;
                     }
 
-                    CompoundTag candidateComponents = (provider != null && hasNbtFilter)
-                            ? NbtFilterData.getSerializedComponents(extracted, provider)
-                            : null;
+                    CompoundTag candidateComponents = null;
+                    if (provider != null && hasNbtFilter) {
+                        if (!slotComponentsCached[slot]) {
+                            slotComponents[slot] = NbtFilterData.getSerializedComponents(extracted, provider);
+                            slotComponentsCached[slot] = true;
+                        }
+                        candidateComponents = slotComponents[slot];
+                    }
 
                     if (provider != null) {
                         if (!FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode, extracted, provider,
@@ -827,6 +841,10 @@ public class TransferEngine {
                                 tgtCache.merge(movedItem, targetAccepted, Integer::sum);
                             }
                             batchMoved.merge(movedItem, sourceLost, Integer::sum);
+                        }
+
+                        if (slotComponentsCached != null) {
+                            slotComponentsCached[slot] = false;
                         }
 
                         break;
@@ -1048,10 +1066,16 @@ public class TransferEngine {
         return received;
     }
 
-    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
+    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,
+            @Nullable ResourceKey<Level> cachedDim) {
+        if (cachedDim != null) {
+            ServerLevel level = server.getLevel(cachedDim);
+            if (level == null)
+                return null;
+            return level.getEntity(nodeId) instanceof LogisticsNodeEntity node ? node : null;
+        }
         for (ServerLevel level : server.getAllLevels()) {
-            Entity entity = level.getEntity(nodeId);
-            if (entity instanceof LogisticsNodeEntity node)
+            if (level.getEntity(nodeId) instanceof LogisticsNodeEntity node)
                 return node;
         }
         return null;

@@ -2,8 +2,11 @@ package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.filter.*;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
@@ -49,30 +52,35 @@ public final class FilterLogic {
                 matched = FilterItemData.containsItemFullInSlot(filter, candidate, provider, candidateNbt,
                         filterReadCache, inventorySlot);
                 isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
-            } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
-                    && TagFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                isFilter = true;
-                matched = TagFilterData.containsTag(filter, candidate);
-                isBlacklist = TagFilterData.isBlacklist(filter);
-            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
-                    && ModFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                isFilter = true;
-                matched = ModFilterData.containsMod(filter, candidate);
-                isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NbtFilterData.isNbtFilter(filter)
-                    && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                if (NbtFilterData.hasEnabledRules(filter)) {
+            } else if (TagFilterData.isTagFilterItem(filter)) {
+                TagFilterData.View view = TagFilterData.view(filter, filterReadCache);
+                if (view.itemTag() != null && view.target() == FilterTargetType.ITEMS) {
                     isFilter = true;
-                    matched = NbtFilterData.matches(filter, candidateNbt);
-                    isBlacklist = NbtFilterData.isBlacklist(filter);
+                    matched = candidate.is(view.itemTag());
+                    isBlacklist = view.blacklist();
                 }
-            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
-                    && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                isFilter = true;
-                matched = NameFilterData.containsName(filter, candidate);
-                isBlacklist = NameFilterData.isBlacklist(filter);
+            } else if (ModFilterData.isModFilter(filter)) {
+                ModFilterData.View view = ModFilterData.view(filter, filterReadCache);
+                if (!view.mods().isEmpty() && view.target() == FilterTargetType.ITEMS) {
+                    isFilter = true;
+                    matched = view.matchesNamespace(BuiltInRegistries.ITEM.getKey(candidate.getItem()));
+                    isBlacklist = view.blacklist();
+                }
+            } else if (NbtFilterData.isNbtFilter(filter)) {
+                NbtFilterData.View view = NbtFilterData.view(filter, filterReadCache);
+                if (view.target() == FilterTargetType.ITEMS && view.anyEnabled()) {
+                    isFilter = true;
+                    matched = NbtFilterData.matches(view.rules(), candidateNbt);
+                    isBlacklist = view.blacklist();
+                }
+            } else if (NameFilterData.isNameFilter(filter)) {
+                NameFilterData.View view = NameFilterData.view(filter, filterReadCache);
+                if (!view.name().isEmpty() && view.target() == FilterTargetType.ITEMS) {
+                    isFilter = true;
+                    matched = NameFilterData.matches(view, candidate);
+                    isBlacklist = view.blacklist();
+                }
             } else if (DurabilityFilterData.isDurabilityFilterItem(filter)) {
-                isFilter = true;
                 if (!DurabilityFilterData.matches(filter, candidate))
                     return false;
                 hasConfiguredFilter = true;
@@ -86,10 +94,13 @@ public final class FilterLogic {
                         return false;
                 } else {
                     hasWhitelist = true;
-                    if (matched)
+                    if (matched) {
                         anyWhitelistMatched = true;
-                    else
+                    } else {
+                        if (matchAll)
+                            return false;
                         allWhitelistsMatched = false;
+                    }
                 }
             }
         }
@@ -125,36 +136,40 @@ public final class FilterLogic {
             boolean matched = false;
             boolean isBlacklist = false;
 
-            // Check each filter type
             if (FilterItemData.isFilterItem(filter)
                     && FilterItemData.hasAnyItemMatchEntries(filter, filterReadCache)) {
                 isFilter = true;
                 matched = FilterItemData.containsItemFull(filter, candidate, provider, candidateNbt, filterReadCache);
                 isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
-            } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
-                    && TagFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                isFilter = true;
-                matched = TagFilterData.containsTag(filter, candidate);
-                isBlacklist = TagFilterData.isBlacklist(filter);
-            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
-                    && ModFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                isFilter = true;
-                matched = ModFilterData.containsMod(filter, candidate);
-                isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NbtFilterData.isNbtFilter(filter)
-                    && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                if (NbtFilterData.hasEnabledRules(filter)) {
+            } else if (TagFilterData.isTagFilterItem(filter)) {
+                TagFilterData.View view = TagFilterData.view(filter, filterReadCache);
+                if (view.itemTag() != null && view.target() == FilterTargetType.ITEMS) {
                     isFilter = true;
-                    matched = NbtFilterData.matches(filter, candidateNbt);
-                    isBlacklist = NbtFilterData.isBlacklist(filter);
+                    matched = candidate.is(view.itemTag());
+                    isBlacklist = view.blacklist();
                 }
-            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
-                    && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                isFilter = true;
-                matched = NameFilterData.containsName(filter, candidate);
-                isBlacklist = NameFilterData.isBlacklist(filter);
+            } else if (ModFilterData.isModFilter(filter)) {
+                ModFilterData.View view = ModFilterData.view(filter, filterReadCache);
+                if (!view.mods().isEmpty() && view.target() == FilterTargetType.ITEMS) {
+                    isFilter = true;
+                    matched = view.matchesNamespace(BuiltInRegistries.ITEM.getKey(candidate.getItem()));
+                    isBlacklist = view.blacklist();
+                }
+            } else if (NbtFilterData.isNbtFilter(filter)) {
+                NbtFilterData.View view = NbtFilterData.view(filter, filterReadCache);
+                if (view.target() == FilterTargetType.ITEMS && view.anyEnabled()) {
+                    isFilter = true;
+                    matched = NbtFilterData.matches(view.rules(), candidateNbt);
+                    isBlacklist = view.blacklist();
+                }
+            } else if (NameFilterData.isNameFilter(filter)) {
+                NameFilterData.View view = NameFilterData.view(filter, filterReadCache);
+                if (!view.name().isEmpty() && view.target() == FilterTargetType.ITEMS) {
+                    isFilter = true;
+                    matched = NameFilterData.matches(view, candidate);
+                    isBlacklist = view.blacklist();
+                }
             } else if (DurabilityFilterData.isDurabilityFilterItem(filter)) {
-                isFilter = true;
                 if (!DurabilityFilterData.matches(filter, candidate)) {
                     return false;
                 }
@@ -172,6 +187,8 @@ public final class FilterLogic {
                     if (matched) {
                         anyWhitelistMatched = true;
                     } else {
+                        if (matchAll)
+                            return false;
                         allWhitelistsMatched = false;
                     }
                 }
@@ -219,28 +236,35 @@ public final class FilterLogic {
                 isFilter = true;
                 matched = FilterItemData.containsFluidFull(filter, candidate, provider, filterReadCache);
                 isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
-            } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
-                    && TagFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
-                isFilter = true;
-                matched = TagFilterData.containsTag(filter, candidate);
-                isBlacklist = TagFilterData.isBlacklist(filter);
-            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
-                    && ModFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
-                isFilter = true;
-                matched = ModFilterData.containsMod(filter, candidate);
-                isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NbtFilterData.isNbtFilter(filter)
-                    && NbtFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
-                if (NbtFilterData.hasEnabledRules(filter)) {
+            } else if (TagFilterData.isTagFilterItem(filter)) {
+                TagFilterData.View view = TagFilterData.view(filter, filterReadCache);
+                if (view.fluidTag() != null && view.target() == FilterTargetType.FLUIDS) {
                     isFilter = true;
-                    matched = NbtFilterData.matchesSelection(filter, candidate, provider);
-                    isBlacklist = NbtFilterData.isBlacklist(filter);
+                    matched = candidate.getFluid().builtInRegistryHolder().is(view.fluidTag());
+                    isBlacklist = view.blacklist();
                 }
-            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
-                    && NameFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
-                isFilter = true;
-                matched = NameFilterData.containsName(filter, candidate);
-                isBlacklist = NameFilterData.isBlacklist(filter);
+            } else if (ModFilterData.isModFilter(filter)) {
+                ModFilterData.View view = ModFilterData.view(filter, filterReadCache);
+                if (!view.mods().isEmpty() && view.target() == FilterTargetType.FLUIDS) {
+                    isFilter = true;
+                    matched = view.matchesNamespace(BuiltInRegistries.FLUID.getKey(candidate.getFluid()));
+                    isBlacklist = view.blacklist();
+                }
+            } else if (NbtFilterData.isNbtFilter(filter)) {
+                NbtFilterData.View view = NbtFilterData.view(filter, filterReadCache);
+                if (view.target() == FilterTargetType.FLUIDS && view.anyEnabled()) {
+                    isFilter = true;
+                    matched = provider != null && NbtFilterData.matches(view.rules(),
+                            NbtFilterData.getSerializedComponents(candidate, provider));
+                    isBlacklist = view.blacklist();
+                }
+            } else if (NameFilterData.isNameFilter(filter)) {
+                NameFilterData.View view = NameFilterData.view(filter, filterReadCache);
+                if (!view.name().isEmpty() && view.target() == FilterTargetType.FLUIDS) {
+                    isFilter = true;
+                    matched = NameFilterData.matches(view, candidate);
+                    isBlacklist = view.blacklist();
+                }
             }
 
             if (isFilter) {
@@ -253,6 +277,8 @@ public final class FilterLogic {
                     if (matched) {
                         anyWhitelistMatched = true;
                     } else {
+                        if (matchAll)
+                            return false;
                         allWhitelistsMatched = false;
                     }
                 }
@@ -299,21 +325,27 @@ public final class FilterLogic {
                 isFilter = true;
                 matched = FilterItemData.containsChemicalFull(filter, chemicalId, filterReadCache);
                 isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
-            } else if (TagFilterData.isTagFilterItem(filter) && TagFilterData.hasAnyTags(filter)
-                    && TagFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
-                isFilter = true;
-                matched = TagFilterData.containsTag(filter, chemicalId);
-                isBlacklist = TagFilterData.isBlacklist(filter);
-            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
-                    && ModFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
-                isFilter = true;
-                matched = ModFilterData.containsMod(filter, chemicalId);
-                isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
-                    && NameFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
-                isFilter = true;
-                matched = NameFilterData.containsName(filter, chemicalId);
-                isBlacklist = NameFilterData.isBlacklist(filter);
+            } else if (TagFilterData.isTagFilterItem(filter)) {
+                TagFilterData.View view = TagFilterData.view(filter, filterReadCache);
+                if (view.tag() != null && view.target() == FilterTargetType.CHEMICALS) {
+                    isFilter = true;
+                    matched = MekanismCompat.chemicalHasTag(chemicalId, view.tag());
+                    isBlacklist = view.blacklist();
+                }
+            } else if (ModFilterData.isModFilter(filter)) {
+                ModFilterData.View view = ModFilterData.view(filter, filterReadCache);
+                if (!view.mods().isEmpty() && view.target() == FilterTargetType.CHEMICALS) {
+                    isFilter = true;
+                    matched = view.matchesNamespace(ResourceLocation.tryParse(chemicalId));
+                    isBlacklist = view.blacklist();
+                }
+            } else if (NameFilterData.isNameFilter(filter)) {
+                NameFilterData.View view = NameFilterData.view(filter, filterReadCache);
+                if (!view.name().isEmpty() && view.target() == FilterTargetType.CHEMICALS) {
+                    isFilter = true;
+                    matched = NameFilterData.matches(view, chemicalId);
+                    isBlacklist = view.blacklist();
+                }
             }
 
             if (isFilter) {
@@ -326,6 +358,8 @@ public final class FilterLogic {
                     if (matched) {
                         anyWhitelistMatched = true;
                     } else {
+                        if (matchAll)
+                            return false;
                         allWhitelistsMatched = false;
                     }
                 }
@@ -341,15 +375,20 @@ public final class FilterLogic {
     }
 
     public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters) {
+        return hasConfiguredItemNbtFilter(filters, null);
+    }
+
+    public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters, @Nullable FilterItemData.ReadCache readCache) {
         if (filters == null)
             return false;
         for (ItemStack filter : filters) {
-            if (NbtFilterData.isNbtFilter(filter)
-                    && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS
-                    && NbtFilterData.hasEnabledRules(filter)) {
-                return true;
+            if (NbtFilterData.isNbtFilter(filter)) {
+                NbtFilterData.View view = NbtFilterData.view(filter, readCache);
+                if (view.target() == FilterTargetType.ITEMS && view.anyEnabled()) {
+                    return true;
+                }
             }
-            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyNbtEntries(filter)) {
+            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyNbtEntries(filter, readCache)) {
                 return true;
             }
         }

@@ -156,7 +156,9 @@ public class EventHandler {
         for (LogisticsNodeEntity node : nodes) {
             if (node.getAttachedPos().equals(pos)) {
                 if (node.getNetworkId() != null) {
-                    NetworkRegistry.get(serverLevel).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
+                    NetworkRegistry registry = NetworkRegistry.get(serverLevel);
+                    registry.removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
+                    registry.evictCapabilities(serverLevel, node.getAttachedPos());
                 }
 
                 if (Config.dropNodeItem) {
