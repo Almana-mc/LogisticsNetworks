@@ -4,9 +4,12 @@ import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.ChestBlock;
+import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -19,13 +22,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-final class TransferCapabilityCache {
-    private static final Object ABSENT = new Object();
+public final class TransferCapabilityCache {
+    private static final Direction[] DIRECTIONS = Direction.values();
 
-    private final Map<Long, Object> items = new HashMap<>();
-    private final Map<Long, Object> fluids = new HashMap<>();
-    private final Map<Long, Object> energy = new HashMap<>();
-    private final Map<Long, Object> chemicals = new HashMap<>();
+    private record CapKey(ResourceKey<Level> dim, long pos, int dir) {
+    }
+
+    private final Map<CapKey, BlockCapabilityCache<IItemHandler, Direction>> items = new HashMap<>();
+    private final Map<CapKey, BlockCapabilityCache<IFluidHandler, Direction>> fluids = new HashMap<>();
+    private final Map<CapKey, BlockCapabilityCache<IEnergyStorage, Direction>> energy = new HashMap<>();
 
     IItemHandler findItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
         if (dir != null) return getItemHandler(level, pos, dir);
@@ -33,7 +38,7 @@ final class TransferCapabilityCache {
             return getItemHandler(level, pos, Direction.UP);
         }
         List<IItemHandler> found = new ArrayList<>(6);
-        for (Direction side : Direction.values()) {
+        for (Direction side : DIRECTIONS) {
             IItemHandler handler = getItemHandler(level, pos, side);
             if (handler != null && !containsIdentity(found, handler)) {
                 found.add(handler);
@@ -46,7 +51,7 @@ final class TransferCapabilityCache {
     IFluidHandler findFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
         if (dir != null) return getFluidHandler(level, pos, dir);
         List<IFluidHandler> found = new ArrayList<>(6);
-        for (Direction side : Direction.values()) {
+        for (Direction side : DIRECTIONS) {
             IFluidHandler handler = getFluidHandler(level, pos, side);
             if (handler != null && !containsIdentity(found, handler)) {
                 found.add(handler);
@@ -59,7 +64,7 @@ final class TransferCapabilityCache {
     IEnergyStorage findEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
         if (dir != null) return getEnergyHandler(level, pos, dir);
         List<IEnergyStorage> found = new ArrayList<>(6);
-        for (Direction side : Direction.values()) {
+        for (Direction side : DIRECTIONS) {
             IEnergyStorage handler = getEnergyHandler(level, pos, side);
             if (handler != null && !containsIdentity(found, handler)) {
                 found.add(handler);
@@ -70,51 +75,38 @@ final class TransferCapabilityCache {
     }
 
     IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-        long key = key(level, pos, dir == null ? Direction.DOWN : dir);
-        if (dir == null) key ^= 0x1L << 62;
-        Object cached = chemicals.get(key);
-        if (cached == ABSENT) return null;
-        if (cached != null) return (IChemicalHandler) cached;
-        IChemicalHandler handler = ChemicalTransferHelper.getHandler(level, pos, dir);
-        chemicals.put(key, handler != null ? handler : ABSENT);
-        return handler;
+        return ChemicalTransferHelper.getHandler(level, pos, dir);
+    }
+
+    public void evict(ResourceKey<Level> dim, BlockPos pos) {
+        long packed = pos.asLong();
+        for (int d = 0; d < DIRECTIONS.length; d++) {
+            CapKey key = new CapKey(dim, packed, d);
+            items.remove(key);
+            fluids.remove(key);
+            energy.remove(key);
+        }
     }
 
     private IItemHandler getItemHandler(ServerLevel level, BlockPos pos, Direction dir) {
-        long key = key(level, pos, dir);
-        Object cached = items.get(key);
-        if (cached == ABSENT) return null;
-        if (cached != null) return (IItemHandler) cached;
-        IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, dir);
-        items.put(key, handler != null ? handler : ABSENT);
-        return handler;
+        BlockCapabilityCache<IItemHandler, Direction> cache = items.computeIfAbsent(
+                new CapKey(level.dimension(), pos.asLong(), dir.ordinal()),
+                k -> BlockCapabilityCache.create(Capabilities.ItemHandler.BLOCK, level, pos, dir));
+        return cache.getCapability();
     }
 
     private IFluidHandler getFluidHandler(ServerLevel level, BlockPos pos, Direction dir) {
-        long key = key(level, pos, dir);
-        Object cached = fluids.get(key);
-        if (cached == ABSENT) return null;
-        if (cached != null) return (IFluidHandler) cached;
-        IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, dir);
-        fluids.put(key, handler != null ? handler : ABSENT);
-        return handler;
+        BlockCapabilityCache<IFluidHandler, Direction> cache = fluids.computeIfAbsent(
+                new CapKey(level.dimension(), pos.asLong(), dir.ordinal()),
+                k -> BlockCapabilityCache.create(Capabilities.FluidHandler.BLOCK, level, pos, dir));
+        return cache.getCapability();
     }
 
     private IEnergyStorage getEnergyHandler(ServerLevel level, BlockPos pos, Direction dir) {
-        long key = key(level, pos, dir);
-        Object cached = energy.get(key);
-        if (cached == ABSENT) return null;
-        if (cached != null) return (IEnergyStorage) cached;
-        IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, dir);
-        energy.put(key, handler != null ? handler : ABSENT);
-        return handler;
-    }
-
-    private static long key(ServerLevel level, BlockPos pos, Direction dir) {
-        long packed = pos.asLong();
-        packed ^= ((long) dir.ordinal()) << 58;
-        packed ^= ((long) level.dimension().location().hashCode()) << 32;
-        return packed;
+        BlockCapabilityCache<IEnergyStorage, Direction> cache = energy.computeIfAbsent(
+                new CapKey(level.dimension(), pos.asLong(), dir.ordinal()),
+                k -> BlockCapabilityCache.create(Capabilities.EnergyStorage.BLOCK, level, pos, dir));
+        return cache.getCapability();
     }
 
     private static <T> boolean containsIdentity(List<T> values, T candidate) {

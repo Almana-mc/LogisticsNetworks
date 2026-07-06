@@ -77,7 +77,9 @@ public class LogisticsCommand {
         int removedCount = 0;
         for (LogisticsNodeEntity node : nodes) {
             if (node.getNetworkId() != null) {
-                NetworkRegistry.get(level).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
+                NetworkRegistry registry = NetworkRegistry.get(level);
+                registry.removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
+                registry.evictCapabilities(level, node.getAttachedPos());
             }
 
             node.dropFilters();

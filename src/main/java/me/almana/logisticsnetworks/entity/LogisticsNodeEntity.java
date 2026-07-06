@@ -221,8 +221,9 @@ public class LogisticsNodeEntity extends Entity {
             if (this.tickCount % 20 == 0) {
                 if (this.level().isEmptyBlock(attached)) {
                     if (this.getNetworkId() != null && this.level() instanceof ServerLevel serverLevel) {
-                        NetworkRegistry.get(serverLevel)
-                                .removeNodeFromNetwork(this.getNetworkId(), this.getUUID());
+                        NetworkRegistry registry = NetworkRegistry.get(serverLevel);
+                        registry.removeNodeFromNetwork(this.getNetworkId(), this.getUUID());
+                        registry.evictCapabilities(serverLevel, attached);
                     }
                     if (Config.dropNodeItem) {
                         this.spawnAtLocation(

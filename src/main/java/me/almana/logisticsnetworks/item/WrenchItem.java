@@ -682,7 +682,9 @@ public class WrenchItem extends Item {
 
     private InteractionResult removeNode(Level level, LogisticsNodeEntity node, Player player) {
         if (level instanceof ServerLevel serverLevel && node.getNetworkId() != null) {
-            NetworkRegistry.get(serverLevel).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
+            NetworkRegistry registry = NetworkRegistry.get(serverLevel);
+            registry.removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
+            registry.evictCapabilities(serverLevel, node.getAttachedPos());
         }
 
         node.dropFilters();
