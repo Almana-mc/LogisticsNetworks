@@ -263,7 +263,7 @@ public class TransferEngine {
                 channel.getTelemetry().record(result);
             }
 
-            updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier, targets.size());
+            updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier);
 
             if (result > 0) {
                 minWakeDelta = 0;
@@ -301,7 +301,7 @@ public class TransferEngine {
     }
 
     private static void updateBackoff(LogisticsNodeEntity node, ChannelData channel, int index, boolean success,
-            long gameTime, int tier, int targetCount) {
+            long gameTime, int tier) {
         node.setLastExecution(index, gameTime);
         boolean isInstantType = channel.getType() == ChannelType.ENERGY;
         int configuredDelay = isInstantType ? 1
@@ -311,9 +311,6 @@ public class TransferEngine {
             float curBackoff = node.getBackoffTicks(index);
             if (curBackoff > configuredDelay) {
                 node.setBackoffTicks(index, Math.max(configuredDelay, curBackoff / BACKOFF_DECAY_DIVISOR));
-            }
-            if (channel.getDistributionMode() == DistributionMode.ROUND_ROBIN) {
-                node.advanceRoundRobin(index, targetCount);
             }
         } else if (Config.backoffEnabled[channel.getType().ordinal()]) {
             float maxBackoff = isInstantType ? BACKOFF_MAX_TICKS_ENERGY : (float) Config.backoffMaxTicks;
@@ -328,15 +325,11 @@ public class TransferEngine {
     }
 
     private static List<ImportTarget> orderTargets(List<ImportTarget> targets, DistributionMode mode,
-            LogisticsNodeEntity sourceNode, int channelIndex) {
+            LogisticsNodeEntity sourceNode) {
         if (targets.size() <= 1)
             return targets;
 
         switch (mode) {
-            case PRIORITY -> {
-                // pre-sorted by priority at rebuild
-                return targets;
-            }
             case NEAREST_FIRST -> {
                 double sx = sourceNode.getX(), sy = sourceNode.getY(), sz = sourceNode.getZ();
                 List<ImportTarget> sorted = new ArrayList<>(targets);
@@ -350,17 +343,8 @@ public class TransferEngine {
                         (a, b) -> Double.compare(b.node.distanceToSqr(sx, sy, sz), a.node.distanceToSqr(sx, sy, sz)));
                 return sorted;
             }
-            case ROUND_ROBIN -> {
-                int startIdx = sourceNode.getRoundRobinIndex(channelIndex) % targets.size();
-                if (startIdx == 0)
-                    return targets;
-                List<ImportTarget> rotated = new ArrayList<>(targets.size());
-                for (int i = 0; i < targets.size(); i++) {
-                    rotated.add(targets.get((startIdx + i) % targets.size()));
-                }
-                return rotated;
-            }
             default -> {
+                // PRIORITY: pre-sorted at rebuild. ROUND_ROBIN: fixed order, no cursor.
                 return targets;
             }
         }
@@ -441,7 +425,7 @@ public class TransferEngine {
         if (sourceHandler == null)
             return -1;
 
-        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode, channelIndex);
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitMb;
         boolean anyReachable = false;
@@ -491,7 +475,7 @@ public class TransferEngine {
         if (sourceHandler == null || !sourceHandler.canExtract())
             return -1;
 
-        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode, channelIndex);
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitRF;
         boolean anyReachable = false;
@@ -551,7 +535,7 @@ public class TransferEngine {
         if (sourceHandler == null)
             return -1;
 
-        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode, channelIndex);
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
@@ -617,7 +601,7 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
-        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode, channelIndex);
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;

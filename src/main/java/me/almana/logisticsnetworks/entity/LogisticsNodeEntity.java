@@ -75,7 +75,6 @@ public class LogisticsNodeEntity extends Entity {
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
 
     private final long[] channelCooldowns = new long[CHANNEL_COUNT];
-    private final int[] roundRobinIndex = new int[CHANNEL_COUNT];
     private final float[] backoffTicks = new float[CHANNEL_COUNT];
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
@@ -390,16 +389,6 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setLastExecution(int index, long time) {
         channelCooldowns[index] = time;
-    }
-
-    public int getRoundRobinIndex(int channelIndex) {
-        return roundRobinIndex[channelIndex];
-    }
-
-    public void advanceRoundRobin(int channelIndex, int targetCount) {
-        if (targetCount > 0) {
-            roundRobinIndex[channelIndex] = (roundRobinIndex[channelIndex] + 1) % targetCount;
-        }
     }
 
     public float getBackoffTicks(int channelIndex) {
