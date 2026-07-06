@@ -69,7 +69,7 @@ public class Registration {
                                         () -> EntityType.Builder
                                                         .<LogisticsNodeEntity>of(LogisticsNodeEntity::new,
                                                                         MobCategory.MISC)
-                                                        .sized(1.0f, 1.0f)
+                                                        .sized(0.05f, 0.05f)
                                                         .clientTrackingRange(4)
                                                         .updateInterval(40)
                                                         .build("logistics_node"));
