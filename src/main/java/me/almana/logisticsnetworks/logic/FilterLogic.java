@@ -291,11 +291,12 @@ public final class FilterLogic {
         return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
     }
 
-    public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters) {
+    public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters,
+            @Nullable FilterItemData.ReadCache readCache) {
         if (filters == null)
             return false;
         for (ItemStack filter : filters) {
-            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyNbtEntries(filter)) {
+            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnyNbtEntries(filter, readCache)) {
                 return true;
             }
         }

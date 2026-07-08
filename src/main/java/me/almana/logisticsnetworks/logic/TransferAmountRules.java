@@ -24,14 +24,15 @@ final class TransferAmountRules {
     private TransferAmountRules() {
     }
 
-    static Constraints collect(ItemStack[] exportFilters, ItemStack[] importFilters) {
+    static Constraints collect(ItemStack[] exportFilters, ItemStack[] importFilters,
+            @Nullable FilterItemData.ReadCache readCache) {
         int exportThreshold = 0;
         boolean hasExportThreshold = false;
         boolean hasPerEntryAmounts = false;
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                if (FilterItemData.hasAnyAmountEntries(filter)) {
+                if (FilterItemData.hasAnyAmountEntries(filter, readCache)) {
                     hasPerEntryAmounts = true;
                 }
             }
@@ -42,7 +43,7 @@ final class TransferAmountRules {
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                if (FilterItemData.hasAnyAmountEntries(filter)) {
+                if (FilterItemData.hasAnyAmountEntries(filter, readCache)) {
                     hasPerEntryAmounts = true;
                 }
             }

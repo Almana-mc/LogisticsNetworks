@@ -398,10 +398,10 @@ public class TransferEngine {
                     targetHandler,
                     importFilters,
                     target.channel.getFilterMode(),
-                    TransferAmountRules.collect(exportFilters, importFilters),
-                    FilterLogic.hasConfiguredItemNbtFilter(importFilters),
+                    TransferAmountRules.collect(exportFilters, importFilters, exportChannel.getReadCache()),
+                    FilterLogic.hasConfiguredItemNbtFilter(importFilters, exportChannel.getReadCache()),
                     targetAllowedSlots,
-                    FilterLogic.hasConfiguredSlotMapping(importFilters, null)));
+                    FilterLogic.hasConfiguredSlotMapping(importFilters, exportChannel.getReadCache())));
         }
         if (!anyReachable)
             return -1;
@@ -643,7 +643,7 @@ public class TransferEngine {
             FilterItemData.ReadCache filterReadCache) {
 
         int remaining = limit;
-        boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters);
+        boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, filterReadCache);
         boolean hasAnyImportNbtFilter = false;
         for (ItemTransferTarget target : targets) {
             if (target.hasItemNbtFilter()) {
@@ -940,7 +940,7 @@ public class TransferEngine {
             HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache) {
 
         int remaining = limitMb;
-        TransferAmountRules.Constraints amountConstraints = TransferAmountRules.collect(exportFilters, importFilters);
+        TransferAmountRules.Constraints amountConstraints = TransferAmountRules.collect(exportFilters, importFilters, filterReadCache);
 
         try (var tx = Transaction.openRoot()) {
             for (int tank = 0; tank < source.size() && remaining > 0; tank++) {

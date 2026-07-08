@@ -987,6 +987,12 @@ public final class FilterItemData {
                 || hasEntryType(stack, KEY_NBT_RAW);
     }
 
+    public static boolean hasAnyNbtEntries(ItemStack stack, @Nullable ReadCache readCache) {
+        if (!isFilterItem(stack))
+            return false;
+        return getItemFilterView(stack, readCache).hasNbtEntries();
+    }
+
     public static boolean isNbtOnlySlot(ItemStack stack, int slot) {
         if (!hasEntryNbt(stack, slot) && !hasEntryDurability(stack, slot) && !hasEntryEnchanted(stack, slot))
             return false;
