@@ -332,6 +332,22 @@ public class LogisticsNetwork {
         tierCache.clear();
     }
 
+    private void sortImportsByPriority() {
+        for (int i = 0; i < 9; i++) {
+            sortByPriority(itemImports[i]);
+            sortByPriority(fluidImports[i]);
+            sortByPriority(energyImports[i]);
+            sortByPriority(chemicalImports[i]);
+            sortByPriority(sourceImports[i]);
+        }
+    }
+
+    private static void sortByPriority(List<NodeRef> refs) {
+        if (refs.size() > 1) {
+            refs.sort((a, b) -> Integer.compare(b.priority(), a.priority()));
+        }
+    }
+
     private void rebuildViews() {
         itemImportsView = copyToUnmodifiableArray(itemImports);
         fluidImportsView = copyToUnmodifiableArray(fluidImports);
@@ -393,6 +409,7 @@ public class LogisticsNetwork {
             }
         }
 
+        sortImportsByPriority();
         rebuildViews();
     }
 
@@ -409,18 +426,19 @@ public class LogisticsNetwork {
                 continue;
             }
 
+            int priority = ch.getPriority();
             switch (ch.getType()) {
-                case ITEM -> this.itemImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
-                case FLUID -> this.fluidImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
-                case ENERGY -> this.energyImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
+                case ITEM -> this.itemImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
+                case FLUID -> this.fluidImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
+                case ENERGY -> this.energyImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
                 case CHEMICAL -> {
                     if (NodeUpgradeData.hasMekanismChemicalUpgrade(node)) {
-                        this.chemicalImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
+                        this.chemicalImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
                     }
                 }
                 case SOURCE -> {
                     if (NodeUpgradeData.hasArsSourceUpgrade(node)) {
-                        this.sourceImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
+                        this.sourceImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
                     }
                 }
             }

@@ -240,8 +240,6 @@ public class TransferEngine {
                 continue;
             }
 
-            targets = orderTargets(targets, channel.getDistributionMode(), sourceNode);
-
             int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
             int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
 
@@ -333,19 +331,20 @@ public class TransferEngine {
 
         switch (mode) {
             case PRIORITY -> {
-                targets.sort((a, b) -> Integer.compare(b.channel.getPriority(), a.channel.getPriority()));
                 return targets;
             }
             case NEAREST_FIRST -> {
                 double sx = sourceNode.getX(), sy = sourceNode.getY(), sz = sourceNode.getZ();
-                targets.sort(Comparator.comparingDouble(t -> t.node.distanceToSqr(sx, sy, sz)));
-                return targets;
+                List<ImportTarget> sorted = new ArrayList<>(targets);
+                sorted.sort(Comparator.comparingDouble(t -> t.node.distanceToSqr(sx, sy, sz)));
+                return sorted;
             }
             case FARTHEST_FIRST -> {
                 double sx = sourceNode.getX(), sy = sourceNode.getY(), sz = sourceNode.getZ();
-                targets.sort(
+                List<ImportTarget> sorted = new ArrayList<>(targets);
+                sorted.sort(
                         (a, b) -> Double.compare(b.node.distanceToSqr(sx, sy, sz), a.node.distanceToSqr(sx, sy, sz)));
-                return targets;
+                return sorted;
             }
             case ROUND_ROBIN -> {
                 return targets;
@@ -367,6 +366,7 @@ public class TransferEngine {
         if (sourceHandler == null)
             return -1;
 
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         boolean anyReachable = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
@@ -426,6 +426,7 @@ public class TransferEngine {
         if (sourceHandler == null)
             return -1;
 
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitMb;
         boolean anyReachable = false;
@@ -475,6 +476,7 @@ public class TransferEngine {
         if (sourceHandler == null)
             return -1;
 
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitRF;
         boolean anyReachable = false;
@@ -529,6 +531,7 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
@@ -589,6 +592,7 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
