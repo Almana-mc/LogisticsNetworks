@@ -132,14 +132,14 @@ public final class NameFilterData {
         return !getNameFilter(stack).isEmpty();
     }
 
-    public record NameFilterView(FilterTargetType targetType, boolean blacklist, String expression,
+    record NameFilterView(FilterTargetType targetType, boolean blacklist, String expression,
             ValidationResult pattern) {
     }
 
-    record CachedNameView(CustomData key, NameFilterView view) {
+    record CachedNameView(@Nullable CustomData key, NameFilterView view) {
     }
 
-    public static NameFilterView getNameFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+    private static NameFilterView getNameFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
         if (readCache == null)
             return buildNameFilterView(stack, null);
 

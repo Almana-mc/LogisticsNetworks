@@ -100,13 +100,13 @@ public final class ModFilterData {
         return !getModFilters(stack).isEmpty();
     }
 
-    public record ModFilterView(FilterTargetType targetType, boolean blacklist, List<String> namespaces) {
+    record ModFilterView(FilterTargetType targetType, boolean blacklist, List<String> namespaces) {
     }
 
-    record CachedModView(CustomData key, ModFilterView view) {
+    record CachedModView(@Nullable CustomData key, ModFilterView view) {
     }
 
-    public static ModFilterView getModFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+    private static ModFilterView getModFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
         if (readCache == null)
             return buildModFilterView(stack);
 
@@ -273,10 +273,10 @@ public final class ModFilterData {
     private static boolean checkModMatch(List<String> namespaces, Identifier id) {
         if (id == null)
             return false;
-        String candidate = id.getNamespace();
+        String namespace = id.getNamespace();
 
         for (String mod : namespaces) {
-            if (mod.equals(candidate))
+            if (mod.equals(namespace))
                 return true;
         }
         return false;
