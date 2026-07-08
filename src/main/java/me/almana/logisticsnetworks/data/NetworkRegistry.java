@@ -172,10 +172,11 @@ public class NetworkRegistry extends SavedData {
     }
 
     public void markNetworkDirty(UUID networkId) {
-        if (networks.containsKey(networkId)) {
+        LogisticsNetwork network = networks.get(networkId);
+        if (network != null) {
             cancelWake(networkId);
             dirtyNetworks.add(networkId);
-            networks.get(networkId).markCacheDirty();
+            network.markCacheDirty();
         }
     }
 

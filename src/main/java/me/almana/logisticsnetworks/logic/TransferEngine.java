@@ -374,7 +374,7 @@ public class TransferEngine {
         boolean[] sourceAllowedSlots = null;
 
         for (ImportTarget target : targets) {
-            if (target.node.getUUID().equals(sourceNode.getUUID()))
+            if (target.node == sourceNode)
                 continue;
             if (!target.node.isValidNode())
                 continue;
@@ -435,7 +435,7 @@ public class TransferEngine {
         for (ImportTarget target : targets) {
             if (remaining <= 0)
                 break;
-            if (target.node.getUUID().equals(sourceNode.getUUID()))
+            if (target.node == sourceNode)
                 continue;
             if (!target.node.isValidNode())
                 continue;
@@ -484,7 +484,7 @@ public class TransferEngine {
         for (ImportTarget target : targets) {
             if (remaining <= 0)
                 break;
-            if (target.node.getUUID().equals(sourceNode.getUUID()))
+            if (target.node == sourceNode)
                 continue;
             if (!target.node.isValidNode())
                 continue;
@@ -539,7 +539,7 @@ public class TransferEngine {
         for (ImportTarget target : targets) {
             if (remaining <= 0)
                 break;
-            if (target.node().getUUID().equals(sourceNode.getUUID()))
+            if (target.node() == sourceNode)
                 continue;
             if (!target.node().isValidNode())
                 continue;
@@ -600,7 +600,7 @@ public class TransferEngine {
         for (ImportTarget target : targets) {
             if (remaining <= 0)
                 break;
-            if (target.node().getUUID().equals(sourceNode.getUUID()))
+            if (target.node() == sourceNode)
                 continue;
             if (!target.node().isValidNode())
                 continue;
