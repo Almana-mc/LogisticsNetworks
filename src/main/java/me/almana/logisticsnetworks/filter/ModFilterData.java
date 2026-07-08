@@ -11,6 +11,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -73,8 +74,10 @@ public final class ModFilterData {
     public static List<String> getModFilters(ItemStack stack) {
         if (!isModFilter(stack))
             return List.of();
+        return readNamespaces(getRoot(stack));
+    }
 
-        CompoundTag root = getRoot(stack);
+    private static List<String> readNamespaces(CompoundTag root) {
         if (!root.contains(KEY_MODS))
             return List.of();
 
@@ -95,6 +98,79 @@ public final class ModFilterData {
 
     public static boolean hasAnyMods(ItemStack stack) {
         return !getModFilters(stack).isEmpty();
+    }
+
+    public record ModFilterView(FilterTargetType targetType, boolean blacklist, List<String> namespaces) {
+    }
+
+    record CachedModView(CustomData key, ModFilterView view) {
+    }
+
+    public static ModFilterView getModFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        if (readCache == null)
+            return buildModFilterView(stack);
+
+        CustomData currentKey = stack.get(DataComponents.CUSTOM_DATA);
+        CachedModView cached = readCache.modViews.get(stack);
+        if (cached != null && cached.key() == currentKey)
+            return cached.view();
+
+        ModFilterView built = buildModFilterView(stack);
+        readCache.modViews.put(stack, new CachedModView(currentKey, built));
+        return built;
+    }
+
+    private static ModFilterView buildModFilterView(ItemStack stack) {
+        if (!isModFilter(stack))
+            return new ModFilterView(FilterTargetType.ITEMS, false, List.of());
+
+        CompoundTag root = getRoot(stack);
+        FilterTargetType targetType = FilterTargetType
+                .fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
+        boolean blacklist = root.getBooleanOr(KEY_IS_BLACKLIST, false);
+        return new ModFilterView(targetType, blacklist, readNamespaces(root));
+    }
+
+    public static boolean hasAnyMods(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        return !getModFilterView(stack, readCache).namespaces().isEmpty();
+    }
+
+    public static FilterTargetType getTargetType(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        return getModFilterView(stack, readCache).targetType();
+    }
+
+    public static boolean isBlacklist(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        return getModFilterView(stack, readCache).blacklist();
+    }
+
+    public static boolean containsMod(ItemStack stack, ItemStack candidate,
+            @Nullable FilterItemData.ReadCache readCache) {
+        if (candidate.isEmpty())
+            return false;
+        ModFilterView view = getModFilterView(stack, readCache);
+        if (view.targetType() != FilterTargetType.ITEMS)
+            return false;
+        return checkModMatch(view.namespaces(), BuiltInRegistries.ITEM.getKey(candidate.getItem()));
+    }
+
+    public static boolean containsMod(ItemStack stack, FluidStack candidate,
+            @Nullable FilterItemData.ReadCache readCache) {
+        if (candidate == null || candidate.isEmpty())
+            return false;
+        ModFilterView view = getModFilterView(stack, readCache);
+        if (view.targetType() != FilterTargetType.FLUIDS)
+            return false;
+        return checkModMatch(view.namespaces(), BuiltInRegistries.FLUID.getKey(candidate.getFluid()));
+    }
+
+    public static boolean containsMod(ItemStack stack, String chemicalId,
+            @Nullable FilterItemData.ReadCache readCache) {
+        if (chemicalId == null || chemicalId.isEmpty())
+            return false;
+        ModFilterView view = getModFilterView(stack, readCache);
+        if (view.targetType() != FilterTargetType.CHEMICALS)
+            return false;
+        return checkModMatch(view.namespaces(), Identifier.tryParse(chemicalId));
     }
 
     public static boolean addModFilter(ItemStack stack, String rawModId) {
@@ -191,12 +267,16 @@ public final class ModFilterData {
     }
 
     private static boolean checkModMatch(ItemStack stack, Identifier id) {
+        return checkModMatch(getModFilters(stack), id);
+    }
+
+    private static boolean checkModMatch(List<String> namespaces, Identifier id) {
         if (id == null)
             return false;
-        String namespace = id.getNamespace();
+        String candidate = id.getNamespace();
 
-        for (String mod : getModFilters(stack)) {
-            if (mod.equals(namespace))
+        for (String mod : namespaces) {
+            if (mod.equals(candidate))
                 return true;
         }
         return false;

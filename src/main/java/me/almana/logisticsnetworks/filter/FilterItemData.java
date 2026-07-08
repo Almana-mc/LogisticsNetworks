@@ -58,6 +58,8 @@ public final class FilterItemData {
 
     public static final class ReadCache {
         private final IdentityHashMap<ItemStack, CachedView> itemViews = new IdentityHashMap<>();
+        final IdentityHashMap<ItemStack, ModFilterData.CachedModView> modViews = new IdentityHashMap<>();
+        final IdentityHashMap<ItemStack, NameFilterData.CachedNameView> nameViews = new IdentityHashMap<>();
         final Map<String, NameFilterData.ValidationResult> namePatterns = new HashMap<>();
 
         private ReadCache() {
@@ -979,12 +981,6 @@ public final class FilterItemData {
                 root.put(KEY_ITEMS, list);
             }
         });
-    }
-
-    public static boolean hasAnyNbtEntries(ItemStack stack) {
-        return hasEntryType(stack, KEY_NBT_RULES)
-                || hasEntryType(stack, KEY_NBT_PATH)
-                || hasEntryType(stack, KEY_NBT_RAW);
     }
 
     public static boolean hasAnyNbtEntries(ItemStack stack, @Nullable ReadCache readCache) {
@@ -1943,19 +1939,6 @@ public final class FilterItemData {
                 }
             }
         });
-    }
-
-    public static boolean hasAnyAmountEntries(ItemStack stack) {
-        if (!isFilterItem(stack))
-            return false;
-        ListTag list = getItemEntries(getRoot(stack));
-        for (Tag t : list) {
-            if (t instanceof CompoundTag c) {
-                if (getEntryBatch(c) > 0 || getEntryStock(c) > 0 || c.contains(KEY_ENCHANTED))
-                    return true;
-            }
-        }
-        return false;
     }
 
     public static int getItemAmountThreshold(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider) {

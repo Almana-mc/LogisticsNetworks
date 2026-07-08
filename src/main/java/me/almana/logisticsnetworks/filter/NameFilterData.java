@@ -132,6 +132,51 @@ public final class NameFilterData {
         return !getNameFilter(stack).isEmpty();
     }
 
+    public record NameFilterView(FilterTargetType targetType, boolean blacklist, String expression,
+            ValidationResult pattern) {
+    }
+
+    record CachedNameView(CustomData key, NameFilterView view) {
+    }
+
+    public static NameFilterView getNameFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        if (readCache == null)
+            return buildNameFilterView(stack, null);
+
+        CustomData currentKey = stack.get(DataComponents.CUSTOM_DATA);
+        CachedNameView cached = readCache.nameViews.get(stack);
+        if (cached != null && cached.key() == currentKey)
+            return cached.view();
+
+        NameFilterView built = buildNameFilterView(stack, readCache);
+        readCache.nameViews.put(stack, new CachedNameView(currentKey, built));
+        return built;
+    }
+
+    private static NameFilterView buildNameFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        if (!isNameFilter(stack))
+            return new NameFilterView(FilterTargetType.ITEMS, false, "", validateRegex(""));
+
+        CompoundTag root = getRoot(stack);
+        FilterTargetType targetType = FilterTargetType
+                .fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
+        boolean blacklist = root.getBooleanOr(KEY_IS_BLACKLIST, false);
+        String expression = root.getStringOr(KEY_NAME, "");
+        return new NameFilterView(targetType, blacklist, expression, resolveRegex(expression, readCache));
+    }
+
+    public static boolean hasNameFilter(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        return !getNameFilterView(stack, readCache).expression().isEmpty();
+    }
+
+    public static FilterTargetType getTargetType(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        return getNameFilterView(stack, readCache).targetType();
+    }
+
+    public static boolean isBlacklist(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        return getNameFilterView(stack, readCache).blacklist();
+    }
+
     public static boolean isValidRegex(String expression) {
         return validateRegex(expression).accepted();
     }
@@ -162,15 +207,14 @@ public final class NameFilterData {
             @Nullable FilterItemData.ReadCache readCache) {
         if (candidate.isEmpty())
             return false;
-        if (getTargetType(filter) != FilterTargetType.ITEMS)
+        NameFilterView view = getNameFilterView(filter, readCache);
+        if (view.targetType() != FilterTargetType.ITEMS)
             return false;
-
-        String expression = getNameFilter(filter);
-        if (expression.isEmpty())
+        if (view.expression().isEmpty())
             return false;
 
         String candidateName = candidate.getHoverName().getString();
-        return matchesExpression(expression, candidateName, readCache);
+        return matchesView(view, candidateName);
     }
 
     public static boolean containsName(ItemStack filter, FluidStack candidate) {
@@ -181,15 +225,14 @@ public final class NameFilterData {
             @Nullable FilterItemData.ReadCache readCache) {
         if (candidate.isEmpty())
             return false;
-        if (getTargetType(filter) != FilterTargetType.FLUIDS)
+        NameFilterView view = getNameFilterView(filter, readCache);
+        if (view.targetType() != FilterTargetType.FLUIDS)
             return false;
-
-        String expression = getNameFilter(filter);
-        if (expression.isEmpty())
+        if (view.expression().isEmpty())
             return false;
 
         String candidateName = candidate.getHoverName().getString();
-        return matchesExpression(expression, candidateName, readCache);
+        return matchesView(view, candidateName);
     }
 
     public static boolean containsName(ItemStack filter, String chemicalId) {
@@ -200,16 +243,15 @@ public final class NameFilterData {
             @Nullable FilterItemData.ReadCache readCache) {
         if (chemicalId == null || chemicalId.isEmpty())
             return false;
-        if (getTargetType(filter) != FilterTargetType.CHEMICALS)
+        NameFilterView view = getNameFilterView(filter, readCache);
+        if (view.targetType() != FilterTargetType.CHEMICALS)
             return false;
-
-        String expression = getNameFilter(filter);
-        if (expression.isEmpty())
+        if (view.expression().isEmpty())
             return false;
 
         Component chemName = MekanismCompat.getChemicalTextComponent(chemicalId);
         String displayName = chemName != null ? chemName.getString() : chemicalId;
-        return matchesExpression(expression, displayName, readCache);
+        return matchesView(view, displayName);
     }
 
     static ValidationResult resolveRegex(String expression, @Nullable FilterItemData.ReadCache readCache) {
@@ -218,12 +260,11 @@ public final class NameFilterData {
         return readCache.namePatterns.computeIfAbsent(expression, NameFilterData::validateRegex);
     }
 
-    static boolean matchesExpression(String expression, String candidate,
-            @Nullable FilterItemData.ReadCache readCache) {
+    private static boolean matchesView(NameFilterView view, String candidate) {
         if (candidate.length() > MAX_CANDIDATE_LENGTH)
             return false;
 
-        ValidationResult result = resolveRegex(expression, readCache);
+        ValidationResult result = view.pattern();
         return result.accepted() && result.pattern().matcher(candidate).find();
     }
 

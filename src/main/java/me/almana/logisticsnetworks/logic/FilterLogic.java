@@ -49,16 +49,16 @@ public final class FilterLogic {
                 matched = FilterItemData.containsItemFullInSlot(filter, candidate, provider, candidateNbt,
                         filterReadCache, inventorySlot);
                 isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
-            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
-                    && ModFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
+            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter, filterReadCache)
+                    && ModFilterData.getTargetType(filter, filterReadCache) == FilterTargetType.ITEMS) {
                 isFilter = true;
-                matched = ModFilterData.containsMod(filter, candidate);
-                isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
-                    && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
+                matched = ModFilterData.containsMod(filter, candidate, filterReadCache);
+                isBlacklist = ModFilterData.isBlacklist(filter, filterReadCache);
+            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter, filterReadCache)
+                    && NameFilterData.getTargetType(filter, filterReadCache) == FilterTargetType.ITEMS) {
                 isFilter = true;
                 matched = NameFilterData.containsName(filter, candidate, filterReadCache);
-                isBlacklist = NameFilterData.isBlacklist(filter);
+                isBlacklist = NameFilterData.isBlacklist(filter, filterReadCache);
             } else if (DurabilityFilterData.isDurabilityFilterItem(filter)) {
                 isFilter = true;
                 if (!DurabilityFilterData.matches(filter, candidate))
@@ -119,16 +119,16 @@ public final class FilterLogic {
                 isFilter = true;
                 matched = FilterItemData.containsItemFull(filter, candidate, provider, candidateNbt, filterReadCache);
                 isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
-            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
-                    && ModFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
+            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter, filterReadCache)
+                    && ModFilterData.getTargetType(filter, filterReadCache) == FilterTargetType.ITEMS) {
                 isFilter = true;
-                matched = ModFilterData.containsMod(filter, candidate);
-                isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
-                    && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
+                matched = ModFilterData.containsMod(filter, candidate, filterReadCache);
+                isBlacklist = ModFilterData.isBlacklist(filter, filterReadCache);
+            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter, filterReadCache)
+                    && NameFilterData.getTargetType(filter, filterReadCache) == FilterTargetType.ITEMS) {
                 isFilter = true;
                 matched = NameFilterData.containsName(filter, candidate, filterReadCache);
-                isBlacklist = NameFilterData.isBlacklist(filter);
+                isBlacklist = NameFilterData.isBlacklist(filter, filterReadCache);
             }
 
             if (isFilter) {
@@ -188,16 +188,16 @@ public final class FilterLogic {
                 isFilter = true;
                 matched = FilterItemData.containsFluidFull(filter, candidate, provider, filterReadCache);
                 isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
-            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
-                    && ModFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
+            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter, filterReadCache)
+                    && ModFilterData.getTargetType(filter, filterReadCache) == FilterTargetType.FLUIDS) {
                 isFilter = true;
-                matched = ModFilterData.containsMod(filter, candidate);
-                isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
-                    && NameFilterData.getTargetType(filter) == FilterTargetType.FLUIDS) {
+                matched = ModFilterData.containsMod(filter, candidate, filterReadCache);
+                isBlacklist = ModFilterData.isBlacklist(filter, filterReadCache);
+            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter, filterReadCache)
+                    && NameFilterData.getTargetType(filter, filterReadCache) == FilterTargetType.FLUIDS) {
                 isFilter = true;
                 matched = NameFilterData.containsName(filter, candidate, filterReadCache);
-                isBlacklist = NameFilterData.isBlacklist(filter);
+                isBlacklist = NameFilterData.isBlacklist(filter, filterReadCache);
             }
 
             if (isFilter) {
@@ -255,16 +255,16 @@ public final class FilterLogic {
                 isFilter = true;
                 matched = FilterItemData.containsChemicalFull(filter, chemicalId);
                 isBlacklist = FilterItemData.isBlacklist(filter);
-            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
-                    && ModFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
+            } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter, filterReadCache)
+                    && ModFilterData.getTargetType(filter, filterReadCache) == FilterTargetType.CHEMICALS) {
                 isFilter = true;
-                matched = ModFilterData.containsMod(filter, chemicalId);
-                isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
-                    && NameFilterData.getTargetType(filter) == FilterTargetType.CHEMICALS) {
+                matched = ModFilterData.containsMod(filter, chemicalId, filterReadCache);
+                isBlacklist = ModFilterData.isBlacklist(filter, filterReadCache);
+            } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter, filterReadCache)
+                    && NameFilterData.getTargetType(filter, filterReadCache) == FilterTargetType.CHEMICALS) {
                 isFilter = true;
                 matched = NameFilterData.containsName(filter, chemicalId, filterReadCache);
-                isBlacklist = NameFilterData.isBlacklist(filter);
+                isBlacklist = NameFilterData.isBlacklist(filter, filterReadCache);
             }
 
             if (isFilter) {
