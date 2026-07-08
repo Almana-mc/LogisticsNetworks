@@ -54,13 +54,6 @@ public final class FilterLogic {
                 isFilter = true;
                 matched = ModFilterData.containsMod(filter, candidate);
                 isBlacklist = ModFilterData.isBlacklist(filter);
-            } else if (NbtFilterData.isNbtFilter(filter)
-                    && NbtFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
-                if (NbtFilterData.hasEnabledRules(filter)) {
-                    isFilter = true;
-                    matched = NbtFilterData.matches(filter, candidateNbt);
-                    isBlacklist = NbtFilterData.isBlacklist(filter);
-                }
             } else if (NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter)
                     && NameFilterData.getTargetType(filter) == FilterTargetType.ITEMS) {
                 isFilter = true;
