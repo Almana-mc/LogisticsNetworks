@@ -5,6 +5,9 @@ import me.almana.logisticsnetworks.item.BaseFilterItem;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.material.Fluid;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
@@ -91,7 +94,9 @@ public final class FilterItemData {
             boolean nbtMatchAny,
             @Nullable int[] slotMapping,
             boolean slotOnly,
-            @Nullable Boolean enchanted) {
+            @Nullable Boolean enchanted,
+            @Nullable TagKey<Item> itemTag,
+            @Nullable TagKey<Fluid> fluidTag) {
     }
 
     private record ItemFilterView(
@@ -1365,7 +1370,7 @@ public final class FilterItemData {
 
             String tag = entry.tag();
             if (tag != null) {
-                if (candidate.typeHolder().tags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
+                if (entry.itemTag() != null && candidate.is(entry.itemTag())) {
                     if (entry.hasNbt()) {
                         if (!candidateComponentsResolved) {
                             resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
@@ -1445,7 +1450,7 @@ public final class FilterItemData {
 
             String tag = entry.tag();
             if (tag != null) {
-                if (candidate.typeHolder().tags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
+                if (entry.itemTag() != null && candidate.is(entry.itemTag())) {
                     if (entry.hasNbt()) {
                         if (!candidateComponentsResolved) {
                             resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
@@ -1517,7 +1522,7 @@ public final class FilterItemData {
 
             String tag = slot.tag();
             if (tag != null) {
-                if (candidate.typeHolder().tags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
+                if (slot.fluidTag() != null && candidate.is(slot.fluidTag())) {
                     return true;
                 }
                 continue;
@@ -1589,7 +1594,7 @@ public final class FilterItemData {
 
             String tag = entry.tag();
             if (tag != null) {
-                if (candidate.typeHolder().tags().map(t -> t.location().toString()).anyMatch(tag::equals))
+                if (entry.itemTag() != null && candidate.is(entry.itemTag()))
                     return entry.stock();
                 continue;
             }
@@ -1641,7 +1646,7 @@ public final class FilterItemData {
 
             String tag = entry.tag();
             if (tag != null) {
-                if (candidate.typeHolder().tags().map(t -> t.location().toString()).anyMatch(tag::equals))
+                if (entry.itemTag() != null && candidate.is(entry.itemTag()))
                     return entry.batch();
                 continue;
             }
@@ -1695,7 +1700,7 @@ public final class FilterItemData {
                 continue;
             String tag = slot.tag();
             if (tag != null) {
-                if (candidate.typeHolder().tags().map(t -> t.location().toString()).anyMatch(tag::equals))
+                if (slot.fluidTag() != null && candidate.is(slot.fluidTag()))
                     return slot.stock();
                 continue;
             }
@@ -1747,7 +1752,7 @@ public final class FilterItemData {
                 continue;
             String tag = slot.tag();
             if (tag != null) {
-                if (candidate.typeHolder().tags().map(t -> t.location().toString()).anyMatch(tag::equals))
+                if (slot.fluidTag() != null && candidate.is(slot.fluidTag()))
                     return slot.batch();
                 continue;
             }
@@ -2033,6 +2038,7 @@ public final class FilterItemData {
 
         CompoundTag root = getRoot(stack);
         boolean blacklist = root.getBooleanOr(KEY_IS_BLACKLIST, false);
+        FilterTargetType targetType = FilterTargetType.fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, 0));
         ListTag list = getItemEntries(root);
 
         boolean hasItemEntries = false;
@@ -2052,6 +2058,18 @@ public final class FilterItemData {
                 continue;
 
             String tag = getEntryTag(entry);
+            TagKey<Item> itemTag = null;
+            TagKey<Fluid> fluidTag = null;
+            if (tag != null) {
+                Identifier tagId = Identifier.tryParse(tag);
+                if (tagId != null) {
+                    if (targetType == FilterTargetType.ITEMS) {
+                        itemTag = TagKey.create(Registries.ITEM, tagId);
+                    } else if (targetType == FilterTargetType.FLUIDS) {
+                        fluidTag = TagKey.create(Registries.FLUID, tagId);
+                    }
+                }
+            }
             Item item = resolveEntryItem(entry);
             boolean hasFluid = entry.contains(KEY_FLUID_ID);
             boolean hasChemical = entry.contains(KEY_CHEMICAL_ID);
@@ -2103,7 +2121,7 @@ public final class FilterItemData {
 
             entriesBySlot[slot] = new ItemFilterSlot(slot, tag, item, chemicalId, fluidEntry, batch, stock, nbtPath,
                     nbtValue, nbtOp, rawNbt, invalidRawNbt, durOp, durVal, hasNbt, nbtOnly, nbtStrict, nbtRules,
-                    nbtMatchAny, slotMapping, slotOnly, enchanted);
+                    nbtMatchAny, slotMapping, slotOnly, enchanted, itemTag, fluidTag);
 
             hasItemEntries |= item != null;
             hasFluidEntries |= hasFluid;
