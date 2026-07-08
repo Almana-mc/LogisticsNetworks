@@ -412,7 +412,8 @@ public class TransferEngine {
                 exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
-                exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN);
+                exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN,
+                exportChannel.getReadCache());
     }
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -430,7 +431,7 @@ public class TransferEngine {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitMb;
         boolean anyReachable = false;
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
+        FilterItemData.ReadCache filterReadCache = exportChannel.getReadCache();
 
         for (ImportTarget target : targets) {
             if (remaining <= 0)
@@ -638,10 +639,10 @@ public class TransferEngine {
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             boolean[] sourceAllowedSlots,
             HolderLookup.Provider provider,
-            boolean roundRobin) {
+            boolean roundRobin,
+            FilterItemData.ReadCache filterReadCache) {
 
         int remaining = limit;
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
         boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters);
         boolean hasAnyImportNbtFilter = false;
         for (ItemTransferTarget target : targets) {

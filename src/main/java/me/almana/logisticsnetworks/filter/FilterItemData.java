@@ -57,11 +57,14 @@ public final class FilterItemData {
     private static final String NBT_OP_EQUALS = "=";
 
     public static final class ReadCache {
-        private final IdentityHashMap<ItemStack, ItemFilterView> itemViews = new IdentityHashMap<>();
+        private final IdentityHashMap<ItemStack, CachedView> itemViews = new IdentityHashMap<>();
         final Map<String, NameFilterData.ValidationResult> namePatterns = new HashMap<>();
 
         private ReadCache() {
         }
+    }
+
+    private record CachedView(@Nullable CustomData key, ItemFilterView view) {
     }
 
     private record ItemFilterSlot(
@@ -2021,13 +2024,14 @@ public final class FilterItemData {
             return buildItemFilterView(stack);
         }
 
-        ItemFilterView cached = readCache.itemViews.get(stack);
-        if (cached != null) {
-            return cached;
+        CustomData currentKey = stack.get(DataComponents.CUSTOM_DATA);
+        CachedView cached = readCache.itemViews.get(stack);
+        if (cached != null && cached.key() == currentKey) {
+            return cached.view();
         }
 
         ItemFilterView built = buildItemFilterView(stack);
-        readCache.itemViews.put(stack, built);
+        readCache.itemViews.put(stack, new CachedView(currentKey, built));
         return built;
     }
 

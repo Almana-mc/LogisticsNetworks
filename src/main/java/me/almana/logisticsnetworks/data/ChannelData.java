@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.data;
 
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.logic.ChannelTelemetry;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -46,6 +47,7 @@ public class ChannelData {
 
     private final ItemStack[] filterItems = new ItemStack[FILTER_SIZE];
     private final transient ChannelTelemetry telemetry = new ChannelTelemetry();
+    private final transient FilterItemData.ReadCache readCache = FilterItemData.createReadCache();
 
     public ChannelData() {
         this(false);
@@ -351,6 +353,10 @@ public class ChannelData {
 
     public ChannelTelemetry getTelemetry() {
         return telemetry;
+    }
+
+    public FilterItemData.ReadCache getReadCache() {
+        return readCache;
     }
 
     public ItemStack[] getFilterItems() {
