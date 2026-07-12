@@ -1,6 +1,17 @@
 {
   "model": {
     "type": "minecraft:model",
-    "model": "logisticsnetworks:item/wrench"
+    "model": "logisticsnetworks:item/wrench",
+    "tints": [
+      {
+        "type": "minecraft:custom_model_data",
+        "default": 14737640
+      },
+      {
+        "type": "minecraft:custom_model_data",
+        "default": 327424,
+        "index": 1
+      }
+    ]
   }
 }
