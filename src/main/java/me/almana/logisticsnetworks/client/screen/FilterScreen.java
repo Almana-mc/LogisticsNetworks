@@ -6,6 +6,9 @@ import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
@@ -66,17 +69,22 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private static final int SUBMODE_SCROLLBAR_W = 6;
     private static final int SUBMODE_SCROLLBAR_GAP = 2;
 
-    // Colors
-    private static final int COL_BG = 0xFF1A1A1A;
-    private static final int COL_BORDER = 0xFF333333;
-    private static final int COL_ACCENT = 0xFF44BB44;
-    private static final int COL_WHITE = 0xFFFFFFFF;
-    private static final int COL_GRAY = 0xFF999999;
-    private static final int COL_HOVER = 0x33FFFFFF;
-    private static final int COL_SELECTED = 0xFF2A4A2A;
-    private static final int COL_BTN_BG = 0xFF2A2A2A;
-    private static final int COL_BTN_HOVER = 0xFF3A3A3A;
-    private static final int COL_BTN_BORDER = 0xFF4A4A4A;
+    private Theme theme() { return ThemeState.active(); }
+    private int cBg() { return theme().surface(); }
+    private int cBorder() { return theme().border(); }
+    private int cAccent() { return theme().accent(); }
+    private int cText() { return theme().text(); }
+    private int cMuted() { return theme().textMuted(); }
+    private int cHover() { return (theme().text() & 0x00FFFFFF) | 0x22000000; }
+    private int cSelected() { return theme().accentSoft(); }
+    private int cBtnBg() { return theme().surface2(); }
+    private int cBtnHover() { return ThemePaint.brighten(theme().surface2(), 0x10); }
+    private int cBtnBorder() { return theme().borderStrong(); }
+    private int cInfo() { return theme().info(); }
+    private int cWarn() { return theme().warn(); }
+    private int cDanger() { return theme().danger(); }
+    private int cOverlayPanel() { return (theme().surface() & 0x00FFFFFF) | 0xF0000000; }
+    private int cTextVeil(int alpha) { return (theme().text() & 0x00FFFFFF) | (alpha << 24); }
 
     private static final Identifier COPY_ICON = Identifier.fromNamespaceAndPath(
             LogisticsNetworks.MOD_ID, "textures/gui/filter_copy.png");
@@ -156,12 +164,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private static final int NBT_EDIT_ENCHANTED = -11;
     private static final int NBT_EDIT_STACK_SIZE = -12;
     private static final int NBT_MIN_GROUP_PREFIX = 10;
-    private static final int NBT_HEADING_COLOR = 0xFF88AACC;
     private static final int DETAIL_SECTION_H = 22;
-    private static final int DETAIL_TAG_COLOR = 0xFF44BB44;
-    private static final int DETAIL_NBT_COLOR = 0xFFFFAA00;
-    private static final int DETAIL_DUR_COLOR = 0xFF55BBFF;
-    private static final int DETAIL_SLOT_COLOR = 0xFFBB88FF;
 
     private record NbtRow(boolean heading, String display, int entryIdx, String group) {}
 
@@ -230,57 +233,57 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         manualInputBox.setMaxLength(256);
         manualInputBox.setVisible(false);
         manualInputBox.setBordered(true);
-        manualInputBox.setTextColor(COL_WHITE);
+        manualInputBox.setTextColor(cText());
         addRenderableWidget(manualInputBox);
 
         tagInputBox = new EditBox(font, leftPos + 12, topPos + 50, 100, 14, Component.empty());
         tagInputBox.setMaxLength(256);
         tagInputBox.setVisible(false);
         tagInputBox.setBordered(true);
-        tagInputBox.setTextColor(COL_WHITE);
+        tagInputBox.setTextColor(cText());
 
         nbtValueEditBox = new EditBox(font, 0, 0, 60, LIST_ROW_H, Component.empty());
         nbtValueEditBox.setMaxLength(128);
         nbtValueEditBox.setVisible(false);
         nbtValueEditBox.setBordered(false);
-        nbtValueEditBox.setTextColor(0xFFFFAA00);
+        nbtValueEditBox.setTextColor(cWarn());
 
         detailIdInputBox = new EditBox(font, leftPos + 12, topPos + 50, 100, 14, Component.empty());
         detailIdInputBox.setMaxLength(256);
         detailIdInputBox.setVisible(false);
         detailIdInputBox.setBordered(true);
-        detailIdInputBox.setTextColor(COL_WHITE);
+        detailIdInputBox.setTextColor(cText());
         detailIdInputBox.setHint(Component.literal("Item or #tag"));
 
         detailBatchInputBox = new EditBox(font, leftPos + 12, topPos + 50, 50, 14, Component.empty());
         detailBatchInputBox.setMaxLength(10);
         detailBatchInputBox.setVisible(false);
         detailBatchInputBox.setBordered(true);
-        detailBatchInputBox.setTextColor(COL_WHITE);
+        detailBatchInputBox.setTextColor(cText());
 
         detailStockInputBox = new EditBox(font, leftPos + 12, topPos + 66, 50, 14, Component.empty());
         detailStockInputBox.setMaxLength(10);
         detailStockInputBox.setVisible(false);
         detailStockInputBox.setBordered(true);
-        detailStockInputBox.setTextColor(COL_WHITE);
+        detailStockInputBox.setTextColor(cText());
 
         detailSlotMappingInputBox = new EditBox(font, leftPos + 12, topPos + 50, 100, 14, Component.empty());
         detailSlotMappingInputBox.setMaxLength(128);
         detailSlotMappingInputBox.setVisible(false);
         detailSlotMappingInputBox.setBordered(true);
-        detailSlotMappingInputBox.setTextColor(COL_WHITE);
+        detailSlotMappingInputBox.setTextColor(cText());
 
         detailDurabilityValueBox = new EditBox(font, leftPos + 12, topPos + 50, 40, 14, Component.empty());
         detailDurabilityValueBox.setMaxLength(5);
         detailDurabilityValueBox.setVisible(false);
         detailDurabilityValueBox.setBordered(true);
-        detailDurabilityValueBox.setTextColor(COL_WHITE);
+        detailDurabilityValueBox.setTextColor(cText());
 
         detailNbtValueBox = new EditBox(font, leftPos + 12, topPos + 50, 80, 14, Component.empty());
         detailNbtValueBox.setMaxLength(256);
         detailNbtValueBox.setVisible(false);
         detailNbtValueBox.setBordered(true);
-        detailNbtValueBox.setTextColor(COL_WHITE);
+        detailNbtValueBox.setTextColor(cText());
 
         detailNbtInputBox = MultiLineEditBox.builder().build(font, 100, 40, Component.literal(""));
         detailNbtInputBox.setCharacterLimit(2048);
@@ -460,7 +463,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             drawButton(g, backButtonX(), backButtonY(), BACK_BUTTON_W, BACK_BUTTON_H, "<", mx, my, true);
             titleX += BACK_BUTTON_W + 4;
         }
-        g.drawString(font, filterTitle(), titleX, topPos + 6, COL_ACCENT, false);
+        g.drawString(font, filterTitle(), titleX, topPos + 6, cAccent(), false);
 
         renderClipboardButtons(g, mx, my);
 
@@ -473,8 +476,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         int playerInvY = menu.getPlayerInventoryY();
         int sepY = topPos + playerInvY - 12;
-        g.fill(leftPos + 8, sepY, leftPos + imageWidth - 8, sepY + 1, COL_BORDER);
-        g.drawString(font, playerInventoryTitle, leftPos + 8, topPos + playerInvY - 10, COL_GRAY, false);
+        g.fill(leftPos + 8, sepY, leftPos + imageWidth - 8, sepY + 1, cBorder());
+        g.drawString(font, playerInventoryTitle, leftPos + 8, topPos + playerInvY - 10, cMuted(), false);
 
         renderPlayerSlots(g);
     }
@@ -493,7 +496,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
             if (menu.isTagSlot(i)) {
                 drawSlot(g, sx, sy);
-                g.renderOutline(sx, sy, 18, 18, 0xFF44BB44);
+                g.renderOutline(sx, sy, 18, 18, cAccent());
 
                 String tag = menu.getEntryTag(i);
                 if (tag != null) {
@@ -514,7 +517,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                                 renderFluidStack(g, new FluidStack(list.get(idx), 1000), sx + 1, sy + 1);
                             }
                         } else if (targetType == FilterTargetType.CHEMICALS) {
-                            g.drawString(font, "#", sx + 5, sy + 5, 0xFF44BB44, true);
+                            g.drawString(font, "#", sx + 5, sy + 5, cAccent(), true);
                         } else {
                             TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagId);
                             List<Item> taggedItems = new ArrayList<>();
@@ -535,7 +538,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             } else if (FilterItemData.isNbtOnlySlot(menu.getOpenedStack(), i)
                     || isAnyItemSlot(i)) {
                 drawSlot(g, sx, sy);
-                g.renderOutline(sx, sy, 18, 18, 0xFF44BB44);
+                g.renderOutline(sx, sy, 18, 18, cAccent());
                 if (nbtOnlyCycleItems == null) {
                     nbtOnlyCycleItems = BuiltInRegistries.ITEM.stream()
                             .map(ItemStack::new)
@@ -574,7 +577,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 g.pose().scale(0.5f, 0.5f, 1.0f);
                 int bx = (int) ((sx + 1) / 0.5f);
                 int by = (int) ((sy + 1) / 0.5f);
-                g.drawString(font, "N", bx, by, 0xFFFFAA00, true);
+                g.drawString(font, "N", bx, by, cWarn(), true);
                 g.pose().popPose();
             }
 
@@ -584,7 +587,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 g.pose().scale(0.5f, 0.5f, 1.0f);
                 int bx = (int) ((sx + 12) / 0.5f);
                 int by = (int) ((sy + 1) / 0.5f);
-                g.drawString(font, "D", bx, by, 0xFF55BBFF, true);
+                g.drawString(font, "D", bx, by, cInfo(), true);
                 g.pose().popPose();
             }
 
@@ -604,7 +607,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 g.pose().scale(0.5f, 0.5f, 1.0f);
                 int bx = (int) ((sx + 12) / 0.5f);
                 int by = (int) ((sy + 12) / 0.5f);
-                g.drawString(font, "S", bx, by, 0xFFAA88FF, true);
+                g.drawString(font, "S", bx, by, cMuted(), true);
                 g.pose().popPose();
             }
         }
@@ -627,17 +630,17 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         renderExtractorSlotTarget(g, mx, my);
         String displayValue = current == null ? tr("gui.logisticsnetworks.filter.none") : current;
         g.drawString(font, Component.translatable("gui.logisticsnetworks.filter.selector.selected", displayValue),
-                leftPos + 8, topPos + 22, COL_GRAY, false);
+                leftPos + 8, topPos + 22, cMuted(), false);
 
         manualInputBox.setHint(fitHint(hint, getSelectorInputWidth()));
 
         boolean hoveringDropdown = isHovering(x, y, w, 14, mx, my);
-        g.renderOutline(x, y, w, 14, (hoveringDropdown || isDropdownOpen) ? COL_WHITE : COL_BORDER);
+        g.renderOutline(x, y, w, 14, (hoveringDropdown || isDropdownOpen) ? cText() : cBorder());
         if (!manualInputBox.isVisible() && !manualInputBox.isFocused()) {
-            g.drawCenteredString(font, current != null ? current : "", x + w / 2, y + 3, COL_WHITE);
+            g.drawCenteredString(font, current != null ? current : "", x + w / 2, y + 3, cText());
         }
 
-        g.drawCenteredString(font, isDropdownOpen ? "^" : "v", arrowX + 6, y + 3, COL_GRAY);
+        g.drawCenteredString(font, isDropdownOpen ? "^" : "v", arrowX + 6, y + 3, cMuted());
 
         if (isDropdownOpen) {
             renderDropdownList(g, x, y + 16, w, items, current, mx, my);
@@ -655,8 +658,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         g.pose().pushPose();
         g.pose().translate(0, 0, 200);
-        g.fill(x, y, x + w, y + listH, COL_BG);
-        g.renderOutline(x, y, w, listH, COL_BORDER);
+        g.fill(x, y, x + w, y + listH, cBg());
+        g.renderOutline(x, y, w, listH, cBorder());
 
         int startIdx = listScrollOffset;
         int endIdx = Math.min(startIdx + DROPDOWN_ROWS, items.size());
@@ -668,12 +671,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             boolean isHovered = mx >= x && mx <= x + w && my >= rowY && my < rowY + LIST_ROW_H;
 
             if (isSelected)
-                g.fill(x, rowY, x + w, rowY + LIST_ROW_H, COL_SELECTED);
+                g.fill(x, rowY, x + w, rowY + LIST_ROW_H, cSelected());
             else if (isHovered)
-                g.fill(x, rowY, x + w, rowY + LIST_ROW_H, COL_HOVER);
+                g.fill(x, rowY, x + w, rowY + LIST_ROW_H, cHover());
 
             String text = scrollText(item, w - 4, i);
-            g.drawString(font, text, x + 2, rowY + 2, isSelected ? COL_ACCENT : COL_WHITE, false);
+            g.drawString(font, text, x + 2, rowY + 2, isSelected ? cAccent() : cText(), false);
         }
         g.pose().popPose();
     }
@@ -694,13 +697,13 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         g.pose().pushPose();
         g.pose().translate(0, 0, 300);
-        g.fill(x, y, x + w, y + h, 0xF0101010);
-        g.renderOutline(x, y, w, h, COL_BORDER);
+        g.fill(x, y, x + w, y + h, cOverlayPanel());
+        g.renderOutline(x, y, w, h, cBorder());
 
         String titleKey = amountInfoPage == 0
                 ? "gui.logisticsnetworks.filter.amount.info.import.title"
                 : "gui.logisticsnetworks.filter.amount.info.export.title";
-        g.drawString(font, Component.translatable(titleKey), x + pad, y + pad, COL_WHITE, false);
+        g.drawString(font, Component.translatable(titleKey), x + pad, y + pad, cText(), false);
 
         String line1Key = amountInfoPage == 0
                 ? "gui.logisticsnetworks.filter.amount.info.import.p1"
@@ -734,7 +737,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             if (nextY + 8 > maxBottom) {
                 break;
             }
-            g.drawString(font, part, x, nextY, COL_GRAY, false);
+            g.drawString(font, part, x, nextY, cMuted(), false);
             nextY += 9;
         }
         return nextY;
@@ -765,8 +768,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private void renderPanel(GuiGraphics g, int x, int y, int w, int h) {
-        g.fill(x, y, x + w, y + h, COL_BG);
-        g.renderOutline(x, y, w, h, COL_BORDER);
+        g.fill(x, y, x + w, y + h, cBg());
+        g.renderOutline(x, y, w, h, cBorder());
     }
 
     private int[] rowBtnCenters(String[] labels) {
@@ -827,15 +830,15 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private void drawSlot(GuiGraphics g, int x, int y) {
-        g.fill(x, y, x + 18, y + 18, 0xFF0A0A0A);
-        g.renderOutline(x, y, 18, 18, 0xFF3A3A3A);
+        g.fill(x, y, x + 18, y + 18, theme().slotBg());
+        g.renderOutline(x, y, 18, 18, theme().slotBorder());
     }
 
     private void drawButton(GuiGraphics g, int x, int y, int w, int h, String label, int mx, int my, boolean active) {
         boolean hovered = active && isHovering(x, y, w, h, mx, my);
-        g.fill(x, y, x + w, y + h, hovered ? COL_BTN_HOVER : COL_BTN_BG);
-        g.renderOutline(x, y, w, h, hovered ? COL_WHITE : COL_BTN_BORDER);
-        g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, hovered ? COL_WHITE : COL_GRAY);
+        g.fill(x, y, x + w, y + h, hovered ? cBtnHover() : cBtnBg());
+        g.renderOutline(x, y, w, h, hovered ? cText() : cBtnBorder());
+        g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, hovered ? cText() : cMuted());
     }
 
     private void renderClipboardButtons(GuiGraphics g, int mx, int my) {
@@ -845,8 +848,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     private void drawIconButton(GuiGraphics g, int x, int y, Identifier icon, int mx, int my, boolean active) {
         boolean hovered = active && isHovering(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my);
-        g.fill(x, y, x + CLIPBOARD_BUTTON_SIZE, y + CLIPBOARD_BUTTON_SIZE, hovered ? COL_BTN_HOVER : COL_BTN_BG);
-        g.renderOutline(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, hovered ? COL_WHITE : COL_BTN_BORDER);
+        g.fill(x, y, x + CLIPBOARD_BUTTON_SIZE, y + CLIPBOARD_BUTTON_SIZE, hovered ? cBtnHover() : cBtnBg());
+        g.renderOutline(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, hovered ? cText() : cBtnBorder());
         g.blit(icon, x + 2, y + 2, 0f, 0f, 8, 8, 8, 8);
     }
 
@@ -1284,7 +1287,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         String activeKey = validRegex
                 ? "gui.logisticsnetworks.filter.name.active"
                 : "gui.logisticsnetworks.filter.name.pattern";
-        int activeColor = validRegex ? COL_ACCENT : COL_GRAY;
+        int activeColor = validRegex ? cAccent() : cMuted();
         String activeLine = Component.translatable(activeKey, display).getString();
         g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, activeColor, false);
 
@@ -1295,10 +1298,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 default -> "gui.logisticsnetworks.filter.name.invalid_regex";
             };
             String warning = Component.translatable(warningKey).getString();
-            g.drawString(font, warning, contentX, hintY, 0xFFFF5555, false);
+            g.drawString(font, warning, contentX, hintY, cDanger(), false);
         } else {
             String hintLine = Component.translatable("gui.logisticsnetworks.filter.name.input_hint").getString();
-            g.drawString(font, font.plainSubstrByWidth(hintLine, contentW), contentX, hintY, COL_GRAY, false);
+            g.drawString(font, font.plainSubstrByWidth(hintLine, contentW), contentX, hintY, cMuted(), false);
         }
     }
 
@@ -2173,7 +2176,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int y = rect[1];
         drawSlot(g, x, y);
         if (isHovering(x, y, 18, 18, mx, my)) {
-            g.fill(x, y, x + 18, y + 18, COL_HOVER);
+            g.fill(x, y, x + 18, y + 18, cHover());
         }
     }
 
@@ -2270,26 +2273,26 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         g.pose().pushPose();
         g.pose().translate(0, 0, 400);
 
-        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xF0101010);
-        g.renderOutline(panelX, panelY, panelW, panelH, COL_ACCENT);
+        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, cOverlayPanel());
+        g.renderOutline(panelX, panelY, panelW, panelH, cAccent());
 
         String title = "Tag for slot " + tagEditSlot;
-        g.drawString(font, title, panelX + 4, panelY + 4, COL_WHITE, false);
+        g.drawString(font, title, panelX + 4, panelY + 4, cText(), false);
 
         String current = menu.getEntryTag(tagEditSlot);
         String display = current != null ? "#" + current : "None";
-        g.drawString(font, display, panelX + 4, panelY + 16, COL_ACCENT, false);
+        g.drawString(font, display, panelX + 4, panelY + 16, cAccent(), false);
 
         int clearW = 40;
         int clearX = panelX + panelW - clearW - 4;
         int clearY = panelY + 4;
         boolean hoverClear = isHovering(clearX, clearY, clearW, 12, mx, my);
         g.fill(clearX, clearY, clearX + clearW, clearY + 12,
-                hoverClear ? COL_BTN_HOVER : COL_BTN_BG);
+                hoverClear ? cBtnHover() : cBtnBg());
         g.renderOutline(clearX, clearY, clearW, 12,
-                hoverClear ? COL_WHITE : COL_BTN_BORDER);
+                hoverClear ? cText() : cBtnBorder());
         g.drawCenteredString(font, "Clear", clearX + clearW / 2, clearY + 2,
-                hoverClear ? COL_WHITE : COL_GRAY);
+                hoverClear ? cText() : cMuted());
 
         int inputY = panelY + 30;
         int inputW = panelW - 60;
@@ -2314,7 +2317,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int endIdx = Math.min(startIdx + maxVisibleRows, cachedSlotTags.size());
 
         g.fill(listX, listY, listX + listW, listY + listH, 0x40000000);
-        g.renderOutline(listX, listY, listW, listH, COL_BORDER);
+        g.renderOutline(listX, listY, listW, listH, cBorder());
 
         for (int i = startIdx; i < endIdx; i++) {
             int rowY = listY + (i - startIdx) * LIST_ROW_H;
@@ -2324,13 +2327,13 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     && my >= rowY && my < rowY + LIST_ROW_H;
 
             if (selected)
-                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_SELECTED);
+                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, cSelected());
             else if (hovered)
-                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_HOVER);
+                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, cHover());
 
             String text = scrollText(tag, rowW - 6, i);
             g.drawString(font, text, listX + 3, rowY + 2,
-                    selected ? COL_ACCENT : COL_WHITE, false);
+                    selected ? cAccent() : cText(), false);
         }
 
         if (scrollable) {
@@ -2340,21 +2343,21 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             int thumbTravel = Math.max(0, listH - thumbH);
             int thumbY = maxScroll <= 0 ? listY : listY + (subModeScrollOffset * thumbTravel) / maxScroll;
 
-            g.fill(scrollbarX, listY, scrollbarX + SUBMODE_SCROLLBAR_W, listY + listH, COL_BTN_BG);
-            g.renderOutline(scrollbarX, listY, SUBMODE_SCROLLBAR_W, listH, COL_BTN_BORDER);
-            g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, COL_ACCENT);
+            g.fill(scrollbarX, listY, scrollbarX + SUBMODE_SCROLLBAR_W, listY + listH, cBtnBg());
+            g.renderOutline(scrollbarX, listY, SUBMODE_SCROLLBAR_W, listH, cBtnBorder());
+            g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, cAccent());
 
             if (subModeScrollOffset > 0) {
-                g.fill(scrollbarX + 1, listY + 1, scrollbarX + SUBMODE_SCROLLBAR_W - 1, listY + 2, COL_WHITE);
+                g.fill(scrollbarX + 1, listY + 1, scrollbarX + SUBMODE_SCROLLBAR_W - 1, listY + 2, cText());
             }
             if (subModeScrollOffset < maxScroll) {
                 g.fill(scrollbarX + 1, listY + listH - 2, scrollbarX + SUBMODE_SCROLLBAR_W - 1,
-                        listY + listH - 1, COL_WHITE);
+                        listY + listH - 1, cText());
             }
         }
 
         if (cachedSlotTags.isEmpty()) {
-            g.drawString(font, "No tags available", listX + 3, listY + 2, COL_GRAY, false);
+            g.drawString(font, "No tags available", listX + 3, listY + 2, cMuted(), false);
         }
 
         g.pose().popPose();
@@ -2477,11 +2480,11 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         g.pose().pushPose();
         g.pose().translate(0, 0, 400);
 
-        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xFF101010);
-        g.renderOutline(panelX, panelY, panelW, panelH, 0xFFFFAA00);
+        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, cBg());
+        g.renderOutline(panelX, panelY, panelW, panelH, cWarn());
 
         g.drawString(font, tr("gui.logisticsnetworks.filter.nbt.slot_title", nbtEditSlot + 1),
-                panelX + 4, panelY + 4, COL_WHITE, false);
+                panelX + 4, panelY + 4, cText(), false);
 
         // Clear button
         int clearW = 30;
@@ -2528,8 +2531,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int rowW = scrollable ? listW - SUBMODE_SCROLLBAR_W - SUBMODE_SCROLLBAR_GAP : listW;
         int endIdx = Math.min(nbtListScrollOffset + maxRows, totalEntries);
 
-        g.fill(listX, listY, listX + listW, listY + drawH, 0xFF101010);
-        g.renderOutline(listX, listY, listW, drawH, COL_BORDER);
+        g.fill(listX, listY, listX + listW, listY + drawH, cBg());
+        g.renderOutline(listX, listY, listW, drawH, cBorder());
 
         int colW = getNbtColW(rowW);
 
@@ -2542,17 +2545,17 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             boolean editing = active && nbtEditingRuleIndex == ruleIdx;
 
             if (active)
-                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_SELECTED);
+                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, cSelected());
             else if (hovered)
-                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, COL_HOVER);
+                g.fill(listX + 1, rowY, listX + rowW - 1, rowY + LIST_ROW_H, cHover());
 
             // Toggle indicator
             int dotX = listX + 2;
             int dotY = rowY + (LIST_ROW_H - 5) / 2;
             if (active) {
-                g.fill(dotX, dotY, dotX + 5, dotY + 5, COL_ACCENT);
+                g.fill(dotX, dotY, dotX + 5, dotY + 5, cAccent());
             } else {
-                g.renderOutline(dotX, dotY, 5, 5, COL_GRAY);
+                g.renderOutline(dotX, dotY, 5, 5, cMuted());
             }
 
             FilterItemData.SlotNbtRule activeRule = active ? activeRules.get(ruleIdx) : null;
@@ -2565,28 +2568,28 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
             // Path column
             String displayPath = FilterScreenText.formatNbtPath(entry.path());
-            g.fill(pathX, rowY, pathX + colW, rowY + LIST_ROW_H, 0xFF080808);
-            g.renderOutline(pathX, rowY, colW, LIST_ROW_H, active ? COL_BTN_BORDER : 0xFF222222);
+            g.fill(pathX, rowY, pathX + colW, rowY + LIST_ROW_H, theme().slotBg());
+            g.renderOutline(pathX, rowY, colW, LIST_ROW_H, active ? cBtnBorder() : cBorder());
             g.drawString(font, font.plainSubstrByWidth(displayPath, colW - 4),
-                    pathX + 2, rowY + 1, active ? COL_ACCENT : COL_WHITE, false);
+                    pathX + 2, rowY + 1, active ? cAccent() : cText(), false);
 
             // Operator column
             boolean opHover = active && isHovering(opX, rowY, NBT_OP_BTN_W, LIST_ROW_H, mx, my);
             g.fill(opX, rowY, opX + NBT_OP_BTN_W, rowY + LIST_ROW_H,
-                    opHover ? COL_BTN_HOVER : COL_BTN_BG);
-            g.renderOutline(opX, rowY, NBT_OP_BTN_W, LIST_ROW_H, COL_BTN_BORDER);
+                    opHover ? cBtnHover() : cBtnBg());
+            g.renderOutline(opX, rowY, NBT_OP_BTN_W, LIST_ROW_H, cBtnBorder());
             g.drawCenteredString(font, op, opX + NBT_OP_BTN_W / 2, rowY + 1,
-                    active ? (opHover ? COL_WHITE : 0xFFFFAA00) : COL_GRAY);
+                    active ? (opHover ? cText() : cWarn()) : cMuted());
 
             // Value column
             String displayVal = active
                     ? FilterScreenText.formatNbtValue(activeRule.value().toString())
                     : FilterScreenText.formatNbtValue(entry.valueDisplay());
 
-            g.fill(valX, rowY, valX + colW, rowY + LIST_ROW_H, 0xFF080808);
+            g.fill(valX, rowY, valX + colW, rowY + LIST_ROW_H, theme().slotBg());
             boolean isBool = FilterScreenText.isBooleanValue(displayVal);
             g.renderOutline(valX, rowY, colW, LIST_ROW_H,
-                    editing ? COL_ACCENT : (active ? COL_BTN_BORDER : 0xFF222222));
+                    editing ? cAccent() : (active ? cBtnBorder() : cBorder()));
 
             if (editing) {
                 nbtValueEditBox.setX(valX + 2);
@@ -2597,9 +2600,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             } else {
                 int valColor;
                 if (isBool) {
-                    valColor = "true".equals(displayVal) ? COL_ACCENT : 0xFFFF5555;
+                    valColor = "true".equals(displayVal) ? cAccent() : cDanger();
                 } else {
-                    valColor = active ? COL_WHITE : COL_GRAY;
+                    valColor = active ? cText() : cMuted();
                 }
                 g.drawString(font, font.plainSubstrByWidth(displayVal, colW - 4), valX + 2, rowY + 1,
                         valColor, false);
@@ -2623,14 +2626,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             int thumbH = Math.max(8, (drawH * maxRows) / totalEntries);
             int thumbTravel = Math.max(0, drawH - thumbH);
             int thumbY = maxScroll <= 0 ? listY : listY + (nbtListScrollOffset * thumbTravel) / maxScroll;
-            g.fill(scrollbarX, listY, scrollbarX + SUBMODE_SCROLLBAR_W, listY + drawH, COL_BTN_BG);
-            g.renderOutline(scrollbarX, listY, SUBMODE_SCROLLBAR_W, drawH, COL_BTN_BORDER);
-            g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, COL_ACCENT);
+            g.fill(scrollbarX, listY, scrollbarX + SUBMODE_SCROLLBAR_W, listY + drawH, cBtnBg());
+            g.renderOutline(scrollbarX, listY, SUBMODE_SCROLLBAR_W, drawH, cBtnBorder());
+            g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, cAccent());
         }
 
         if (totalEntries == 0) {
             g.drawString(font, tr("gui.logisticsnetworks.filter.nbt.no_entries"),
-                    listX + 3, listY + 2, COL_GRAY, false);
+                    listX + 3, listY + 2, cMuted(), false);
         }
     }
 
@@ -3302,13 +3305,13 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int contentX = panelX + 4;
         int contentW = panelW - 8;
 
-        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xF0101010);
-        g.renderOutline(panelX, panelY, panelW, panelH, COL_ACCENT);
+        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, cOverlayPanel());
+        g.renderOutline(panelX, panelY, panelW, panelH, cAccent());
 
         int backW = 30;
         drawButton(g, panelX + 4, panelY + 4, backW, 12, "<", mx, my, true);
         g.drawString(font, tr("gui.logisticsnetworks.filter.detail.title", detailEditSlot),
-                panelX + backW + 8, panelY + 6, COL_WHITE, false);
+                panelX + backW + 8, panelY + 6, cText(), false);
 
         int clearW = 40;
         int clearXPos = panelX + panelW - clearW - 4;
@@ -3328,7 +3331,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             String tagStr = idVal.substring(1).trim();
             Identifier tagId = Identifier.tryParse(tagStr);
             if (tagId != null) {
-                g.renderOutline(slotX, slotY, 18, 18, DETAIL_TAG_COLOR);
+                g.renderOutline(slotX, slotY, 18, 18, cAccent());
                 if (detailTargetType == FilterTargetType.FLUIDS) {
                     TagKey<Fluid> fluidTagKey = TagKey.create(Registries.FLUID, tagId);
                     var list = new ArrayList<Fluid>();
@@ -3342,7 +3345,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                         renderFluidStack(g, new FluidStack(list.get(idx), 1000), slotX + 1, slotY + 1);
                     }
                 } else if (detailTargetType == FilterTargetType.CHEMICALS) {
-                    g.drawString(font, "#", slotX + 5, slotY + 5, DETAIL_TAG_COLOR, true);
+                    g.drawString(font, "#", slotX + 5, slotY + 5, cAccent(), true);
                 } else {
                     TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagId);
                     List<Item> tagItems = new ArrayList<>();
@@ -3357,9 +3360,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     }
                 }
             } else {
-                g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
+                g.renderOutline(slotX, slotY, 18, 18, cAccent());
                 int qx = slotX + (18 - font.width("?")) / 2;
-                g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
+                g.drawString(font, "?", qx, slotY + 5, cAccent(), true);
             }
         } else if (!idVal.isEmpty()) {
             if (detailTargetType == FilterTargetType.FLUIDS) {
@@ -3367,17 +3370,17 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 if (fluidId != null && BuiltInRegistries.FLUID.containsKey(fluidId)) {
                     renderFluidStack(g, new FluidStack(BuiltInRegistries.FLUID.getValue(fluidId), 1000), slotX + 1, slotY + 1);
                 } else {
-                    g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
+                    g.renderOutline(slotX, slotY, 18, 18, cAccent());
                     int qx = slotX + (18 - font.width("?")) / 2;
-                    g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
+                    g.drawString(font, "?", qx, slotY + 5, cAccent(), true);
                 }
             } else if (detailTargetType == FilterTargetType.CHEMICALS) {
                 if (MekanismCompat.isValidChemicalId(idVal)) {
                     renderChemicalStack(g, idVal, slotX + 1, slotY + 1);
                 } else {
-                    g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
+                    g.renderOutline(slotX, slotY, 18, 18, cAccent());
                     int qx = slotX + (18 - font.width("?")) / 2;
-                    g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
+                    g.drawString(font, "?", qx, slotY + 5, cAccent(), true);
                 }
             } else {
                 Identifier itemId = Identifier.tryParse(idVal);
@@ -3386,32 +3389,32 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     if (item != Items.AIR) {
                         g.renderItem(new ItemStack(item), slotX + 1, slotY + 1);
                     } else {
-                        g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
+                        g.renderOutline(slotX, slotY, 18, 18, cAccent());
                         int qx = slotX + (18 - font.width("?")) / 2;
-                        g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
+                        g.drawString(font, "?", qx, slotY + 5, cAccent(), true);
                     }
                 } else if (detailEditSlot < menu.slots.size()) {
                     ItemStack itemInSlot = menu.slots.get(detailEditSlot).getItem();
                     if (!itemInSlot.isEmpty()) {
                         g.renderItem(itemInSlot, slotX + 1, slotY + 1);
                     } else {
-                        g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
+                        g.renderOutline(slotX, slotY, 18, 18, cAccent());
                         int qx = slotX + (18 - font.width("?")) / 2;
-                        g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
+                        g.drawString(font, "?", qx, slotY + 5, cAccent(), true);
                     }
                 }
             }
         } else if (!isFluidOrChemical && FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
             boolean hasNbt = FilterItemData.hasEntryNbt(openedStack, detailEditSlot);
-            int ic = hasNbt ? DETAIL_NBT_COLOR : DETAIL_DUR_COLOR;
+            int ic = hasNbt ? cWarn() : cInfo();
             String il = hasNbt ? "N" : "D";
             g.renderOutline(slotX, slotY, 18, 18, ic);
             int nx = slotX + (18 - font.width(il)) / 2;
             g.drawString(font, il, nx, slotY + 5, ic, true);
         } else {
-            g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
+            g.renderOutline(slotX, slotY, 18, 18, cAccent());
             int qx = slotX + (18 - font.width("?")) / 2;
-            g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
+            g.drawString(font, "?", qx, slotY + 5, cAccent(), true);
         }
 
         int idFieldX = slotX + 22;
@@ -3434,8 +3437,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             boolean scrollable = dropdownList.size() > DROPDOWN_ROWS;
             int rowW = scrollable ? dropW - SUBMODE_SCROLLBAR_W - SUBMODE_SCROLLBAR_GAP : dropW;
 
-            g.fill(dropX, y, dropX + dropW, y + dropH, 0xF0101010);
-            g.renderOutline(dropX, y, dropW, dropH, COL_BORDER);
+            g.fill(dropX, y, dropX + dropW, y + dropH, cOverlayPanel());
+            g.renderOutline(dropX, y, dropW, dropH, cBorder());
 
             String currentTag = menu.getEntryTag(detailEditSlot);
             int maxScroll = Math.max(0, dropdownList.size() - DROPDOWN_ROWS);
@@ -3451,14 +3454,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                         && my >= rowY && my < rowY + LIST_ROW_H;
 
                 if (selected)
-                    g.fill(dropX + 1, rowY, dropX + rowW - 1, rowY + LIST_ROW_H, COL_SELECTED);
+                    g.fill(dropX + 1, rowY, dropX + rowW - 1, rowY + LIST_ROW_H, cSelected());
                 else if (hovered)
-                    g.fill(dropX + 1, rowY, dropX + rowW - 1, rowY + LIST_ROW_H, COL_HOVER);
+                    g.fill(dropX + 1, rowY, dropX + rowW - 1, rowY + LIST_ROW_H, cHover());
 
                 String displayText = isTagInput ? "#" + entry : entry;
                 String text = font.plainSubstrByWidth(displayText, rowW - 6);
                 g.drawString(font, text, dropX + 3, rowY + 2,
-                        selected ? COL_ACCENT : COL_WHITE, false);
+                        selected ? cAccent() : cText(), false);
             }
 
             if (scrollable) {
@@ -3467,43 +3470,43 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 int thumbTravel = Math.max(0, dropH - thumbH);
                 int thumbY = maxScroll <= 0 ? y : y + (detailTagScrollOffset * thumbTravel) / maxScroll;
 
-                g.fill(scrollbarX, y, scrollbarX + SUBMODE_SCROLLBAR_W, y + dropH, COL_BTN_BG);
-                g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, COL_ACCENT);
+                g.fill(scrollbarX, y, scrollbarX + SUBMODE_SCROLLBAR_W, y + dropH, cBtnBg());
+                g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, cAccent());
             }
 
             y += dropH + 2;
         }
 
-        g.drawString(font, tr("gui.logisticsnetworks.filter.detail.batch"), contentX, y + 3, COL_WHITE, false);
+        g.drawString(font, tr("gui.logisticsnetworks.filter.detail.batch"), contentX, y + 3, cText(), false);
         int batchInputX = contentX + labelW;
         detailBatchInputBox.setX(batchInputX);
         detailBatchInputBox.setY(y);
         detailBatchInputBox.setWidth(50);
         detailBatchInputBox.extractRenderState(g.raw(), mx, my, 0);
         if (isFluidOrChemical) {
-            g.drawString(font, "mB", batchInputX + 54, y + 3, COL_GRAY, false);
+            g.drawString(font, "mB", batchInputX + 54, y + 3, cMuted(), false);
         }
         y += DETAIL_SECTION_H;
 
-        g.drawString(font, tr("gui.logisticsnetworks.filter.detail.stock"), contentX, y + 3, COL_WHITE, false);
+        g.drawString(font, tr("gui.logisticsnetworks.filter.detail.stock"), contentX, y + 3, cText(), false);
         int stockInputX = contentX + labelW;
         detailStockInputBox.setX(stockInputX);
         detailStockInputBox.setY(y);
         detailStockInputBox.setWidth(50);
         detailStockInputBox.extractRenderState(g.raw(), mx, my, 0);
         if (isFluidOrChemical) {
-            g.drawString(font, "mB", stockInputX + 54, y + 3, COL_GRAY, false);
+            g.drawString(font, "mB", stockInputX + 54, y + 3, cMuted(), false);
         }
         y += DETAIL_SECTION_H;
 
         if (!isFluidOrChemical) {
-            g.drawString(font, tr("gui.logisticsnetworks.filter.detail.nbt"), contentX, y + 3, DETAIL_NBT_COLOR, false);
+            g.drawString(font, tr("gui.logisticsnetworks.filter.detail.nbt"), contentX, y + 3, cWarn(), false);
             boolean strictNbt = menu.isEntryNbtStrict(detailEditSlot);
             int strictToggleX = contentX + labelW;
             String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
             drawToggle(g, strictToggleX, y + 2, strictNbt);
             g.drawString(font, strictLabel, strictToggleX + 14, y + 3,
-                    strictNbt ? COL_ACCENT : COL_GRAY, false);
+                    strictNbt ? cAccent() : cMuted(), false);
 
             int nbtBtnX = strictToggleX + 14 + font.width(strictLabel) + 8;
             String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
@@ -3537,7 +3540,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             }
             y += DETAIL_SECTION_H;
 
-            g.drawString(font, tr("gui.logisticsnetworks.filter.detail.slots"), contentX, y + 3, DETAIL_SLOT_COLOR, false);
+            g.drawString(font, tr("gui.logisticsnetworks.filter.detail.slots"), contentX, y + 3, cMuted(), false);
             int slotInputX = contentX + labelW;
             int slotInputW = contentW - labelW;
             detailSlotMappingInputBox.setX(slotInputX);
@@ -3556,12 +3559,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int contentX = panelX + 4;
         int contentW = panelW - 8;
 
-        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xF0101010);
-        g.renderOutline(panelX, panelY, panelW, panelH, DETAIL_NBT_COLOR);
+        g.fill(panelX, panelY, panelX + panelW, panelY + panelH, cOverlayPanel());
+        g.renderOutline(panelX, panelY, panelW, panelH, cWarn());
 
         int backW = 50;
         drawButton(g, panelX + 4, panelY + 4, backW, 12, "< Back", mx, my, true);
-        g.drawString(font, "NBT Filter", panelX + backW + 8, panelY + 6, COL_WHITE, false);
+        g.drawString(font, "NBT Filter", panelX + backW + 8, panelY + 6, cText(), false);
 
         int clearW = 40;
         int clearXPos = panelX + panelW - clearW - 4;
@@ -3597,7 +3600,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             int len = detailNbtInputBox.getValue().length();
             if (len >= 1800) {
                 String counter = len + "/2048";
-                int counterColor = len >= 2000 ? 0xFFFF5555 : COL_GRAY;
+                int counterColor = len >= 2000 ? cDanger() : cMuted();
                 g.drawString(font, counter, panelX + panelW - 4 - font.width(counter), y + 3, counterColor, false);
             }
         } else {
@@ -3694,7 +3697,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailNbtScrollOffset = Mth.clamp(detailNbtScrollOffset, 0, maxScroll);
 
         g.fill(tableX, tableY, tableX + tableW, tableY + tableH, 0x40000000);
-        g.renderOutline(tableX, tableY, tableW, tableH, COL_BORDER);
+        g.renderOutline(tableX, tableY, tableW, tableH, cBorder());
 
         int colToggleX = tableX + 2;
         int colPathX = colToggleX + NBT_COL_TOGGLE + NBT_COL_TOGGLE_GAP;
@@ -3714,15 +3717,15 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
             if (vi < NBT_BUILTIN_ROWS) {
                 if (hovered)
-                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
-                g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x20));
+                g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x20));
 
                 switch (vi) {
                     case 0 -> {
                         drawToggle(g, colToggleX, rowY + 1, durEnabled);
-                        g.drawString(font, "Durability", colPathX, rowY + 3, DETAIL_DUR_COLOR, false);
+                        g.drawString(font, "Durability", colPathX, rowY + 3, cInfo(), false);
                         String opStr = detailDurabilityOp != null ? detailDurabilityOp : "=";
-                        g.drawString(font, opStr, colOpX + 4, rowY + 3, COL_WHITE, false);
+                        g.drawString(font, opStr, colOpX + 4, rowY + 3, cText(), false);
                         if (nbtTableEditingRow == NBT_EDIT_DURABILITY) {
                             renderBuiltinEditBox(g, mx, my, colValX, rowY);
                         } else {
@@ -3731,24 +3734,24 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                                     : String.valueOf(detailItemDurability);
                             String truncVal = font.plainSubstrByWidth(durVal, NBT_COL_VAL - 4);
                             g.drawString(font, truncVal, colValX + 2, rowY + 3,
-                                    durEnabled ? COL_WHITE : COL_GRAY, false);
+                                    durEnabled ? cText() : cMuted(), false);
                         }
                     }
                     case 1 -> {
                         drawToggle(g, colToggleX, rowY + 1, detailEnchantedEnabled);
                         g.drawString(font, "Enchanted", colPathX, rowY + 3, 0xFFDD88FF, false);
-                        int enchColor = detailItemEnchanted ? COL_ACCENT : 0xFFFF5555;
+                        int enchColor = detailItemEnchanted ? cAccent() : cDanger();
                         String enchStr = detailItemEnchanted ? "true" : "false";
                         g.drawString(font, enchStr, colValX + 2, rowY + 3,
-                                detailEnchantedEnabled ? enchColor : COL_GRAY, false);
+                                detailEnchantedEnabled ? enchColor : cMuted(), false);
                     }
                     case 2 -> {
                         drawToggle(g, colToggleX, rowY + 1, false);
-                        g.drawString(font, "Stack Size", colPathX, rowY + 3, 0xFFFFCC44, false);
+                        g.drawString(font, "Stack Size", colPathX, rowY + 3, cWarn(), false);
                         if (nbtTableEditingRow == NBT_EDIT_STACK_SIZE) {
                             renderBuiltinEditBox(g, mx, my, colValX, rowY);
                         } else {
-                            g.drawString(font, String.valueOf(detailItemStackSize), colValX + 2, rowY + 3, COL_GRAY, false);
+                            g.drawString(font, String.valueOf(detailItemStackSize), colValX + 2, rowY + 3, cMuted(), false);
                         }
                     }
                 }
@@ -3757,15 +3760,15 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
                 if (row.heading()) {
                     boolean collapsed = nbtCollapsedGroups.contains(row.group());
-                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x18FFFFFF);
-                    g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x18));
+                    g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x20));
                     if (hovered)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x10FFFFFF);
+                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x10));
 
                     String arrow = collapsed ? ">" : "v";
-                    g.drawString(font, arrow, colToggleX + 2, rowY + 3, NBT_HEADING_COLOR, false);
+                    g.drawString(font, arrow, colToggleX + 2, rowY + 3, cInfo(), false);
                     String headText = font.plainSubstrByWidth(row.display(), rowW - 20);
-                    g.drawString(font, headText, colToggleX + 12, rowY + 3, NBT_HEADING_COLOR, false);
+                    g.drawString(font, headText, colToggleX + 12, rowY + 3, cInfo(), false);
                     if (hovered && headText.length() < row.display().length()) {
                         hoveredFullText = row.display();
                     }
@@ -3776,9 +3779,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     boolean indented = !row.group().isEmpty();
 
                     if (active)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, COL_SELECTED);
+                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cSelected());
                     else if (hovered)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, COL_HOVER);
+                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cHover());
 
                     drawToggle(g, colToggleX, rowY + 1, active);
 
@@ -3787,14 +3790,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     String pathDisplay = row.display();
                     String truncPath = font.plainSubstrByWidth(pathDisplay, entryPathW - 4);
                     g.drawString(font, truncPath, entryPathX, rowY + 3,
-                            active ? COL_ACCENT : COL_WHITE, false);
+                            active ? cAccent() : cText(), false);
 
                     if (hovered && truncPath.length() < pathDisplay.length()) {
                         hoveredFullText = entry.path() + " = " + entry.valueDisplay();
                     }
 
                     String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path(), "=") : "=";
-                    int opColor = active ? COL_WHITE : COL_GRAY;
+                    int opColor = active ? cText() : cMuted();
                     g.drawString(font, opStr, colOpX + 4, rowY + 3, opColor, false);
 
                     if (nbtTableEditingRow == entryIdx) {
@@ -3808,7 +3811,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                         String valDisplay = entry.valueDisplay();
                         String truncVal = font.plainSubstrByWidth(valDisplay, NBT_COL_VAL - 4);
                         g.drawString(font, truncVal, colValX + 2, rowY + 3,
-                                active ? COL_ACCENT : COL_GRAY, false);
+                                active ? cAccent() : cMuted(), false);
                         if (hovered && truncVal.length() < valDisplay.length() && hoveredFullText == null) {
                             hoveredFullText = entry.path() + " = " + valDisplay;
                         }
@@ -3823,12 +3826,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             int thumbTravel = Math.max(0, tableH - thumbH);
             int thumbY = maxScroll <= 0 ? tableY : tableY + (detailNbtScrollOffset * thumbTravel) / maxScroll;
 
-            g.fill(scrollbarX, tableY, scrollbarX + SUBMODE_SCROLLBAR_W, tableY + tableH, COL_BTN_BG);
-            g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, COL_ACCENT);
+            g.fill(scrollbarX, tableY, scrollbarX + SUBMODE_SCROLLBAR_W, tableY + tableH, cBtnBg());
+            g.fill(scrollbarX + 1, thumbY, scrollbarX + SUBMODE_SCROLLBAR_W - 1, thumbY + thumbH, cAccent());
         }
 
         if (totalRows == 0) {
-            g.drawString(font, "No NBT data", tableX + 3, tableY + 2, COL_GRAY, false);
+            g.drawString(font, "No NBT data", tableX + 3, tableY + 2, cMuted(), false);
         }
 
         if (hoveredFullText != null) {
@@ -3838,10 +3841,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     private void drawToggle(GuiGraphics g, int x, int y, boolean on) {
         int size = 10;
-        g.fill(x, y, x + size, y + size, on ? 0xFF225522 : 0xFF332222);
-        g.renderOutline(x, y, size, size, on ? COL_ACCENT : 0xFF884444);
+        g.fill(x, y, x + size, y + size, on ? cSelected() : theme().dangerSoft());
+        g.renderOutline(x, y, size, size, on ? cAccent() : cDanger());
         if (on) {
-            g.fill(x + 3, y + 3, x + 7, y + 7, COL_ACCENT);
+            g.fill(x + 3, y + 3, x + 7, y + 7, cAccent());
         }
     }
 
