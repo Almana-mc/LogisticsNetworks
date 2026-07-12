@@ -39,6 +39,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
@@ -72,6 +73,11 @@ public class WrenchItem extends Item {
     private static final String KEY_AE2_LINK = "ae2_link";
     private static final int MAX_MASS_SELECTIONS = 10_000;
     private static final int MAX_MASS_NODES = 2048;
+
+    public static final int DEFAULT_CASE_COLOR = 0xE0E0E8;
+    public static final int DEFAULT_SCREEN_COLOR = 0x04FF00;
+    private static final int COLOR_INDEX_CASE = 0;
+    private static final int COLOR_INDEX_SCREEN = 1;
 
     public record MassSelectionTarget(ResourceKey<Level> dimension, BlockPos pos) {
     }
@@ -875,6 +881,45 @@ public class WrenchItem extends Item {
             root.remove(KEY_CLIPBOARD);
             writeRoot(customTag, root);
         });
+    }
+
+    public static int getCaseColor(ItemStack stack) {
+        return getColor(stack, COLOR_INDEX_CASE, DEFAULT_CASE_COLOR);
+    }
+
+    public static int getScreenColor(ItemStack stack) {
+        return getColor(stack, COLOR_INDEX_SCREEN, DEFAULT_SCREEN_COLOR);
+    }
+
+    private static int getColor(ItemStack stack, int index, int fallback) {
+        CustomModelData data = stack.get(DataComponents.CUSTOM_MODEL_DATA);
+        if (data == null) {
+            return fallback;
+        }
+        Integer color = data.getColor(index);
+        return color == null ? fallback : color;
+    }
+
+    public static void setColors(ItemStack stack, int caseRgb, int screenRgb) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof WrenchItem)) {
+            return;
+        }
+        CustomModelData old = stack.getOrDefault(DataComponents.CUSTOM_MODEL_DATA, CustomModelData.EMPTY);
+        stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(old.floats(), old.flags(), old.strings(),
+                List.of(caseRgb & 0xFFFFFF, screenRgb & 0xFFFFFF)));
+    }
+
+    public static void clearColors(ItemStack stack) {
+        CustomModelData old = stack.get(DataComponents.CUSTOM_MODEL_DATA);
+        if (old == null) {
+            return;
+        }
+        if (old.floats().isEmpty() && old.flags().isEmpty() && old.strings().isEmpty()) {
+            stack.remove(DataComponents.CUSTOM_MODEL_DATA);
+        } else {
+            stack.set(DataComponents.CUSTOM_MODEL_DATA,
+                    new CustomModelData(old.floats(), old.flags(), old.strings(), List.of()));
+        }
     }
 
     private InteractionResult toggleAE2Link(ItemStack wrenchStack, Player player, Level level, BlockPos clickedPos) {

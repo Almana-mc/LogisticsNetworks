@@ -1,6 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "logisticsnetworks:item/wrench"
+    "layer0": "logisticsnetworks:item/wrench_case",
+    "layer1": "logisticsnetworks:item/wrench_screen"
   }
 }
