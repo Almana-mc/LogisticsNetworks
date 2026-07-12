@@ -6,6 +6,9 @@ import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.network.ApplyPatternPayload;
 import net.minecraft.client.gui.components.EditBox;
 import me.almana.logisticsnetworks.client.ClientInput;
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
@@ -15,17 +18,15 @@ public class PatternSetterScreen extends LegacyContainerScreen<PatternSetterMenu
     private static final int GUI_WIDTH = 176;
     private static final int GUI_HEIGHT = 152;
 
-    private static final int COLOR_BG = 0xFF161616;
-    private static final int COLOR_PANEL = 0xFF1F1F1F;
-    private static final int COLOR_BORDER = 0xFF3A3A3A;
-    private static final int COLOR_SLOT = 0xFF2A2A2A;
-    private static final int COLOR_SLOT_BORDER = 0xFF444444;
-    private static final int COLOR_BTN = 0xFF2E2E2E;
-    private static final int COLOR_BTN_HOVER = 0xFF3A3A3A;
-    private static final int COLOR_BTN_BORDER = 0xFF505050;
-    private static final int COLOR_TEXT = 0xFFE0E0E0;
-    private static final int COLOR_MUTED = 0xFF999999;
-    private static final int COLOR_SUCCESS = 0xFF44CC44;
+    private Theme theme() { return ThemeState.active(); }
+    private int cBg() { return theme().bg(); }
+    private int cPanel() { return theme().surface(); }
+    private int cBorder() { return theme().border(); }
+    private int cText() { return theme().text(); }
+    private int cMuted() { return theme().textMuted(); }
+    private int cBtn() { return theme().surface2(); }
+    private int cBtnHover() { return ThemePaint.brighten(theme().surface2(), 0x10); }
+    private int cBtnBorder() { return theme().borderStrong(); }
 
     private static final int SLOT_X = 62;
     private static final int PATTERN_SLOT_Y = 28;
@@ -62,7 +63,7 @@ public class PatternSetterScreen extends LegacyContainerScreen<PatternSetterMenu
         multiplierField.setMaxLength(5);
         multiplierField.setValue("1");
         multiplierField.setFilter(s -> s.isEmpty() || s.matches("\\d+"));
-        multiplierField.setTextColor(COLOR_TEXT);
+        multiplierField.setTextColor(cText());
         multiplierField.setBordered(false);
         addRenderableWidget(multiplierField);
     }
@@ -130,34 +131,34 @@ public class PatternSetterScreen extends LegacyContainerScreen<PatternSetterMenu
         int tp = topPos;
 
         // Main background
-        graphics.fill(lp, tp, lp + GUI_WIDTH, tp + GUI_HEIGHT, COLOR_BG);
-        graphics.fill(lp + 1, tp + 1, lp + GUI_WIDTH - 1, tp + GUI_HEIGHT - 1, COLOR_PANEL);
+        graphics.fill(lp, tp, lp + GUI_WIDTH, tp + GUI_HEIGHT, cBg());
+        graphics.fill(lp + 1, tp + 1, lp + GUI_WIDTH - 1, tp + GUI_HEIGHT - 1, cPanel());
 
         // Border
-        graphics.fill(lp, tp, lp + GUI_WIDTH, tp + 1, COLOR_BORDER);
-        graphics.fill(lp, tp + GUI_HEIGHT - 1, lp + GUI_WIDTH, tp + GUI_HEIGHT, COLOR_BORDER);
-        graphics.fill(lp, tp, lp + 1, tp + GUI_HEIGHT, COLOR_BORDER);
-        graphics.fill(lp + GUI_WIDTH - 1, tp, lp + GUI_WIDTH, tp + GUI_HEIGHT, COLOR_BORDER);
+        graphics.fill(lp, tp, lp + GUI_WIDTH, tp + 1, cBorder());
+        graphics.fill(lp, tp + GUI_HEIGHT - 1, lp + GUI_WIDTH, tp + GUI_HEIGHT, cBorder());
+        graphics.fill(lp, tp, lp + 1, tp + GUI_HEIGHT, cBorder());
+        graphics.fill(lp + GUI_WIDTH - 1, tp, lp + GUI_WIDTH, tp + GUI_HEIGHT, cBorder());
 
         // Title
         graphics.drawCenteredString(font,
                 Component.translatable("gui.logisticsnetworks.pattern_setter.title"),
-                lp + GUI_WIDTH / 2, tp + 6, COLOR_TEXT);
+                lp + GUI_WIDTH / 2, tp + 6, cText());
 
         // Multiplier field background + label
-        graphics.drawString(font, "x", lp + MULT_FIELD_X + MULT_FIELD_W + 2, tp + MULT_FIELD_Y + 2, COLOR_MUTED, false);
+        graphics.drawString(font, "x", lp + MULT_FIELD_X + MULT_FIELD_W + 2, tp + MULT_FIELD_Y + 2, cMuted(), false);
         graphics.fill(lp + MULT_FIELD_X - 1, tp + MULT_FIELD_Y - 1,
-                lp + MULT_FIELD_X + MULT_FIELD_W + 1, tp + MULT_FIELD_Y + MULT_FIELD_H + 1, COLOR_SLOT_BORDER);
+                lp + MULT_FIELD_X + MULT_FIELD_W + 1, tp + MULT_FIELD_Y + MULT_FIELD_H + 1, theme().slotBorder());
         graphics.fill(lp + MULT_FIELD_X, tp + MULT_FIELD_Y,
-                lp + MULT_FIELD_X + MULT_FIELD_W, tp + MULT_FIELD_Y + MULT_FIELD_H, COLOR_SLOT);
+                lp + MULT_FIELD_X + MULT_FIELD_W, tp + MULT_FIELD_Y + MULT_FIELD_H, theme().slotBg());
 
         // Slot labels
         graphics.drawString(font,
                 Component.translatable("gui.logisticsnetworks.pattern_setter.pattern_label"),
-                lp + 8, tp + PATTERN_SLOT_Y + 4, COLOR_MUTED, false);
+                lp + 8, tp + PATTERN_SLOT_Y + 4, cMuted(), false);
         graphics.drawString(font,
                 Component.translatable("gui.logisticsnetworks.pattern_setter.filter_label"),
-                lp + 8, tp + FILTER_SLOT_Y + 4, COLOR_MUTED, false);
+                lp + 8, tp + FILTER_SLOT_Y + 4, cMuted(), false);
 
         // Slot backgrounds
         renderSlotBackground(graphics, lp + SLOT_X, tp + PATTERN_SLOT_Y);
@@ -180,12 +181,12 @@ public class PatternSetterScreen extends LegacyContainerScreen<PatternSetterMenu
         if (feedbackTimer > 0) {
             graphics.drawCenteredString(font,
                     Component.translatable("gui.logisticsnetworks.pattern_setter.applied"),
-                    lp + GUI_WIDTH / 2, tp + 70, COLOR_SUCCESS);
+                    lp + GUI_WIDTH / 2, tp + 70, theme().accent());
         }
 
         // Player inventory label
         graphics.drawString(font, Component.translatable("container.inventory"),
-                lp + 8, tp + 73, COLOR_MUTED, false);
+                lp + 8, tp + 73, cMuted(), false);
 
         // Player inventory slot backgrounds
         for (int r = 0; r < 3; r++) {
@@ -199,14 +200,14 @@ public class PatternSetterScreen extends LegacyContainerScreen<PatternSetterMenu
     }
 
     private void renderButton(GuiGraphics graphics, int x, int y, Component label, boolean hovered) {
-        int bg = hovered ? COLOR_BTN_HOVER : COLOR_BTN;
-        graphics.fill(x, y, x + BTN_WIDTH, y + BTN_HEIGHT, COLOR_BTN_BORDER);
+        int bg = hovered ? cBtnHover() : cBtn();
+        graphics.fill(x, y, x + BTN_WIDTH, y + BTN_HEIGHT, cBtnBorder());
         graphics.fill(x + 1, y + 1, x + BTN_WIDTH - 1, y + BTN_HEIGHT - 1, bg);
-        graphics.drawCenteredString(font, label, x + BTN_WIDTH / 2, y + (BTN_HEIGHT - 8) / 2, COLOR_TEXT);
+        graphics.drawCenteredString(font, label, x + BTN_WIDTH / 2, y + (BTN_HEIGHT - 8) / 2, cText());
     }
 
     private void renderSlotBackground(GuiGraphics graphics, int x, int y) {
-        graphics.fill(x - 1, y - 1, x + 17, y + 17, COLOR_SLOT_BORDER);
-        graphics.fill(x, y, x + 16, y + 16, COLOR_SLOT);
+        graphics.fill(x - 1, y - 1, x + 17, y + 17, theme().slotBorder());
+        graphics.fill(x, y, x + 16, y + 16, theme().slotBg());
     }
 }

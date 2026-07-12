@@ -235,7 +235,7 @@ public final class ThemePaint {
         roundOutline(graphics, x, y, width, height, 2, frame.border(), frame.sharpCorners());
     }
 
-    private static int brighten(int argb, int delta) {
+    public static int brighten(int argb, int delta) {
         int alpha = (argb >>> 24) & 0xFF;
         int red = Math.min(0xFF, ((argb >> 16) & 0xFF) + delta);
         int green = Math.min(0xFF, ((argb >> 8) & 0xFF) + delta);

@@ -72,6 +72,7 @@ public class ModConfigScreen extends Screen {
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
     private static final Component TEXT_DEFAULT_NODE_VISIBILITY = Component.translatable("gui.logisticsnetworks.config.client.defaultNodeVisibility");
     private static final Component TEXT_CONNECTED_NODE_TEXTURES = Component.translatable("gui.logisticsnetworks.config.client.connectedNodeTextures");
+    private static final Component TEXT_COMPUTER_CLASSIC = Component.translatable("gui.logisticsnetworks.config.client.computerClassicTheme");
 
     private static final Component[] TIER_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.upgrades.tier.none"),
@@ -115,6 +116,7 @@ public class ModConfigScreen extends Screen {
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
     private String pendingTheme;
+    private boolean pendingComputerClassic;
 
     private TierLimits[] pendingTiers;
     private int expandedTier = -1;
@@ -151,6 +153,7 @@ public class ModConfigScreen extends Screen {
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
         pendingConnectedNodeTextures = ClientConfig.connectedNodeTexturesSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
+        pendingComputerClassic = ClientConfig.computerClassicThemeSpec.get();
         pendingTiers = UpgradeLimitsConfig.getAll();
 
         buildTab();
@@ -391,6 +394,8 @@ public class ModConfigScreen extends Screen {
                 g.outline(sx - 1, sy - 1, swatchW + 2, swatchH + 2, COL_BORDER);
             }
         }
+
+        renderCheckbox(g, cx, cy + 152, cw, TEXT_COMPUTER_CLASSIC, pendingComputerClassic, mx, my, false);
     }
 
     private boolean handleClientClick(double mouseX, double mouseY, int cx, int cy, int cw) {
@@ -420,6 +425,11 @@ public class ModConfigScreen extends Screen {
                 pendingTheme = Themes.ALL.get(i).id();
                 return true;
             }
+        }
+
+        if (inBox(mouseX, mouseY, boxX, cy + 154, boxSize)) {
+            pendingComputerClassic = !pendingComputerClassic;
+            return true;
         }
         return false;
     }
@@ -667,6 +677,7 @@ public class ModConfigScreen extends Screen {
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
         ClientConfig.connectedNodeTexturesSpec.set(pendingConnectedNodeTextures);
         ClientConfig.themeSpec.set(pendingTheme);
+        ClientConfig.computerClassicThemeSpec.set(pendingComputerClassic);
         ClientConfig.refresh();
         DefaultNodeVisibilitySync.send();
         ThemeState.setTheme(Themes.byId(pendingTheme));

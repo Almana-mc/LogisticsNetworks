@@ -392,6 +392,7 @@
   "gui.logisticsnetworks.config.client.maxVisibleNodes": "Máximo de Nós Visíveis",
   "gui.logisticsnetworks.config.client.connectedNodeTextures": "Texturas de Nós Conectadas",
   "gui.logisticsnetworks.config.client.theme": "Tema",
+  "gui.logisticsnetworks.config.client.computerClassicTheme": "Terminal clássico do computador",
   "gui.logisticsnetworks.config.upgrades.tier.none": "Sem Melhoria",
   "gui.logisticsnetworks.config.upgrades.tier.iron": "Nível Ferro",
   "gui.logisticsnetworks.config.upgrades.tier.gold": "Nível Ouro",
