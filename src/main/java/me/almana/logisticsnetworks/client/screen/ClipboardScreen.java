@@ -2,6 +2,9 @@ package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
@@ -19,13 +22,6 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
     private static final int GUI_WIDTH = 256;
     private static final int GUI_HEIGHT = 284;
 
-    private static final int COLOR_BG = 0xFF111111;
-    private static final int COLOR_PANEL = 0xFF1A1A1A;
-    private static final int COLOR_BORDER = 0xFF333333;
-    private static final int COLOR_ACCENT = 0xFF55CC55;
-    private static final int COLOR_TEXT = 0xFFE0E0E0;
-    private static final int COLOR_DIM = 0xFF888888;
-    private static final int COLOR_HOVER = 0x30FFFFFF;
     private static final Component EDITOR_TITLE = Component.translatable("gui.logisticsnetworks.clipboard.editor");
     private static final Component VISUAL_SLOTS_HINT = Component
             .translatable("gui.logisticsnetworks.clipboard.visual_slots_hint");
@@ -36,16 +32,25 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
         this.titleLabelY = 10_000;
     }
 
+    private Theme theme() { return ThemeState.active(); }
+    private int cBg() { return theme().bg(); }
+    private int cPanel() { return theme().surface(); }
+    private int cBorder() { return theme().border(); }
+    private int cAccent() { return theme().accent(); }
+    private int cText() { return theme().text(); }
+    private int cDim() { return theme().textMuted(); }
+    private int cHover() { return (theme().text() & 0x00FFFFFF) | 0x22000000; }
+
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
     }
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        graphics.fill(leftPos, topPos, leftPos + GUI_WIDTH, topPos + GUI_HEIGHT, COLOR_BG);
-        graphics.renderOutline(leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, COLOR_BORDER);
+        graphics.fill(leftPos, topPos, leftPos + GUI_WIDTH, topPos + GUI_HEIGHT, cBg());
+        graphics.renderOutline(leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, cBorder());
 
-        graphics.drawCenteredString(font, EDITOR_TITLE, leftPos + GUI_WIDTH / 2, topPos + 8, COLOR_ACCENT);
+        graphics.drawCenteredString(font, EDITOR_TITLE, leftPos + GUI_WIDTH / 2, topPos + 8, cAccent());
         drawButton(graphics, leftPos + GUI_WIDTH - 56, topPos + 6, 46, 12,
                 tr("gui.logisticsnetworks.clipboard.clear"), mouseX, mouseY);
 
@@ -64,14 +69,14 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
             int x = startX + i * 26;
             boolean isSelected = i == selected;
             boolean hovered = isHoveringBox(x, y, 24, 14, mouseX, mouseY);
-            int bg = isSelected ? 0xFF2A4A2A : COLOR_PANEL;
-            int border = isSelected ? COLOR_ACCENT : COLOR_BORDER;
+            int bg = isSelected ? theme().accentSoft() : cPanel();
+            int border = isSelected ? cAccent() : cBorder();
             if (hovered) {
-                bg = isSelected ? bg : 0xFF262626;
+                bg = isSelected ? bg : theme().surfaceSunken();
             }
             graphics.fill(x, y, x + 24, y + 14, bg);
             graphics.renderOutline(x, y, 24, 14, border);
-            graphics.drawCenteredString(font, String.valueOf(i), x + 12, y + 3, isSelected ? COLOR_ACCENT : COLOR_TEXT);
+            graphics.drawCenteredString(font, String.valueOf(i), x + 12, y + 3, isSelected ? cAccent() : cText());
         }
     }
 
@@ -81,8 +86,8 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
         int panelW = 148;
         int rowH = 14;
 
-        graphics.fill(panelX, panelY, panelX + panelW, panelY + rowH * 10 + 4, COLOR_PANEL);
-        graphics.renderOutline(panelX, panelY, panelW, rowH * 10 + 4, COLOR_BORDER);
+        graphics.fill(panelX, panelY, panelX + panelW, panelY + rowH * 10 + 4, cPanel());
+        graphics.renderOutline(panelX, panelY, panelW, rowH * 10 + 4, cBorder());
 
         drawRow(graphics, panelX + 2, panelY + 2 + rowH * 0, panelW - 4,
                 tr("gui.logisticsnetworks.node.setting.status"),
@@ -121,35 +126,35 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
     private void drawRow(GuiGraphics graphics, int x, int y, int width, String label, String value, int mouseX,
             int mouseY) {
         if (isHoveringBox(x, y, width, 13, mouseX, mouseY)) {
-            graphics.fill(x, y, x + width, y + 13, COLOR_HOVER);
+            graphics.fill(x, y, x + width, y + 13, cHover());
         }
-        graphics.drawString(font, label, x + 4, y + 3, COLOR_DIM, false);
-        graphics.drawString(font, value, x + width - font.width(value) - 4, y + 3, COLOR_TEXT, false);
+        graphics.drawString(font, label, x + 4, y + 3, cDim(), false);
+        graphics.drawString(font, value, x + width - font.width(value) - 4, y + 3, cText(), false);
     }
 
     private void renderVisualSections(GuiGraphics graphics) {
         int filterX = leftPos + 170;
         int filterY = topPos + 52;
         graphics.drawString(font, Component.translatable("gui.logisticsnetworks.node.filters"), filterX, topPos + 40,
-                COLOR_DIM, false);
+                cDim(), false);
         drawSlotGrid(graphics, filterX, filterY, 2, 3);
 
         int upgradeX = leftPos + 170;
         int upgradeY = topPos + 130;
         graphics.drawString(font, Component.translatable("gui.logisticsnetworks.node.upgrades"), upgradeX,
-                topPos + 118, COLOR_DIM, false);
+                topPos + 118, cDim(), false);
         drawSlotGrid(graphics, upgradeX, upgradeY, 2, 2);
 
-        graphics.drawString(font, VISUAL_SLOTS_HINT, leftPos + 10, topPos + 182, COLOR_DIM, false);
+        graphics.drawString(font, VISUAL_SLOTS_HINT, leftPos + 10, topPos + 182, cDim(), false);
     }
 
     private void drawButton(GuiGraphics graphics, int x, int y, int width, int height, String label, int mouseX,
             int mouseY) {
         boolean hovered = isHoveringBox(x, y, width, height, mouseX, mouseY);
-        int bg = hovered ? 0xFF3A3A3A : 0xFF2A2A2A;
+        int bg = hovered ? ThemePaint.brighten(theme().surface2(), 0x10) : theme().surface2();
         graphics.fill(x, y, x + width, y + height, bg);
-        graphics.renderOutline(x, y, width, height, hovered ? COLOR_ACCENT : COLOR_BORDER);
-        graphics.drawCenteredString(font, label, x + width / 2, y + 2, hovered ? COLOR_TEXT : COLOR_DIM);
+        graphics.renderOutline(x, y, width, height, hovered ? cAccent() : cBorder());
+        graphics.drawCenteredString(font, label, x + width / 2, y + 2, hovered ? cText() : cDim());
     }
 
     private void drawSlotGrid(GuiGraphics graphics, int startX, int startY, int rows, int cols) {
@@ -157,8 +162,8 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
             for (int col = 0; col < cols; col++) {
                 int x = startX + col * 19 - 1;
                 int y = startY + row * 19 - 1;
-                graphics.fill(x, y, x + 18, y + 18, 0xFF090909);
-                graphics.renderOutline(x, y, 18, 18, 0xFF3A3A3A);
+                graphics.fill(x, y, x + 18, y + 18, theme().slotBg());
+                graphics.renderOutline(x, y, 18, 18, theme().slotBorder());
             }
         }
     }
@@ -170,15 +175,15 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
             for (int col = 0; col < 9; col++) {
                 int x = startX + col * 18 - 1;
                 int y = startY + row * 18 - 1;
-                graphics.fill(x, y, x + 18, y + 18, 0xFF090909);
-                graphics.renderOutline(x, y, 18, 18, 0xFF3A3A3A);
+                graphics.fill(x, y, x + 18, y + 18, theme().slotBg());
+                graphics.renderOutline(x, y, 18, 18, theme().slotBorder());
             }
         }
         for (int col = 0; col < 9; col++) {
             int x = startX + col * 18 - 1;
             int y = startY + 58 - 1;
-            graphics.fill(x, y, x + 18, y + 18, 0xFF090909);
-            graphics.renderOutline(x, y, 18, 18, 0xFF3A3A3A);
+            graphics.fill(x, y, x + 18, y + 18, theme().slotBg());
+            graphics.renderOutline(x, y, 18, 18, theme().slotBorder());
         }
     }
 
