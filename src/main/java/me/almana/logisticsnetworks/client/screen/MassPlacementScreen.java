@@ -2,6 +2,9 @@ package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
 import net.minecraft.network.chat.Component;
@@ -15,20 +18,16 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
     private static final int GUI_WIDTH = 246;
     private static final int GUI_HEIGHT = 262;
 
-    private static final int COLOR_BG = 0xFF161616;
-    private static final int COLOR_PANEL = 0xFF1F1F1F;
-    private static final int COLOR_BORDER = 0xFF3A3A3A;
-    private static final int COLOR_ACCENT = 0xFF44BB44;
-    private static final int COLOR_TEXT = 0xFFE0E0E0;
-    private static final int COLOR_MUTED = 0xFF999999;
-    private static final int COLOR_OK = 0xFF44CC44;
-    private static final int COLOR_FAIL = 0xFFCC4444;
-    private static final int COLOR_BTN_BG = 0xFF2A2A2A;
-    private static final int COLOR_BTN_HOVER = 0xFF333333;
-    private static final int COLOR_BTN_BORDER = 0xFF4A4A4A;
-    private static final int COLOR_WHITE = 0xFFFFFFFF;
-    private static final int COLOR_GRAY = 0xFFBBBBBB;
-    private static final int COLOR_DISABLED = 0xFF666666;
+    private Theme theme() { return ThemeState.active(); }
+    private int cBg() { return theme().bg(); }
+    private int cPanel() { return theme().surface(); }
+    private int cBorder() { return theme().border(); }
+    private int cAccent() { return theme().accent(); }
+    private int cText() { return theme().text(); }
+    private int cMuted() { return theme().textMuted(); }
+    private int cBtnBg() { return theme().surface2(); }
+    private int cBtnHover() { return ThemePaint.brighten(theme().surface2(), 0x10); }
+    private int cBtnBorder() { return theme().borderStrong(); }
 
     private static final int BTN_H = 16;
     private static final int BTN_PAD = 10;
@@ -61,18 +60,18 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        graphics.fill(leftPos, topPos, leftPos + GUI_WIDTH, topPos + GUI_HEIGHT, COLOR_BG);
-        graphics.renderOutline(leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, COLOR_BORDER);
+        graphics.fill(leftPos, topPos, leftPos + GUI_WIDTH, topPos + GUI_HEIGHT, cBg());
+        graphics.renderOutline(leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, cBorder());
 
         graphics.drawCenteredString(font, Component.translatable("gui.logisticsnetworks.mass_placement"),
-                leftPos + GUI_WIDTH / 2, topPos + 8, COLOR_ACCENT);
+                leftPos + GUI_WIDTH / 2, topPos + 8, cAccent());
 
         int panelX = leftPos + PANEL_X_OFFSET;
         int panelY = topPos + PANEL_Y_OFFSET;
         int panelW = PANEL_W;
         int panelH = PANEL_H;
-        graphics.fill(panelX, panelY, panelX + panelW, panelY + panelH, COLOR_PANEL);
-        graphics.renderOutline(panelX, panelY, panelW, panelH, COLOR_BORDER);
+        graphics.fill(panelX, panelY, panelX + panelW, panelY + panelH, cPanel());
+        graphics.renderOutline(panelX, panelY, panelW, panelH, cBorder());
 
         int textX = panelX + 8;
         int y = panelY + 8;
@@ -80,18 +79,18 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
 
         y = drawWrappedLine(graphics,
                 Component.translatable("gui.logisticsnetworks.mass_placement.selected", menu.getSelectedCount()),
-                textX, y, textW, COLOR_TEXT);
+                textX, y, textW, cText());
         y = drawWrappedLine(graphics,
                 Component.translatable("gui.logisticsnetworks.mass_placement.nodes_required", menu.getNodesRequired()),
-                textX, y, textW, COLOR_TEXT);
+                textX, y, textW, cText());
         y = drawWrappedLine(graphics,
                 Component.translatable("gui.logisticsnetworks.mass_placement.upgrades_required",
                         menu.getUpgradesRequired()),
-                textX, y, textW, COLOR_TEXT);
+                textX, y, textW, cText());
         y = drawWrappedLine(graphics,
                 Component.translatable("gui.logisticsnetworks.mass_placement.filters_required",
                         menu.getFiltersRequired()),
-                textX, y, textW, COLOR_TEXT);
+                textX, y, textW, cText());
 
         boolean canPlace = menu.canPlace();
         String mark = canPlace ? "\u2714" : "\u2716";
@@ -99,7 +98,7 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
                 canPlace ? "gui.logisticsnetworks.mass_placement.status_ok"
                         : "gui.logisticsnetworks.mass_placement.status_blocked");
         y = drawWrappedLine(graphics, Component.literal(mark + " ").append(status), textX, y, textW,
-                canPlace ? COLOR_OK : COLOR_FAIL);
+                canPlace ? theme().accent() : theme().danger());
 
         int choicesTitleY = panelY + 67;
         drawChoiceHeader(graphics, textX, choicesTitleY, textW);
@@ -107,7 +106,7 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
 
         int requirementsTitleY = panelY + 130;
         drawWrappedLine(graphics, Component.translatable("gui.logisticsnetworks.mass_placement.requirements"),
-                textX, requirementsTitleY, textW, COLOR_MUTED);
+                textX, requirementsTitleY, textW, cMuted());
 
         List<MassPlacementMenu.RequirementView> requirementViews = menu.getRequirementViews();
         int maxRequirementLines = 2;
@@ -116,13 +115,13 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
         if (requirementViews.isEmpty()) {
             drawWrappedLine(graphics,
                     Component.translatable("gui.logisticsnetworks.mass_placement.requirement_empty"),
-                    textX, requirementY, textW, COLOR_MUTED);
+                    textX, requirementY, textW, cMuted());
         } else {
             int shown = Math.min(maxRequirementLines, requirementViews.size());
             for (int i = 0; i < shown; i++) {
                 MassPlacementMenu.RequirementView requirement = requirementViews.get(i);
                 String requirementMark = requirement.missing() ? "\u2716" : "\u2714";
-                int color = requirement.missing() ? COLOR_FAIL : COLOR_OK;
+                int color = requirement.missing() ? theme().danger() : theme().accent();
                 Component line = Component.literal(requirementMark + " ")
                         .append(requirement.name().copy())
                         .append(Component.literal(": " + requirement.available() + "/" + requirement.required()));
@@ -137,13 +136,13 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
             if (requirementViews.size() > shown) {
                 graphics.drawString(font, Component.translatable("gui.logisticsnetworks.mass_placement.requirement_more",
                         requirementViews.size() - shown), textX,
-                        requirementY + shown * font.lineHeight + 1, COLOR_MUTED, false);
+                        requirementY + shown * font.lineHeight + 1, cMuted(), false);
             }
         }
 
         int hintY = panelY + panelH + 6;
         drawWrappedLine(graphics, Component.translatable("gui.logisticsnetworks.mass_placement.hint"),
-                textX, hintY, textW, COLOR_MUTED);
+                textX, hintY, textW, cMuted());
 
         String clearLabel = Component.translatable("gui.logisticsnetworks.mass_placement.clear").getString();
         String placeLabel = Component.translatable("gui.logisticsnetworks.mass_placement.place").getString();
@@ -219,7 +218,7 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
     private int drawBlockChoices(GuiGraphics g, int x, int y, int width, int mx, int my) {
         if (blockChoices.isEmpty()) {
             return drawWrappedLine(g, Component.translatable("gui.logisticsnetworks.mass_placement.block_choices_empty"),
-                    x, y, width, COLOR_MUTED);
+                    x, y, width, cMuted());
         }
 
         clampChoiceScroll();
@@ -229,15 +228,15 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
             SyncMassPlacementChoicesPayload.BlockChoice choice = blockChoices.get(choiceScrollOffset + i);
             boolean hovered = isHoveringAbs(x, y, rowWidth, CHOICE_ROW_H, mx, my);
             boolean selected = choice.selected();
-            int border = selected ? COLOR_ACCENT : hovered ? COLOR_BTN_BORDER : COLOR_BORDER;
-            int fill = hovered ? COLOR_BTN_HOVER : COLOR_BTN_BG;
+            int border = selected ? cAccent() : hovered ? cBtnBorder() : cBorder();
+            int fill = hovered ? cBtnHover() : cBtnBg();
             g.fill(x, y, x + rowWidth, y + CHOICE_ROW_H, fill);
             g.renderOutline(x, y, rowWidth, CHOICE_ROW_H, border);
 
             String count = choice.targetCount() > maxNodes ? maxNodes + "+" : String.valueOf(choice.targetCount());
             String label = (selected ? "> " : "  ") + choice.name() + " (" + count + ")";
             g.drawString(font, font.plainSubstrByWidth(label, rowWidth - 8), x + 4, y + 3,
-                    selected ? COLOR_WHITE : COLOR_GRAY, false);
+                    selected ? cText() : cMuted(), false);
             y += CHOICE_ROW_H + CHOICE_ROW_GAP;
         }
 
@@ -277,7 +276,7 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
 
     private void drawChoiceHeader(GuiGraphics g, int x, int y, int width) {
         g.drawString(font, Component.translatable("gui.logisticsnetworks.mass_placement.block_choices"),
-                x, y, COLOR_MUTED, false);
+                x, y, cMuted(), false);
         int maxScroll = getMaxChoiceScroll();
         if (maxScroll <= 0) {
             return;
@@ -286,7 +285,7 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
         int first = choiceScrollOffset + 1;
         int last = Math.min(choiceScrollOffset + MAX_CHOICE_ROWS, blockChoices.size());
         String range = first + "-" + last + "/" + blockChoices.size();
-        g.drawString(font, range, x + width - font.width(range), y, COLOR_MUTED, false);
+        g.drawString(font, range, x + width - font.width(range), y, cMuted(), false);
     }
 
     private int getChoiceListY() {
@@ -310,26 +309,26 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
         int trackX = x + width - SCROLLBAR_W;
         int trackY = getChoiceListY();
         int trackH = MAX_CHOICE_ROWS * CHOICE_ROW_H + (MAX_CHOICE_ROWS - 1) * CHOICE_ROW_GAP;
-        g.fill(trackX, trackY, trackX + SCROLLBAR_W, trackY + trackH, COLOR_BORDER);
+        g.fill(trackX, trackY, trackX + SCROLLBAR_W, trackY + trackH, cBorder());
 
         int thumbH = Math.max(8, trackH * MAX_CHOICE_ROWS / blockChoices.size());
         int thumbTravel = trackH - thumbH;
         int thumbY = trackY + (thumbTravel * choiceScrollOffset) / maxScroll;
-        g.fill(trackX, thumbY, trackX + SCROLLBAR_W, thumbY + thumbH, COLOR_ACCENT);
+        g.fill(trackX, thumbY, trackX + SCROLLBAR_W, thumbY + thumbH, cAccent());
     }
 
     private void drawThemedButton(GuiGraphics g, int x, int y, int w, int h, String label,
                                   boolean enabled, int mx, int my) {
         if (!enabled) {
-            g.fill(x, y, x + w, y + h, COLOR_PANEL);
-            g.renderOutline(x, y, w, h, COLOR_BORDER);
-            g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, COLOR_DISABLED);
+            g.fill(x, y, x + w, y + h, cPanel());
+            g.renderOutline(x, y, w, h, cBorder());
+            g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, theme().textSubtle());
             return;
         }
         boolean hovered = isHoveringAbs(x, y, w, h, mx, my);
-        g.fill(x, y, x + w, y + h, hovered ? COLOR_BTN_HOVER : COLOR_BTN_BG);
-        g.renderOutline(x, y, w, h, hovered ? COLOR_ACCENT : COLOR_BTN_BORDER);
-        g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, hovered ? COLOR_WHITE : COLOR_GRAY);
+        g.fill(x, y, x + w, y + h, hovered ? cBtnHover() : cBtnBg());
+        g.renderOutline(x, y, w, h, hovered ? cAccent() : cBtnBorder());
+        g.drawCenteredString(font, label, x + w / 2, y + (h - 8) / 2, hovered ? cText() : cMuted());
     }
 
     private boolean isHoveringAbs(int x, int y, int w, int h, double mx, double my) {
