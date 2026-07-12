@@ -20,5 +20,8 @@ public class NetworkScheduler {
 
         registry.processDirtyNetworks(event.getServer());
         registry.getTelemetryManager().tick(registry, event.getServer());
+        if (level.getGameTime() % 10L == 0L) {
+            TransferVisualBatch.sendTopologies(registry, event.getServer());
+        }
     }
 }

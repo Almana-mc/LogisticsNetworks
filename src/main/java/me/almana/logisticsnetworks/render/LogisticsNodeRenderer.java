@@ -192,6 +192,15 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         return allowedNodeIds == null || allowedNodeIds.contains(entity.getId());
     }
 
+    public static boolean isWithinWrenchRenderLimit(int entityId) {
+        Minecraft mc = Minecraft.getInstance();
+        if (entityId < 0 || mc.level == null || !(mc.level.getEntity(entityId) instanceof LogisticsNodeEntity)) {
+            return false;
+        }
+        updateAllowedNodes(mc);
+        return allowedNodeIds == null || allowedNodeIds.contains(entityId);
+    }
+
     private static void updateRenderBounds(LogisticsNodeEntity entity, LogisticsNodeRenderState state) {
         state.resetBounds();
 

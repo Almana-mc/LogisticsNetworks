@@ -51,6 +51,7 @@ import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
+import me.almana.logisticsnetworks.network.TransferVisualPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.datagen.ModDataGenerators;
@@ -216,5 +217,7 @@ public class LogisticsNetworks {
                                 ClientPayloadHandler::handleSyncChannelList);
                 registrar.playToClient(SyncNetworkExportPayload.TYPE, SyncNetworkExportPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkExport);
+                registrar.playToClient(TransferVisualPayload.TYPE, TransferVisualPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleTransferVisual);
         }
 }
