@@ -369,6 +369,7 @@
   "gui.logisticsnetworks.config.client.maxRenderedNodes": "最大渲染节点数",
   "gui.logisticsnetworks.config.client.maxVisibleNodes": "最大可见节点数",
   "gui.logisticsnetworks.config.client.theme": "主题",
+  "gui.logisticsnetworks.config.client.computerClassicTheme": "经典计算机终端",
   "gui.logisticsnetworks.config.upgrades.tier.none": "无升级",
   "gui.logisticsnetworks.config.upgrades.tier.iron": "铁级",
   "gui.logisticsnetworks.config.upgrades.tier.gold": "金级",
