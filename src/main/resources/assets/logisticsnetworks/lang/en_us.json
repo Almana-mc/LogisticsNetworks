@@ -448,6 +448,7 @@
   "gui.logisticsnetworks.config.disabled": "OFF",
   "gui.logisticsnetworks.config.common.dropNodeItem": "Drop Node Item",
   "gui.logisticsnetworks.config.common.debugMode": "Debug Mode",
+  "gui.logisticsnetworks.config.common.networkTicking": "Network Ticking",
   "gui.logisticsnetworks.config.common.backoffMaxTicks": "Max Backoff Ticks",
   "gui.logisticsnetworks.config.common.backoffItem": "Item Backoff",
   "gui.logisticsnetworks.config.common.backoffFluid": "Fluid Backoff",
