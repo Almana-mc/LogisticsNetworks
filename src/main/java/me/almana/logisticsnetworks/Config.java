@@ -23,6 +23,11 @@ public class Config {
             .comment("Send June awareness message.")
             .define("juneAwarenessMessage", true);
 
+    public static final ModConfigSpec.BooleanValue networkTickingEnabledSpec = builder
+            .comment("Whether logistics networks are processed each server tick. "
+                    + "Disable to isolate network-related crashes for debugging.")
+            .define("networkTickingEnabled", true);
+
     public static final ModConfigSpec.IntValue backoffMaxTicksSpec;
     public static final ModConfigSpec.BooleanValue backoffItemSpec;
     public static final ModConfigSpec.BooleanValue backoffFluidSpec;
@@ -48,6 +53,7 @@ public class Config {
     public static boolean dropNodeItem;
     public static boolean debugMode;
     public static boolean juneAwarenessMessage;
+    public static boolean networkTickingEnabled;
     public static int backoffMaxTicks = 40;
     public static boolean[] backoffEnabled = {true, true, true, true, true};
 
@@ -61,6 +67,7 @@ public class Config {
         dropNodeItem = dropNodeItemSpec.get();
         debugMode = debugModeSpec.get();
         juneAwarenessMessage = juneAwarenessMessageSpec.get();
+        networkTickingEnabled = networkTickingEnabledSpec.get();
         backoffMaxTicks = backoffMaxTicksSpec.get();
         backoffEnabled[ChannelType.ITEM.ordinal()] = backoffItemSpec.get();
         backoffEnabled[ChannelType.FLUID.ordinal()] = backoffFluidSpec.get();
