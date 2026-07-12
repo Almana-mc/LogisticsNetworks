@@ -196,14 +196,6 @@ public final class NbtFilterData {
         return !getRules(stack).isEmpty();
     }
 
-    public static boolean hasEnabledRules(ItemStack stack) {
-        for (NbtRule rule : getRules(stack)) {
-            if (rule.enabled())
-                return true;
-        }
-        return false;
-    }
-
     public static boolean addRule(ItemStack stack, String rawPath, Operator operator, Tag value) {
         if (!isNbtFilter(stack) || value == null)
             return false;
