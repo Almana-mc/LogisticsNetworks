@@ -37,12 +37,17 @@ public class ClientConfig {
             .comment("GUI theme for logistics node screens: light, dark, redstone, nebula, glass, terminal, pastel, brutalist")
             .define("theme", "dark", option -> option instanceof String value && THEMES.contains(value));
 
+    public static final ModConfigSpec.BooleanValue computerClassicThemeSpec = builder
+            .comment("Use the classic green terminal look for the network computer instead of the selected GUI theme.")
+            .define("computerClassicTheme", true);
+
     public static final ModConfigSpec SPEC = builder.build();
 
     public static boolean defaultNodeVisibility = true;
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
     public static boolean connectedNodeTextures = true;
+    public static boolean computerClassicTheme = true;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -55,6 +60,7 @@ public class ClientConfig {
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
         connectedNodeTextures = connectedNodeTexturesSpec.get();
+        computerClassicTheme = computerClassicThemeSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());
     }
 }
