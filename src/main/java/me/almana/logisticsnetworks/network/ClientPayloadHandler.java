@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
+import me.almana.logisticsnetworks.client.TransferVisuals;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
@@ -15,6 +16,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 public class ClientPayloadHandler {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+
+    public static void handleTransferVisual(TransferVisualPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> TransferVisuals.accept(payload));
+    }
 
     public static void handleSyncNetworkList(SyncNetworkListPayload payload, IPayloadContext context) {
         if (Config.debugMode) LOGGER.debug("Received SyncNetworkListPayload with {} networks", payload.networks().size());

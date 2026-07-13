@@ -54,6 +54,9 @@ public final class ThemeState {
     public static void load() {
         Path file = filePath();
         if (!Files.exists(file)) {
+            migrateLegacyFile(file);
+        }
+        if (!Files.exists(file)) {
             return;
         }
         try {
@@ -71,7 +74,9 @@ public final class ThemeState {
         JsonObject object = new JsonObject();
         object.addProperty("theme", active.id());
         try {
-            Files.writeString(filePath(), object.toString());
+            Path file = filePath();
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, object.toString());
         } catch (IOException exception) {
             if (Config.debugMode) LOGGER.warn("failed to save theme state", exception);
         }
@@ -88,7 +93,20 @@ public final class ThemeState {
     }
 
     private static Path filePath() {
-        return FMLPaths.CONFIGDIR.get().resolve(FILE_NAME);
+        return FMLPaths.CONFIGDIR.get().resolve("logistics-network").resolve(FILE_NAME);
+    }
+
+    private static void migrateLegacyFile(Path target) {
+        Path legacy = FMLPaths.CONFIGDIR.get().resolve(FILE_NAME);
+        if (!Files.exists(legacy)) {
+            return;
+        }
+        try {
+            Files.createDirectories(target.getParent());
+            Files.move(legacy, target);
+        } catch (IOException exception) {
+            if (Config.debugMode) LOGGER.warn("failed to migrate legacy theme file", exception);
+        }
     }
 
     private ThemeState() {

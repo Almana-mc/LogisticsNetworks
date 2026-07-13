@@ -30,6 +30,14 @@ public class ClientConfig {
             .comment("Render logistics nodes as connected textures when neighboring nodes are visible.")
             .define("connectedNodeTextures", true);
 
+    public static final ModConfigSpec.BooleanValue showTransferVisualsSpec = builder
+            .comment("Show resource transfer particles while holding a wrench.")
+            .define("showTransferVisuals", true);
+
+    public static final ModConfigSpec.IntValue maxTransferVisualsSpec = builder
+            .comment("Maximum simultaneous resource transfer paths.")
+            .defineInRange("maxTransferVisuals", 100, 1, 1000);
+
     private static final List<String> THEMES = List.of(
             "light", "dark", "redstone", "nebula", "glass", "terminal", "pastel", "brutalist");
 
@@ -37,12 +45,19 @@ public class ClientConfig {
             .comment("GUI theme for logistics node screens: light, dark, redstone, nebula, glass, terminal, pastel, brutalist")
             .define("theme", "dark", option -> option instanceof String value && THEMES.contains(value));
 
+    public static final ModConfigSpec.BooleanValue computerClassicThemeSpec = builder
+            .comment("Use the classic green terminal look for the network computer instead of the selected GUI theme.")
+            .define("computerClassicTheme", true);
+
     public static final ModConfigSpec SPEC = builder.build();
 
     public static boolean defaultNodeVisibility = true;
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
     public static boolean connectedNodeTextures = true;
+    public static boolean showTransferVisuals = true;
+    public static int maxTransferVisuals = 100;
+    public static boolean computerClassicTheme = true;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -55,6 +70,9 @@ public class ClientConfig {
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
         connectedNodeTextures = connectedNodeTexturesSpec.get();
+        showTransferVisuals = showTransferVisualsSpec.get();
+        maxTransferVisuals = maxTransferVisualsSpec.get();
+        computerClassicTheme = computerClassicThemeSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());
     }
 }

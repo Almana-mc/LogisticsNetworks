@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic;
 
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -12,6 +13,9 @@ public class NetworkScheduler {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!Config.networkTickingEnabled)
+            return;
+
         ServerLevel level = event.getServer().overworld();
 
         NetworkRegistry registry = NetworkRegistry.get(level);
@@ -20,5 +24,8 @@ public class NetworkScheduler {
 
         registry.processDirtyNetworks(event.getServer());
         registry.getTelemetryManager().tick(registry, event.getServer());
+        if (level.getGameTime() % 10L == 0L) {
+            TransferVisualBatch.sendTopologies(registry, event.getServer());
+        }
     }
 }

@@ -25,6 +25,7 @@ import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterPayload;
 import me.almana.logisticsnetworks.network.SetNodeUpgradeItemPayload;
+import me.almana.logisticsnetworks.network.SetWrenchColorsPayload;
 import me.almana.logisticsnetworks.network.ApplyPatternPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.SetNetworkColorPayload;
@@ -51,6 +52,7 @@ import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
+import me.almana.logisticsnetworks.network.TransferVisualPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.datagen.ModDataGenerators;
@@ -154,6 +156,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetDefaultNodeVisibility);
                 registrar.playToServer(CycleWrenchModePayload.TYPE, CycleWrenchModePayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleCycleWrenchMode);
+                registrar.playToServer(SetWrenchColorsPayload.TYPE, SetWrenchColorsPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetWrenchColors);
                 registrar.playToServer(MassSelectConnectedPayload.TYPE, MassSelectConnectedPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleMassSelectConnected);
                 registrar.playToServer(CopyPasteConnectedPayload.TYPE, CopyPasteConnectedPayload.STREAM_CODEC,
@@ -216,5 +220,7 @@ public class LogisticsNetworks {
                                 ClientPayloadHandler::handleSyncChannelList);
                 registrar.playToClient(SyncNetworkExportPayload.TYPE, SyncNetworkExportPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkExport);
+                registrar.playToClient(TransferVisualPayload.TYPE, TransferVisualPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleTransferVisual);
         }
 }

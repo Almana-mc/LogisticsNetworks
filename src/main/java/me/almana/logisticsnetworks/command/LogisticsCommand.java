@@ -1,11 +1,13 @@
 package me.almana.logisticsnetworks.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -87,7 +89,29 @@ public class LogisticsCommand {
                         .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                         .executes(context -> list(context.getSource(), 1))
                         .then(Commands.argument("page", IntegerArgumentType.integer(1))
-                                .executes(context -> list(context.getSource(), IntegerArgumentType.getInteger(context, "page")))));
+                                .executes(context -> list(context.getSource(), IntegerArgumentType.getInteger(context, "page")))))
+                .then(Commands.literal("networkTicking")
+                        .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+                        .executes(context -> networkTicking(context.getSource(), null))
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(context -> networkTicking(context.getSource(),
+                                        BoolArgumentType.getBool(context, "enabled")))));
+    }
+
+    private static int networkTicking(CommandSourceStack source, Boolean enabled) {
+        if (enabled == null) {
+            source.sendSuccess(() -> Component.literal("Network ticking is "
+                    + (Config.networkTickingEnabled ? "enabled" : "disabled")), false);
+            return 1;
+        }
+
+        Config.networkTickingEnabledSpec.set(enabled);
+        Config.refresh();
+        Config.SPEC.save();
+
+        source.sendSuccess(() -> Component.literal("Network ticking "
+                + (enabled ? "enabled" : "disabled") + "."), true);
+        return 1;
     }
 
     private static int removeNodes(CommandSourceStack source) {

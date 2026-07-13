@@ -6,16 +6,20 @@ import net.minecraft.nbt.Tag;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 public class LogisticsNetwork {
@@ -55,6 +59,19 @@ public class LogisticsNetwork {
     @SuppressWarnings("unchecked")
     private final List<NodeRef>[] sourceImports = new List[9];
 
+    // Prebuilt unmodifiable views, rebuilt on cache rebuild
+    private List<NodeRef>[] itemImportsView;
+    private List<NodeRef>[] fluidImportsView;
+    private List<NodeRef>[] energyImportsView;
+    private List<NodeRef>[] chemicalImportsView;
+    private List<NodeRef>[] sourceImportsView;
+
+    // Per-node derived state, rebuilt on cache rebuild
+    private List<UUID> sortedUuids = Collections.emptyList();
+    private final Map<UUID, ResourceKey<Level>> nodeDimensions = new HashMap<>();
+    private final Map<UUID, Boolean> dimensionalCache = new HashMap<>();
+    private final Map<UUID, Integer> tierCache = new HashMap<>();
+
     private boolean cacheDirty = true;
 
     public LogisticsNetwork(UUID id) {
@@ -73,6 +90,7 @@ public class LogisticsNetwork {
             this.chemicalImports[i] = new ArrayList<>();
             this.sourceImports[i] = new ArrayList<>();
         }
+        rebuildViews();
     }
 
     public CompoundTag save() {
@@ -245,23 +263,39 @@ public class LogisticsNetwork {
     }
 
     public List<NodeRef>[] getItemImports() {
-        return copyToUnmodifiableArray(itemImports);
+        return itemImportsView;
     }
 
     public List<NodeRef>[] getFluidImports() {
-        return copyToUnmodifiableArray(fluidImports);
+        return fluidImportsView;
     }
 
     public List<NodeRef>[] getEnergyImports() {
-        return copyToUnmodifiableArray(energyImports);
+        return energyImportsView;
     }
 
     public List<NodeRef>[] getChemicalImports() {
-        return copyToUnmodifiableArray(chemicalImports);
+        return chemicalImportsView;
     }
 
     public List<NodeRef>[] getSourceImports() {
-        return copyToUnmodifiableArray(sourceImports);
+        return sourceImportsView;
+    }
+
+    public List<UUID> getSortedUuids() {
+        return sortedUuids;
+    }
+
+    public ResourceKey<Level> getNodeDimension(UUID nodeId) {
+        return nodeDimensions.get(nodeId);
+    }
+
+    public Map<UUID, Boolean> getDimensionalCache() {
+        return dimensionalCache;
+    }
+
+    public Map<UUID, Integer> getTierCache() {
+        return tierCache;
     }
 
     @SuppressWarnings("unchecked")
@@ -293,12 +327,43 @@ public class LogisticsNetwork {
             this.chemicalImports[i] = new ArrayList<>();
             this.sourceImports[i] = new ArrayList<>();
         }
+        nodeDimensions.clear();
+        dimensionalCache.clear();
+        tierCache.clear();
+    }
+
+    private void sortImportsByPriority() {
+        for (int i = 0; i < 9; i++) {
+            sortByPriority(itemImports[i]);
+            sortByPriority(fluidImports[i]);
+            sortByPriority(energyImports[i]);
+            sortByPriority(chemicalImports[i]);
+            sortByPriority(sourceImports[i]);
+        }
+    }
+
+    private static void sortByPriority(List<NodeRef> refs) {
+        if (refs.size() > 1) {
+            refs.sort((a, b) -> Integer.compare(b.priority(), a.priority()));
+        }
+    }
+
+    private void rebuildViews() {
+        itemImportsView = copyToUnmodifiableArray(itemImports);
+        fluidImportsView = copyToUnmodifiableArray(fluidImports);
+        energyImportsView = copyToUnmodifiableArray(energyImports);
+        chemicalImportsView = copyToUnmodifiableArray(chemicalImports);
+        sourceImportsView = copyToUnmodifiableArray(sourceImports);
     }
 
     public void rebuildCache(NetworkRegistry registry) {
         clearAllCaches();
+        sortedUuids = new ArrayList<>(nodeUuids);
+        sortedUuids.sort(null);
+
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server == null) {
+            rebuildViews();
             return;
         }
 
@@ -317,6 +382,10 @@ public class LogisticsNetwork {
             if (node == null) {
                 continue;
             }
+
+            nodeDimensions.put(nodeId, node.level().dimension());
+            dimensionalCache.put(nodeId, NodeUpgradeData.hasDimensionalUpgrade(node));
+            tierCache.put(nodeId, NodeUpgradeData.getUpgradeTier(node));
 
             for (int i = 0; i < 9; i++) {
                 if (channelNames[i].isEmpty()) {
@@ -339,6 +408,9 @@ public class LogisticsNetwork {
                 }
             }
         }
+
+        sortImportsByPriority();
+        rebuildViews();
     }
 
     private void classifyNode(LogisticsNodeEntity node) {
@@ -354,18 +426,19 @@ public class LogisticsNetwork {
                 continue;
             }
 
+            int priority = ch.getPriority();
             switch (ch.getType()) {
-                case ITEM -> this.itemImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
-                case FLUID -> this.fluidImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
-                case ENERGY -> this.energyImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
+                case ITEM -> this.itemImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
+                case FLUID -> this.fluidImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
+                case ENERGY -> this.energyImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
                 case CHEMICAL -> {
                     if (NodeUpgradeData.hasMekanismChemicalUpgrade(node)) {
-                        this.chemicalImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
+                        this.chemicalImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
                     }
                 }
                 case SOURCE -> {
                     if (NodeUpgradeData.hasArsSourceUpgrade(node)) {
-                        this.sourceImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
+                        this.sourceImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
                     }
                 }
             }

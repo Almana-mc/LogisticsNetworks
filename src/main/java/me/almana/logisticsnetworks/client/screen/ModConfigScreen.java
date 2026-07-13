@@ -56,11 +56,13 @@ public class ModConfigScreen extends Screen {
     private static final Component[] TAB_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.tab.common"),
         Component.translatable("gui.logisticsnetworks.config.tab.client"),
+        Component.translatable("gui.logisticsnetworks.config.tab.visuals"),
         Component.translatable("gui.logisticsnetworks.config.tab.upgrades")
     };
 
     private static final Component TEXT_DROP_NODE = Component.translatable("gui.logisticsnetworks.config.common.dropNodeItem");
     private static final Component TEXT_DEBUG = Component.translatable("gui.logisticsnetworks.config.common.debugMode");
+    private static final Component TEXT_NETWORK_TICKING = Component.translatable("gui.logisticsnetworks.config.common.networkTicking");
     private static final Component TEXT_BACKOFF_TICKS = Component.translatable("gui.logisticsnetworks.config.common.backoffMaxTicks");
     private static final Component TEXT_BACKOFF_ITEM = Component.translatable("gui.logisticsnetworks.config.common.backoffItem");
     private static final Component TEXT_BACKOFF_FLUID = Component.translatable("gui.logisticsnetworks.config.common.backoffFluid");
@@ -72,6 +74,9 @@ public class ModConfigScreen extends Screen {
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
     private static final Component TEXT_DEFAULT_NODE_VISIBILITY = Component.translatable("gui.logisticsnetworks.config.client.defaultNodeVisibility");
     private static final Component TEXT_CONNECTED_NODE_TEXTURES = Component.translatable("gui.logisticsnetworks.config.client.connectedNodeTextures");
+    private static final Component TEXT_COMPUTER_CLASSIC = Component.translatable("gui.logisticsnetworks.config.client.computerClassicTheme");
+    private static final Component TEXT_SHOW_TRANSFER_VISUALS = Component.translatable("gui.logisticsnetworks.config.visuals.showTransferVisuals");
+    private static final Component TEXT_MAX_TRANSFER_VISUALS = Component.translatable("gui.logisticsnetworks.config.visuals.maxTransferVisuals");
 
     private static final Component[] TIER_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.upgrades.tier.none"),
@@ -92,7 +97,7 @@ public class ModConfigScreen extends Screen {
 
     private static final Component TEXT_NO_PERMISSION = Component.translatable("gui.logisticsnetworks.config.no_permission");
 
-    private enum Tab { COMMON, CLIENT, UPGRADES }
+    private enum Tab { COMMON, CLIENT, VISUALS, UPGRADES }
 
     private final Screen parent;
     private int x0, y0;
@@ -100,6 +105,7 @@ public class ModConfigScreen extends Screen {
 
     private boolean pendingDropNodeItem;
     private boolean pendingDebugMode;
+    private boolean pendingNetworkTicking;
     private boolean pendingBackoffItem;
     private boolean pendingBackoffFluid;
     private boolean pendingBackoffEnergy;
@@ -115,6 +121,10 @@ public class ModConfigScreen extends Screen {
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
     private String pendingTheme;
+    private boolean pendingComputerClassic;
+    private boolean pendingShowTransferVisuals;
+    private int pendingMaxTransferVisuals;
+    private EditBox maxTransferVisualsBox;
 
     private TierLimits[] pendingTiers;
     private int expandedTier = -1;
@@ -140,6 +150,7 @@ public class ModConfigScreen extends Screen {
 
         pendingDropNodeItem = Config.dropNodeItemSpec.get();
         pendingDebugMode = Config.debugModeSpec.get();
+        pendingNetworkTicking = Config.networkTickingEnabledSpec.get();
         pendingBackoffItem = Config.backoffItemSpec.get();
         pendingBackoffFluid = Config.backoffFluidSpec.get();
         pendingBackoffEnergy = Config.backoffEnergySpec.get();
@@ -151,6 +162,9 @@ public class ModConfigScreen extends Screen {
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
         pendingConnectedNodeTextures = ClientConfig.connectedNodeTexturesSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
+        pendingComputerClassic = ClientConfig.computerClassicThemeSpec.get();
+        pendingShowTransferVisuals = ClientConfig.showTransferVisualsSpec.get();
+        pendingMaxTransferVisuals = ClientConfig.maxTransferVisualsSpec.get();
         pendingTiers = UpgradeLimitsConfig.getAll();
 
         buildTab();
@@ -161,6 +175,7 @@ public class ModConfigScreen extends Screen {
         backoffMaxTicksBox = null;
         maxRenderedNodesBox = null;
         maxVisibleNodesBox = null;
+        maxTransferVisualsBox = null;
         upgradeBoxes = new EditBox[6];
 
         int doneW = 60;
@@ -182,13 +197,14 @@ public class ModConfigScreen extends Screen {
         switch (currentTab) {
             case COMMON -> buildCommonTab(contentX, contentY, contentW);
             case CLIENT -> buildClientTab(contentX, contentY, contentW);
+            case VISUALS -> buildVisualsTab(contentX, contentY, contentW);
             case UPGRADES -> buildUpgradesTab(contentX, contentY, contentW);
         }
     }
 
     private void buildCommonTab(int cx, int cy, int cw) {
         if (canEditServerConfig) {
-            backoffMaxTicksBox = new EditBox(font, cx + 130, cy + 42, 60, 14, Component.empty());
+            backoffMaxTicksBox = new EditBox(font, cx + 130, cy + 60, 60, 14, Component.empty());
             backoffMaxTicksBox.setMaxLength(4);
             backoffMaxTicksBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
             backoffMaxTicksBox.setValue(String.valueOf(pendingBackoffMaxTicks));
@@ -211,6 +227,15 @@ public class ModConfigScreen extends Screen {
         maxVisibleNodesBox.setValue(String.valueOf(pendingMaxVisibleNodes));
         maxVisibleNodesBox.setBordered(false);
         addWidget(maxVisibleNodesBox);
+    }
+
+    private void buildVisualsTab(int cx, int cy, int cw) {
+        maxTransferVisualsBox = new EditBox(font, cx + 150, cy + 24, 80, 14, Component.empty());
+        maxTransferVisualsBox.setMaxLength(4);
+        maxTransferVisualsBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
+        maxTransferVisualsBox.setValue(String.valueOf(pendingMaxTransferVisuals));
+        maxTransferVisualsBox.setBordered(false);
+        addWidget(maxTransferVisualsBox);
     }
 
     private void buildUpgradesTab(int cx, int cy, int cw) {
@@ -269,6 +294,7 @@ public class ModConfigScreen extends Screen {
         switch (currentTab) {
             case COMMON -> renderCommonTab(g, contentX, contentY, contentW, mouseX, mouseY);
             case CLIENT -> renderClientTab(g, contentX, contentY, contentW, mouseX, mouseY);
+            case VISUALS -> renderVisualsTab(g, contentX, contentY, contentW, mouseX, mouseY);
             case UPGRADES -> renderUpgradesTab(g, contentX, contentY, contentW, mouseX, mouseY);
         }
 
@@ -277,6 +303,7 @@ public class ModConfigScreen extends Screen {
         renderEditBox(g, backoffMaxTicksBox);
         renderEditBox(g, maxRenderedNodesBox);
         renderEditBox(g, maxVisibleNodesBox);
+        renderEditBox(g, maxTransferVisualsBox);
         for (EditBox box : upgradeBoxes) {
             renderEditBox(g, box);
         }
@@ -338,16 +365,17 @@ public class ModConfigScreen extends Screen {
 
         y = renderCheckbox(g, cx, y, cw, TEXT_DROP_NODE, pendingDropNodeItem, mx, my, locked);
         y = renderCheckbox(g, cx, y, cw, TEXT_DEBUG, pendingDebugMode, mx, my, locked);
+        y = renderCheckbox(g, cx, y, cw, TEXT_NETWORK_TICKING, pendingNetworkTicking, mx, my, locked);
 
         int labelColor = locked ? COL_INK_LOCKED : COL_INK;
-        g.text(font, TEXT_BACKOFF_TICKS, cx, cy + 46, labelColor, false);
+        g.text(font, TEXT_BACKOFF_TICKS, cx, cy + 64, labelColor, false);
         if (locked) {
-            g.text(font, String.valueOf(pendingBackoffMaxTicks), cx + 130, cy + 45, COL_INK_LOCKED, false);
+            g.text(font, String.valueOf(pendingBackoffMaxTicks), cx + 130, cy + 63, COL_INK_LOCKED, false);
         } else {
-            renderUnderline(g, cx + 130, cy + 42 + 14, 60);
+            renderUnderline(g, cx + 130, cy + 60 + 14, 60);
         }
 
-        y = cy + 62;
+        y = cy + 80;
         y = renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_ITEM, pendingBackoffItem, mx, my, locked);
         y = renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_FLUID, pendingBackoffFluid, mx, my, locked);
         y = renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_ENERGY, pendingBackoffEnergy, mx, my, locked);
@@ -391,6 +419,14 @@ public class ModConfigScreen extends Screen {
                 g.outline(sx - 1, sy - 1, swatchW + 2, swatchH + 2, COL_BORDER);
             }
         }
+
+        renderCheckbox(g, cx, cy + 152, cw, TEXT_COMPUTER_CLASSIC, pendingComputerClassic, mx, my, false);
+    }
+
+    private void renderVisualsTab(GuiGraphicsExtractor g, int cx, int cy, int cw, int mx, int my) {
+        renderCheckbox(g, cx, cy, cw, TEXT_SHOW_TRANSFER_VISUALS, pendingShowTransferVisuals, mx, my, false);
+        g.text(font, TEXT_MAX_TRANSFER_VISUALS, cx, cy + 27, COL_INK, false);
+        renderUnderline(g, cx + 150, cy + 38, 80);
     }
 
     private boolean handleClientClick(double mouseX, double mouseY, int cx, int cy, int cw) {
@@ -420,6 +456,20 @@ public class ModConfigScreen extends Screen {
                 pendingTheme = Themes.ALL.get(i).id();
                 return true;
             }
+        }
+
+        if (inBox(mouseX, mouseY, boxX, cy + 154, boxSize)) {
+            pendingComputerClassic = !pendingComputerClassic;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleVisualsClick(double mouseX, double mouseY, int cx, int cy, int cw) {
+        int boxX = cx + cw - 14;
+        if (inBox(mouseX, mouseY, boxX, cy + 2, 9)) {
+            pendingShowTransferVisuals = !pendingShowTransferVisuals;
+            return true;
         }
         return false;
     }
@@ -512,11 +562,15 @@ public class ModConfigScreen extends Screen {
                 switch (currentTab) {
                     case COMMON -> { if (handleCommonClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
                     case UPGRADES -> { if (handleUpgradesClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
-                    case CLIENT -> { }
+                    case CLIENT, VISUALS -> { }
                 }
             }
 
             if (currentTab == Tab.CLIENT && handleClientClick(mouseX, mouseY, contentX, contentY, contentW)) {
+                unfocusEditBoxes();
+                return true;
+            }
+            if (currentTab == Tab.VISUALS && handleVisualsClick(mouseX, mouseY, contentX, contentY, contentW)) {
                 unfocusEditBoxes();
                 return true;
             }
@@ -561,8 +615,10 @@ public class ModConfigScreen extends Screen {
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingDropNodeItem = !pendingDropNodeItem; return true; }
         y += 18;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingDebugMode = !pendingDebugMode; return true; }
+        y += 18;
+        if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingNetworkTicking = !pendingNetworkTicking; return true; }
 
-        y = cy + 62;
+        y = cy + 80;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingBackoffItem = !pendingBackoffItem; return true; }
         y += 18;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingBackoffFluid = !pendingBackoffFluid; return true; }
@@ -612,6 +668,12 @@ public class ModConfigScreen extends Screen {
                     pendingMaxVisibleNodes = parseIntClamped(maxVisibleNodesBox.getValue(), 0, Integer.MAX_VALUE, pendingMaxVisibleNodes);
                 }
             }
+            case VISUALS -> {
+                if (maxTransferVisualsBox != null) {
+                    pendingMaxTransferVisuals = parseIntClamped(maxTransferVisualsBox.getValue(), 1, 1000,
+                            pendingMaxTransferVisuals);
+                }
+            }
             case UPGRADES -> stashExpandedTier();
         }
     }
@@ -638,6 +700,7 @@ public class ModConfigScreen extends Screen {
         if (canEditServerConfig) {
             Config.dropNodeItemSpec.set(pendingDropNodeItem);
             Config.debugModeSpec.set(pendingDebugMode);
+            Config.networkTickingEnabledSpec.set(pendingNetworkTicking);
             Config.backoffItemSpec.set(pendingBackoffItem);
             Config.backoffFluidSpec.set(pendingBackoffFluid);
             Config.backoffEnergySpec.set(pendingBackoffEnergy);
@@ -667,6 +730,9 @@ public class ModConfigScreen extends Screen {
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
         ClientConfig.connectedNodeTexturesSpec.set(pendingConnectedNodeTextures);
         ClientConfig.themeSpec.set(pendingTheme);
+        ClientConfig.computerClassicThemeSpec.set(pendingComputerClassic);
+        ClientConfig.showTransferVisualsSpec.set(pendingShowTransferVisuals);
+        ClientConfig.maxTransferVisualsSpec.set(pendingMaxTransferVisuals);
         ClientConfig.refresh();
         DefaultNodeVisibilitySync.send();
         ThemeState.setTheme(Themes.byId(pendingTheme));
@@ -737,6 +803,7 @@ public class ModConfigScreen extends Screen {
         if (backoffMaxTicksBox != null && backoffMaxTicksBox.isFocused()) return backoffMaxTicksBox;
         if (maxRenderedNodesBox != null && maxRenderedNodesBox.isFocused()) return maxRenderedNodesBox;
         if (maxVisibleNodesBox != null && maxVisibleNodesBox.isFocused()) return maxVisibleNodesBox;
+        if (maxTransferVisualsBox != null && maxTransferVisualsBox.isFocused()) return maxTransferVisualsBox;
         for (EditBox box : upgradeBoxes) {
             if (box != null && box.isFocused()) return box;
         }
@@ -747,6 +814,7 @@ public class ModConfigScreen extends Screen {
         if (backoffMaxTicksBox != null) backoffMaxTicksBox.setFocused(false);
         if (maxRenderedNodesBox != null) maxRenderedNodesBox.setFocused(false);
         if (maxVisibleNodesBox != null) maxVisibleNodesBox.setFocused(false);
+        if (maxTransferVisualsBox != null) maxTransferVisualsBox.setFocused(false);
         for (EditBox box : upgradeBoxes) {
             if (box != null) box.setFocused(false);
         }

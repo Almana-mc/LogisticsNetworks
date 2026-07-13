@@ -24,14 +24,15 @@ final class TransferAmountRules {
     private TransferAmountRules() {
     }
 
-    static Constraints collect(ItemStack[] exportFilters, ItemStack[] importFilters) {
+    static Constraints collect(ItemStack[] exportFilters, ItemStack[] importFilters,
+            @Nullable FilterItemData.ReadCache readCache) {
         int exportThreshold = 0;
         boolean hasExportThreshold = false;
         boolean hasPerEntryAmounts = false;
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                if (FilterItemData.hasAnyAmountEntries(filter)) {
+                if (FilterItemData.hasAnyAmountEntries(filter, readCache)) {
                     hasPerEntryAmounts = true;
                 }
             }
@@ -42,7 +43,7 @@ final class TransferAmountRules {
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                if (FilterItemData.hasAnyAmountEntries(filter)) {
+                if (FilterItemData.hasAnyAmountEntries(filter, readCache)) {
                     hasPerEntryAmounts = true;
                 }
             }
@@ -173,12 +174,14 @@ final class TransferAmountRules {
             ItemStack[] importFilters, ResourceHandler<FluidResource> source, ResourceHandler<FluidResource> target,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         int allowed = Integer.MAX_VALUE;
+        int sourceAmount = -1;
+        int targetAmount = -1;
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
                 int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
                 if (threshold > 0) {
-                    int sourceAmount = countFluids(source, candidate);
+                    if (sourceAmount < 0) sourceAmount = countFluids(source, candidate);
                     int exportCap = sourceAmount - threshold;
                     if (exportCap <= 0) {
                         return 0;
@@ -192,7 +195,7 @@ final class TransferAmountRules {
             for (ItemStack filter : importFilters) {
                 int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
                 if (threshold > 0) {
-                    int targetAmount = countFluids(target, candidate);
+                    if (targetAmount < 0) targetAmount = countFluids(target, candidate);
                     int importCap = threshold - targetAmount;
                     if (importCap <= 0) {
                         return 0;
