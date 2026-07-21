@@ -73,6 +73,9 @@ public class LogisticsCommand {
                 .then(Commands.literal("removeNodes")
                         .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                         .executes(context -> removeNodes(context.getSource())))
+                .then(Commands.literal("removeInvalidNodes")
+                        .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+                        .executes(context -> removeInvalidNodes(context.getSource())))
                 .then(Commands.literal("cullNetwork")
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .suggests(SUGGEST_NETWORKS)
@@ -121,19 +124,36 @@ public class LogisticsCommand {
 
         int removedCount = 0;
         for (LogisticsNodeEntity node : nodes) {
-            if (node.getNetworkId() != null) {
-                NetworkRegistry.get(level).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
-            }
-
-            node.dropFilters();
-            node.dropUpgrades();
-            node.discard(); // Safely removes it without triggering drops again via standard tick()
+            removeNode(level, node);
             removedCount++;
         }
 
         final int count = removedCount;
         source.sendSuccess(
                 () -> Component.literal("Successfully removed " + count + " logistics nodes in this dimension."),
+                true);
+        return count;
+    }
+
+    private static int removeInvalidNodes(CommandSourceStack source) {
+        int removedCount = 0;
+        for (ServerLevel level : source.getServer().getAllLevels()) {
+            NetworkRegistry registry = NetworkRegistry.get(level);
+            List<LogisticsNodeEntity> nodes = level.getEntitiesOfClass(LogisticsNodeEntity.class,
+                    AABB.ofSize(Vec3.ZERO, 60000000, 60000000, 60000000));
+
+            for (LogisticsNodeEntity node : nodes) {
+                if (!isInvalidNode(node, registry)) {
+                    continue;
+                }
+                removeNode(level, node);
+                removedCount++;
+            }
+        }
+
+        int count = removedCount;
+        source.sendSuccess(
+                () -> Component.literal("Removed " + count + " invalid logistics nodes across all dimensions."),
                 true);
         return count;
     }
@@ -177,9 +197,7 @@ public class LogisticsCommand {
                 Entity entity = serverLevel.getEntity(nodeId);
                 if (entity instanceof LogisticsNodeEntity node) {
                     node.setNetworkId(null);
-                    node.dropFilters();
-                    node.dropUpgrades();
-                    node.discard();
+                    removeNode(serverLevel, node);
                     removedNodes++;
                     break;
                 }
@@ -196,6 +214,26 @@ public class LogisticsCommand {
                 true);
 
         return 1;
+    }
+
+    private static boolean isInvalidNode(LogisticsNodeEntity node, NetworkRegistry registry) {
+        UUID networkId = node.getNetworkId();
+        if (!node.isValidNode() || networkId == null) {
+            return true;
+        }
+
+        LogisticsNetwork network = registry.getNetwork(networkId);
+        return network == null || !network.getNodeUuids().contains(node.getUUID());
+    }
+
+    private static void removeNode(ServerLevel level, LogisticsNodeEntity node) {
+        if (node.getNetworkId() != null) {
+            NetworkRegistry.get(level).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
+        }
+        node.capabilities().reset();
+        node.dropFilters();
+        node.dropUpgrades();
+        node.discard();
     }
 
     private record LoadedNode(ServerLevel level, BlockPos pos) {}
