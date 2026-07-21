@@ -26,16 +26,19 @@ jobs:
             metadata: META-INF/mods.toml
             datagen: ":1.20.1-forge:runData"
             mixin_level: JAVA_17
+            resource_schema: legacy
           - target: 1.21.1-neoforge
             java: 21
             metadata: META-INF/neoforge.mods.toml
             datagen: ":1.21.1-neoforge:runData"
             mixin_level: JAVA_21
+            resource_schema: modern
           - target: 26.1.2-neoforge
             java: 25
             metadata: META-INF/neoforge.mods.toml
             datagen: ":26.1.2-neoforge:runClientData :26.1.2-neoforge:runServerData"
             mixin_level: JAVA_21
+            resource_schema: modern
 
     steps:
       - name: Checkout
@@ -72,6 +75,7 @@ jobs:
           TARGET: ${{ matrix.target }}
           METADATA: ${{ matrix.metadata }}
           MIXIN_LEVEL: ${{ matrix.mixin_level }}
+          RESOURCE_SCHEMA: ${{ matrix.resource_schema }}
         run: |
           python3 - <<'PY'
           import json
@@ -82,6 +86,7 @@ jobs:
           target = os.environ["TARGET"]
           metadata = os.environ["METADATA"]
           mixin_level = os.environ["MIXIN_LEVEL"]
+          resource_schema = os.environ["RESOURCE_SCHEMA"]
           minecraft = target.rsplit("-", 1)[0]
           jar = Path("versions") / target / "build" / "libs" / f"logisticsnetworks-{target}-2.0.0.jar"
           if not jar.is_file():
@@ -107,6 +112,12 @@ jobs:
               for class_name in configured:
                   if f"{package}/{class_name}.class" not in names:
                       raise SystemExit(f"Missing configured mixin class: {class_name}")
+              legacy_paths = ("advancements/", "loot_tables/", "recipes/", "tags/blocks/", "tags/fluids/", "tags/items/")
+              modern_paths = ("advancement/", "loot_table/", "recipe/", "tags/block/", "tags/fluid/", "tags/item/")
+              forbidden = modern_paths if resource_schema == "legacy" else legacy_paths
+              for path in forbidden:
+                  if any(name.startswith(f"data/logisticsnetworks/{path}") for name in names):
+                      raise SystemExit(f"Resource path uses the wrong target schema: {path}")
           PY
 
       - name: Upload artifact

@@ -144,6 +144,14 @@ tasks.named<ProcessResources>("processResources") {
     filesMatching("META-INF/mods.toml") {
         expand(replaceProperties)
     }
+    exclude(
+        "data/logisticsnetworks/advancement/**",
+        "data/logisticsnetworks/loot_table/**",
+        "data/logisticsnetworks/recipe/**",
+        "data/logisticsnetworks/tags/block/**",
+        "data/logisticsnetworks/tags/fluid/**",
+        "data/logisticsnetworks/tags/item/**"
+    )
 }
 
 tasks.named("createMinecraftArtifacts") {

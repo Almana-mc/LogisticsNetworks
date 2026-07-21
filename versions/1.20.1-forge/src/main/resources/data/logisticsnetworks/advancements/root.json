@@ -1,7 +1,7 @@
 {
   "display": {
     "icon": {
-      "id": "logisticsnetworks:wrench"
+      "item": "logisticsnetworks:wrench"
     },
     "title": {
       "translate": "advancement.logisticsnetworks.root.title"
@@ -19,7 +19,9 @@
       "conditions": {
         "items": [
           {
-            "items": "logisticsnetworks:wrench"
+            "items": [
+              "logisticsnetworks:wrench"
+            ]
           }
         ]
       }
@@ -29,7 +31,9 @@
       "conditions": {
         "items": [
           {
-            "items": "logisticsnetworks:logistics_node"
+            "items": [
+              "logisticsnetworks:logistics_node"
+            ]
           }
         ]
       }
@@ -39,13 +43,19 @@
       "conditions": {
         "items": [
           {
-            "items": "logisticsnetworks:computer"
+            "items": [
+              "logisticsnetworks:computer"
+            ]
           }
         ]
       }
     }
   },
   "requirements": [
-    ["has_wrench", "has_node", "has_computer"]
+    [
+      "has_wrench",
+      "has_node",
+      "has_computer"
+    ]
   ]
 }
