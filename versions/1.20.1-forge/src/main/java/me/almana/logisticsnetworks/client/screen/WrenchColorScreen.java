@@ -1,1 +1,346 @@
+package me.almana.logisticsnetworks.client.screen;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
+import me.almana.logisticsnetworks.data.NetworkColors;
+import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.network.NetworkHandler;
+import me.almana.logisticsnetworks.network.SetWrenchColorsPayload;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
+
+public class WrenchColorScreen extends Screen {
+
+    private static final ResourceLocation CASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            Logisticsnetworks.MOD_ID, "textures/item/wrench_case.png");
+    private static final ResourceLocation SCREEN_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            Logisticsnetworks.MOD_ID, "textures/item/wrench_screen.png");
+
+    private static final int SQ = 100;
+    private static final int SQ_H = 76;
+    private static final int HUE_H = 10;
+    private static final int PAD = 10;
+    private static final int PREVIEW = 96;
+    private static final int TAB_H = 14;
+    private static final int SV_COLS = 25;
+    private static final int SV_ROWS = 19;
+    private static final int HUE_CELLS = 50;
+    private static final int GUI_W = PAD + SQ + 14 + PREVIEW + PAD;
+    private static final int TAB_CASE = 0;
+    private static final int TAB_SCREEN = 1;
+
+    private final InteractionHand hand;
+    private final int[] colors = new int[2];
+
+    private int x;
+    private int y;
+    private int tab = TAB_CASE;
+    private float hue;
+    private float sat;
+    private float val;
+    private String hex;
+    private boolean hexFocused;
+    private int drag = -1;
+
+    public WrenchColorScreen(ItemStack wrenchStack, InteractionHand hand) {
+        super(Component.translatable("gui.logisticsnetworks.wrench.colors.title"));
+        this.hand = hand;
+        colors[TAB_CASE] = WrenchItem.getCaseColor(wrenchStack);
+        colors[TAB_SCREEN] = WrenchItem.getScreenColor(wrenchStack);
+        loadColor(colors[TAB_CASE]);
+    }
+
+    @Override
+    protected void init() {
+        x = (width - GUI_W) / 2;
+        y = (height - guiHeight()) / 2;
+    }
+
+    private int guiHeight() {
+        return PAD + 10 + TAB_H + 8 + SQ_H + 6 + HUE_H + 8 + 12 + 8 + 12 + PAD;
+    }
+
+    private int current() {
+        return NetworkColors.hsvToRgb(hue, sat, val);
+    }
+
+    private void loadColor(int rgb) {
+        float[] hsv = NetworkColors.rgbToHsv(rgb);
+        hue = hsv[0];
+        sat = hsv[1];
+        val = hsv[2];
+        hex = NetworkColors.toHex(rgb);
+    }
+
+    private void commitCurrent() {
+        colors[tab] = current();
+    }
+
+    private int tabY() { return y + PAD + 10; }
+    private int svX() { return x + PAD; }
+    private int svY() { return tabY() + TAB_H + 8; }
+    private int hueY() { return svY() + SQ_H + 6; }
+    private int rowY() { return hueY() + HUE_H + 8; }
+    private int btnY() { return rowY() + 20; }
+    private int previewX() { return x + PAD + SQ + 14; }
+    private int previewY() { return svY() + 4; }
+
+    @Override
+    public void render(GuiGraphics g, int mx, int my, float pt) {
+        Theme theme = ThemeState.active();
+        g.fill(0, 0, width, height, theme.bg());
+        ThemePaint.window(g, x, y, GUI_W, guiHeight(), theme);
+        ThemePaint.drawCentered(g, font, title, x + GUI_W / 2, y + PAD, theme.accent());
+        renderTabs(g, mx, my, theme);
+        renderSvSquare(g);
+        renderHueStrip(g);
+        renderHexRow(g, theme);
+        renderButtons(g, mx, my, theme);
+        renderPreview(g, theme);
+        super.render(g, mx, my, pt);
+    }
+
+    private void renderTabs(GuiGraphics g, int mx, int my, Theme theme) {
+        int half = (SQ - 4) / 2;
+        String[] labels = {
+                tr("gui.logisticsnetworks.wrench.colors.case"),
+                tr("gui.logisticsnetworks.wrench.colors.screen") };
+        for (int i = 0; i < labels.length; i++) {
+            int tx = svX() + i * (half + 4);
+            boolean hovered = inRect(mx, my, tx, tabY(), half, TAB_H);
+            ThemePaint.button(g, font, tx, tabY(), half, TAB_H, labels[i], hovered || tab == i, theme);
+            if (tab == i) {
+                g.renderOutline(tx, tabY(), half, TAB_H, theme.accent());
+            }
+        }
+    }
+
+    private void renderSvSquare(GuiGraphics g) {
+        float cellW = SQ / (float) SV_COLS;
+        float cellH = SQ_H / (float) SV_ROWS;
+        for (int column = 0; column < SV_COLS; column++) {
+            for (int row = 0; row < SV_ROWS; row++) {
+                float s = column / (float) (SV_COLS - 1);
+                float v = 1f - row / (float) (SV_ROWS - 1);
+                int color = 0xFF000000 | NetworkColors.hsvToRgb(hue, s, v);
+                int x0 = svX() + Math.round(column * cellW);
+                int y0 = svY() + Math.round(row * cellH);
+                int x1 = svX() + Math.round((column + 1) * cellW);
+                int y1 = svY() + Math.round((row + 1) * cellH);
+                g.fill(x0, y0, x1, y1, color);
+            }
+        }
+        int cx = svX() + Math.round(sat * SQ);
+        int cy = svY() + Math.round((1f - val) * SQ_H);
+        g.renderOutline(cx - 2, cy - 2, 4, 4, 0xFFFFFFFF);
+        g.renderOutline(cx - 1, cy - 1, 2, 2, 0xFF000000);
+    }
+
+    private void renderHueStrip(GuiGraphics g) {
+        float cellW = SQ / (float) HUE_CELLS;
+        for (int i = 0; i < HUE_CELLS; i++) {
+            int color = 0xFF000000 | NetworkColors.hsvToRgb(i / (float) (HUE_CELLS - 1), 1f, 1f);
+            int x0 = svX() + Math.round(i * cellW);
+            int x1 = svX() + Math.round((i + 1) * cellW);
+            g.fill(x0, hueY(), x1, hueY() + HUE_H, color);
+        }
+        int cx = svX() + Math.round(hue * SQ);
+        g.renderOutline(cx - 1, hueY() - 1, 3, HUE_H + 2, 0xFFFFFFFF);
+    }
+
+    private void renderHexRow(GuiGraphics g, Theme theme) {
+        g.fill(svX(), rowY(), svX() + 16, rowY() + 12, 0xFF000000 | current());
+        g.renderOutline(svX(), rowY(), 16, 12, theme.border());
+        int hexX = svX() + 22;
+        ThemePaint.sunkPanel(g, hexX, rowY(), SQ - 22, 12, theme);
+        g.drawString(font, "#" + hex + (hexFocused ? "_" : ""), hexX + 4, rowY() + 2, theme.text(), false);
+    }
+
+    private void renderButtons(GuiGraphics g, int mx, int my, Theme theme) {
+        int width = (GUI_W - 2 * PAD - 12) / 3;
+        int bx = x + PAD;
+        String[] labels = {
+                tr("gui.logisticsnetworks.node.color.random"),
+                tr("gui.logisticsnetworks.wrench.colors.reset"),
+                tr("gui.logisticsnetworks.node.color.apply") };
+        for (int i = 0; i < labels.length; i++) {
+            int px = bx + i * (width + 6);
+            ThemePaint.button(g, font, px, btnY(), width, 12, labels[i],
+                    inRect(mx, my, px, btnY(), width, 12), theme);
+        }
+    }
+
+    private void renderPreview(GuiGraphics g, Theme theme) {
+        int px = previewX();
+        int py = previewY();
+        ThemePaint.sunkPanel(g, px - 4, py - 4, PREVIEW + 8, PREVIEW + 8, theme);
+        int caseColor = tab == TAB_CASE ? current() : colors[TAB_CASE];
+        int screenColor = tab == TAB_SCREEN ? current() : colors[TAB_SCREEN];
+        g.pose().pushPose();
+        g.pose().translate(px, py, 0);
+        g.pose().scale(PREVIEW / 16f, PREVIEW / 16f, 1f);
+        drawLayer(g, CASE_TEXTURE, caseColor);
+        drawLayer(g, SCREEN_TEXTURE, screenColor);
+        g.pose().popPose();
+    }
+
+    private static void drawLayer(GuiGraphics g, ResourceLocation texture, int color) {
+        RenderSystem.setShaderColor(((color >> 16) & 0xFF) / 255f, ((color >> 8) & 0xFF) / 255f,
+                (color & 0xFF) / 255f, 1f);
+        g.blit(texture, 0, 0, 0f, 0f, 16, 16, 16, 16);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) {
+        if (button != 0) {
+            return super.mouseClicked(mx, my, button);
+        }
+        int half = (SQ - 4) / 2;
+        if (inRect(mx, my, svX(), tabY(), half, TAB_H)) {
+            switchTab(TAB_CASE);
+        } else if (inRect(mx, my, svX() + half + 4, tabY(), half, TAB_H)) {
+            switchTab(TAB_SCREEN);
+        } else if (inRect(mx, my, svX(), svY(), SQ, SQ_H)) {
+            drag = 0;
+            updateSv(mx, my);
+            hexFocused = false;
+        } else if (inRect(mx, my, svX(), hueY(), SQ, HUE_H)) {
+            drag = 1;
+            updateHue(mx);
+            hexFocused = false;
+        } else if (inRect(mx, my, svX() + 22, rowY(), SQ - 22, 12)) {
+            hexFocused = true;
+        } else {
+            handleButtonClick(mx, my);
+        }
+        return true;
+    }
+
+    private void handleButtonClick(double mx, double my) {
+        int width = (GUI_W - 2 * PAD - 12) / 3;
+        int bx = x + PAD;
+        if (inRect(mx, my, bx, btnY(), width, 12)) {
+            loadColor(NetworkColors.randomColor());
+        } else if (inRect(mx, my, bx + width + 6, btnY(), width, 12)) {
+            colors[TAB_CASE] = WrenchItem.DEFAULT_CASE_COLOR;
+            colors[TAB_SCREEN] = WrenchItem.DEFAULT_SCREEN_COLOR;
+            loadColor(colors[tab]);
+        } else if (inRect(mx, my, bx + 2 * (width + 6), btnY(), width, 12)) {
+            apply();
+        } else if (!inRect(mx, my, x, y, GUI_W, guiHeight())) {
+            onClose();
+        }
+        hexFocused = false;
+    }
+
+    private void switchTab(int newTab) {
+        if (tab == newTab) {
+            return;
+        }
+        commitCurrent();
+        tab = newTab;
+        loadColor(colors[tab]);
+        hexFocused = false;
+    }
+
+    private void apply() {
+        commitCurrent();
+        boolean reset = colors[TAB_CASE] == WrenchItem.DEFAULT_CASE_COLOR
+                && colors[TAB_SCREEN] == WrenchItem.DEFAULT_SCREEN_COLOR;
+        NetworkHandler.sendToServer(new SetWrenchColorsPayload(hand.ordinal(), reset,
+                colors[TAB_CASE], colors[TAB_SCREEN]));
+        onClose();
+    }
+
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (drag == 0) {
+            updateSv(mx, my);
+            return true;
+        }
+        if (drag == 1) {
+            updateHue(mx);
+            return true;
+        }
+        return super.mouseDragged(mx, my, button, dx, dy);
+    }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
+        if (drag != -1) {
+            drag = -1;
+            return true;
+        }
+        return super.mouseReleased(mx, my, button);
+    }
+
+    @Override
+    public boolean charTyped(char c, int modifiers) {
+        if (!hexFocused || hex.length() >= 6) {
+            return hexFocused;
+        }
+        if (isHexChar(c)) {
+            hex += Character.toUpperCase(c);
+            syncFromHex();
+        }
+        return true;
+    }
+
+    @Override
+    public boolean keyPressed(int key, int scanCode, int modifiers) {
+        if (!hexFocused) {
+            return super.keyPressed(key, scanCode, modifiers);
+        }
+        if (key == 259 && !hex.isEmpty()) {
+            hex = hex.substring(0, hex.length() - 1);
+            syncFromHex();
+        } else if (key == 257 || key == 335 || key == 256) {
+            hexFocused = false;
+        }
+        return true;
+    }
+
+    private void syncFromHex() {
+        if (hex.length() == 6) {
+            float[] hsv = NetworkColors.rgbToHsv(NetworkColors.parseHex(hex, current()));
+            hue = hsv[0];
+            sat = hsv[1];
+            val = hsv[2];
+        }
+    }
+
+    private void updateSv(double mx, double my) {
+        sat = clamp01((float) (mx - svX()) / SQ);
+        val = 1f - clamp01((float) (my - svY()) / SQ_H);
+        hex = NetworkColors.toHex(current());
+    }
+
+    private void updateHue(double mx) {
+        hue = clamp01((float) (mx - svX()) / SQ);
+        hex = NetworkColors.toHex(current());
+    }
+
+    private static boolean inRect(double mx, double my, int rx, int ry, int rw, int rh) {
+        return mx >= rx && mx <= rx + rw && my >= ry && my <= ry + rh;
+    }
+
+    private static boolean isHexChar(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+    }
+
+    private static float clamp01(float value) {
+        return Math.max(0f, Math.min(1f, value));
+    }
+
+    private String tr(String key) {
+        return Component.translatable(key).getString();
+    }
+}

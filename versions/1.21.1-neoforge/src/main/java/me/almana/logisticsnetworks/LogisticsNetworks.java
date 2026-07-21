@@ -38,6 +38,7 @@ import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
 import me.almana.logisticsnetworks.network.SetNameFilterPayload;
 import me.almana.logisticsnetworks.network.SetSlotFilterSlotsPayload;
+import me.almana.logisticsnetworks.network.SetWrenchColorsPayload;
 import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncChannelDataPayload;
@@ -155,6 +156,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetDefaultNodeVisibility);
                 registrar.playToServer(CycleWrenchModePayload.TYPE, CycleWrenchModePayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleCycleWrenchMode);
+                registrar.playToServer(SetWrenchColorsPayload.TYPE, SetWrenchColorsPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetWrenchColors);
                 registrar.playToServer(MassSelectConnectedPayload.TYPE, MassSelectConnectedPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleMassSelectConnected);
                 registrar.playToServer(CopyPasteConnectedPayload.TYPE, CopyPasteConnectedPayload.STREAM_CODEC,

@@ -424,5 +424,13 @@
   "gui.logisticsnetworks.theme.pastel": "Pastel",
   "gui.logisticsnetworks.theme.brutalist": "Brutalista",
   "gui.logisticsnetworks.config.client.theme": "Tema",
-  "gui.logisticsnetworks.config.client.density": "Densidade"
+  "gui.logisticsnetworks.config.client.density": "Densidade",
+  "key.logisticsnetworks.wrench_colors": "Editar cores da chave",
+  "gui.logisticsnetworks.wrench.colors.title": "Cores da chave",
+  "gui.logisticsnetworks.wrench.colors.case": "Corpo",
+  "gui.logisticsnetworks.wrench.colors.screen": "Tela",
+  "gui.logisticsnetworks.wrench.colors.reset": "Redefinir",
+  "message.logisticsnetworks.wrench.colors.no_wrench": "Segure uma chave para editar suas cores",
+  "gui.logisticsnetworks.node.color.apply": "Aplicar",
+  "gui.logisticsnetworks.node.color.random": "Aleatório"
 }

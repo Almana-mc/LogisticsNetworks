@@ -50,6 +50,7 @@ public final class NetworkHandler {
         registerServer(SetNameFilterPayload.class, SetNameFilterPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNameFilter);
         registerServer(ToggleNodeVisibilityPayload.class, ToggleNodeVisibilityPayload.STREAM_CODEC, ServerPayloadHandler::handleToggleVisibility);
         registerServer(CycleWrenchModePayload.class, CycleWrenchModePayload.STREAM_CODEC, ServerPayloadHandler::handleCycleWrenchMode);
+        registerServer(SetWrenchColorsPayload.class, SetWrenchColorsPayload.STREAM_CODEC, ServerPayloadHandler::handleSetWrenchColors);
         registerServer(MassSelectConnectedPayload.class, MassSelectConnectedPayload.STREAM_CODEC, ServerPayloadHandler::handleMassSelectConnected);
         registerServer(CopyPasteConnectedPayload.class, CopyPasteConnectedPayload.STREAM_CODEC, ServerPayloadHandler::handleCopyPasteConnected);
         registerServer(OpenFilterInSlotPayload.class, OpenFilterInSlotPayload.STREAM_CODEC, ServerPayloadHandler::handleOpenFilterInSlot);

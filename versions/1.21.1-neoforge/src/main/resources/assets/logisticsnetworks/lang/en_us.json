@@ -427,5 +427,13 @@
   "gui.logisticsnetworks.theme.brutalist": "Brutalist",
   "gui.logisticsnetworks.config.client.theme": "Theme",
   "gui.logisticsnetworks.config.client.computerClassicTheme": "Classic computer terminal",
-  "gui.logisticsnetworks.config.client.density": "Density"
+  "gui.logisticsnetworks.config.client.density": "Density",
+  "key.logisticsnetworks.wrench_colors": "Edit Wrench Colors",
+  "gui.logisticsnetworks.wrench.colors.title": "Wrench Colors",
+  "gui.logisticsnetworks.wrench.colors.case": "Case",
+  "gui.logisticsnetworks.wrench.colors.screen": "Screen",
+  "gui.logisticsnetworks.wrench.colors.reset": "Reset",
+  "message.logisticsnetworks.wrench.colors.no_wrench": "Hold a wrench to edit its colors",
+  "gui.logisticsnetworks.node.color.apply": "Apply",
+  "gui.logisticsnetworks.node.color.random": "Random"
 }

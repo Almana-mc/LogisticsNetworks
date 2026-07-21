@@ -62,7 +62,12 @@ public class WrenchItem extends Item {
     private static final String KEY_SELECTION_DIMENSION = "dimension";
     private static final String KEY_SELECTION_POS = "pos";
     private static final String KEY_AE2_LINK = "ae2_link";
+    private static final String KEY_CASE_COLOR = "case_color";
+    private static final String KEY_SCREEN_COLOR = "screen_color";
     private static final int MAX_MASS_SELECTIONS = 2048;
+
+    public static final int DEFAULT_CASE_COLOR = 0xE0E0E8;
+    public static final int DEFAULT_SCREEN_COLOR = 0x04FF00;
 
     public record MassSelectionTarget(ResourceKey<Level> dimension, BlockPos pos) {
     }
@@ -826,6 +831,40 @@ public class WrenchItem extends Item {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
             CompoundTag root = getRootTag(customTag);
             root.remove(KEY_CLIPBOARD);
+            writeRoot(customTag, root);
+        });
+    }
+
+    public static int getCaseColor(ItemStack stack) {
+        CompoundTag root = getRootTag(stack);
+        return root.contains(KEY_CASE_COLOR, Tag.TAG_INT) ? root.getInt(KEY_CASE_COLOR) : DEFAULT_CASE_COLOR;
+    }
+
+    public static int getScreenColor(ItemStack stack) {
+        CompoundTag root = getRootTag(stack);
+        return root.contains(KEY_SCREEN_COLOR, Tag.TAG_INT) ? root.getInt(KEY_SCREEN_COLOR) : DEFAULT_SCREEN_COLOR;
+    }
+
+    public static void setColors(ItemStack stack, int caseRgb, int screenRgb) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof WrenchItem)) {
+            return;
+        }
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            root.putInt(KEY_CASE_COLOR, caseRgb & 0xFFFFFF);
+            root.putInt(KEY_SCREEN_COLOR, screenRgb & 0xFFFFFF);
+            writeRoot(customTag, root);
+        });
+    }
+
+    public static void clearColors(ItemStack stack) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof WrenchItem)) {
+            return;
+        }
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            root.remove(KEY_CASE_COLOR);
+            root.remove(KEY_SCREEN_COLOR);
             writeRoot(customTag, root);
         });
     }

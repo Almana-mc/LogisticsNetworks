@@ -1,13 +1,16 @@
 package me.almana.logisticsnetworks.client;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.client.screen.WrenchColorScreen;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
 import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
@@ -17,10 +20,40 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import org.jetbrains.annotations.Nullable;
 
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
 public class WrenchInputHandler {
+
+    public static final KeyMapping OPEN_COLOR_EDITOR = new KeyMapping(
+            "key.logisticsnetworks.wrench_colors",
+            InputConstants.KEY_G,
+            "key.categories.logisticsnetworks");
+
+    @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    public static class ModEvents {
+        @SubscribeEvent
+        public static void registerKeys(RegisterKeyMappingsEvent event) {
+            event.register(OPEN_COLOR_EDITOR);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onKeyInput(InputEvent.Key event) {
+        if (!OPEN_COLOR_EDITOR.consumeClick()) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        Player player = minecraft.player;
+        if (player == null || minecraft.screen != null) {
+            return;
+        }
+        InteractionHand hand = findWrenchHand(player);
+        if (hand != null) {
+            minecraft.setScreen(new WrenchColorScreen(player.getItemInHand(hand), hand));
+        }
+    }
 
     @SubscribeEvent
     public static void onMouseScrolling(InputEvent.MouseScrollingEvent event) {
@@ -85,7 +118,7 @@ public class WrenchInputHandler {
     }
 
     @Nullable
-    private static InteractionHand findWrenchHand(Player player) {
+    public static InteractionHand findWrenchHand(Player player) {
         if (player.getMainHandItem().getItem() instanceof WrenchItem) {
             return InteractionHand.MAIN_HAND;
         }
@@ -95,4 +128,3 @@ public class WrenchInputHandler {
         return null;
     }
 }
-

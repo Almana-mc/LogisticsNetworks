@@ -419,5 +419,13 @@
   "gui.logisticsnetworks.theme.brutalist": "粗野",
   "gui.logisticsnetworks.config.client.theme": "主题",
   "gui.logisticsnetworks.config.client.computerClassicTheme": "经典计算机终端",
-  "gui.logisticsnetworks.config.client.density": "密度"
+  "gui.logisticsnetworks.config.client.density": "密度",
+  "key.logisticsnetworks.wrench_colors": "编辑扳手颜色",
+  "gui.logisticsnetworks.wrench.colors.title": "扳手颜色",
+  "gui.logisticsnetworks.wrench.colors.case": "外壳",
+  "gui.logisticsnetworks.wrench.colors.screen": "屏幕",
+  "gui.logisticsnetworks.wrench.colors.reset": "重置",
+  "message.logisticsnetworks.wrench.colors.no_wrench": "手持扳手以编辑颜色",
+  "gui.logisticsnetworks.node.color.apply": "应用",
+  "gui.logisticsnetworks.node.color.random": "随机"
 }

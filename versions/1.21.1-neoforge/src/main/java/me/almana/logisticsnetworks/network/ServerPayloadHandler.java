@@ -299,6 +299,29 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleSetWrenchColors(SetWrenchColorsPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+
+            InteractionHand hand = payload.handOrdinal() == InteractionHand.OFF_HAND.ordinal()
+                    ? InteractionHand.OFF_HAND
+                    : InteractionHand.MAIN_HAND;
+            ItemStack heldStack = player.getItemInHand(hand);
+            if (!(heldStack.getItem() instanceof WrenchItem)) {
+                return;
+            }
+
+            if (payload.reset()) {
+                WrenchItem.clearColors(heldStack);
+            } else {
+                WrenchItem.setColors(heldStack, payload.caseRgb(), payload.screenRgb());
+            }
+            player.getInventory().setChanged();
+        });
+    }
+
     public static void handleMassSelectConnected(MassSelectConnectedPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)) {

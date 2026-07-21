@@ -411,5 +411,13 @@
   "gui.logisticsnetworks.config.upgrades.energyBatch": "Energy Batch",
   "gui.logisticsnetworks.config.upgrades.chemicalBatch": "Chemical Batch",
   "gui.logisticsnetworks.config.upgrades.sourceBatch": "Source Batch",
-  "gui.logisticsnetworks.config.no_permission": "You do not have permission to change this setting"
+  "gui.logisticsnetworks.config.no_permission": "You do not have permission to change this setting",
+  "key.logisticsnetworks.wrench_colors": "Edit Wrench Colors",
+  "gui.logisticsnetworks.wrench.colors.title": "Wrench Colors",
+  "gui.logisticsnetworks.wrench.colors.case": "Case",
+  "gui.logisticsnetworks.wrench.colors.screen": "Screen",
+  "gui.logisticsnetworks.wrench.colors.reset": "Reset",
+  "message.logisticsnetworks.wrench.colors.no_wrench": "Hold a wrench to edit its colors",
+  "gui.logisticsnetworks.node.color.apply": "Apply",
+  "gui.logisticsnetworks.node.color.random": "Random"
 }

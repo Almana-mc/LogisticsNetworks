@@ -400,5 +400,13 @@
   "gui.logisticsnetworks.config.upgrades.energyBatch": "能量单次数量",
   "gui.logisticsnetworks.config.upgrades.chemicalBatch": "化学品单次数量",
   "gui.logisticsnetworks.config.upgrades.sourceBatch": "魔源单次数量",
-  "gui.logisticsnetworks.config.no_permission": "你没有权限更改此设置"
+  "gui.logisticsnetworks.config.no_permission": "你没有权限更改此设置",
+  "key.logisticsnetworks.wrench_colors": "编辑扳手颜色",
+  "gui.logisticsnetworks.wrench.colors.title": "扳手颜色",
+  "gui.logisticsnetworks.wrench.colors.case": "外壳",
+  "gui.logisticsnetworks.wrench.colors.screen": "屏幕",
+  "gui.logisticsnetworks.wrench.colors.reset": "重置",
+  "message.logisticsnetworks.wrench.colors.no_wrench": "手持扳手以编辑颜色",
+  "gui.logisticsnetworks.node.color.apply": "应用",
+  "gui.logisticsnetworks.node.color.random": "随机"
 }
