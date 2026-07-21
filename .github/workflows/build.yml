@@ -25,14 +25,17 @@ jobs:
             java: 17
             metadata: META-INF/mods.toml
             datagen: ":1.20.1-forge:runData"
+            mixin_level: JAVA_17
           - target: 1.21.1-neoforge
             java: 21
             metadata: META-INF/neoforge.mods.toml
             datagen: ":1.21.1-neoforge:runData"
+            mixin_level: JAVA_21
           - target: 26.1.2-neoforge
             java: 25
             metadata: META-INF/neoforge.mods.toml
             datagen: ":26.1.2-neoforge:runClientData :26.1.2-neoforge:runServerData"
+            mixin_level: JAVA_21
 
     steps:
       - name: Checkout
@@ -68,14 +71,17 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
           METADATA: ${{ matrix.metadata }}
+          MIXIN_LEVEL: ${{ matrix.mixin_level }}
         run: |
           python3 - <<'PY'
+          import json
           import os
           import zipfile
           from pathlib import Path
 
           target = os.environ["TARGET"]
           metadata = os.environ["METADATA"]
+          mixin_level = os.environ["MIXIN_LEVEL"]
           minecraft = target.rsplit("-", 1)[0]
           jar = Path("versions") / target / "build" / "libs" / f"logisticsnetworks-{target}-2.0.0.jar"
           if not jar.is_file():
@@ -93,6 +99,14 @@ jobs:
               descriptor = archive.read(metadata).decode("utf-8")
               if minecraft not in descriptor or 'version = "2.0.0"' not in descriptor:
                   raise SystemExit("Incorrect Minecraft or mod version metadata")
+              mixin = json.loads(archive.read("logisticsnetworks.mixins.json"))
+              if mixin.get("compatibilityLevel") != mixin_level:
+                  raise SystemExit("Incorrect mixin Java compatibility level")
+              package = mixin["package"].replace(".", "/")
+              configured = mixin.get("mixins", []) + mixin.get("client", []) + mixin.get("server", [])
+              for class_name in configured:
+                  if f"{package}/{class_name}.class" not in names:
+                      raise SystemExit(f"Missing configured mixin class: {class_name}")
           PY
 
       - name: Upload artifact
