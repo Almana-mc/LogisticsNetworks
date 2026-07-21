@@ -13,7 +13,8 @@ public final class WrenchColorRegistration {
 
     @SubscribeEvent
     public static void registerItemColors(RegisterColorHandlersEvent.Item event) {
-        event.register((stack, tintIndex) -> switch (tintIndex) {
+        // renderer reads tint alpha
+        event.register((stack, tintIndex) -> 0xFF000000 | switch (tintIndex) {
             case 0 -> WrenchItem.getCaseColor(stack);
             case 1 -> WrenchItem.getScreenColor(stack);
             default -> 0xFFFFFF;
