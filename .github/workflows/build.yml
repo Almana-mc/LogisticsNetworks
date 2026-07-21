@@ -24,12 +24,15 @@ jobs:
           - target: 1.20.1-forge
             java: 17
             metadata: META-INF/mods.toml
+            datagen: ":1.20.1-forge:runData"
           - target: 1.21.1-neoforge
             java: 21
             metadata: META-INF/neoforge.mods.toml
+            datagen: ":1.21.1-neoforge:runData"
           - target: 26.1.2-neoforge
             java: 25
             metadata: META-INF/neoforge.mods.toml
+            datagen: ":26.1.2-neoforge:runClientData :26.1.2-neoforge:runServerData"
 
     steps:
       - name: Checkout
@@ -46,6 +49,14 @@ jobs:
 
       - name: Ensure gradlew is executable
         run: chmod +x ./gradlew
+
+      - name: Run datagen
+        run: ./gradlew ${{ matrix.datagen }} --console=plain
+        env:
+          CI: true
+
+      - name: Check generated resources
+        run: git diff --exit-code -- src/generated versions/${{ matrix.target }}/src/generated
 
       - name: Build
         run: ./gradlew ":${{ matrix.target }}:build" --console=plain

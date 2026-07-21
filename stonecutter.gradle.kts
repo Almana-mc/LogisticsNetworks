@@ -28,3 +28,13 @@ tasks.register("buildAll") {
     group = "build"
     dependsOn(collectJars)
 }
+
+tasks.register("dataAll") {
+    group = "build"
+    dependsOn(
+        ":1.20.1-forge:runData",
+        ":1.21.1-neoforge:runData",
+        ":26.1.2-neoforge:runClientData",
+        ":26.1.2-neoforge:runServerData"
+    )
+}
