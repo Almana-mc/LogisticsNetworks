@@ -1,5 +1,8 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.network.ApplyPatternPayload;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,17 +17,17 @@ public class PatternSetterScreen extends AbstractContainerScreen<PatternSetterMe
     private static final int GUI_WIDTH = 176;
     private static final int GUI_HEIGHT = 152;
 
-    private static final int COLOR_BG = 0xFF161616;
-    private static final int COLOR_PANEL = 0xFF1F1F1F;
-    private static final int COLOR_BORDER = 0xFF3A3A3A;
-    private static final int COLOR_SLOT = 0xFF2A2A2A;
-    private static final int COLOR_SLOT_BORDER = 0xFF444444;
-    private static final int COLOR_BTN = 0xFF2E2E2E;
-    private static final int COLOR_BTN_HOVER = 0xFF3A3A3A;
-    private static final int COLOR_BTN_BORDER = 0xFF505050;
-    private static final int COLOR_TEXT = 0xFFE0E0E0;
-    private static final int COLOR_MUTED = 0xFF999999;
-    private static final int COLOR_SUCCESS = 0xFF44CC44;
+    private static int COLOR_BG;
+    private static int COLOR_PANEL;
+    private static int COLOR_BORDER;
+    private static int COLOR_SLOT;
+    private static int COLOR_SLOT_BORDER;
+    private static int COLOR_BTN;
+    private static int COLOR_BTN_HOVER;
+    private static int COLOR_BTN_BORDER;
+    private static int COLOR_TEXT;
+    private static int COLOR_MUTED;
+    private static int COLOR_SUCCESS;
 
     private static final int SLOT_X = 62;
     private static final int PATTERN_SLOT_Y = 28;
@@ -55,6 +58,7 @@ public class PatternSetterScreen extends AbstractContainerScreen<PatternSetterMe
     @Override
     protected void init() {
         super.init();
+        refreshTheme();
         this.leftPos = (this.width - GUI_WIDTH) / 2;
         this.topPos = (this.height - GUI_HEIGHT) / 2;
 
@@ -127,6 +131,7 @@ public class PatternSetterScreen extends AbstractContainerScreen<PatternSetterMe
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+        refreshTheme();
         int lp = leftPos;
         int tp = topPos;
 
@@ -197,6 +202,21 @@ public class PatternSetterScreen extends AbstractContainerScreen<PatternSetterMe
         for (int c = 0; c < 9; c++) {
             renderSlotBackground(graphics, lp + 8 + c * 18, tp + 84 + 58);
         }
+    }
+
+    private static void refreshTheme() {
+        Theme theme = ThemeState.active();
+        COLOR_BG = theme.bg();
+        COLOR_PANEL = theme.surface();
+        COLOR_BORDER = theme.border();
+        COLOR_SLOT = theme.slotBg();
+        COLOR_SLOT_BORDER = theme.slotBorder();
+        COLOR_BTN = theme.surface2();
+        COLOR_BTN_HOVER = ThemePaint.brighten(theme.surface2(), 0x10);
+        COLOR_BTN_BORDER = theme.borderStrong();
+        COLOR_TEXT = theme.text();
+        COLOR_MUTED = theme.textMuted();
+        COLOR_SUCCESS = theme.accent();
     }
 
     private void renderButton(GuiGraphics graphics, int x, int y, Component label, boolean hovered) {

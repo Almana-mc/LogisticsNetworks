@@ -1,5 +1,8 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -14,13 +17,19 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
     private static final int GUI_WIDTH = 256;
     private static final int GUI_HEIGHT = 284;
 
-    private static final int COLOR_BG = 0xFF111111;
-    private static final int COLOR_PANEL = 0xFF1A1A1A;
-    private static final int COLOR_BORDER = 0xFF333333;
-    private static final int COLOR_ACCENT = 0xFF55CC55;
-    private static final int COLOR_TEXT = 0xFFE0E0E0;
-    private static final int COLOR_DIM = 0xFF888888;
-    private static final int COLOR_HOVER = 0x30FFFFFF;
+    private static int COLOR_BG;
+    private static int COLOR_PANEL;
+    private static int COLOR_BORDER;
+    private static int COLOR_ACCENT;
+    private static int COLOR_TEXT;
+    private static int COLOR_DIM;
+    private static int COLOR_HOVER;
+    private static int COLOR_SELECTED;
+    private static int COLOR_PANEL_HOVER;
+    private static int COLOR_BUTTON;
+    private static int COLOR_BUTTON_HOVER;
+    private static int COLOR_SLOT;
+    private static int COLOR_SLOT_BORDER;
     private static final Component EDITOR_TITLE = Component.translatable("gui.logisticsnetworks.clipboard.editor");
     private static final Component VISUAL_SLOTS_HINT = Component
             .translatable("gui.logisticsnetworks.clipboard.visual_slots_hint");
@@ -45,6 +54,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+        refreshTheme();
         graphics.fill(leftPos, topPos, leftPos + GUI_WIDTH, topPos + GUI_HEIGHT, COLOR_BG);
         graphics.renderOutline(leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, COLOR_BORDER);
 
@@ -58,6 +68,23 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
         renderPlayerSlots(graphics);
     }
 
+    private static void refreshTheme() {
+        Theme theme = ThemeState.active();
+        COLOR_BG = theme.bg();
+        COLOR_PANEL = theme.surface();
+        COLOR_BORDER = theme.border();
+        COLOR_ACCENT = theme.accent();
+        COLOR_TEXT = theme.text();
+        COLOR_DIM = theme.textMuted();
+        COLOR_HOVER = (theme.text() & 0x00FFFFFF) | 0x22000000;
+        COLOR_SELECTED = theme.accentSoft();
+        COLOR_PANEL_HOVER = theme.surfaceSunken();
+        COLOR_BUTTON = theme.surface2();
+        COLOR_BUTTON_HOVER = ThemePaint.brighten(theme.surface2(), 0x10);
+        COLOR_SLOT = theme.slotBg();
+        COLOR_SLOT_BORDER = theme.slotBorder();
+    }
+
     private void renderChannelTabs(GuiGraphics graphics, int mouseX, int mouseY) {
         int startX = leftPos + 10;
         int y = topPos + 22;
@@ -67,10 +94,10 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
             int x = startX + i * 26;
             boolean isSelected = i == selected;
             boolean hovered = isHoveringBox(x, y, 24, 14, mouseX, mouseY);
-            int bg = isSelected ? 0xFF2A4A2A : COLOR_PANEL;
+            int bg = isSelected ? COLOR_SELECTED : COLOR_PANEL;
             int border = isSelected ? COLOR_ACCENT : COLOR_BORDER;
             if (hovered) {
-                bg = isSelected ? bg : 0xFF262626;
+                bg = isSelected ? bg : COLOR_PANEL_HOVER;
             }
             graphics.fill(x, y, x + 24, y + 14, bg);
             graphics.renderOutline(x, y, 24, 14, border);
@@ -149,7 +176,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
     private void drawButton(GuiGraphics graphics, int x, int y, int width, int height, String label, int mouseX,
             int mouseY) {
         boolean hovered = isHoveringBox(x, y, width, height, mouseX, mouseY);
-        int bg = hovered ? 0xFF3A3A3A : 0xFF2A2A2A;
+        int bg = hovered ? COLOR_BUTTON_HOVER : COLOR_BUTTON;
         graphics.fill(x, y, x + width, y + height, bg);
         graphics.renderOutline(x, y, width, height, hovered ? COLOR_ACCENT : COLOR_BORDER);
         graphics.drawCenteredString(font, label, x + width / 2, y + 2, hovered ? COLOR_TEXT : COLOR_DIM);
@@ -160,8 +187,8 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
             for (int col = 0; col < cols; col++) {
                 int x = startX + col * 19 - 1;
                 int y = startY + row * 19 - 1;
-                graphics.fill(x, y, x + 18, y + 18, 0xFF090909);
-                graphics.renderOutline(x, y, 18, 18, 0xFF3A3A3A);
+                graphics.fill(x, y, x + 18, y + 18, COLOR_SLOT);
+                graphics.renderOutline(x, y, 18, 18, COLOR_SLOT_BORDER);
             }
         }
     }
@@ -173,15 +200,15 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
             for (int col = 0; col < 9; col++) {
                 int x = startX + col * 18 - 1;
                 int y = startY + row * 18 - 1;
-                graphics.fill(x, y, x + 18, y + 18, 0xFF090909);
-                graphics.renderOutline(x, y, 18, 18, 0xFF3A3A3A);
+                graphics.fill(x, y, x + 18, y + 18, COLOR_SLOT);
+                graphics.renderOutline(x, y, 18, 18, COLOR_SLOT_BORDER);
             }
         }
         for (int col = 0; col < 9; col++) {
             int x = startX + col * 18 - 1;
             int y = startY + 58 - 1;
-            graphics.fill(x, y, x + 18, y + 18, 0xFF090909);
-            graphics.renderOutline(x, y, 18, 18, 0xFF3A3A3A);
+            graphics.fill(x, y, x + 18, y + 18, COLOR_SLOT);
+            graphics.renderOutline(x, y, 18, 18, COLOR_SLOT_BORDER);
         }
     }
 

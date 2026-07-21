@@ -1,5 +1,8 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -14,20 +17,20 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
     private static final int GUI_WIDTH = 246;
     private static final int GUI_HEIGHT = 218;
 
-    private static final int COLOR_BG = 0xFF161616;
-    private static final int COLOR_PANEL = 0xFF1F1F1F;
-    private static final int COLOR_BORDER = 0xFF3A3A3A;
-    private static final int COLOR_ACCENT = 0xFF44BB44;
-    private static final int COLOR_TEXT = 0xFFE0E0E0;
-    private static final int COLOR_MUTED = 0xFF999999;
-    private static final int COLOR_OK = 0xFF44CC44;
-    private static final int COLOR_FAIL = 0xFFCC4444;
-    private static final int COLOR_BTN_BG = 0xFF2A2A2A;
-    private static final int COLOR_BTN_HOVER = 0xFF333333;
-    private static final int COLOR_BTN_BORDER = 0xFF4A4A4A;
-    private static final int COLOR_WHITE = 0xFFFFFFFF;
-    private static final int COLOR_GRAY = 0xFFBBBBBB;
-    private static final int COLOR_DISABLED = 0xFF666666;
+    private static int COLOR_BG;
+    private static int COLOR_PANEL;
+    private static int COLOR_BORDER;
+    private static int COLOR_ACCENT;
+    private static int COLOR_TEXT;
+    private static int COLOR_MUTED;
+    private static int COLOR_OK;
+    private static int COLOR_FAIL;
+    private static int COLOR_BTN_BG;
+    private static int COLOR_BTN_HOVER;
+    private static int COLOR_BTN_BORDER;
+    private static int COLOR_WHITE;
+    private static int COLOR_GRAY;
+    private static int COLOR_DISABLED;
 
     private static final int BTN_H = 16;
     private static final int BTN_PAD = 10;
@@ -50,6 +53,7 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+        refreshTheme();
         graphics.fill(leftPos, topPos, leftPos + GUI_WIDTH, topPos + GUI_HEIGHT, COLOR_BG);
         graphics.renderOutline(leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, COLOR_BORDER);
 
@@ -140,6 +144,24 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
                 menu.getSelectedCount() > 0, mouseX, mouseY);
         drawThemedButton(graphics, startX + clearW + BTN_GAP, btnY, placeW, BTN_H, placeLabel,
                 menu.canPlace(), mouseX, mouseY);
+    }
+
+    private static void refreshTheme() {
+        Theme theme = ThemeState.active();
+        COLOR_BG = theme.bg();
+        COLOR_PANEL = theme.surface();
+        COLOR_BORDER = theme.border();
+        COLOR_ACCENT = theme.accent();
+        COLOR_TEXT = theme.text();
+        COLOR_MUTED = theme.textMuted();
+        COLOR_OK = theme.accent();
+        COLOR_FAIL = theme.danger();
+        COLOR_BTN_BG = theme.surface2();
+        COLOR_BTN_HOVER = ThemePaint.brighten(theme.surface2(), 0x10);
+        COLOR_BTN_BORDER = theme.borderStrong();
+        COLOR_WHITE = theme.text();
+        COLOR_GRAY = theme.textMuted();
+        COLOR_DISABLED = theme.textSubtle();
     }
 
     @Override
