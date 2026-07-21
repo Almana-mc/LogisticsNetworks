@@ -100,6 +100,9 @@ obfuscation {
 }
 
 dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
     "modCompileOnly"("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     "modCompileOnly"("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
     "modLocalRuntime"("mezz.jei:jei-${minecraft_version}-forge:${jei_version}")
@@ -113,6 +116,10 @@ dependencies {
     "modCompileOnly"("dev.ftb.mods:ftb-teams-forge:${ftb_teams_version}") {
         isTransitive = false
     }
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
 }
 
 tasks.withType<JavaCompile>().configureEach {
