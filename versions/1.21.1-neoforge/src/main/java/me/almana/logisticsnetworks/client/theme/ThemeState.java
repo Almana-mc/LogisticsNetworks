@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.client.theme;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.Config;
 import net.neoforged.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 
@@ -53,14 +54,24 @@ public final class ThemeState {
     }
 
     public static void load() {
-        Path file = filePath();
-        if (!Files.exists(file)) return;
+        Path target = filePath();
+        boolean migrate = !Files.exists(target);
+        Path file = migrate ? FMLPaths.CONFIGDIR.get().resolve(FILE_NAME) : target;
+        if (!Files.exists(file)) {
+            return;
+        }
         try {
             String json = Files.readString(file);
             JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
-            if (obj.has("theme")) active = Themes.byId(obj.get("theme").getAsString());
+            if (obj.has("theme")) {
+                active = Themes.byId(obj.get("theme").getAsString());
+                if (migrate) {
+                    Files.createDirectories(target.getParent());
+                    Files.move(file, target);
+                }
+            }
         } catch (IOException | RuntimeException e) {
-            LOGGER.warn("failed to load theme state", e);
+            if (Config.debugMode) LOGGER.warn("failed to load theme state", e);
         }
     }
 
@@ -68,14 +79,16 @@ public final class ThemeState {
         JsonObject obj = new JsonObject();
         obj.addProperty("theme", active.id());
         try {
-            Files.writeString(filePath(), obj.toString());
+            Path file = filePath();
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, obj.toString());
         } catch (IOException e) {
-            LOGGER.warn("failed to save theme state", e);
+            if (Config.debugMode) LOGGER.warn("failed to save theme state", e);
         }
     }
 
     private static Path filePath() {
-        return FMLPaths.CONFIGDIR.get().resolve(FILE_NAME);
+        return FMLPaths.CONFIGDIR.get().resolve("logistics-network").resolve(FILE_NAME);
     }
 
     private ThemeState() {}

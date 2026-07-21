@@ -52,10 +52,9 @@ public final class ThemeState {
     }
 
     public static void load() {
-        Path file = filePath();
-        if (!Files.exists(file)) {
-            migrateLegacyFile(file);
-        }
+        Path target = filePath();
+        boolean migrate = !Files.exists(target);
+        Path file = migrate ? FMLPaths.CONFIGDIR.get().resolve(FILE_NAME) : target;
         if (!Files.exists(file)) {
             return;
         }
@@ -64,6 +63,10 @@ public final class ThemeState {
             JsonObject object = JsonParser.parseString(json).getAsJsonObject();
             if (object.has("theme")) {
                 active = Themes.byId(object.get("theme").getAsString());
+                if (migrate) {
+                    Files.createDirectories(target.getParent());
+                    Files.move(file, target);
+                }
             }
         } catch (IOException | RuntimeException exception) {
             if (Config.debugMode) LOGGER.warn("failed to load theme state", exception);
@@ -94,19 +97,6 @@ public final class ThemeState {
 
     private static Path filePath() {
         return FMLPaths.CONFIGDIR.get().resolve("logistics-network").resolve(FILE_NAME);
-    }
-
-    private static void migrateLegacyFile(Path target) {
-        Path legacy = FMLPaths.CONFIGDIR.get().resolve(FILE_NAME);
-        if (!Files.exists(legacy)) {
-            return;
-        }
-        try {
-            Files.createDirectories(target.getParent());
-            Files.move(legacy, target);
-        } catch (IOException exception) {
-            if (Config.debugMode) LOGGER.warn("failed to migrate legacy theme file", exception);
-        }
     }
 
     private ThemeState() {
