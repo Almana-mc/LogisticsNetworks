@@ -18,7 +18,9 @@ import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,11 +37,14 @@ import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.player.PlayerContainerEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.items.IItemHandler;
+import java.time.LocalDate;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -73,6 +78,53 @@ public class EventHandler {
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         LogisticsCommand.register(event.getDispatcher());
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+        if (!Config.juneAwarenessMessage)
+            return;
+
+        LocalDate today = LocalDate.now();
+        if (today.getMonth() != Month.JUNE)
+            return;
+
+        player.sendSystemMessage(Component.literal("— June Awareness —").withStyle(ChatFormatting.BOLD));
+        player.sendSystemMessage(rainbow("Happy Pride Month!"));
+        player.sendSystemMessage(Component.literal("You matter. Be proud, take care of yourself.")
+                .withStyle(ChatFormatting.GRAY));
+        player.sendSystemMessage(Component.literal("Happy Men's Mental Health Month.")
+                .withStyle(ChatFormatting.AQUA));
+        player.sendSystemMessage(Component.literal("Reach out, talk to your friends. If nothing, else, join our discord and talk.")
+                .withStyle(ChatFormatting.GOLD));
+
+        MutableComponent from = Component.literal("From AlmanaX21 ").withStyle(ChatFormatting.GRAY);
+        from.append(Component.literal("[Discord]").withStyle(style -> style
+                .withColor(ChatFormatting.BLUE)
+                .withUnderlined(true)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://discord.gg/xTeHR2tdYh"))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Component.literal("Join the Logistics Networks Discord")))));
+        player.sendSystemMessage(from);
+
+        Config.juneAwarenessMessageSpec.set(false);
+        Config.refresh();
+        Config.SPEC.save();
+    }
+
+    private static MutableComponent rainbow(String text) {
+        ChatFormatting[] colors = {
+                ChatFormatting.RED, ChatFormatting.GOLD, ChatFormatting.YELLOW,
+                ChatFormatting.GREEN, ChatFormatting.AQUA, ChatFormatting.LIGHT_PURPLE
+        };
+        MutableComponent out = Component.empty();
+        for (int i = 0; i < text.length(); i++) {
+            out.append(Component.literal(String.valueOf(text.charAt(i)))
+                    .withStyle(colors[i % colors.length]));
+        }
+        return out;
     }
 
     @SubscribeEvent

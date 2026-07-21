@@ -19,6 +19,10 @@ public class Config {
             .comment("Enable debug overlays and diagnostic logging.")
             .define("debugMode", false);
 
+    public static final ForgeConfigSpec.BooleanValue juneAwarenessMessageSpec = builder
+            .comment("Send June awareness message.")
+            .define("juneAwarenessMessage", true);
+
     public static final ForgeConfigSpec.BooleanValue networkTickingEnabledSpec = builder
             .comment("Whether logistics networks are processed each server tick.")
             .define("networkTickingEnabled", true);
@@ -47,6 +51,7 @@ public class Config {
 
     public static boolean dropNodeItem;
     public static boolean debugMode;
+    public static boolean juneAwarenessMessage;
     public static boolean networkTickingEnabled;
     public static int backoffMaxTicks = 40;
     public static boolean[] backoffEnabled = {true, true, true, true, true};
@@ -60,6 +65,7 @@ public class Config {
     public static void refresh() {
         dropNodeItem = dropNodeItemSpec.get();
         debugMode = debugModeSpec.get();
+        juneAwarenessMessage = juneAwarenessMessageSpec.get();
         networkTickingEnabled = networkTickingEnabledSpec.get();
         backoffMaxTicks = backoffMaxTicksSpec.get();
         backoffEnabled[ChannelType.ITEM.ordinal()] = backoffItemSpec.get();
