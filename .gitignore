@@ -11,6 +11,7 @@ bin/
 
 # Minecraft Run Stuff
 run/
+versions/*/src/generated/
 
 # Personal Planning
 planning/

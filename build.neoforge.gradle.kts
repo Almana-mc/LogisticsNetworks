@@ -84,8 +84,8 @@ neoForge {
                 programArguments.addAll(
                     "--mod", mod_id,
                     "--all",
-                    "--output", file("src/generated/client").absolutePath,
-                    "--existing", file("src/main/resources").absolutePath
+                    "--output", rootProject.file("src/generated/client").absolutePath,
+                    "--existing", rootProject.file("src/main/resources").absolutePath
                 )
             }
             create("serverData") {
@@ -94,8 +94,8 @@ neoForge {
                 programArguments.addAll(
                     "--mod", mod_id,
                     "--all",
-                    "--output", file("src/generated/server").absolutePath,
-                    "--existing", file("src/main/resources").absolutePath
+                    "--output", rootProject.file("src/generated/server").absolutePath,
+                    "--existing", rootProject.file("src/main/resources").absolutePath
                 )
             }
         } else {
@@ -124,8 +124,8 @@ neoForge {
 }
 
 if (modernMinecraft) {
-    sourceSets.main.get().resources.srcDir("src/generated/client")
-    sourceSets.main.get().resources.srcDir("src/generated/server")
+    sourceSets.main.get().resources.srcDir(rootProject.file("src/generated/client"))
+    sourceSets.main.get().resources.srcDir(rootProject.file("src/generated/server"))
 } else {
     sourceSets.main.get().resources.srcDir("src/generated/resources")
 }
