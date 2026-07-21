@@ -3,277 +3,50 @@ name: Release Build
 on:
   workflow_dispatch:
     inputs:
-      publish_discord:
-        description: "Send Discord notification"
-        required: true
-        type: boolean
-        default: true
       publish_github:
-        description: "Publish to GitHub Releases"
+        description: "Publish the GitHub release"
         required: true
         type: boolean
         default: true
-      publish_curseforge:
-        description: "Publish to CurseForge"
+      publish_platforms:
+        description: "Publish CurseForge and Modrinth entries"
         required: true
         type: boolean
         default: true
-      publish_modrinth:
-        description: "Publish to Modrinth"
-        required: true
-        type: boolean
-        default: true
-      changelog_type:
-        description: "CurseForge changelog format"
-        required: true
-        type: choice
-        options:
-          - markdown
-          - text
-          - html
-        default: markdown
       confirm:
         description: "Type RELEASE to confirm"
         required: true
         type: string
 
 concurrency:
-  group: release-${{ github.ref_name || github.run_id }}
+  group: release-2.0.0
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  validate-release:
-    name: Validate Release Target
+  validate:
+    name: Validate release
     runs-on: ubuntu-latest
-    outputs:
-      is_version_branch: ${{ steps.branch_check.outputs.is_version_branch }}
-      target_branch: ${{ steps.branch_check.outputs.target_branch }}
-      publish_discord: ${{ steps.branch_check.outputs.publish_discord }}
-      publish_github: ${{ steps.branch_check.outputs.publish_github }}
-      publish_curseforge: ${{ steps.branch_check.outputs.publish_curseforge }}
-      publish_modrinth: ${{ steps.branch_check.outputs.publish_modrinth }}
-      changelog_type: ${{ steps.branch_check.outputs.changelog_type }}
     steps:
-      - name: Resolve trigger inputs
-        id: branch_check
-        shell: bash
-        env:
-          TARGET_BRANCH: ${{ github.ref_name }}
-          INPUT_PUBLISH_DISCORD: ${{ inputs.publish_discord }}
-          INPUT_PUBLISH_GITHUB: ${{ inputs.publish_github }}
-          INPUT_PUBLISH_CURSEFORGE: ${{ inputs.publish_curseforge }}
-          INPUT_PUBLISH_MODRINTH: ${{ inputs.publish_modrinth }}
-          INPUT_CHANGELOG_TYPE: ${{ inputs.changelog_type }}
-          INPUT_CONFIRM: ${{ inputs.confirm }}
-        run: |
-          target="$TARGET_BRANCH"
-          publish_discord="$INPUT_PUBLISH_DISCORD"
-          publish_github="$INPUT_PUBLISH_GITHUB"
-          publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
-          publish_modrinth="$INPUT_PUBLISH_MODRINTH"
-          changelog_type="$INPUT_CHANGELOG_TYPE"
-
-          if [[ "$INPUT_CONFIRM" != "RELEASE" ]]; then
-            echo "Manual confirmation failed. Type RELEASE in the confirm input."
-            exit 1
-          fi
-
-          # Accept branch names like 26.1, 1.21.1, 1.20.2, etc.
-          if [[ "$target" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-            echo "is_version_branch=true" >> "$GITHUB_OUTPUT"
-            echo "Release target branch '$target' accepted."
-          else
-            echo "is_version_branch=false" >> "$GITHUB_OUTPUT"
-            echo "Release target branch '$target' is not a version branch. Workflow will skip."
-          fi
-
-          echo "target_branch=$target" >> "$GITHUB_OUTPUT"
-          echo "publish_discord=$publish_discord" >> "$GITHUB_OUTPUT"
-          echo "publish_github=$publish_github" >> "$GITHUB_OUTPUT"
-          echo "publish_curseforge=$publish_curseforge" >> "$GITHUB_OUTPUT"
-          echo "publish_modrinth=$publish_modrinth" >> "$GITHUB_OUTPUT"
-          echo "changelog_type=$changelog_type" >> "$GITHUB_OUTPUT"
+      - name: Check confirmation
+        if: inputs.confirm != 'RELEASE'
+        run: exit 1
 
   build:
-    name: Build
-    needs: validate-release
-    if: needs.validate-release.outputs.is_version_branch == 'true'
+    name: Build all targets
+    needs: validate
     runs-on: ubuntu-latest
-    outputs:
-      minecraft_version: ${{ steps.meta.outputs.minecraft_version }}
-      mod_version: ${{ steps.meta.outputs.mod_version }}
-      mod_name: ${{ steps.meta.outputs.mod_name }}
-      release_tag: ${{ steps.meta.outputs.release_tag }}
-      changelog: ${{ steps.meta.outputs.changelog }}
-      curseforge_dependencies: ${{ steps.meta.outputs.curseforge_dependencies }}
-      modrinth_dependencies: ${{ steps.meta.outputs.modrinth_dependencies }}
-      java_version: ${{ steps.meta.outputs.java_version }}
-      loader: ${{ steps.meta.outputs.loader }}
-
     steps:
-      - name: Checkout target branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.ref }}
-
-      - name: Read project metadata
-        id: meta
-        shell: bash
-        run: |
-          minecraft_version="$(awk -F= '/^minecraft_version=/{print $2}' gradle.properties | tr -d '\r')"
-          mod_version="$(awk -F= '/^mod_version=/{print $2}' gradle.properties | tr -d '\r')"
-          mod_name="$(awk -F= '/^mod_name=/{print $2}' gradle.properties | tr -d '\r')"
-          release_tag="${minecraft_version}-${mod_version}"
-          changelog_file="CHANGELOGS/${release_tag}.md"
-          java_version="$(grep -oE 'JavaLanguageVersion\\.of\\([0-9]+\\)' build.gradle.kts | head -n1 | grep -oE '[0-9]+' || true)"
-
-          if [[ -z "$java_version" ]]; then
-            java_version="21"
-          fi
-
-          if [[ ! -f "$changelog_file" ]]; then
-            echo "Missing changelog file: $changelog_file"
-            exit 1
-          fi
-
-          if grep -q 'id("net.neoforged.moddev")' build.gradle.kts; then
-            loader="neoforge"
-          elif grep -q 'id("net.minecraftforge.gradle")' build.gradle.kts; then
-            loader="forge"
-          else
-            loader="neoforge"
-          fi
-
-          dependency_data="$(python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          curseforge_projects = {
-              "ae2": {"slug": "applied-energistics-2", "projectID": 223794},
-              "ars_nouveau": {"slug": "ars-nouveau", "projectID": 401955},
-              "ftbteams": {"slug": "ftb-teams-forge", "projectID": 404468},
-              "guideme": {"slug": "guideme", "projectID": 1173950},
-              "jade": {"slug": "jade", "projectID": 324717},
-              "jei": {"slug": "jei", "projectID": 238222},
-              "mekanism": {"slug": "mekanism", "projectID": 268560},
-          }
-          modrinth_projects = {
-              "ae2": "ae2",
-              "ars_nouveau": "ars-nouveau",
-              "guideme": "guideme",
-              "jade": "jade",
-              "jei": "jei",
-              "mekanism": "mekanism",
-          }
-          curseforge_types = {
-              "required": "requiredDependency",
-              "optional": "optionalDependency",
-              "incompatible": "incompatible",
-              "discouraged": "optionalDependency",
-          }
-          modrinth_types = {
-              "required": "required",
-              "optional": "optional",
-              "incompatible": "incompatible",
-              "discouraged": "recommended",
-          }
-
-          dependencies = []
-          current_dependency = None
-          for raw_line in Path("src/main/templates/META-INF/neoforge.mods.toml").read_text().splitlines():
-              line = raw_line.split("#", 1)[0].strip()
-              if line.startswith("[[dependencies."):
-                  if current_dependency:
-                      dependencies.append(current_dependency)
-                  current_dependency = {}
-                  continue
-
-              if current_dependency is None:
-                  continue
-
-              if line.startswith("["):
-                  if current_dependency:
-                      dependencies.append(current_dependency)
-                  current_dependency = None
-                  continue
-
-              if "=" not in line:
-                  continue
-
-              key, value = line.split("=", 1)
-              key = key.strip()
-              if key in {"modId", "type"}:
-                  current_dependency[key] = value.strip().strip('"')
-
-          if current_dependency:
-              dependencies.append(current_dependency)
-
-          curseforge_dependencies = []
-          modrinth_dependencies = []
-          missing_curseforge = []
-
-          for dependency in dependencies:
-              mod_id = dependency["modId"]
-              if mod_id in {"minecraft", "neoforge"}:
-                  continue
-
-              dependency_type = dependency.get("type", "optional").lower()
-              curseforge_project = curseforge_projects.get(mod_id)
-              if curseforge_project:
-                  curseforge_dependencies.append({
-                      **curseforge_project,
-                      "type": curseforge_types.get(dependency_type, "optionalDependency"),
-                  })
-              else:
-                  missing_curseforge.append(mod_id)
-
-              modrinth_project = modrinth_projects.get(mod_id)
-              if modrinth_project:
-                  modrinth_dependencies.append(
-                      f"{modrinth_project}({modrinth_types.get(dependency_type, 'optional')})"
-                  )
-
-          if missing_curseforge:
-              missing = ", ".join(sorted(missing_curseforge))
-              raise SystemExit(f"Missing CurseForge dependency mappings: {missing}")
-
-          print(json.dumps({
-              "curseforge": curseforge_dependencies,
-              "modrinth": modrinth_dependencies,
-          }))
-          PY
-          )"
-
-          curseforge_dependencies="$(jq -c '.curseforge' <<<"$dependency_data")"
-          modrinth_dependencies="$(jq -r '.modrinth[]' <<<"$dependency_data")"
-
-          echo "minecraft_version=$minecraft_version" >> "$GITHUB_OUTPUT"
-          echo "mod_version=$mod_version" >> "$GITHUB_OUTPUT"
-          echo "mod_name=$mod_name" >> "$GITHUB_OUTPUT"
-          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
-          echo "java_version=$java_version" >> "$GITHUB_OUTPUT"
-          echo "loader=$loader" >> "$GITHUB_OUTPUT"
-          echo "curseforge_dependencies=$curseforge_dependencies" >> "$GITHUB_OUTPUT"
-          {
-            echo "modrinth_dependencies<<EOF"
-            printf '%s\n' "$modrinth_dependencies"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-          {
-            echo "changelog<<EOF"
-            cat "$changelog_file"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ steps.meta.outputs.java_version }}
+          java-version: 25
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -282,315 +55,106 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build
-        shell: bash
-        run: |
-          exclude_args=()
-          if ./gradlew tasks --all --console=plain | grep -qE '^copyJar\\s'; then
-            exclude_args=(-x copyJar)
-          fi
-
-          ./gradlew clean build "${exclude_args[@]}" --console=plain
+        run: ./gradlew buildAll --console=plain
         env:
           CI: true
-          BUILD_VERSION: ${{ steps.meta.outputs.release_tag }}
-          CHANGELOG: ${{ steps.meta.outputs.changelog }}
-          PUBLISH: true
 
-      - name: Upload build artifacts
+      - name: Upload release jars
         uses: actions/upload-artifact@v4
         with:
-          name: release-build
-          path: build/libs/*.jar
+          name: logisticsnetworks-2.0.0
+          path: build/stonecutter-jars/*.jar
 
-  publish-github:
-    name: Publish to GitHub Releases
-    needs: [validate-release, build]
-    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_github == 'true'
+  github:
+    name: Publish GitHub release
+    needs: build
+    if: inputs.publish_github
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    outputs:
-      release_url: ${{ steps.github_release.outputs.url }}
-
     steps:
-      - name: Download artifacts
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download jars
         uses: actions/download-artifact@v4
         with:
-          name: release-build
-          path: build/libs
+          name: logisticsnetworks-2.0.0
+          path: build/stonecutter-jars
 
-      - name: Publish to GitHub Releases
-        id: github_release
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ needs.build.outputs.release_tag }}
+          tag_name: 2.0.0
           target_commitish: ${{ github.sha }}
-          name: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
-          body: ${{ needs.build.outputs.changelog }}
-          files: build/libs/*.jar
+          name: LogisticsNetworks 2.0.0
+          body_path: CHANGELOGS/2.0.0.md
+          files: build/stonecutter-jars/*.jar
           fail_on_unmatched_files: true
 
-  publish-curseforge:
-    name: Publish to CurseForge
-    needs: [validate-release, build]
-    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_curseforge == 'true' && vars.CURSEFORGE_PROJECT_ID != ''
+  platforms:
+    name: Publish ${{ matrix.target }}
+    needs: build
+    if: inputs.publish_platforms
     runs-on: ubuntu-latest
-    env:
-      CURSEFORGE_TOKEN: ${{ secrets.TOKEN_CURSEFORGE }}
-    outputs:
-      release_url: ${{ steps.curseforge_publish.outputs.curseforge-url }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: 1.20.1-forge
+            minecraft: 1.20.1
+            loader: forge
+            java: 17
+          - target: 1.21.1-neoforge
+            minecraft: 1.21.1
+            loader: neoforge
+            java: 21
+          - target: 26.1.2-neoforge
+            minecraft: 26.1.2
+            loader: neoforge
+            java: 25
 
     steps:
-      - name: Validate CurseForge config
-        id: curseforge_config
-        shell: bash
-        run: |
-          if [[ -z "$CURSEFORGE_TOKEN" ]]; then
-            echo "CurseForge token is not configured. Skipping publish."
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Download artifacts
-        if: steps.curseforge_config.outputs.enabled == 'true'
+      - name: Download jars
         uses: actions/download-artifact@v4
         with:
-          name: release-build
-          path: build/libs
+          name: logisticsnetworks-2.0.0
+          path: build/stonecutter-jars
 
-      - name: Publish to CurseForge
-        if: steps.curseforge_config.outputs.enabled == 'true'
-        id: curseforge_publish
+      - name: Resolve project identifiers
+        id: projects
         shell: bash
         env:
-          PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
-          DISPLAY_NAME: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
-          MINECRAFT_VERSION: ${{ needs.build.outputs.minecraft_version }}
-          LOADER: ${{ needs.build.outputs.loader }}
-          JAVA_VERSION: ${{ needs.build.outputs.java_version }}
-          CHANGELOG: ${{ needs.build.outputs.changelog }}
-          CHANGELOG_TYPE: ${{ needs.validate-release.outputs.changelog_type }}
-          CURSEFORGE_DEPENDENCIES: ${{ needs.build.outputs.curseforge_dependencies }}
+          TARGET: ${{ matrix.target }}
+          CF_1201: ${{ vars.CURSEFORGE_PROJECT_ID_1_20_1_FORGE }}
+          CF_1211: ${{ vars.CURSEFORGE_PROJECT_ID_1_21_1_NEOFORGE }}
+          CF_2612: ${{ vars.CURSEFORGE_PROJECT_ID_26_1_2_NEOFORGE }}
+          MR_1201: ${{ vars.MODRINTH_PROJECT_ID_1_20_1_FORGE }}
+          MR_1211: ${{ vars.MODRINTH_PROJECT_ID_1_21_1_NEOFORGE }}
+          MR_2612: ${{ vars.MODRINTH_PROJECT_ID_26_1_2_NEOFORGE }}
         run: |
-          set -euo pipefail
+          case "$TARGET" in
+            1.20.1-forge) echo "curseforge=$CF_1201" >> "$GITHUB_OUTPUT"; echo "modrinth=$MR_1201" >> "$GITHUB_OUTPUT" ;;
+            1.21.1-neoforge) echo "curseforge=$CF_1211" >> "$GITHUB_OUTPUT"; echo "modrinth=$MR_1211" >> "$GITHUB_OUTPUT" ;;
+            26.1.2-neoforge) echo "curseforge=$CF_2612" >> "$GITHUB_OUTPUT"; echo "modrinth=$MR_2612" >> "$GITHUB_OUTPUT" ;;
+          esac
 
-          versions="$(curl -fsSL -H "X-Api-Token: $CURSEFORGE_TOKEN" \
-            https://minecraft.curseforge.com/api/game/versions)"
-
-          mc_id="$(jq -r --arg v "$MINECRAFT_VERSION" 'map(select(.name==$v))|.[0].id // empty' <<<"$versions")"
-          loader_id="$(jq -r --arg v "$LOADER" 'map(select((.name|ascii_downcase)==($v|ascii_downcase)))|.[0].id // empty' <<<"$versions")"
-          client_id="$(jq -r 'map(select(.name=="Client"))|.[0].id // empty' <<<"$versions")"
-          server_id="$(jq -r 'map(select(.name=="Server"))|.[0].id // empty' <<<"$versions")"
-          java_id="$(jq -r --arg v "Java $JAVA_VERSION" 'map(select(.name==$v))|.[0].id // empty' <<<"$versions")"
-
-          if [[ -z "$mc_id" ]]; then echo "No CurseForge game version for Minecraft $MINECRAFT_VERSION"; exit 1; fi
-          if [[ -z "$loader_id" ]]; then echo "No CurseForge loader id for $LOADER"; exit 1; fi
-          if [[ -z "$client_id" || -z "$server_id" ]]; then echo "Missing Client/Server environment ids"; exit 1; fi
-
-          ids=("$mc_id" "$loader_id" "$client_id" "$server_id")
-          if [[ -n "$java_id" ]]; then ids+=("$java_id"); fi
-
-          game_versions="$(printf '%s\n' "${ids[@]}" | jq -R 'tonumber' | jq -sc '.')"
-
-          changelog_body="${CHANGELOG//$'\r'/}"
-
-          metadata="$(jq -nc \
-            --arg changelog "$changelog_body" \
-            --arg changelog_type "$CHANGELOG_TYPE" \
-            --arg name "$DISPLAY_NAME" \
-            --argjson gv "$game_versions" \
-            --argjson dependencies "$CURSEFORGE_DEPENDENCIES" \
-            '{changelog:$changelog, changelogType:$changelog_type, displayName:$name, gameVersions:$gv, releaseType:"release"} + (if ($dependencies | length) > 0 then {relations:{projects:$dependencies}} else {} end)')"
-
-          jar="$(find build/libs -maxdepth 1 -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n1)"
-          if [[ -z "$jar" ]]; then echo "No jar found in build/libs"; exit 1; fi
-
-          body_file="$(mktemp)"
-          http_code="$(curl -sS -o "$body_file" -w '%{http_code}' \
-            -H "X-Api-Token: $CURSEFORGE_TOKEN" \
-            -F "metadata=$metadata" \
-            -F "file=@${jar}" \
-            "https://minecraft.curseforge.com/api/projects/${PROJECT_ID}/upload-file")"
-
-          if [[ "$http_code" != "200" ]]; then
-            echo "CurseForge upload failed (HTTP $http_code):"
-            cat "$body_file"
-            exit 1
-          fi
-
-          file_id="$(jq -r '.id' <"$body_file")"
-          echo "curseforge-url=https://www.curseforge.com/projects/${PROJECT_ID}/files/${file_id}" >> "$GITHUB_OUTPUT"
-
-  publish-modrinth:
-    name: Publish to Modrinth
-    needs: [validate-release, build]
-    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_modrinth == 'true' && vars.MODRINTH_PROJECT_ID != ''
-    runs-on: ubuntu-latest
-    env:
-      MODRINTH_TOKEN: ${{ secrets.TOKEN_MODRINTH }}
-    outputs:
-      release_url: ${{ steps.modrinth_publish.outputs.modrinth-url }}
-
-    steps:
-      - name: Validate Modrinth config
-        id: modrinth_config
-        shell: bash
-        run: |
-          if [[ -z "$MODRINTH_TOKEN" ]]; then
-            echo "Modrinth token is not configured. Skipping publish."
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Download artifacts
-        if: steps.modrinth_config.outputs.enabled == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: release-build
-          path: build/libs
-
-      - name: Publish to Modrinth
-        if: steps.modrinth_config.outputs.enabled == 'true'
-        id: modrinth_publish
+      - name: Publish target
+        if: steps.projects.outputs.curseforge != '' || steps.projects.outputs.modrinth != ''
         uses: Kira-NT/mc-publish@v3.3.0
         with:
-          name: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
-          version: ${{ needs.build.outputs.release_tag }}
+          name: LogisticsNetworks 2.0.0 for ${{ matrix.target }}
+          version: 2.0.0+${{ matrix.target }}
           version-type: release
-          files: build/libs/*.jar
-          changelog: ${{ needs.build.outputs.changelog }}
-          dependencies: ${{ needs.build.outputs.modrinth_dependencies }}
-          loaders: ${{ needs.build.outputs.loader }}
-          game-versions: ${{ needs.build.outputs.minecraft_version }}
-          java: ${{ needs.build.outputs.java_version }}
-          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
-          modrinth-token: ${{ env.MODRINTH_TOKEN }}
-
-  notify-discord:
-    name: Notify Discord
-    needs: [validate-release, build, publish-github, publish-curseforge, publish-modrinth]
-    if: always() && needs.validate-release.outputs.is_version_branch == 'true' && needs.validate-release.outputs.publish_discord == 'true' && needs.build.result == 'success'
-    runs-on: ubuntu-latest
-    env:
-      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
-      DISCORD_ROLE_ID: ${{ vars.DISCORD_RELEASE_ROLE_ID }}
-      TARGET_BRANCH: ${{ needs.validate-release.outputs.target_branch }}
-      MINECRAFT_VERSION: ${{ needs.build.outputs.minecraft_version }}
-      MOD_VERSION: ${{ needs.build.outputs.mod_version }}
-      RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-      MOD_NAME: ${{ needs.build.outputs.mod_name }}
-      CHANGELOG: ${{ needs.build.outputs.changelog }}
-      BUILD_RESULT: ${{ needs.build.result }}
-      GITHUB_RESULT: ${{ needs.publish-github.result }}
-      GITHUB_URL: ${{ needs.publish-github.outputs.release_url }}
-      CURSEFORGE_RESULT: ${{ needs.publish-curseforge.result }}
-      CURSEFORGE_URL: ${{ needs.publish-curseforge.outputs.release_url }}
-      MODRINTH_RESULT: ${{ needs.publish-modrinth.result }}
-      MODRINTH_URL: ${{ needs.publish-modrinth.outputs.release_url }}
-      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      ACTOR: ${{ github.actor }}
-      REPOSITORY: ${{ github.repository }}
-
-    steps:
-      - name: Validate Discord config
-        id: discord_config
-        shell: bash
-        run: |
-          if [[ -z "$DISCORD_WEBHOOK_URL" ]]; then
-            echo "Discord webhook is not configured. Skipping notification."
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Send Discord notification
-        if: steps.discord_config.outputs.enabled == 'true'
-        shell: bash
-        run: |
-          payload=$(python3 - <<'PY'
-          import json
-          import os
-
-          def link_line(label, url, result):
-              if url:
-                  return f"{label}: {url}"
-              if result == "skipped":
-                  return f"{label}: Skipped"
-              if result == "success":
-                  return f"{label}: Published"
-              if result == "failure":
-                  return f"{label}: Failed"
-              if result == "cancelled":
-                  return f"{label}: Cancelled"
-              return f"{label}: {result}"
-
-          role_id = os.environ.get("DISCORD_ROLE_ID", "").strip()
-          greeting = f"Hey <@&{role_id}>" if role_id else "Hey"
-          release_name = f"LogisticsNetwork-{os.environ['MINECRAFT_VERSION']}-{os.environ['MOD_VERSION']}"
-
-          lines = [
-              greeting,
-              "",
-              f"New release: {release_name}",
-              "## Changelog",
-              "",
-          ]
-
-          changelog = os.environ.get("CHANGELOG", "").strip()
-          if changelog:
-              lines.append(changelog)
-          else:
-              lines.append("No changelog provided.")
-
-          lines.extend([
-              "",
-              link_line("Curseforge", os.environ.get("CURSEFORGE_URL", "").strip(), os.environ.get("CURSEFORGE_RESULT", "").strip()),
-              link_line("Modrinth", os.environ.get("MODRINTH_URL", "").strip(), os.environ.get("MODRINTH_RESULT", "").strip()),
-              link_line("Github", os.environ.get("GITHUB_URL", "").strip(), os.environ.get("GITHUB_RESULT", "").strip()),
-              "",
-              "Thank you all for downloading,",
-              "AlmanaX21",
-          ])
-
-          content = "\n".join(lines)
-          if len(content) > 1900:
-              static_lines = [
-                  greeting,
-                  "",
-                  f"New release: {release_name}",
-                  "## Changelog",
-                  "",
-              ]
-              footer_lines = [
-                  "",
-                  link_line("Curseforge", os.environ.get("CURSEFORGE_URL", "").strip(), os.environ.get("CURSEFORGE_RESULT", "").strip()),
-                  link_line("Modrinth", os.environ.get("MODRINTH_URL", "").strip(), os.environ.get("MODRINTH_RESULT", "").strip()),
-                  link_line("Github", os.environ.get("GITHUB_URL", "").strip(), os.environ.get("GITHUB_RESULT", "").strip()),
-                  "",
-                  "Thank you all for downloading,",
-                  "AlmanaX21",
-              ]
-              static_prefix = "\n".join(static_lines)
-              static_suffix = "\n".join(footer_lines)
-              available = 1900 - len(static_prefix) - len(static_suffix) - len("\n...\n")
-              trimmed = changelog[:max(0, available)].rstrip()
-              content = "\n".join(static_lines + [trimmed, "..."] + footer_lines)
-
-          payload = {"content": content}
-          if role_id:
-              payload["allowed_mentions"] = {"parse": [], "roles": [role_id]}
-
-          print(json.dumps(payload))
-          PY
-          )
-
-          curl \
-            --fail \
-            --silent \
-            --show-error \
-            -H "Content-Type: application/json" \
-            -d "$payload" \
-            "$DISCORD_WEBHOOK_URL"
+          files: build/stonecutter-jars/logisticsnetworks-${{ matrix.target }}-2.0.0.jar
+          changelog-file: CHANGELOGS/2.0.0.md
+          loaders: ${{ matrix.loader }}
+          game-versions: ${{ matrix.minecraft }}
+          java: ${{ matrix.java }}
+          curseforge-id: ${{ steps.projects.outputs.curseforge }}
+          curseforge-token: ${{ secrets.TOKEN_CURSEFORGE }}
+          modrinth-id: ${{ steps.projects.outputs.modrinth }}
+          modrinth-token: ${{ secrets.TOKEN_MODRINTH }}
