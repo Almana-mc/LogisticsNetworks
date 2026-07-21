@@ -71,6 +71,7 @@ public class ModConfigScreen extends Screen {
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
     private static final Component TEXT_DEFAULT_NODE_VISIBILITY = Component.translatable("gui.logisticsnetworks.config.client.defaultNodeVisibility");
     private static final Component TEXT_CONNECTED_NODE_TEXTURES = Component.translatable("gui.logisticsnetworks.config.client.connectedNodeTextures");
+    private static final Component TEXT_COMPUTER_CLASSIC = Component.translatable("gui.logisticsnetworks.config.client.computerClassicTheme");
 
     private static final Component[] TIER_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.upgrades.tier.none"),
@@ -114,6 +115,7 @@ public class ModConfigScreen extends Screen {
     private EditBox maxVisibleNodesBox;
 
     private String pendingTheme;
+    private boolean pendingComputerClassic;
 
     private TierLimits[] pendingTiers;
     private int expandedTier = -1;
@@ -150,6 +152,7 @@ public class ModConfigScreen extends Screen {
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
         pendingConnectedNodeTextures = ClientConfig.connectedNodeTexturesSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
+        pendingComputerClassic = ClientConfig.computerClassicThemeSpec.get();
         pendingTiers = UpgradeLimitsConfig.getAll();
 
         buildTab();
@@ -427,6 +430,8 @@ public class ModConfigScreen extends Screen {
             }
         }
 
+        renderCheckbox(g, cx, cy + 152, cw, TEXT_COMPUTER_CLASSIC, pendingComputerClassic, mx, my, false);
+
     }
 
     private boolean handleClientClick(double mx, double my, int cx, int cy, int cw) {
@@ -455,6 +460,11 @@ public class ModConfigScreen extends Screen {
                 pendingTheme = Themes.ALL.get(i).id();
                 return true;
             }
+        }
+
+        if (inBox(mx, my, boxX, cy + 154, 9)) {
+            pendingComputerClassic = !pendingComputerClassic;
+            return true;
         }
 
         return false;
@@ -700,6 +710,7 @@ public class ModConfigScreen extends Screen {
         ClientConfig.defaultNodeVisibilitySpec.set(pendingDefaultNodeVisibility);
         ClientConfig.connectedNodeTexturesSpec.set(pendingConnectedNodeTextures);
         ClientConfig.themeSpec.set(pendingTheme);
+        ClientConfig.computerClassicThemeSpec.set(pendingComputerClassic);
         ClientConfig.refresh();
         DefaultNodeVisibilitySync.send();
         ThemeState.setTheme(Themes.byId(pendingTheme));

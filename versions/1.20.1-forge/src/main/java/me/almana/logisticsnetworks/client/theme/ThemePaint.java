@@ -295,7 +295,7 @@ public final class ThemePaint {
         g.drawString(font, c.getString(), x, y, color, false);
     }
 
-    private static int brighten(int argb, int delta) {
+    public static int brighten(int argb, int delta) {
         int a = (argb >>> 24) & 0xFF;
         int r = Math.min(0xFF, ((argb >> 16) & 0xFF) + delta);
         int gC = Math.min(0xFF, ((argb >> 8) & 0xFF) + delta);

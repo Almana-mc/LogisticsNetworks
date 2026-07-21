@@ -254,6 +254,7 @@
   "gui.logisticsnetworks.compatibility_blacklist": "该方块来自不兼容的模组",
   "gui.logisticsnetworks.blacklist": "该方块已被列入黑名单",
   "gui.logisticsnetworks.config.client.theme": "主题",
+  "gui.logisticsnetworks.config.client.computerClassicTheme": "经典计算机终端",
   "item.logisticsnetworks.mekanism_chemical_upgrade": "通用机械化学品升级",
   "tooltip.logisticsnetworks.mekanism_chemical_upgrade": "解锁化学品频道传输",
   "gui.logisticsnetworks.filter.target.chemicals": "化学品",

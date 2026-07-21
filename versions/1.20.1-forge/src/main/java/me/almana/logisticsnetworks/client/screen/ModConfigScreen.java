@@ -68,6 +68,7 @@ public class ModConfigScreen extends Screen {
 
     private static final Component TEXT_MAX_RENDERED = Component.translatable("gui.logisticsnetworks.config.client.maxRenderedNodes");
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
+    private static final Component TEXT_COMPUTER_CLASSIC = Component.translatable("gui.logisticsnetworks.config.client.computerClassicTheme");
 
     private static final Component[] TIER_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.upgrades.tier.none"),
@@ -109,6 +110,7 @@ public class ModConfigScreen extends Screen {
     private EditBox maxVisibleNodesBox;
 
     private String pendingTheme;
+    private boolean pendingComputerClassic;
 
     private TierLimits[] pendingTiers;
     private int expandedTier = -1;
@@ -143,6 +145,7 @@ public class ModConfigScreen extends Screen {
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
+        pendingComputerClassic = ClientConfig.computerClassicThemeSpec.get();
         pendingTiers = UpgradeLimitsConfig.getAll();
 
         buildTab();
@@ -415,9 +418,12 @@ public class ModConfigScreen extends Screen {
             }
         }
 
+        renderCheckbox(g, cx, cy + 112, cw, TEXT_COMPUTER_CLASSIC, pendingComputerClassic, mx, my, false);
+
     }
 
     private boolean handleClientClick(double mx, double my, int cx, int cy, int cw) {
+        int boxX = cx + cw - 14;
         int themeY = cy + 48;
         int cols = 4;
         int swatchGap = 4;
@@ -433,6 +439,11 @@ public class ModConfigScreen extends Screen {
                 pendingTheme = Themes.ALL.get(i).id();
                 return true;
             }
+        }
+
+        if (inBox(mx, my, boxX, cy + 114, 9)) {
+            pendingComputerClassic = !pendingComputerClassic;
+            return true;
         }
 
         return false;
@@ -676,6 +687,7 @@ public class ModConfigScreen extends Screen {
         ClientConfig.maxRenderedNodesSpec.set(pendingMaxRenderedNodes);
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
         ClientConfig.themeSpec.set(pendingTheme);
+        ClientConfig.computerClassicThemeSpec.set(pendingComputerClassic);
         ClientConfig.refresh();
         ThemeState.setTheme(Themes.byId(pendingTheme));
 

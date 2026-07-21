@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.theme.ComputerPalette;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
@@ -81,37 +82,37 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private static final int CHANNEL_ENTRY_HEIGHT = 18;
     private static final int CHANNELS_PER_PAGE = 7;
 
-    private static final int COLOR_FRAME = 0xE0181E1A;
-    private static final int COLOR_FRAME_EDGE = 0xFF73806F;
-    private static final int COLOR_FRAME_INNER = 0xC0080E0B;
-    private static final int COLOR_SCREEN = 0xD00C130F;
-    private static final int COLOR_PANEL = 0xF0101713;
-    private static final int COLOR_PANEL_ALT = 0xFF152019;
-    private static final int COLOR_PANEL_HEADER = 0xFF1C2B22;
-    private static final int COLOR_BORDER = 0xFF4D6654;
-    private static final int COLOR_BORDER_BRIGHT = 0xFF96D9A9;
-    private static final int COLOR_ROW = 0xFF14201A;
-    private static final int COLOR_ROW_HOVER = 0xFF192920;
-    private static final int COLOR_ROW_SELECTED = 0xFF23382B;
-    private static final int COLOR_TEXT = 0xFFD8F7DD;
-    private static final int COLOR_TEXT_SECONDARY = 0xFF88B693;
-    private static final int COLOR_TEXT_MUTED = 0xFF587263;
-    private static final int COLOR_ACCENT = 0xFF80F2A3;
-    private static final int COLOR_ACCENT_DARK = 0xFF315D3B;
-    private static final int COLOR_WARNING = 0xFFE4CA7D;
-    private static final int COLOR_SCANLINE = 0x1200FF88;
-    private static final int COLOR_BADGE_BG = 0xFF17221A;
-    private static final int COLOR_BADGE_TEXT = 0xFFA4FDBB;
-    private static final int COLOR_GRAPH = 0xFF6EE896;
-    private static final int COLOR_GRAPH_GRID = 0xFF213529;
-    private static final int COLOR_HIGHLIGHT_BG = 0xFF1B2640;
-    private static final int COLOR_HIGHLIGHT_HOVER = 0xFF25355B;
-    private static final int COLOR_HIGHLIGHT_BORDER = 0xFF72A7FF;
-    private static final int COLOR_LAMP_OFF = 0xFF5F7568;
-    private static final int COLOR_LAMP_OFF_GLOW = 0xFF37443D;
-    private static final int COLOR_LAMP_ON = 0xFF72A7FF;
-    private static final int COLOR_LAMP_ON_GLOW = 0xFFBED6FF;
-    private static final int COLOR_LAMP_BASE = 0xFF8FA39C;
+    private static int COLOR_FRAME;
+    private static int COLOR_FRAME_EDGE;
+    private static int COLOR_FRAME_INNER;
+    private static int COLOR_SCREEN;
+    private static int COLOR_PANEL;
+    private static int COLOR_PANEL_ALT;
+    private static int COLOR_PANEL_HEADER;
+    private static int COLOR_BORDER;
+    private static int COLOR_BORDER_BRIGHT;
+    private static int COLOR_ROW;
+    private static int COLOR_ROW_HOVER;
+    private static int COLOR_ROW_SELECTED;
+    private static int COLOR_TEXT;
+    private static int COLOR_TEXT_SECONDARY;
+    private static int COLOR_TEXT_MUTED;
+    private static int COLOR_ACCENT;
+    private static int COLOR_ACCENT_DARK;
+    private static int COLOR_WARNING;
+    private static int COLOR_SCANLINE;
+    private static int COLOR_BADGE_BG;
+    private static int COLOR_BADGE_TEXT;
+    private static int COLOR_GRAPH;
+    private static int COLOR_GRAPH_GRID;
+    private static int COLOR_HIGHLIGHT_BG;
+    private static int COLOR_HIGHLIGHT_HOVER;
+    private static int COLOR_HIGHLIGHT_BORDER;
+    private static int COLOR_LAMP_OFF;
+    private static int COLOR_LAMP_OFF_GLOW;
+    private static int COLOR_LAMP_ON;
+    private static int COLOR_LAMP_ON_GLOW;
+    private static int COLOR_LAMP_BASE;
     private static final int COLOR_FLUID_BAR = 0xFF6EB4E8;
     private static final int COLOR_ENERGY_BAR = 0xFFE8D46E;
     private static final int COLOR_CHEMICAL_BAR = 0xFFD070E8;
@@ -156,6 +157,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     @Override
     protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
+        refreshPalette();
         renderComputerShell(g);
 
         menu.setWrenchSlotActive(currentPage == Page.NETWORK_LIST);
@@ -166,6 +168,41 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             case IO_CHANNEL_GRAPH -> renderChannelGraphPage(g, mouseX, mouseY);
             case NODE_MAP -> renderNodeMapPage(g, mouseX, mouseY);
         }
+    }
+
+    private static void refreshPalette() {
+        ComputerPalette palette = ComputerPalette.active();
+        COLOR_FRAME = palette.frame();
+        COLOR_FRAME_EDGE = palette.frameEdge();
+        COLOR_FRAME_INNER = palette.frameInner();
+        COLOR_SCREEN = palette.screen();
+        COLOR_PANEL = palette.panel();
+        COLOR_PANEL_ALT = palette.panelAlt();
+        COLOR_PANEL_HEADER = palette.panelHeader();
+        COLOR_BORDER = palette.border();
+        COLOR_BORDER_BRIGHT = palette.borderBright();
+        COLOR_ROW = palette.row();
+        COLOR_ROW_HOVER = palette.rowHover();
+        COLOR_ROW_SELECTED = palette.rowSelected();
+        COLOR_TEXT = palette.text();
+        COLOR_TEXT_SECONDARY = palette.textSecondary();
+        COLOR_TEXT_MUTED = palette.textMuted();
+        COLOR_ACCENT = palette.accent();
+        COLOR_ACCENT_DARK = palette.accentDark();
+        COLOR_WARNING = palette.warning();
+        COLOR_SCANLINE = palette.scanline();
+        COLOR_BADGE_BG = palette.badgeBg();
+        COLOR_BADGE_TEXT = palette.badgeText();
+        COLOR_GRAPH = palette.graph();
+        COLOR_GRAPH_GRID = palette.graphGrid();
+        COLOR_HIGHLIGHT_BG = palette.highlightBg();
+        COLOR_HIGHLIGHT_HOVER = palette.highlightHover();
+        COLOR_HIGHLIGHT_BORDER = palette.highlightBorder();
+        COLOR_LAMP_OFF = palette.lampOff();
+        COLOR_LAMP_OFF_GLOW = palette.lampOffGlow();
+        COLOR_LAMP_ON = palette.lampOn();
+        COLOR_LAMP_ON_GLOW = palette.lampOnGlow();
+        COLOR_LAMP_BASE = palette.lampBase();
     }
 
     private void renderComputerShell(GuiGraphics g) {

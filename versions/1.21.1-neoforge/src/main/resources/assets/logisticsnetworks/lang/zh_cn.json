@@ -418,5 +418,6 @@
   "gui.logisticsnetworks.theme.pastel": "粉彩",
   "gui.logisticsnetworks.theme.brutalist": "粗野",
   "gui.logisticsnetworks.config.client.theme": "主题",
+  "gui.logisticsnetworks.config.client.computerClassicTheme": "经典计算机终端",
   "gui.logisticsnetworks.config.client.density": "密度"
 }

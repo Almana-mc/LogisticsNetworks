@@ -29,10 +29,15 @@ public class ClientConfig {
             .comment("GUI theme for logistics node screens: light, dark, redstone, nebula, glass, terminal, pastel, brutalist")
             .define("theme", "dark", o -> o instanceof String s && THEMES.contains(s));
 
+    public static final ForgeConfigSpec.BooleanValue computerClassicThemeSpec = builder
+            .comment("Use the classic green terminal look for the network computer instead of the selected GUI theme.")
+            .define("computerClassicTheme", true);
+
     static final ForgeConfigSpec SPEC = builder.build();
 
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
+    public static boolean computerClassicTheme = true;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -43,6 +48,7 @@ public class ClientConfig {
     public static void refresh() {
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
+        computerClassicTheme = computerClassicThemeSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());
     }
 }

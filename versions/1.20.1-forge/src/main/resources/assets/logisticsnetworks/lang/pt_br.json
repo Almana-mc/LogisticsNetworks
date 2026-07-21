@@ -180,5 +180,6 @@
   "tooltip.logisticsnetworks.upgrade.unlimited": "Ilimitado",
   "tooltip.logisticsnetworks.upgrade.dimensional": "Habilita transferências entre dimensões",
   "gui.logisticsnetworks.compatibility_blacklist": "Este bloco é de um mod incompatível",
-  "gui.logisticsnetworks.blacklist": "Este bloco está na lista negra"
+  "gui.logisticsnetworks.blacklist": "Este bloco está na lista negra",
+  "gui.logisticsnetworks.config.client.computerClassicTheme": "Terminal clássico do computador"
 }

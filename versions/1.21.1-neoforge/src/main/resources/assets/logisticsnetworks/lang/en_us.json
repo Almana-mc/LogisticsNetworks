@@ -426,5 +426,6 @@
   "gui.logisticsnetworks.theme.pastel": "Pastel",
   "gui.logisticsnetworks.theme.brutalist": "Brutalist",
   "gui.logisticsnetworks.config.client.theme": "Theme",
+  "gui.logisticsnetworks.config.client.computerClassicTheme": "Classic computer terminal",
   "gui.logisticsnetworks.config.client.density": "Density"
 }

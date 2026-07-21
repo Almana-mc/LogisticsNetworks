@@ -254,6 +254,7 @@
   "gui.logisticsnetworks.compatibility_blacklist": "This block is from an incompatible mod",
   "gui.logisticsnetworks.blacklist": "This block is blacklisted",
   "gui.logisticsnetworks.config.client.theme": "Theme",
+  "gui.logisticsnetworks.config.client.computerClassicTheme": "Classic computer terminal",
   "item.logisticsnetworks.mekanism_chemical_upgrade": "Mekanism Chemical Upgrade",
   "tooltip.logisticsnetworks.mekanism_chemical_upgrade": "Unlocks Chemical channel transfer",
   "gui.logisticsnetworks.filter.target.chemicals": "Chemicals",
