@@ -10,6 +10,8 @@ val minecraft_version_range: String by project
 val neo_version: String by project
 val neo_version_range: String by project
 val loader_version_range: String by project
+val parchment_minecraft_version: String? by project
+val parchment_mappings_version: String? by project
 val mod_id: String by project
 val mod_name: String by project
 val mod_license: String by project
@@ -25,8 +27,10 @@ val ae2_version: String by project
 val ftb_teams_version: String by project
 val emi_version: String by project
 val guideme_version: String by project
+val iris_version: String? by project
+val modernMinecraft = minecraft_version.startsWith("26.")
 
-version = "${minecraft_version}-${mod_version}"
+version = mod_version
 group = mod_group_id
 
 repositories {
@@ -40,25 +44,32 @@ repositories {
 }
 
 base {
-    archivesName.set(mod_id)
+    archivesName.set("${mod_id}-${minecraft_version}-neoforge")
 }
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(if (modernMinecraft) 25 else 21))
 }
 
 neoForge {
     version = neo_version
 
+    if (!modernMinecraft) {
+        parchment {
+            mappingsVersion = parchment_mappings_version
+            minecraftVersion = parchment_minecraft_version
+        }
+    }
+
     runs {
         create("client") {
             client()
-            gameDirectory = file("run/${minecraft_version}/client")
+            gameDirectory = file("run/client")
             systemProperty("neoforge.enabledGameTestNamespaces", mod_id)
         }
         create("server") {
             server()
-            gameDirectory = file("run/${minecraft_version}/server")
+            gameDirectory = file("run/server")
             programArgument("--nogui")
             systemProperty("neoforge.enabledGameTestNamespaces", mod_id)
         }
@@ -66,25 +77,38 @@ neoForge {
             type = "gameTestServer"
             systemProperty("neoforge.enabledGameTestNamespaces", mod_id)
         }
-        create("data") {
-            clientData()
-            gameDirectory = file("run/${minecraft_version}/data")
-            programArguments.addAll(
-                "--mod", mod_id,
-                "--all",
-                "--output", file("src/generated/client/").absolutePath,
-                "--existing", file("src/main/resources/").absolutePath
-            )
-        }
-        create("serverData") {
-            serverData()
-            gameDirectory = file("run/${minecraft_version}/serverData")
-            programArguments.addAll(
-                "--mod", mod_id,
-                "--all",
-                "--output", file("src/generated/server/").absolutePath,
-                "--existing", file("src/main/resources/").absolutePath
-            )
+        if (modernMinecraft) {
+            create("clientData") {
+                clientData()
+                gameDirectory = file("run/clientData")
+                programArguments.addAll(
+                    "--mod", mod_id,
+                    "--all",
+                    "--output", file("src/generated/client").absolutePath,
+                    "--existing", file("src/main/resources").absolutePath
+                )
+            }
+            create("serverData") {
+                serverData()
+                gameDirectory = file("run/serverData")
+                programArguments.addAll(
+                    "--mod", mod_id,
+                    "--all",
+                    "--output", file("src/generated/server").absolutePath,
+                    "--existing", file("src/main/resources").absolutePath
+                )
+            }
+        } else {
+            create("data") {
+                data()
+                gameDirectory = file("run/data")
+                programArguments.addAll(
+                    "--mod", mod_id,
+                    "--all",
+                    "--output", file("src/generated/resources").absolutePath,
+                    "--existing", file("src/main/resources").absolutePath
+                )
+            }
         }
         configureEach {
             systemProperty("forge.logging.markers", "REGISTRIES")
@@ -99,8 +123,12 @@ neoForge {
     }
 }
 
-sourceSets.main.get().resources.srcDir("src/generated/client")
-sourceSets.main.get().resources.srcDir("src/generated/server")
+if (modernMinecraft) {
+    sourceSets.main.get().resources.srcDir("src/generated/client")
+    sourceSets.main.get().resources.srcDir("src/generated/server")
+} else {
+    sourceSets.main.get().resources.srcDir("src/generated/resources")
+}
 
 dependencies {
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
@@ -111,7 +139,19 @@ dependencies {
         isTransitive = false
     }
 
-    compileOnly("org.appliedenergistics:guideme:${guideme_version}")
+    if (modernMinecraft) {
+        compileOnly("org.appliedenergistics:guideme:${guideme_version}")
+        compileOnly("maven.modrinth:iris:${iris_version}") {
+            isTransitive = false
+        }
+    } else {
+        compileOnly("org.appliedenergistics:guideme:${guideme_version}:api")
+        compileOnly("mekanism:Mekanism:${mekanism_version}")
+        compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
+        compileOnly("dev.emi:emi-neoforge:${emi_version}") {
+            isTransitive = false
+        }
+    }
     runtimeOnly("org.appliedenergistics:guideme:${guideme_version}")
 
     compileOnly("maven.modrinth:jade:${jade_version}")
@@ -119,22 +159,6 @@ dependencies {
 
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
     runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
-
-    // Iris API — compile-only; shaders are an optional runtime dependency.
-    compileOnly("maven.modrinth:iris:1.10.9+26.1-neoforge") {
-        isTransitive = false
-    }
-
-    // 26.1 compat deps pending
-    /*
-    compileOnly("mekanism:Mekanism:${mekanism_version}")
-
-    compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
-
-    compileOnly("dev.emi:emi-neoforge:${emi_version}") {
-        isTransitive = false
-    }
-    */
 }
 
 val generateModMetadata by tasks.registering(ProcessResources::class) {
@@ -154,12 +178,16 @@ val generateModMetadata by tasks.registering(ProcessResources::class) {
     )
     inputs.properties(replaceProperties)
     expand(replaceProperties)
-    from("src/main/templates")
+    from(rootProject.file("src/main/templates"))
     into("build/generated/sources/modMetadata")
 }
 
 sourceSets.main.get().resources.srcDir(generateModMetadata)
 neoForge.ideSyncTask(generateModMetadata)
+
+tasks.named("createMinecraftArtifacts") {
+    dependsOn("stonecutterGenerate")
+}
 
 publishing {
     publications {
@@ -178,17 +206,5 @@ idea {
     module {
         isDownloadSources = true
         isDownloadJavadoc = true
-    }
-}
-
-val copyJarDest = File("C:/Users/Kanishq/AppData/Roaming/PrismLauncher/instances/26.1/minecraft/mods")
-if (copyJarDest.isDirectory) {
-    tasks.register<Copy>("copyJar") {
-        from(tasks.named("jar"))
-        into(copyJarDest)
-    }
-
-    tasks.named("build") {
-        finalizedBy("copyJar")
     }
 }
