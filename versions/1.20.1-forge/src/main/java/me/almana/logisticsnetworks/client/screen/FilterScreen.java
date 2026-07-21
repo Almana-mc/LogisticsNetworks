@@ -1,5 +1,8 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.client.theme.ThemePaint;
+import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 
 import me.almana.logisticsnetworks.util.ItemStackCompat;
@@ -63,16 +66,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private static final int SUBMODE_SCROLLBAR_GAP = 2;
 
     // Colors
-    private static final int COL_BG = 0xFF1A1A1A;
-    private static final int COL_BORDER = 0xFF333333;
-    private static final int COL_ACCENT = 0xFF44BB44;
-    private static final int COL_WHITE = 0xFFFFFFFF;
-    private static final int COL_GRAY = 0xFF999999;
-    private static final int COL_HOVER = 0x33FFFFFF;
-    private static final int COL_SELECTED = 0xFF2A4A2A;
-    private static final int COL_BTN_BG = 0xFF2A2A2A;
-    private static final int COL_BTN_HOVER = 0xFF3A3A3A;
-    private static final int COL_BTN_BORDER = 0xFF4A4A4A;
+    private static int COL_BG;
+    private static int COL_BORDER;
+    private static int COL_ACCENT;
+    private static int COL_WHITE;
+    private static int COL_GRAY;
+    private static int COL_HOVER;
+    private static int COL_SELECTED;
+    private static int COL_BTN_BG;
+    private static int COL_BTN_HOVER;
+    private static int COL_BTN_BORDER;
 
     // State
     private EditBox manualInputBox;
@@ -135,7 +138,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private static final int NBT_EDIT_ENCHANTED = -11;
     private static final int NBT_EDIT_STACK_SIZE = -12;
     private static final int NBT_MIN_GROUP_PREFIX = 10;
-    private static final int NBT_HEADING_COLOR = 0xFF88AACC;
+    private static int NBT_HEADING_COLOR;
 
     private record NbtRow(boolean heading, String display, int entryIdx, String group) {}
     private List<NbtRow> nbtRows = new ArrayList<>();
@@ -190,6 +193,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     @Override
     protected void init() {
         super.init();
+        refreshTheme();
         this.leftPos = (this.width - GUI_WIDTH) / 2;
         this.topPos = (this.height - imageHeight) / 2;
 
@@ -447,6 +451,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     protected void renderBg(GuiGraphics g, float pt, int mx, int my) {
+        refreshTheme();
         renderPanel(g, leftPos, topPos, imageWidth, imageHeight);
 
         g.drawString(font, title, leftPos + 8, topPos + 6, COL_ACCENT, false);
@@ -486,6 +491,21 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         g.drawString(font, playerInventoryTitle, leftPos + 8, topPos + playerInvY - 10, COL_GRAY, false);
 
         renderPlayerSlots(g);
+    }
+
+    private static void refreshTheme() {
+        Theme theme = ThemeState.active();
+        COL_BG = theme.surface();
+        COL_BORDER = theme.border();
+        COL_ACCENT = theme.accent();
+        COL_WHITE = theme.text();
+        COL_GRAY = theme.textMuted();
+        COL_HOVER = (theme.text() & 0x00FFFFFF) | 0x22000000;
+        COL_SELECTED = theme.accentSoft();
+        COL_BTN_BG = theme.surface2();
+        COL_BTN_HOVER = ThemePaint.brighten(theme.surface2(), 0x10);
+        COL_BTN_BORDER = theme.borderStrong();
+        NBT_HEADING_COLOR = theme.info();
     }
 
     @Override
