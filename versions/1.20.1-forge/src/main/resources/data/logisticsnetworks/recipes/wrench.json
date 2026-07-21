@@ -1,0 +1,33 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "conditions": [
+        {
+            "type": "forge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "T T",
+        "BGB",
+        "PPP"
+    ],
+    "key": {
+        "T": {
+            "item": "minecraft:redstone_torch"
+        },
+        "B": {
+            "item": "minecraft:stone_button"
+        },
+        "G": {
+            "tag": "forge:glass_panes"
+        },
+        "P": {
+            "item": "minecraft:polished_blackstone"
+        }
+    },
+    "result": {
+        "item": "logisticsnetworks:wrench",
+        "count": 1
+    }
+}

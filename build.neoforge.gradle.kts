@@ -178,7 +178,7 @@ val generateModMetadata by tasks.registering(ProcessResources::class) {
     )
     inputs.properties(replaceProperties)
     expand(replaceProperties)
-    from(rootProject.file("src/main/templates"))
+    from(if (modernMinecraft) rootProject.file("src/main/templates") else file("src/main/templates"))
     into("build/generated/sources/modMetadata")
 }
 

@@ -1,0 +1,30 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "PSP",
+        "AAA",
+        "PSP"
+    ],
+    "key": {
+        "P": {
+            "tag": "minecraft:planks"
+        },
+        "S": {
+            "tag": "c:strings"
+        },
+        "A": {
+            "item": "minecraft:paper"
+        }
+    },
+    "result": {
+        "id": "logisticsnetworks:small_filter",
+        "count": 1
+    }
+}

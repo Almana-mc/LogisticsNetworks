@@ -1,0 +1,36 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "conditions": [
+        {
+            "type": "forge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "ORO",
+        "HEH",
+        "OTO"
+    ],
+    "key": {
+        "O": {
+            "item": "minecraft:obsidian"
+        },
+        "R": {
+            "item": "minecraft:redstone_block"
+        },
+        "H": {
+            "item": "minecraft:hopper"
+        },
+        "E": {
+            "item": "minecraft:ender_eye"
+        },
+        "T": {
+            "item": "minecraft:redstone_torch"
+        }
+    },
+    "result": {
+        "item": "logisticsnetworks:logistics_node",
+        "count": 1
+    }
+}

@@ -1,0 +1,34 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        },
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "ars_nouveau"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "GSG",
+        "CSC",
+        "GSG"
+    ],
+    "key": {
+        "G": {
+            "item": "ars_nouveau:source_gem"
+        },
+        "S": {
+            "item": "ars_nouveau:source_jar"
+        },
+        "C": {
+            "item": "logisticsnetworks:iron_upgrade"
+        }
+    },
+    "result": {
+        "id": "logisticsnetworks:ars_source_upgrade",
+        "count": 1
+    }
+}

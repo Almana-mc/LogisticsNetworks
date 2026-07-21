@@ -1,0 +1,33 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "IHI",
+        "CSC",
+        "IHI"
+    ],
+    "key": {
+        "I": {
+            "item": "minecraft:iron_ingot"
+        },
+        "H": {
+            "item": "minecraft:hopper"
+        },
+        "C": {
+            "item": "minecraft:chest"
+        },
+        "S": {
+            "item": "minecraft:smooth_stone"
+        }
+    },
+    "result": {
+        "id": "logisticsnetworks:iron_upgrade",
+        "count": 1
+    }
+}

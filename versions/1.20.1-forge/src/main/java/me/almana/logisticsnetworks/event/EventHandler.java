@@ -1,0 +1,273 @@
+package me.almana.logisticsnetworks.event;
+
+import me.almana.logisticsnetworks.Config;
+import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.command.LogisticsCommand;
+import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.LogisticsNetwork;
+import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.data.RedstoneMode;
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.registration.ModTags;
+import me.almana.logisticsnetworks.registration.Registration;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.AABB;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
+import net.minecraftforge.eventbus.api.Event;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.entity.player.PlayerContainerEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.event.level.BlockEvent;
+import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fluids.capability.IFluidHandler;
+import net.minecraftforge.items.IItemHandler;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID)
+public class EventHandler {
+
+    @SubscribeEvent
+    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        if (!(event.getEntity() instanceof LogisticsNodeEntity node) || node.level().isClientSide())
+            return;
+        if (!(event.getLevel() instanceof ServerLevel serverLevel))
+            return;
+
+        UUID networkId = node.getNetworkId();
+        if (networkId != null) {
+            NetworkRegistry registry = NetworkRegistry.get(serverLevel);
+            LogisticsNetwork network = registry.getNetwork(networkId);
+            if (network != null) {
+                node.setNetworkName(network.getName());
+                registry.markNetworkDirty(networkId);
+            } else {
+                node.setNetworkName("Network-" + networkId.toString().substring(0, 6));
+            }
+        } else {
+            node.setNetworkName("");
+        }
+
+    }
+
+    @SubscribeEvent
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        LogisticsCommand.register(event.getDispatcher());
+    }
+
+    @SubscribeEvent
+    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        Player player = event.getEntity();
+        ItemStack stack = player.getItemInHand(event.getHand());
+
+        if (!(stack.getItem() instanceof WrenchItem))
+            return;
+
+        if (WrenchItem.getMode(stack) == WrenchItem.Mode.MASS_PLACEMENT) {
+            event.setUseBlock(Event.Result.DENY);
+            return;
+        }
+
+        Level level = event.getLevel();
+        BlockPos pos = event.getPos();
+
+        List<LogisticsNodeEntity> nodes = level.getEntitiesOfClass(LogisticsNodeEntity.class,
+                new AABB(pos).inflate(0.5));
+        for (LogisticsNodeEntity node : nodes) {
+            if (node.getAttachedPos().equals(pos) && node.isActive()) {
+                event.setUseBlock(Event.Result.DENY);
+                return;
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onNeighborUpdate(BlockEvent.NeighborNotifyEvent event) {
+        if (event.getLevel().isClientSide() || !(event.getLevel() instanceof ServerLevel level))
+            return;
+
+        AABB searchBox = new AABB(event.getPos()).inflate(1.0);
+        List<LogisticsNodeEntity> nodes = level.getEntitiesOfClass(LogisticsNodeEntity.class, searchBox);
+        NetworkRegistry registry = NetworkRegistry.get(level);
+
+        for (LogisticsNodeEntity node : nodes) {
+            if (!node.isActive() || node.getNetworkId() == null)
+                continue;
+
+            if (node.getAttachedPos().equals(event.getPos())) {
+                registry.markNetworkDirty(node.getNetworkId());
+            } else if (hasRedstoneSensitiveChannel(node)) {
+                registry.markNetworkDirty(node.getNetworkId());
+            }
+        }
+    }
+
+    private static boolean hasRedstoneSensitiveChannel(LogisticsNodeEntity node) {
+        ChannelData[] channels = node.getChannels();
+        for (ChannelData ch : channels) {
+            if (ch.isEnabled()) {
+                RedstoneMode mode = ch.getRedstoneMode();
+                if (mode == RedstoneMode.HIGH || mode == RedstoneMode.LOW) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @SubscribeEvent
+    public static void onBlockBreak(BlockEvent.BreakEvent event) {
+        if (event.getLevel().isClientSide() || !(event.getLevel() instanceof ServerLevel serverLevel))
+            return;
+
+        BlockPos pos = event.getPos();
+        List<LogisticsNodeEntity> nodes = serverLevel.getEntitiesOfClass(LogisticsNodeEntity.class,
+                new AABB(pos).inflate(0.1));
+
+        for (LogisticsNodeEntity node : nodes) {
+            if (node.getAttachedPos().equals(pos)) {
+                if (node.getNetworkId() != null) {
+                    NetworkRegistry.get(serverLevel).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
+                }
+
+                if (Config.dropNodeItem) {
+                    node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
+                }
+                node.dropFilters();
+                node.dropUpgrades();
+                node.discard();
+            }
+        }
+    }
+
+    private static List<String> getFilterWarnings(LogisticsNodeEntity node) {
+        List<String> warnings = new ArrayList<>();
+        ChannelData[] channels = node.getChannels();
+        for (int ch = 0; ch < channels.length; ch++) {
+            ChannelData channel = channels[ch];
+            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
+                ItemStack filterStack = channel.getFilterItem(slot);
+                if (filterStack.isEmpty())
+                    continue;
+                List<String> itemWarnings = FilterItemData.getWarnings(filterStack);
+                for (String w : itemWarnings) {
+                    warnings.add("Channel " + (ch + 1) + ", Filter " + (slot + 1) + ": " + w);
+                }
+            }
+        }
+        return warnings;
+    }
+
+    private static List<String> getBlacklistedResourceIds(ServerLevel level, BlockPos pos) {
+        List<String> ids = new ArrayList<>();
+
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity != null) {
+            IItemHandler itemHandler = blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER, null).orElse(null);
+            if (itemHandler != null) {
+                for (int slot = 0; slot < itemHandler.getSlots(); slot++) {
+                    ItemStack stack = itemHandler.getStackInSlot(slot);
+                    if (!stack.isEmpty() && stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
+                        String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+                        if (!ids.contains(id)) {
+                            ids.add(id);
+                        }
+                    }
+                }
+            }
+
+            IFluidHandler fluidHandler = blockEntity.getCapability(ForgeCapabilities.FLUID_HANDLER, null).orElse(null);
+            if (fluidHandler != null) {
+                for (int tank = 0; tank < fluidHandler.getTanks(); tank++) {
+                    FluidStack fluid = fluidHandler.getFluidInTank(tank);
+                    if (!fluid.isEmpty() && fluid.getFluid().builtInRegistryHolder().is(ModTags.RESOURCE_BLACKLIST_FLUIDS)) {
+                        String id = BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString();
+                        if (!ids.contains(id)) {
+                            ids.add(id);
+                        }
+                    }
+                }
+            }
+        }
+
+        ids.addAll(MekanismCompat.getBlacklistedChemicalNames(level, pos));
+        return ids;
+    }
+
+    @SubscribeEvent
+    public static void onPlayerContainerClose(PlayerContainerEvent.Close event) {
+        if (!(event.getEntity().level() instanceof ServerLevel level))
+            return;
+
+        if (event.getContainer() instanceof NodeMenu menu && event.getEntity() instanceof ServerPlayer player) {
+            LogisticsNodeEntity node = menu.getNode();
+            if (node != null && node.isActive() && node.getNetworkId() != null) {
+                LogisticsNetwork network = NetworkRegistry.get(level).getNetwork(node.getNetworkId());
+                if (network != null
+                        && NodeUpgradeData.needsDimensionalUpgradeWarning(node, network, level.getServer())) {
+                    player.sendSystemMessage(
+                            Component.translatable("gui.logisticsnetworks.dimensional_upgrade_warning"));
+                }
+
+                BlockPos attachedPos = node.getAttachedPos();
+                List<String> blacklisted = getBlacklistedResourceIds(level, attachedPos);
+                if (!blacklisted.isEmpty()) {
+                    MutableComponent msg = Component.translatable("gui.logisticsnetworks.blacklisted_resource_warning")
+                            .withStyle(ChatFormatting.RED);
+                    msg.append(Component.literal(" [" + String.join(", ", blacklisted) + "]")
+                            .withStyle(ChatFormatting.YELLOW));
+                    player.sendSystemMessage(msg);
+                }
+
+                List<String> filterWarnings = getFilterWarnings(node);
+                if (!filterWarnings.isEmpty()) {
+                    player.sendSystemMessage(Component.translatable("gui.logisticsnetworks.filter_warning")
+                            .withStyle(ChatFormatting.RED));
+                    for (String warning : filterWarnings) {
+                        player.sendSystemMessage(Component.literal("  " + warning)
+                                .withStyle(ChatFormatting.YELLOW));
+                    }
+                }
+            }
+        }
+
+        BlockPos containerPos = null;
+        for (Slot slot : event.getContainer().slots) {
+            if (slot.container instanceof BlockEntity be) {
+                containerPos = be.getBlockPos();
+                break;
+            }
+        }
+
+        if (containerPos != null) {
+            List<LogisticsNodeEntity> nodes = level.getEntitiesOfClass(LogisticsNodeEntity.class,
+                    new AABB(containerPos).inflate(0.1));
+            for (LogisticsNodeEntity node : nodes) {
+                if (node.isActive() && node.getNetworkId() != null && node.getAttachedPos().equals(containerPos)) {
+                    NetworkRegistry.get(level).markNetworkDirty(node.getNetworkId());
+                }
+            }
+        }
+    }
+
+}

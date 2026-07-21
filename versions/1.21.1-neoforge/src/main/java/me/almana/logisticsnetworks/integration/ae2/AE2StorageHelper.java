@@ -1,0 +1,144 @@
+package me.almana.logisticsnetworks.integration.ae2;
+
+import appeng.api.config.Actionable;
+import appeng.api.features.GridLinkables;
+import appeng.api.networking.IGrid;
+import appeng.api.networking.IGridNode;
+import appeng.api.networking.IInWorldGridNodeHost;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.KeyCounter;
+import appeng.api.storage.MEStorage;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import me.almana.logisticsnetworks.registration.Registration;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+
+final class AE2StorageHelper {
+
+    private AE2StorageHelper() {
+    }
+
+    @Nullable
+    static IGrid resolveGrid(ServerLevel callerLevel, GlobalPos linkPos) {
+        ServerLevel targetLevel = callerLevel.getServer().getLevel(linkPos.dimension());
+        if (targetLevel == null) return null;
+        BlockEntity be = targetLevel.getBlockEntity(linkPos.pos());
+        if (!(be instanceof IInWorldGridNodeHost host)) return null;
+        IGridNode gridNode = host.getGridNode(null);
+        if (gridNode == null) {
+            for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.values()) {
+                gridNode = host.getGridNode(dir);
+                if (gridNode != null) break;
+            }
+        }
+        if (gridNode == null || !gridNode.isActive()) return null;
+        return gridNode.getGrid();
+    }
+
+    static boolean isGridAccessible(ServerLevel callerLevel, GlobalPos linkPos) {
+        return resolveGrid(callerLevel, linkPos) != null;
+    }
+
+    static boolean isGridHost(Level level, BlockPos pos) {
+        return level.getBlockEntity(pos) instanceof IInWorldGridNodeHost;
+    }
+
+    static long countAvailable(ServerLevel callerLevel, GlobalPos linkPos, ItemStack pattern) {
+        IGrid grid = resolveGrid(callerLevel, linkPos);
+        if (grid == null || pattern.isEmpty()) return 0;
+        MEStorage storage = grid.getStorageService().getInventory();
+        long total = 0;
+        for (AEItemKey key : matchingItemKeys(storage, pattern)) {
+            total = saturatingAdd(total, storage.extract(key, Long.MAX_VALUE, Actionable.SIMULATE,
+                    IActionSource.empty()));
+        }
+        return total;
+    }
+
+    static int extractItems(ServerLevel callerLevel, GlobalPos linkPos, ItemStack pattern, int amount, ServerPlayer player) {
+        IGrid grid = resolveGrid(callerLevel, linkPos);
+        if (grid == null || pattern.isEmpty() || amount <= 0) return 0;
+        MEStorage storage = grid.getStorageService().getInventory();
+        IActionSource source = IActionSource.ofPlayer(player);
+        long remaining = amount;
+        long extracted = 0;
+        for (AEItemKey key : matchingItemKeys(storage, pattern)) {
+            if (remaining <= 0) break;
+            long moved = storage.extract(key, remaining, Actionable.MODULATE, source);
+            remaining -= moved;
+            extracted += moved;
+        }
+        return (int) Math.min(extracted, Integer.MAX_VALUE);
+    }
+
+    static long countAvailableByItem(ServerLevel callerLevel, GlobalPos linkPos, Item target) {
+        IGrid grid = resolveGrid(callerLevel, linkPos);
+        if (grid == null) return 0;
+        MEStorage storage = grid.getStorageService().getInventory();
+        KeyCounter counter = storage.getAvailableStacks();
+        long total = 0;
+        for (Object2LongMap.Entry<AEKey> entry : counter) {
+            AEKey what = entry.getKey();
+            if (what instanceof AEItemKey itemKey && itemKey.getItem() == target) {
+                total += entry.getLongValue();
+                if (total < 0) return Long.MAX_VALUE;
+            }
+        }
+        return total;
+    }
+
+    static int extractItemsByItem(ServerLevel callerLevel, GlobalPos linkPos, Item target, int amount, ServerPlayer player) {
+        IGrid grid = resolveGrid(callerLevel, linkPos);
+        if (grid == null) return 0;
+        MEStorage storage = grid.getStorageService().getInventory();
+        KeyCounter counter = storage.getAvailableStacks();
+        List<AEItemKey> candidates = new ArrayList<>();
+        for (Object2LongMap.Entry<AEKey> entry : counter) {
+            AEKey what = entry.getKey();
+            if (what instanceof AEItemKey itemKey && itemKey.getItem() == target) {
+                candidates.add(itemKey);
+            }
+        }
+        int remaining = amount;
+        IActionSource src = IActionSource.ofPlayer(player);
+        for (AEItemKey itemKey : candidates) {
+            if (remaining <= 0) break;
+            long extracted = storage.extract(itemKey, remaining, Actionable.MODULATE, src);
+            remaining -= (int) Math.min(extracted, remaining);
+        }
+        return amount - remaining;
+    }
+
+    static void registerWrenchLinkable() {
+        GridLinkables.register(Registration.WRENCH.get(), AE2LinkHandler.INSTANCE);
+    }
+
+    private static List<AEItemKey> matchingItemKeys(MEStorage storage, ItemStack pattern) {
+        KeyCounter counter = storage.getAvailableStacks();
+        List<AEItemKey> candidates = new ArrayList<>();
+        for (Object2LongMap.Entry<AEKey> entry : counter) {
+            AEKey what = entry.getKey();
+            if (what instanceof AEItemKey itemKey && ItemStack.isSameItem(itemKey.toStack(), pattern)) {
+                candidates.add(itemKey);
+            }
+        }
+        return candidates;
+    }
+
+    private static long saturatingAdd(long left, long right) {
+        long result = left + right;
+        return result < 0 ? Long.MAX_VALUE : result;
+    }
+}

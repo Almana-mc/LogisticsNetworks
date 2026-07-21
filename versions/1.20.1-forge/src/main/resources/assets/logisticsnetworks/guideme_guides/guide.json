@@ -1,0 +1,15 @@
+{
+  "item_settings": {
+    "display_name": {
+      "text": "Logistics Networks Guide"
+    },
+    "tooltip_lines": [
+      {
+        "text": "In game documentation for Logistics Networks",
+        "color": "gray"
+      }
+    ]
+  },
+  "default_language": "en_us",
+  "initial_page": "index.md"
+}

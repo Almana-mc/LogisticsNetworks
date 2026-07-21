@@ -1,0 +1,33 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "CEC",
+        "BSB",
+        "CEC"
+    ],
+    "key": {
+        "C": {
+            "item": "minecraft:crying_obsidian"
+        },
+        "E": {
+            "item": "minecraft:end_crystal"
+        },
+        "B": {
+            "item": "minecraft:dragon_breath"
+        },
+        "S": {
+            "item": "minecraft:nether_star"
+        }
+    },
+    "result": {
+        "id": "logisticsnetworks:dimensional_upgrade",
+        "count": 1
+    }
+}

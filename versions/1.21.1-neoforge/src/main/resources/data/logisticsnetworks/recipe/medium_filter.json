@@ -1,0 +1,27 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "PPP",
+        " S ",
+        "PPP"
+    ],
+    "key": {
+        "P": {
+            "item": "minecraft:paper"
+        },
+        "S": {
+            "item": "logisticsnetworks:small_filter"
+        }
+    },
+    "result": {
+        "id": "logisticsnetworks:medium_filter",
+        "count": 1
+    }
+}

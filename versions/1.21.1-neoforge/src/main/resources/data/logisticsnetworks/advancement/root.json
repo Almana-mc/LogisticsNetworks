@@ -1,0 +1,51 @@
+{
+  "display": {
+    "icon": {
+      "id": "logisticsnetworks:wrench"
+    },
+    "title": {
+      "translate": "advancement.logisticsnetworks.root.title"
+    },
+    "description": {
+      "translate": "advancement.logisticsnetworks.root.description"
+    },
+    "background": "minecraft:textures/block/deepslate.png",
+    "show_toast": true,
+    "announce_to_chat": false
+  },
+  "criteria": {
+    "has_wrench": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "logisticsnetworks:wrench"
+          }
+        ]
+      }
+    },
+    "has_node": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "logisticsnetworks:logistics_node"
+          }
+        ]
+      }
+    },
+    "has_computer": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "logisticsnetworks:computer"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    ["has_wrench", "has_node", "has_computer"]
+  ]
+}

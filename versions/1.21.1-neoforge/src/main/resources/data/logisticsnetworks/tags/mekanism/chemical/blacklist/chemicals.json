@@ -1,0 +1,13 @@
+{
+    "replace": false,
+    "values": [
+        {
+            "id": "mekanism:nuclear_waste",
+            "required": false
+        },
+        {
+            "id": "mekanism:spent_nuclear_waste",
+            "required": false
+        }
+    ]
+}

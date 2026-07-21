@@ -119,7 +119,7 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 }
 
-val generateModMetadata by tasks.registering(ProcessResources::class) {
+tasks.named<ProcessResources>("processResources") {
     val replaceProperties = mapOf(
         "minecraft_version" to minecraft_version,
         "minecraft_version_range" to minecraft_version_range,
@@ -134,13 +134,10 @@ val generateModMetadata by tasks.registering(ProcessResources::class) {
         "mod_description" to mod_description
     )
     inputs.properties(replaceProperties)
-    expand(replaceProperties)
-    from(rootProject.file("src/forge/templates"))
-    into("build/generated/sources/modMetadata")
+    filesMatching("META-INF/mods.toml") {
+        expand(replaceProperties)
+    }
 }
-
-sourceSets.main.get().resources.srcDir(generateModMetadata)
-legacyForge.ideSyncTask(generateModMetadata)
 
 tasks.named("createMinecraftArtifacts") {
     dependsOn("stonecutterGenerate")
