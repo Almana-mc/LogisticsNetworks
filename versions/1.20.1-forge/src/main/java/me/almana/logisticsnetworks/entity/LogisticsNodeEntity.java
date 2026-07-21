@@ -45,6 +45,7 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_VALID = "Valid";
     private static final String KEY_NETWORK_ID = "NetworkId";
     private static final String KEY_NETWORK_NAME = "NetworkName";
+    private static final String KEY_NETWORK_COLOR = "NetworkColor";
     private static final String KEY_VISIBLE = "RenderVisible";
     private static final String KEY_CHANNELS = "Channels";
     private static final String KEY_UPGRADES = "Upgrades";
@@ -63,6 +64,8 @@ public class LogisticsNodeEntity extends Entity {
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
     private static final EntityDataAccessor<String> NETWORK_NAME = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Integer> NETWORK_COLOR = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> RENDER_VISIBLE = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Optional<UUID>> OWNER_UUID = SynchedEntityData
@@ -103,6 +106,7 @@ public class LogisticsNodeEntity extends Entity {
         this.entityData.define(VALID, false);
         this.entityData.define(NETWORK_ID, Optional.empty());
         this.entityData.define(NETWORK_NAME, "");
+        this.entityData.define(NETWORK_COLOR, me.almana.logisticsnetworks.data.NetworkColors.DEFAULT);
         this.entityData.define(RENDER_VISIBLE, true);
         this.entityData.define(OWNER_UUID, Optional.empty());
         this.entityData.define(NODE_LABEL, "");
@@ -121,6 +125,9 @@ public class LogisticsNodeEntity extends Entity {
         }
         if (compound.contains(KEY_NETWORK_NAME, Tag.TAG_STRING)) {
             setNetworkName(compound.getString(KEY_NETWORK_NAME));
+        }
+        if (compound.contains(KEY_NETWORK_COLOR)) {
+            setNetworkColor(compound.getInt(KEY_NETWORK_COLOR));
         }
         if (compound.contains(KEY_VISIBLE)) {
             setRenderVisible(compound.getBoolean(KEY_VISIBLE));
@@ -174,6 +181,7 @@ public class LogisticsNodeEntity extends Entity {
         if (!networkName.isBlank()) {
             compound.putString(KEY_NETWORK_NAME, networkName);
         }
+        compound.putInt(KEY_NETWORK_COLOR, getNetworkColor());
         compound.putBoolean(KEY_VISIBLE, isRenderVisible());
 
         UUID owner = getOwnerUUID();
@@ -304,6 +312,7 @@ public class LogisticsNodeEntity extends Entity {
         this.entityData.set(NETWORK_ID, Optional.ofNullable(networkId));
         if (networkId == null) {
             setNetworkName("");
+            setNetworkColor(me.almana.logisticsnetworks.data.NetworkColors.DEFAULT);
         }
     }
 
@@ -313,6 +322,14 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setNetworkName(@Nullable String networkName) {
         this.entityData.set(NETWORK_NAME, networkName == null ? "" : networkName);
+    }
+
+    public int getNetworkColor() {
+        return this.entityData.get(NETWORK_COLOR);
+    }
+
+    public void setNetworkColor(int color) {
+        this.entityData.set(NETWORK_COLOR, me.almana.logisticsnetworks.data.NetworkColors.mask(color));
     }
 
     public boolean isRenderVisible() {

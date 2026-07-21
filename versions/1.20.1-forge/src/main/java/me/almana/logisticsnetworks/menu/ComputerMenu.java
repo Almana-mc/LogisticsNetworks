@@ -106,7 +106,8 @@ public class ComputerMenu extends AbstractContainerMenu {
             entries.add(new SyncNetworkListPayload.NetworkEntry(
                     net.getId(),
                     net.getName(),
-                    net.getNodeUuids().size()));
+                    net.getNodeUuids().size(),
+                    net.getColor()));
         }
 
         LOGGER.debug("Sending {} network entries to client", entries.size());

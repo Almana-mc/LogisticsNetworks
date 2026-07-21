@@ -22,6 +22,7 @@ import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
 import me.almana.logisticsnetworks.network.SetChannelNamePayload;
+import me.almana.logisticsnetworks.network.SetNetworkColorPayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
@@ -95,6 +96,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     // Rename state
     private UUID renamingNetworkId = null;
     private EditBox renameEditBox = null;
+    private NetworkEditor colorEditor = null;
 
     // Settings scroll state
     private int settingsScrollOffset = 0;
@@ -236,6 +238,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
         if (tweaksOpen) {
             renderTweaksPanel(g, mx, my);
+        }
+        if (colorEditor != null) {
+            colorEditor.render(g, mx, my, theme());
         }
         this.renderTooltip(g, mx, my);
         if (hoveredChannelName != null && currentPage == Page.CHANNEL_CONFIG) {
@@ -507,7 +512,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         g.fill(x, y, x + w, y + 17, hoveredRow ? cBorderStrong() : cPanel());
         g.renderOutline(x, y, w, 17, hoveredRow ? cAccent() : cBorder());
-        g.drawString(font, entry.name(), x + 5, y + 4, hoveredRow ? hoverFg : cMuted(), false);
+        g.fill(x + 4, y + 4, x + 12, y + 13, 0xFF000000 | entry.color());
+        g.renderOutline(x + 4, y + 4, 8, 9, cBorder());
+        g.drawString(font, entry.name(), x + 16, y + 4, hoveredRow ? hoverFg : cMuted(), false);
 
         String info = tr("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
         int infoX = renameBtnX - font.width(info) - 4;
@@ -935,6 +942,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
+        if (colorEditor != null) {
+            return colorEditor.mouseClicked(mx, my, btn);
+        }
         if (tweaksOpen) {
             if (btn == 0) return handleTweaksClick(mx, my);
             return true;
@@ -995,6 +1005,11 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             int renameBtnW = font.width(tr("gui.logisticsnetworks.rename")) + 14;
             int renameBtnX = leftPos + 14 + entryW - renameBtnW;
 
+            if (isHoveringAbs(leftPos + 14 + 4, y + 4, 8, 9, mx, my)) {
+                openColorEditor(entry);
+                return true;
+            }
+
             // Check rename button click
             if (isHoveringAbs(renameBtnX, y, renameBtnW, 17, mx, my)) {
                 startRenameEdit(entry, leftPos + 14 + 3, y + 1, entryW - 6);
@@ -1021,6 +1036,34 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         renameEditBox.setFocused(true);
         addRenderableWidget(renameEditBox);
         setFocused(renameEditBox);
+    }
+
+    private void openColorEditor(SyncNetworkListPayload.NetworkEntry entry) {
+        UUID id = entry.id();
+        int oldColor = entry.color();
+        colorEditor = new NetworkEditor(font, width, height, oldColor,
+                rgb -> {
+                    if (rgb != oldColor) {
+                        NetworkHandler.sendToServer(new SetNetworkColorPayload(id, rgb));
+                    }
+                },
+                () -> colorEditor = null);
+    }
+
+    @Override
+    public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
+        if (colorEditor != null && colorEditor.mouseDragged(mx, my)) {
+            return true;
+        }
+        return super.mouseDragged(mx, my, btn, dx, dy);
+    }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int btn) {
+        if (colorEditor != null && colorEditor.mouseReleased()) {
+            return true;
+        }
+        return super.mouseReleased(mx, my, btn);
     }
 
     private void stopRenameEdit(boolean commit) {
@@ -1478,6 +1521,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
+        if (colorEditor != null) {
+            return colorEditor.keyPressed(key);
+        }
         if (key == 256) {
             if (channelNameEditing) {
                 stopChannelNameEdit(false);
@@ -1538,6 +1584,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     @Override
     public boolean charTyped(char ch, int modifiers) {
+        if (colorEditor != null) {
+            return colorEditor.charTyped(ch);
+        }
         if (channelNameEditing && channelNameEditBox != null) {
             return channelNameEditBox.charTyped(ch, modifiers);
         }

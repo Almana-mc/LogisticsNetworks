@@ -113,7 +113,8 @@ public class ComputerMenu extends AbstractContainerMenu {
                     net.getId(),
                     net.getName(),
                     net.getNodeUuids().size(),
-                    starredNetworks.contains(net.getId())));
+                    starredNetworks.contains(net.getId()),
+                    net.getColor()));
         }
 
         LOGGER.debug("Sending {} network entries to client", entries.size());

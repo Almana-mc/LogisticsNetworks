@@ -232,6 +232,43 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleSetNetworkColor(SetNetworkColorPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null)
+                return;
+
+            if (network.getOwnerUuid() != null
+                    && !network.getOwnerUuid().equals(player.getUUID())
+                    && !(FTBTeamsCompat.isLoaded()
+                            && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
+                    && !player.hasPermissions(2)) {
+                return;
+            }
+
+            network.setColor(payload.color());
+            registry.setDirty();
+
+            for (java.util.UUID nodeId : network.getNodeUuids()) {
+                for (ServerLevel level : player.getServer().getAllLevels()) {
+                    Entity entity = level.getEntity(nodeId);
+                    if (entity instanceof LogisticsNodeEntity node) {
+                        node.setNetworkColor(network.getColor());
+                        break;
+                    }
+                }
+            }
+
+            if (player.containerMenu instanceof NodeMenu menu) {
+                menu.sendNetworkListToClient(player);
+            }
+        });
+    }
+
     public static void handleToggleComputerPinnedNetwork(ToggleComputerPinnedNetworkPayload payload,
             IPayloadContext context) {
         context.enqueueWork(() -> {

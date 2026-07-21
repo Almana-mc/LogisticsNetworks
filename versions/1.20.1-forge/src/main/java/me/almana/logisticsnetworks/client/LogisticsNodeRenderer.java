@@ -116,7 +116,11 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     private void renderWrenchOverlay(LogisticsNodeEntity entity, PoseStack poseStack, MultiBufferSource buffer,
             int light) {
-        renderHighlightBox(poseStack, buffer, 0f, 1f, 0f, 0.35f, false);
+        int networkColor = entity.getNetworkColor();
+        float wr = ((networkColor >> 16) & 0xFF) / 255f;
+        float wg = ((networkColor >> 8) & 0xFF) / 255f;
+        float wb = (networkColor & 0xFF) / 255f;
+        renderHighlightBox(poseStack, buffer, wr, wg, wb, 0.35f, false);
 
         if (Config.debugMode) {
             poseStack.pushPose();

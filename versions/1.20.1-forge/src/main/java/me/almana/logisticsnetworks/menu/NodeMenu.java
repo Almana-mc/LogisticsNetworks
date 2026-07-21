@@ -169,7 +169,8 @@ public class NodeMenu extends AbstractContainerMenu {
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {
-            entries.add(new SyncNetworkListPayload.NetworkEntry(net.getId(), net.getName(), net.getNodeUuids().size()));
+            entries.add(new SyncNetworkListPayload.NetworkEntry(net.getId(), net.getName(), net.getNodeUuids().size(),
+                    net.getColor()));
         }
 
         NetworkHandler.sendToPlayer(player, new SyncNetworkListPayload(entries));

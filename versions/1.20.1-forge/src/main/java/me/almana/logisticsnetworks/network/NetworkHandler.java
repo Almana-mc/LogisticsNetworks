@@ -56,6 +56,7 @@ public final class NetworkHandler {
         registerServer(OpenFilterInSlotPayload.class, OpenFilterInSlotPayload.STREAM_CODEC, ServerPayloadHandler::handleOpenFilterInSlot);
         registerServer(OpenNodeFilterPayload.class, OpenNodeFilterPayload.STREAM_CODEC, ServerPayloadHandler::handleOpenNodeFilter);
         registerServer(RenameNetworkPayload.class, RenameNetworkPayload.STREAM_CODEC, ServerPayloadHandler::handleRenameNetwork);
+        registerServer(SetNetworkColorPayload.class, SetNetworkColorPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNetworkColor);
         registerServer(ApplyPatternPayload.class, ApplyPatternPayload.STREAM_CODEC, ServerPayloadHandler::handleApplyPattern);
         registerServer(RequestNetworkNodesPayload.class, RequestNetworkNodesPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestNetworkNodes);
         registerServer(RequestNetworkLabelsPayload.class, RequestNetworkLabelsPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestNetworkLabels);
