@@ -15,8 +15,17 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.filter.FilterTargetType;
+import me.almana.logisticsnetworks.filter.ModFilterData;
+import me.almana.logisticsnetworks.filter.NameFilterData;
+import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.registration.ModTags;
+import me.almana.logisticsnetworks.network.AddNodeFilterItemPayload;
 import me.almana.logisticsnetworks.network.AssignNetworkPayload;
+import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
+import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
@@ -31,6 +40,7 @@ import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.client.theme.Themes;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -38,6 +48,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.*;
@@ -121,6 +132,15 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     private int labelScrollOffset = 0;
     private static final int LABEL_PICKER_ENTRY_H = 14;
     private static final int LABEL_PICKER_MAX_VISIBLE = 5;
+
+    // Virtual filter state
+    private boolean filterDisabledHover = false;
+    private boolean filterPickerOpen = false;
+    private int filterPickerSlot = -1;
+    private boolean filterAddHover = false;
+    private long filterAddedToastUntil = 0;
+    private static final int FILTER_PICKER_W = 56;
+    private static final int FILTER_PICKER_ROW_H = 13;
 
     private int getLabelPickerWidth() {
         int maxW = font.width(tr("gui.logisticsnetworks.node.label.clear")) + 24;
@@ -236,6 +256,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         if (labelPickerOpen && currentPage == Page.CHANNEL_CONFIG) {
             renderLabelPicker(g, mx, my, pt);
         }
+        if (filterPickerOpen && currentPage == Page.CHANNEL_CONFIG) {
+            renderFilterPicker(g, mx, my);
+        }
         if (tweaksOpen) {
             renderTweaksPanel(g, mx, my);
         }
@@ -251,6 +274,19 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             LogisticsNodeEntity node = getMenu().getNode();
             List<Component> tip = getSettingTooltip(node.getChannel(selectedChannel), settingsHoverRow);
             g.renderComponentTooltip(font, tip, mx, my);
+        }
+        if (filterDisabledHover && currentPage == Page.CHANNEL_CONFIG) {
+            g.renderTooltip(font,
+                    Component.translatable("gui.logisticsnetworks.node.filter.unfilterable"), mx, my);
+        }
+        if (filterAddHover && currentPage == Page.CHANNEL_CONFIG) {
+            g.renderTooltip(font,
+                    Component.translatable("gui.logisticsnetworks.node.filter.add.hint"), mx, my);
+        }
+        if (System.currentTimeMillis() < filterAddedToastUntil && currentPage == Page.CHANNEL_CONFIG) {
+            g.renderTooltip(font,
+                    Component.translatable("gui.logisticsnetworks.node.filter.add.done")
+                            .withStyle(ChatFormatting.GREEN), mx, my);
         }
     }
 
@@ -835,6 +871,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
     }
 
     private void drawFilterGrid(GuiGraphics g, ChannelData ch, int x, int y, int mx, int my) {
+        filterDisabledHover = false;
+        filterAddHover = false;
         Theme t = theme();
         String filtersLabel = tr("gui.logisticsnetworks.node.filters");
         g.drawString(font, filtersLabel, x, y, cMuted(), false);
@@ -848,16 +886,182 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
         int gridY = y + 12;
         int gridW = 3 * 19 - 1;
-        ThemePaint.sunkPanel(g, x - 2, gridY - 2, gridW + 4, 3 * 19 + 2, t);
-        drawSlotGrid(g, x, gridY, 3, 3, mx, my);
+        boolean filterable = ch.getType() != ChannelType.ENERGY && ch.getType() != ChannelType.SOURCE;
+        ThemePaint.sunkPanel(g, x - 2, gridY - 2, gridW + 4, 2 * 19 + 2, t);
+        for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
+            int bx = x + (i % 3) * 19;
+            int by = gridY + (i / 3) * 19;
+            boolean hovered = filterable && !labelPickerOpen && !filterPickerOpen
+                    && mx >= bx - 1 && mx <= bx + 17 && my >= by - 1 && my <= by + 17;
+            ItemStack stack = ch.getFilterItem(i);
+            String label = filterable ? filterButtonText(stack) : "";
+            ThemePaint.button(g, font, bx - 1, by - 1, 18, 18, label, hovered, t);
+            if (hovered && !menu.getCarried().isEmpty() && !menu.getCarried().is(ModTags.FILTERS)
+                    && isFilterSlotItemAddable(i)) {
+                filterAddHover = true;
+            }
+        }
+        if (!filterable) {
+            g.fill(x - 2, gridY - 2, x - 2 + gridW + 4, gridY - 2 + 2 * 19 + 2, 0x99202020);
+            if (!labelPickerOpen && mx >= x - 2 && mx <= x + gridW && my >= gridY - 2 && my <= gridY + 2 * 19) {
+                filterDisabledHover = true;
+            }
+        }
 
-        int upgY = gridY + 3 * 19 + 2;
+        int upgY = gridY + 2 * 19 + 2;
         String upgradesLabel = Component.translatable("gui.logisticsnetworks.node.upgrades").getString();
         g.drawString(font, upgradesLabel, x, upgY, cMuted(), false);
 
         int gridW2 = 2 * 19 - 1;
         ThemePaint.sunkPanel(g, x - 2, upgY + 8, gridW2 + 4, 2 * 19 + 2, t);
         drawSlotGrid(g, x, upgY + 10, 2, 2, mx, my);
+    }
+
+    private int filterButtonX(int slot) {
+        return leftPos + 168 + (slot % 3) * 19;
+    }
+
+    private int filterButtonY(int slot) {
+        return topPos + 68 + (slot / 3) * 19;
+    }
+
+    private boolean isHoveringFilterButton(int slot, double mx, double my) {
+        int x = filterButtonX(slot);
+        int y = filterButtonY(slot);
+        return mx >= x - 1 && mx <= x + 17 && my >= y - 1 && my <= y + 17;
+    }
+
+    public boolean isFilterSlotItemAddable(int slot) {
+        LogisticsNodeEntity node = getMenu().getNode();
+        if (node == null) {
+            return false;
+        }
+        ChannelData ch = node.getChannel(selectedChannel);
+        if (ch == null || ch.getType() == ChannelType.ENERGY || ch.getType() == ChannelType.SOURCE) {
+            return false;
+        }
+        ItemStack filter = ch.getFilterItem(slot);
+        return filter.isEmpty() || FilterItemData.isFilterItem(filter);
+    }
+
+    public void addItemToFilterSlot(int slot, ItemStack item) {
+        LogisticsNodeEntity node = getMenu().getNode();
+        if (node == null || item.isEmpty() || item.is(ModTags.FILTERS)) {
+            return;
+        }
+        ChannelData ch = node.getChannel(selectedChannel);
+        if (ch == null || ch.getType() == ChannelType.ENERGY || ch.getType() == ChannelType.SOURCE) {
+            return;
+        }
+        ItemStack filter = ch.getFilterItem(slot);
+        if (filter.isEmpty()) {
+            filter = VirtualFilterType.SMALL.createStack();
+            FilterItemData.setTargetType(filter, FilterTargetType.forChannel(ch.getType()));
+        } else if (!FilterItemData.isFilterItem(filter)) {
+            return;
+        } else {
+            filter = filter.copy();
+        }
+        if (!FilterItemData.addItem(filter, item, minecraft.level.registryAccess())) {
+            return;
+        }
+        ch.setFilterItem(slot, filter);
+        PacketDistributor.sendToServer(new AddNodeFilterItemPayload(
+                node.getId(), selectedChannel, slot, item.copyWithCount(1)));
+        filterAddedToastUntil = System.currentTimeMillis() + 1500;
+    }
+
+    private String filterButtonText(ItemStack stack) {
+        if (isFilterButtonEmpty(stack)) {
+            return "+";
+        }
+        return switch (VirtualFilterType.fromStack(stack)) {
+            case MOD -> "Mo";
+            case NAME -> "Rx";
+            default -> "N";
+        };
+    }
+
+    private boolean isFilterButtonEmpty(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return true;
+        }
+        VirtualFilterType type = VirtualFilterType.fromStack(stack);
+        return switch (type) {
+            case EXISTING -> false;
+            case SMALL, MEDIUM, BIG -> !FilterItemData.hasAnyEntries(stack);
+            case MOD -> !ModFilterData.hasAnyMods(stack);
+            case NAME -> !NameFilterData.hasNameFilter(stack);
+        };
+    }
+
+    private void openFilterPicker(int slot) {
+        filterPickerOpen = true;
+        filterPickerSlot = slot;
+    }
+
+    private void closeFilterPicker() {
+        filterPickerOpen = false;
+        filterPickerSlot = -1;
+    }
+
+    private int filterPickerX() {
+        int x = filterButtonX(filterPickerSlot);
+        return Math.min(x, leftPos + GUI_WIDTH - FILTER_PICKER_W - 2);
+    }
+
+    private int filterPickerY() {
+        return filterButtonY(filterPickerSlot) + 18;
+    }
+
+    private void renderFilterPicker(GuiGraphics g, int mx, int my) {
+        int px = filterPickerX();
+        int py = filterPickerY();
+        int pw = FILTER_PICKER_W;
+        int ph = 3 * FILTER_PICKER_ROW_H;
+        String[] labels = {
+                tr("gui.logisticsnetworks.node.filter.pick.normal"),
+                tr("gui.logisticsnetworks.node.filter.pick.mod"),
+                tr("gui.logisticsnetworks.node.filter.pick.regex")
+        };
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 200);
+        g.fill(px - 1, py - 1, px + pw + 1, py + ph + 1, cBorder());
+        g.fill(px, py, px + pw, py + ph, cPanel());
+        for (int r = 0; r < labels.length; r++) {
+            int ry = py + r * FILTER_PICKER_ROW_H;
+            boolean hovered = mx >= px && mx < px + pw && my >= ry && my < ry + FILTER_PICKER_ROW_H;
+            if (hovered) {
+                g.fill(px, ry, px + pw, ry + FILTER_PICKER_ROW_H, cHover());
+            }
+            g.drawString(font, labels[r], px + 4, ry + 3, cInfo(), false);
+        }
+        g.pose().popPose();
+    }
+
+    private boolean handleFilterPickerClick(LogisticsNodeEntity node, double mx, double my) {
+        ChannelData channel = node.getChannel(selectedChannel);
+        if (channel == null) {
+            return false;
+        }
+        int slot = filterPickerSlot;
+        VirtualFilterType[] opts = {
+                VirtualFilterType.SMALL, VirtualFilterType.MOD, VirtualFilterType.NAME
+        };
+        int px = filterPickerX();
+        int py = filterPickerY();
+        for (int r = 0; r < opts.length; r++) {
+            int ry = py + r * FILTER_PICKER_ROW_H;
+            if (mx >= px && mx < px + FILTER_PICKER_W && my >= ry && my < ry + FILTER_PICKER_ROW_H) {
+                VirtualFilterType type = opts[r];
+                channel.setFilterItem(slot, type.createStack());
+                PacketDistributor.sendToServer(new OpenNodeFilterPayload(
+                        node.getId(), selectedChannel, slot, type));
+                closeFilterPicker();
+                return true;
+            }
+        }
+        return false;
     }
 
     private void drawSlotGrid(GuiGraphics g, int startX, int startY, int rows, int cols, int mx, int my) {
@@ -1181,6 +1385,13 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             return true;
         }
 
+        if (filterPickerOpen) {
+            if (handleFilterPickerClick(node, mx, my))
+                return true;
+            closeFilterPicker();
+            return true;
+        }
+
         String visibilityLabel = getVisibilityLabel(node.isRenderVisible());
         if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(visibilityLabel) + 16, 12, mx, my)) {
             node.setRenderVisible(!node.isRenderVisible());
@@ -1270,6 +1481,35 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             ch.setFilterMode(cycleEnum(ch.getFilterMode(), (btn == 0) ? 1 : -1));
             commitChannelUpdate(node, ch);
             return true;
+        }
+
+        if (ch.getType() != ChannelType.ENERGY && ch.getType() != ChannelType.SOURCE) {
+            for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
+                if (isHoveringFilterButton(i, mx, my)) {
+                    ItemStack carried = menu.getCarried();
+                    if (!carried.isEmpty() && !carried.is(ModTags.FILTERS)
+                            && isFilterSlotItemAddable(i)) {
+                        addItemToFilterSlot(i, carried);
+                        return true;
+                    }
+                    ItemStack current = ch.getFilterItem(i);
+                    if (isFilterButtonEmpty(current)) {
+                        if (btn == 0) {
+                            openFilterPicker(i);
+                        }
+                        return true;
+                    }
+                    if (btn == 1) {
+                        ch.setFilterItem(i, ItemStack.EMPTY);
+                        PacketDistributor.sendToServer(new SetChannelFilterItemPayload(
+                                node.getId(), selectedChannel, i, ItemStack.EMPTY));
+                        return true;
+                    }
+                    PacketDistributor.sendToServer(new OpenNodeFilterPayload(
+                            node.getId(), selectedChannel, i, VirtualFilterType.EXISTING));
+                    return true;
+                }
+            }
         }
 
         return false;

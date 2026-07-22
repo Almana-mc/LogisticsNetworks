@@ -599,39 +599,121 @@ public class ServerPayloadHandler {
 
             int ch = payload.channel();
             int fs = payload.filterSlot();
-            if (ch < 0 || ch >= 9 || fs < 0 || fs >= 9) return;
+            if (ch < 0 || ch >= LogisticsNodeEntity.CHANNEL_COUNT || fs < 0 || fs >= ChannelData.FILTER_SIZE) return;
 
             ChannelData channel = node.getChannel(ch);
             if (channel == null) return;
 
-            ItemStack stack = channel.getFilterItem(fs);
-            if (stack.isEmpty() || !stack.is(ModTags.FILTERS)) return;
+            FilterTargetType desired = targetForChannel(channel.getType());
+            if (desired == null) return;
 
-            boolean isTag = stack.getItem() instanceof TagFilterItem;
-            boolean isAmount = stack.getItem() instanceof AmountFilterItem;
-            boolean isDurability = stack.getItem() instanceof DurabilityFilterItem;
-            boolean isMod = stack.getItem() instanceof ModFilterItem;
-            boolean isSlot = stack.getItem() instanceof SlotFilterItem;
-            boolean isName = stack.getItem() instanceof NameFilterItem;
-            boolean isSpecial = isTag || isAmount || isDurability || isMod || isSlot || isName;
+            ItemStack stack = channel.getFilterItem(fs);
+            VirtualFilterType requested = payload.requestedType();
+            boolean needFresh = requested != VirtualFilterType.EXISTING
+                    || stack.isEmpty() || !stack.is(ModTags.FILTERS)
+                    || currentTarget(stack) != desired;
+            if (needFresh) {
+                VirtualFilterType role = requested != VirtualFilterType.EXISTING
+                        ? requested
+                        : (stack.isEmpty() ? VirtualFilterType.SMALL : VirtualFilterType.fromStack(stack));
+                stack = role.createStack();
+                applyTarget(stack, desired);
+                channel.setFilterItem(fs, stack);
+                sendChannelSyncToViewers(node, ch, channel);
+                propagateToLabelGroup(node, ch);
+                markNetworkDirty(node);
+            }
+
+            VirtualFilterType type = VirtualFilterType.fromStack(stack);
+            boolean isMod = type == VirtualFilterType.MOD;
+            boolean isName = type == VirtualFilterType.NAME;
+            boolean isSpecial = type.isSpecial();
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
+            ItemStack openedStack = stack.copyWithCount(1);
+            CompoundTag stackTag = new CompoundTag();
+            stackTag.put("Item", openedStack.save(node.level().registryAccess()));
 
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new FilterMenu(id, inv, node, ch, fs),
-                    stack.getHoverName()), buf -> {
+                    openedStack.getHoverName()), buf -> {
                         buf.writeVarInt(-2);
                         buf.writeVarInt(payload.entityId());
                         buf.writeVarInt(ch);
                         buf.writeVarInt(fs);
+                        buf.writeNbt(stackTag);
                         buf.writeVarInt(slotCount);
-                        buf.writeBoolean(isTag);
-                        buf.writeBoolean(isAmount);
                         buf.writeBoolean(false);
-                        buf.writeBoolean(isDurability);
+                        buf.writeBoolean(false);
                         buf.writeBoolean(isMod);
-                        buf.writeBoolean(isSlot);
+                        buf.writeBoolean(false);
                         buf.writeBoolean(isName);
                     });
+        });
+    }
+
+    private static FilterTargetType targetForChannel(ChannelType type) {
+        return FilterTargetType.forChannel(type);
+    }
+
+    private static FilterTargetType currentTarget(ItemStack stack) {
+        if (FilterItemData.isFilterItem(stack)) {
+            return FilterItemData.getTargetType(stack);
+        }
+        if (NameFilterData.isNameFilter(stack)) {
+            return NameFilterData.getTargetType(stack);
+        }
+        if (ModFilterData.isModFilter(stack)) {
+            return ModFilterData.getTargetType(stack);
+        }
+        return FilterTargetType.ITEMS;
+    }
+
+    private static void applyTarget(ItemStack stack, FilterTargetType target) {
+        if (FilterItemData.isFilterItem(stack)) {
+            FilterItemData.setTargetType(stack, target);
+        } else if (NameFilterData.isNameFilter(stack)) {
+            NameFilterData.setTargetType(stack, target);
+        } else if (ModFilterData.isModFilter(stack)) {
+            ModFilterData.setTargetType(stack, target);
+        }
+    }
+
+    public static void handleAddNodeFilterItem(AddNodeFilterItemPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            if (node == null)
+                return;
+            ChannelData channel = node.getChannel(payload.channel());
+            if (channel == null)
+                return;
+            int fs = payload.filterSlot();
+            if (fs < 0 || fs >= ChannelData.FILTER_SIZE)
+                return;
+            ItemStack item = payload.item();
+            if (item.isEmpty() || item.is(ModTags.FILTERS))
+                return;
+            FilterTargetType desired = FilterTargetType.forChannel(channel.getType());
+            if (desired == null)
+                return;
+
+            ItemStack filter = channel.getFilterItem(fs);
+            if (filter.isEmpty()) {
+                filter = VirtualFilterType.SMALL.createStack();
+                FilterItemData.setTargetType(filter, desired);
+            } else if (!FilterItemData.isFilterItem(filter)) {
+                return;
+            } else {
+                filter = filter.copy();
+            }
+
+            if (!FilterItemData.addItem(filter, item, node.level().registryAccess())) {
+                return;
+            }
+
+            channel.setFilterItem(fs, filter);
+            sendChannelSyncToViewers(node, payload.channel(), channel);
+            propagateToLabelGroup(node, payload.channel());
+            markNetworkDirty(node);
         });
     }
 

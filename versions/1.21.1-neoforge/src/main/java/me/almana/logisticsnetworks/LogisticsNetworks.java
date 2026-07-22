@@ -21,6 +21,7 @@ import me.almana.logisticsnetworks.network.SetFilterEntryNbtPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntrySlotMappingPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryTagPayload;
 import me.almana.logisticsnetworks.network.SetChannelNamePayload;
+import me.almana.logisticsnetworks.network.AddNodeFilterItemPayload;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
@@ -127,6 +128,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetChannelName);
                 registrar.playToServer(OpenNodeFilterPayload.TYPE, OpenNodeFilterPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleOpenNodeFilter);
+                registrar.playToServer(AddNodeFilterItemPayload.TYPE, AddNodeFilterItemPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleAddNodeFilterItem);
                 registrar.playToServer(SetFilterEntryTagPayload.TYPE, SetFilterEntryTagPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetFilterEntryTag);
                 registrar.playToServer(SetFilterEntryNbtPayload.TYPE, SetFilterEntryNbtPayload.STREAM_CODEC,

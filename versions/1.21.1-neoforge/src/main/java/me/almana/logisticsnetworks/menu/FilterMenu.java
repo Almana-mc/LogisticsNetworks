@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
@@ -86,15 +87,14 @@ public class FilterMenu extends AbstractContainerMenu {
         this.nodeFilterSlot = -1;
 
         ItemStack stack = getOpenedStack();
-        this.isTagMode = stack.getItem() instanceof TagFilterItem;
-        this.isAmountMode = stack.getItem() instanceof AmountFilterItem;
+        this.isTagMode = false;
+        this.isAmountMode = false;
         this.isNbtMode = false;
-        this.isDurabilityMode = stack.getItem() instanceof DurabilityFilterItem;
+        this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
-        this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
-                || isNameMode;
+        this.isSpecialMode = isModMode || isNameMode;
 
         this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
         this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
@@ -119,15 +119,14 @@ public class FilterMenu extends AbstractContainerMenu {
         this.nodeFilterSlot = -1;
 
         ItemStack stack = getOpenedStack();
-        this.isTagMode = stack.getItem() instanceof TagFilterItem;
-        this.isAmountMode = stack.getItem() instanceof AmountFilterItem;
+        this.isTagMode = false;
+        this.isAmountMode = false;
         this.isNbtMode = false;
-        this.isDurabilityMode = stack.getItem() instanceof DurabilityFilterItem;
+        this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
-        this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
-                || isNameMode;
+        this.isSpecialMode = isModMode || isNameMode;
 
         this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
         this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
@@ -152,15 +151,14 @@ public class FilterMenu extends AbstractContainerMenu {
         this.nodeFilterSlot = filterSlot;
 
         ItemStack stack = getOpenedStack();
-        this.isTagMode = stack.getItem() instanceof TagFilterItem;
-        this.isAmountMode = stack.getItem() instanceof AmountFilterItem;
+        this.isTagMode = false;
+        this.isAmountMode = false;
         this.isNbtMode = false;
-        this.isDurabilityMode = stack.getItem() instanceof DurabilityFilterItem;
+        this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
-        this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
-                || isNameMode;
+        this.isSpecialMode = isModMode || isNameMode;
 
         this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
         this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
@@ -186,6 +184,17 @@ public class FilterMenu extends AbstractContainerMenu {
             this.lockedSlot = -1;
             var entity = playerInv.player.level().getEntity(entityId);
             this.nodeSource = (entity instanceof LogisticsNodeEntity node) ? node : null;
+            CompoundTag stackTag = buf.readNbt();
+            ItemStack openedStack = stackTag != null
+                    ? ItemStack.parseOptional(playerInv.player.level().registryAccess(),
+                            stackTag.getCompound("Item"))
+                    : ItemStack.EMPTY;
+            if (this.nodeSource != null && !openedStack.isEmpty()) {
+                ChannelData channel = this.nodeSource.getChannel(this.nodeChannel);
+                if (channel != null) {
+                    channel.setFilterItem(this.nodeFilterSlot, openedStack);
+                }
+            }
         } else if (handOrdinal == -1) {
             this.inventorySlotIndex = buf.readVarInt();
             this.hand = InteractionHand.MAIN_HAND;
@@ -207,16 +216,17 @@ public class FilterMenu extends AbstractContainerMenu {
 
         this.slotCount = Math.max(0, buf.readVarInt());
 
-        this.isTagMode = buf.readBoolean();
-        this.isAmountMode = buf.readBoolean();
+        this.isTagMode = false;
+        this.isAmountMode = false;
         buf.readBoolean();
         this.isNbtMode = false;
-        this.isDurabilityMode = buf.readBoolean();
+        this.isDurabilityMode = false;
+        buf.readBoolean();
         this.isModMode = buf.readBoolean();
-        this.isSlotMode = buf.readBoolean();
+        this.isSlotMode = false;
+        buf.readBoolean();
         this.isNameMode = buf.readBoolean();
-        this.isSpecialMode = isTagMode || isAmountMode || isDurabilityMode || isModMode || isSlotMode
-                || isNameMode;
+        this.isSpecialMode = isModMode || isNameMode;
 
         this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
         this.filterInventory = new SimpleContainer(slotCount);

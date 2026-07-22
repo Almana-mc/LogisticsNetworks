@@ -222,6 +222,32 @@ public final class FilterItemData {
         });
     }
 
+    public static boolean addItem(ItemStack filter, ItemStack item, @Nullable HolderLookup.Provider provider) {
+        if (!isFilterItem(filter) || item == null || item.isEmpty() || provider == null) {
+            return false;
+        }
+        int cap = getCapacity(filter);
+        ItemStack entry = item.copyWithCount(1);
+        for (int i = 0; i < cap; i++) {
+            ItemStack existing = getEntry(filter, i, provider);
+            if (!existing.isEmpty() && ItemStack.isSameItemSameComponents(existing, entry)) {
+                return false;
+            }
+        }
+        for (int i = 0; i < cap; i++) {
+            if (getEntry(filter, i, provider).isEmpty()
+                    && getFluidEntry(filter, i).isEmpty()
+                    && getChemicalEntry(filter, i) == null
+                    && getEntryTag(filter, i) == null
+                    && !isNbtOnlySlot(filter, i)
+                    && getEntrySlotMapping(filter, i) == null) {
+                setEntry(filter, i, entry, provider);
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void clearEntryItem(ItemStack stack, int slot) {
         if (!isFilterItem(stack)) return;
         if (slot < 0 || slot >= getCapacity(stack)) return;

@@ -1,11 +1,10 @@
 package me.almana.logisticsnetworks.logic;
 
-import me.almana.logisticsnetworks.filter.SlotFilterData;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 
 import java.util.Arrays;
-import java.util.List;
 
 final class TransferSlotAccess {
     private TransferSlotAccess() {
@@ -27,27 +26,31 @@ final class TransferSlotAccess {
         boolean hasWhitelist = false;
 
         for (ItemStack filter : filters) {
-            if (!SlotFilterData.isSlotFilterItem(filter) || !SlotFilterData.hasAnySlots(filter)) {
+            if (!FilterItemData.isFilterItem(filter)) {
                 continue;
             }
 
-            hasConfiguredSlotFilter = true;
-            List<Integer> slots = SlotFilterData.getSlots(filter);
-            if (slots.isEmpty()) {
-                continue;
-            }
-
-            if (SlotFilterData.isBlacklist(filter)) {
-                for (int slot : slots) {
-                    if (slot >= 0 && slot < slotCount) {
-                        blacklistMask[slot] = true;
-                    }
+            boolean blacklist = FilterItemData.isBlacklist(filter);
+            int capacity = FilterItemData.getCapacity(filter);
+            for (int entry = 0; entry < capacity; entry++) {
+                int[] slots = FilterItemData.getEntrySlotMapping(filter, entry);
+                if (slots == null || slots.length == 0) {
+                    continue;
                 }
-            } else {
-                hasWhitelist = true;
-                for (int slot : slots) {
-                    if (slot >= 0 && slot < slotCount) {
-                        allowed[slot] = true;
+
+                hasConfiguredSlotFilter = true;
+                if (blacklist) {
+                    for (int slot : slots) {
+                        if (slot >= 0 && slot < slotCount) {
+                            blacklistMask[slot] = true;
+                        }
+                    }
+                } else {
+                    hasWhitelist = true;
+                    for (int slot : slots) {
+                        if (slot >= 0 && slot < slotCount) {
+                            allowed[slot] = true;
+                        }
                     }
                 }
             }

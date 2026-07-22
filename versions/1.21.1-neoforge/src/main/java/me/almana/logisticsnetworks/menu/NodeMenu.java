@@ -32,10 +32,7 @@ public class NodeMenu extends AbstractContainerMenu {
 
     // Grid Layout constants
     private static final int FILTER_GRID_X = 168;
-    private static final int FILTER_GRID_Y = 68;
-    private static final int FILTER_SLOTS = 9;
-
-    private static final int UPGRADE_GRID_Y = 137;
+    private static final int UPGRADE_GRID_Y = 118;
     private static final int UPGRADE_SLOTS = LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
     private static final int GRID_STEP = 19;
 
@@ -44,14 +41,12 @@ public class NodeMenu extends AbstractContainerMenu {
     private int selectedChannel = 0;
     private boolean nodeSlotsActive = true;
 
-    private final Container filterContainer;
     private final Container upgradeContainer;
 
     // Server-side
     public NodeMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node) {
         super(Registration.NODE_MENU.get(), containerId);
         this.node = node;
-        this.filterContainer = new FilterItemsContainer();
         this.upgradeContainer = new UpgradeItemsContainer();
 
         layoutNodeSlots();
@@ -65,7 +60,6 @@ public class NodeMenu extends AbstractContainerMenu {
         Entity entity = playerInv.player.level().getEntity(entityId);
         this.node = (entity instanceof LogisticsNodeEntity n) ? n : null;
 
-        this.filterContainer = new FilterItemsContainer();
         this.upgradeContainer = new UpgradeItemsContainer();
 
         if (this.node != null) {
@@ -94,17 +88,6 @@ public class NodeMenu extends AbstractContainerMenu {
     // Slot Layout
 
     private void layoutNodeSlots() {
-        // 3x3 Filter Grid
-        for (int r = 0; r < 3; r++) {
-            for (int c = 0; c < 3; c++) {
-                int index = r * 3 + c;
-                addSlot(new FilterSlot(filterContainer, index,
-                        FILTER_GRID_X + c * GRID_STEP,
-                        FILTER_GRID_Y + r * GRID_STEP));
-            }
-        }
-
-        // 2x2 Upgrade Grid
         for (int r = 0; r < 2; r++) {
             for (int c = 0; c < 2; c++) {
                 int index = r * 2 + c;
@@ -199,27 +182,19 @@ public class NodeMenu extends AbstractContainerMenu {
         ItemStack fromStack = fromSlot.getItem();
         ItemStack copy = fromStack.copy();
 
-        int nodeSlotCount = FILTER_SLOTS + UPGRADE_SLOTS;
+        int nodeSlotCount = UPGRADE_SLOTS;
 
         if (index < nodeSlotCount) {
             if (!moveItemStackTo(fromStack, nodeSlotCount, slots.size(), true)) {
                 return ItemStack.EMPTY;
             }
         } else {
-            int targetStart;
-            int targetEnd;
-            if (fromStack.is(ModTags.FILTERS)) {
-                targetStart = 0;
-                targetEnd = FILTER_SLOTS;
-            } else if (fromStack.is(ModTags.UPGRADES)) {
-                targetStart = FILTER_SLOTS;
-                targetEnd = nodeSlotCount;
-            } else {
+            if (!fromStack.is(ModTags.UPGRADES)) {
                 return ItemStack.EMPTY;
             }
 
             ItemStack single = fromStack.copyWithCount(1);
-            if (!moveItemStackTo(single, targetStart, targetEnd, false)) {
+            if (!moveItemStackTo(single, 0, nodeSlotCount, false)) {
                 return ItemStack.EMPTY;
             }
             fromStack.shrink(1);
@@ -238,28 +213,6 @@ public class NodeMenu extends AbstractContainerMenu {
         }
 
         return copy;
-    }
-
-    private class FilterItemsContainer extends AbstractProxyContainer {
-        FilterItemsContainer() {
-            super(FILTER_SLOTS);
-        }
-
-        @Override
-        public ItemStack getItem(int slot) {
-            return (node != null) ? node.getChannel(selectedChannel).getFilterItem(slot) : ItemStack.EMPTY;
-        }
-
-        @Override
-        public void setItem(int slot, ItemStack stack) {
-            if (node != null) {
-                node.getChannel(selectedChannel).setFilterItem(slot, stack.copyWithCount(1));
-                markDirty();
-                if (node.level() instanceof ServerLevel) {
-                    ServerPayloadHandler.propagateToLabelGroup(node, selectedChannel);
-                }
-            }
-        }
     }
 
     private class UpgradeItemsContainer extends AbstractProxyContainer {
@@ -323,27 +276,6 @@ public class NodeMenu extends AbstractContainerMenu {
 
         @Override
         public void clearContent() {
-        }
-    }
-
-    private class FilterSlot extends Slot {
-        FilterSlot(Container c, int i, int x, int y) {
-            super(c, i, x, y);
-        }
-
-        @Override
-        public boolean isActive() {
-            return nodeSlotsActive;
-        }
-
-        @Override
-        public boolean mayPlace(ItemStack stack) {
-            return !stack.isEmpty() && stack.is(ModTags.FILTERS);
-        }
-
-        @Override
-        public int getMaxStackSize() {
-            return 1;
         }
     }
 

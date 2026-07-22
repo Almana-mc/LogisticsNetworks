@@ -173,9 +173,22 @@ public class Registration {
                                         .displayItems((params, output) -> {
                                                 ITEMS.getEntries().stream()
                                                                 .map(Supplier::get)
+                                                                .filter(item -> !isFilterItem(item))
                                                                 .forEach(output::accept);
                                         })
                                         .build());
+
+        // Filters are virtual: registered as data carriers, never obtainable
+        private static boolean isFilterItem(Item item) {
+                return item instanceof BaseFilterItem
+                                || item instanceof ModFilterItem
+                                || item instanceof NameFilterItem
+                                || item instanceof AmountFilterItem
+                                || item instanceof DurabilityFilterItem
+                                || item instanceof NbtFilterItem
+                                || item instanceof SlotFilterItem
+                                || item instanceof TagFilterItem;
+        }
 
         public static void init(IEventBus modEventBus) {
                 ENTITIES.register(modEventBus);
