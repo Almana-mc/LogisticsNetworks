@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks.event;
 
 import me.almana.logisticsnetworks.Config;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.command.LogisticsCommand;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
@@ -49,7 +49,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID)
+@EventBusSubscriber(modid = LogisticsNetworks.MOD_ID)
 public class EventHandler {
 
     @SubscribeEvent

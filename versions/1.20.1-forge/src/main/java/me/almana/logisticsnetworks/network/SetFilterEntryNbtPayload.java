@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.network.codec.RegistryFriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
@@ -41,7 +41,7 @@ public record SetFilterEntryNbtPayload(int slot, int action, String path, String
     }
 
     public static final Type<SetFilterEntryNbtPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_entry_nbt"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "set_filter_entry_nbt"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterEntryNbtPayload> STREAM_CODEC = StreamCodec
             .of(SetFilterEntryNbtPayload::write, SetFilterEntryNbtPayload::read);

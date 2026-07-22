@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
 import net.minecraft.network.FriendlyByteBuf;
@@ -16,7 +16,7 @@ public record SyncChannelListPayload(UUID networkId, List<ChannelEntry> channels
     }
 
     public static final CustomPacketPayload.Type<SyncChannelListPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "sync_channel_list"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "sync_channel_list"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncChannelListPayload> STREAM_CODEC = StreamCodec
             .of(SyncChannelListPayload::write, SyncChannelListPayload::read);

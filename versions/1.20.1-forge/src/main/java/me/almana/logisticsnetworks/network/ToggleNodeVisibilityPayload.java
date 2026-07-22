@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
@@ -10,7 +10,7 @@ public record ToggleNodeVisibilityPayload(
         int entityId) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<ToggleNodeVisibilityPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "toggle_visibility"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "toggle_visibility"));
 
     public static final StreamCodec<FriendlyByteBuf, ToggleNodeVisibilityPayload> STREAM_CODEC = StreamCodec
             .of(ToggleNodeVisibilityPayload::write, ToggleNodeVisibilityPayload::read);

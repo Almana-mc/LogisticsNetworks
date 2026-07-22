@@ -3,7 +3,7 @@ package me.almana.logisticsnetworks.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.screen.WrenchColorScreen;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -23,7 +23,7 @@ import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import org.jetbrains.annotations.Nullable;
 
-@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
 public class WrenchInputHandler {
 
     public static final KeyMapping OPEN_COLOR_EDITOR = new KeyMapping(
@@ -31,7 +31,7 @@ public class WrenchInputHandler {
             InputConstants.KEY_G,
             "key.categories.logisticsnetworks");
 
-    @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static class ModEvents {
         @SubscribeEvent
         public static void registerKeys(RegisterKeyMappingsEvent event) {

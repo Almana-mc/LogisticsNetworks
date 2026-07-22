@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.network.codec.RegistryFriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
@@ -9,7 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 public record SetFilterEntryDurabilityPayload(int entryIndex, String comparison, int value) implements CustomPacketPayload {
 
     public static final Type<SetFilterEntryDurabilityPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_entry_durability"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "set_filter_entry_durability"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterEntryDurabilityPayload> STREAM_CODEC = StreamCodec
             .of(SetFilterEntryDurabilityPayload::write, SetFilterEntryDurabilityPayload::read);

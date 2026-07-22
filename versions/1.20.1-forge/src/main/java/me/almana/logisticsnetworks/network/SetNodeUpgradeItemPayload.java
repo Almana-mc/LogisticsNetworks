@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.network.codec.RegistryFriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
@@ -13,7 +13,7 @@ public record SetNodeUpgradeItemPayload(
         ItemStack upgradeItem) implements CustomPacketPayload {
 
     public static final Type<SetNodeUpgradeItemPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_node_upgrade_item"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "set_node_upgrade_item"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetNodeUpgradeItemPayload> STREAM_CODEC = StreamCodec
             .of(SetNodeUpgradeItemPayload::write, SetNodeUpgradeItemPayload::read);

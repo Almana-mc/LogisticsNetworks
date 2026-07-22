@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -26,7 +26,7 @@ public class WrenchHudOverlay {
             InputConstants.KEY_H,
             "key.categories.logisticsnetworks");
 
-    @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static class ModEvents {
         @SubscribeEvent
         public static void registerKeys(RegisterKeyMappingsEvent event) {
@@ -34,7 +34,7 @@ public class WrenchHudOverlay {
         }
     }
 
-    @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
+    @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
     public static class GameEvents {
 
         @SubscribeEvent

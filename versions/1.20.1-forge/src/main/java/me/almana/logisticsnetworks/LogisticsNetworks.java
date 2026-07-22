@@ -13,12 +13,12 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 
-@Mod(Logisticsnetworks.MOD_ID)
-public class Logisticsnetworks {
+@Mod(LogisticsNetworks.MOD_ID)
+public class LogisticsNetworks {
 
     public static final String MOD_ID = "logisticsnetworks";
 
-    public Logisticsnetworks(FMLJavaModLoadingContext context) {
+    public LogisticsNetworks(FMLJavaModLoadingContext context) {
         IEventBus modBus = context.getModEventBus();
         Registration.init(modBus);
         NetworkHandler.register();

@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.network.codec.RegistryFriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.ByteBufCodecs;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
@@ -12,7 +12,7 @@ public record ModifyFilterTagPayload(
                 boolean remove) implements CustomPacketPayload {
 
         public static final Type<ModifyFilterTagPayload> TYPE = new Type<>(
-                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "modify_filter_tag"));
+                        ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "modify_filter_tag"));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, ModifyFilterTagPayload> STREAM_CODEC = StreamCodec
                         .composite(

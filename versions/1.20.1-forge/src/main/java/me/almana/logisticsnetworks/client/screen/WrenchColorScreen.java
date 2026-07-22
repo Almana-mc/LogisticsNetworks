@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks.client.screen;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
@@ -19,9 +19,9 @@ import net.minecraft.world.item.ItemStack;
 public class WrenchColorScreen extends Screen {
 
     private static final ResourceLocation CASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            Logisticsnetworks.MOD_ID, "textures/item/wrench_case.png");
+            LogisticsNetworks.MOD_ID, "textures/item/wrench_case.png");
     private static final ResourceLocation SCREEN_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            Logisticsnetworks.MOD_ID, "textures/item/wrench_screen.png");
+            LogisticsNetworks.MOD_ID, "textures/item/wrench_screen.png");
 
     private static final int SQ = 100;
     private static final int SQ_H = 76;

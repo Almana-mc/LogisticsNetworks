@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
 import net.minecraft.network.FriendlyByteBuf;
@@ -10,7 +10,7 @@ public record SetWrenchColorsPayload(int handOrdinal, boolean reset, int caseRgb
         implements CustomPacketPayload {
 
     public static final Type<SetWrenchColorsPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_wrench_colors"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "set_wrench_colors"));
 
     public static final StreamCodec<FriendlyByteBuf, SetWrenchColorsPayload> STREAM_CODEC = StreamCodec
             .of(SetWrenchColorsPayload::write, SetWrenchColorsPayload::read);

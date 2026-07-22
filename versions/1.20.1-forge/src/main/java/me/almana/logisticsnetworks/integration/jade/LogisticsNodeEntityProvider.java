@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.integration.jade;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -15,7 +15,7 @@ public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, ISe
     INSTANCE;
 
     private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath(
-            Logisticsnetworks.MOD_ID, "logistics_node_entity");
+            LogisticsNetworks.MOD_ID, "logistics_node_entity");
 
     @Override
     public void appendServerData(CompoundTag data, EntityAccessor accessor) {

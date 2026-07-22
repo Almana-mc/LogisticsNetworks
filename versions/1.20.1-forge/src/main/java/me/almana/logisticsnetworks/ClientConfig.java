@@ -9,7 +9,7 @@ import net.minecraftforge.fml.event.config.ModConfigEvent;
 
 import java.util.List;
 
-@EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class ClientConfig {
 
     private static final ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();

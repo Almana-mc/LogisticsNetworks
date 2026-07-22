@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
 import net.minecraft.network.FriendlyByteBuf;
@@ -11,7 +11,7 @@ import java.util.UUID;
 public record RenameNetworkPayload(UUID networkId, String newName) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<RenameNetworkPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "rename_network"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "rename_network"));
 
     public static final StreamCodec<FriendlyByteBuf, RenameNetworkPayload> STREAM_CODEC = StreamCodec
             .of(RenameNetworkPayload::write, RenameNetworkPayload::read);

@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.network.FriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
@@ -9,7 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 public record CycleWrenchModePayload(int handOrdinal, boolean forward) implements CustomPacketPayload {
 
     public static final Type<CycleWrenchModePayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "cycle_wrench_mode"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "cycle_wrench_mode"));
 
     public static final StreamCodec<FriendlyByteBuf, CycleWrenchModePayload> STREAM_CODEC = StreamCodec
             .of(CycleWrenchModePayload::write, CycleWrenchModePayload::read);

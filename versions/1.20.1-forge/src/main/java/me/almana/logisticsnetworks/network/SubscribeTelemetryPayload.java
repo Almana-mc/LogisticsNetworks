@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
 import net.minecraft.network.FriendlyByteBuf;
@@ -11,7 +11,7 @@ import java.util.UUID;
 public record SubscribeTelemetryPayload(UUID networkId, boolean subscribe, int channelIndex) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SubscribeTelemetryPayload> TYPE = new CustomPacketPayload.Type<>(
-            ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "subscribe_telemetry"));
+            ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "subscribe_telemetry"));
 
     public static final StreamCodec<FriendlyByteBuf, SubscribeTelemetryPayload> STREAM_CODEC = StreamCodec
             .of(SubscribeTelemetryPayload::write, SubscribeTelemetryPayload::read);

@@ -1,6 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.network.codec.RegistryFriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.ByteBufCodecs;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
@@ -12,7 +12,7 @@ public record SetFilterFluidEntryPayload(
                 String fluidId) implements CustomPacketPayload {
 
         public static final Type<SetFilterFluidEntryPayload> TYPE = new Type<>(
-                        ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "set_filter_fluid_entry"));
+                        ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "set_filter_fluid_entry"));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, SetFilterFluidEntryPayload> STREAM_CODEC = StreamCodec
                         .composite(
