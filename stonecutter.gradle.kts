@@ -6,6 +6,11 @@ stonecutter active "26.1.2-neoforge" /* [SC] DO NOT EDIT */
 
 stonecutter parameters {
     constants.match(node.metadata.project.substringAfterLast('-'), "forge", "neoforge")
+
+    // ResourceLocation was renamed to Identifier in 26.x
+    replacements.string(current.parsed < "26") {
+        replace("Identifier", "ResourceLocation")
+    }
 }
 
 stonecutter tasks {
