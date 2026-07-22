@@ -33,11 +33,16 @@ public class ClientConfig {
             .comment("Use the classic green terminal look for the network computer instead of the selected GUI theme.")
             .define("computerClassicTheme", true);
 
+    public static final ForgeConfigSpec.BooleanValue connectedNodeTexturesSpec = builder
+            .comment("Render nodes as a single connected frame when adjacent, instead of separate baked models.")
+            .define("connectedNodeTextures", true);
+
     static final ForgeConfigSpec SPEC = builder.build();
 
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
     public static boolean computerClassicTheme = true;
+    public static boolean connectedNodeTextures = true;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -49,6 +54,7 @@ public class ClientConfig {
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
         computerClassicTheme = computerClassicThemeSpec.get();
+        connectedNodeTextures = connectedNodeTexturesSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());
     }
 }
