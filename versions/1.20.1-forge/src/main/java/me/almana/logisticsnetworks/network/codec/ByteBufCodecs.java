@@ -14,6 +14,12 @@ public final class ByteBufCodecs {
             (buf, value) -> buf.writeUtf(value == null ? "" : value),
             RegistryFriendlyByteBuf::readUtf);
 
+    public static StreamCodec<RegistryFriendlyByteBuf, String> stringUtf8(int maxLength) {
+        return StreamCodec.of(
+                (buf, value) -> buf.writeUtf(value == null ? "" : value, maxLength),
+                buf -> buf.readUtf(maxLength));
+    }
+
     private ByteBufCodecs() {
     }
 }

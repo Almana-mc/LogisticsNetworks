@@ -5,11 +5,51 @@ plugins {
 stonecutter active "26.1.2-neoforge" /* [SC] DO NOT EDIT */
 
 stonecutter parameters {
-    constants.match(node.metadata.project.substringAfterLast('-'), "forge", "neoforge")
+    val loader = node.metadata.project.substringAfterLast('-')
+
+    constants.match(loader, "forge", "neoforge")
 
     // ResourceLocation was renamed to Identifier in 26.x
     replacements.string(current.parsed < "26") {
         replace("Identifier", "ResourceLocation")
+    }
+
+    // 26.x split the client half of PacketDistributor into its own class
+    replacements.string(current.parsed < "26") {
+        replace(
+            "net.neoforged.neoforge.client.network.ClientPacketDistributor",
+            "me.almana.logisticsnetworks.network.dist.ClientPacketDistributor")
+    }
+
+    // 1.20.1 predates both the vanilla payload/codec API and NeoForge, so it
+    // routes them through the hand-rolled compat layer under network/
+    replacements.string(loader == "forge") {
+        replace(
+            "net.minecraft.network.protocol.common.custom.CustomPacketPayload",
+            "me.almana.logisticsnetworks.network.payload.CustomPacketPayload")
+        replace(
+            "net.neoforged.neoforge.network.handling.IPayloadContext",
+            "me.almana.logisticsnetworks.network.payload.IPayloadContext")
+        replace(
+            "net.minecraft.network.codec.StreamCodec",
+            "me.almana.logisticsnetworks.network.codec.StreamCodec")
+        replace(
+            "net.minecraft.network.codec.ByteBufCodecs",
+            "me.almana.logisticsnetworks.network.codec.ByteBufCodecs")
+        replace(
+            "net.minecraft.network.RegistryFriendlyByteBuf",
+            "me.almana.logisticsnetworks.network.codec.RegistryFriendlyByteBuf")
+        replace(
+            "net.neoforged.neoforge.network.PacketDistributor",
+            "me.almana.logisticsnetworks.network.dist.PacketDistributor")
+
+        // loader packages, identical types either side
+        replace("net.neoforged.bus.api.SubscribeEvent", "net.minecraftforge.eventbus.api.SubscribeEvent")
+        replace("net.neoforged.api.distmarker.Dist", "net.minecraftforge.api.distmarker.Dist")
+        replace("net.neoforged.fml.ModList", "net.minecraftforge.fml.ModList")
+        replace(
+            "net.neoforged.fml.common.EventBusSubscriber",
+            "net.minecraftforge.fml.common.Mod.EventBusSubscriber")
     }
 }
 
