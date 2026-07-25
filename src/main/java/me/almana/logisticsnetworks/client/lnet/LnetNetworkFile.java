@@ -3,8 +3,6 @@ package me.almana.logisticsnetworks.client.lnet;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.nbt.TagParser;
-import net.neoforged.fml.loading.FMLPaths;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -26,7 +24,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
     }
 
     public static Path directory() {
-        return FMLPaths.CONFIGDIR.get().resolve("logistics-network").resolve("networks");
+        return LnetPaths.configDirectory().resolve("logistics-network").resolve("networks");
     }
 
     public static List<Path> listFiles() throws IOException {
@@ -71,18 +69,18 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
         CompoundTag root = source.copy();
         root.remove("version");
         root.remove("network_id");
-        if (root.getBooleanOr("renderVisible", true)) {
+        if (LnetNbtAccess.getBoolean(root, "renderVisible", true)) {
             root.remove("renderVisible");
         }
 
         ListTag compactChannels = new ListTag();
-        for (Tag tag : root.getListOrEmpty("channels")) {
+        for (Tag tag : LnetNbtAccess.getList(root, "channels")) {
             if (!(tag instanceof CompoundTag channel)) {
                 continue;
             }
 
             CompoundTag entry = new CompoundTag();
-            int index = channel.getIntOr("index", -1);
+            int index = LnetNbtAccess.getInt(channel, "index", -1);
             if (index < 0) {
                 continue;
             }
@@ -98,8 +96,8 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
             changed |= copyString(channel, entry, "distribution", "PRIORITY");
             changed |= copyString(channel, entry, "filter_mode", "MATCH_ANY");
             changed |= copyInt(channel, entry, "priority", 0);
-            if (channel.contains("name") && !channel.getStringOr("name", "").isEmpty()) {
-                entry.putString("name", channel.getStringOr("name", ""));
+            if (channel.contains("name") && !LnetNbtAccess.getString(channel, "name", "").isEmpty()) {
+                entry.putString("name", LnetNbtAccess.getString(channel, "name", ""));
                 changed = true;
             }
             if (changed) {
@@ -111,7 +109,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
     }
 
     private static boolean copyBoolean(CompoundTag source, CompoundTag target, String key, boolean fallback) {
-        boolean value = source.getBooleanOr(key, fallback);
+        boolean value = LnetNbtAccess.getBoolean(source, key, fallback);
         if (value == fallback) {
             return false;
         }
@@ -120,7 +118,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
     }
 
     private static boolean copyInt(CompoundTag source, CompoundTag target, String key, int fallback) {
-        int value = source.getIntOr(key, fallback);
+        int value = LnetNbtAccess.getInt(source, key, fallback);
         if (value == fallback) {
             return false;
         }
@@ -129,7 +127,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
     }
 
     private static boolean copyString(CompoundTag source, CompoundTag target, String key, String fallback) {
-        String value = source.getStringOr(key, fallback);
+        String value = LnetNbtAccess.getString(source, key, fallback);
         if (value.equals(fallback)) {
             return false;
         }
@@ -188,7 +186,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
                 case "v" -> visible = !"0".equals(value);
                 case "clipboard", "c" -> {
                     try {
-                        clipboard = TagParser.parseCompoundFully(value);
+                        clipboard = LnetNbtAccess.parse(value);
                     } catch (Exception e) {
                         throw new IOException("Invalid clipboard SNBT", e);
                     }

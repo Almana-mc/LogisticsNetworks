@@ -13,6 +13,7 @@ public class LogisticsJeiPlugin implements IModPlugin {
     private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID,
             "jei_plugin");
     private static final FilterGhostIngredientHandler FILTER_GHOST_HANDLER = new FilterGhostIngredientHandler();
+    private static final NodeGhostIngredientHandler NODE_GHOST_HANDLER = new NodeGhostIngredientHandler();
 
     @Override
     public ResourceLocation getPluginUid() {
@@ -22,6 +23,8 @@ public class LogisticsJeiPlugin implements IModPlugin {
     @Override
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
         registration.addGhostIngredientHandler(FilterScreen.class, FILTER_GHOST_HANDLER);
+        registration.addGhostIngredientHandler(me.almana.logisticsnetworks.client.screen.NodeScreen.class,
+                NODE_GHOST_HANDLER);
         registration.addGuiContainerHandler(FilterScreen.class,
                 new mezz.jei.api.gui.handlers.IGuiContainerHandler<>() {
                     @Override
@@ -31,4 +34,3 @@ public class LogisticsJeiPlugin implements IModPlugin {
                 });
     }
 }
-

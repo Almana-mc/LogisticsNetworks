@@ -23,6 +23,7 @@ import me.almana.logisticsnetworks.network.SetFilterEntryTagPayload;
 import me.almana.logisticsnetworks.network.SetChannelNamePayload;
 import me.almana.logisticsnetworks.network.AddNodeFilterItemPayload;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
+import me.almana.logisticsnetworks.network.OpenNodeMenuPayload;
 import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
@@ -35,6 +36,8 @@ import me.almana.logisticsnetworks.network.RequestChannelListPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
+import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
+import me.almana.logisticsnetworks.network.SetComputerWrenchClipboardPayload;
 import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
@@ -48,12 +51,16 @@ import me.almana.logisticsnetworks.network.SyncChannelListPayload;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
+import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
+import me.almana.logisticsnetworks.network.SyncNetworkExportPayload;
+import me.almana.logisticsnetworks.network.TransferVisualPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
+import me.almana.logisticsnetworks.datagen.ModDataGenerators;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
@@ -75,6 +82,7 @@ public class LogisticsNetworks {
                 Registration.init(modBus);
                 modBus.addListener(this::registerPayloads);
                 modBus.addListener(this::commonSetup);
+                modBus.addListener(ModDataGenerators::gather);
 
                 ModLoadingContext.get().getActiveContainer()
                                 .registerConfig(ModConfig.Type.COMMON, Config.SPEC, "logistics-network/common.toml");
@@ -128,6 +136,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetChannelName);
                 registrar.playToServer(OpenNodeFilterPayload.TYPE, OpenNodeFilterPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleOpenNodeFilter);
+                registrar.playToServer(OpenNodeMenuPayload.TYPE, OpenNodeMenuPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleOpenNodeMenu);
                 registrar.playToServer(AddNodeFilterItemPayload.TYPE, AddNodeFilterItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleAddNodeFilterItem);
                 registrar.playToServer(SetFilterEntryTagPayload.TYPE, SetFilterEntryTagPayload.STREAM_CODEC,
@@ -199,8 +209,17 @@ public class LogisticsNetworks {
                 registrar.playToServer(ToggleComputerPinnedNetworkPayload.TYPE,
                                 ToggleComputerPinnedNetworkPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleToggleComputerPinnedNetwork);
+                registrar.playToServer(RequestNetworkExportPayload.TYPE,
+                                RequestNetworkExportPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleRequestNetworkExport);
+                registrar.playToServer(SetComputerWrenchClipboardPayload.TYPE,
+                                SetComputerWrenchClipboardPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetComputerWrenchClipboard);
 
                 // Server -> Client
+                registrar.playToClient(SyncMassPlacementChoicesPayload.TYPE,
+                                SyncMassPlacementChoicesPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncMassPlacementChoices);
                 registrar.playToClient(SyncNetworkListPayload.TYPE, SyncNetworkListPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkList);
                 registrar.playToClient(SyncNetworkNodesPayload.TYPE, SyncNetworkNodesPayload.STREAM_CODEC,
@@ -213,5 +232,9 @@ public class LogisticsNetworks {
                                 ClientPayloadHandler::handleSyncTelemetry);
                 registrar.playToClient(SyncChannelListPayload.TYPE, SyncChannelListPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncChannelList);
+                registrar.playToClient(SyncNetworkExportPayload.TYPE, SyncNetworkExportPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncNetworkExport);
+                registrar.playToClient(TransferVisualPayload.TYPE, TransferVisualPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleTransferVisual);
         }
 }

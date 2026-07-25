@@ -1,27 +1,22 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
-import me.almana.logisticsnetworks.network.codec.StreamCodec;
-import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
+import me.almana.logisticsnetworks.network.codec.StreamCodec;
+import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public record SyncNetworkNodesPayload(UUID networkId, List<NodeInfo> nodes) implements CustomPacketPayload {
+public record SyncNetworkNodesPayload(
+        UUID networkId,
+        List<NodeInfo> nodes) implements CustomPacketPayload {
 
-    public record NodeInfo(
-            UUID nodeId,
-            BlockPos nodePos,
-            BlockPos attachedPos,
-            String blockName,
-            String nodeLabel,
-            String dimension,
-            boolean visible,
-            boolean highlighted) {
+    public record NodeInfo(UUID nodeId, BlockPos nodePos, BlockPos attachedPos, String blockName, String nodeLabel,
+            ResourceLocation dimension, boolean visible, boolean highlighted) {
     }
 
     public static final CustomPacketPayload.Type<SyncNetworkNodesPayload> TYPE = new CustomPacketPayload.Type<>(
@@ -38,9 +33,9 @@ public record SyncNetworkNodesPayload(UUID networkId, List<NodeInfo> nodes) impl
             UUID nodeId = buf.readUUID();
             BlockPos nodePos = buf.readBlockPos();
             BlockPos attachedPos = buf.readBlockPos();
-            String blockName = buf.readUtf(256);
+            String blockName = buf.readUtf(128);
             String nodeLabel = buf.readUtf(64);
-            String dimension = buf.readUtf(256);
+            ResourceLocation dimension = buf.readResourceLocation();
             boolean visible = buf.readBoolean();
             boolean highlighted = buf.readBoolean();
             nodes.add(new NodeInfo(nodeId, nodePos, attachedPos, blockName, nodeLabel, dimension, visible, highlighted));
@@ -52,14 +47,14 @@ public record SyncNetworkNodesPayload(UUID networkId, List<NodeInfo> nodes) impl
         buf.writeUUID(payload.networkId);
         buf.writeVarInt(payload.nodes.size());
         for (NodeInfo node : payload.nodes) {
-            buf.writeUUID(node.nodeId);
-            buf.writeBlockPos(node.nodePos);
-            buf.writeBlockPos(node.attachedPos);
-            buf.writeUtf(node.blockName, 256);
-            buf.writeUtf(node.nodeLabel, 64);
-            buf.writeUtf(node.dimension, 256);
-            buf.writeBoolean(node.visible);
-            buf.writeBoolean(node.highlighted);
+            buf.writeUUID(node.nodeId());
+            buf.writeBlockPos(node.nodePos());
+            buf.writeBlockPos(node.attachedPos());
+            buf.writeUtf(node.blockName(), 128);
+            buf.writeUtf(node.nodeLabel(), 64);
+            buf.writeResourceLocation(node.dimension());
+            buf.writeBoolean(node.visible());
+            buf.writeBoolean(node.highlighted());
         }
     }
 

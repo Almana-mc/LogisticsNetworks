@@ -1,23 +1,31 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.Config;
+
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import me.almana.logisticsnetworks.client.lnet.LnetNetworkFile;
 import me.almana.logisticsnetworks.client.theme.ComputerPalette;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
+import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
+import me.almana.logisticsnetworks.network.SetComputerWrenchClipboardPayload;
 import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.RequestChannelListPayload;
 import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncChannelListPayload;
+import me.almana.logisticsnetworks.network.SyncNetworkExportPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
 import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -30,6 +38,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -43,11 +53,16 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    private static ComputerPalette pal() {
+        return ComputerPalette.active();
+    }
+
     private enum Page {
         NETWORK_LIST,
         IO_CHANNEL_LIST,
         IO_CHANNEL_GRAPH,
-        NODE_MAP
+        NODE_MAP,
+        LNET_FILES
     }
 
     private static final int GUI_WIDTH = 320;
@@ -61,8 +76,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private static final int DETAIL_PANEL_Y = 38;
     private static final int DETAIL_PANEL_WIDTH = 172;
     private static final int DETAIL_PANEL_HEIGHT = 194;
-    private static final int OPTION_BTN_HEIGHT = 34;
-    private static final int OPTION_BTN_GAP = 12;
+    private static final int OPTION_BTN_HEIGHT = 28;
+    private static final int OPTION_BTN_GAP = 6;
     private static final int NODE_ENTRY_HEIGHT = 22;
     private static final int NODES_PER_PAGE = 7;
     private static final int VIS_BTN_W = 54;
@@ -83,40 +98,16 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private static final int PANEL_HEADER_HEIGHT = 14;
     private static final int CHANNEL_ENTRY_HEIGHT = 18;
     private static final int CHANNELS_PER_PAGE = 7;
+    private static final int LNET_ENTRY_HEIGHT = 18;
+    private static final int LNET_FILES_PER_PAGE = 6;
+    private static final int LNET_LABELS_PER_PAGE = 6;
+    private static final int LNET_TOOLBAR_Y = 24;
+    private static final int LNET_LIST_Y = 54;
+    private static final int LNET_FILE_W = 104;
+    private static final int LNET_LABEL_W = 80;
+    private static final int LNET_COLUMN_GAP = 8;
 
-    private static int COLOR_FRAME;
-    private static int COLOR_FRAME_EDGE;
-    private static int COLOR_FRAME_INNER;
-    private static int COLOR_SCREEN;
-    private static int COLOR_PANEL;
-    private static int COLOR_PANEL_ALT;
-    private static int COLOR_PANEL_HEADER;
-    private static int COLOR_BORDER;
-    private static int COLOR_BORDER_BRIGHT;
-    private static int COLOR_ROW;
-    private static int COLOR_ROW_HOVER;
-    private static int COLOR_ROW_SELECTED;
-    private static int COLOR_TEXT;
-    private static int COLOR_TEXT_SECONDARY;
-    private static int COLOR_TEXT_MUTED;
-    private static int COLOR_ACCENT;
-    private static int COLOR_ACCENT_DARK;
-    private static int COLOR_WARNING;
-    private static int COLOR_SCANLINE;
-    private static int COLOR_BADGE_BG;
-    private static int COLOR_BADGE_TEXT;
-    private static int COLOR_GRAPH;
-    private static int COLOR_GRAPH_GRID;
-    private static int COLOR_HIGHLIGHT_BG;
-    private static int COLOR_HIGHLIGHT_HOVER;
-    private static int COLOR_HIGHLIGHT_BORDER;
-    private static int COLOR_LAMP_OFF;
-    private static int COLOR_LAMP_OFF_GLOW;
-    private static int COLOR_LAMP_ON;
-    private static int COLOR_LAMP_ON_GLOW;
-    private static int COLOR_LAMP_BASE;
     private static final int COLOR_STAR = 0xFFFFD700;
-    private static int COLOR_STAR_EMPTY;
     private static final int STAR_BTN_W = 10;
     private static final int SEARCH_BOX_HEIGHT = 16;
     private static final int SEARCH_INPUT_HEIGHT = SEARCH_BOX_HEIGHT - 4;
@@ -147,6 +138,15 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private int telemetryIndex;
     private boolean telemetrySubscribed;
 
+    private List<Path> lnetFiles = new ArrayList<>();
+    private Path selectedLnetPath;
+    private LnetNetworkFile selectedLnetFile;
+    private int lnetFileScrollOffset;
+    private int lnetLabelScrollOffset;
+    private int selectedLnetLabelIndex = -1;
+    private String lnetStatus = "";
+    private int lnetStatusColor = pal().textSecondary();
+
     public ComputerScreen(ComputerMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         this.imageWidth = GUI_WIDTH;
@@ -158,11 +158,10 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     @Override
     protected void init() {
         super.init();
-        refreshPalette();
         networkSearchBox = new EditBox(font, 0, 0, SEARCH_INPUT_WIDTH, SEARCH_INPUT_HEIGHT, Component.empty());
         networkSearchBox.setMaxLength(32);
         networkSearchBox.setBordered(false);
-        networkSearchBox.setTextColor(COLOR_TEXT);
+        networkSearchBox.setTextColor(pal().text());
         networkSearchBox.setHint(Component.translatable("gui.logisticsnetworks.computer.search_hint"));
         layoutSearchBox();
         addRenderableWidget(networkSearchBox);
@@ -176,8 +175,6 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     @Override
     protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
-        refreshPalette();
-        networkSearchBox.setTextColor(COLOR_TEXT);
         renderComputerShell(g);
 
         menu.setWrenchSlotActive(currentPage == Page.NETWORK_LIST);
@@ -185,65 +182,30 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         if (currentPage != Page.NETWORK_LIST && networkSearchBox.isFocused()) {
             networkSearchBox.setFocused(false);
         }
-        networkSearchBox.visible = (currentPage == Page.NETWORK_LIST);
+        networkSearchBox.visible = currentPage == Page.NETWORK_LIST;
 
         switch (currentPage) {
             case NETWORK_LIST -> renderNetworkListPage(g, mouseX, mouseY);
             case IO_CHANNEL_LIST -> renderChannelListPage(g, mouseX, mouseY);
             case IO_CHANNEL_GRAPH -> renderChannelGraphPage(g, mouseX, mouseY);
             case NODE_MAP -> renderNodeMapPage(g, mouseX, mouseY);
+            case LNET_FILES -> renderLnetFilesPage(g, mouseX, mouseY);
         }
     }
 
-    private static void refreshPalette() {
-        ComputerPalette palette = ComputerPalette.active();
-        COLOR_FRAME = palette.frame();
-        COLOR_FRAME_EDGE = palette.frameEdge();
-        COLOR_FRAME_INNER = palette.frameInner();
-        COLOR_SCREEN = palette.screen();
-        COLOR_PANEL = palette.panel();
-        COLOR_PANEL_ALT = palette.panelAlt();
-        COLOR_PANEL_HEADER = palette.panelHeader();
-        COLOR_BORDER = palette.border();
-        COLOR_BORDER_BRIGHT = palette.borderBright();
-        COLOR_ROW = palette.row();
-        COLOR_ROW_HOVER = palette.rowHover();
-        COLOR_ROW_SELECTED = palette.rowSelected();
-        COLOR_TEXT = palette.text();
-        COLOR_TEXT_SECONDARY = palette.textSecondary();
-        COLOR_TEXT_MUTED = palette.textMuted();
-        COLOR_ACCENT = palette.accent();
-        COLOR_ACCENT_DARK = palette.accentDark();
-        COLOR_WARNING = palette.warning();
-        COLOR_SCANLINE = palette.scanline();
-        COLOR_BADGE_BG = palette.badgeBg();
-        COLOR_BADGE_TEXT = palette.badgeText();
-        COLOR_GRAPH = palette.graph();
-        COLOR_GRAPH_GRID = palette.graphGrid();
-        COLOR_HIGHLIGHT_BG = palette.highlightBg();
-        COLOR_HIGHLIGHT_HOVER = palette.highlightHover();
-        COLOR_HIGHLIGHT_BORDER = palette.highlightBorder();
-        COLOR_LAMP_OFF = palette.lampOff();
-        COLOR_LAMP_OFF_GLOW = palette.lampOffGlow();
-        COLOR_LAMP_ON = palette.lampOn();
-        COLOR_LAMP_ON_GLOW = palette.lampOnGlow();
-        COLOR_LAMP_BASE = palette.lampBase();
-        COLOR_STAR_EMPTY = palette.starEmpty();
-    }
-
     private void renderComputerShell(GuiGraphics g) {
-        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, COLOR_FRAME);
-        g.renderOutline(leftPos, topPos, imageWidth, imageHeight, COLOR_FRAME_EDGE);
+        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, pal().frame());
+        g.renderOutline(leftPos, topPos, imageWidth, imageHeight, pal().frameEdge());
 
-        g.fill(leftPos + 3, topPos + 3, leftPos + imageWidth - 3, topPos + imageHeight - 3, COLOR_FRAME_INNER);
-        g.renderOutline(leftPos + 3, topPos + 3, imageWidth - 6, imageHeight - 6, COLOR_BORDER);
+        g.fill(leftPos + 3, topPos + 3, leftPos + imageWidth - 3, topPos + imageHeight - 3, pal().frameInner());
+        g.renderOutline(leftPos + 3, topPos + 3, imageWidth - 6, imageHeight - 6, pal().border());
 
-        g.fill(leftPos + 6, topPos + 6, leftPos + imageWidth - 6, topPos + imageHeight - 6, COLOR_SCREEN);
-        g.fill(leftPos + 6, topPos + 6, leftPos + imageWidth - 6, topPos + 24, COLOR_PANEL_HEADER);
-        g.fill(leftPos + 6, topPos + 24, leftPos + imageWidth - 6, topPos + 25, COLOR_BORDER);
+        g.fill(leftPos + 6, topPos + 6, leftPos + imageWidth - 6, topPos + imageHeight - 6, pal().screen());
+        g.fill(leftPos + 6, topPos + 6, leftPos + imageWidth - 6, topPos + 24, pal().panelHeader());
+        g.fill(leftPos + 6, topPos + 24, leftPos + imageWidth - 6, topPos + 25, pal().border());
 
         String shellTitle = trimText(title.getString().toUpperCase(Locale.ROOT), imageWidth - 96);
-        g.drawString(font, shellTitle, leftPos + 12, topPos + 11, COLOR_ACCENT);
+        g.drawString(font, shellTitle, leftPos + 12, topPos + 11, pal().accent());
         renderStatusBadge(g, leftPos + imageWidth - 110, topPos + 10, 62, 10,
                 line("gui.logisticsnetworks.computer.status.online"));
         renderScanlines(g, leftPos + 7, topPos + 25, imageWidth - 14, imageHeight - 32);
@@ -264,7 +226,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         renderNetworkList(g, mouseX, mouseY);
 
         if (selectedNetworkId == null) {
-            renderIdleSession(g, leftPos + DETAIL_PANEL_X, topPos + DETAIL_PANEL_Y);
+            renderIdleSession(g, leftPos + DETAIL_PANEL_X, topPos + DETAIL_PANEL_Y, mouseX, mouseY);
         } else {
             renderSelectedSession(g, mouseX, mouseY);
         }
@@ -276,19 +238,19 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int slotY = topPos + slot.y;
         int housingX = slotX - 3;
         int housingY = slotY - 3;
-        g.fill(housingX, housingY, housingX + 22, housingY + 22, COLOR_PANEL_ALT);
-        g.renderOutline(housingX, housingY, 22, 22, COLOR_BORDER);
-        g.fill(slotX - 2, slotY - 2, slotX + 18, slotY + 18, COLOR_FRAME_INNER);
-        g.renderOutline(slotX - 2, slotY - 2, 20, 20, COLOR_ACCENT_DARK);
-        g.fill(slotX - 1, slotY - 1, slotX + 17, slotY + 17, COLOR_PANEL);
-        g.renderOutline(slotX - 1, slotY - 1, 18, 18, COLOR_BORDER);
+        g.fill(housingX, housingY, housingX + 22, housingY + 22, pal().panelAlt());
+        g.renderOutline(housingX, housingY, 22, 22, pal().border());
+        g.fill(slotX - 2, slotY - 2, slotX + 18, slotY + 18, pal().frameInner());
+        g.renderOutline(slotX - 2, slotY - 2, 20, 20, pal().accentDark());
+        g.fill(slotX - 1, slotY - 1, slotX + 17, slotY + 17, pal().panel());
+        g.renderOutline(slotX - 1, slotY - 1, 18, 18, pal().border());
     }
 
     private void renderNetworkList(GuiGraphics g, int mouseX, int mouseY) {
         int startX = leftPos + NETWORK_LIST_X;
         int searchY = getSearchBoxTop();
-        g.fill(startX, searchY, startX + NETWORK_LIST_WIDTH, searchY + SEARCH_BOX_HEIGHT, COLOR_PANEL_ALT);
-        g.renderOutline(startX, searchY, NETWORK_LIST_WIDTH, SEARCH_BOX_HEIGHT, COLOR_BORDER);
+        g.fill(startX, searchY, startX + NETWORK_LIST_WIDTH, searchY + SEARCH_BOX_HEIGHT, pal().panelAlt());
+        g.renderOutline(startX, searchY, NETWORK_LIST_WIDTH, SEARCH_BOX_HEIGHT, pal().border());
 
         int startY = searchY + SEARCH_BOX_HEIGHT + 2;
 
@@ -300,9 +262,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
         if (networkList.isEmpty()) {
             g.drawString(font, label("gui.logisticsnetworks.computer.no_networks_online"), startX + 4, startY + 10,
-                    COLOR_TEXT_MUTED);
+                    pal().textMuted());
             g.drawString(font, label("gui.logisticsnetworks.computer.insert_wrench"), startX + 4, startY + 22,
-                    COLOR_TEXT_MUTED);
+                    pal().textMuted());
             return;
         }
 
@@ -327,7 +289,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             String pageInfo = line("gui.logisticsnetworks.node.page_info", first, last, filtered.size());
             int pageInfoX = leftPos + NETWORK_LIST_X + NETWORK_LIST_WIDTH - font.width(pageInfo);
             g.drawString(font, pageInfo, pageInfoX,
-                    topPos + DETAIL_PANEL_Y + DETAIL_PANEL_HEIGHT - 11, COLOR_TEXT_MUTED);
+                    topPos + DETAIL_PANEL_Y + DETAIL_PANEL_HEIGHT - 11, pal().textMuted());
         }
     }
 
@@ -336,8 +298,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         boolean selected = entry.id().equals(selectedNetworkId);
         boolean isPinned = entry.pinned();
         int entryHeight = NETWORK_ENTRY_HEIGHT - 2;
-        int bgColor = selected ? COLOR_ROW_SELECTED : (hovered ? COLOR_ROW_HOVER : COLOR_ROW);
-        int borderColor = selected ? COLOR_BORDER_BRIGHT : (hovered ? COLOR_ACCENT_DARK : COLOR_BORDER);
+        int bgColor = selected ? pal().rowSelected() : (hovered ? pal().rowHover() : pal().row());
+        int borderColor = selected ? pal().borderBright() : (hovered ? pal().accentDark() : pal().border());
 
         g.fill(x, y, x + width, y + entryHeight, bgColor);
         g.renderOutline(x, y, width, entryHeight, borderColor);
@@ -348,18 +310,18 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         boolean starHovered = mouseX >= starX && mouseX < starX + STAR_BTN_W
                 && mouseY >= starY && mouseY < starY + STAR_BTN_W;
         g.drawString(font, "\u2605", starX, starY,
-                isPinned ? COLOR_STAR : (starHovered ? COLOR_TEXT_SECONDARY : COLOR_STAR_EMPTY), false);
+                isPinned ? COLOR_STAR : (starHovered ? pal().textSecondary() : pal().starEmpty()), false);
 
         int textW = width - STAR_BTN_W - 14;
         String prefix = selected ? "> " : (hovered ? "+ " : "- ");
         String name = trimText(prefix + entry.name(), textW);
         String nodeCount = line("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
 
-        g.drawString(font, name, x + 7, y + 6, selected ? COLOR_ACCENT : COLOR_TEXT);
-        g.drawString(font, trimText(nodeCount, textW), x + 7, y + 18, COLOR_TEXT_SECONDARY);
+        g.drawString(font, name, x + 7, y + 6, selected ? pal().accent() : pal().text());
+        g.drawString(font, trimText(nodeCount, textW), x + 7, y + 18, pal().textSecondary());
     }
 
-    private void renderIdleSession(GuiGraphics g, int panelX, int panelY) {
+    private void renderIdleSession(GuiGraphics g, int panelX, int panelY, int mouseX, int mouseY) {
         int textX = panelX + 12;
         int lineY = panelY + 24;
         String totalNetworks = line("gui.logisticsnetworks.computer.total_networks_badge", networkList.size());
@@ -368,17 +330,25 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int badgeGroupW = 114;
         int totalX = badgeGroupX + ((badgeGroupW - totalWidth) / 2);
 
-        g.drawString(font, label("gui.logisticsnetworks.computer.no_network_mounted"), textX, lineY, COLOR_WARNING);
+        g.drawString(font, label("gui.logisticsnetworks.computer.no_network_mounted"), textX, lineY, pal().warning());
         g.drawString(font, label("gui.logisticsnetworks.computer.select_directory"), textX, lineY + 16,
-                COLOR_TEXT_SECONDARY);
+                pal().textSecondary());
         g.drawString(font, label("gui.logisticsnetworks.computer.open_workstation"), textX, lineY + 28,
-                COLOR_TEXT_SECONDARY);
+                pal().textSecondary());
         renderStatusBadge(g, textX, lineY + 50, 48, 10, line("gui.logisticsnetworks.computer.status.idle"));
         renderStatusBadge(g, textX + 56, lineY + 50, 58, 10, line("gui.logisticsnetworks.computer.status.ready"));
         renderStatusBadge(g, totalX, lineY + 64, totalWidth, 10, totalNetworks);
-        g.drawString(font, label("gui.logisticsnetworks.computer.hint.dir"), textX, lineY + 76, COLOR_TEXT_MUTED);
-        g.drawString(font, label("gui.logisticsnetworks.computer.hint.tab"), textX, lineY + 88, COLOR_TEXT_MUTED);
-        g.drawString(font, label("gui.logisticsnetworks.computer.hint.run"), textX, lineY + 100, COLOR_TEXT_MUTED);
+        g.drawString(font, label("gui.logisticsnetworks.computer.hint.dir"), textX, lineY + 76, pal().textMuted());
+        g.drawString(font, label("gui.logisticsnetworks.computer.hint.tab"), textX, lineY + 88, pal().textMuted());
+        g.drawString(font, label("gui.logisticsnetworks.computer.hint.run"), textX, lineY + 100, pal().textMuted());
+
+        int loadY = panelY + 152;
+        int buttonWidth = DETAIL_PANEL_WIDTH - 24;
+        boolean loadHovered = mouseX >= textX && mouseX < textX + buttonWidth
+                && mouseY >= loadY && mouseY < loadY + OPTION_BTN_HEIGHT;
+        renderCommandCard(g, textX, loadY, buttonWidth, OPTION_BTN_HEIGHT,
+                line("gui.logisticsnetworks.computer.load_network"),
+                line("gui.logisticsnetworks.computer.load_network_detail"), loadHovered);
     }
 
     private void renderSelectedSession(GuiGraphics g, int mouseX, int mouseY) {
@@ -387,18 +357,21 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int textX = panelX + 12;
         SyncNetworkListPayload.NetworkEntry selectedEntry = getSelectedNetworkEntry();
 
-        g.drawString(font, label("gui.logisticsnetworks.computer.network"), textX, panelY + 24, COLOR_TEXT_SECONDARY);
-        g.drawString(font, trimText(selectedNetworkName, DETAIL_PANEL_WIDTH - 24), textX, panelY + 38, COLOR_TEXT);
+        g.drawString(font, label("gui.logisticsnetworks.computer.network"), textX, panelY + 24, pal().textSecondary());
+        g.drawString(font, trimText(selectedNetworkName, DETAIL_PANEL_WIDTH - 24), textX, panelY + 38, pal().text());
         String nodeCount = selectedEntry == null
                 ? line("gui.logisticsnetworks.computer.nodes_unknown")
                 : line("gui.logisticsnetworks.computer.nodes_badge", selectedEntry.nodeCount());
         renderStatusBadge(g, textX, panelY + 56, 58, 10, nodeCount);
         renderStatusBadge(g, textX + 66, panelY + 56, 54, 10, line("gui.logisticsnetworks.computer.status.synced"));
-        g.drawString(font, label("gui.logisticsnetworks.computer.choose_subsystem"), textX, panelY + 82,
-                COLOR_TEXT_SECONDARY);
-        g.drawString(font, label("gui.logisticsnetworks.computer.inspect_network"), textX, panelY + 94,
-                COLOR_TEXT_SECONDARY);
+        g.drawString(font, label("gui.logisticsnetworks.computer.choose_subsystem"), textX, panelY + 72,
+                pal().textSecondary());
         renderOptionButtons(g, mouseX, mouseY);
+
+        if (!lnetStatus.isEmpty()) {
+            g.drawString(font, trimText(lnetStatus, DETAIL_PANEL_WIDTH - 24), textX,
+                    panelY + DETAIL_PANEL_HEIGHT - 12, lnetStatusColor);
+        }
     }
 
     private void renderOptionButtons(GuiGraphics g, int mouseX, int mouseY) {
@@ -406,13 +379,16 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int panelY = topPos + DETAIL_PANEL_Y;
         int buttonX = panelX + 12;
         int buttonWidth = DETAIL_PANEL_WIDTH - 24;
-        int button1Y = panelY + 112;
+        int button1Y = panelY + 84;
         int button2Y = button1Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
+        int button3Y = button2Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
 
         boolean button1Hovered = mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button1Y && mouseY < button1Y + OPTION_BTN_HEIGHT;
         boolean button2Hovered = mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button2Y && mouseY < button2Y + OPTION_BTN_HEIGHT;
+        boolean button3Hovered = mouseX >= buttonX && mouseX < buttonX + buttonWidth
+                && mouseY >= button3Y && mouseY < button3Y + OPTION_BTN_HEIGHT;
 
         renderCommandCard(g, buttonX, button1Y, buttonWidth, OPTION_BTN_HEIGHT,
                 line("gui.logisticsnetworks.computer.open_io_monitor"),
@@ -420,18 +396,21 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         renderCommandCard(g, buttonX, button2Y, buttonWidth, OPTION_BTN_HEIGHT,
                 line("gui.logisticsnetworks.computer.open_node_table"),
                 line("gui.logisticsnetworks.computer.device_topology"), button2Hovered);
+        renderCommandCard(g, buttonX, button3Y, buttonWidth, OPTION_BTN_HEIGHT,
+                line("gui.logisticsnetworks.computer.open_lnet_files"),
+                line("gui.logisticsnetworks.computer.lnet_file_ops"), button3Hovered);
     }
 
     private void renderCommandCard(GuiGraphics g, int x, int y, int w, int h,
             String label, String detail, boolean hovered) {
-        int bgColor = hovered ? COLOR_ROW_SELECTED : COLOR_PANEL_ALT;
-        int borderColor = hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER;
+        int bgColor = hovered ? pal().rowSelected() : pal().panelAlt();
+        int borderColor = hovered ? pal().borderBright() : pal().border();
 
         g.fill(x, y, x + w, y + h, bgColor);
         g.renderOutline(x, y, w, h, borderColor);
-        g.fill(x + 1, y + 1, x + w - 1, y + 9, hovered ? COLOR_ACCENT_DARK : COLOR_PANEL_HEADER);
-        g.drawString(font, label, x + 8, y + 6, hovered ? COLOR_ACCENT : COLOR_TEXT);
-        g.drawString(font, detail, x + 8, y + 20, COLOR_TEXT_SECONDARY);
+        g.fill(x + 1, y + 1, x + w - 1, y + 8, hovered ? pal().accentDark() : pal().panelHeader());
+        g.drawString(font, trimText(label, w - 16), x + 8, y + 5, hovered ? pal().accent() : pal().text());
+        g.drawString(font, trimText(detail, w - 16), x + 8, y + 15, pal().textSecondary());
     }
 
     private void renderChannelListPage(GuiGraphics g, int mouseX, int mouseY) {
@@ -444,25 +423,25 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         renderBackButton(g, mouseX, mouseY);
         g.drawString(font, trimText(line("gui.logisticsnetworks.computer.io_monitor_title", selectedNetworkName),
                         contentW - 88),
-                contentX + 64, contentY + 4, COLOR_ACCENT);
+                contentX + 64, contentY + 4, pal().accent());
 
         if (channelList.isEmpty()) {
             g.drawString(font, label("gui.logisticsnetworks.computer.no_channels"), contentX + 12, contentY + 28,
-                    COLOR_TEXT_MUTED);
+                    pal().textMuted());
             g.drawString(font, label("gui.logisticsnetworks.computer.enable_channels_hint"), contentX + 12,
-                    contentY + 40, COLOR_TEXT_MUTED);
+                    contentY + 40, pal().textMuted());
             return;
         }
 
         int headerX = contentX + 8;
         int headerY = contentY + 22;
         int headerW = contentW - 16;
-        g.fill(headerX, headerY, headerX + headerW, headerY + 14, COLOR_PANEL_ALT);
-        g.renderOutline(headerX, headerY, headerW, 14, COLOR_BORDER);
+        g.fill(headerX, headerY, headerX + headerW, headerY + 14, pal().panelAlt());
+        g.renderOutline(headerX, headerY, headerW, 14, pal().border());
         g.drawString(font, label("gui.logisticsnetworks.computer.channel_header_device"), headerX + 8, headerY + 3,
-                COLOR_TEXT_SECONDARY);
+                pal().textSecondary());
         g.drawString(font, label("gui.logisticsnetworks.computer.channel_header_type"), headerX + headerW - 72,
-                headerY + 3, COLOR_TEXT_SECONDARY);
+                headerY + 3, pal().textSecondary());
 
         int listY = contentY + 40;
         int maxScroll = Math.max(0, channelList.size() - CHANNELS_PER_PAGE);
@@ -482,15 +461,15 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             int last = Math.min(channelListScrollOffset + CHANNELS_PER_PAGE, channelList.size());
             String scrollInfo = line("gui.logisticsnetworks.node.page_info", first, last, channelList.size());
             g.drawString(font, scrollInfo, contentX + contentW - 12 - font.width(scrollInfo),
-                    contentY + contentH - 14, COLOR_TEXT_MUTED);
+                    contentY + contentH - 14, pal().textMuted());
         }
     }
 
     private void renderChannelEntry(GuiGraphics g, SyncChannelListPayload.ChannelEntry entry,
             int x, int y, int width, boolean hovered) {
         int h = CHANNEL_ENTRY_HEIGHT - 2;
-        int bgColor = hovered ? COLOR_ROW_HOVER : COLOR_ROW;
-        int borderColor = hovered ? COLOR_ACCENT_DARK : COLOR_BORDER;
+        int bgColor = hovered ? pal().rowHover() : pal().row();
+        int borderColor = hovered ? pal().accentDark() : pal().border();
         int typeColor = resolveTypeColor(entry.typeOrdinal());
 
         g.fill(x, y, x + width, y + h, bgColor);
@@ -505,9 +484,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int nodesX = x + width - 6 - font.width(nodesBadge);
         int typeX = nodesX - 6 - font.width(typeName);
 
-        g.drawString(font, chLabel, textX, y + 5, COLOR_TEXT);
+        g.drawString(font, chLabel, textX, y + 5, pal().text());
         g.drawString(font, typeName, typeX, y + 5, typeColor);
-        g.drawString(font, nodesBadge, nodesX, y + 5, COLOR_TEXT_SECONDARY);
+        g.drawString(font, nodesBadge, nodesX, y + 5, pal().textSecondary());
     }
 
     private void renderChannelGraphPage(GuiGraphics g, int mouseX, int mouseY) {
@@ -520,7 +499,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         renderBackButton(g, mouseX, mouseY);
         g.drawString(font, trimText(line("gui.logisticsnetworks.computer.channel_graph_title",
                         "CH" + watchedChannelIndex), contentW - 88),
-                contentX + 64, contentY + 4, COLOR_ACCENT);
+                contentX + 64, contentY + 4, pal().accent());
 
         int graphX = contentX + 10;
         int graphY = contentY + 24;
@@ -544,7 +523,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             case 2 -> COLOR_ENERGY_BAR;
             case 3 -> COLOR_CHEMICAL_BAR;
             case 4 -> COLOR_SOURCE_BAR;
-            default -> COLOR_GRAPH;
+            default -> pal().graph();
         };
     }
 
@@ -570,10 +549,10 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
     private void renderTelemetryGraph(GuiGraphics g, int x, int y, int w, int h,
             String label, long[] history, int writeIndex, int barColor, String unit) {
-        g.fill(x, y, x + w, y + h, COLOR_PANEL_ALT);
-        g.renderOutline(x, y, w, h, COLOR_BORDER);
-        g.fill(x + 1, y + 1, x + w - 1, y + 11, COLOR_PANEL_HEADER);
-        g.fill(x + 1, y + 11, x + w - 1, y + 12, COLOR_BORDER);
+        g.fill(x, y, x + w, y + h, pal().panelAlt());
+        g.renderOutline(x, y, w, h, pal().border());
+        g.fill(x + 1, y + 1, x + w - 1, y + 11, pal().panelHeader());
+        g.fill(x + 1, y + 11, x + w - 1, y + 12, pal().border());
 
         int barAreaX = x + 4;
         int barAreaY = y + 14;
@@ -592,7 +571,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         }
 
         for (int gy = barAreaY + 4; gy < barAreaY + barAreaH; gy += 6) {
-            g.fill(barAreaX, gy, barAreaX + barAreaW, gy + 1, COLOR_GRAPH_GRID);
+            g.fill(barAreaX, gy, barAreaX + barAreaW, gy + 1, pal().graphGrid());
         }
 
         int newestIdx = ((writeIndex - 1) % TelemetryManager.HISTORY_SIZE
@@ -611,10 +590,10 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             if (bx < barAreaX) break;
             int by = barAreaY + barAreaH - barH;
             g.fill(bx, by, bx + barW, barAreaY + barAreaH, barColor);
-            g.fill(bx, by, bx + barW, by + 1, COLOR_ACCENT);
+            g.fill(bx, by, bx + barW, by + 1, pal().accent());
         }
 
-        g.drawString(font, label, x + 4, y + 2, COLOR_TEXT_SECONDARY);
+        g.drawString(font, label, x + 4, y + 2, pal().textSecondary());
         String valueText = formatThroughput(newestVal) + " " + unit;
         g.drawString(font, valueText, x + w - 4 - font.width(valueText), y + 2, barColor);
     }
@@ -635,14 +614,14 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
         if (nodeInfoList.isEmpty()) {
             g.drawString(font, label("gui.logisticsnetworks.computer.no_nodes"), contentX + 12, contentY + 28,
-                    COLOR_TEXT_MUTED);
+                    pal().textMuted());
             g.drawString(font, label("gui.logisticsnetworks.computer.attach_device"), contentX + 12, contentY + 40,
-                    COLOR_TEXT_MUTED);
+                    pal().textMuted());
             renderBackButton(g, mouseX, mouseY);
             renderVisibilityButtons(g, mouseX, mouseY);
             g.drawString(font, trimText(line("gui.logisticsnetworks.computer.node_table_title", selectedNetworkName),
                             contentW - 156),
-                    contentX + 64, contentY + 4, COLOR_ACCENT);
+                    contentX + 64, contentY + 4, pal().accent());
             return;
         }
 
@@ -651,7 +630,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         renderVisibilityButtons(g, mouseX, mouseY);
         g.drawString(font, trimText(line("gui.logisticsnetworks.computer.node_table_title", selectedNetworkName),
                         contentW - 156),
-                contentX + 64, contentY + 4, COLOR_ACCENT);
+                contentX + 64, contentY + 4, pal().accent());
     }
 
     private void renderVisibilityButtons(GuiGraphics g, int mouseX, int mouseY) {
@@ -671,21 +650,21 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     private void renderHeaderButton(GuiGraphics g, int x, int y, int w, int h, String label, boolean hovered) {
-        int bgColor = hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG;
-        int borderColor = hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER;
+        int bgColor = hovered ? pal().rowSelected() : pal().badgeBg();
+        int borderColor = hovered ? pal().borderBright() : pal().border();
 
         g.fill(x, y, x + w, y + h, bgColor);
         g.renderOutline(x, y, w, h, borderColor);
 
         int textX = x + (w / 2) - (font.width(label) / 2);
         int textY = y + (h / 2) - (font.lineHeight / 2);
-        g.drawString(font, label, textX, textY, hovered ? COLOR_ACCENT : COLOR_TEXT_SECONDARY);
+        g.drawString(font, label, textX, textY, hovered ? pal().accent() : pal().textSecondary());
     }
 
     private void renderToggleButton(GuiGraphics g, int x, int y, int w, int h, boolean hovered, boolean active) {
-        int bgColor = active ? (hovered ? COLOR_HIGHLIGHT_HOVER : COLOR_HIGHLIGHT_BG)
-                : (hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG);
-        int borderColor = active ? COLOR_HIGHLIGHT_BORDER : (hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER);
+        int bgColor = active ? (hovered ? pal().highlightHover() : pal().highlightBg())
+                : (hovered ? pal().rowSelected() : pal().badgeBg());
+        int borderColor = active ? pal().highlightBorder() : (hovered ? pal().borderBright() : pal().border());
 
         g.fill(x, y, x + w, y + h, bgColor);
         g.renderOutline(x, y, w, h, borderColor);
@@ -702,18 +681,18 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int baseRight = baseLeft + 4;
         int baseTop = bulbBottom;
         int baseBottom = baseTop + 3;
-        int glowColor = active ? COLOR_LAMP_ON_GLOW : COLOR_LAMP_OFF_GLOW;
-        int bulbColor = active ? COLOR_LAMP_ON : COLOR_LAMP_OFF;
+        int glowColor = active ? pal().lampOnGlow() : pal().lampOffGlow();
+        int bulbColor = active ? pal().lampOn() : pal().lampOff();
 
         g.fill(bulbLeft - 1, bulbTop - 1, bulbRight + 1, bulbBottom + 1, glowColor);
         g.fill(bulbLeft, bulbTop, bulbRight, bulbBottom, bulbColor);
-        g.fill(baseLeft, baseTop, baseRight, baseBottom, COLOR_LAMP_BASE);
-        g.fill(centerX - 1, baseBottom, centerX + 1, baseBottom + 1, COLOR_LAMP_BASE);
+        g.fill(baseLeft, baseTop, baseRight, baseBottom, pal().lampBase());
+        g.fill(centerX - 1, baseBottom, centerX + 1, baseBottom + 1, pal().lampBase());
     }
 
     private void renderSettingsButton(GuiGraphics g, int x, int y, int w, int h, boolean hovered) {
-        int bgColor = hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG;
-        int borderColor = hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER;
+        int bgColor = hovered ? pal().rowSelected() : pal().badgeBg();
+        int borderColor = hovered ? pal().borderBright() : pal().border();
         g.fill(x, y, x + w, y + h, bgColor);
         g.renderOutline(x, y, w, h, borderColor);
         renderGearIcon(g, x, y, w, h, hovered);
@@ -722,8 +701,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private void renderGearIcon(GuiGraphics g, int x, int y, int w, int h, boolean hovered) {
         int cx = x + (w / 2);
         int cy = y + (h / 2);
-        int color = hovered ? COLOR_ACCENT : COLOR_TEXT_SECONDARY;
-        int hole = hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG;
+        int color = hovered ? pal().accent() : pal().textSecondary();
+        int hole = hovered ? pal().rowSelected() : pal().badgeBg();
 
         g.fill(cx - 2, cy - 2, cx + 2, cy + 2, color);
         g.fill(cx - 1, cy - 4, cx + 1, cy - 2, color);
@@ -767,12 +746,12 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int headerX = contentX + 8;
         int headerY = contentY + 22;
         int headerW = contentW - 16;
-        g.fill(headerX, headerY, headerX + headerW, headerY + 14, COLOR_PANEL_ALT);
-        g.renderOutline(headerX, headerY, headerW, 14, COLOR_BORDER);
+        g.fill(headerX, headerY, headerX + headerW, headerY + 14, pal().panelAlt());
+        g.renderOutline(headerX, headerY, headerW, 14, pal().border());
         g.drawString(font, label("gui.logisticsnetworks.computer.device"), headerX + 8, headerY + 3,
-                COLOR_TEXT_SECONDARY);
+                pal().textSecondary());
         g.drawString(font, label("gui.logisticsnetworks.computer.location"), headerX + headerW - 72, headerY + 3,
-                COLOR_TEXT_SECONDARY);
+                pal().textSecondary());
 
         int listY = contentY + 40;
         for (int i = 0; i < NODES_PER_PAGE && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
@@ -796,10 +775,10 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 String headerText = marker + " "
                         + trimText(entry.headerName, Math.max(0, countX - NODE_TEXT_GAP - (headerX + NODE_ROW_SIDE_PAD)));
 
-                g.fill(headerX, entryY, headerX + headerW, entryY + NODE_ENTRY_HEIGHT - 2, COLOR_PANEL_ALT);
-                g.renderOutline(headerX, entryY, headerW, NODE_ENTRY_HEIGHT - 2, COLOR_ACCENT_DARK);
-                g.drawString(font, headerText, headerX + NODE_ROW_SIDE_PAD, entryY + 7, COLOR_ACCENT);
-                g.drawString(font, countText, countX, entryY + 7, COLOR_TEXT_SECONDARY);
+                g.fill(headerX, entryY, headerX + headerW, entryY + NODE_ENTRY_HEIGHT - 2, pal().panelAlt());
+                g.renderOutline(headerX, entryY, headerW, NODE_ENTRY_HEIGHT - 2, pal().accentDark());
+                g.drawString(font, headerText, headerX + NODE_ROW_SIDE_PAD, entryY + 7, pal().accent());
+                g.drawString(font, countText, countX, entryY + 7, pal().textSecondary());
                 renderSettingsButton(g, settingsX, buttonY, SETTINGS_BTN_W, SETTINGS_BTN_H, settingsHovered);
                 renderToggleButton(g, buttonX, buttonY, HIGHLIGHT_BTN_W, HIGHLIGHT_BTN_H, buttonHovered, active);
                 continue;
@@ -807,13 +786,13 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
             boolean hovered = mouseX >= headerX && mouseX < headerX + headerW
                     && mouseY >= entryY && mouseY < entryY + NODE_ENTRY_HEIGHT - 2;
-            int bgColor = hovered ? COLOR_ROW_HOVER : COLOR_ROW;
-            int borderColor = hovered ? COLOR_ACCENT_DARK : COLOR_BORDER;
+            int bgColor = hovered ? pal().rowHover() : pal().row();
+            int borderColor = hovered ? pal().accentDark() : pal().border();
             g.fill(headerX, entryY, headerX + headerW, entryY + NODE_ENTRY_HEIGHT - 2, bgColor);
             g.renderOutline(headerX, entryY, headerW, NODE_ENTRY_HEIGHT - 2, borderColor);
 
             if (entry.isGrouped) {
-                g.fill(headerX + 1, entryY + 1, headerX + 3, entryY + NODE_ENTRY_HEIGHT - 3, COLOR_ACCENT_DARK);
+                g.fill(headerX + 1, entryY + 1, headerX + 3, entryY + NODE_ENTRY_HEIGHT - 3, pal().accentDark());
             }
 
             boolean active = entry.nodeInfo.highlighted();
@@ -848,8 +827,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             String blockLabel = trimText(resolveBlockLabel(entry.nodeInfo.blockName()),
                     Math.max(0, positionX - NODE_TEXT_GAP - textX));
 
-            g.drawString(font, blockLabel, textX, entryY + 7, COLOR_TEXT);
-            g.drawString(font, positionText, positionX, entryY + 7, COLOR_TEXT_SECONDARY);
+            g.drawString(font, blockLabel, textX, entryY + 7, pal().text());
+            g.drawString(font, positionText, positionX, entryY + 7, pal().textSecondary());
             renderToggleButton(g, buttonX, buttonY, HIGHLIGHT_BTN_W, HIGHLIGHT_BTN_H, buttonHovered, active);
         }
 
@@ -858,31 +837,180 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                     + Math.min(nodeMapScrollOffset + NODES_PER_PAGE, renderEntries.size())
                     + " / " + renderEntries.size();
             g.drawString(font, scrollInfo, contentX + contentW - 12 - font.width(scrollInfo),
-                    contentY + contentH - 14, COLOR_TEXT_MUTED);
+                    contentY + contentH - 14, pal().textMuted());
         }
     }
 
     private void renderTerminalPanel(GuiGraphics g, int x, int y, int w, int h, String label) {
-        g.fill(x, y, x + w, y + h, COLOR_PANEL);
-        g.renderOutline(x, y, w, h, COLOR_BORDER);
-        g.fill(x + 1, y + 1, x + w - 1, y + PANEL_HEADER_HEIGHT, COLOR_PANEL_HEADER);
-        g.fill(x + 1, y + PANEL_HEADER_HEIGHT, x + w - 1, y + PANEL_HEADER_HEIGHT + 1, COLOR_BORDER);
-        g.drawString(font, trimText(label.toUpperCase(Locale.ROOT), w - 12), x + 6, y + 4, COLOR_ACCENT);
+        g.fill(x, y, x + w, y + h, pal().panel());
+        g.renderOutline(x, y, w, h, pal().border());
+        g.fill(x + 1, y + 1, x + w - 1, y + PANEL_HEADER_HEIGHT, pal().panelHeader());
+        g.fill(x + 1, y + PANEL_HEADER_HEIGHT, x + w - 1, y + PANEL_HEADER_HEIGHT + 1, pal().border());
+        g.drawString(font, trimText(label.toUpperCase(Locale.ROOT), w - 12), x + 6, y + 4, pal().accent());
         renderScanlines(g, x + 1, y + PANEL_HEADER_HEIGHT + 1, w - 2, h - PANEL_HEADER_HEIGHT - 2);
     }
 
     private void renderStatusBadge(GuiGraphics g, int x, int y, int w, int h, String label) {
-        g.fill(x, y, x + w, y + h, COLOR_BADGE_BG);
-        g.renderOutline(x, y, w, h, COLOR_ACCENT_DARK);
+        g.fill(x, y, x + w, y + h, pal().badgeBg());
+        g.renderOutline(x, y, w, h, pal().accentDark());
         int textX = x + (w / 2) - (font.width(label) / 2);
         int textY = y + (h / 2) - (font.lineHeight / 2);
-        g.drawString(font, label, textX, textY, COLOR_BADGE_TEXT);
+        g.drawString(font, label, textX, textY, pal().badgeText());
     }
 
     private void renderScanlines(GuiGraphics g, int x, int y, int w, int h) {
         for (int row = y; row < y + h; row += 4) {
-            g.fill(x, row, x + w, row + 1, COLOR_SCANLINE);
+            g.fill(x, row, x + w, row + 1, pal().scanline());
         }
+    }
+
+    private void renderLnetFilesPage(GuiGraphics g, int mouseX, int mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int contentW = imageWidth - 20;
+        int contentH = imageHeight - 44;
+        int panelRight = contentX + contentW - 8;
+
+        renderTerminalPanel(g, contentX, contentY, contentW, contentH, "");
+        renderBackButton(g, mouseX, mouseY);
+        g.drawString(font, trimText(line("gui.logisticsnetworks.computer.lnet_title", selectedNetworkName),
+                        contentW - BACK_BTN_W - 40),
+                contentX + BACK_BTN_W + 18, contentY + 4, pal().accent());
+
+        int saveX = contentX + 8;
+        int refreshX = saveX + 66;
+        int buttonY = contentY + LNET_TOOLBAR_Y;
+        renderSmallButton(g, saveX, buttonY, 58, 14, line("gui.logisticsnetworks.computer.lnet_save"),
+                isHoveringAbs(saveX, buttonY, 58, 14, mouseX, mouseY));
+        renderSmallButton(g, refreshX, buttonY, 58, 14, line("gui.logisticsnetworks.computer.lnet_refresh"),
+                isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY));
+
+        int fileX = contentX + 8;
+        int listY = contentY + LNET_LIST_Y;
+        int fileW = LNET_FILE_W;
+        int labelX = fileX + fileW + LNET_COLUMN_GAP;
+        int labelW = LNET_LABEL_W;
+        int previewX = labelX + labelW + LNET_COLUMN_GAP;
+        int previewW = panelRight - previewX;
+        int headerY = listY - 13;
+
+        g.drawString(font, label("gui.logisticsnetworks.computer.lnet_files"), fileX, headerY, pal().textSecondary());
+        g.drawString(font, label("gui.logisticsnetworks.computer.lnet_labels"), labelX, headerY, pal().textSecondary());
+        g.drawString(font, label("gui.logisticsnetworks.computer.lnet_preview"), previewX, headerY, pal().textSecondary());
+
+        renderLnetFileList(g, fileX, listY, fileW, mouseX, mouseY);
+        renderLnetLabelList(g, labelX, listY, labelW, mouseX, mouseY);
+        renderLnetPreview(g, previewX, listY, previewW, mouseX, mouseY);
+
+        if (!lnetStatus.isEmpty()) {
+            g.drawString(font, trimText(lnetStatus, contentW - 16), contentX + 8, contentY + contentH - 12,
+                    lnetStatusColor);
+        }
+    }
+
+    private void renderLnetFileList(GuiGraphics g, int x, int y, int width, int mouseX, int mouseY) {
+        if (lnetFiles.isEmpty()) {
+            g.drawString(font, label("gui.logisticsnetworks.computer.lnet_no_files"), x, y + 8, pal().textMuted());
+            return;
+        }
+
+        int maxScroll = Math.max(0, lnetFiles.size() - LNET_FILES_PER_PAGE);
+        lnetFileScrollOffset = Math.max(0, Math.min(lnetFileScrollOffset, maxScroll));
+        for (int i = 0; i < LNET_FILES_PER_PAGE && i + lnetFileScrollOffset < lnetFiles.size(); i++) {
+            int index = i + lnetFileScrollOffset;
+            Path path = lnetFiles.get(index);
+            int rowY = y + i * LNET_ENTRY_HEIGHT;
+            boolean selected = path.equals(selectedLnetPath);
+            boolean hovered = isHoveringAbs(x, rowY, width, LNET_ENTRY_HEIGHT - 2, mouseX, mouseY);
+            renderSimpleRow(g, x, rowY, width, LNET_ENTRY_HEIGHT - 2, selected, hovered);
+            g.drawString(font, trimText(path.getFileName().toString(), width - 8), x + 4, rowY + 5,
+                    selected ? pal().accent() : pal().text());
+        }
+        renderLnetScrollInfo(g, x, y, width, lnetFileScrollOffset, lnetFiles.size(), LNET_FILES_PER_PAGE);
+    }
+
+    private void renderLnetLabelList(GuiGraphics g, int x, int y, int width, int mouseX, int mouseY) {
+        if (selectedLnetFile == null) {
+            g.drawString(font, label("gui.logisticsnetworks.computer.lnet_select_file"), x, y + 8, pal().textMuted());
+            return;
+        }
+
+        List<LnetNetworkFile.NodeEntry> nodes = selectedLnetFile.nodes();
+        int maxScroll = Math.max(0, nodes.size() - LNET_LABELS_PER_PAGE);
+        lnetLabelScrollOffset = Math.max(0, Math.min(lnetLabelScrollOffset, maxScroll));
+        for (int i = 0; i < LNET_LABELS_PER_PAGE && i + lnetLabelScrollOffset < nodes.size(); i++) {
+            int index = i + lnetLabelScrollOffset;
+            LnetNetworkFile.NodeEntry node = nodes.get(index);
+            int rowY = y + i * LNET_ENTRY_HEIGHT;
+            boolean selected = index == selectedLnetLabelIndex;
+            boolean hovered = isHoveringAbs(x, rowY, width, LNET_ENTRY_HEIGHT - 2, mouseX, mouseY);
+            renderSimpleRow(g, x, rowY, width, LNET_ENTRY_HEIGHT - 2, selected, hovered);
+            g.drawString(font, trimText(node.label(), width - 8), x + 4, rowY + 5,
+                    selected ? pal().accent() : pal().text());
+        }
+        renderLnetScrollInfo(g, x, y, width, lnetLabelScrollOffset, nodes.size(), LNET_LABELS_PER_PAGE);
+    }
+
+    private void renderLnetScrollInfo(GuiGraphics g, int x, int y, int width, int offset, int total, int pageSize) {
+        if (total <= pageSize) {
+            return;
+        }
+        int first = offset + 1;
+        int last = Math.min(offset + pageSize, total);
+        String info = line("gui.logisticsnetworks.node.page_info", first, last, total);
+        g.drawString(font, info, x + width - font.width(info), y + pageSize * LNET_ENTRY_HEIGHT + 4,
+                pal().textMuted());
+    }
+
+    private void renderLnetPreview(GuiGraphics g, int x, int y, int width, int mouseX, int mouseY) {
+        g.fill(x, y, x + width, y + 112, pal().panelAlt());
+        g.renderOutline(x, y, width, 112, pal().border());
+
+        LnetNetworkFile.NodeEntry entry = getSelectedLnetNode();
+        if (entry == null) {
+            g.drawString(font, label("gui.logisticsnetworks.computer.lnet_select_label"), x + 6, y + 8,
+                    pal().textMuted());
+            return;
+        }
+
+        NodeClipboardConfig config = loadClipboardPreview(entry);
+        if (config == null) {
+            g.drawString(font, label("gui.logisticsnetworks.computer.lnet_invalid_label"), x + 6, y + 8,
+                    pal().warning());
+            return;
+        }
+
+        g.drawString(font, trimText(entry.label(), width - 12), x + 6, y + 8, pal().accent());
+        g.drawString(font, line("gui.logisticsnetworks.computer.lnet_preview_channels",
+                config.getEnabledChannelCount()), x + 6, y + 24, pal().textSecondary());
+        g.drawString(font, line("gui.logisticsnetworks.computer.lnet_preview_filters",
+                config.getTotalFilterCount()), x + 6, y + 36, pal().textSecondary());
+        g.drawString(font, line("gui.logisticsnetworks.computer.lnet_preview_upgrades",
+                config.getTotalUpgradeCount()), x + 6, y + 48, pal().textSecondary());
+        g.drawString(font, line("gui.logisticsnetworks.computer.lnet_preview_required",
+                config.getRequiredItemsPreview().size()), x + 6, y + 60, pal().textSecondary());
+
+        int buttonY = y + 92;
+        renderSmallButton(g, x + 6, buttonY, width - 12, 14,
+                line("gui.logisticsnetworks.computer.lnet_copy_wrench"),
+                isHoveringAbs(x + 6, buttonY, width - 12, 14, mouseX, mouseY));
+    }
+
+    private void renderSimpleRow(GuiGraphics g, int x, int y, int width, int height, boolean selected, boolean hovered) {
+        int bgColor = selected ? pal().rowSelected() : (hovered ? pal().rowHover() : pal().row());
+        int borderColor = selected ? pal().borderBright() : (hovered ? pal().accentDark() : pal().border());
+        g.fill(x, y, x + width, y + height, bgColor);
+        g.renderOutline(x, y, width, height, borderColor);
+    }
+
+    private void renderSmallButton(GuiGraphics g, int x, int y, int width, int height, String label, boolean hovered) {
+        int bgColor = hovered ? pal().rowSelected() : pal().badgeBg();
+        int borderColor = hovered ? pal().borderBright() : pal().border();
+        g.fill(x, y, x + width, y + height, bgColor);
+        g.renderOutline(x, y, width, height, borderColor);
+        String display = trimText(label, width - 8);
+        int textX = x + Math.max(4, (width - font.width(display)) / 2);
+        g.drawString(font, display, textX, y + 4, hovered ? pal().accent() : pal().textSecondary());
     }
 
     private void renderBackButton(GuiGraphics g, int mouseX, int mouseY) {
@@ -891,15 +1019,15 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         boolean hovered = mouseX >= buttonX && mouseX < buttonX + BACK_BTN_W
                 && mouseY >= buttonY && mouseY < buttonY + BACK_BTN_H;
 
-        int bgColor = hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG;
-        int borderColor = hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER;
+        int bgColor = hovered ? pal().rowSelected() : pal().badgeBg();
+        int borderColor = hovered ? pal().borderBright() : pal().border();
         g.fill(buttonX, buttonY, buttonX + BACK_BTN_W, buttonY + BACK_BTN_H, bgColor);
         g.renderOutline(buttonX, buttonY, BACK_BTN_W, BACK_BTN_H, borderColor);
 
         String label = line("gui.logisticsnetworks.computer.exit");
         int textX = buttonX + (BACK_BTN_W / 2) - (font.width(label) / 2);
         int textY = buttonY + (BACK_BTN_H / 2) - (font.lineHeight / 2);
-        g.drawString(font, label, textX, textY, hovered ? COLOR_ACCENT : COLOR_TEXT_SECONDARY);
+        g.drawString(font, label, textX, textY, hovered ? pal().accent() : pal().textSecondary());
     }
 
     private boolean isBackButtonClicked(double mouseX, double mouseY) {
@@ -973,6 +1101,21 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                     }
                 }
             }
+            case LNET_FILES -> {
+                if (isLnetFileColumn(mouseX, mouseY) && lnetFiles.size() > LNET_FILES_PER_PAGE) {
+                    lnetFileScrollOffset -= (int) scrollY;
+                    int maxScroll = Math.max(0, lnetFiles.size() - LNET_FILES_PER_PAGE);
+                    lnetFileScrollOffset = Math.max(0, Math.min(lnetFileScrollOffset, maxScroll));
+                    return true;
+                }
+                if (isLnetLabelColumn(mouseX, mouseY)
+                        && selectedLnetFile != null && selectedLnetFile.nodes().size() > LNET_LABELS_PER_PAGE) {
+                    lnetLabelScrollOffset -= (int) scrollY;
+                    int maxScroll = Math.max(0, selectedLnetFile.nodes().size() - LNET_LABELS_PER_PAGE);
+                    lnetLabelScrollOffset = Math.max(0, Math.min(lnetLabelScrollOffset, maxScroll));
+                    return true;
+                }
+            }
             default -> {
             }
         }
@@ -991,6 +1134,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                         return true;
                     }
                     if (selectedNetworkId != null && handleOptionButtonClick(mouseX, mouseY)) {
+                        return true;
+                    }
+                    if (selectedNetworkId == null && handleLoadButtonClick(mouseX, mouseY)) {
                         return true;
                     }
                 }
@@ -1028,6 +1174,15 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                         return true;
                     }
                 }
+                case LNET_FILES -> {
+                    if (isBackButtonClicked(mouseX, mouseY)) {
+                        currentPage = Page.NETWORK_LIST;
+                        return true;
+                    }
+                    if (handleLnetFilesClick(mouseX, mouseY)) {
+                        return true;
+                    }
+                }
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -1060,6 +1215,159 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         setFocused(networkSearchBox);
         networkSearchBox.mouseClicked(mouseX, mouseY, 0);
         return true;
+    }
+
+    private boolean handleLnetFilesClick(double mouseX, double mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int saveX = contentX + 8;
+        int refreshX = saveX + 66;
+        int buttonY = contentY + LNET_TOOLBAR_Y;
+
+        if (isHoveringAbs(saveX, buttonY, 58, 14, mouseX, mouseY)) {
+            requestNetworkSave();
+            return true;
+        }
+        if (isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY)) {
+            refreshLnetFiles();
+            return true;
+        }
+
+        int listY = contentY + LNET_LIST_Y;
+        int fileX = contentX + 8;
+        int fileW = LNET_FILE_W;
+        for (int i = 0; i < LNET_FILES_PER_PAGE && i + lnetFileScrollOffset < lnetFiles.size(); i++) {
+            int index = i + lnetFileScrollOffset;
+            int rowY = listY + i * LNET_ENTRY_HEIGHT;
+            if (isHoveringAbs(fileX, rowY, fileW, LNET_ENTRY_HEIGHT - 2, mouseX, mouseY)) {
+                selectLnetFile(lnetFiles.get(index));
+                return true;
+            }
+        }
+
+        if (selectedLnetFile != null) {
+            int labelX = fileX + fileW + LNET_COLUMN_GAP;
+            int labelW = LNET_LABEL_W;
+            for (int i = 0; i < LNET_LABELS_PER_PAGE && i + lnetLabelScrollOffset < selectedLnetFile.nodes().size(); i++) {
+                int index = i + lnetLabelScrollOffset;
+                int rowY = listY + i * LNET_ENTRY_HEIGHT;
+                if (isHoveringAbs(labelX, rowY, labelW, LNET_ENTRY_HEIGHT - 2, mouseX, mouseY)) {
+                    selectedLnetLabelIndex = index;
+                    setLnetStatus(line("gui.logisticsnetworks.computer.lnet_label_selected",
+                            selectedLnetFile.nodes().get(index).label()), pal().textSecondary());
+                    return true;
+                }
+            }
+
+            int previewX = labelX + labelW + LNET_COLUMN_GAP;
+            int previewW = contentX + (imageWidth - 20) - previewX - 8;
+            if (isHoveringAbs(previewX + 6, listY + 92, previewW - 12, 14, mouseX, mouseY)) {
+                copySelectedLnetLabelToWrench();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void requestNetworkSave() {
+        if (selectedNetworkId == null) {
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_no_network"), pal().warning());
+            return;
+        }
+        setLnetStatus(line("gui.logisticsnetworks.computer.lnet_saving"), pal().textSecondary());
+        PacketDistributor.sendToServer(new RequestNetworkExportPayload(selectedNetworkId));
+    }
+
+    private void refreshLnetFiles() {
+        try {
+            lnetFiles = new ArrayList<>(LnetNetworkFile.listFiles());
+            lnetFileScrollOffset = 0;
+            if (selectedLnetPath != null && !lnetFiles.contains(selectedLnetPath)) {
+                selectedLnetPath = null;
+                selectedLnetFile = null;
+                selectedLnetLabelIndex = -1;
+            }
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_files_refreshed", lnetFiles.size()),
+                    pal().textSecondary());
+        } catch (IOException e) {
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_file_error"), pal().warning());
+            if (Config.debugMode) LOGGER.warn("Failed to list lnet files", e);
+        }
+    }
+
+    private void selectLnetFile(Path path) {
+        try {
+            selectedLnetPath = path;
+            selectedLnetFile = LnetNetworkFile.read(path);
+            selectedLnetLabelIndex = selectedLnetFile.nodes().isEmpty() ? -1 : 0;
+            lnetLabelScrollOffset = 0;
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_file_loaded",
+                    path.getFileName().toString()), pal().textSecondary());
+        } catch (IOException e) {
+            selectedLnetPath = path;
+            selectedLnetFile = null;
+            selectedLnetLabelIndex = -1;
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_invalid_file"), pal().warning());
+            if (Config.debugMode) LOGGER.warn("Failed to read lnet file {}", path, e);
+        }
+    }
+
+    private void copySelectedLnetLabelToWrench() {
+        LnetNetworkFile.NodeEntry entry = getSelectedLnetNode();
+        if (entry == null) {
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_select_label"), pal().warning());
+            return;
+        }
+
+        NodeClipboardConfig config = loadClipboardPreview(entry);
+        if (config == null) {
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_invalid_label"), pal().warning());
+            return;
+        }
+
+        PacketDistributor.sendToServer(new SetComputerWrenchClipboardPayload(entry.clipboardTag()));
+        setLnetStatus(line("gui.logisticsnetworks.computer.lnet_copy_sent", entry.label()), pal().textSecondary());
+    }
+
+    private LnetNetworkFile.NodeEntry getSelectedLnetNode() {
+        if (selectedLnetFile == null || selectedLnetLabelIndex < 0
+                || selectedLnetLabelIndex >= selectedLnetFile.nodes().size()) {
+            return null;
+        }
+        return selectedLnetFile.nodes().get(selectedLnetLabelIndex);
+    }
+
+    private NodeClipboardConfig loadClipboardPreview(LnetNetworkFile.NodeEntry entry) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) {
+            return null;
+        }
+        return NodeClipboardConfig.load(entry.clipboardTag(), minecraft.level.registryAccess());
+    }
+
+    private boolean isLnetFileColumn(double mouseX, double mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        return isHoveringAbs(contentX + 8, contentY + LNET_LIST_Y, LNET_FILE_W,
+                LNET_FILES_PER_PAGE * LNET_ENTRY_HEIGHT, mouseX, mouseY);
+    }
+
+    private boolean isLnetLabelColumn(double mouseX, double mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int labelX = contentX + 8 + LNET_FILE_W + LNET_COLUMN_GAP;
+        return isHoveringAbs(labelX, contentY + LNET_LIST_Y, LNET_LABEL_W,
+                LNET_LABELS_PER_PAGE * LNET_ENTRY_HEIGHT, mouseX, mouseY);
+    }
+
+    private boolean isHoveringAbs(int x, int y, int w, int h, double mx, double my) {
+        return mx >= x && mx < x + w && my >= y && my < y + h;
+    }
+
+    private void setLnetStatus(String status, int color) {
+        this.lnetStatus = status;
+        this.lnetStatusColor = color;
     }
 
     private int getSearchBoxTop() {
@@ -1185,8 +1493,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int panelY = topPos + DETAIL_PANEL_Y;
         int buttonX = panelX + 12;
         int buttonWidth = DETAIL_PANEL_WIDTH - 24;
-        int button1Y = panelY + 112;
+        int button1Y = panelY + 84;
         int button2Y = button1Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
+        int button3Y = button2Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
 
         if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button1Y && mouseY < button1Y + OPTION_BTN_HEIGHT) {
@@ -1204,6 +1513,25 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             return true;
         }
 
+        if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
+                && mouseY >= button3Y && mouseY < button3Y + OPTION_BTN_HEIGHT) {
+            requestNetworkSave();
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean handleLoadButtonClick(double mouseX, double mouseY) {
+        int textX = leftPos + DETAIL_PANEL_X + 12;
+        int loadY = topPos + DETAIL_PANEL_Y + 152;
+        int buttonWidth = DETAIL_PANEL_WIDTH - 24;
+        if (mouseX >= textX && mouseX < textX + buttonWidth
+                && mouseY >= loadY && mouseY < loadY + OPTION_BTN_HEIGHT) {
+            currentPage = Page.LNET_FILES;
+            refreshLnetFiles();
+            return true;
+        }
         return false;
     }
 
@@ -1474,14 +1802,57 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
-        LOGGER.debug("Received network list with {} entries", networks.size());
-        for (SyncNetworkListPayload.NetworkEntry entry : networks) {
-            LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
+        if (Config.debugMode) LOGGER.debug("Received network list with {} entries", networks.size());
+        if (Config.debugMode) {
+            for (SyncNetworkListPayload.NetworkEntry entry : networks) {
+                LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
+            }
         }
         this.networkList = new ArrayList<>(networks);
         this.networkScrollOffset = Math.min(this.networkScrollOffset,
                 Math.max(0, networkList.size() - NETWORKS_PER_PAGE));
-        LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());
+        if (Config.debugMode) LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());
+    }
+
+    public void receiveNetworkExport(SyncNetworkExportPayload payload) {
+        if (selectedNetworkId == null || !payload.networkId().equals(selectedNetworkId)) {
+            return;
+        }
+
+        if (!payload.errorKey().isEmpty()) {
+            setLnetStatus(formatExportError(payload.errorKey()), pal().warning());
+            return;
+        }
+
+        try {
+            List<LnetNetworkFile.NodeEntry> nodes = new ArrayList<>();
+            for (SyncNetworkExportPayload.NodeExportInfo node : payload.nodes()) {
+                nodes.add(new LnetNetworkFile.NodeEntry(node.label(), node.visible(), node.clipboardTag()));
+            }
+            Path path = LnetNetworkFile.write(payload.networkName(), nodes);
+            lnetFiles = new ArrayList<>(LnetNetworkFile.listFiles());
+            selectedLnetPath = path;
+            selectedLnetFile = new LnetNetworkFile(payload.networkName(), nodes);
+            selectedLnetLabelIndex = nodes.isEmpty() ? -1 : 0;
+            lnetLabelScrollOffset = 0;
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_saved", path.getFileName().toString()),
+                    pal().accent());
+        } catch (IOException e) {
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_save_failed"), pal().warning());
+            if (Config.debugMode) LOGGER.warn("Failed to save lnet export", e);
+        }
+    }
+
+    private String formatExportError(String errorKey) {
+        if (errorKey.startsWith("missing_labels|")) {
+            String count = errorKey.substring("missing_labels|".length());
+            return line("gui.logisticsnetworks.computer.lnet_missing_labels", count);
+        }
+        if (errorKey.startsWith("duplicate_labels|")) {
+            String labels = errorKey.substring("duplicate_labels|".length());
+            return line("gui.logisticsnetworks.computer.lnet_duplicate_labels", labels);
+        }
+        return line("gui.logisticsnetworks.computer.lnet_export_failed");
     }
 
     public void receiveNetworkNodes(UUID networkId, List<SyncNetworkNodesPayload.NodeInfo> nodes) {

@@ -5,10 +5,8 @@ import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.network.TransferVisualPayload;
 import me.almana.logisticsnetworks.registration.Registration;
-import me.almana.logisticsnetworks.render.LogisticsNodeRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -89,10 +87,10 @@ public final class TransferVisuals {
 
     private static boolean eligible(TransferVisualPayload.Path path) {
         return switch (path.shape()) {
-            case FULL -> LogisticsNodeRenderer.isWithinWrenchRenderLimit(path.sourceEntityId())
-                    || LogisticsNodeRenderer.isWithinWrenchRenderLimit(path.targetEntityId());
-            case OUTBOUND -> LogisticsNodeRenderer.isWithinWrenchRenderLimit(path.sourceEntityId());
-            case INBOUND -> LogisticsNodeRenderer.isWithinWrenchRenderLimit(path.targetEntityId());
+            case FULL -> TransferVisualAccess.isWithinWrenchRenderLimit(path.sourceEntityId())
+                    || TransferVisualAccess.isWithinWrenchRenderLimit(path.targetEntityId());
+            case OUTBOUND -> TransferVisualAccess.isWithinWrenchRenderLimit(path.sourceEntityId());
+            case INBOUND -> TransferVisualAccess.isWithinWrenchRenderLimit(path.targetEntityId());
         };
     }
 
@@ -151,11 +149,11 @@ public final class TransferVisuals {
             default -> 0.65f;
         };
         float pulse = 0.85f + (float) Math.sin(progress * Math.PI * 2.0) * 0.2f;
-        level.addParticle(new DustParticleOptions(active.color, Math.max(0.1f, scale * pulse * fade)),
+        level.addParticle(TransferVisualAccess.dust(active.color, Math.max(0.1f, scale * pulse * fade)),
                 point.x, point.y, point.z, 0.0, 0.0, 0.0);
         if (active.path.shape() != TransferVisualPayload.Shape.FULL && (tick + active.keyHash) % 3L == 0L) {
             Vec3 portal = active.portalPoint(tick);
-            level.addParticle(new DustParticleOptions(active.color, Math.max(0.1f, 0.75f * fade)),
+            level.addParticle(TransferVisualAccess.dust(active.color, Math.max(0.1f, 0.75f * fade)),
                     portal.x, portal.y, portal.z, 0.0, 0.0, 0.0);
         }
     }

@@ -370,7 +370,6 @@
   "gui.logisticsnetworks.node.channel_name.set_tooltip": "Clique duas vezes para nomear o canal",
   "advancement.logisticsnetworks.root.title": "Redes de Logística",
   "advancement.logisticsnetworks.root.description": "Segure 'G' sobre os itens para o guia",
-
   "gui.logisticsnetworks.config.title": "Configurações da Logistics Networks",
   "gui.logisticsnetworks.config.tab.common": "Comum",
   "gui.logisticsnetworks.config.tab.client": "Local",
@@ -420,5 +419,15 @@
   "tooltip.logisticsnetworks.wrench.ae2_linked_detail": "Conectado a [%s, %s, %s] em %s",
   "tooltip.logisticsnetworks.wrench.ae2_unlinked": "Desconectado",
   "message.logisticsnetworks.ae2.linked": "Chave inglesa conectada à Rede ME em [%s, %s, %s]",
-  "message.logisticsnetworks.ae2.unlinked": "Chave inglesa desconectada da Rede ME"
+  "message.logisticsnetworks.ae2.unlinked": "Chave inglesa desconectada da Rede ME",
+  "item.logisticsnetworks.tag_filter": "Filtro de Tag",
+  "item.logisticsnetworks.amount_filter": "Filtro de Quantidade",
+  "item.logisticsnetworks.durability_filter": "Filtro de Durabilidade",
+  "item.logisticsnetworks.nbt_filter": "Filtro NBT",
+  "item.logisticsnetworks.slot_filter": "Filtro de Slot",
+  "gui.logisticsnetworks.node.search": "Buscar itens…",
+  "gui.logisticsnetworks.node.tweaks.density": "Densidade",
+  "gui.logisticsnetworks.node.tweaks.density.normal": "Normal",
+  "gui.logisticsnetworks.node.tweaks.density.compact": "Compacto",
+  "gui.logisticsnetworks.config.client.density": "Densidade"
 }

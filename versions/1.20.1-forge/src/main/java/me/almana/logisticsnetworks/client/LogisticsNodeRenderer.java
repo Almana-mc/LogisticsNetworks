@@ -104,6 +104,15 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
                 && (allowedNodeIds == null || allowedNodeIds.contains(entity.getId()));
     }
 
+    public static boolean isWithinWrenchRenderLimit(int entityId) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (entityId < 0 || minecraft.level == null
+                || !(minecraft.level.getEntity(entityId) instanceof LogisticsNodeEntity))
+            return false;
+        updateAllowedNodes(minecraft);
+        return allowedNodeIds == null || allowedNodeIds.contains(entityId);
+    }
+
     @Override
     protected void renderNameTag(LogisticsNodeEntity entity, Component displayName, PoseStack poseStack,
             MultiBufferSource buffer, int packedLight) {
@@ -194,7 +203,8 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     private void renderHighlightBox(PoseStack poseStack, MultiBufferSource buffer, float r, float g, float b,
             float a, boolean xray) {
-        VertexConsumer builder = buffer.getBuffer(xray ? ModRenderTypes.OVERLAY_XRAY : ModRenderTypes.OVERLAY);
+        VertexConsumer builder = buffer.getBuffer(xray && !Shaders.shadersActive()
+                ? ModRenderTypes.OVERLAY_XRAY : ModRenderTypes.OVERLAY);
         Matrix4f matrix = poseStack.last().pose();
 
         float minX = -0.501f, maxX = 0.501f;

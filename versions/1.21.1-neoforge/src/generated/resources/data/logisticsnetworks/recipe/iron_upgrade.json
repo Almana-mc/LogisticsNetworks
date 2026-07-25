@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "minecraft:chest"
+    },
+    "H": {
+      "item": "minecraft:hopper"
+    },
+    "S": {
+      "item": "minecraft:smooth_stone"
+    },
+    "X": {
+      "item": "minecraft:iron_ingot"
+    }
+  },
+  "pattern": [
+    "XHX",
+    "CSC",
+    "XHX"
+  ],
+  "result": {
+    "count": 1,
+    "id": "logisticsnetworks:iron_upgrade"
+  }
+}

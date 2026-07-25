@@ -27,8 +27,16 @@ public class ClientConfig {
             .defineInRange("maxVisibleNodes", 500, 0, Integer.MAX_VALUE);
 
     public static final ModConfigSpec.BooleanValue connectedNodeTexturesSpec = builder
-            .comment("Whether adjacent visible nodes should render as connected.")
+            .comment("Render logistics nodes as connected textures when neighboring nodes are visible.")
             .define("connectedNodeTextures", true);
+
+    public static final ModConfigSpec.BooleanValue showTransferVisualsSpec = builder
+            .comment("Show resource transfer particles while holding a wrench.")
+            .define("showTransferVisuals", true);
+
+    public static final ModConfigSpec.IntValue maxTransferVisualsSpec = builder
+            .comment("Maximum simultaneous resource transfer paths.")
+            .defineInRange("maxTransferVisuals", 100, 1, 1000);
 
     private static final List<String> THEMES = List.of(
             "light", "dark", "redstone", "nebula", "glass", "terminal", "pastel", "brutalist");
@@ -47,6 +55,8 @@ public class ClientConfig {
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
     public static boolean connectedNodeTextures = true;
+    public static boolean showTransferVisuals = true;
+    public static int maxTransferVisuals = 100;
     public static boolean computerClassicTheme = true;
 
     @SubscribeEvent
@@ -60,6 +70,8 @@ public class ClientConfig {
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
         connectedNodeTextures = connectedNodeTexturesSpec.get();
+        showTransferVisuals = showTransferVisualsSpec.get();
+        maxTransferVisuals = maxTransferVisualsSpec.get();
         computerClassicTheme = computerClassicThemeSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());
     }

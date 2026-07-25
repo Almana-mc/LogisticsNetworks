@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.item;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -55,6 +56,9 @@ public class LogisticsNodeItem extends Item {
         LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, pos, player != null ? player.getUUID() : null);
         if (node == null)
             return InteractionResult.FAIL;
+
+        if (player != null && !ServerPayloadHandler.getDefaultNodeVisibility(player))
+            node.setRenderVisible(false);
 
         tryAutoPasteFromOffhandWrench(context, node);
         level.playSound(null, pos, SoundEvents.METAL_PLACE, SoundSource.BLOCKS, 1.0f, 1.0f);

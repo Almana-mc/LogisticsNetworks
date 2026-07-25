@@ -46,6 +46,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
@@ -754,7 +755,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             int x = startX + i * 26;
             boolean hovered = !labelPickerOpen && mx >= x && mx <= x + 24 && my >= y && my <= y + 12;
             boolean hasDot = !isSelected && isEnabled;
-            ThemePaint.tab(g, font, x, y, 24, 12, String.valueOf(i), isSelected, hasDot, hovered, t);
+            ThemePaint.channelTab(g, font, x, y, 24, 12, String.valueOf(i),
+                    ch == null ? null : ch.getType(), isSelected, hasDot, hovered, t);
             if (isSelected && !isEnabled) {
                 ThemePaint.roundOutline(g, x, y, 24, 12, 2, cDanger(), t.sharpCorners());
             }
@@ -924,6 +926,14 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private int filterButtonY(int slot) {
         return topPos + 68 + (slot / 3) * 19;
+    }
+
+    public int getFilterSlotCount() {
+        return ChannelData.FILTER_SIZE;
+    }
+
+    public Rect2i getFilterSlotArea(int slot) {
+        return new Rect2i(filterButtonX(slot) - 1, filterButtonY(slot) - 1, 18, 18);
     }
 
     private boolean isHoveringFilterButton(int slot, double mx, double my) {

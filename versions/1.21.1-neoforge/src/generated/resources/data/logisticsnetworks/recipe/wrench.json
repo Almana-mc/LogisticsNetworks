@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "B": {
+      "item": "minecraft:stone_button"
+    },
+    "G": {
+      "tag": "c:glass_panes"
+    },
+    "P": {
+      "item": "minecraft:polished_blackstone"
+    },
+    "T": {
+      "item": "minecraft:redstone_torch"
+    }
+  },
+  "pattern": [
+    "T T",
+    "BGB",
+    "PPP"
+  ],
+  "result": {
+    "count": 1,
+    "id": "logisticsnetworks:wrench"
+  }
+}

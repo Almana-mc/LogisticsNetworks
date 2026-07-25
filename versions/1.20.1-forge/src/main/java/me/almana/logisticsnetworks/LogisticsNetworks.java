@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks;
 
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
+import me.almana.logisticsnetworks.datagen.ModDataGenerators;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -23,6 +24,7 @@ public class LogisticsNetworks {
         Registration.init(modBus);
         NetworkHandler.register();
         modBus.addListener(this::commonSetup);
+        modBus.addListener(ModDataGenerators::gather);
 
         context.registerConfig(ModConfig.Type.COMMON, Config.SPEC, "logistics-network/common.toml");
         context.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC, "logistics-network/client.toml");

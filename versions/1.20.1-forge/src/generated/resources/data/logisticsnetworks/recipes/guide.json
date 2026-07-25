@@ -1,0 +1,17 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "guideme"
+        }
+      ],
+      "recipe": {
+        "type": "logisticsnetworks:guide",
+        "category": "misc"
+      }
+    }
+  ]
+}

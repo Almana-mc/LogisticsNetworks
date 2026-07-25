@@ -13,7 +13,9 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -27,7 +29,9 @@ import net.minecraftforge.network.NetworkHooks;
 import java.util.EnumMap;
 import java.util.Map;
 
-public class ComputerBlock extends HorizontalDirectionalBlock {
+import org.jetbrains.annotations.Nullable;
+
+public class ComputerBlock extends HorizontalDirectionalBlock implements EntityBlock {
 
     private static final Map<Direction, VoxelShape> SHAPES = new EnumMap<>(Direction.class);
 
@@ -70,6 +74,11 @@ public class ComputerBlock extends HorizontalDirectionalBlock {
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         return SHAPES.get(state.getValue(FACING));
+    }
+
+    @Override
+    public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new ComputerBlockEntity(pos, state);
     }
 
     @Override

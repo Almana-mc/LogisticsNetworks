@@ -106,7 +106,7 @@ neoForge {
                     "--mod", mod_id,
                     "--all",
                     "--output", file("src/generated/resources").absolutePath,
-                    "--existing", file("src/main/resources").absolutePath
+                    "--existing", rootProject.file("src/main/resources").absolutePath
                 )
             }
         }
@@ -144,16 +144,16 @@ dependencies {
 
     if (modernMinecraft) {
         compileOnly("org.appliedenergistics:guideme:${guideme_version}")
-        compileOnly("maven.modrinth:iris:${iris_version}") {
-            isTransitive = false
-        }
     } else {
-        compileOnly("org.appliedenergistics:guideme:${guideme_version}:api")
+        compileOnly("org.appliedenergistics:guideme:${guideme_version}")
         compileOnly("mekanism:Mekanism:${mekanism_version}")
         compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
         compileOnly("dev.emi:emi-neoforge:${emi_version}") {
             isTransitive = false
         }
+    }
+    compileOnly("maven.modrinth:iris:${iris_version}") {
+        isTransitive = false
     }
     runtimeOnly("org.appliedenergistics:guideme:${guideme_version}")
 
@@ -166,6 +166,11 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    classpath += sourceSets.main.get().compileClasspath
+}
+
+tasks.named<JavaCompile>("compileTestJava") {
+    classpath += sourceSets.main.get().compileClasspath
 }
 
 val generateModMetadata by tasks.registering(ProcessResources::class) {

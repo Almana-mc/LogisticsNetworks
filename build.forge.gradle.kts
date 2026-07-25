@@ -24,6 +24,8 @@ val jade_version: String by project
 val ae2_version: String by project
 val ftb_teams_version: String by project
 val guideme_version: String by project
+val emi_version: String by project
+val oculus_version: String by project
 
 version = mod_version
 group = mod_group_id
@@ -71,7 +73,7 @@ legacyForge {
                 "--mod", mod_id,
                 "--all",
                 "--output", file("src/generated/resources").absolutePath,
-                "--existing", file("src/main/resources").absolutePath
+                "--existing", rootProject.file("src/main/resources").absolutePath
             )
         }
         configureEach {
@@ -111,15 +113,26 @@ dependencies {
     "modCompileOnly"("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
     "modCompileOnly"("maven.modrinth:jade:${jade_version}")
     "modCompileOnly"("appeng:appliedenergistics2-forge:${ae2_version}")
-    "modCompileOnly"("org.appliedenergistics:guideme:${guideme_version}:api")
+    "modCompileOnly"("org.appliedenergistics:guideme:${guideme_version}")
     "modLocalRuntime"("org.appliedenergistics:guideme:${guideme_version}")
     "modCompileOnly"("dev.ftb.mods:ftb-teams-forge:${ftb_teams_version}") {
+        isTransitive = false
+    }
+    "modCompileOnly"("maven.modrinth:fRiHVvU7:${emi_version}") {
+        isTransitive = false
+    }
+    "modCompileOnly"("maven.modrinth:GchcoXML:${oculus_version}") {
         isTransitive = false
     }
 }
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    classpath += sourceSets.main.get().compileClasspath
+}
+
+tasks.named<JavaCompile>("compileTestJava") {
+    classpath += sourceSets.main.get().compileClasspath
 }
 
 tasks.withType<JavaCompile>().configureEach {

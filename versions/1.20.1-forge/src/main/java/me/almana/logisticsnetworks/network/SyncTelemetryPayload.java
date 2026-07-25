@@ -2,16 +2,19 @@ package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
+import net.minecraft.network.FriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.UUID;
 
-public record SyncTelemetryPayload(UUID networkId, int channelIndex, int cursor, long[] history, int historySize) implements CustomPacketPayload {
-
-    public static final int HISTORY_SIZE = TelemetryManager.HISTORY_SIZE;
+public record SyncTelemetryPayload(
+        UUID networkId,
+        int channelIndex,
+        int typeOrdinal,
+        long[] history,
+        int historyIndex) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SyncTelemetryPayload> TYPE = new CustomPacketPayload.Type<>(
             ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "sync_telemetry"));
@@ -22,23 +25,19 @@ public record SyncTelemetryPayload(UUID networkId, int channelIndex, int cursor,
     public static SyncTelemetryPayload read(FriendlyByteBuf buf) {
         UUID networkId = buf.readUUID();
         int channelIndex = buf.readVarInt();
-        int cursor = buf.readVarInt();
-        long[] history = new long[HISTORY_SIZE];
-        for (int i = 0; i < HISTORY_SIZE; i++) {
-            history[i] = buf.readLong();
-        }
-        int historySize = buf.readVarInt();
-        return new SyncTelemetryPayload(networkId, channelIndex, cursor, history, historySize);
+        int typeOrdinal = buf.readVarInt();
+        long[] history = new long[TelemetryManager.HISTORY_SIZE];
+        for (int i = 0; i < TelemetryManager.HISTORY_SIZE; i++) history[i] = buf.readLong();
+        int index = buf.readVarInt();
+        return new SyncTelemetryPayload(networkId, channelIndex, typeOrdinal, history, index);
     }
 
     public static void write(FriendlyByteBuf buf, SyncTelemetryPayload payload) {
         buf.writeUUID(payload.networkId);
         buf.writeVarInt(payload.channelIndex);
-        buf.writeVarInt(payload.cursor);
-        for (int i = 0; i < HISTORY_SIZE; i++) {
-            buf.writeLong(payload.history[i]);
-        }
-        buf.writeVarInt(payload.historySize);
+        buf.writeVarInt(payload.typeOrdinal);
+        for (long v : payload.history) buf.writeLong(v);
+        buf.writeVarInt(payload.historyIndex);
     }
 
     @Override

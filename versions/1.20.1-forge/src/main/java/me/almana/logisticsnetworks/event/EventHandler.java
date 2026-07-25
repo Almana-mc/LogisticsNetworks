@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.event;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.command.LogisticsCommand;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -79,6 +80,12 @@ public class EventHandler {
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         LogisticsCommand.register(event.getDispatcher());
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player)
+            ServerPayloadHandler.clearDefaultNodeVisibility(player);
     }
 
     @SubscribeEvent

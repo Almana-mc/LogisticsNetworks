@@ -75,6 +75,11 @@ public final class NetworkHandler {
         registerServer(SetFilterEntryDurabilityPayload.class, SetFilterEntryDurabilityPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntryDurability);
         registerServer(SetFilterEntrySlotMappingPayload.class, SetFilterEntrySlotMappingPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntrySlotMapping);
         registerServer(SetFilterEntryEnchantedPayload.class, SetFilterEntryEnchantedPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterEntryEnchanted);
+        registerServer(SetDefaultNodeVisibilityPayload.class, SetDefaultNodeVisibilityPayload.STREAM_CODEC, ServerPayloadHandler::handleSetDefaultNodeVisibility);
+        registerServer(ToggleComputerPinnedNetworkPayload.class, ToggleComputerPinnedNetworkPayload.STREAM_CODEC, ServerPayloadHandler::handleToggleComputerPinnedNetwork);
+        registerServer(RequestNetworkExportPayload.class, RequestNetworkExportPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestNetworkExport);
+        registerServer(SetComputerWrenchClipboardPayload.class, SetComputerWrenchClipboardPayload.STREAM_CODEC, ServerPayloadHandler::handleSetComputerWrenchClipboard);
+        registerServer(OpenNodeMenuPayload.class, OpenNodeMenuPayload.STREAM_CODEC, ServerPayloadHandler::handleOpenNodeMenu);
 
         registerClient(SyncNetworkListPayload.class, SyncNetworkListPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkList);
         registerClient(SyncNetworkNodesPayload.class, SyncNetworkNodesPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkNodes);
@@ -82,6 +87,9 @@ public final class NetworkHandler {
         registerClient(SyncChannelDataPayload.class, SyncChannelDataPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncChannelData);
         registerClient(SyncTelemetryPayload.class, SyncTelemetryPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncTelemetry);
         registerClient(SyncChannelListPayload.class, SyncChannelListPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncChannelList);
+        registerClient(SyncMassPlacementChoicesPayload.class, SyncMassPlacementChoicesPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncMassPlacementChoices);
+        registerClient(SyncNetworkExportPayload.class, SyncNetworkExportPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkExport);
+        registerClient(TransferVisualPayload.class, TransferVisualPayload.STREAM_CODEC, ClientPayloadHandler::handleTransferVisual);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {

@@ -59,6 +59,7 @@ public class FilterMenu extends AbstractContainerMenu {
     private final boolean isSlotMode;
     private final boolean isNameMode;
     private final boolean isSpecialMode;
+    private boolean slotsHidden;
 
     private final SimpleContainer filterInventory;
     private final SimpleContainer extractorInventory = new SimpleContainer(1);
@@ -398,6 +399,26 @@ public class FilterMenu extends AbstractContainerMenu {
         return isNameMode;
     }
 
+    public boolean isSpecialMode() {
+        return isSpecialMode;
+    }
+
+    public void setSlotsHidden(boolean hidden) {
+        slotsHidden = hidden;
+    }
+
+    public boolean isNodeFilter() {
+        return nodeSource != null;
+    }
+
+    public LogisticsNodeEntity getNodeSource() {
+        return nodeSource;
+    }
+
+    public int getNodeChannel() {
+        return nodeChannel;
+    }
+
     public String getNameFilter() {
         if (!isNameMode)
             return "";
@@ -412,6 +433,8 @@ public class FilterMenu extends AbstractContainerMenu {
 
     public boolean setNameExpression(Player player, String name) {
         if (!isNameMode)
+            return false;
+        if (!name.isEmpty() && !NameFilterData.validateRegex(name).accepted())
             return false;
         NameFilterData.setNameFilter(getOpenedStack(), name);
         broadcastChanges();
@@ -467,6 +490,19 @@ public class FilterMenu extends AbstractContainerMenu {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return 0;
         return FilterItemData.getEntryBatch(getOpenedStack(), slot);
+    }
+
+    public int getEntryAmount(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return 0;
+        return FilterItemData.getEntryAmount(getOpenedStack(), slot);
+    }
+
+    public void setEntryAmount(Player player, int slot, int amount) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.setEntryAmount(getOpenedStack(), slot, Math.max(0, amount));
+        broadcastChanges();
     }
 
     public int getEntryStock(int slot) {
@@ -547,6 +583,18 @@ public class FilterMenu extends AbstractContainerMenu {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return List.of();
         return FilterItemData.getSlotNbtRules(getOpenedStack(), slot);
+    }
+
+    public boolean isEntryNbtStrict(int slot) {
+        return !isSpecialMode && slot >= 0 && slot < slotCount
+                && FilterItemData.isEntryNbtStrict(getOpenedStack(), slot);
+    }
+
+    public void setEntryNbtStrict(int slot, boolean strict) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.setEntryNbtStrict(getOpenedStack(), slot, strict);
+        broadcastChanges();
     }
 
     public boolean isSlotNbtMatchAny(int slot) {
@@ -995,6 +1043,19 @@ public class FilterMenu extends AbstractContainerMenu {
         });
     }
 
+    public void clearFilterEntryItem(Player player, int slot) {
+        clearFilterEntryItem(slot);
+    }
+
+    public void clearEntryNbt(Player player, int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.setEntryNbt(getOpenedStack(), slot, null, null);
+        FilterItemData.setEntryNbtRaw(getOpenedStack(), slot, null);
+        FilterItemData.clearSlotNbtRules(getOpenedStack(), slot);
+        broadcastChanges();
+    }
+
     private void updateFilter(int slot, java.util.function.IntConsumer action) {
         action.accept(slot);
         broadcastChanges();
@@ -1257,6 +1318,11 @@ public class FilterMenu extends AbstractContainerMenu {
         }
 
         @Override
+        public boolean isActive() {
+            return !slotsHidden;
+        }
+
+        @Override
         public boolean mayPlace(ItemStack stack) {
             return false;
         }
@@ -1290,6 +1356,11 @@ public class FilterMenu extends AbstractContainerMenu {
         }
 
         @Override
+        public boolean isActive() {
+            return !slotsHidden;
+        }
+
+        @Override
         public boolean mayPickup(Player player) {
             return index != lockedSlot;
         }
@@ -1300,7 +1371,4 @@ public class FilterMenu extends AbstractContainerMenu {
         }
     }
 }
-
-
-
 

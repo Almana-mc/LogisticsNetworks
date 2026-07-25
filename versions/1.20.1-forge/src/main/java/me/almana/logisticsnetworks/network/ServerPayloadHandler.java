@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.util.ItemStackCompat;
+import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
@@ -43,8 +44,11 @@ import net.minecraftforge.network.NetworkHooks;
 import me.almana.logisticsnetworks.network.payload.IPayloadContext;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import com.mojang.logging.LogUtils;
@@ -53,6 +57,16 @@ import org.slf4j.Logger;
 public class ServerPayloadHandler {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Map<UUID, Boolean> DEFAULT_NODE_VISIBILITY = new HashMap<>();
+
+    private static void refreshOpenComputerMenus(ServerPlayer sourcePlayer, BlockPos computerPos) {
+        for (ServerPlayer player : sourcePlayer.getServer().getPlayerList().getPlayers()) {
+            if (player.containerMenu instanceof ComputerMenu menu
+                    && player.level() == sourcePlayer.level()
+                    && menu.getComputerPos().equals(computerPos))
+                menu.requestNetworkList(player);
+        }
+    }
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -312,6 +326,36 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleToggleComputerPinnedNetwork(ToggleComputerPinnedNetworkPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof ComputerMenu menu)
+                    || !menu.getComputerPos().equals(payload.computerPos()))
+                return;
+            if (player.level().getBlockEntity(payload.computerPos()) instanceof ComputerBlockEntity computer) {
+                computer.toggleNetworkStar(payload.networkId());
+                refreshOpenComputerMenus(player, payload.computerPos());
+            }
+        });
+    }
+
+    public static void handleSetDefaultNodeVisibility(SetDefaultNodeVisibilityPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player)
+                DEFAULT_NODE_VISIBILITY.put(player.getUUID(), payload.visible());
+        });
+    }
+
+    public static boolean getDefaultNodeVisibility(Player player) {
+        return DEFAULT_NODE_VISIBILITY.getOrDefault(player.getUUID(), true);
+    }
+
+    public static void clearDefaultNodeVisibility(Player player) {
+        DEFAULT_NODE_VISIBILITY.remove(player.getUUID());
+    }
+
     public static void handleCycleWrenchMode(CycleWrenchModePayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)) {
@@ -552,6 +596,8 @@ public class ServerPayloadHandler {
                     case SetFilterEntryNbtPayload.ACTION_SET_RAW ->
                         menu.setEntryNbtRaw((Player) context.player(), payload.slot(),
                                 payload.path(), payload.value());
+                    case SetFilterEntryNbtPayload.ACTION_SET_STRICT ->
+                        menu.setEntryNbtStrict(payload.slot(), Boolean.parseBoolean(payload.value()));
                 }
             }
         });
@@ -666,6 +712,16 @@ public class ServerPayloadHandler {
     public static void handleSetNameFilter(SetNameFilterPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && menu.isNameMode()) {
+                NameFilterData.ValidationResult validation = NameFilterData.validateRegex(payload.name());
+                if (!payload.name().isEmpty() && !validation.accepted()) {
+                    String key = switch (validation.error()) {
+                        case TOO_LONG -> "message.logisticsnetworks.filter.regex.too_long";
+                        case UNSUPPORTED -> "message.logisticsnetworks.filter.regex.unsupported";
+                        default -> "message.logisticsnetworks.filter.regex.invalid";
+                    };
+                    context.player().sendSystemMessage(Component.translatable(key));
+                    return;
+                }
                 menu.setNameExpression((Player) context.player(), payload.name());
             }
         });
@@ -799,6 +855,45 @@ public class ServerPayloadHandler {
         } else if (ModFilterData.isModFilter(stack)) {
             ModFilterData.setTargetType(stack, target);
         }
+    }
+
+    public static void handleOpenNodeMenu(OpenNodeMenuPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            if (node == null)
+                return;
+
+            int selectedChannel = Math.max(0,
+                    Math.min(LogisticsNodeEntity.CHANNEL_COUNT - 1, payload.selectedChannel()));
+            NetworkHooks.openScreen(player, new MenuProvider() {
+                @Override
+                public Component getDisplayName() {
+                    return Component.translatable("gui.logisticsnetworks.node_config");
+                }
+
+                @Override
+                public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
+                    NodeMenu menu = new NodeMenu(containerId, playerInv, node);
+                    menu.setSelectedChannel(selectedChannel);
+                    return menu;
+                }
+            }, buf -> {
+                buf.writeVarInt(node.getId());
+                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                    ChannelData channel = node.getChannel(i);
+                    buf.writeNbt(channel != null ? channel.save(player.level().registryAccess()) : new CompoundTag());
+                }
+                for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++)
+                    buf.writeNbt(ItemStackCompat.saveOptional(node.getUpgradeItem(i), player.level().registryAccess()));
+            });
+
+            if (player.containerMenu instanceof NodeMenu menu) {
+                menu.setSelectedChannel(selectedChannel);
+                menu.sendNetworkListToClient(player);
+            }
+        });
     }
 
     public static void handleAddNodeFilterItem(AddNodeFilterItemPayload payload, IPayloadContext context) {
@@ -936,7 +1031,7 @@ public class ServerPayloadHandler {
                         }
                         nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
                                 nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
-                                level.dimension().location().toString(), node.isRenderVisible(), node.isHighlighted()));
+                                level.dimension().location(), node.isRenderVisible(), node.isHighlighted()));
                         break;
                     }
                 }
@@ -1318,12 +1413,77 @@ public class ServerPayloadHandler {
             List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 if (nodeCounts[i] > 0) {
-                    entries.add(new SyncChannelListPayload.ChannelEntry(i, 0, typeOrdinals[i], nodeCounts[i]));
+                    entries.add(new SyncChannelListPayload.ChannelEntry(i, typeOrdinals[i], nodeCounts[i]));
                 }
             }
 
             NetworkHandler.sendToPlayer(player,
                     new SyncChannelListPayload(payload.networkId(), entries));
+        });
+    }
+
+    public static void handleRequestNetworkExport(RequestNetworkExportPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof ComputerMenu))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network)) {
+                sendNetworkExportError(player, payload.networkId(), "", "not_found");
+                return;
+            }
+
+            List<SyncNetworkExportPayload.NodeExportInfo> entries = new ArrayList<>();
+            Set<String> seenLabels = new HashSet<>();
+            int missingLabels = 0;
+            for (UUID nodeId : network.getNodeUuids()) {
+                LogisticsNodeEntity node = findNode(player, nodeId);
+                if (node == null || node.getNodeLabel().trim().isEmpty()) {
+                    missingLabels++;
+                    continue;
+                }
+                String label = node.getNodeLabel().trim();
+                if (!seenLabels.add(label))
+                    continue;
+                CompoundTag clipboard = NodeClipboardConfig.fromNode(node).save(player.level().registryAccess());
+                entries.add(new SyncNetworkExportPayload.NodeExportInfo(label, node.isRenderVisible(), clipboard));
+            }
+
+            if (missingLabels > 0) {
+                sendNetworkExportError(player, network.getId(), network.getName(),
+                        "missing_labels|" + missingLabels);
+                return;
+            }
+            NetworkHandler.sendToPlayer(player,
+                    new SyncNetworkExportPayload(network.getId(), network.getName(), entries, ""));
+        });
+    }
+
+    private static void sendNetworkExportError(ServerPlayer player, UUID networkId, String networkName,
+            String errorKey) {
+        String trimmed = errorKey.length() > 256 ? errorKey.substring(0, 256) : errorKey;
+        NetworkHandler.sendToPlayer(player,
+                new SyncNetworkExportPayload(networkId, networkName, List.of(), trimmed));
+    }
+
+    public static void handleSetComputerWrenchClipboard(SetComputerWrenchClipboardPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof ComputerMenu menu))
+                return;
+            NodeClipboardConfig config = NodeClipboardConfig.load(payload.clipboardTag(), player.level().registryAccess());
+            if (config == null || !config.isStructurallyValid()) {
+                player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.invalid_clipboard"));
+                return;
+            }
+            if (!menu.setWrenchClipboard(config, player.level().registryAccess())) {
+                player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.no_wrench"));
+                return;
+            }
+            player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.copied_to_wrench"));
         });
     }
 

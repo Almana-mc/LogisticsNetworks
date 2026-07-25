@@ -19,7 +19,6 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -52,7 +51,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         super(Registration.MASS_PLACEMENT_MENU.get(), containerId);
         this.hand = hand;
         this.player = playerInventory.player;
-        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInventory.getSelectedSlot() : -1;
+        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? MassPlacementInventoryAccess.selectedSlot(playerInventory) : -1;
         addDataSlots(data);
         refreshState();
     }
@@ -62,7 +61,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         int handOrdinal = buf.readVarInt();
         this.hand = handOrdinal == InteractionHand.OFF_HAND.ordinal() ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
         this.player = playerInventory.player;
-        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInventory.getSelectedSlot() : -1;
+        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? MassPlacementInventoryAccess.selectedSlot(playerInventory) : -1;
         addDataSlots(data);
     }
 
@@ -97,7 +96,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             return List.of();
         }
 
-        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrenchStack, player.registryAccess());
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrenchStack, player.level().registryAccess());
         boolean clipboardPresent = clipboard != null && !clipboard.isEffectivelyEmpty();
         boolean clipboardValid = !clipboardPresent || clipboard.isStructurallyValid();
 
@@ -198,7 +197,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         List<WrenchItem.MassSelectionTarget> targets = WrenchItem.getMassPlacementTargets(player.level(), wrenchStack);
         int nodeCount = targets.size();
 
-        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrenchStack, player.registryAccess());
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrenchStack, player.level().registryAccess());
         boolean clipboardPresent = clipboard != null && !clipboard.isEffectivelyEmpty();
         boolean clipboardValid = !clipboardPresent || clipboard.isStructurallyValid();
         boolean hasBlockSelection = WrenchItem.getMassSelectedBlock(wrenchStack) != null;
@@ -257,7 +256,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             return false;
         }
 
-        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrenchStack, player.registryAccess());
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrenchStack, player.level().registryAccess());
         boolean clipboardPresent = clipboard != null && !clipboard.isEffectivelyEmpty();
         if (clipboardPresent && !clipboard.isStructurallyValid()) {
             WrenchItem.sendPlayerMessage(player, Component.translatable("message.logisticsnetworks.clipboard.invalid"), true);
@@ -402,7 +401,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             payloadChoices.add(new SyncMassPlacementChoicesPayload.BlockChoice(
                     choice.blockId(), choice.name().getString(), choice.targetCount(), choice.selected()));
         }
-        PacketDistributor.sendToPlayer(serverPlayer,
+        MassPlacementNetworkAccess.sendToPlayer(serverPlayer,
                 new SyncMassPlacementChoicesPayload(containerId, payloadChoices, WrenchItem.getMaxMassNodes()));
     }
 

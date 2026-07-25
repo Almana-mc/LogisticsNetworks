@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.theme;
 
+import me.almana.logisticsnetworks.data.ChannelType;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -106,6 +107,23 @@ public final class ThemePaint {
 
     public static int pillWidth(Font font, String text) {
         return font.width(text) + 6 + 8 + 2;
+    }
+
+    public static void channelTab(GuiGraphics g, Font font, int x, int y, int w, int h, String label,
+            ChannelType type, boolean active, boolean hasDot, boolean hovered, Theme t) {
+        int bg = type == null ? (active ? t.tabActiveBg() : t.surface2())
+                : active ? ChannelTint.selectedBg(type, t) : ChannelTint.tabBg(type, t);
+        int fg = type == null ? (active ? t.tabActiveFg() : hovered ? t.text() : t.textMuted())
+                : active ? ChannelTint.selectedFg(type, t) : ChannelTint.digit(type, t);
+        int border = type == null ? (active ? t.tabActiveBg() : t.border())
+                : active ? bg : ChannelTint.border(type, t);
+        if (hovered && !active) bg = brighten(bg, 0x10);
+        if (t.hardShadow() && active) g.fill(x + 2, y + 2, x + w + 2, y + h + 2, 0xFF000000);
+        roundRect(g, x, y, w, h, 2, bg, t.sharpCorners());
+        if (!active) roundOutline(g, x, y, w, h, 2, border, t.sharpCorners());
+        else if (t.sharpCorners()) roundOutline(g, x, y, w, h, 0, t.border(), true);
+        drawCentered(g, font, label, x + w / 2, y + (h - 7) / 2, fg);
+        if (hasDot) g.fill(x + w - 5, y + 2, x + w - 2, y + 5, t.accent());
     }
 
     public static void tab(GuiGraphics g, Font font, int x, int y, int w, int h,

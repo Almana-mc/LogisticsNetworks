@@ -15,6 +15,7 @@ public record SetFilterEntryNbtPayload(int slot, int action, String path, String
     public static final int ACTION_CLEAR = 3;
     public static final int ACTION_SET_VALUE = 4;
     public static final int ACTION_SET_RAW = 5;
+    public static final int ACTION_SET_STRICT = 6;
 
     public static SetFilterEntryNbtPayload add(int slot, String path, String operator, String fallbackValue) {
         return new SetFilterEntryNbtPayload(slot, ACTION_ADD, path, operator, -1, fallbackValue);
@@ -38,6 +39,11 @@ public record SetFilterEntryNbtPayload(int slot, int action, String path, String
 
     public static SetFilterEntryNbtPayload setRaw(int slot, String rawSnbt) {
         return new SetFilterEntryNbtPayload(slot, ACTION_SET_RAW, "", "=", -1, rawSnbt);
+    }
+
+    public static SetFilterEntryNbtPayload setStrict(int slot, boolean strict) {
+        return new SetFilterEntryNbtPayload(slot, ACTION_SET_STRICT, "", "=", -1,
+                Boolean.toString(strict));
     }
 
     public static final Type<SetFilterEntryNbtPayload> TYPE = new Type<>(

@@ -1,12 +1,14 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.item.WrenchItem;
-import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -16,18 +18,21 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import me.almana.logisticsnetworks.network.NetworkHandler;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 public class ComputerMenu extends AbstractContainerMenu {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final int WRENCH_SLOT_X = 291;
-    private static final int WRENCH_SLOT_Y = 9;
+    private static final int WRENCH_SLOT_Y = 8;
 
     private final BlockPos computerPos;
     private ItemStack wrenchStack = ItemStack.EMPTY;
@@ -66,6 +71,7 @@ public class ComputerMenu extends AbstractContainerMenu {
     }
 
     private void layoutSlots() {
+        // Single wrench slot on the right side
         addSlot(new Slot(wrenchContainer, 0, WRENCH_SLOT_X, WRENCH_SLOT_Y) {
             @Override
             public boolean mayPlace(ItemStack stack) {
@@ -95,6 +101,8 @@ public class ComputerMenu extends AbstractContainerMenu {
 
         NetworkRegistry registry = NetworkRegistry.get(level);
         List<LogisticsNetwork> networks = registry.getNetworksForPlayer(player.getUUID());
+        ComputerBlockEntity computer = getComputer(level);
+        Set<UUID> starredNetworks = computer != null ? computer.getStarredNetworks() : Set.of();
 
         LOGGER.debug("Player {} UUID: {}", player.getName().getString(), player.getUUID());
         LOGGER.debug("Found {} networks for player", networks.size());
@@ -107,6 +115,7 @@ public class ComputerMenu extends AbstractContainerMenu {
                     net.getId(),
                     net.getName(),
                     net.getNodeUuids().size(),
+                    starredNetworks.contains(net.getId()),
                     net.getColor()));
         }
 
@@ -149,8 +158,29 @@ public class ComputerMenu extends AbstractContainerMenu {
         this.wrenchSlotActive = active;
     }
 
+    public boolean hasWrench() {
+        return !wrenchStack.isEmpty() && wrenchStack.getItem() instanceof WrenchItem;
+    }
+
+    public boolean setWrenchClipboard(NodeClipboardConfig config, HolderLookup.Provider provider) {
+        if (!hasWrench()) {
+            return false;
+        }
+        WrenchItem.setClipboard(wrenchStack, config, provider);
+        wrenchContainer.setChanged();
+        broadcastChanges();
+        return true;
+    }
+
     public BlockPos getComputerPos() {
         return computerPos;
+    }
+
+    private ComputerBlockEntity getComputer(ServerLevel level) {
+        if (level.getBlockEntity(computerPos) instanceof ComputerBlockEntity computer) {
+            return computer;
+        }
+        return null;
     }
 
     private class WrenchSlotContainer implements Container {
@@ -194,7 +224,7 @@ public class ComputerMenu extends AbstractContainerMenu {
         @Override
         public void setItem(int slot, ItemStack stack) {
             if (slot == 0) {
-                wrenchStack = stack.copyWithCount(1);
+                wrenchStack = stack.copyWithCount(1); // Only 1 wrench
             }
         }
 

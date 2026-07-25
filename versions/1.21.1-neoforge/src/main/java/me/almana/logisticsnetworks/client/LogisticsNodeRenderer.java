@@ -203,7 +203,8 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         float minZ = bounds.minZ() - HIGHLIGHT_EPS;
         float maxZ = bounds.maxZ() + HIGHLIGHT_EPS;
 
-        VertexConsumer builder = buffer.getBuffer(xray ? ModRenderTypes.OVERLAY_XRAY : ModRenderTypes.OVERLAY);
+        VertexConsumer builder = buffer.getBuffer(xray && !Shaders.shadersActive()
+                ? ModRenderTypes.OVERLAY_XRAY : ModRenderTypes.OVERLAY);
         Matrix4f matrix = poseStack.last().pose();
         renderHighlightCuboid(builder, matrix, minX, minY, minZ, maxX, maxY, maxZ, r, g, b, a);
     }
@@ -317,6 +318,15 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         } else {
             visibleNodeIds = null;
         }
+    }
+
+    public static boolean isWithinWrenchRenderLimit(int entityId) {
+        Minecraft mc = Minecraft.getInstance();
+        if (entityId < 0 || mc.level == null || !(mc.level.getEntity(entityId) instanceof LogisticsNodeEntity)) {
+            return false;
+        }
+        updateAllowedNodes(mc);
+        return allowedNodeIds == null || allowedNodeIds.contains(entityId);
     }
 
     private static int getConnectionMask(LogisticsNodeEntity entity) {

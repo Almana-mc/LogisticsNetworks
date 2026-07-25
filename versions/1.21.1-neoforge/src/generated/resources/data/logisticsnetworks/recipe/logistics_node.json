@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "B": {
+      "item": "minecraft:iron_bars"
+    },
+    "D": {
+      "item": "minecraft:deepslate"
+    },
+    "E": {
+      "item": "minecraft:ender_pearl"
+    },
+    "H": {
+      "item": "minecraft:hopper"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "pattern": [
+    "DRD",
+    "BHB",
+    "DED"
+  ],
+  "result": {
+    "count": 1,
+    "id": "logisticsnetworks:logistics_node"
+  }
+}
