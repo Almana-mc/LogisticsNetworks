@@ -5,11 +5,16 @@ import me.almana.logisticsnetworks.item.NameFilterItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomData;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -133,7 +138,7 @@ public final class NameFilterData {
     }
 
     record NameFilterView(FilterTargetType targetType, boolean blacklist, String expression,
-            ValidationResult pattern) {
+            ValidationResult pattern, NameMatchScope scope) {
     }
 
     record CachedNameView(@Nullable CustomData key, NameFilterView view) {
@@ -155,14 +160,16 @@ public final class NameFilterData {
 
     private static NameFilterView buildNameFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
         if (!isNameFilter(stack))
-            return new NameFilterView(FilterTargetType.ITEMS, false, "", validateRegex(""));
+            return new NameFilterView(FilterTargetType.ITEMS, false, "", validateRegex(""), NameMatchScope.NAME);
 
         CompoundTag root = getRoot(stack);
         FilterTargetType targetType = FilterTargetType
                 .fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
         boolean blacklist = root.getBooleanOr(KEY_IS_BLACKLIST, false);
         String expression = root.getStringOr(KEY_NAME, "");
-        return new NameFilterView(targetType, blacklist, expression, resolveRegex(expression, readCache));
+        NameMatchScope scope = NameMatchScope
+                .fromOrdinal(root.getIntOr(KEY_MATCH_SCOPE, NameMatchScope.NAME.ordinal()));
+        return new NameFilterView(targetType, blacklist, expression, resolveRegex(expression, readCache), scope);
     }
 
     public static boolean hasNameFilter(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
@@ -213,8 +220,34 @@ public final class NameFilterData {
         if (view.expression().isEmpty())
             return false;
 
-        String candidateName = candidate.getHoverName().getString();
-        return matchesView(view, candidateName);
+        NameMatchScope scope = view.scope();
+        if (scope == NameMatchScope.NAME || scope == NameMatchScope.BOTH) {
+            String candidateName = candidate.getHoverName().getString();
+            if (candidateName.length() > MAX_CANDIDATE_LENGTH)
+                return false;
+            if (matchesView(view, candidateName))
+                return true;
+        }
+
+        if (scope == NameMatchScope.TOOLTIP || scope == NameMatchScope.BOTH) {
+            List<Component> lines = tooltipLines(candidate);
+            for (int i = (scope == NameMatchScope.BOTH ? 1 : 0); i < lines.size(); i++) {
+                if (matchesView(view, lines.get(i).getString()))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static List<Component> tooltipLines(ItemStack candidate) {
+        //? if forge {
+        /*if (FMLEnvironment.dist == Dist.DEDICATED_SERVER)
+            return List.of();
+        return candidate.getTooltipLines(null, TooltipFlag.NORMAL);
+        *///?} else {
+        return candidate.getTooltipLines(Item.TooltipContext.EMPTY, null, TooltipFlag.NORMAL);
+        //?}
     }
 
     public static boolean containsName(ItemStack filter, FluidStack candidate) {

@@ -1,13 +1,20 @@
 package me.almana.logisticsnetworks.filter;
 
 public enum NameMatchScope {
-    NAME;
+    NAME,
+    TOOLTIP,
+    BOTH;
 
     public NameMatchScope next() {
-        return NAME;
+        NameMatchScope[] values = values();
+        return values[(ordinal() + 1) % values.length];
     }
 
     public static NameMatchScope fromOrdinal(int ordinal) {
-        return NAME;
+        NameMatchScope[] values = values();
+        if (ordinal < 0 || ordinal >= values.length) {
+            return NAME;
+        }
+        return values[ordinal];
     }
 }

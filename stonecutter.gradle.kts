@@ -48,6 +48,7 @@ stonecutter parameters {
         replace("net.neoforged.api.distmarker.Dist", "net.minecraftforge.api.distmarker.Dist")
         replace("net.neoforged.fml.ModList", "net.minecraftforge.fml.ModList")
         replace("net.neoforged.fml.loading.FMLPaths", "net.minecraftforge.fml.loading.FMLPaths")
+        replace("net.neoforged.fml.loading.FMLEnvironment", "net.minecraftforge.fml.loading.FMLEnvironment")
         replace(
             "net.neoforged.fml.common.EventBusSubscriber",
             "net.minecraftforge.fml.common.Mod.EventBusSubscriber")
