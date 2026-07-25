@@ -1,9 +1,9 @@
 package me.almana.logisticsnetworks.filter;
 
-import net.minecraft.core.component.DataComponents;
+import me.almana.logisticsnetworks.util.ItemDataUtil;
+import me.almana.logisticsnetworks.util.NbtAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import org.jetbrains.annotations.Nullable;
 
 public final class DurabilityFilterData {
@@ -69,13 +69,13 @@ public final class DurabilityFilterData {
     public static boolean isBlacklist(ItemStack stack) {
         if (!isDurabilityFilterItem(stack))
             return false;
-        return getRootTag(stack).getBooleanOr(KEY_IS_BLACKLIST, false);
+        return NbtAccess.getBoolean(getRootTag(stack), KEY_IS_BLACKLIST, false);
     }
 
     public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
         if (!isDurabilityFilterItem(stack))
             return;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+        ItemDataUtil.updateCustomData(stack, customTag -> {
             CompoundTag root = getRootTag(customTag);
             if (isBlacklist) {
                 root.putBoolean(KEY_IS_BLACKLIST, true);
@@ -90,14 +90,14 @@ public final class DurabilityFilterData {
         if (!isDurabilityFilterItem(stack))
             return FilterTargetType.ITEMS;
         CompoundTag root = getRootTag(stack);
-        return FilterTargetType.fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
+        return FilterTargetType.fromOrdinal(NbtAccess.getInt(root, KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
     }
 
     public static void setTargetType(ItemStack stack, FilterTargetType type) {
         if (!isDurabilityFilterItem(stack))
             return;
         FilterTargetType target = type == null ? FilterTargetType.ITEMS : type;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+        ItemDataUtil.updateCustomData(stack, customTag -> {
             CompoundTag root = getRootTag(customTag);
             if (target == FilterTargetType.ITEMS) {
                 root.remove(KEY_TARGET_TYPE);
@@ -116,7 +116,7 @@ public final class DurabilityFilterData {
         if (!root.contains(KEY_VALUE))
             return DEFAULT_VALUE;
 
-        return clamp(root.getIntOr(KEY_VALUE, DEFAULT_VALUE));
+        return clamp(NbtAccess.getInt(root, KEY_VALUE, DEFAULT_VALUE));
     }
 
     public static void setValue(ItemStack stack, int value) {
@@ -124,7 +124,7 @@ public final class DurabilityFilterData {
             return;
 
         int clamped = clamp(value);
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+        ItemDataUtil.updateCustomData(stack, customTag -> {
             CompoundTag root = getRootTag(customTag);
             if (clamped == DEFAULT_VALUE) {
                 root.remove(KEY_VALUE);
@@ -143,7 +143,7 @@ public final class DurabilityFilterData {
         if (!root.contains(KEY_OPERATOR))
             return DEFAULT_OPERATOR;
 
-        return Operator.fromId(root.getStringOr(KEY_OPERATOR, DEFAULT_OPERATOR.id()));
+        return Operator.fromId(NbtAccess.getString(root, KEY_OPERATOR, DEFAULT_OPERATOR.id()));
     }
 
     public static void setOperator(ItemStack stack, @Nullable Operator operator) {
@@ -151,7 +151,7 @@ public final class DurabilityFilterData {
             return;
 
         Operator normalized = operator == null ? DEFAULT_OPERATOR : operator;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+        ItemDataUtil.updateCustomData(stack, customTag -> {
             CompoundTag root = getRootTag(customTag);
             if (normalized == DEFAULT_OPERATOR) {
                 root.remove(KEY_OPERATOR);
@@ -191,12 +191,12 @@ public final class DurabilityFilterData {
     }
 
     private static CompoundTag getRootTag(ItemStack stack) {
-        return getRootTag(stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag());
+        return getRootTag(ItemDataUtil.getCustomData(stack));
     }
 
     private static CompoundTag getRootTag(CompoundTag customTag) {
         if (customTag.contains(ROOT_KEY)) {
-            return customTag.getCompound(ROOT_KEY).map(CompoundTag::copy).orElseGet(CompoundTag::new);
+            return NbtAccess.getCompound(customTag, ROOT_KEY).copy();
         }
         return new CompoundTag();
     }
