@@ -3,7 +3,6 @@ package me.almana.logisticsnetworks.client.screen;
 import net.minecraft.core.Direction;
 import org.jetbrains.annotations.Nullable;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NetworkColors;
@@ -285,7 +284,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
                 && System.currentTimeMillis() - settingsHoverStartTime >= TOOLTIP_DELAY && !tweaksOpen) {
             LogisticsNodeEntity node = getMenu().getNode();
             List<Component> tip = getSettingTooltip(node.getChannel(selectedChannel), settingsHoverRow);
-            g.renderTooltip(font, tip, mx, my);
+            g.renderComponentTooltip(font, tip, mx, my);
         }
         if (filterDisabledHover && currentPage == Page.CHANNEL_CONFIG) {
             g.renderTooltip(font,
@@ -706,7 +705,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
         // Edit Box
         if (labelEditBox != null) {
-            labelEditBox.extractRenderState(g.raw(), mx, my, pt);
+            ClientInput.widget(g, labelEditBox, mx, my, pt);
         }
 
         // Character counter (shown only when > 40 chars)
@@ -1531,7 +1530,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
                     return true;
 
                 if (row >= 6 && row <= 8) {
-                    if (hasAltDown()) {
+                    if (ClientInput.altDown()) {
                         setNumericExtremum(ch, row, btn == 0);
                         commitChannelUpdate(node, ch);
                         return true;
@@ -1575,9 +1574,9 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             case 3 -> ch.setIoDirection(cycleSide(ch.getIoDirection(), dir));
             case 4 -> ch.setRedstoneMode(cycleEnum(ch.getRedstoneMode(), dir));
             case 5 -> ch.setDistributionMode(cycleEnum(ch.getDistributionMode(), dir));
-            case 6 -> ch.setPriority(ch.getPriority() + (hasShiftDown() ? 10 : 1) * dir);
-            case 7 -> ch.setBatchSize(ch.getBatchSize() + (hasShiftDown() ? 8 : 1) * dir);
-            case 8 -> ch.setTickDelay(ch.getTickDelay() + (hasShiftDown() ? 10 : 1) * dir);
+            case 6 -> ch.setPriority(ch.getPriority() + (ClientInput.shiftDown() ? 10 : 1) * dir);
+            case 7 -> ch.setBatchSize(ch.getBatchSize() + (ClientInput.shiftDown() ? 8 : 1) * dir);
+            case 8 -> ch.setTickDelay(ch.getTickDelay() + (ClientInput.shiftDown() ? 10 : 1) * dir);
         }
     }
 
@@ -1795,18 +1794,6 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
 
     private boolean isHoveringAbs(int x, int y, int w, int h, double mx, double my) {
         return mx >= x && mx <= x + w && my >= y && my <= y + h;
-    }
-
-    private boolean hasAltDown() {
-        return minecraft != null
-                && (InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LALT)
-                        || InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_RALT));
-    }
-
-    private boolean hasShiftDown() {
-        return minecraft != null
-                && (InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LSHIFT)
-                        || InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_RSHIFT));
     }
 
     private boolean isHoveringMenuSlot(double mx, double my) {

@@ -161,6 +161,7 @@ public class NodeMenu extends AbstractContainerMenu {
                     net.getName(),
                     net.getNodeUuids().size(),
                     false,
+                    net.getCreatedAt(),
                     net.getColor()));
         }
 

@@ -22,6 +22,12 @@ stonecutter parameters {
             "net.minecraft.client.gui.GuiGraphics")
     }
 
+    // 26.x renamed the registry lookup; root never uses the short form
+    replacements.string(current.parsed < "26") {
+        replace("BuiltInRegistries.ITEM.getValue(", "BuiltInRegistries.ITEM.get(")
+        replace("BuiltInRegistries.FLUID.getValue(", "BuiltInRegistries.FLUID.get(")
+    }
+
     // 26.x split the client half of PacketDistributor into its own class
     replacements.string(current.parsed < "26") {
         replace(

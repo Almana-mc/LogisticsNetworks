@@ -51,6 +51,33 @@ public final class ClientInput {
         //?}
     }
 
+    public static boolean altDown() {
+        //? if <26 {
+        /*return net.minecraft.client.gui.screens.Screen.hasAltDown();
+        *///?} else {
+        return modifierDown(com.mojang.blaze3d.platform.InputConstants.KEY_LALT,
+                com.mojang.blaze3d.platform.InputConstants.KEY_RALT);
+        //?}
+    }
+
+    public static boolean shiftDown() {
+        //? if <26 {
+        /*return net.minecraft.client.gui.screens.Screen.hasShiftDown();
+        *///?} else {
+        return modifierDown(com.mojang.blaze3d.platform.InputConstants.KEY_LSHIFT,
+                com.mojang.blaze3d.platform.InputConstants.KEY_RSHIFT);
+        //?}
+    }
+
+    //? if >=26 {
+    private static boolean modifierDown(int left, int right) {
+        net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+        return minecraft != null
+                && (com.mojang.blaze3d.platform.InputConstants.isKeyDown(minecraft.getWindow(), left)
+                        || com.mojang.blaze3d.platform.InputConstants.isKeyDown(minecraft.getWindow(), right));
+    }
+    //?}
+
     public static void widget(GuiGraphics graphics, Renderable widget, int mouseX, int mouseY, float partialTick) {
         //? if <26 {
         /*widget.render(graphics, mouseX, mouseY, partialTick);

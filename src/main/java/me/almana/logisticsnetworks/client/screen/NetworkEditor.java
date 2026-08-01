@@ -84,7 +84,7 @@ public class NetworkEditor {
         ThemePaint.drawCentered(g, font, Component.translatable("gui.logisticsnetworks.node.color.title"),
                 x + W / 2, y + PAD, t.accent());
 
-        nameField.extractRenderState(g.raw(), mx, my, pt);
+        ClientInput.widget(g, nameField, mx, my, pt);
 
         renderSvSquare(g);
         renderHueStrip(g);
