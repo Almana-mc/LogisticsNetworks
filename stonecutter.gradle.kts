@@ -44,6 +44,7 @@ stonecutter parameters {
             "me.almana.logisticsnetworks.network.dist.PacketDistributor")
 
         // loader packages, identical types either side
+        replace("net.neoforged.neoforge.server.ServerLifecycleHooks", "net.minecraftforge.server.ServerLifecycleHooks")
         replace("net.neoforged.bus.api.SubscribeEvent", "net.minecraftforge.eventbus.api.SubscribeEvent")
         replace("net.neoforged.api.distmarker.Dist", "net.minecraftforge.api.distmarker.Dist")
         replace("net.neoforged.fml.ModList", "net.minecraftforge.fml.ModList")

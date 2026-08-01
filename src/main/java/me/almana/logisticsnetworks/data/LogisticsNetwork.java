@@ -15,10 +15,10 @@ import java.util.UUID;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.util.NbtAccess;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
@@ -95,19 +95,19 @@ public class LogisticsNetwork {
 
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
-        tag.putString(KEY_ID, id.toString());
+        NbtAccess.putUuid(tag, KEY_ID, id);
         tag.putString(KEY_NAME, name);
         tag.putBoolean(KEY_SLEEPING, sleeping);
         tag.putLong(KEY_CREATED, createdAt);
         tag.putInt(KEY_COLOR, color);
         if (ownerUuid != null) {
-            tag.putString(KEY_OWNER_UUID, ownerUuid.toString());
+            NbtAccess.putUuid(tag, KEY_OWNER_UUID, ownerUuid);
         }
 
         ListTag nodesTag = new ListTag();
         for (UUID uuid : nodeUuids) {
             CompoundTag uuidTag = new CompoundTag();
-            uuidTag.putString(KEY_NODE_UUID, uuid.toString());
+            NbtAccess.putUuid(uuidTag, KEY_NODE_UUID, uuid);
             nodesTag.add(uuidTag);
         }
         tag.put(KEY_NODES, nodesTag);
@@ -124,28 +124,28 @@ public class LogisticsNetwork {
     }
 
     public static LogisticsNetwork load(CompoundTag tag) {
-        UUID id = parseRequiredUuid(tag.getStringOr(KEY_ID, null));
+        UUID id = NbtAccess.getUuidOrRandom(tag, KEY_ID);
         LogisticsNetwork network = new LogisticsNetwork(id);
 
         if (tag.contains(KEY_NAME)) {
-            network.name = tag.getStringOr(KEY_NAME, network.name);
+            network.name = NbtAccess.getString(tag, KEY_NAME, network.name);
         }
         if (tag.contains(KEY_SLEEPING)) {
-            network.sleeping = tag.getBooleanOr(KEY_SLEEPING, network.sleeping);
+            network.sleeping = NbtAccess.getBoolean(tag, KEY_SLEEPING, network.sleeping);
         }
         if (tag.contains(KEY_OWNER_UUID)) {
-            network.ownerUuid = parseOptionalUuid(tag.getStringOr(KEY_OWNER_UUID, null));
+            network.ownerUuid = NbtAccess.getUuidOrNull(tag, KEY_OWNER_UUID);
         }
-        network.createdAt = tag.getLongOr(KEY_CREATED, 0L);
+        network.createdAt = NbtAccess.getLong(tag, KEY_CREATED, 0L);
         if (tag.contains(KEY_COLOR)) {
-            network.color = NetworkColors.mask(tag.getIntOr(KEY_COLOR, network.color));
+            network.color = NetworkColors.mask(NbtAccess.getInt(tag, KEY_COLOR, network.color));
         }
 
         if (tag.contains(KEY_NODES)) {
-            ListTag nodesTag = tag.getListOrEmpty(KEY_NODES);
+            ListTag nodesTag = NbtAccess.getList(tag, KEY_NODES, Tag.TAG_COMPOUND);
             for (Tag t : nodesTag) {
                 if (t instanceof CompoundTag ct && ct.contains(KEY_NODE_UUID)) {
-                    UUID nodeId = parseOptionalUuid(ct.getStringOr(KEY_NODE_UUID, null));
+                    UUID nodeId = NbtAccess.getUuidOrNull(ct, KEY_NODE_UUID);
                     if (nodeId != null) {
                         network.addNode(nodeId);
                     }
@@ -153,10 +153,10 @@ public class LogisticsNetwork {
             }
         }
         if (tag.contains(KEY_CHANNEL_NAMES)) {
-            ListTag namesTag = tag.getListOrEmpty(KEY_CHANNEL_NAMES);
+            ListTag namesTag = NbtAccess.getList(tag, KEY_CHANNEL_NAMES, Tag.TAG_COMPOUND);
             for (int i = 0; i < Math.min(namesTag.size(), 9); i++) {
                 if (namesTag.get(i) instanceof CompoundTag ct) {
-                    network.channelNames[i] = ct.getStringOr("Name", "");
+                    network.channelNames[i] = NbtAccess.getString(ct, "Name", "");
                 }
             }
         }
@@ -356,6 +356,15 @@ public class LogisticsNetwork {
         sourceImportsView = copyToUnmodifiableArray(sourceImports);
     }
 
+    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
+        for (ServerLevel level : server.getAllLevels()) {
+            if (level.getEntity(nodeId) instanceof LogisticsNodeEntity node) {
+                return node;
+            }
+        }
+        return null;
+    }
+
     public void rebuildCache(NetworkRegistry registry) {
         clearAllCaches();
         sortedUuids = new ArrayList<>(nodeUuids);
@@ -369,16 +378,8 @@ public class LogisticsNetwork {
 
         List<LogisticsNodeEntity> resolved = new ArrayList<>();
 
-        for (UUID nodeId : nodeUuids) {
-            LogisticsNodeEntity node = null;
-            for (ServerLevel level : server.getAllLevels()) {
-                Entity entity = level.getEntity(nodeId);
-                if (entity instanceof LogisticsNodeEntity lne) {
-                    node = lne;
-                    break;
-                }
-            }
-
+        for (UUID nodeId : sortedUuids) {
+            LogisticsNodeEntity node = findNode(server, nodeId);
             if (node == null) {
                 continue;
             }
@@ -445,19 +446,4 @@ public class LogisticsNetwork {
         }
     }
 
-    private static UUID parseRequiredUuid(String value) {
-        UUID parsed = parseOptionalUuid(value);
-        return parsed != null ? parsed : UUID.randomUUID();
-    }
-
-    private static UUID parseOptionalUuid(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(value);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
 }

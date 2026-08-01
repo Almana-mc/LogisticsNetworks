@@ -5,11 +5,17 @@ import net.minecraft.nbt.ListTag;
 //? if <26
 /*import net.minecraft.nbt.Tag;*/
 
+import java.util.UUID;
+
 /**
  * 26.x turned the CompoundTag getters into Optional-returning methods and added
  * the {@code *Or} family; older versions return the primitive directly and take
  * an element type. Every read of a stored tag goes through here so the callers
  * stay version-agnostic.
+ *
+ * <p>26.x also dropped {@code putUUID}/{@code getUUID} entirely, so each version
+ * keeps its own on-disk shape for UUIDs — a dashed string on 26.x, the four-int
+ * array everywhere else. Existing saves therefore still read back on every target.
  */
 public final class NbtAccess {
 
@@ -63,4 +69,38 @@ public final class NbtAccess {
         return tag.getListOrEmpty(key);
         //?}
     }
+
+    public static void putUuid(CompoundTag tag, String key, UUID value) {
+        //? if <26 {
+        /*tag.putUUID(key, value);
+        *///?} else {
+        tag.putString(key, value.toString());
+        //?}
+    }
+
+    public static UUID getUuidOrNull(CompoundTag tag, String key) {
+        //? if <26 {
+        /*return tag.hasUUID(key) ? tag.getUUID(key) : null;
+        *///?} else {
+        return parseUuid(tag.getStringOr(key, null));
+        //?}
+    }
+
+    public static UUID getUuidOrRandom(CompoundTag tag, String key) {
+        UUID stored = getUuidOrNull(tag, key);
+        return stored != null ? stored : UUID.randomUUID();
+    }
+
+    //? if >=26 {
+    private static UUID parseUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+    //?}
 }
