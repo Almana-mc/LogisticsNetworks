@@ -3,20 +3,15 @@ package me.almana.logisticsnetworks.registration;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
-import me.almana.logisticsnetworks.item.AmountFilterItem;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
-import me.almana.logisticsnetworks.item.DurabilityFilterItem;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
 import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
 import me.almana.logisticsnetworks.item.PatternSetterItem;
 import me.almana.logisticsnetworks.item.ModFilterItem;
 import me.almana.logisticsnetworks.item.NameFilterItem;
-import me.almana.logisticsnetworks.item.NbtFilterItem;
 import me.almana.logisticsnetworks.item.NodeUpgradeItem;
-import me.almana.logisticsnetworks.item.SlotFilterItem;
-import me.almana.logisticsnetworks.item.TagFilterItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.GuideRecipe;
@@ -93,24 +88,14 @@ public class Registration {
                         () -> new WrenchItem(new Item.Properties().stacksTo(1)));
 
         public static final DeferredHolder<Item, BaseFilterItem> SMALL_FILTER = ITEMS.register("small_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 9));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
         public static final DeferredHolder<Item, BaseFilterItem> MEDIUM_FILTER = ITEMS.register("medium_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 18));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
         public static final DeferredHolder<Item, BaseFilterItem> BIG_FILTER = ITEMS.register("big_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 27));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
 
-        public static final DeferredHolder<Item, TagFilterItem> TAG_FILTER = ITEMS.register("tag_filter",
-                        () -> new TagFilterItem(new Item.Properties()));
-        public static final DeferredHolder<Item, AmountFilterItem> AMOUNT_FILTER = ITEMS.register("amount_filter",
-                        () -> new AmountFilterItem(new Item.Properties()));
-        public static final DeferredHolder<Item, DurabilityFilterItem> DURABILITY_FILTER = ITEMS
-                        .register("durability_filter", () -> new DurabilityFilterItem(new Item.Properties()));
-        public static final DeferredHolder<Item, NbtFilterItem> NBT_FILTER = ITEMS.register("nbt_filter",
-                        () -> new NbtFilterItem(new Item.Properties()));
         public static final DeferredHolder<Item, ModFilterItem> MOD_FILTER = ITEMS.register("mod_filter",
                         () -> new ModFilterItem(new Item.Properties()));
-        public static final DeferredHolder<Item, SlotFilterItem> SLOT_FILTER = ITEMS.register("slot_filter",
-                        () -> new SlotFilterItem(new Item.Properties()));
         public static final DeferredHolder<Item, NameFilterItem> NAME_FILTER = ITEMS.register("name_filter",
                         () -> new NameFilterItem(new Item.Properties()));
 
@@ -189,12 +174,7 @@ public class Registration {
         private static boolean isFilterItem(Item item) {
                 return item instanceof BaseFilterItem
                                 || item instanceof ModFilterItem
-                                || item instanceof NameFilterItem
-                                || item instanceof AmountFilterItem
-                                || item instanceof DurabilityFilterItem
-                                || item instanceof NbtFilterItem
-                                || item instanceof SlotFilterItem
-                                || item instanceof TagFilterItem;
+                                || item instanceof NameFilterItem;
         }
 
         public static void init(IEventBus modEventBus) {
