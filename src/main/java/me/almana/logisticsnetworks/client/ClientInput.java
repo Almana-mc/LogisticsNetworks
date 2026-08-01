@@ -43,6 +43,14 @@ public final class ClientInput {
         //?}
     }
 
+    public static boolean mouseScrolled(GuiEventListener target, double mouseX, double mouseY, double delta) {
+        //? if forge {
+        /*return target.mouseScrolled(mouseX, mouseY, delta);
+        *///?} else {
+        return target.mouseScrolled(mouseX, mouseY, 0.0, delta);
+        //?}
+    }
+
     public static void widget(GuiGraphics graphics, Renderable widget, int mouseX, int mouseY, float partialTick) {
         //? if <26 {
         /*widget.render(graphics, mouseX, mouseY, partialTick);

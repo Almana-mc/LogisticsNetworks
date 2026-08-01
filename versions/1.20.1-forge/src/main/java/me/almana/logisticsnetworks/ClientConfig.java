@@ -49,7 +49,7 @@ public class ClientConfig {
             .comment("Maximum simultaneous resource transfer paths.")
             .defineInRange("maxTransferVisuals", 100, 1, 1000);
 
-    static final ForgeConfigSpec SPEC = builder.build();
+    public static final ForgeConfigSpec SPEC = builder.build();
 
     public static boolean defaultNodeVisibility = true;
     public static int maxRenderedNodes = 200;

@@ -144,8 +144,13 @@ public class ModConfigScreen extends LegacyScreen {
         x0 = (width - GUI_WIDTH) / 2;
         y0 = (height - GUI_HEIGHT) / 2;
 
+        //? if <26 {
+        /*canEditServerConfig = minecraft.player == null || minecraft.isLocalServer()
+                || minecraft.player.hasPermissions(2);
+        *///?} else {
         canEditServerConfig = minecraft.player == null || minecraft.isLocalServer()
                 || minecraft.player.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER);
+        //?}
 
         pendingDropNodeItem = Config.dropNodeItemSpec.get();
         pendingDebugMode = Config.debugModeSpec.get();

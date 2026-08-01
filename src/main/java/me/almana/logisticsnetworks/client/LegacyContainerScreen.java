@@ -33,6 +33,18 @@ public abstract class LegacyContainerScreen<T extends AbstractContainerMenu> ext
         //?}
     }
 
+    //? if forge {
+    /*// 1.20.1 predates the split scroll axes
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        return mouseScrolled(mouseX, mouseY, 0.0, delta);
+    }
+
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        return super.mouseScrolled(mouseX, mouseY, scrollY);
+    }
+    *///?}
+
     //? if >=26 {
     @Override
     public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {

@@ -74,7 +74,16 @@ public class FlatEditBox extends EditBox {
         String value = getValue();
         String view = font.plainSubstrByWidth(value.substring(displayPos), getWidth());
         int idx = font.plainSubstrByWidth(view, relX).length();
+        //? if forge {
+        /*// 1.20.1 has no extend-selection overload; anchor the highlight by hand
+        int anchor = getCursorPosition();
+        moveCursorTo(displayPos + idx);
+        if (extendSelection) {
+            setHighlightPos(anchor);
+        }
+        *///?} else {
         moveCursorTo(displayPos + idx, extendSelection);
+        //?}
     }
 
     //? if <26 {

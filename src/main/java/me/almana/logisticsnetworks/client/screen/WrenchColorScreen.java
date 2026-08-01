@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.network.SetWrenchColorsPayload;
 import me.almana.logisticsnetworks.client.LegacyScreen;
+//? if >=26
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -191,13 +192,34 @@ public class WrenchColorScreen extends LegacyScreen {
         int px = previewX();
         int py = previewY();
         ThemePaint.sunkPanel(g, px - 4, py - 4, PREVIEW + 8, PREVIEW + 8, t);
+        //? if <26 {
+        /*// pre-26 has no tinted blit, so scale by pose and tint the shader
+        int caseColor = tab == TAB_CASE ? current() : colors[TAB_CASE];
+        int screenColor = tab == TAB_SCREEN ? current() : colors[TAB_SCREEN];
+        g.pose().pushPose();
+        g.pose().translate(px, py, 0);
+        g.pose().scale(PREVIEW / 16f, PREVIEW / 16f, 1f);
+        drawLayer(g, CASE_TEXTURE, caseColor);
+        drawLayer(g, SCREEN_TEXTURE, screenColor);
+        g.pose().popPose();
+        *///?} else {
         int caseColor = 0xFF000000 | (tab == TAB_CASE ? current() : colors[TAB_CASE]);
         int screenColor = 0xFF000000 | (tab == TAB_SCREEN ? current() : colors[TAB_SCREEN]);
         g.raw().blit(RenderPipelines.GUI_TEXTURED, CASE_TEXTURE, px, py, 0f, 0f,
                 PREVIEW, PREVIEW, 16, 16, 16, 16, caseColor);
         g.raw().blit(RenderPipelines.GUI_TEXTURED, SCREEN_TEXTURE, px, py, 0f, 0f,
                 PREVIEW, PREVIEW, 16, 16, 16, 16, screenColor);
+        //?}
     }
+
+    //? if <26 {
+    /*private static void drawLayer(GuiGraphics g, Identifier texture, int color) {
+        com.mojang.blaze3d.systems.RenderSystem.setShaderColor(((color >> 16) & 0xFF) / 255f,
+                ((color >> 8) & 0xFF) / 255f, (color & 0xFF) / 255f, 1f);
+        g.blit(texture, 0, 0, 0f, 0f, 16, 16, 16, 16);
+        com.mojang.blaze3d.systems.RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+    }
+    *///?}
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {

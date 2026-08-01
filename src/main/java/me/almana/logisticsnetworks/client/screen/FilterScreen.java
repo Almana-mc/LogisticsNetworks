@@ -4481,7 +4481,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private boolean handleDetailPageScroll(double mx, double my, double delta) {
         if (detailNbtPageOpen) {
             if (detailNbtRawMode && detailNbtInputBox.active) {
-                return detailNbtInputBox.mouseScrolled(mx, my, 0, delta);
+                return ClientInput.mouseScrolled(detailNbtInputBox, mx, my, delta);
             }
             int panelY = topPos + 20;
             int panelH = imageHeight - 24;
