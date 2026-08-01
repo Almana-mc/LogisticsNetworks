@@ -1053,7 +1053,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                 networkSearchBox.setFocused(false);
                 return true;
             }
-            networkSearchBox.keyPressed(ClientInput.key(keyCode, scanCode, modifiers));
+            ClientInput.keyPressed(networkSearchBox, keyCode, scanCode, modifiers);
             return true;
         }
         if (keyCode == 256) return super.keyPressed(keyCode, scanCode, modifiers);
@@ -1063,7 +1063,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     @Override
     public boolean charTyped(char ch, int modifiers) {
         if (currentPage == Page.NETWORK_LIST && networkSearchBox != null && networkSearchBox.isFocused()) {
-            return networkSearchBox.charTyped(ClientInput.character(ch));
+            return ClientInput.charTyped(networkSearchBox, ch);
         }
         return super.charTyped(ch, modifiers);
     }
@@ -1211,7 +1211,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         }
         networkSearchBox.setFocused(true);
         setFocused(networkSearchBox);
-        networkSearchBox.mouseClicked(ClientInput.mouse(mouseX, mouseY, 0), false);
+        ClientInput.mouseClicked(networkSearchBox, mouseX, mouseY, 0);
         return true;
     }
 

@@ -1,9 +1,8 @@
 package me.almana.logisticsnetworks.client;
 
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import me.almana.logisticsnetworks.client.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 //? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
@@ -12,48 +11,27 @@ import net.minecraft.client.input.MouseButtonEvent;
 //?}
 
 /**
- * 26.x split screen drawing into extractBackground / extractLabels /
- * extractRenderState and boxed the input arguments into event records. The
- * screens are written against the older render / renderBg / renderLabels shape
- * and this base adapts them forward, so on 1.21.1 and 1.20.1 it is little more
- * than the vanilla class with the same constructors.
+ * The plain-Screen counterpart of {@link LegacyContainerScreen}: it adapts the
+ * 26.x extractRenderState / event-record shape back to the older render and
+ * raw-argument one the screens are written against.
  */
-public abstract class LegacyContainerScreen<T extends AbstractContainerMenu> extends AbstractContainerScreen<T> {
-    protected LegacyContainerScreen(T menu, Inventory inventory, Component title) {
-        super(menu, inventory, title);
+public abstract class LegacyScreen extends Screen {
+    protected LegacyScreen(Component title) {
+        super(title);
     }
 
-    protected LegacyContainerScreen(T menu, Inventory inventory, Component title, int imageWidth, int imageHeight) {
+    protected void renderSuper(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         //? if <26 {
-        /*super(menu, inventory, title);
-        this.imageWidth = imageWidth;
-        this.imageHeight = imageHeight;
+        /*super.render(graphics, mouseX, mouseY, partialTick);
         *///?} else {
-        super(menu, inventory, title, imageWidth, imageHeight);
+        super.extractRenderState(graphics.raw(), mouseX, mouseY, partialTick);
         //?}
     }
 
     //? if >=26 {
     @Override
-    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        super.extractBackground(graphics, mouseX, mouseY, partialTick);
-        renderBg(new GuiGraphics(graphics), partialTick, mouseX, mouseY);
-    }
-
-    @Override
-    protected void extractLabels(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-        renderLabels(new GuiGraphics(graphics), mouseX, mouseY);
-    }
-
-    @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         render(new GuiGraphics(graphics), mouseX, mouseY, partialTick);
-    }
-
-    @Override
-    protected void extractTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-        renderTooltip(new GuiGraphics(graphics), mouseX, mouseY);
     }
 
     @Override
@@ -96,19 +74,7 @@ public abstract class LegacyContainerScreen<T extends AbstractContainerMenu> ext
         return super.charTyped(event);
     }
 
-    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-    }
-
-    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(this.font, this.title, this.titleLabelX, this.titleLabelY, -12566464, false);
-        graphics.drawString(this.font, this.playerInventoryTitle, this.inventoryLabelX, this.inventoryLabelY, -12566464, false);
-    }
-
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-    }
-
-    protected void renderTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
-        super.extractTooltip(graphics.raw(), mouseX, mouseY);
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {

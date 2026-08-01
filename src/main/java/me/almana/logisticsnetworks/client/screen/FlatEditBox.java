@@ -1,11 +1,12 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.GuiGraphics;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+//? if <26
+/*import net.minecraft.client.gui.screens.Screen;*/
 
 public class FlatEditBox extends EditBox {
     private final Font font;
@@ -54,19 +55,36 @@ public class FlatEditBox extends EditBox {
         }
     }
 
+    //? if <26 {
+    /*@Override
+    public void onClick(double mouseX, double mouseY) {
+        placeCursorAt(mouseX, 0, Screen.hasShiftDown());
+    }
+    *///?} else {
     @Override
-    public void onClick(MouseButtonEvent event, boolean doubleClick) {
+    public void onClick(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
         if (event.button() == 0) {
-            int relX = Mth.floor(event.x()) - getX();
-            String value = getValue();
-            String view = font.plainSubstrByWidth(value.substring(displayPos), getWidth());
-            int idx = font.plainSubstrByWidth(view, relX).length();
-            moveCursorTo(displayPos + idx, event.hasShiftDown());
+            placeCursorAt(event.x(), event.button(), event.hasShiftDown());
         }
     }
+    //?}
 
+    private void placeCursorAt(double mouseX, int button, boolean extendSelection) {
+        int relX = Mth.floor(mouseX) - getX();
+        String value = getValue();
+        String view = font.plainSubstrByWidth(value.substring(displayPos), getWidth());
+        int idx = font.plainSubstrByWidth(view, relX).length();
+        moveCursorTo(displayPos + idx, extendSelection);
+    }
+
+    //? if <26 {
+    /*@Override
+    public void renderWidget(GuiGraphics g, int mx, int my, float pt) {
+    *///?} else {
     @Override
-    public void extractWidgetRenderState(GuiGraphicsExtractor g, int mx, int my, float pt) {
+    public void extractWidgetRenderState(net.minecraft.client.gui.GuiGraphicsExtractor raw, int mx, int my, float pt) {
+        GuiGraphics g = new GuiGraphics(raw);
+    //?}
         if (!isVisible()) return;
         clampScroll();
 
@@ -79,7 +97,7 @@ public class FlatEditBox extends EditBox {
         int y = getY() + (getHeight() - 8) / 2;
 
         if (!view.isEmpty()) {
-            g.text(font, view, x, y, textColor, false);
+            g.drawString(font, view, x, y, textColor, false);
         }
 
         if (hp != cursorPos) {
@@ -100,7 +118,7 @@ public class FlatEditBox extends EditBox {
             int cIdx = Math.max(displayPos, Math.min(cursorPos, viewEnd));
             int cx = x + font.width(value.substring(displayPos, cIdx));
             if (cursorPos >= value.length()) {
-                g.text(font, "_", cx, y, textColor, false);
+                g.drawString(font, "_", cx, y, textColor, false);
             } else {
                 g.fill(cx, y - 1, cx + 1, y + 9, textColor);
             }

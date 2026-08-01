@@ -33,6 +33,10 @@ public final class GuiGraphics {
         raw.fill(x0, y0, x1, y1, color);
     }
 
+    public void fillGradient(int x0, int y0, int x1, int y1, int colorFrom, int colorTo) {
+        raw.fillGradient(x0, y0, x1, y1, colorFrom, colorTo);
+    }
+
     public void renderOutline(int x, int y, int width, int height, int color) {
         raw.outline(x, y, width, height, color);
     }
@@ -83,6 +87,10 @@ public final class GuiGraphics {
 
     public void renderTooltip(Font font, List<Component> lines, int x, int y) {
         raw.setTooltipForNextFrame(font, lines, Optional.empty(), x, y);
+    }
+
+    public void renderComponentTooltip(Font font, List<Component> lines, int x, int y) {
+        raw.setComponentTooltipForNextFrame(font, lines, x, y);
     }
 
     public void blit(int x, int y, int z, int width, int height, TextureAtlasSprite sprite) {

@@ -439,14 +439,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     @Override
-    protected void extractTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+    protected void renderTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
         if (tagEditSlot >= 0 || nbtEditSlot >= 0 || detailEditSlot >= 0) {
             return;
         }
         if (this.hoveredSlot != null && this.hoveredSlot.index < menu.getFilterSlots()) {
             return;
         }
-        super.extractTooltip(graphics, mouseX, mouseY);
+        super.renderTooltip(graphics, mouseX, mouseY);
     }
 
     @Override
@@ -1428,7 +1428,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (btn != 0 || manualInputBox == null || !manualInputBox.isVisible() || !isHoveringManualInput(mx, my)) {
             return false;
         }
-        manualInputBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+        ClientInput.mouseClicked(manualInputBox, mx, my, btn);
         manualInputBox.setFocused(true);
         setFocused(manualInputBox);
         wasManualInputFocused = true;
@@ -1547,7 +1547,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 commitNbtValueEdit();
                 return true;
             }
-            nbtValueEditBox.keyPressed(ClientInput.key(key, scan, modifiers));
+            ClientInput.keyPressed(nbtValueEditBox, key, scan, modifiers);
             return true;
         }
 
@@ -1556,7 +1556,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 commitTagInput();
                 return true;
             }
-            tagInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
+            ClientInput.keyPressed(tagInputBox, key, scan, modifiers);
             return true;
         }
 
@@ -1565,7 +1565,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 saveManualInputAndClearFocus();
                 return true;
             }
-            manualInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
+            ClientInput.keyPressed(manualInputBox, key, scan, modifiers);
             return true;
         }
         return true;
@@ -1575,29 +1575,29 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     public boolean charTyped(char c, int modifiers) {
         if (detailEditSlot >= 0) {
             if (detailIdInputBox != null && detailIdInputBox.isFocused())
-                return detailIdInputBox.charTyped(ClientInput.character(c));
+                return ClientInput.charTyped(detailIdInputBox, c);
             if (detailBatchInputBox != null && detailBatchInputBox.isFocused())
-                return detailBatchInputBox.charTyped(ClientInput.character(c));
+                return ClientInput.charTyped(detailBatchInputBox, c);
             if (detailStockInputBox != null && detailStockInputBox.isFocused())
-                return detailStockInputBox.charTyped(ClientInput.character(c));
+                return ClientInput.charTyped(detailStockInputBox, c);
             if (detailSlotMappingInputBox != null && detailSlotMappingInputBox.isFocused())
-                return detailSlotMappingInputBox.charTyped(ClientInput.character(c));
+                return ClientInput.charTyped(detailSlotMappingInputBox, c);
             if (detailNbtInputBox != null && detailNbtInputBox.isFocused())
-                return detailNbtInputBox.charTyped(ClientInput.character(c));
+                return ClientInput.charTyped(detailNbtInputBox, c);
             if (detailNbtValueBox != null && detailNbtValueBox.isFocused())
-                return detailNbtValueBox.charTyped(ClientInput.character(c));
+                return ClientInput.charTyped(detailNbtValueBox, c);
             return true;
         }
         if (nbtValueEditBox != null && nbtValueEditBox.isFocused()) {
-            nbtValueEditBox.charTyped(ClientInput.character(c));
+            ClientInput.charTyped(nbtValueEditBox, c);
             return true;
         }
         if (tagInputBox != null && tagInputBox.isFocused()) {
-            tagInputBox.charTyped(ClientInput.character(c));
+            ClientInput.charTyped(tagInputBox, c);
             return true;
         }
         if (manualInputBox.isFocused()) {
-            manualInputBox.charTyped(ClientInput.character(c));
+            ClientInput.charTyped(manualInputBox, c);
             return true;
         }
         return super.charTyped(c, modifiers);
@@ -2299,7 +2299,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         tagInputBox.setX(panelX + 4);
         tagInputBox.setY(inputY);
         tagInputBox.setWidth(inputW);
-        tagInputBox.extractRenderState(g.raw(), mx, my, 0);
+        ClientInput.widget(g, tagInputBox, mx, my, 0);
 
         int doneW = 40;
         int doneX = panelX + panelW - doneW - 4;
@@ -2394,7 +2394,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (tagInputBox != null && tagInputBox.isVisible()) {
             int inputW = panelW - 60;
             if (isHovering(panelX + 4, inputY, inputW, 14, (int) mx, (int) my)) {
-                tagInputBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+                ClientInput.mouseClicked(tagInputBox, mx, my, btn);
                 return true;
             }
         }
@@ -2596,7 +2596,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 nbtValueEditBox.setY(rowY + 1);
                 nbtValueEditBox.setWidth(colW - 4);
                 nbtValueEditBox.setVisible(true);
-                nbtValueEditBox.extractRenderState(g.raw(), mx, my, 0);
+                ClientInput.widget(g, nbtValueEditBox, mx, my, 0);
             } else {
                 int valColor;
                 if (isBool) {
@@ -2762,7 +2762,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
                 // Edit value
                 if (nbtEditingRuleIndex == ruleIdx) {
-                    nbtValueEditBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+                    ClientInput.mouseClicked(nbtValueEditBox, mx, my, btn);
                     return true;
                 }
                 commitNbtValueEditIfActive();
@@ -3422,7 +3422,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailIdInputBox.setX(idFieldX);
         detailIdInputBox.setY(slotY + 2);
         detailIdInputBox.setWidth(idFieldW);
-        detailIdInputBox.extractRenderState(g.raw(), mx, my, 0);
+        ClientInput.widget(g, detailIdInputBox, mx, my, 0);
 
         y = slotY + 22;
 
@@ -3482,7 +3482,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailBatchInputBox.setX(batchInputX);
         detailBatchInputBox.setY(y);
         detailBatchInputBox.setWidth(50);
-        detailBatchInputBox.extractRenderState(g.raw(), mx, my, 0);
+        ClientInput.widget(g, detailBatchInputBox, mx, my, 0);
         if (isFluidOrChemical) {
             g.drawString(font, "mB", batchInputX + 54, y + 3, cMuted(), false);
         }
@@ -3493,7 +3493,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailStockInputBox.setX(stockInputX);
         detailStockInputBox.setY(y);
         detailStockInputBox.setWidth(50);
-        detailStockInputBox.extractRenderState(g.raw(), mx, my, 0);
+        ClientInput.widget(g, detailStockInputBox, mx, my, 0);
         if (isFluidOrChemical) {
             g.drawString(font, "mB", stockInputX + 54, y + 3, cMuted(), false);
         }
@@ -3547,7 +3547,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             detailSlotMappingInputBox.setY(y);
             detailSlotMappingInputBox.setWidth(slotInputW);
             detailSlotMappingInputBox.setHint(Component.empty());
-            detailSlotMappingInputBox.extractRenderState(g.raw(), mx, my, 0);
+            ClientInput.widget(g, detailSlotMappingInputBox, mx, my, 0);
         }
     }
 
@@ -3589,7 +3589,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 detailNbtInputBox.setX(contentX);
                 detailNbtInputBox.setY(y);
                 detailNbtInputBox.active = true;
-                detailNbtInputBox.extractRenderState(g.raw(), mx, my, 0);
+                ClientInput.widget(g, detailNbtInputBox, mx, my, 0);
                 y += nbtH + 4;
             }
 
@@ -3679,7 +3679,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailNbtValueBox.setWidth(NBT_COL_VAL);
         detailNbtValueBox.setHeight(NBT_ROW_H);
         detailNbtValueBox.setVisible(true);
-        detailNbtValueBox.extractRenderState(g.raw(), mx, my, 0);
+        ClientInput.widget(g, detailNbtValueBox, mx, my, 0);
     }
 
     private void renderNbtTable(GuiGraphics g, int mx, int my, int tableX, int tableY, int tableW, int tableH) {
@@ -3806,7 +3806,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                         detailNbtValueBox.setWidth(NBT_COL_VAL);
                         detailNbtValueBox.setHeight(NBT_ROW_H);
                         detailNbtValueBox.setVisible(true);
-                        detailNbtValueBox.extractRenderState(g.raw(), mx, my, 0);
+                        ClientInput.widget(g, detailNbtValueBox, mx, my, 0);
                     } else {
                         String valDisplay = entry.valueDisplay();
                         String truncVal = font.plainSubstrByWidth(valDisplay, NBT_COL_VAL - 4);
@@ -4004,22 +4004,22 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (detailIdInputBox.isMouseOver(mx, my)) {
             detailIdInputBox.setFocused(true);
-            detailIdInputBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+            ClientInput.mouseClicked(detailIdInputBox, mx, my, btn);
             return true;
         }
         if (detailBatchInputBox.isMouseOver(mx, my)) {
             detailBatchInputBox.setFocused(true);
-            detailBatchInputBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+            ClientInput.mouseClicked(detailBatchInputBox, mx, my, btn);
             return true;
         }
         if (detailStockInputBox.isMouseOver(mx, my)) {
             detailStockInputBox.setFocused(true);
-            detailStockInputBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+            ClientInput.mouseClicked(detailStockInputBox, mx, my, btn);
             return true;
         }
         if (!isFluidOrChemical && detailSlotMappingInputBox.isMouseOver(mx, my)) {
             detailSlotMappingInputBox.setFocused(true);
-            detailSlotMappingInputBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+            ClientInput.mouseClicked(detailSlotMappingInputBox, mx, my, btn);
             return true;
         }
         return true;
@@ -4081,7 +4081,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (detailNbtRawMode) {
             if (detailNbtInputBox.active) {
-                detailNbtInputBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+                ClientInput.mouseClicked(detailNbtInputBox, mx, my, btn);
             }
 
             int nbtH = panelY + panelH - y - 20;
@@ -4157,7 +4157,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                         detailNbtValueBox.setValue(getBuiltinDefault(builtinEditId));
                     }
                     detailNbtValueBox.setFocused(true);
-                    detailNbtValueBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+                    ClientInput.mouseClicked(detailNbtValueBox, mx, my, btn);
                     return true;
                 }
                 return true;
@@ -4221,7 +4221,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 }
                 nbtTableEditingRow = entryIdx;
                 detailNbtValueBox.setFocused(true);
-                detailNbtValueBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+                ClientInput.mouseClicked(detailNbtValueBox, mx, my, btn);
                 return true;
             }
 
@@ -4417,7 +4417,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private boolean handleDetailPageKey(int key, int scan, int modifiers) {
         if (detailNbtPageOpen) {
             if (detailNbtInputBox.isFocused()) {
-                detailNbtInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
+                ClientInput.keyPressed(detailNbtInputBox, key, scan, modifiers);
                 return true;
             }
             if (detailNbtValueBox.isFocused()) {
@@ -4429,7 +4429,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     }
                     return true;
                 }
-                detailNbtValueBox.keyPressed(ClientInput.key(key, scan, modifiers));
+                ClientInput.keyPressed(detailNbtValueBox, key, scan, modifiers);
                 return true;
             }
             return true;
@@ -4459,19 +4459,19 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         }
 
         if (detailIdInputBox.isFocused()) {
-            detailIdInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
+            ClientInput.keyPressed(detailIdInputBox, key, scan, modifiers);
             return true;
         }
         if (detailBatchInputBox.isFocused()) {
-            detailBatchInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
+            ClientInput.keyPressed(detailBatchInputBox, key, scan, modifiers);
             return true;
         }
         if (detailStockInputBox.isFocused()) {
-            detailStockInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
+            ClientInput.keyPressed(detailStockInputBox, key, scan, modifiers);
             return true;
         }
         if (detailSlotMappingInputBox.isFocused()) {
-            detailSlotMappingInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
+            ClientInput.keyPressed(detailSlotMappingInputBox, key, scan, modifiers);
             return true;
         }
 

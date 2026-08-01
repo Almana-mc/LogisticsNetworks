@@ -8,11 +8,7 @@ import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.network.SetWrenchColorsPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
+import me.almana.logisticsnetworks.client.LegacyScreen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -20,7 +16,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
-public class WrenchColorScreen extends Screen {
+public class WrenchColorScreen extends LegacyScreen {
 
     private static final Identifier CASE_TEXTURE = Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID,
             "textures/item/wrench_case.png");
@@ -98,9 +94,8 @@ public class WrenchColorScreen extends Screen {
     private int previewY() { return svY() + (SQ_H + 6 + HUE_H - PREVIEW) / 2 + PREVIEW / 8; }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor raw, int mx, int my, float pt) {
-        super.extractRenderState(raw, mx, my, pt);
-        GuiGraphics g = new GuiGraphics(raw);
+    public void render(GuiGraphics g, int mx, int my, float pt) {
+        renderSuper(g, mx, my, pt);
         Theme t = ThemeState.active();
 
         ThemePaint.window(g, x, y, GUI_W, guiHeight(), t);
@@ -205,11 +200,9 @@ public class WrenchColorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        double mx = event.x();
-        double my = event.y();
-        if (event.button() != 0) {
-            return super.mouseClicked(event, doubleClick);
+    public boolean mouseClicked(double mx, double my, int button) {
+        if (button != 0) {
+            return super.mouseClicked(mx, my, button);
         }
 
         int half = (SQ - 4) / 2;
@@ -285,30 +278,29 @@ public class WrenchColorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
         if (drag == 0) {
-            updateSv(event.x(), event.y());
+            updateSv(mx, my);
             return true;
         }
         if (drag == 1) {
-            updateHue(event.x());
+            updateHue(mx);
             return true;
         }
-        return super.mouseDragged(event, dx, dy);
+        return super.mouseDragged(mx, my, button, dx, dy);
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
+    public boolean mouseReleased(double mx, double my, int button) {
         if (drag != -1) {
             drag = -1;
             return true;
         }
-        return super.mouseReleased(event);
+        return super.mouseReleased(mx, my, button);
     }
 
     @Override
-    public boolean charTyped(CharacterEvent event) {
-        char c = (char) event.codepoint();
+    public boolean charTyped(char c, int modifiers) {
         if (!hexFocused || hex.length() >= 6) {
             return hexFocused;
         }
@@ -320,8 +312,7 @@ public class WrenchColorScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
-        int key = event.key();
+    public boolean keyPressed(int key, int scanCode, int modifiers) {
         if (hexFocused) {
             if (key == 259 && !hex.isEmpty()) {
                 hex = hex.substring(0, hex.length() - 1);
@@ -338,7 +329,7 @@ public class WrenchColorScreen extends Screen {
             }
             return true;
         }
-        return super.keyPressed(event);
+        return super.keyPressed(key, scanCode, modifiers);
     }
 
     private void syncFromHex() {

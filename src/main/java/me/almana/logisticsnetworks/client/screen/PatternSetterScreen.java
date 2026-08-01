@@ -91,7 +91,7 @@ public class PatternSetterScreen extends LegacyContainerScreen<PatternSetterMenu
             return true;
         }
         if (multiplierField != null && multiplierField.isFocused()) {
-            return multiplierField.keyPressed(ClientInput.key(key, scan, modifiers));
+            return ClientInput.keyPressed(multiplierField, key, scan, modifiers);
         }
         return true;
     }

@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.client.screen;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.client.GuiGraphics;
+import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.DefaultNodeVisibilitySync;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
@@ -10,17 +11,15 @@ import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.client.theme.Themes;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig.TierLimits;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import me.almana.logisticsnetworks.client.LegacyScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
-public class ModConfigScreen extends Screen {
+public class ModConfigScreen extends LegacyScreen {
 
     private static final int GUI_WIDTH = 360;
     private static final int GUI_HEIGHT = 230;
@@ -265,7 +264,7 @@ public class ModConfigScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         g.fill(x0 + 4, y0 + 4, x0 + GUI_WIDTH + 4, y0 + GUI_HEIGHT + 4, COL_SHADOW);
         g.fill(x0 + 3, y0 + 3, x0 + GUI_WIDTH + 3, y0 + GUI_HEIGHT + 3, COL_SHADOW_SOFT);
 
@@ -278,10 +277,10 @@ public class ModConfigScreen extends Screen {
         g.fill(x0 + 3, y0 + 5, x0 + 5, y0 + GUI_HEIGHT - 5, COL_VIGNETTE);
         g.fill(x0 + GUI_WIDTH - 5, y0 + 5, x0 + GUI_WIDTH - 3, y0 + GUI_HEIGHT - 5, COL_VIGNETTE);
 
-        g.outline(x0, y0, GUI_WIDTH, GUI_HEIGHT, COL_BORDER);
+        g.renderOutline(x0, y0, GUI_WIDTH, GUI_HEIGHT, COL_BORDER);
 
         int titleW = font.width(title);
-        g.text(font, title, x0 + (GUI_WIDTH - titleW) / 2, y0 + 5, COL_INK_TITLE, false);
+        g.drawString(font, title, x0 + (GUI_WIDTH - titleW) / 2, y0 + 5, COL_INK_TITLE, false);
 
         g.fill(x0 + 8, y0 + 16, x0 + GUI_WIDTH - 8, y0 + 17, COL_BORDER);
 
@@ -298,7 +297,7 @@ public class ModConfigScreen extends Screen {
             case UPGRADES -> renderUpgradesTab(g, contentX, contentY, contentW, mouseX, mouseY);
         }
 
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        renderSuper(g, mouseX, mouseY, partialTick);
 
         renderEditBox(g, backoffMaxTicksBox);
         renderEditBox(g, maxRenderedNodesBox);
@@ -311,18 +310,18 @@ public class ModConfigScreen extends Screen {
         if (!canEditServerConfig && (currentTab == Tab.COMMON || currentTab == Tab.UPGRADES)) {
             int tipH = GUI_HEIGHT - 60;
             if (mouseX >= contentX && mouseX < contentX + contentW && mouseY >= contentY && mouseY < contentY + tipH) {
-                g.setComponentTooltipForNextFrame(font, List.of(TEXT_NO_PERMISSION), mouseX, mouseY);
+                g.renderComponentTooltip(font, List.of(TEXT_NO_PERMISSION), mouseX, mouseY);
             }
         }
     }
 
-    private void renderEditBox(GuiGraphicsExtractor g, EditBox box) {
+    private void renderEditBox(GuiGraphics g, EditBox box) {
         if (box == null) return;
         String value = box.getValue();
         int textX = box.getX();
         int textY = box.getY() + (box.getHeight() - 8) / 2;
 
-        g.text(font, value, textX, textY, COL_INK, false);
+        g.drawString(font, value, textX, textY, COL_INK, false);
 
         if (box.isFocused() && (System.currentTimeMillis() / 500) % 2 == 0) {
             int cursorPos = Math.min(box.getCursorPosition(), value.length());
@@ -331,7 +330,7 @@ public class ModConfigScreen extends Screen {
         }
     }
 
-    private void renderTabs(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+    private void renderTabs(GuiGraphics g, int mouseX, int mouseY) {
         int tabW = 80;
         int tabH = 14;
         int totalTabW = TABS.length * tabW + (TABS.length - 1) * 4;
@@ -351,15 +350,15 @@ public class ModConfigScreen extends Screen {
                 g.fill(tx, tabY, tx + 1, tabY + tabH, COL_BORDER);
                 g.fill(tx + tabW - 1, tabY, tx + tabW, tabY + tabH, COL_BORDER);
             } else {
-                g.outline(tx, tabY, tabW, tabH, COL_BORDER);
+                g.renderOutline(tx, tabY, tabW, tabH, COL_BORDER);
             }
 
             int textColor = active ? COL_INK : COL_INK_FADED;
-            g.text(font, TAB_LABELS[i], tx + (tabW - font.width(TAB_LABELS[i])) / 2, tabY + 3, textColor, false);
+            g.drawString(font, TAB_LABELS[i], tx + (tabW - font.width(TAB_LABELS[i])) / 2, tabY + 3, textColor, false);
         }
     }
 
-    private void renderCommonTab(GuiGraphicsExtractor g, int cx, int cy, int cw, int mx, int my) {
+    private void renderCommonTab(GuiGraphics g, int cx, int cy, int cw, int mx, int my) {
         boolean locked = !canEditServerConfig;
         int y = cy;
 
@@ -368,9 +367,9 @@ public class ModConfigScreen extends Screen {
         y = renderCheckbox(g, cx, y, cw, TEXT_NETWORK_TICKING, pendingNetworkTicking, mx, my, locked);
 
         int labelColor = locked ? COL_INK_LOCKED : COL_INK;
-        g.text(font, TEXT_BACKOFF_TICKS, cx, cy + 64, labelColor, false);
+        g.drawString(font, TEXT_BACKOFF_TICKS, cx, cy + 64, labelColor, false);
         if (locked) {
-            g.text(font, String.valueOf(pendingBackoffMaxTicks), cx + 130, cy + 63, COL_INK_LOCKED, false);
+            g.drawString(font, String.valueOf(pendingBackoffMaxTicks), cx + 130, cy + 63, COL_INK_LOCKED, false);
         } else {
             renderUnderline(g, cx + 130, cy + 60 + 14, 60);
         }
@@ -383,26 +382,26 @@ public class ModConfigScreen extends Screen {
         renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_SOURCE, pendingBackoffSource, mx, my, locked);
     }
 
-    private void renderClientTab(GuiGraphicsExtractor g, int cx, int cy, int cw, int mx, int my) {
+    private void renderClientTab(GuiGraphics g, int cx, int cy, int cw, int mx, int my) {
         renderCheckbox(g, cx, cy, cw, TEXT_DEFAULT_NODE_VISIBILITY, pendingDefaultNodeVisibility, mx, my, false);
 
-        g.text(font, TEXT_MAX_RENDERED, cx, cy + 27, COL_INK, false);
+        g.drawString(font, TEXT_MAX_RENDERED, cx, cy + 27, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 24 + 14, 80);
 
-        g.text(font, TEXT_MAX_VISIBLE, cx, cy + 47, COL_INK, false);
+        g.drawString(font, TEXT_MAX_VISIBLE, cx, cy + 47, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 44 + 14, 80);
 
         renderCheckbox(g, cx, cy + 64, cw, TEXT_CONNECTED_NODE_TEXTURES, pendingConnectedNodeTextures, mx, my, false);
 
         int themeY = cy + 88;
-        g.text(font, Component.translatable("gui.logisticsnetworks.config.client.theme"), cx, themeY, COL_INK, false);
+        g.drawString(font, Component.translatable("gui.logisticsnetworks.config.client.theme"), cx, themeY, COL_INK, false);
 
         int cols = 4;
         int swatchGap = 4;
         int swatchW = (cw - (cols - 1) * swatchGap) / cols;
         int swatchH = 22;
         int startY = themeY + 12;
-        GuiGraphics graphics = new GuiGraphics(g);
+        GuiGraphics graphics = g;
         Theme frame = ThemeState.active();
         for (int i = 0; i < Themes.ALL.size(); i++) {
             Theme preview = Themes.ALL.get(i);
@@ -416,16 +415,16 @@ public class ModConfigScreen extends Screen {
             int fg = active ? 0xFF000000 : (hovered ? COL_INK : COL_INK_FADED);
             ThemePaint.drawCentered(graphics, font, preview.label(), sx + swatchW / 2, sy + 13, fg);
             if (active) {
-                g.outline(sx - 1, sy - 1, swatchW + 2, swatchH + 2, COL_BORDER);
+                g.renderOutline(sx - 1, sy - 1, swatchW + 2, swatchH + 2, COL_BORDER);
             }
         }
 
         renderCheckbox(g, cx, cy + 152, cw, TEXT_COMPUTER_CLASSIC, pendingComputerClassic, mx, my, false);
     }
 
-    private void renderVisualsTab(GuiGraphicsExtractor g, int cx, int cy, int cw, int mx, int my) {
+    private void renderVisualsTab(GuiGraphics g, int cx, int cy, int cw, int mx, int my) {
         renderCheckbox(g, cx, cy, cw, TEXT_SHOW_TRANSFER_VISUALS, pendingShowTransferVisuals, mx, my, false);
-        g.text(font, TEXT_MAX_TRANSFER_VISUALS, cx, cy + 27, COL_INK, false);
+        g.drawString(font, TEXT_MAX_TRANSFER_VISUALS, cx, cy + 27, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 38, 80);
     }
 
@@ -474,7 +473,7 @@ public class ModConfigScreen extends Screen {
         return false;
     }
 
-    private void renderUpgradesTab(GuiGraphicsExtractor g, int cx, int cy, int cw, int mx, int my) {
+    private void renderUpgradesTab(GuiGraphics g, int cx, int cy, int cw, int mx, int my) {
         boolean locked = !canEditServerConfig;
         int y = cy;
         for (int tier = 0; tier < 5; tier++) {
@@ -487,7 +486,7 @@ public class ModConfigScreen extends Screen {
 
             int tierTextColor = locked ? COL_INK_LOCKED : (expanded ? COL_INK : COL_INK_DIM);
             String arrow = expanded ? "\u25BC " : "\u25B6 ";
-            g.text(font, arrow + TIER_LABELS[tier].getString(), cx + 4, y + 4, tierTextColor, false);
+            g.drawString(font, arrow + TIER_LABELS[tier].getString(), cx + 4, y + 4, tierTextColor, false);
             y += 18;
 
             if (expanded) {
@@ -500,9 +499,9 @@ public class ModConfigScreen extends Screen {
                     int lx = cx + 4 + col * (colW + 12);
                     int ly = y + row * 22 + 3;
                     int fieldColor = locked ? COL_INK_LOCKED : COL_INK_DIM;
-                    g.text(font, FIELD_LABELS[i], lx, ly, fieldColor, false);
+                    g.drawString(font, FIELD_LABELS[i], lx, ly, fieldColor, false);
                     if (locked) {
-                        g.text(font, String.valueOf(vals[i]), lx + 80, ly, COL_INK_LOCKED, false);
+                        g.drawString(font, String.valueOf(vals[i]), lx + 80, ly, COL_INK_LOCKED, false);
                     } else {
                         renderUnderline(g, lx + 80, ly + 14, 80);
                     }
@@ -512,7 +511,7 @@ public class ModConfigScreen extends Screen {
         }
     }
 
-    private int renderCheckbox(GuiGraphicsExtractor g, int cx, int y, int cw, Component label, boolean value, int mx, int my, boolean locked) {
+    private int renderCheckbox(GuiGraphics g, int cx, int y, int cw, Component label, boolean value, int mx, int my, boolean locked) {
         int boxX = cx + cw - 14;
         int boxY = y + 2;
         int boxSize = 9;
@@ -521,9 +520,9 @@ public class ModConfigScreen extends Screen {
         int boxColor = locked ? COL_INK_LOCKED : COL_INK_DIM;
         int checkColor = locked ? COL_INK_LOCKED : COL_INK;
 
-        g.text(font, label, cx, y + 3, labelColor, false);
+        g.drawString(font, label, cx, y + 3, labelColor, false);
 
-        g.outline(boxX, boxY, boxSize, boxSize, boxColor);
+        g.renderOutline(boxX, boxY, boxSize, boxSize, boxColor);
         g.fill(boxX + 1, boxY + 1, boxX + boxSize - 1, boxY + boxSize - 1, 0xFFEDD9B5);
 
         if (value) {
@@ -537,15 +536,12 @@ public class ModConfigScreen extends Screen {
         return y + 18;
     }
 
-    private void renderUnderline(GuiGraphicsExtractor g, int x, int y, int w) {
+    private void renderUnderline(GuiGraphics g, int x, int y, int w) {
         g.fill(x, y, x + w, y + 1, COL_INK_DIM);
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        double mouseX = event.x();
-        double mouseY = event.y();
-        int button = event.button();
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         EditBox prev = findFocusedEditBox();
 
         if (button == 0) {
@@ -576,7 +572,7 @@ public class ModConfigScreen extends Screen {
             }
         }
 
-        boolean result = super.mouseClicked(event, doubleClick);
+        boolean result = super.mouseClicked(mouseX, mouseY, button);
 
         EditBox now = findFocusedEditBox();
         if (now != null && now != prev) {
@@ -777,8 +773,7 @@ public class ModConfigScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
-        int keyCode = event.key();
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         EditBox focused = findFocusedEditBox();
         if (focused != null) {
             if (keyCode == 256) {
@@ -790,13 +785,13 @@ public class ModConfigScreen extends Screen {
                 focused.setFocused(false);
                 return true;
             }
-            return focused.keyPressed(event);
+            return ClientInput.keyPressed(focused, keyCode, scanCode, modifiers);
         }
         if (keyCode == 256) {
             save();
             return true;
         }
-        return super.keyPressed(event);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private EditBox findFocusedEditBox() {

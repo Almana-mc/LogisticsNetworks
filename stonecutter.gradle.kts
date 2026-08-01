@@ -14,6 +14,14 @@ stonecutter parameters {
         replace("Identifier", "ResourceLocation")
     }
 
+    // Pre-26 vanilla GuiGraphics already exposes the method set the screens are
+    // written against, so the 26.x wrapper collapses to the vanilla type
+    replacements.string(current.parsed < "26") {
+        replace(
+            "me.almana.logisticsnetworks.client.GuiGraphics",
+            "net.minecraft.client.gui.GuiGraphics")
+    }
+
     // 26.x split the client half of PacketDistributor into its own class
     replacements.string(current.parsed < "26") {
         replace(

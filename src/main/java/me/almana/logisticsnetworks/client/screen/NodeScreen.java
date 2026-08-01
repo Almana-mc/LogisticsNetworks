@@ -1865,7 +1865,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             if (key == 257 || key == 335) {
                 stopChannelNameEdit(true);
             } else {
-                channelNameEditBox.keyPressed(ClientInput.key(key, scan, modifiers));
+                ClientInput.keyPressed(channelNameEditBox, key, scan, modifiers);
             }
             return true;
         }
@@ -1874,7 +1874,7 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
                 String val = labelEditBox.getValue().trim();
                 commitLabelChange(val);
             } else {
-                labelEditBox.keyPressed(ClientInput.key(key, scan, modifiers));
+                ClientInput.keyPressed(labelEditBox, key, scan, modifiers);
             }
             return true;
         }
@@ -1882,14 +1882,14 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             if (key == 257 || key == 335)
                 stopNumericEdit(true);
             else
-                numericEditBox.keyPressed(ClientInput.key(key, scan, modifiers));
+                ClientInput.keyPressed(numericEditBox, key, scan, modifiers);
             return true;
         }
         if (networkNameField != null && networkNameField.isFocused()) {
             if (key == 257 || key == 335)
                 networkNameField.setFocused(false);
             else
-                networkNameField.keyPressed(ClientInput.key(key, scan, modifiers));
+                ClientInput.keyPressed(networkNameField, key, scan, modifiers);
             return true;
         }
         return true;
@@ -1901,18 +1901,18 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
             return editor.charTyped(ch);
         }
         if (channelNameEditing && channelNameEditBox != null) {
-            return channelNameEditBox.charTyped(ClientInput.character(ch));
+            return ClientInput.charTyped(channelNameEditBox, ch);
         }
         if (labelPickerOpen && labelEditBox != null) {
-            return labelEditBox.charTyped(ClientInput.character(ch));
+            return ClientInput.charTyped(labelEditBox, ch);
         }
         if (editingRow != -1 && numericEditBox != null) {
             if (Character.isDigit(ch) || ch == '-')
-                return numericEditBox.charTyped(ClientInput.character(ch));
+                return ClientInput.charTyped(numericEditBox, ch);
             return true;
         }
         if (networkNameField != null && networkNameField.isFocused()) {
-            return networkNameField.charTyped(ClientInput.character(ch));
+            return ClientInput.charTyped(networkNameField, ch);
         }
         return super.charTyped(ch, modifiers);
     }

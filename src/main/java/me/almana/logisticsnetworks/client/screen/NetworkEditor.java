@@ -221,7 +221,7 @@ public class NetworkEditor {
 
     public boolean charTyped(char c) {
         if (nameField.isFocused()) {
-            return nameField.charTyped(ClientInput.character(c));
+            return ClientInput.charTyped(nameField, c);
         }
         if (!hexFocused || hex.length() >= 6) {
             return hexFocused;
@@ -242,7 +242,7 @@ public class NetworkEditor {
             if (key == 256) {
                 return false;
             }
-            nameField.keyPressed(ClientInput.key(key, scan, modifiers));
+            ClientInput.keyPressed(nameField, key, scan, modifiers);
             return true;
         }
         if (!hexFocused) {

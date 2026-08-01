@@ -8,6 +8,10 @@ final class MassPlacementInventoryAccess {
     }
 
     static int selectedSlot(Inventory inventory) {
+        //? if <26 {
+        /*return inventory.selected;
+        *///?} else {
         return inventory.getSelectedSlot();
+        //?}
     }
 }
