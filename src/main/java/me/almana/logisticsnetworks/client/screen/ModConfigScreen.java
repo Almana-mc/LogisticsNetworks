@@ -268,6 +268,19 @@ public class ModConfigScreen extends LegacyScreen {
         }
     }
 
+    // the panel is its own backdrop; below 26 renderSuper would blur over it
+    //? if forge {
+    /*@Override
+    public void renderBackground(GuiGraphics g) {
+    }
+    *///?}
+
+    //? if >=1.21 && <26 {
+    /*@Override
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    }
+    *///?}
+
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         g.fill(x0 + 4, y0 + 4, x0 + GUI_WIDTH + 4, y0 + GUI_HEIGHT + 4, COL_SHADOW);
