@@ -220,7 +220,7 @@ public class LogisticsNodeEntity extends Entity {
 
         BlockPos attached = getAttachedPos();
         if (!attached.equals(BlockPos.ZERO)) {
-            Vec3 target = Vec3.atCenterOf(attached);
+            Vec3 target = Vec3.atBottomCenterOf(attached);
             if (distanceToSqr(target) > 0.001) {
                 setPos(target);
             }
