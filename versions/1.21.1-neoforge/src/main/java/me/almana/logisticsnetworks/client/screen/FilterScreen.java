@@ -395,7 +395,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         if (detailEditSlot >= 0) {
+            this.renderBackground(g, mx, my, pt);
+            this.renderBg(g, pt, mx, my);
             return;
+        }
+
+        // sub-modes suppress the vanilla slot hover
+        if (tagEditSlot >= 0 || nbtEditSlot >= 0) {
+            super.render(g, -1, -1, pt);
+        } else {
+            super.render(g, mx, my, pt);
         }
 
         if (renderClipboardTooltip(g, mx, my)) {
