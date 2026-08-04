@@ -1,4 +1,5 @@
-package me.almana.logisticsnetworks.client.model;
+//? if <26 {
+/*package me.almana.logisticsnetworks.client.model;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -104,3 +105,5 @@ public class JsonModelLoader {
         return PartPose.offset(px, py, pz);
     }
 }
+
+*///?}

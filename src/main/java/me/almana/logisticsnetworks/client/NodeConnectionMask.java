@@ -1,4 +1,5 @@
-package me.almana.logisticsnetworks.client;
+//? if <26 {
+/*package me.almana.logisticsnetworks.client;
 
 import net.minecraft.core.Direction;
 
@@ -59,3 +60,5 @@ public final class NodeConnectionMask {
         throw new IllegalArgumentException("Unsupported corner pair");
     }
 }
+
+*///?}
