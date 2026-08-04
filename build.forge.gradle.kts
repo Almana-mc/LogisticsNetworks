@@ -139,6 +139,10 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 }
 
+tasks.named<Jar>("jar") {
+    manifest.attributes["MixinConfigs"] = "logisticsnetworks.mixins.json"
+}
+
 tasks.named<ProcessResources>("processResources") {
     val replaceProperties = mapOf(
         "minecraft_version" to minecraft_version,

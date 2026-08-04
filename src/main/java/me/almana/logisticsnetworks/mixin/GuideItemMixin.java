@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.mixin;
 
 import guideme.internal.item.GuideItem;
+//? if >=26
 import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
@@ -14,6 +15,13 @@ public abstract class GuideItemMixin extends Item {
         super(null);
     }
 
+    //? if <26 {
+    /*@Override
+    public String getCreatorModId(ItemStack stack) {
+        Identifier guideId = GuideItem.getGuideId(stack);
+        return guideId == null ? super.getCreatorModId(stack) : guideId.getNamespace();
+    }
+    *///?} else {
     @Override
     public String getCreatorModId(HolderLookup.Provider registries, ItemStack stack) {
         Identifier guideId = GuideItem.getGuideId(stack);
@@ -22,4 +30,5 @@ public abstract class GuideItemMixin extends Item {
         }
         return super.getCreatorModId(registries, stack);
     }
+    //?}
 }
