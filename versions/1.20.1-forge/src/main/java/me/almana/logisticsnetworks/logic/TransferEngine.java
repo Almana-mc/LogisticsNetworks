@@ -4,10 +4,8 @@ import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.filter.AmountFilterData;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
-import me.almana.logisticsnetworks.filter.SlotFilterData;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
@@ -514,7 +512,7 @@ public class TransferEngine {
                     importFilters,
                     target.channel.getFilterMode(),
                     collectAmountConstraints(exportFilters, importFilters),
-                    FilterLogic.hasConfiguredItemNbtFilter(importFilters),
+                    FilterLogic.hasConfiguredItemNbtFilter(importFilters, null),
                     targetAllowedSlots));
         }
         if (!anyReachable)
@@ -764,7 +762,7 @@ public class TransferEngine {
 
         int remaining = limit;
         FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
-        boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters);
+        boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, null);
         boolean hasAnyImportNbtFilter = false;
         for (ItemTransferTarget target : targets) {
             if (target.hasItemNbtFilter()) {

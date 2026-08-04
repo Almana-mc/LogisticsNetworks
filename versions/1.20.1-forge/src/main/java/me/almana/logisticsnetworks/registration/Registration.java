@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
+import me.almana.logisticsnetworks.item.LegacyFilterItem;
 import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
 import me.almana.logisticsnetworks.item.ModFilterItem;
@@ -99,6 +100,12 @@ public class Registration {
         public static final RegistryObject<NameFilterItem> NAME_FILTER = ITEMS.register("name_filter",
                         () -> new NameFilterItem(new Item.Properties()));
 
+        public static final RegistryObject<LegacyFilterItem> AMOUNT_FILTER = legacyFilter(LegacyFilterItem.Kind.AMOUNT);
+        public static final RegistryObject<LegacyFilterItem> DURABILITY_FILTER = legacyFilter(LegacyFilterItem.Kind.DURABILITY);
+        public static final RegistryObject<LegacyFilterItem> NBT_FILTER = legacyFilter(LegacyFilterItem.Kind.NBT);
+        public static final RegistryObject<LegacyFilterItem> SLOT_FILTER = legacyFilter(LegacyFilterItem.Kind.SLOT);
+        public static final RegistryObject<LegacyFilterItem> TAG_FILTER = legacyFilter(LegacyFilterItem.Kind.TAG);
+
         public static final RegistryObject<NodeUpgradeItem> IRON_UPGRADE = ITEMS.register("iron_upgrade",
                         () -> new NodeUpgradeItem(new Item.Properties(), 16, 1_000, 10_000, 10));
         public static final RegistryObject<NodeUpgradeItem> GOLD_UPGRADE = ITEMS.register("gold_upgrade",
@@ -175,6 +182,10 @@ public class Registration {
                 return item instanceof BaseFilterItem
                                 || item instanceof ModFilterItem
                                 || item instanceof NameFilterItem;
+        }
+
+        private static RegistryObject<LegacyFilterItem> legacyFilter(LegacyFilterItem.Kind kind) {
+                return ITEMS.register(kind.id(), () -> new LegacyFilterItem(new Item.Properties(), kind));
         }
 
         public static void init(IEventBus modEventBus) {

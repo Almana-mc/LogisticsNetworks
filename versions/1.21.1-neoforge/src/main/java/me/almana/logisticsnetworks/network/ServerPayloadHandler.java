@@ -451,25 +451,6 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleModifyFilterTag(ModifyFilterTagPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            Player player = (Player) context.player();
-            ItemStack filterStack = findOpenFilterStack(player, TagFilterData::isTagFilterItem);
-            if (TagFilterData.isTagFilterItem(filterStack)) {
-                String normalizedTag = FilterTagUtil.normalizeTag(payload.tag());
-                boolean changed = normalizedTag != null
-                        && (payload.remove() ? TagFilterData.removeTagFilter(filterStack, normalizedTag)
-                                : TagFilterData.addTagFilter(filterStack, normalizedTag));
-                if (changed) {
-                    player.getInventory().setChanged();
-                    if (player.containerMenu instanceof FilterMenu menu && menu.isTagMode()) {
-                        menu.broadcastChanges();
-                    }
-                }
-            }
-        });
-    }
-
     public static void handleModifyFilterMod(ModifyFilterModPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             Player player = (Player) context.player();
@@ -483,42 +464,6 @@ public class ServerPayloadHandler {
                         menu.broadcastChanges();
                     }
                 }
-            }
-        });
-    }
-
-    public static void handleModifyFilterNbt(ModifyFilterNbtPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            ServerPlayer player = (ServerPlayer) context.player();
-            if (player.containerMenu instanceof FilterMenu menu && menu.isNbtMode()) {
-                ItemStack filterStack = menu.getOpenedFilterStack(player);
-                if (NbtFilterData.isNbtFilter(filterStack)) {
-                    boolean changed = switch (ModifyFilterNbtPayload.Action.fromOrdinal(payload.actionOrdinal())) {
-                        case ADD_RULE -> {
-                            ItemStack extractor = menu.getExtractorItem();
-                            Tag selectedValue = NbtFilterData.resolvePathValue(extractor, payload.path(),
-                                    player.level().registryAccess());
-                            yield selectedValue != null
-                                    && NbtFilterData.addRule(filterStack, payload.path(),
-                                            NbtFilterData.Operator.EQUALS, selectedValue);
-                        }
-                        case TOGGLE_RULE -> NbtFilterData.toggleRuleEnabled(filterStack, payload.ruleIndex());
-                        case REMOVE_RULE -> NbtFilterData.removeRule(filterStack, payload.ruleIndex());
-                        case CYCLE_OPERATOR -> NbtFilterData.cycleRuleOperator(filterStack, payload.ruleIndex());
-                    };
-                    if (changed) {
-                        player.getInventory().setChanged();
-                        menu.broadcastChanges();
-                    }
-                }
-            }
-        });
-    }
-
-    public static void handleSetAmountFilterValue(SetAmountFilterValuePayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof FilterMenu menu && menu.isAmountMode()) {
-                menu.setAmountValue((Player) context.player(), payload.amount());
             }
         });
     }
@@ -811,27 +756,6 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleSetDurabilityFilterValue(SetDurabilityFilterValuePayload payload,
-            IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof FilterMenu menu && menu.isDurabilityMode()) {
-                menu.setDurabilityValue((Player) context.player(), payload.value());
-            }
-        });
-    }
-
-    public static void handleSetSlotFilterSlots(SetSlotFilterSlotsPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof FilterMenu menu && menu.isSlotMode()) {
-                boolean ok = menu.setSlotExpression((Player) context.player(), payload.expression());
-                if (!ok && context.player() instanceof ServerPlayer player) {
-                    player.displayClientMessage(
-                            Component.translatable("message.logisticsnetworks.filter.slot.invalid"), true);
-                }
-            }
-        });
-    }
-
     public static void handleSetFilterFluidEntry(SetFilterFluidEntryPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && !isSpecialMode(menu)) {
@@ -912,16 +836,9 @@ public class ServerPayloadHandler {
             ItemStack stack = serverPlayer.getInventory().getItem(slotIndex);
             if (stack.isEmpty() || !stack.is(ModTags.FILTERS))
                 return;
-            if (stack.getItem() instanceof NbtFilterItem)
-                return;
-
-            boolean isTag = stack.getItem() instanceof TagFilterItem;
-            boolean isAmount = stack.getItem() instanceof AmountFilterItem;
-            boolean isDurability = stack.getItem() instanceof DurabilityFilterItem;
             boolean isMod = stack.getItem() instanceof ModFilterItem;
-            boolean isSlot = stack.getItem() instanceof SlotFilterItem;
             boolean isName = stack.getItem() instanceof NameFilterItem;
-            boolean isSpecial = isTag || isAmount || isDurability || isMod || isSlot || isName;
+            boolean isSpecial = isMod || isName;
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
 
             serverPlayer.openMenu(new SimpleMenuProvider(
@@ -930,12 +847,12 @@ public class ServerPayloadHandler {
                         buf.writeVarInt(-1);
                         buf.writeVarInt(slotIndex);
                         buf.writeVarInt(slotCount);
-                        buf.writeBoolean(isTag);
-                        buf.writeBoolean(isAmount);
                         buf.writeBoolean(false);
-                        buf.writeBoolean(isDurability);
+                        buf.writeBoolean(false);
+                        buf.writeBoolean(false);
+                        buf.writeBoolean(false);
                         buf.writeBoolean(isMod);
-                        buf.writeBoolean(isSlot);
+                        buf.writeBoolean(false);
                         buf.writeBoolean(isName);
                     });
         });

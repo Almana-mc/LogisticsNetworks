@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "logisticsnetworks:item/nbt_filter"
+  }
+}

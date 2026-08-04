@@ -70,6 +70,14 @@ public final class NbtAccess {
         //?}
     }
 
+    public static int[] getIntArray(CompoundTag tag, String key) {
+        //? if <26 {
+        /*return tag.contains(key, Tag.TAG_INT_ARRAY) ? tag.getIntArray(key) : new int[0];
+        *///?} else {
+        return tag.getIntArray(key).orElse(new int[0]);
+        //?}
+    }
+
     public static void putUuid(CompoundTag tag, String key, UUID value) {
         //? if <26 {
         /*tag.putUUID(key, value);

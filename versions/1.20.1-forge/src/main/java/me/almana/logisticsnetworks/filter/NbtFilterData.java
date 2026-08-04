@@ -2,7 +2,6 @@ package me.almana.logisticsnetworks.filter;
 
 import me.almana.logisticsnetworks.util.ItemDataUtil;
 
-import me.almana.logisticsnetworks.item.NbtFilterItem;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
@@ -105,7 +104,7 @@ public final class NbtFilterData {
     }
 
     public static boolean isNbtFilter(ItemStack stack) {
-        return !stack.isEmpty() && stack.getItem() instanceof NbtFilterItem;
+        return false;
     }
 
     public static boolean isBlacklist(ItemStack stack) {

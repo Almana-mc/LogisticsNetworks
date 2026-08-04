@@ -20,7 +20,12 @@ public class ModItemTagProvider extends ItemTagsProvider {
                 Registration.MEDIUM_FILTER.get(),
                 Registration.BIG_FILTER.get(),
                 Registration.MOD_FILTER.get(),
-                Registration.NAME_FILTER.get());
+                Registration.NAME_FILTER.get(),
+                Registration.AMOUNT_FILTER.get(),
+                Registration.DURABILITY_FILTER.get(),
+                Registration.NBT_FILTER.get(),
+                Registration.SLOT_FILTER.get(),
+                Registration.TAG_FILTER.get());
 
         tag(ModTags.UPGRADES).add(
                 Registration.IRON_UPGRADE.get(),

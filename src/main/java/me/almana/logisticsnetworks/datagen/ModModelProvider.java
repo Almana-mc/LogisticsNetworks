@@ -42,6 +42,11 @@ public class ModModelProvider extends ModelProvider {
         for (Item item : flatItems) {
             itemModels.generateFlatItem(item, ModelTemplates.FLAT_ITEM);
         }
+        legacyFilter(itemModels, Registration.AMOUNT_FILTER.get());
+        legacyFilter(itemModels, Registration.DURABILITY_FILTER.get());
+        legacyFilter(itemModels, Registration.NBT_FILTER.get());
+        legacyFilter(itemModels, Registration.SLOT_FILTER.get());
+        legacyFilter(itemModels, Registration.TAG_FILTER.get());
 
         Identifier wrenchModel = ModelTemplates.TWO_LAYERED_ITEM.create(
                 ModelLocationUtils.getModelLocation(Registration.WRENCH.get()),
@@ -62,5 +67,14 @@ public class ModModelProvider extends ModelProvider {
 
         Identifier node = Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "item/logistics_node");
         itemModels.itemModelOutput.accept(Registration.LOGISTICS_NODE_ITEM.get(), ItemModelUtils.plainModel(node));
+    }
+
+    private static void legacyFilter(ItemModelGenerators itemModels, Item item) {
+        Identifier model = ModelTemplates.FLAT_ITEM.create(
+                ModelLocationUtils.getModelLocation(item),
+                TextureMapping.layer0(new Material(Identifier.fromNamespaceAndPath(
+                        LogisticsNetworks.MOD_ID, "item/small_filter"))),
+                itemModels.modelOutput);
+        itemModels.itemModelOutput.accept(item, ItemModelUtils.plainModel(model));
     }
 }

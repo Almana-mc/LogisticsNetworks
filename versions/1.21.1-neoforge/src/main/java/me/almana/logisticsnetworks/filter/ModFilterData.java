@@ -140,6 +140,37 @@ public final class ModFilterData {
         return !getModFilters(stack).isEmpty();
     }
 
+    public static boolean hasAnyMods(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return !view(stack, cache).mods().isEmpty();
+    }
+
+    public static FilterTargetType getTargetType(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return view(stack, cache).target();
+    }
+
+    public static boolean isBlacklist(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return view(stack, cache).blacklist();
+    }
+
+    public static boolean containsMod(ItemStack stack, ItemStack candidate,
+            @Nullable FilterItemData.ReadCache cache) {
+        return !candidate.isEmpty() && view(stack, cache).target() == FilterTargetType.ITEMS
+                && view(stack, cache).matchesNamespace(BuiltInRegistries.ITEM.getKey(candidate.getItem()));
+    }
+
+    public static boolean containsMod(ItemStack stack, FluidStack candidate,
+            @Nullable FilterItemData.ReadCache cache) {
+        return candidate != null && !candidate.isEmpty() && view(stack, cache).target() == FilterTargetType.FLUIDS
+                && view(stack, cache).matchesNamespace(BuiltInRegistries.FLUID.getKey(candidate.getFluid()));
+    }
+
+    public static boolean containsMod(ItemStack stack, String chemicalId,
+            @Nullable FilterItemData.ReadCache cache) {
+        return chemicalId != null && !chemicalId.isEmpty()
+                && view(stack, cache).target() == FilterTargetType.CHEMICALS
+                && view(stack, cache).matchesNamespace(ResourceLocation.tryParse(chemicalId));
+    }
+
     public static boolean addModFilter(ItemStack stack, String rawModId) {
         if (!isModFilter(stack))
             return false;

@@ -12,6 +12,7 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.fluids.FluidStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -132,6 +133,18 @@ public final class NameFilterData {
         return !getNameFilter(stack).isEmpty();
     }
 
+    public static boolean hasNameFilter(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return hasNameFilter(stack);
+    }
+
+    public static FilterTargetType getTargetType(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return getTargetType(stack);
+    }
+
+    public static boolean isBlacklist(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return isBlacklist(stack);
+    }
+
     public static boolean isValidRegex(String pattern) {
         return validateRegex(pattern).accepted();
     }
@@ -192,6 +205,11 @@ public final class NameFilterData {
         return false;
     }
 
+    public static boolean containsName(ItemStack filter, ItemStack candidate,
+            @Nullable FilterItemData.ReadCache cache) {
+        return containsName(filter, candidate);
+    }
+
     public static boolean containsName(ItemStack filter, FluidStack candidate) {
         if (candidate == null || candidate.isEmpty())
             return false;
@@ -211,6 +229,11 @@ public final class NameFilterData {
         return candidateName.length() <= MAX_CANDIDATE_LENGTH && pattern.matcher(candidateName).find();
     }
 
+    public static boolean containsName(ItemStack filter, FluidStack candidate,
+            @Nullable FilterItemData.ReadCache cache) {
+        return containsName(filter, candidate);
+    }
+
     public static boolean containsName(ItemStack filter, String chemicalId) {
         if (chemicalId == null || chemicalId.isEmpty())
             return false;
@@ -228,6 +251,11 @@ public final class NameFilterData {
         Component chemName = MekanismCompat.getChemicalTextComponent(chemicalId);
         String displayName = chemName != null ? chemName.getString() : chemicalId;
         return displayName.length() <= MAX_CANDIDATE_LENGTH && pattern.matcher(displayName).find();
+    }
+
+    public static boolean containsName(ItemStack filter, String chemicalId,
+            @Nullable FilterItemData.ReadCache cache) {
+        return containsName(filter, chemicalId);
     }
 
     private static ValidationError inspectSyntax(String expression) {
@@ -306,5 +334,3 @@ public final class NameFilterData {
         });
     }
 }
-
-

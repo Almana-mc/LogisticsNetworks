@@ -56,6 +56,7 @@ stonecutter parameters {
         replace(
             "net.neoforged.neoforge.network.PacketDistributor",
             "me.almana.logisticsnetworks.network.dist.PacketDistributor")
+        replace("net.neoforged.neoforge.fluids.FluidStack", "net.minecraftforge.fluids.FluidStack")
 
         // loader packages, identical types either side
         replace("net.neoforged.neoforge.server.ServerLifecycleHooks", "net.minecraftforge.server.ServerLifecycleHooks")

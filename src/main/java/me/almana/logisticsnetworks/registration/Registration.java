@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
+import me.almana.logisticsnetworks.item.LegacyFilterItem;
 import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
 import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
@@ -92,6 +93,12 @@ public class Registration {
                         id -> new ModFilterItem(itemProperties(id)));
         public static final DeferredItem<NameFilterItem> NAME_FILTER = ITEMS.register("name_filter",
                         id -> new NameFilterItem(itemProperties(id)));
+
+        public static final DeferredItem<LegacyFilterItem> AMOUNT_FILTER = legacyFilter(LegacyFilterItem.Kind.AMOUNT);
+        public static final DeferredItem<LegacyFilterItem> DURABILITY_FILTER = legacyFilter(LegacyFilterItem.Kind.DURABILITY);
+        public static final DeferredItem<LegacyFilterItem> NBT_FILTER = legacyFilter(LegacyFilterItem.Kind.NBT);
+        public static final DeferredItem<LegacyFilterItem> SLOT_FILTER = legacyFilter(LegacyFilterItem.Kind.SLOT);
+        public static final DeferredItem<LegacyFilterItem> TAG_FILTER = legacyFilter(LegacyFilterItem.Kind.TAG);
 
         public static final DeferredItem<NodeUpgradeItem> IRON_UPGRADE = ITEMS.register("iron_upgrade",
                         id -> new NodeUpgradeItem(itemProperties(id), 16, 1_000, 10_000, 10));
@@ -197,6 +204,10 @@ public class Registration {
         private static Item.Properties itemProperties(Identifier id) {
                 return new Item.Properties()
                                 .setId(ResourceKey.create(Registries.ITEM, id));
+        }
+
+        private static DeferredItem<LegacyFilterItem> legacyFilter(LegacyFilterItem.Kind kind) {
+                return ITEMS.register(kind.id(), id -> new LegacyFilterItem(itemProperties(id), kind));
         }
 
         private static Item.Properties blockItemProperties(Identifier id) {

@@ -11,6 +11,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -91,6 +92,30 @@ public final class ModFilterData {
 
     public static boolean hasAnyMods(ItemStack stack) {
         return !getModFilters(stack).isEmpty();
+    }
+
+    public static boolean hasAnyMods(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return hasAnyMods(stack);
+    }
+
+    public static FilterTargetType getTargetType(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return getTargetType(stack);
+    }
+
+    public static boolean isBlacklist(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return isBlacklist(stack);
+    }
+
+    public static boolean containsMod(ItemStack stack, ItemStack candidate, @Nullable FilterItemData.ReadCache cache) {
+        return containsMod(stack, candidate);
+    }
+
+    public static boolean containsMod(ItemStack stack, FluidStack candidate, @Nullable FilterItemData.ReadCache cache) {
+        return containsMod(stack, candidate);
+    }
+
+    public static boolean containsMod(ItemStack stack, String chemicalId, @Nullable FilterItemData.ReadCache cache) {
+        return containsMod(stack, chemicalId);
     }
 
     public static boolean addModFilter(ItemStack stack, String rawModId) {
@@ -242,7 +267,5 @@ public final class ModFilterData {
         });
     }
 }
-
-
 
 

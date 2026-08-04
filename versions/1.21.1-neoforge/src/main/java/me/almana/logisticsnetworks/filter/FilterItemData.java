@@ -41,6 +41,7 @@ public final class FilterItemData {
     private static final String KEY_DUR_VAL = "dur_val";
     private static final String KEY_NBT_RAW = "nbt_raw";
     private static final String KEY_SLOT_MAPPING = "slot_map";
+    private static final String KEY_SLOT_MAPPING_EXPR = "slot_map_expr";
     private static final String KEY_ENCHANTED = "enchanted";
     private static final String KEY_NBT_RULES = "nbt_rules";
     private static final String KEY_NBT_MATCH_ANY = "nbt_match_any";
@@ -53,7 +54,6 @@ public final class FilterItemData {
 
     public static final class ReadCache {
         private final IdentityHashMap<ItemStack, ItemFilterView> itemViews = new IdentityHashMap<>();
-        final IdentityHashMap<ItemStack, TagFilterData.View> tagViews = new IdentityHashMap<>();
         final IdentityHashMap<ItemStack, ModFilterData.View> modViews = new IdentityHashMap<>();
         final IdentityHashMap<ItemStack, NameFilterData.View> nameViews = new IdentityHashMap<>();
         final IdentityHashMap<ItemStack, NbtFilterData.View> nbtViews = new IdentityHashMap<>();
@@ -692,6 +692,18 @@ public final class FilterItemData {
     }
 
     public static String getEntrySlotMappingExpression(ItemStack stack, int slot) {
+        if (!isFilterItem(stack)) return "";
+        CompoundTag root = getRoot(stack);
+        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+        for (Tag t : list) {
+            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
+                String stored = entry.getString(KEY_SLOT_MAPPING_EXPR);
+                if (!stored.isEmpty()) {
+                    return stored;
+                }
+                break;
+            }
+        }
         int[] mapping = getEntrySlotMapping(stack, slot);
         if (mapping == null) return "";
         List<Integer> sorted = new ArrayList<>();
@@ -700,26 +712,42 @@ public final class FilterItemData {
     }
 
     public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots) {
+        setEntrySlotMapping(stack, slot, slots, null);
+    }
+
+    public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots,
+            @Nullable String expression) {
         if (!isFilterItem(stack)) return;
         if (slot < 0 || slot >= getCapacity(stack)) return;
 
+        boolean hasSlots = slots != null && slots.length > 0;
+        boolean hasExpression = expression != null && !expression.isEmpty();
         updateRoot(stack, root -> {
             ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
             for (Tag t : list) {
                 if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    if (slots != null && slots.length > 0) {
+                    if (hasSlots) {
                         entry.putIntArray(KEY_SLOT_MAPPING, slots);
+                        if (hasExpression) {
+                            entry.putString(KEY_SLOT_MAPPING_EXPR, expression);
+                        } else {
+                            entry.remove(KEY_SLOT_MAPPING_EXPR);
+                        }
                     } else {
                         entry.remove(KEY_SLOT_MAPPING);
+                        entry.remove(KEY_SLOT_MAPPING_EXPR);
                     }
                     root.put(KEY_ITEMS, list);
                     return;
                 }
             }
-            if (slots != null && slots.length > 0) {
+            if (hasSlots) {
                 CompoundTag entry = new CompoundTag();
                 entry.putInt(KEY_SLOT, slot);
                 entry.putIntArray(KEY_SLOT_MAPPING, slots);
+                if (hasExpression) {
+                    entry.putString(KEY_SLOT_MAPPING_EXPR, expression);
+                }
                 list.add(entry);
                 root.put(KEY_ITEMS, list);
             }
@@ -2225,16 +2253,15 @@ public final class FilterItemData {
 
     private static CompoundTag getRoot(ItemStack stack) {
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
-        return custom.get(KEY_ROOT) instanceof CompoundTag root ? root : new CompoundTag();
+        return LegacyFilterData.getCanonicalRoot(stack, custom);
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
-                    ? customTag.getCompound(KEY_ROOT)
-                    : new CompoundTag();
+            CompoundTag root = LegacyFilterData.getCanonicalRoot(stack, customTag);
 
             modifier.accept(root);
+            LegacyFilterData.removeLegacyRoot(stack, customTag);
 
             if (root.isEmpty()) {
                 customTag.remove(KEY_ROOT);

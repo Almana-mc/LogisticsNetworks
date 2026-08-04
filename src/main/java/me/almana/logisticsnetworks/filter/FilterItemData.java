@@ -2284,14 +2284,15 @@ public final class FilterItemData {
 
     private static CompoundTag getRoot(ItemStack stack) {
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
+        return LegacyFilterData.getCanonicalRoot(stack, custom);
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
+            CompoundTag root = LegacyFilterData.getCanonicalRoot(stack, customTag);
 
             modifier.accept(root);
+            LegacyFilterData.removeLegacyRoot(stack, customTag);
 
             if (root.isEmpty()) {
                 customTag.remove(KEY_ROOT);

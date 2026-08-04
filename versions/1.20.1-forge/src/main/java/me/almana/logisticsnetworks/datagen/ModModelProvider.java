@@ -27,6 +27,11 @@ public class ModModelProvider extends BlockStateProvider {
         itemModels().basicItem(Registration.BIG_FILTER.get());
         itemModels().basicItem(Registration.MOD_FILTER.get());
         itemModels().basicItem(Registration.NAME_FILTER.get());
+        legacyFilter("amount_filter");
+        legacyFilter("durability_filter");
+        legacyFilter("nbt_filter");
+        legacyFilter("slot_filter");
+        legacyFilter("tag_filter");
         itemModels().basicItem(Registration.IRON_UPGRADE.get());
         itemModels().basicItem(Registration.GOLD_UPGRADE.get());
         itemModels().basicItem(Registration.DIAMOND_UPGRADE.get());
@@ -35,5 +40,11 @@ public class ModModelProvider extends BlockStateProvider {
         itemModels().basicItem(Registration.MEKANISM_CHEMICAL_UPGRADE.get());
         itemModels().basicItem(Registration.ARS_SOURCE_UPGRADE.get());
         itemModels().basicItem(Registration.PATTERN_SETTER.get());
+    }
+
+    private void legacyFilter(String name) {
+        itemModels().getBuilder(name)
+                .parent(new ModelFile.UncheckedModelFile("item/generated"))
+                .texture("layer0", modLoc("item/small_filter"));
     }
 }

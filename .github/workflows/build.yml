@@ -88,6 +88,17 @@ jobs:
           mixin_level = os.environ["MIXIN_LEVEL"]
           resource_schema = os.environ["RESOURCE_SCHEMA"]
           minecraft = target.rsplit("-", 1)[0]
+          bootstrap = (Path("versions") / target / "src/main/java/me/almana/logisticsnetworks/network/NetworkHandler.java"
+                       if target == "1.20.1-forge"
+                       else Path("versions") / target / "src/main/java/me/almana/logisticsnetworks/LogisticsNetworks.java")
+          if target == "26.1.2-neoforge":
+              bootstrap = Path("src/main/java/me/almana/logisticsnetworks/LogisticsNetworks.java")
+          payload_count = sum(
+              line.strip().startswith(("registrar.playToServer(", "registrar.playToClient(",
+                                       "registerServer(", "registerClient("))
+              for line in bootstrap.read_text(encoding="utf-8").splitlines())
+          if payload_count != 52:
+              raise SystemExit(f"Expected 52 payload registrations, found {payload_count}")
           jar = Path("versions") / target / "build" / "libs" / f"logisticsnetworks-{target}-2.0.0.jar"
           if not jar.is_file():
               raise SystemExit(f"Missing artifact: {jar}")
@@ -101,9 +112,27 @@ jobs:
                   raise SystemExit("Jar contains metadata for another loader")
               if "assets/logisticsnetworks/lang/en_us.json" not in names:
                   raise SystemExit("Missing shared language resources")
+              legacy_ids = ("amount_filter", "durability_filter", "nbt_filter", "slot_filter", "tag_filter")
+              for legacy_id in legacy_ids:
+                  if f"assets/logisticsnetworks/models/item/{legacy_id}.json" not in names:
+                      raise SystemExit(f"Missing legacy filter model: {legacy_id}")
+              obsolete_classes = (
+                  "AmountFilterData", "SlotFilterData", "TagFilterData", "AmountFilterItem",
+                  "DurabilityFilterItem", "NbtFilterItem", "SlotFilterItem", "TagFilterItem",
+                  "ModifyFilterNbtPayload", "ModifyFilterTagPayload", "SetAmountFilterValuePayload",
+                  "SetDurabilityFilterValuePayload", "SetSlotFilterSlotsPayload")
+              if any(any(name.endswith(f"/{class_name}.class") for name in names)
+                     for class_name in obsolete_classes):
+                  raise SystemExit("Jar contains obsolete physical-filter implementation")
               descriptor = archive.read(metadata).decode("utf-8")
               if minecraft not in descriptor or 'version = "2.0.0"' not in descriptor:
                   raise SystemExit("Incorrect Minecraft or mod version metadata")
+              if metadata == "META-INF/neoforge.mods.toml" and 'config="logisticsnetworks.mixins.json"' not in descriptor.replace(" ", ""):
+                  raise SystemExit("NeoForge mixin config is not declared")
+              if metadata == "META-INF/mods.toml":
+                  manifest = archive.read("META-INF/MANIFEST.MF").decode("utf-8")
+                  if "MixinConfigs: logisticsnetworks.mixins.json" not in manifest:
+                      raise SystemExit("Forge mixin config is not declared")
               mixin = json.loads(archive.read("logisticsnetworks.mixins.json"))
               if mixin.get("compatibilityLevel") != mixin_level:
                   raise SystemExit("Incorrect mixin Java compatibility level")
@@ -118,6 +147,11 @@ jobs:
               for path in forbidden:
                   if any(name.startswith(f"data/logisticsnetworks/{path}") for name in names):
                       raise SystemExit(f"Resource path uses the wrong target schema: {path}")
+              filter_tag = ("data/logisticsnetworks/tags/items/filters.json" if resource_schema == "legacy"
+                            else "data/logisticsnetworks/tags/item/filters.json")
+              filter_values = set(json.loads(archive.read(filter_tag))["values"])
+              if not {f"logisticsnetworks:{legacy_id}" for legacy_id in legacy_ids}.issubset(filter_values):
+                  raise SystemExit("Legacy filter IDs are missing from the compatibility tag")
           PY
 
       - name: Upload artifact

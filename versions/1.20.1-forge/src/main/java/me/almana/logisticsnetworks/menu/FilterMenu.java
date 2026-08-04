@@ -240,34 +240,16 @@ public class FilterMenu extends AbstractContainerMenu {
     private void initSyncedData(ItemStack stack) {
         HolderLookup.Provider provider = player.level().registryAccess();
 
-        if (isTagMode) {
-            data.set(0, TagFilterData.isBlacklist(stack) ? 1 : 0);
-            data.set(1, TagFilterData.getTargetType(stack).ordinal());
-            data.set(2, 0);
-            var tags = TagFilterData.getTagFilters(stack);
-            selectedTag = tags.isEmpty() ? null : tags.get(0);
-        } else if (isModMode) {
+        if (isModMode) {
             data.set(0, ModFilterData.isBlacklist(stack) ? 1 : 0);
             data.set(1, ModFilterData.getTargetType(stack).ordinal());
             data.set(2, 0);
             var mods = ModFilterData.getModFilters(stack);
             selectedMod = mods.isEmpty() ? null : mods.get(0);
-        } else if (isNbtMode) {
-            data.set(0, NbtFilterData.isBlacklist(stack) ? 1 : 0);
-            data.set(1, NbtFilterData.getTargetType(stack).ordinal());
-            data.set(2, 0);
-        } else if (isAmountMode) {
-            data.set(0, AmountFilterData.isBlacklist(stack) ? 1 : 0);
-            data.set(1, AmountFilterData.getTargetType(stack).ordinal());
-            data.set(2, AmountFilterData.getAmount(stack));
         } else if (isNameMode) {
             data.set(0, NameFilterData.isBlacklist(stack) ? 1 : 0);
             data.set(1, NameFilterData.getTargetType(stack).ordinal());
             data.set(2, NameFilterData.getMatchScope(stack).ordinal());
-        } else if (isSlotMode) {
-            data.set(0, SlotFilterData.isBlacklist(stack) ? 1 : 0);
-            data.set(1, 0);
-            data.set(2, 0);
         } else if (isDurabilityMode) {
             data.set(0, DurabilityFilterData.isBlacklist(stack) ? 1 : 0);
             data.set(1, DurabilityFilterData.getTargetType(stack).ordinal());
@@ -332,12 +314,6 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public String getSelectedTag() {
-        if (selectedTag == null && isTagMode) {
-            var tags = TagFilterData.getTagFilters(getOpenedStack());
-            if (!tags.isEmpty()) {
-                selectedTag = tags.get(0);
-            }
-        }
         return selectedTag;
     }
 
@@ -448,10 +424,7 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public String getSlotExpression() {
-        if (!isSlotMode) {
-            return "";
-        }
-        return SlotFilterData.getSlotExpression(getOpenedStack());
+        return "";
     }
 
     public int getFilterSlots() {
@@ -751,12 +724,6 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public void setAmountValue(Player player, int amount) {
-        if (isAmountMode) {
-            ItemStack stack = getOpenedStack();
-            AmountFilterData.setAmount(stack, amount);
-            data.set(2, AmountFilterData.getAmount(stack));
-            broadcastChanges();
-        }
     }
 
     public void setDurabilityValue(Player player, int value) {
@@ -773,14 +740,7 @@ public class FilterMenu extends AbstractContainerMenu {
             return false;
         }
 
-        SlotFilterData.ParseResult result = SlotFilterData.setSlotsFromExpression(getOpenedStack(), expression);
-        if (!result.valid()) {
-            return false;
-        }
-        if (result.changed()) {
-            broadcastChanges();
-        }
-        return true;
+        return false;
     }
 
     public ItemStack getOpenedFilterStack(Player player) {
@@ -821,18 +781,10 @@ public class FilterMenu extends AbstractContainerMenu {
         data.set(0, newState ? 1 : 0);
 
         ItemStack stack = getOpenedStack();
-        if (isTagMode)
-            TagFilterData.setBlacklist(stack, newState);
-        else if (isModMode)
+        if (isModMode)
             ModFilterData.setBlacklist(stack, newState);
-        else if (isNbtMode)
-            NbtFilterData.setBlacklist(stack, newState);
         else if (isNameMode)
             NameFilterData.setBlacklist(stack, newState);
-        else if (isSlotMode)
-            SlotFilterData.setBlacklist(stack, newState);
-        else if (isAmountMode)
-            AmountFilterData.setBlacklist(stack, newState);
         else if (isDurabilityMode)
             DurabilityFilterData.setBlacklist(stack, newState);
         else
@@ -847,19 +799,13 @@ public class FilterMenu extends AbstractContainerMenu {
         data.set(1, next.ordinal());
 
         ItemStack stack = getOpenedStack();
-        if (isTagMode)
-            TagFilterData.setTargetType(stack, next);
-        else if (isModMode)
+        if (isModMode)
             ModFilterData.setTargetType(stack, next);
-        else if (isNbtMode)
-            NbtFilterData.setTargetType(stack, next);
         else if (isNameMode)
             NameFilterData.setTargetType(stack, next);
-        else if (isAmountMode)
-            AmountFilterData.setTargetType(stack, next);
         else if (isDurabilityMode)
             DurabilityFilterData.setTargetType(stack, next);
-        else if (!isSlotMode)
+        else
             FilterItemData.setTargetType(stack, next);
 
         broadcastChanges();
@@ -913,7 +859,6 @@ public class FilterMenu extends AbstractContainerMenu {
         if (delta != 0) {
             int current = data.get(2);
             int next = Math.max(0, current + delta);
-            AmountFilterData.setAmount(getOpenedStack(), next);
             data.set(2, next);
             broadcastChanges();
             return true;
@@ -1239,12 +1184,7 @@ public class FilterMenu extends AbstractContainerMenu {
     public boolean stillValid(Player player) {
         ItemStack stack = getOpenedStack();
         return !stack.isEmpty() && (stack.getItem() instanceof BaseFilterItem ||
-                stack.getItem() instanceof TagFilterItem ||
-                stack.getItem() instanceof AmountFilterItem ||
-                stack.getItem() instanceof NbtFilterItem ||
-                stack.getItem() instanceof DurabilityFilterItem ||
                 stack.getItem() instanceof ModFilterItem ||
-                stack.getItem() instanceof SlotFilterItem ||
                 stack.getItem() instanceof NameFilterItem);
     }
 
@@ -1371,4 +1311,3 @@ public class FilterMenu extends AbstractContainerMenu {
         }
     }
 }
-

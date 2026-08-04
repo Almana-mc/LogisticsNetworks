@@ -38,15 +38,10 @@ public final class NetworkHandler {
         registerServer(SetChannelFilterItemPayload.class, SetChannelFilterItemPayload.STREAM_CODEC, ServerPayloadHandler::handleSetChannelFilterItem);
         registerServer(SetNodeUpgradeItemPayload.class, SetNodeUpgradeItemPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNodeUpgradeItem);
         registerServer(SelectNodeChannelPayload.class, SelectNodeChannelPayload.STREAM_CODEC, ServerPayloadHandler::handleSelectNodeChannel);
-        registerServer(ModifyFilterTagPayload.class, ModifyFilterTagPayload.STREAM_CODEC, ServerPayloadHandler::handleModifyFilterTag);
         registerServer(ModifyFilterModPayload.class, ModifyFilterModPayload.STREAM_CODEC, ServerPayloadHandler::handleModifyFilterMod);
-        registerServer(ModifyFilterNbtPayload.class, ModifyFilterNbtPayload.STREAM_CODEC, ServerPayloadHandler::handleModifyFilterNbt);
-        registerServer(SetAmountFilterValuePayload.class, SetAmountFilterValuePayload.STREAM_CODEC, ServerPayloadHandler::handleSetAmountFilterValue);
         registerServer(SetFilterFluidEntryPayload.class, SetFilterFluidEntryPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterFluidEntry);
         registerServer(SetFilterChemicalEntryPayload.class, SetFilterChemicalEntryPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterChemicalEntry);
         registerServer(SetFilterItemEntryPayload.class, SetFilterItemEntryPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilterItemEntry);
-        registerServer(SetDurabilityFilterValuePayload.class, SetDurabilityFilterValuePayload.STREAM_CODEC, ServerPayloadHandler::handleSetDurabilityFilterValue);
-        registerServer(SetSlotFilterSlotsPayload.class, SetSlotFilterSlotsPayload.STREAM_CODEC, ServerPayloadHandler::handleSetSlotFilterSlots);
         registerServer(SetNameFilterPayload.class, SetNameFilterPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNameFilter);
         registerServer(ToggleNodeVisibilityPayload.class, ToggleNodeVisibilityPayload.STREAM_CODEC, ServerPayloadHandler::handleToggleVisibility);
         registerServer(CycleWrenchModePayload.class, CycleWrenchModePayload.STREAM_CODEC, ServerPayloadHandler::handleCycleWrenchMode);

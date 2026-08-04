@@ -48,6 +48,7 @@ public final class FilterItemData {
     private static final String KEY_NBT_RAW = "nbt_raw";
     private static final String KEY_NBT_OP = "nbt_op";
     private static final String KEY_SLOT_MAPPING = "slot_map";
+    private static final String KEY_SLOT_MAPPING_EXPR = "slot_map_expr";
     private static final String KEY_ENCHANTED = "enchanted";
     private static final String KEY_NBT_RULES = "nbt_rules";
     private static final String KEY_NBT_MATCH_ANY = "nbt_match_any";
@@ -508,7 +509,7 @@ public final class FilterItemData {
         return getItemFilterView(stack, readCache).hasChemicalEntries();
     }
 
-    // ── Tag per-slot methods ──
+    // â”€â”€ Tag per-slot methods â”€â”€
 
     @Nullable
     public static String getEntryTag(ItemStack stack, int slot) {
@@ -588,7 +589,7 @@ public final class FilterItemData {
         return getItemFilterView(stack, readCache).hasAmountEntries();
     }
 
-    // ── Slot mapping per-entry methods ──
+    // â”€â”€ Slot mapping per-entry methods â”€â”€
 
     @Nullable
     public static int[] getEntrySlotMapping(ItemStack stack, int slot) {
@@ -608,6 +609,16 @@ public final class FilterItemData {
     }
 
     public static String getEntrySlotMappingExpression(ItemStack stack, int slot) {
+        if (!isFilterItem(stack)) return "";
+        CompoundTag root = getRoot(stack);
+        ListTag entries = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+        for (Tag t : entries) {
+            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
+                String stored = entry.getString(KEY_SLOT_MAPPING_EXPR);
+                if (!stored.isEmpty()) return stored;
+                break;
+            }
+        }
         int[] mapping = getEntrySlotMapping(stack, slot);
         if (mapping == null) return "";
         List<Integer> list = new ArrayList<>();
@@ -616,29 +627,39 @@ public final class FilterItemData {
     }
 
     public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots) {
+        setEntrySlotMapping(stack, slot, slots, null);
+    }
+    public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots,
+            @Nullable String expression) {
         if (!isFilterItem(stack))
             return;
         if (slot < 0 || slot >= getCapacity(stack))
             return;
 
+        boolean hasSlots = slots != null && slots.length > 0;
+        boolean hasExpression = expression != null && !expression.isEmpty();
         updateRoot(stack, root -> {
             ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
             for (Tag t : list) {
                 if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    if (slots != null && slots.length > 0) {
+                    if (hasSlots) {
                         entry.putIntArray(KEY_SLOT_MAPPING, slots);
+                        if (hasExpression) entry.putString(KEY_SLOT_MAPPING_EXPR, expression);
+                        else entry.remove(KEY_SLOT_MAPPING_EXPR);
                     } else {
                         entry.remove(KEY_SLOT_MAPPING);
+                        entry.remove(KEY_SLOT_MAPPING_EXPR);
                     }
                     root.put(KEY_ITEMS, list);
                     return;
                 }
             }
 
-            if (slots != null && slots.length > 0) {
+            if (hasSlots) {
                 CompoundTag entry = new CompoundTag();
                 entry.putInt(KEY_SLOT, slot);
                 entry.putIntArray(KEY_SLOT_MAPPING, slots);
+                if (hasExpression) entry.putString(KEY_SLOT_MAPPING_EXPR, expression);
                 list.add(entry);
                 root.put(KEY_ITEMS, list);
             }
@@ -658,7 +679,7 @@ public final class FilterItemData {
         return false;
     }
 
-    // ── NBT per-slot methods ──
+    // â”€â”€ NBT per-slot methods â”€â”€
 
     @Nullable
     public static String getEntryNbtPath(ItemStack stack, int slot) {
@@ -799,6 +820,9 @@ public final class FilterItemData {
                 || hasEntryType(stack, KEY_NBT_PATH)
                 || hasEntryType(stack, KEY_NBT_RAW);
     }
+    public static boolean hasAnyNbtEntries(ItemStack stack, @Nullable ReadCache cache) {
+        return hasAnyNbtEntries(stack);
+    }
 
     public static boolean isNbtOnlySlot(ItemStack stack, int slot) {
         if (!hasEntryNbt(stack, slot) && !hasEntryDurability(stack, slot) && !hasEntryEnchanted(stack, slot))
@@ -818,7 +842,7 @@ public final class FilterItemData {
         return true;
     }
 
-    // ── Multi-rule NBT per-slot methods ──
+    // â”€â”€ Multi-rule NBT per-slot methods â”€â”€
 
     public static boolean isEntryNbtStrict(ItemStack stack, int slot) {
         if (!isFilterItem(stack))
@@ -1069,7 +1093,7 @@ public final class FilterItemData {
         }
     }
 
-    // ── Durability per-slot methods ──
+    // â”€â”€ Durability per-slot methods â”€â”€
 
     @Nullable
     public static String getEntryDurabilityOp(ItemStack stack, int slot) {
@@ -1178,7 +1202,7 @@ public final class FilterItemData {
         });
     }
 
-    // ── Full matching methods (tag + NBT + durability aware) ──
+    // â”€â”€ Full matching methods (tag + NBT + durability aware) â”€â”€
 
     public static boolean containsItemFull(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider) {
         return containsItemFull(filter, candidate, provider, null);
@@ -1441,7 +1465,7 @@ public final class FilterItemData {
         return false;
     }
 
-    // ── Full amount threshold methods (tag-aware + constraint-aware) ──
+    // â”€â”€ Full amount threshold methods (tag-aware + constraint-aware) â”€â”€
 
     public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
             HolderLookup.Provider provider) {
@@ -1876,7 +1900,7 @@ public final class FilterItemData {
         return 0;
     }
 
-    // ── Constraint helpers ──
+    // â”€â”€ Constraint helpers â”€â”€
 
     private static boolean checkNbtConstraint(ItemStack filter, int slot, @Nullable CompoundTag components) {
         CompoundTag entry = getEntryData(filter, slot);
@@ -2430,16 +2454,15 @@ public final class FilterItemData {
 
     private static CompoundTag getRoot(ItemStack stack) {
         CompoundTag custom = ItemDataUtil.getCustomData(stack);
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
+        return LegacyFilterData.getCanonicalRoot(stack, custom);
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
         ItemDataUtil.updateCustomData(stack, customTag -> {
-            CompoundTag root = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
-                    ? customTag.getCompound(KEY_ROOT)
-                    : new CompoundTag();
+            CompoundTag root = LegacyFilterData.getCanonicalRoot(stack, customTag);
 
             modifier.accept(root);
+            LegacyFilterData.removeLegacyRoot(stack, customTag);
 
             if (root.isEmpty()) {
                 customTag.remove(KEY_ROOT);

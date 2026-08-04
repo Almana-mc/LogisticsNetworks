@@ -210,6 +210,18 @@ public final class NameFilterData {
         return !getNameFilter(stack).isEmpty();
     }
 
+    public static boolean hasNameFilter(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return !view(stack, cache).name().isEmpty();
+    }
+
+    public static FilterTargetType getTargetType(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return view(stack, cache).target();
+    }
+
+    public static boolean isBlacklist(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
+        return view(stack, cache).blacklist();
+    }
+
     public static boolean isValidRegex(String pattern) {
         return validateRegex(pattern).accepted();
     }
@@ -267,6 +279,12 @@ public final class NameFilterData {
         return false;
     }
 
+    public static boolean containsName(ItemStack filter, ItemStack candidate,
+            @Nullable FilterItemData.ReadCache cache) {
+        View view = view(filter, cache);
+        return !candidate.isEmpty() && view.target() == FilterTargetType.ITEMS && matches(view, candidate);
+    }
+
     public static boolean containsName(ItemStack filter, FluidStack candidate) {
         if (candidate.isEmpty())
             return false;
@@ -286,6 +304,13 @@ public final class NameFilterData {
         return pattern.matcher(candidateName).find();
     }
 
+    public static boolean containsName(ItemStack filter, FluidStack candidate,
+            @Nullable FilterItemData.ReadCache cache) {
+        View view = view(filter, cache);
+        return candidate != null && !candidate.isEmpty() && view.target() == FilterTargetType.FLUIDS
+                && matches(view, candidate);
+    }
+
     public static boolean containsName(ItemStack filter, String chemicalId) {
         if (chemicalId == null || chemicalId.isEmpty())
             return false;
@@ -303,6 +328,13 @@ public final class NameFilterData {
         Component chemName = MekanismCompat.getChemicalTextComponent(chemicalId);
         String displayName = chemName != null ? chemName.getString() : chemicalId;
         return pattern.matcher(displayName).find();
+    }
+
+    public static boolean containsName(ItemStack filter, String chemicalId,
+            @Nullable FilterItemData.ReadCache cache) {
+        View view = view(filter, cache);
+        return chemicalId != null && !chemicalId.isEmpty() && view.target() == FilterTargetType.CHEMICALS
+                && matches(view, chemicalId);
     }
 
     private static ValidationError inspectSyntax(String expression) {
