@@ -9,11 +9,13 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class ChannelData {
 
-    public static final int FILTER_SIZE = 9;
+    public static final int FILTER_SIZE = 6;
     private static final String KEY_ENABLED = "Enabled";
     private static final String KEY_MODE = "Mode";
     private static final String KEY_TYPE = "Type";
@@ -122,16 +124,45 @@ public class ChannelData {
         Arrays.fill(filterItems, ItemStack.EMPTY);
         if (provider != null && tag.contains(KEY_FILTERS, Tag.TAG_LIST)) {
             ListTag list = tag.getList(KEY_FILTERS, Tag.TAG_COMPOUND);
+            List<ItemStack> overflow = new ArrayList<>();
             for (Tag t : list) {
                 if (t instanceof CompoundTag ct) {
                     int slot = ct.getInt("Slot");
-                    if (slot >= 0 && slot < FILTER_SIZE) {
-                        filterItems[slot] = ItemStack.parseOptional(provider, ct.getCompound("Item"));
+                    if (slot < 0) {
+                        continue;
+                    }
+                    ItemStack stack = ItemStack.parseOptional(provider, ct.getCompound("Item"));
+                    if (stack.isEmpty()) {
+                        continue;
+                    }
+                    if (slot < FILTER_SIZE) {
+                        filterItems[slot] = stack;
+                    } else {
+                        overflow.add(stack);
                     }
                 }
             }
+            placeOverflowFilters(overflow);
         } else if (provider != null && tag.contains("FilterItem", Tag.TAG_COMPOUND)) {
             filterItems[0] = ItemStack.parseOptional(provider, tag.getCompound("FilterItem"));
+        }
+    }
+
+    // Relocate legacy overflow filters
+    private void placeOverflowFilters(List<ItemStack> overflow) {
+        if (overflow.isEmpty()) {
+            return;
+        }
+        int next = 0;
+        for (ItemStack stack : overflow) {
+            while (next < FILTER_SIZE && !filterItems[next].isEmpty()) {
+                next++;
+            }
+            if (next >= FILTER_SIZE) {
+                break;
+            }
+            filterItems[next] = stack;
+            next++;
         }
     }
 

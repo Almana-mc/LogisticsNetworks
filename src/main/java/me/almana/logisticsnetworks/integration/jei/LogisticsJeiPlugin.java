@@ -6,6 +6,7 @@ import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.gui.handlers.IGuiContainerHandler;
 import mezz.jei.api.registration.IGuiHandlerRegistration;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
+import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.resources.ResourceLocation;
 
@@ -17,6 +18,7 @@ public class LogisticsJeiPlugin implements IModPlugin {
     private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID,
             "jei_plugin");
     private static final FilterGhostIngredientHandler FILTER_GHOST_HANDLER = new FilterGhostIngredientHandler();
+    private static final NodeGhostIngredientHandler NODE_GHOST_HANDLER = new NodeGhostIngredientHandler();
 
     @Override
     public ResourceLocation getPluginUid() {
@@ -26,6 +28,7 @@ public class LogisticsJeiPlugin implements IModPlugin {
     @Override
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
         registration.addGhostIngredientHandler(FilterScreen.class, FILTER_GHOST_HANDLER);
+        registration.addGhostIngredientHandler(NodeScreen.class, NODE_GHOST_HANDLER);
         registration.addGuiContainerHandler(FilterScreen.class, new IGuiContainerHandler<>() {
             @Override
             public List<Rect2i> getGuiExtraAreas(FilterScreen screen) {

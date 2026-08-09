@@ -70,7 +70,7 @@ public final class NodeClipboardConfig {
         INVENTORY_FULL
     }
 
-    private record Requirement(ItemStack stack, int count, boolean looseMatch) {
+    private record Requirement(ItemStack stack, int count) {
     }
 
     public record RequiredItem(ItemStack stack, int count) {
@@ -294,7 +294,7 @@ public final class NodeClipboardConfig {
 
     public List<RequiredItem> getRequiredItemsPreview() {
         List<RequiredItem> result = new ArrayList<>();
-        for (Requirement requirement : buildRequirements(null)) {
+        for (Requirement requirement : buildUpgradeRequirements(null)) {
             result.add(new RequiredItem(requirement.stack().copyWithCount(1), requirement.count()));
         }
         return result;
@@ -521,7 +521,7 @@ public final class NodeClipboardConfig {
         }
 
         ListTag requiredTag = new ListTag();
-        for (Requirement requirement : buildRequirements(null)) {
+        for (Requirement requirement : buildUpgradeRequirements(null)) {
             CompoundTag entry = new CompoundTag();
             entry.put(KEY_ITEM, requirement.stack().save(provider));
             entry.putInt(KEY_COUNT, requirement.count());
@@ -664,13 +664,13 @@ public final class NodeClipboardConfig {
 
         Inventory inventory = player.getInventory();
         int protectedSlot = findProtectedSlot(inventory, protectedStack);
-        List<Requirement> requirements = buildRequirements(node);
+        List<Requirement> requirements = buildUpgradeRequirements(node);
         List<ItemStack> returnedItems = collectReturnedItems(node);
 
         ServerLevel level = player.level() instanceof ServerLevel sl ? sl : null;
         for (Requirement requirement : requirements) {
             if (!AE2Compat.hasCombinedStock(inventory, requirement.stack(), requirement.count(),
-                    protectedSlot, ae2Link, level, requirement.looseMatch())) {
+                    protectedSlot, ae2Link, level)) {
                 return PasteResult.MISSING_ITEMS;
             }
         }
@@ -680,7 +680,7 @@ public final class NodeClipboardConfig {
 
         for (Requirement requirement : requirements) {
             AE2Compat.consumeCombined(inventory, requirement.stack(), requirement.count(),
-                    protectedSlot, ae2Link, player, requirement.looseMatch());
+                    protectedSlot, ae2Link, player);
         }
         applyToNode(node);
         applyNetworkToNode(node);
@@ -728,20 +728,6 @@ public final class NodeClipboardConfig {
             ItemStack current = node.getUpgradeItem(slot);
             if (shouldReturnReplacedItem(expected, current)) {
                 returnedItems.add(current.copy());
-            }
-        }
-
-        for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
-            ChannelData channelData = node.getChannel(channel);
-            if (channelData == null) {
-                continue;
-            }
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack expected = filterItems[channel][slot];
-                ItemStack current = channelData.getFilterItem(slot);
-                if (shouldReturnReplacedItem(expected, current)) {
-                    returnedItems.add(current.copy());
-                }
             }
         }
 
@@ -823,7 +809,7 @@ public final class NodeClipboardConfig {
         return null;
     }
 
-    private List<Requirement> buildRequirements(LogisticsNodeEntity node) {
+    private List<Requirement> buildUpgradeRequirements(LogisticsNodeEntity node) {
         List<Requirement> requirements = new ArrayList<>();
 
         for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
@@ -838,35 +824,18 @@ public final class NodeClipboardConfig {
             addRequirement(requirements, required);
         }
 
-        for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
-            ChannelData channelData = node == null ? null : node.getChannel(channel);
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack required = filterItems[channel][slot];
-                if (required.isEmpty()) {
-                    continue;
-                }
-
-                if (channelData != null
-                        && ItemStack.isSameItem(required, channelData.getFilterItem(slot))) {
-                    continue;
-                }
-                addRequirement(requirements, required);
-            }
-        }
-
         return requirements;
     }
 
     private static void addRequirement(List<Requirement> requirements, ItemStack stack) {
-        boolean loose = stack.is(ModTags.FILTERS);
         for (int i = 0; i < requirements.size(); i++) {
             Requirement requirement = requirements.get(i);
-            if (requirement.looseMatch() == loose && ItemStack.isSameItem(requirement.stack(), stack)) {
-                requirements.set(i, new Requirement(requirement.stack(), requirement.count() + 1, loose));
+            if (ItemStack.isSameItem(requirement.stack(), stack)) {
+                requirements.set(i, new Requirement(requirement.stack(), requirement.count() + 1));
                 return;
             }
         }
-        requirements.add(new Requirement(stack.copyWithCount(1), 1, loose));
+        requirements.add(new Requirement(stack.copyWithCount(1), 1));
     }
 
     private static int findProtectedSlot(Inventory inventory, ItemStack protectedStack) {

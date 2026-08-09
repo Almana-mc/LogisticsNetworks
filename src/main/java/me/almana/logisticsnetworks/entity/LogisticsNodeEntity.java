@@ -212,7 +212,7 @@ public class LogisticsNodeEntity extends Entity {
 
         BlockPos attached = getAttachedPos();
         if (!attached.equals(BlockPos.ZERO)) {
-            Vec3 target = Vec3.atCenterOf(attached);
+            Vec3 target = Vec3.atBottomCenterOf(attached);
             if (distanceToSqr(target) > 0.001) {
                 setPos(target);
             }
@@ -413,11 +413,7 @@ public class LogisticsNodeEntity extends Entity {
         for (int channelIndex = 0; channelIndex < CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = channels[channelIndex];
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack stack = channel.getFilterItem(slot);
-                if (!stack.isEmpty()) {
-                    spawnAtLocation(stack.copy());
-                    channel.setFilterItem(slot, ItemStack.EMPTY);
-                }
+                channel.setFilterItem(slot, ItemStack.EMPTY);
             }
         }
     }
