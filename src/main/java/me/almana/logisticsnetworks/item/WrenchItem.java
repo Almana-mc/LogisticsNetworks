@@ -7,6 +7,7 @@ import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.ChatFormatting;
@@ -19,7 +20,6 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
@@ -761,7 +761,7 @@ public class WrenchItem extends Item {
                 public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
                     return new NodeMenu(containerId, playerInv, node, openingLink);
                 }
-            }, buf -> Util.writeNodeSyncData(buf, node, player.registryAccess()));
+            }, buf -> NodeMenuSync.write(buf, node, player.registryAccess(), 0));
 
             if (serverPlayer.containerMenu instanceof NodeMenu menu) {
                 menu.sendNetworkListToClient(serverPlayer);
@@ -1355,19 +1355,4 @@ public class WrenchItem extends Item {
         return player.isSecondaryUseActive() || player.isShiftKeyDown() || player.isCrouching();
     }
 
-    private static class Util {
-        static void writeNodeSyncData(FriendlyByteBuf buf, LogisticsNodeEntity node,
-                HolderLookup.Provider provider) {
-            buf.writeVarInt(node.getId());
-            buf.writeVarInt(0);
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                buf.writeNbt(node.getChannel(i).save(provider));
-            }
-            for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-                CompoundTag entry = new CompoundTag();
-                entry.store("Item", ItemStack.OPTIONAL_CODEC, node.getUpgradeItem(i));
-                buf.writeNbt(entry);
-            }
-        }
-    }
 }

@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -685,17 +686,7 @@ public class ServerPayloadHandler {
                     return menu;
                 }
             }, buf -> {
-                buf.writeVarInt(node.getId());
-                buf.writeVarInt(selectedChannel);
-                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                    ChannelData ch = node.getChannel(i);
-                    buf.writeNbt(ch != null ? ch.save(player.level().registryAccess()) : new CompoundTag());
-                }
-                for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-                    CompoundTag entry = new CompoundTag();
-                    entry.store("Item", ItemStack.OPTIONAL_CODEC, node.getUpgradeItem(i));
-                    buf.writeNbt(entry);
-                }
+                NodeMenuSync.write(buf, node, player.level().registryAccess(), selectedChannel);
             });
 
             if (player.containerMenu instanceof NodeMenu menu) {
@@ -1394,17 +1385,7 @@ public class ServerPayloadHandler {
                     return new NodeMenu(containerId, playerInv, node);
                 }
             }, buf -> {
-                buf.writeVarInt(node.getId());
-                buf.writeVarInt(0);
-                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                    ChannelData ch = node.getChannel(i);
-                    buf.writeNbt(ch != null ? ch.save(player.level().registryAccess()) : new CompoundTag());
-                }
-                for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-                    CompoundTag entry = new CompoundTag();
-                    entry.store("Item", ItemStack.OPTIONAL_CODEC, node.getUpgradeItem(i));
-                    buf.writeNbt(entry);
-                }
+                NodeMenuSync.write(buf, node, player.level().registryAccess(), 0);
             });
 
             if (player.containerMenu instanceof NodeMenu menu) {

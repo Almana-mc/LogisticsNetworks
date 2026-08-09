@@ -216,8 +216,7 @@ public class FilterMenu extends AbstractContainerMenu {
             this.hand = InteractionHand.MAIN_HAND;
             this.lockedSlot = -1;
             this.nodeAE2Link = null;
-            var entity = playerInv.player.level().getEntity(entityId);
-            this.nodeSource = (entity instanceof LogisticsNodeEntity node) ? node : null;
+            this.nodeSource = NodeMenuSync.findOrCreateClientNode(playerInv.player, entityId);
             CompoundTag stackTag = buf.readNbt();
             ItemStack openedStack = stackTag != null
                     ? stackTag.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY)
