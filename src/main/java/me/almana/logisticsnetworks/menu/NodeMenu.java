@@ -6,13 +6,10 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -37,6 +34,7 @@ public class NodeMenu extends AbstractContainerMenu {
     private static final int GRID_STEP = 19;
 
     private final LogisticsNodeEntity node;
+    private final int nodeId;
     private boolean remoteAccess;
     private int selectedChannel = 0;
     private boolean nodeSlotsActive = true;
@@ -47,6 +45,7 @@ public class NodeMenu extends AbstractContainerMenu {
     public NodeMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node) {
         super(Registration.NODE_MENU.get(), containerId);
         this.node = node;
+        this.nodeId = node.getId();
         this.upgradeContainer = new UpgradeItemsContainer();
 
         layoutNodeSlots();
@@ -56,34 +55,15 @@ public class NodeMenu extends AbstractContainerMenu {
     // Client-side
     public NodeMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
         super(Registration.NODE_MENU.get(), containerId);
-        int entityId = buf.readVarInt();
-        this.selectedChannel = Math.max(0, Math.min(8, buf.readVarInt()));
-        Entity entity = playerInv.player.level().getEntity(entityId);
-        this.node = (entity instanceof LogisticsNodeEntity n) ? n : null;
+        NodeMenuSync.ClientNodeState state = NodeMenuSync.read(buf, playerInv.player);
+        this.nodeId = state.entityId();
+        this.selectedChannel = state.selectedChannel();
+        this.node = state.node();
 
         this.upgradeContainer = new UpgradeItemsContainer();
 
-        if (this.node != null) {
-            readInitialData(buf, playerInv.player.level().registryAccess());
-        }
-
         layoutNodeSlots();
         layoutPlayerSlots(playerInv);
-    }
-
-    private void readInitialData(FriendlyByteBuf buf, HolderLookup.Provider provider) {
-        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-            CompoundTag tag = buf.readNbt();
-            if (tag != null) {
-                node.getChannel(i).load(tag, provider);
-            }
-        }
-        for (int i = 0; i < UPGRADE_SLOTS; i++) {
-            CompoundTag tag = buf.readNbt();
-            if (tag != null) {
-                node.setUpgradeItem(i, ItemStack.parseOptional(provider, tag));
-            }
-        }
     }
 
     // Slot Layout
@@ -115,6 +95,10 @@ public class NodeMenu extends AbstractContainerMenu {
 
     public LogisticsNodeEntity getNode() {
         return node;
+    }
+
+    public int getNodeId() {
+        return nodeId;
     }
 
     public int getSelectedChannel() {

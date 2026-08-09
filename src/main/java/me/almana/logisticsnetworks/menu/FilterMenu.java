@@ -204,8 +204,7 @@ public class FilterMenu extends AbstractContainerMenu {
             this.inventorySlotIndex = -1;
             this.hand = InteractionHand.MAIN_HAND;
             this.lockedSlot = -1;
-            var entity = playerInv.player.level().getEntity(entityId);
-            this.nodeSource = (entity instanceof LogisticsNodeEntity node) ? node : null;
+            this.nodeSource = NodeMenuSync.findOrCreateClientNode(playerInv.player, entityId);
             CompoundTag stackTag = buf.readNbt();
             ItemStack openedStack = stackTag != null
                     ? ItemStack.parseOptional(playerInv.player.level().registryAccess(), stackTag.getCompound("Item"))
