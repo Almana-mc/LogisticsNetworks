@@ -1256,62 +1256,29 @@ public final class FilterItemData {
             return false;
 
         ItemFilterView view = getItemFilterView(filter, readCache);
-        CompoundTag resolvedCandidateComponents = candidateComponents;
-        boolean candidateComponentsResolved = candidateComponents != null;
+        LazyComponents components = new LazyComponents(candidateComponents);
         for (ItemFilterSlot entry : view.entriesBySlot()) {
             if (entry == null)
                 continue;
 
             String tag = entry.tag();
             if (tag != null) {
-                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
-                    if (entry.hasNbt()) {
-                        if (!candidateComponentsResolved) {
-                            resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                            candidateComponentsResolved = true;
-                        }
-                        if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                            continue;
-                    }
-                    if (!checkDurabilityConstraint(entry, candidate))
-                        continue;
-                    if (!checkEnchantedConstraint(entry, candidate))
-                        continue;
+                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
+                        && entryConstraintsMatch(entry, candidate, provider, components))
                     return true;
-                }
                 continue;
             }
 
             if (entry.nbtOnly()) {
-                if (!candidateComponentsResolved) {
-                    resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                    candidateComponentsResolved = true;
-                }
-                if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                    continue;
-                if (!checkDurabilityConstraint(entry, candidate))
-                    continue;
-                if (!checkEnchantedConstraint(entry, candidate))
-                    continue;
-                return true;
+                if (entryConstraintsMatch(entry, candidate, provider, components))
+                    return true;
+                continue;
             }
 
             Item itemEntry = entry.item();
-            if (itemEntry != null && itemEntry == candidate.getItem()) {
-                if (entry.hasNbt()) {
-                    if (!candidateComponentsResolved) {
-                        resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                        candidateComponentsResolved = true;
-                    }
-                    if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                        continue;
-                }
-                if (!checkDurabilityConstraint(entry, candidate))
-                    continue;
-                if (!checkEnchantedConstraint(entry, candidate))
-                    continue;
+            if (itemEntry != null && itemEntry == candidate.getItem()
+                    && entryConstraintsMatch(entry, candidate, provider, components))
                 return true;
-            }
         }
         return false;
     }
@@ -1322,8 +1289,7 @@ public final class FilterItemData {
             return false;
 
         ItemFilterView view = getItemFilterView(filter, readCache);
-        CompoundTag resolvedCandidateComponents = candidateComponents;
-        boolean candidateComponentsResolved = candidateComponents != null;
+        LazyComponents components = new LazyComponents(candidateComponents);
         for (ItemFilterSlot entry : view.entriesBySlot()) {
             if (entry == null)
                 continue;
@@ -1338,54 +1304,22 @@ public final class FilterItemData {
 
             String tag = entry.tag();
             if (tag != null) {
-                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
-                    if (entry.hasNbt()) {
-                        if (!candidateComponentsResolved) {
-                            resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                            candidateComponentsResolved = true;
-                        }
-                        if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                            continue;
-                    }
-                    if (!checkDurabilityConstraint(entry, candidate))
-                        continue;
-                    if (!checkEnchantedConstraint(entry, candidate))
-                        continue;
+                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
+                        && entryConstraintsMatch(entry, candidate, provider, components))
                     return true;
-                }
                 continue;
             }
 
             if (entry.nbtOnly()) {
-                if (!candidateComponentsResolved) {
-                    resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                    candidateComponentsResolved = true;
-                }
-                if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                    continue;
-                if (!checkDurabilityConstraint(entry, candidate))
-                    continue;
-                if (!checkEnchantedConstraint(entry, candidate))
-                    continue;
-                return true;
+                if (entryConstraintsMatch(entry, candidate, provider, components))
+                    return true;
+                continue;
             }
 
             Item itemEntry = entry.item();
-            if (itemEntry != null && itemEntry == candidate.getItem()) {
-                if (entry.hasNbt()) {
-                    if (!candidateComponentsResolved) {
-                        resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                        candidateComponentsResolved = true;
-                    }
-                    if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                        continue;
-                }
-                if (!checkDurabilityConstraint(entry, candidate))
-                    continue;
-                if (!checkEnchantedConstraint(entry, candidate))
-                    continue;
+            if (itemEntry != null && itemEntry == candidate.getItem()
+                    && entryConstraintsMatch(entry, candidate, provider, components))
                 return true;
-            }
         }
         return false;
     }
@@ -1408,6 +1342,14 @@ public final class FilterItemData {
             String tag = slot.tag();
             if (tag != null) {
                 if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
+                    if (slot.hasNbt()) {
+                        if (!candidateComponentsResolved) {
+                            candidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
+                            candidateComponentsResolved = true;
+                        }
+                        if (!checkNbtConstraint(slot, candidateComponents))
+                            continue;
+                    }
                     return true;
                 }
                 continue;
@@ -1470,47 +1412,29 @@ public final class FilterItemData {
         if (!isFilterItem(filter) || candidate.isEmpty())
             return 0;
         ItemFilterView view = getItemFilterView(filter, readCache);
-        CompoundTag resolvedCandidateComponents = candidateComponents;
-        boolean candidateComponentsResolved = candidateComponents != null;
+        LazyComponents components = new LazyComponents(candidateComponents);
         for (ItemFilterSlot entry : view.entriesBySlot()) {
             if (entry == null)
                 continue;
 
             String tag = entry.tag();
             if (tag != null) {
-                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals))
+                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
+                        && entryConstraintsMatch(entry, candidate, provider, components))
                     return entry.stock();
                 continue;
             }
 
             if (entry.nbtOnly()) {
-                if (!candidateComponentsResolved) {
-                    resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                    candidateComponentsResolved = true;
-                }
-                if (checkNbtConstraint(entry, resolvedCandidateComponents)
-                        && checkDurabilityConstraint(entry, candidate)
-                        && checkEnchantedConstraint(entry, candidate))
+                if (entryConstraintsMatch(entry, candidate, provider, components))
                     return entry.stock();
                 continue;
             }
 
             Item itemEntry = entry.item();
-            if (itemEntry != null && itemEntry == candidate.getItem()) {
-                if (entry.hasNbt()) {
-                    if (!candidateComponentsResolved) {
-                        resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                        candidateComponentsResolved = true;
-                    }
-                    if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                        continue;
-                }
-                if (!checkDurabilityConstraint(entry, candidate))
-                    continue;
-                if (!checkEnchantedConstraint(entry, candidate))
-                    continue;
+            if (itemEntry != null && itemEntry == candidate.getItem()
+                    && entryConstraintsMatch(entry, candidate, provider, components))
                 return entry.stock();
-            }
         }
         return 0;
     }
@@ -1520,47 +1444,29 @@ public final class FilterItemData {
         if (!isFilterItem(filter) || candidate.isEmpty())
             return 0;
         ItemFilterView view = getItemFilterView(filter, readCache);
-        CompoundTag resolvedCandidateComponents = candidateComponents;
-        boolean candidateComponentsResolved = candidateComponents != null;
+        LazyComponents components = new LazyComponents(candidateComponents);
         for (ItemFilterSlot entry : view.entriesBySlot()) {
             if (entry == null)
                 continue;
 
             String tag = entry.tag();
             if (tag != null) {
-                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals))
+                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
+                        && entryConstraintsMatch(entry, candidate, provider, components))
                     return entry.batch();
                 continue;
             }
 
             if (entry.nbtOnly()) {
-                if (!candidateComponentsResolved) {
-                    resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                    candidateComponentsResolved = true;
-                }
-                if (checkNbtConstraint(entry, resolvedCandidateComponents)
-                        && checkDurabilityConstraint(entry, candidate)
-                        && checkEnchantedConstraint(entry, candidate))
+                if (entryConstraintsMatch(entry, candidate, provider, components))
                     return entry.batch();
                 continue;
             }
 
             Item itemEntry = entry.item();
-            if (itemEntry != null && itemEntry == candidate.getItem()) {
-                if (entry.hasNbt()) {
-                    if (!candidateComponentsResolved) {
-                        resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                        candidateComponentsResolved = true;
-                    }
-                    if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                        continue;
-                }
-                if (!checkDurabilityConstraint(entry, candidate))
-                    continue;
-                if (!checkEnchantedConstraint(entry, candidate))
-                    continue;
+            if (itemEntry != null && itemEntry == candidate.getItem()
+                    && entryConstraintsMatch(entry, candidate, provider, components))
                 return entry.batch();
-            }
         }
         return 0;
     }
@@ -1667,6 +1573,32 @@ public final class FilterItemData {
     }
 
     // ── Constraint helpers ──
+
+    private static final class LazyComponents {
+        private CompoundTag components;
+        private boolean resolved;
+
+        LazyComponents(@Nullable CompoundTag preresolved) {
+            components = preresolved;
+            resolved = preresolved != null;
+        }
+
+        @Nullable
+        CompoundTag of(ItemStack stack, HolderLookup.Provider provider) {
+            if (!resolved) {
+                components = NbtFilterData.getSerializedComponents(stack, provider);
+                resolved = true;
+            }
+            return components;
+        }
+    }
+
+    private static boolean entryConstraintsMatch(ItemFilterSlot entry, ItemStack candidate,
+            HolderLookup.Provider provider, LazyComponents components) {
+        if (entry.hasNbt() && !checkNbtConstraint(entry, components.of(candidate, provider)))
+            return false;
+        return checkDurabilityConstraint(entry, candidate) && checkEnchantedConstraint(entry, candidate);
+    }
 
     private static boolean checkNbtConstraint(ItemStack filter, int slot, @Nullable CompoundTag components) {
         CompoundTag entry = getEntryData(filter, slot);
