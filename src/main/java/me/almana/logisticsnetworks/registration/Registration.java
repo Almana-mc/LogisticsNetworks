@@ -91,11 +91,11 @@ public class Registration {
                         () -> new WrenchItem(new Item.Properties().stacksTo(1)));
 
         public static final DeferredHolder<Item, BaseFilterItem> SMALL_FILTER = ITEMS.register("small_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 9));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
         public static final DeferredHolder<Item, BaseFilterItem> MEDIUM_FILTER = ITEMS.register("medium_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 18));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
         public static final DeferredHolder<Item, BaseFilterItem> BIG_FILTER = ITEMS.register("big_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 27));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
 
         public static final DeferredHolder<Item, TagFilterItem> TAG_FILTER = ITEMS.register("tag_filter",
                         () -> new TagFilterItem(new Item.Properties()));
@@ -173,6 +173,14 @@ public class Registration {
                                         .displayItems((params, output) -> {
                                                 ITEMS.getEntries().stream()
                                                                 .map(Supplier::get)
+                                                                .filter(item -> !(item instanceof BaseFilterItem))
+                                                                .filter(item -> !(item instanceof ModFilterItem))
+                                                                .filter(item -> !(item instanceof NameFilterItem))
+                                                                .filter(item -> !(item instanceof TagFilterItem))
+                                                                .filter(item -> !(item instanceof AmountFilterItem))
+                                                                .filter(item -> !(item instanceof DurabilityFilterItem))
+                                                                .filter(item -> !(item instanceof NbtFilterItem))
+                                                                .filter(item -> !(item instanceof SlotFilterItem))
                                                                 .forEach(output::accept);
                                         })
                                         .build());

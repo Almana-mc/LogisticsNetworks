@@ -413,11 +413,7 @@ public class LogisticsNodeEntity extends Entity {
         for (int channelIndex = 0; channelIndex < CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = channels[channelIndex];
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack stack = channel.getFilterItem(slot);
-                if (!stack.isEmpty()) {
-                    spawnAtLocation(stack.copy());
-                    channel.setFilterItem(slot, ItemStack.EMPTY);
-                }
+                channel.setFilterItem(slot, ItemStack.EMPTY);
             }
         }
     }

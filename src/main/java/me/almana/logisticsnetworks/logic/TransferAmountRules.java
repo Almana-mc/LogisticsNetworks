@@ -1,6 +1,5 @@
 package me.almana.logisticsnetworks.logic;
 
-import me.almana.logisticsnetworks.filter.AmountFilterData;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -35,10 +34,6 @@ final class TransferAmountRules {
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                if (AmountFilterData.isAmountFilterItem(filter)) {
-                    hasExportThreshold = true;
-                    exportThreshold = Math.max(exportThreshold, AmountFilterData.getAmount(filter));
-                }
                 if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
                     hasPerEntryAmounts = true;
                 }
@@ -50,10 +45,6 @@ final class TransferAmountRules {
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                if (AmountFilterData.isAmountFilterItem(filter)) {
-                    hasImportThreshold = true;
-                    importThreshold = Math.min(importThreshold, AmountFilterData.getAmount(filter));
-                }
                 if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
                     hasPerEntryAmounts = true;
                 }

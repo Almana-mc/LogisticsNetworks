@@ -40,18 +40,6 @@ public final class TagFilterData {
         return !stack.isEmpty() && stack.getItem() instanceof TagFilterItem;
     }
 
-    public static View view(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
-        if (cache == null) {
-            return buildView(stack);
-        }
-        View cached = cache.tagViews.get(stack);
-        if (cached == null) {
-            cached = buildView(stack);
-            cache.tagViews.put(stack, cached);
-        }
-        return cached;
-    }
-
     private static View buildView(ItemStack stack) {
         CompoundTag root = getRootTag(stack);
         String tag = null;
