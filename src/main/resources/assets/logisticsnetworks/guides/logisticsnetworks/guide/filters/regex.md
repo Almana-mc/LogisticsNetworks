@@ -9,24 +9,20 @@ navigation:
 
 # Regex Filter
 
-Matches items by their **display name** or **tooltip text**, using a regular expression (regex). Powerful but easy to misuse — read the warnings at the bottom before putting one on a high-traffic channel.
+Matches items by their **display name**, using a regular expression (regex). Powerful but easy to misuse — read the warnings at the bottom before putting one on a high-traffic channel.
 
 ## What It Matches
 
-Any item whose chosen text (name, tooltip, or both) matches the regex pattern you set. The match is checked against the text the item would show in-game, not its registry id.
+Any item whose display name matches the regex pattern you set. The match is checked against the name the item would show in-game, not its registry id. Tooltip lines are not matched — they only exist on the client, so a server cannot read them.
 
 ## Config
 
 Right-click the filter in-hand to open the menu. You will see:
 
-- **Regex pattern** — the regular expression to test against the item's text. Standard Java regex syntax.
-- **Scope** — what text to match against:
-  - **Name** (default) — only the item's display name.
-  - **Tooltip** — only the tooltip lines (lore, NBT hints, etc.), not the name.
-  - **Both** — name and every tooltip line.
+- **Regex pattern** — the regular expression to test against the item's name. Standard Java regex syntax.
 - **Whitelist / Blacklist** toggle.
 
-The item's own tooltip shows the current scope, the pattern, and the mode at a glance.
+The item's own tooltip shows the pattern and the mode at a glance.
 
 ## Whitelist vs Blacklist
 
@@ -35,13 +31,13 @@ The item's own tooltip shows the current scope, the pattern, and the mode at a g
 
 ## Use Cases
 
-- Match every enchanted book that mentions "Silk Touch" in its tooltip → scope Tooltip, pattern `Silk Touch`.
-- Match any item whose name starts with "Iron" → scope Name, pattern `^Iron`.
-- Block anything with "Damaged" in its tooltip from being imported into your storage → scope Tooltip, pattern `Damaged`, mode Blacklist.
+- Match any item whose name starts with "Iron" → pattern `^Iron`.
+- Move every kind of ingot onto one channel → pattern `Ingot$`.
+- Block anything named "Debug" from being imported into your storage → pattern `Debug`, mode Blacklist.
 
 ## Regex Examples
 
-A quick cheat sheet for common patterns. Assume scope **Name** unless noted.
+A quick cheat sheet for common patterns.
 
 | Pattern | Matches | Example items |
 |---------|---------|---------------|
@@ -55,8 +51,6 @@ A quick cheat sheet for common patterns. Assume scope **Name** unless noted.
 | `^(?!.*Netherite).*Pickaxe$` | any Pickaxe that is **not** Netherite | Iron / Gold / Diamond Pickaxe |
 | `\d+` | anything containing a digit | items with numbers in the name |
 | `Enchanted Book` | exact phrase appears anywhere | any enchanted book |
-| `Silk Touch` *(scope Tooltip)* | tooltip contains "Silk Touch" | enchanted books / gear with Silk Touch |
-| `Level \d+` *(scope Tooltip)* | tooltip has "Level" followed by a number | leveled items, XP books |
 
 ### Syntax Quick Reference
 

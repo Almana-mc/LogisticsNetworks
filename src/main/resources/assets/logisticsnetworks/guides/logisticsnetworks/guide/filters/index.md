@@ -47,7 +47,7 @@ For a full walkthrough, see [Filters & Upgrades → Filters](../nodes/filters-up
 - [Medium Filter](medium.md) — exact item/fluid match, 18 entry slots.
 - [Big Filter](big.md) — exact item/fluid match, 27 entry slots.
 - [Mod Filter](mod.md) — match everything from a chosen mod.
-- [Regex Filter](regex.md) — match items by name or tooltip using a regular expression.
+- [Regex Filter](regex.md) — match items by name using a regular expression.
 
 ## Copying Filters
 

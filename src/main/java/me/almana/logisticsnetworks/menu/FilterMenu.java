@@ -34,7 +34,6 @@ public class FilterMenu extends AbstractContainerMenu {
     private static final int ID_TOGGLE_MODE = 0;
     private static final int ID_CYCLE_DURABILITY = 7;
     private static final int ID_CYCLE_TARGET = 8;
-    private static final int ID_CYCLE_NAME_SCOPE = 9;
 
     private static final int FILTER_COLS = 9;
     private static final int FILTER_X = 8;
@@ -254,7 +253,7 @@ public class FilterMenu extends AbstractContainerMenu {
         } else if (isNameMode) {
             data.set(0, NameFilterData.isBlacklist(stack) ? 1 : 0);
             data.set(1, NameFilterData.getTargetType(stack).ordinal());
-            data.set(2, NameFilterData.getMatchScope(stack).ordinal());
+            data.set(2, 0);
         } else if (isSlotMode) {
             data.set(0, SlotFilterData.isBlacklist(stack) ? 1 : 0);
             data.set(1, 0);
@@ -413,12 +412,6 @@ public class FilterMenu extends AbstractContainerMenu {
         NameFilterData.setNameFilter(getOpenedStack(), name);
         broadcastChanges();
         return true;
-    }
-
-    public NameMatchScope getNameMatchScope() {
-        if (!isNameMode)
-            return NameMatchScope.NAME;
-        return NameMatchScope.fromOrdinal(data.get(2));
     }
 
     public String getSlotExpression() {
@@ -799,8 +792,6 @@ public class FilterMenu extends AbstractContainerMenu {
             return toggleBlacklist();
         if (id == ID_CYCLE_TARGET)
             return cycleTargetType();
-        if (id == ID_CYCLE_NAME_SCOPE && isNameMode)
-            return cycleNameMatchScope();
         if (isDurabilityMode)
             return handleDurabilityAction(id);
         if (isAmountMode)
@@ -851,15 +842,6 @@ public class FilterMenu extends AbstractContainerMenu {
         else if (!isSlotMode)
             FilterItemData.setTargetType(stack, next);
 
-        broadcastChanges();
-        return true;
-    }
-
-    private boolean cycleNameMatchScope() {
-        ItemStack stack = getOpenedStack();
-        NameMatchScope next = NameFilterData.getMatchScope(stack).next();
-        NameFilterData.setMatchScope(stack, next);
-        data.set(2, next.ordinal());
         broadcastChanges();
         return true;
     }
