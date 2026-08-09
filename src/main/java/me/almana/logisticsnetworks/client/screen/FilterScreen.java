@@ -662,7 +662,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         g.drawString(font, Component.translatable("gui.logisticsnetworks.filter.selector.selected", displayValue),
                 leftPos + 8, topPos + 22, COL_GRAY, false);
 
-        manualInputBox.setHint(hint);
+        manualInputBox.setHint(fitHint(hint, w));
 
         boolean hoveringDropdown = isHovering(x, y, w, 14, mx, my);
         g.renderOutline(x, y, w, 14, (hoveringDropdown || isDropdownOpen) ? COL_WHITE : COL_BORDER);
