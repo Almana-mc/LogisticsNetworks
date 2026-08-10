@@ -25,55 +25,11 @@ public final class ModFilterData {
     private static final String KEY_MODS = "mods";
     private static final String KEY_TARGET_TYPE = "target";
 
-    public record View(List<String> mods, FilterTargetType target, boolean blacklist) {
-
-        public boolean matchesNamespace(@Nullable ResourceLocation id) {
-            if (id == null)
-                return false;
-            String namespace = id.getNamespace();
-            for (String mod : mods) {
-                if (mod.equals(namespace))
-                    return true;
-            }
-            return false;
-        }
-    }
-
     private ModFilterData() {
     }
 
     public static boolean isModFilter(ItemStack stack) {
         return !stack.isEmpty() && stack.getItem() instanceof ModFilterItem;
-    }
-
-    public static View view(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
-        if (cache == null) {
-            return buildView(stack);
-        }
-        View cached = cache.modViews.get(stack);
-        if (cached == null) {
-            cached = buildView(stack);
-            cache.modViews.put(stack, cached);
-        }
-        return cached;
-    }
-
-    private static View buildView(ItemStack stack) {
-        CompoundTag root = getRoot(stack);
-        List<String> mods = List.of();
-        if (root.contains(KEY_MODS, Tag.TAG_LIST)) {
-            ListTag list = root.getList(KEY_MODS, Tag.TAG_STRING);
-            mods = new ArrayList<>(list.size());
-            for (int i = 0; i < list.size(); i++) {
-                String modId = normalizeModId(list.getString(i));
-                if (modId != null) {
-                    mods.add(modId);
-                }
-            }
-        }
-        return new View(mods,
-                FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE)),
-                root.getBoolean(KEY_IS_BLACKLIST));
     }
 
     public static boolean isBlacklist(ItemStack stack) {
@@ -119,8 +75,10 @@ public final class ModFilterData {
     public static List<String> getModFilters(ItemStack stack) {
         if (!isModFilter(stack))
             return List.of();
+        return readNamespaces(getRoot(stack));
+    }
 
-        CompoundTag root = getRoot(stack);
+    private static List<String> readNamespaces(CompoundTag root) {
         if (!root.contains(KEY_MODS, Tag.TAG_LIST))
             return List.of();
 
@@ -138,6 +96,78 @@ public final class ModFilterData {
 
     public static boolean hasAnyMods(ItemStack stack) {
         return !getModFilters(stack).isEmpty();
+    }
+
+    record ModFilterView(FilterTargetType targetType, boolean blacklist, List<String> namespaces) {
+    }
+
+    record CachedModView(@Nullable CustomData key, ModFilterView view) {
+    }
+
+    private static ModFilterView getModFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        if (readCache == null)
+            return buildModFilterView(stack);
+
+        CustomData currentKey = stack.get(DataComponents.CUSTOM_DATA);
+        CachedModView cached = readCache.modViews.get(stack);
+        if (cached != null && cached.key() == currentKey)
+            return cached.view();
+
+        ModFilterView built = buildModFilterView(stack);
+        readCache.modViews.put(stack, new CachedModView(currentKey, built));
+        return built;
+    }
+
+    private static ModFilterView buildModFilterView(ItemStack stack) {
+        if (!isModFilter(stack))
+            return new ModFilterView(FilterTargetType.ITEMS, false, List.of());
+
+        CompoundTag root = getRoot(stack);
+        FilterTargetType targetType = FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE));
+        boolean blacklist = root.getBoolean(KEY_IS_BLACKLIST);
+        return new ModFilterView(targetType, blacklist, readNamespaces(root));
+    }
+
+    public static boolean hasAnyMods(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        return !getModFilterView(stack, readCache).namespaces().isEmpty();
+    }
+
+    public static FilterTargetType getTargetType(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        return getModFilterView(stack, readCache).targetType();
+    }
+
+    public static boolean isBlacklist(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
+        return getModFilterView(stack, readCache).blacklist();
+    }
+
+    public static boolean containsMod(ItemStack stack, ItemStack candidate,
+            @Nullable FilterItemData.ReadCache readCache) {
+        if (candidate.isEmpty())
+            return false;
+        ModFilterView view = getModFilterView(stack, readCache);
+        if (view.targetType() != FilterTargetType.ITEMS)
+            return false;
+        return checkModMatch(view.namespaces(), BuiltInRegistries.ITEM.getKey(candidate.getItem()));
+    }
+
+    public static boolean containsMod(ItemStack stack, FluidStack candidate,
+            @Nullable FilterItemData.ReadCache readCache) {
+        if (candidate == null || candidate.isEmpty())
+            return false;
+        ModFilterView view = getModFilterView(stack, readCache);
+        if (view.targetType() != FilterTargetType.FLUIDS)
+            return false;
+        return checkModMatch(view.namespaces(), BuiltInRegistries.FLUID.getKey(candidate.getFluid()));
+    }
+
+    public static boolean containsMod(ItemStack stack, String chemicalId,
+            @Nullable FilterItemData.ReadCache readCache) {
+        if (chemicalId == null || chemicalId.isEmpty())
+            return false;
+        ModFilterView view = getModFilterView(stack, readCache);
+        if (view.targetType() != FilterTargetType.CHEMICALS)
+            return false;
+        return checkModMatch(view.namespaces(), ResourceLocation.tryParse(chemicalId));
     }
 
     public static boolean addModFilter(ItemStack stack, String rawModId) {
@@ -232,11 +262,15 @@ public final class ModFilterData {
     }
 
     private static boolean checkModMatch(ItemStack stack, ResourceLocation id) {
+        return checkModMatch(getModFilters(stack), id);
+    }
+
+    private static boolean checkModMatch(List<String> namespaces, ResourceLocation id) {
         if (id == null)
             return false;
         String namespace = id.getNamespace();
 
-        for (String mod : getModFilters(stack)) {
+        for (String mod : namespaces) {
             if (mod.equals(namespace))
                 return true;
         }

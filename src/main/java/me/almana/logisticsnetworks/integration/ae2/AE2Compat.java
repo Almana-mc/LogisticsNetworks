@@ -115,37 +115,18 @@ public final class AE2Compat {
     public static boolean hasCombinedStock(Inventory inventory, ItemStack pattern, int needed,
                                            int protectedSlot, @Nullable GlobalPos ae2Link,
                                            @Nullable ServerLevel level) {
-        return hasCombinedStock(inventory, pattern, needed, protectedSlot, ae2Link, level, false);
-    }
-
-    public static boolean hasCombinedStock(Inventory inventory, ItemStack pattern, int needed,
-                                           int protectedSlot, @Nullable GlobalPos ae2Link,
-                                           @Nullable ServerLevel level, boolean looseMatch) {
         int invCount = countInInventory(inventory, pattern, protectedSlot);
         if (invCount >= needed) return true;
         if (ae2Link == null || level == null) return false;
-        long aeCount = looseMatch
-                ? countAvailableByItem(level, ae2Link, pattern.getItem())
-                : countAvailable(level, ae2Link, pattern);
-        return invCount + aeCount >= needed;
+        return invCount + countAvailable(level, ae2Link, pattern) >= needed;
     }
 
     public static void consumeCombined(Inventory inventory, ItemStack pattern, int amount,
                                        int protectedSlot, @Nullable GlobalPos ae2Link,
                                        @Nullable ServerPlayer player) {
-        consumeCombined(inventory, pattern, amount, protectedSlot, ae2Link, player, false);
-    }
-
-    public static void consumeCombined(Inventory inventory, ItemStack pattern, int amount,
-                                       int protectedSlot, @Nullable GlobalPos ae2Link,
-                                       @Nullable ServerPlayer player, boolean looseMatch) {
         int remaining = consumeFromInventory(inventory, pattern, amount, protectedSlot);
         if (remaining > 0 && ae2Link != null && player != null && player.level() instanceof ServerLevel sl) {
-            if (looseMatch) {
-                extractItemsByItem(sl, ae2Link, pattern.getItem(), remaining, player);
-            } else {
-                extractItems(sl, ae2Link, pattern, remaining, player);
-            }
+            extractItems(sl, ae2Link, pattern, remaining, player);
         }
     }
 }

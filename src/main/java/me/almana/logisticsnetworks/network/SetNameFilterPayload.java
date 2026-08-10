@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.filter.NameFilterData;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -14,7 +15,7 @@ public record SetNameFilterPayload(String name) implements CustomPacketPayload {
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetNameFilterPayload> STREAM_CODEC = StreamCodec
             .composite(
-                    ByteBufCodecs.STRING_UTF8,
+                    ByteBufCodecs.stringUtf8(NameFilterData.MAX_EXPRESSION_LENGTH),
                     SetNameFilterPayload::name,
                     SetNameFilterPayload::new);
 

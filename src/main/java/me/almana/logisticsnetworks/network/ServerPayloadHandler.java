@@ -10,6 +10,7 @@ import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -388,22 +389,40 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleModifyFilterTag(ModifyFilterTagPayload payload, IPayloadContext context) {
+    public static void handleAddNodeFilterItem(AddNodeFilterItemPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            Player player = (Player) context.player();
-            ItemStack filterStack = findOpenFilterStack(player, TagFilterData::isTagFilterItem);
-            if (TagFilterData.isTagFilterItem(filterStack)) {
-                String normalizedTag = FilterTagUtil.normalizeTag(payload.tag());
-                boolean changed = normalizedTag != null
-                        && (payload.remove() ? TagFilterData.removeTagFilter(filterStack, normalizedTag)
-                                : TagFilterData.addTagFilter(filterStack, normalizedTag));
-                if (changed) {
-                    player.getInventory().setChanged();
-                    if (player.containerMenu instanceof FilterMenu menu && menu.isTagMode()) {
-                        menu.broadcastChanges();
-                    }
-                }
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            if (node == null)
+                return;
+            ChannelData channel = node.getChannel(payload.channel());
+            if (channel == null)
+                return;
+            int fs = payload.filterSlot();
+            if (fs < 0 || fs >= ChannelData.FILTER_SIZE)
+                return;
+            ItemStack item = payload.item();
+            if (item.isEmpty() || item.is(ModTags.FILTERS))
+                return;
+            FilterTargetType desired = FilterTargetType.forChannel(channel.getType());
+            if (desired == null)
+                return;
+
+            ItemStack filter = channel.getFilterItem(fs);
+            if (filter.isEmpty()) {
+                filter = VirtualFilterType.SMALL.createStack();
+                FilterItemData.setTargetType(filter, desired);
+            } else if (!FilterItemData.isFilterItem(filter)) {
+                return;
+            } else {
+                filter = filter.copy();
             }
+
+            if (!FilterItemData.addItem(filter, item, node.level().registryAccess())) {
+                return;
+            }
+            channel.setFilterItem(fs, filter);
+            propagateToLabelGroup(node, payload.channel());
+            markNetworkDirty(node);
         });
     }
 
@@ -420,42 +439,6 @@ public class ServerPayloadHandler {
                         menu.broadcastChanges();
                     }
                 }
-            }
-        });
-    }
-
-    public static void handleModifyFilterNbt(ModifyFilterNbtPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            ServerPlayer player = (ServerPlayer) context.player();
-            if (player.containerMenu instanceof FilterMenu menu && menu.isNbtMode()) {
-                ItemStack filterStack = menu.getOpenedFilterStack(player);
-                if (NbtFilterData.isNbtFilter(filterStack)) {
-                    boolean changed = switch (ModifyFilterNbtPayload.Action.fromOrdinal(payload.actionOrdinal())) {
-                        case ADD_RULE -> {
-                            ItemStack extractor = menu.getExtractorItem();
-                            Tag selectedValue = NbtFilterData.resolvePathValue(extractor, payload.path(),
-                                    player.level().registryAccess());
-                            yield selectedValue != null
-                                    && NbtFilterData.addRule(filterStack, payload.path(),
-                                            NbtFilterData.Operator.EQUALS, selectedValue);
-                        }
-                        case TOGGLE_RULE -> NbtFilterData.toggleRuleEnabled(filterStack, payload.ruleIndex());
-                        case REMOVE_RULE -> NbtFilterData.removeRule(filterStack, payload.ruleIndex());
-                        case CYCLE_OPERATOR -> NbtFilterData.cycleRuleOperator(filterStack, payload.ruleIndex());
-                    };
-                    if (changed) {
-                        player.getInventory().setChanged();
-                        menu.broadcastChanges();
-                    }
-                }
-            }
-        });
-    }
-
-    public static void handleSetAmountFilterValue(SetAmountFilterValuePayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof FilterMenu menu && menu.isAmountMode()) {
-                menu.setAmountValue((Player) context.player(), payload.amount());
             }
         });
     }
@@ -539,39 +522,112 @@ public class ServerPayloadHandler {
 
             int ch = payload.channel();
             int fs = payload.filterSlot();
-            if (ch < 0 || ch >= 9 || fs < 0 || fs >= 9) return;
+            if (ch < 0 || ch >= LogisticsNodeEntity.CHANNEL_COUNT || fs < 0 || fs >= ChannelData.FILTER_SIZE) return;
 
             ChannelData channel = node.getChannel(ch);
             if (channel == null) return;
 
-            ItemStack stack = channel.getFilterItem(fs);
-            if (stack.isEmpty() || !stack.is(ModTags.FILTERS)) return;
+            FilterTargetType desired = FilterTargetType.forChannel(channel.getType());
+            if (desired == null) return;
 
-            boolean isTag = stack.getItem() instanceof TagFilterItem;
-            boolean isAmount = stack.getItem() instanceof AmountFilterItem;
-            boolean isDurability = stack.getItem() instanceof DurabilityFilterItem;
-            boolean isMod = stack.getItem() instanceof ModFilterItem;
-            boolean isSlot = stack.getItem() instanceof SlotFilterItem;
-            boolean isName = stack.getItem() instanceof NameFilterItem;
-            boolean isSpecial = isTag || isAmount || isDurability || isMod || isSlot || isName;
+            ItemStack stack = channel.getFilterItem(fs);
+            VirtualFilterType requested = payload.requestedType();
+            boolean needFresh = requested != VirtualFilterType.EXISTING
+                    || stack.isEmpty() || !stack.is(ModTags.FILTERS)
+                    || currentTarget(stack) != desired;
+            if (needFresh) {
+                VirtualFilterType role = requested != VirtualFilterType.EXISTING
+                        ? requested
+                        : (stack.isEmpty() ? VirtualFilterType.SMALL : VirtualFilterType.fromStack(stack));
+                stack = role.createStack();
+                applyTarget(stack, desired);
+                channel.setFilterItem(fs, stack);
+                sendChannelSyncToViewers(node, ch, channel);
+                propagateToLabelGroup(node, ch);
+                markNetworkDirty(node);
+            }
+
+            VirtualFilterType type = VirtualFilterType.fromStack(stack);
+            boolean isMod = type == VirtualFilterType.MOD;
+            boolean isName = type == VirtualFilterType.NAME;
+            boolean isSpecial = type.isSpecial();
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
+            ItemStack openedStack = stack.copyWithCount(1);
+            CompoundTag stackTag = new CompoundTag();
+            stackTag.put("Item", openedStack.save(serverPlayer.level().registryAccess()));
 
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new FilterMenu(id, inv, node, ch, fs),
-                    stack.getHoverName()), buf -> {
+                    openedStack.getHoverName()), buf -> {
                         buf.writeVarInt(-2);
                         buf.writeVarInt(payload.entityId());
                         buf.writeVarInt(ch);
                         buf.writeVarInt(fs);
+                        buf.writeNbt(stackTag);
                         buf.writeVarInt(slotCount);
-                        buf.writeBoolean(isTag);
-                        buf.writeBoolean(isAmount);
                         buf.writeBoolean(false);
-                        buf.writeBoolean(isDurability);
+                        buf.writeBoolean(false);
+                        buf.writeBoolean(false);
+                        buf.writeBoolean(false);
                         buf.writeBoolean(isMod);
-                        buf.writeBoolean(isSlot);
+                        buf.writeBoolean(false);
                         buf.writeBoolean(isName);
                     });
+        });
+    }
+
+    private static FilterTargetType currentTarget(ItemStack stack) {
+        if (FilterItemData.isFilterItem(stack)) {
+            return FilterItemData.getTargetType(stack);
+        }
+        if (NameFilterData.isNameFilter(stack)) {
+            return NameFilterData.getTargetType(stack);
+        }
+        if (ModFilterData.isModFilter(stack)) {
+            return ModFilterData.getTargetType(stack);
+        }
+        return FilterTargetType.ITEMS;
+    }
+
+    private static void applyTarget(ItemStack stack, FilterTargetType target) {
+        if (FilterItemData.isFilterItem(stack)) {
+            FilterItemData.setTargetType(stack, target);
+        } else if (NameFilterData.isNameFilter(stack)) {
+            NameFilterData.setTargetType(stack, target);
+        } else if (ModFilterData.isModFilter(stack)) {
+            ModFilterData.setTargetType(stack, target);
+        }
+    }
+
+    public static void handleOpenNodeMenu(OpenNodeMenuPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) return;
+
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            if (node == null) return;
+
+            int selectedChannel = Math.max(0,
+                    Math.min(LogisticsNodeEntity.CHANNEL_COUNT - 1, payload.selectedChannel()));
+            player.openMenu(new MenuProvider() {
+                @Override
+                public Component getDisplayName() {
+                    return Component.translatable("gui.logisticsnetworks.node_config");
+                }
+
+                @Override
+                public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
+                    NodeMenu menu = new NodeMenu(containerId, playerInv, node);
+                    menu.setSelectedChannel(selectedChannel);
+                    return menu;
+                }
+            }, buf -> {
+                NodeMenuSync.write(buf, node, player.level().registryAccess(), selectedChannel);
+            });
+
+            if (player.containerMenu instanceof NodeMenu menu) {
+                menu.setSelectedChannel(selectedChannel);
+                menu.sendNetworkListToClient(player);
+            }
         });
     }
 
@@ -606,6 +662,8 @@ public class ServerPayloadHandler {
                     case SetFilterEntryNbtPayload.ACTION_SET_RAW ->
                         menu.setEntryNbtRaw((Player) context.player(), payload.slot(),
                                 payload.path(), payload.value());
+                    case SetFilterEntryNbtPayload.ACTION_SET_STRICT ->
+                        menu.setEntryNbtStrict(payload.slot(), Boolean.parseBoolean(payload.value()));
                 }
             }
         });
@@ -620,27 +678,6 @@ public class ServerPayloadHandler {
                 } else {
                     menu.setEntryDurability((Player) context.player(), payload.slot(),
                             payload.operator(), payload.value());
-                }
-            }
-        });
-    }
-
-    public static void handleSetDurabilityFilterValue(SetDurabilityFilterValuePayload payload,
-            IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof FilterMenu menu && menu.isDurabilityMode()) {
-                menu.setDurabilityValue((Player) context.player(), payload.value());
-            }
-        });
-    }
-
-    public static void handleSetSlotFilterSlots(SetSlotFilterSlotsPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof FilterMenu menu && menu.isSlotMode()) {
-                boolean ok = menu.setSlotExpression((Player) context.player(), payload.expression());
-                if (!ok && context.player() instanceof ServerPlayer player) {
-                    player.displayClientMessage(
-                            Component.translatable("message.logisticsnetworks.filter.slot.invalid"), true);
                 }
             }
         });
@@ -699,6 +736,16 @@ public class ServerPayloadHandler {
     public static void handleSetNameFilter(SetNameFilterPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && menu.isNameMode()) {
+                NameFilterData.ValidationResult validation = NameFilterData.validateRegex(payload.name());
+                if (!payload.name().isEmpty() && !validation.accepted()) {
+                    String key = switch (validation.error()) {
+                        case TOO_LONG -> "message.logisticsnetworks.filter.regex.too_long";
+                        case UNSUPPORTED -> "message.logisticsnetworks.filter.regex.unsupported";
+                        default -> "message.logisticsnetworks.filter.regex.invalid";
+                    };
+                    context.player().sendSystemMessage(Component.translatable(key));
+                    return;
+                }
                 menu.setNameExpression((Player) context.player(), payload.name());
             }
         });
@@ -719,29 +766,15 @@ public class ServerPayloadHandler {
             if (stack.getItem() instanceof NbtFilterItem)
                 return;
 
-            boolean isTag = stack.getItem() instanceof TagFilterItem;
-            boolean isAmount = stack.getItem() instanceof AmountFilterItem;
-            boolean isDurability = stack.getItem() instanceof DurabilityFilterItem;
             boolean isMod = stack.getItem() instanceof ModFilterItem;
-            boolean isSlot = stack.getItem() instanceof SlotFilterItem;
             boolean isName = stack.getItem() instanceof NameFilterItem;
-            boolean isSpecial = isTag || isAmount || isDurability || isMod || isSlot || isName;
+            boolean isSpecial = isMod || isName;
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
 
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new FilterMenu(id, inv, slotIndex),
-                    stack.getHoverName()), buf -> {
-                        buf.writeVarInt(-1);
-                        buf.writeVarInt(slotIndex);
-                        buf.writeVarInt(slotCount);
-                        buf.writeBoolean(isTag);
-                        buf.writeBoolean(isAmount);
-                        buf.writeBoolean(false);
-                        buf.writeBoolean(isDurability);
-                        buf.writeBoolean(isMod);
-                        buf.writeBoolean(isSlot);
-                        buf.writeBoolean(isName);
-                    });
+                    stack.getHoverName()),
+                    buf -> FilterMenu.writeMenuData(buf, slotIndex, slotCount, isMod, false, isName));
         });
     }
 
@@ -755,8 +788,7 @@ public class ServerPayloadHandler {
     }
 
     private static boolean isSpecialMode(FilterMenu menu) {
-        return menu.isTagMode() || menu.isAmountMode() || menu.isDurabilityMode()
-                || menu.isModMode() || menu.isSlotMode() || menu.isNameMode();
+        return menu.isModMode() || menu.isNameMode();
     }
 
     private static ItemStack findOpenFilterStack(Player player, java.util.function.Predicate<ItemStack> matcher) {
@@ -1027,14 +1059,7 @@ public class ServerPayloadHandler {
                     return new NodeMenu(containerId, playerInv, node);
                 }
             }, buf -> {
-                buf.writeVarInt(node.getId());
-                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                    ChannelData ch = node.getChannel(i);
-                    buf.writeNbt(ch != null ? ch.save(player.level().registryAccess()) : new CompoundTag());
-                }
-                for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-                    buf.writeNbt(node.getUpgradeItem(i).saveOptional(player.level().registryAccess()));
-                }
+                NodeMenuSync.write(buf, node, player.level().registryAccess(), 0);
             });
 
             if (player.containerMenu instanceof NodeMenu menu) {
@@ -1206,7 +1231,7 @@ public class ServerPayloadHandler {
         return null;
     }
 
-    private static void sendChannelSyncToViewers(LogisticsNodeEntity node, int channelIndex, ChannelData channel) {
+    public static void sendChannelSyncToViewers(LogisticsNodeEntity node, int channelIndex, ChannelData channel) {
         if (!(node.level() instanceof ServerLevel level))
             return;
         CompoundTag tag = channel.save(level.registryAccess());

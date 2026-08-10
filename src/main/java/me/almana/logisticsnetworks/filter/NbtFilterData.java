@@ -108,18 +108,6 @@ public final class NbtFilterData {
     private NbtFilterData() {
     }
 
-    public static View view(ItemStack stack, @Nullable FilterItemData.ReadCache cache) {
-        if (cache == null) {
-            return buildView(stack);
-        }
-        View cached = cache.nbtViews.get(stack);
-        if (cached == null) {
-            cached = buildView(stack);
-            cache.nbtViews.put(stack, cached);
-        }
-        return cached;
-    }
-
     private static View buildView(ItemStack stack) {
         CompoundTag root = getRoot(stack);
         List<NbtRule> rules = getRulesFromRoot(root);
