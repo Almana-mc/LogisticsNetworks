@@ -36,7 +36,7 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven("https://maven.blamejared.com")
-    maven("https://modmaven.dev/")
+    maven("https://modmaven.dev/artifactory/local-releases/")
     maven("https://api.modrinth.com/maven")
     maven("https://maven.ftb.dev/releases")
     maven("https://maven.terraformersmc.com/releases")
