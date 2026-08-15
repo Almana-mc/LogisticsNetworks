@@ -278,6 +278,19 @@ public class LogisticsNodeEntity extends Entity {
         return this.entityData.get(ATTACHED_POS);
     }
 
+    public void moveAttachment(BlockPos pos, Vec3 entityPos) {
+        BlockPos previousPos = getAttachedPos();
+        setPos(entityPos);
+        setAttachedPos(pos);
+
+        if (this.level() instanceof ServerLevel serverLevel && getNetworkId() != null) {
+            NetworkRegistry registry = NetworkRegistry.get(serverLevel);
+            registry.evictCapabilities(serverLevel, previousPos);
+            registry.evictCapabilities(serverLevel, pos);
+            registry.markNetworkDirty(getNetworkId());
+        }
+    }
+
     public void setValid(boolean valid) {
         this.entityData.set(VALID, valid);
     }
