@@ -27,6 +27,7 @@ val ae2_version: String by project
 val ftb_teams_version: String by project
 val emi_version: String by project
 val guideme_version: String by project
+val sophisticated_core_version: String by project
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -120,6 +121,10 @@ dependencies {
 
     compileOnly("maven.modrinth:jade:${jade_version}")
     runtimeOnly("maven.modrinth:jade:${jade_version}")
+
+    compileOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") {
+        isTransitive = false
+    }
 }
 
 val generateModMetadata by tasks.registering(ProcessResources::class) {

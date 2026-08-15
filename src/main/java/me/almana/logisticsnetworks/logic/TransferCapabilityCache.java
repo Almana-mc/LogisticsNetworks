@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
+import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -48,6 +49,13 @@ public final class TransferCapabilityCache {
         return found.size() == 1 ? found.get(0) : new CombinedItemHandler(found.toArray(IItemHandler[]::new));
     }
 
+    @Nullable
+    IItemHandler findBulkItemHandler(ServerLevel level, BlockPos pos, IItemHandler sidedHandler) {
+        if (!SophisticatedCoreCompat.isSidedWrapper(sidedHandler)) return null;
+        IItemHandler unsidedHandler = getItemHandler(level, pos, null);
+        return SophisticatedCoreCompat.isBulkHandler(unsidedHandler) ? unsidedHandler : null;
+    }
+
     IFluidHandler findFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
         if (dir != null) return getFluidHandler(level, pos, dir);
         List<IFluidHandler> found = new ArrayList<>(6);
@@ -86,11 +94,12 @@ public final class TransferCapabilityCache {
             fluids.remove(key);
             energy.remove(key);
         }
+        items.remove(new CapKey(dim, packed, DIRECTIONS.length));
     }
 
-    private IItemHandler getItemHandler(ServerLevel level, BlockPos pos, Direction dir) {
+    private IItemHandler getItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
         BlockCapabilityCache<IItemHandler, Direction> cache = items.computeIfAbsent(
-                new CapKey(level.dimension(), pos.asLong(), dir.ordinal()),
+                new CapKey(level.dimension(), pos.asLong(), dir == null ? DIRECTIONS.length : dir.ordinal()),
                 k -> BlockCapabilityCache.create(Capabilities.ItemHandler.BLOCK, level, pos, dir));
         return cache.getCapability();
     }

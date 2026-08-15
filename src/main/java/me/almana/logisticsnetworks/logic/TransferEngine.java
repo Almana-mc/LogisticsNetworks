@@ -10,6 +10,7 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
@@ -48,7 +49,8 @@ public class TransferEngine {
     private record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
     }
 
-    private record ItemTransferTarget(IItemHandler handler, ItemStack[] importFilters,
+    private record ItemTransferTarget(IItemHandler handler, @Nullable IItemHandler bulkHandler,
+            ItemStack[] importFilters,
             FilterMode importFilterMode, TransferAmountRules.Constraints constraints, boolean hasItemNbtFilter,
             boolean[] allowedSlots, boolean hasImportSlotMapping) {
     }
@@ -390,15 +392,20 @@ public class TransferEngine {
 
             ItemStack[] importFilters = target.channel.getFilterItems();
             boolean[] targetAllowedSlots = null;
+            boolean hasImportSlotMapping = FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache);
+            IItemHandler bulkHandler = hasImportSlotMapping
+                    ? null
+                    : capCache.findBulkItemHandler(targetLevel, targetPos, targetHandler);
 
             reachableTargets.add(new ItemTransferTarget(
                     targetHandler,
+                    bulkHandler,
                     importFilters,
                     target.channel.getFilterMode(),
                     TransferAmountRules.collect(exportFilters, importFilters, filterReadCache),
                     FilterLogic.hasConfiguredItemNbtFilter(importFilters, filterReadCache),
                     targetAllowedSlots,
-                    FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache)));
+                    hasImportSlotMapping));
         }
         if (!anyReachable)
             return -1;
@@ -794,8 +801,8 @@ public class TransferEngine {
                     }
 
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
-                    ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), simulatedInsert, true,
-                            importAllowedSlots);
+                    ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), target.bulkHandler(),
+                            simulatedInsert, true, importAllowedSlots);
                     int acceptableCount = allowed - simRemainder.getCount();
                     if (acceptableCount <= 0) {
                         continue;
@@ -806,8 +813,8 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, false,
-                            importAllowedSlots);
+                    ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), target.bulkHandler(),
+                            toMove, false, importAllowedSlots);
                     int targetAccepted = toMove.getCount() - uninserted.getCount();
                     int droppedToWorld = 0;
 
@@ -818,8 +825,8 @@ public class TransferEngine {
                                 stillLeft = source.insertItem(fallback, stillLeft, false);
                             }
                             if (!stillLeft.isEmpty()) {
-                                ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(), stillLeft,
-                                        false, importAllowedSlots);
+                                ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(),
+                                        target.bulkHandler(), stillLeft, false, importAllowedSlots);
                                 int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
                                 targetAccepted += forcedIn;
                                 if (!forcedRemainder.isEmpty()) {
@@ -888,12 +895,15 @@ public class TransferEngine {
         return any ? mask : null;
     }
 
-    private static ItemStack insertItemWithAllowedSlots(IItemHandler handler, ItemStack stack, boolean simulate,
-            boolean[] allowedSlots) {
+    private static ItemStack insertItemWithAllowedSlots(IItemHandler handler, @Nullable IItemHandler bulkHandler,
+            ItemStack stack, boolean simulate, boolean[] allowedSlots) {
         if (stack.isEmpty()) {
             return ItemStack.EMPTY;
         }
         if (allowedSlots == null) {
+            if (bulkHandler != null) {
+                return SophisticatedCoreCompat.insertItem(bulkHandler, stack, simulate);
+            }
             return ItemHandlerHelper.insertItemStacked(handler, stack, simulate);
         }
         if (handler instanceof IItemHandlerModifiable modifiable) {
