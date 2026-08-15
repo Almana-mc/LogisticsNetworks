@@ -239,7 +239,7 @@ jobs:
       - name: Publish to CurseForge
         if: steps.curseforge_config.outputs.enabled == 'true'
         id: curseforge_publish
-        uses: Kira-NT/mc-publish@v3.3.0
+        uses: Kira-NT/mc-publish@v3.3.1
         with:
           name: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
           version: ${{ needs.build.outputs.release_tag }}
