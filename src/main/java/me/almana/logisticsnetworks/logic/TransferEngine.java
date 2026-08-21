@@ -709,6 +709,7 @@ public class TransferEngine {
         boolean[] openTargets = new boolean[targets.size()];
         Arrays.fill(openTargets, true);
         int openTargetCount = targets.size();
+        BulkInsertRejectionCache bulkInsertRejections = null;
 
         // Serialize each source slot once across the target loop
         CompoundTag[] slotComponents = hasNbtFilter ? new CompoundTag[source.getSlots()] : null;
@@ -723,6 +724,7 @@ public class TransferEngine {
                 }
 
                 ItemTransferTarget target = targets.get(targetIndex);
+                IItemHandler bulkHandler = target.bulkHandler();
                 boolean movedForTarget = false;
 
                 for (int slot = 0; slot < source.getSlots() && remaining > 0; slot++) {
@@ -801,8 +803,17 @@ public class TransferEngine {
                     }
 
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
-                    ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), target.bulkHandler(),
-                            simulatedInsert, true, importAllowedSlots);
+                    ItemStack simRemainder;
+                    if (bulkHandler != null) {
+                        if (bulkInsertRejections == null) {
+                            bulkInsertRejections = new BulkInsertRejectionCache(
+                                    (handler, stack) -> SophisticatedCoreCompat.insertItem(handler, stack, true));
+                        }
+                        simRemainder = bulkInsertRejections.simulate(bulkHandler, simulatedInsert);
+                    } else {
+                        simRemainder = insertItemWithAllowedSlots(target.handler(), null,
+                                simulatedInsert, true, importAllowedSlots);
+                    }
                     int acceptableCount = allowed - simRemainder.getCount();
                     if (acceptableCount <= 0) {
                         continue;
@@ -813,9 +824,12 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), target.bulkHandler(),
+                    ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), bulkHandler,
                             toMove, false, importAllowedSlots);
                     int targetAccepted = toMove.getCount() - uninserted.getCount();
+                    if (targetAccepted > 0 && bulkHandler != null) {
+                        bulkInsertRejections.clear(bulkHandler);
+                    }
                     int droppedToWorld = 0;
 
                     if (!uninserted.isEmpty()) {
@@ -826,9 +840,12 @@ public class TransferEngine {
                             }
                             if (!stillLeft.isEmpty()) {
                                 ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(),
-                                        target.bulkHandler(), stillLeft, false, importAllowedSlots);
+                                        bulkHandler, stillLeft, false, importAllowedSlots);
                                 int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
                                 targetAccepted += forcedIn;
+                                if (forcedIn > 0 && bulkHandler != null) {
+                                    bulkInsertRejections.clear(bulkHandler);
+                                }
                                 if (!forcedRemainder.isEmpty()) {
                                     LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
                                             + "target slot mask. Dropping at source pos {}.",

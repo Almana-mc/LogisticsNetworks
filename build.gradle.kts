@@ -92,11 +92,18 @@ neoForge {
             sourceSet(sourceSets.main.get())
         }
     }
+
+    unitTest {
+        testedMod.set(mods.named(mod_id))
+        enable()
+    }
 }
 
 sourceSets.main.get().resources.srcDir("src/generated/resources")
 
 dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
     runtimeOnly("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
@@ -125,6 +132,10 @@ dependencies {
     compileOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") {
         isTransitive = false
     }
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 val generateModMetadata by tasks.registering(ProcessResources::class) {
