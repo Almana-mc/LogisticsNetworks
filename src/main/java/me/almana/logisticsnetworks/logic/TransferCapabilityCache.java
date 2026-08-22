@@ -52,7 +52,7 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
-    IItemHandler findItemHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
+    public IItemHandler findItemHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
         if (node.isMountedOnCreate()) {
             return CreateCompat.findMountedItemHandler(node);
         }
@@ -88,7 +88,7 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
-    IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
+    public IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
         if (node.isMountedOnCreate()) {
             return CreateCompat.findMountedFluidHandler(node);
         }

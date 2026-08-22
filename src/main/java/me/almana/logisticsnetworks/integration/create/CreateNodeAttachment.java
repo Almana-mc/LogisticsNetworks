@@ -52,6 +52,19 @@ public final class CreateNodeAttachment {
         node.updateMountedPosition(position);
     }
 
+    @Nullable
+    public static LogisticsNodeEntity findNode(AbstractContraptionEntity entity, BlockPos localPos) {
+        Vec3 center = entity.toGlobalVector(Vec3.atCenterOf(localPos), 0.0F);
+        AABB search = new AABB(center, center).inflate(1.5);
+        for (LogisticsNodeEntity node : entity.level().getEntitiesOfClass(LogisticsNodeEntity.class, search)) {
+            if (entity.getUUID().equals(node.getCreateContraptionId())
+                    && localPos.equals(node.getCreateLocalPos()) && node.isActive()) {
+                return node;
+            }
+        }
+        return null;
+    }
+
     public static void dismountNodes(Contraption contraption, Level level, StructureTransform transform) {
         AbstractContraptionEntity entity = contraption.entity;
         if (entity == null) {
