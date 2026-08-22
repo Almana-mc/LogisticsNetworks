@@ -107,9 +107,13 @@ sourceSets.main.get().resources.srcDir("src/generated/resources")
 dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
 
-    compileOnly("com.simibubi.create:create-${minecraft_version}:${create_version}")
+    compileOnly("com.simibubi.create:create-${minecraft_version}:${create_version}") {
+        isTransitive = false
+    }
     if (create_runtime.get()) {
-        runtimeOnly("com.simibubi.create:create-${minecraft_version}:${create_version}")
+        runtimeOnly("com.simibubi.create:create-${minecraft_version}:${create_version}") {
+            isTransitive = false
+        }
     }
 
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
