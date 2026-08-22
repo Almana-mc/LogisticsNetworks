@@ -382,6 +382,9 @@ public class TransferEngine {
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         boolean anyReachable = false;
+        boolean hasUsableTarget = false;
+        boolean hasUnavailableMountedTarget = false;
+        boolean hasStationaryTarget = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
         ItemStack[] exportFilters = exportChannel.getFilterItems();
         boolean[] sourceAllowedSlots = null;
@@ -396,6 +399,7 @@ public class TransferEngine {
                 continue;
 
             anyReachable = true;
+            hasStationaryTarget |= !target.node.isMountedOnCreate();
             ServerLevel targetLevel = (ServerLevel) target.node.level();
             BlockPos targetPos = target.node.getAttachedPos();
             if (!target.node.isMountedOnCreate() && !targetLevel.isLoaded(targetPos))
@@ -405,8 +409,11 @@ public class TransferEngine {
                 continue;
 
             IItemHandler targetHandler = capCache.findItemHandler(target.node, target.channel.getIoDirection());
-            if (targetHandler == null)
+            if (targetHandler == null) {
+                hasUnavailableMountedTarget |= target.node.isMountedOnCreate();
                 continue;
+            }
+            hasUsableTarget = true;
             if (sourceHandler == targetHandler)
                 continue;
 
@@ -428,6 +435,9 @@ public class TransferEngine {
                     hasImportSlotMapping));
         }
         if (!anyReachable)
+            return -1;
+        if (shouldPauseForUnavailableMountedTargets(hasUsableTarget, hasUnavailableMountedTarget,
+                hasStationaryTarget))
             return -1;
         if (reachableTargets.isEmpty())
             return 0;
@@ -454,6 +464,9 @@ public class TransferEngine {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitMb;
         boolean anyReachable = false;
+        boolean hasUsableTarget = false;
+        boolean hasUnavailableMountedTarget = false;
+        boolean hasStationaryTarget = false;
         FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
 
         for (ImportTarget target : targets) {
@@ -467,14 +480,18 @@ public class TransferEngine {
                 continue;
 
             anyReachable = true;
+            hasStationaryTarget |= !target.node.isMountedOnCreate();
             ServerLevel targetLevel = (ServerLevel) target.node.level();
             BlockPos targetPos = target.node.getAttachedPos();
             if (!target.node.isMountedOnCreate() && !targetLevel.isLoaded(targetPos))
                 continue;
 
             IFluidHandler targetHandler = capCache.findFluidHandler(target.node, target.channel.getIoDirection());
-            if (targetHandler == null)
+            if (targetHandler == null) {
+                hasUnavailableMountedTarget |= target.node.isMountedOnCreate();
                 continue;
+            }
+            hasUsableTarget = true;
             if (sourceHandler == targetHandler)
                 continue;
 
@@ -486,7 +503,8 @@ public class TransferEngine {
                 remaining -= filled;
         }
 
-        if (!anyReachable)
+        if (!anyReachable || shouldPauseForUnavailableMountedTargets(hasUsableTarget, hasUnavailableMountedTarget,
+                hasStationaryTarget))
             return -1;
         return batchLimitMb - remaining;
     }
@@ -1173,5 +1191,10 @@ public class TransferEngine {
 
     private static boolean canRunChannel(LogisticsNodeEntity node, ChannelData channel) {
         return canRunChannel(node.isMountedOnCreate(), channel.getType(), channel.getRedstoneMode());
+    }
+
+    static boolean shouldPauseForUnavailableMountedTargets(boolean hasUsableTarget,
+            boolean hasUnavailableMountedTarget, boolean hasStationaryTarget) {
+        return !hasUsableTarget && hasUnavailableMountedTarget && !hasStationaryTarget;
     }
 }
