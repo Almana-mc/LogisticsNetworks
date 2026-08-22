@@ -392,6 +392,10 @@ public class FilterMenu extends AbstractContainerMenu {
         return nodeSource != null;
     }
 
+    public boolean canScanAttachedStorage() {
+        return nodeSource != null && !isSpecialMode;
+    }
+
     @Nullable
     public LogisticsNodeEntity getNodeSource() {
         return nodeSource;
@@ -403,6 +407,17 @@ public class FilterMenu extends AbstractContainerMenu {
 
     public int getNodeFilterSlot() {
         return nodeFilterSlot;
+    }
+
+    public void refreshFilterEntries() {
+        loadFilterItems(getOpenedStack(), player.level().registryAccess());
+        broadcastChanges();
+    }
+
+    public void applySyncedFilter(ItemStack filter) {
+        ChannelData channel = nodeSource.getChannel(nodeChannel);
+        channel.setFilterItem(nodeFilterSlot, filter.copyWithCount(1));
+        refreshFilterEntries();
     }
 
     public String getNameFilter() {

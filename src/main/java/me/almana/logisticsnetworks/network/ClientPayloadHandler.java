@@ -1,9 +1,11 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
+import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.menu.FilterMenu;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 import net.minecraft.client.Minecraft;
@@ -76,6 +78,19 @@ public class ClientPayloadHandler {
                 if (channel != null) {
                     channel.load(payload.channelData(), player.level().registryAccess());
                 }
+            }
+        });
+    }
+
+    public static void handleSyncFilterScanResult(SyncFilterScanResultPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var minecraft = Minecraft.getInstance();
+            if (minecraft.player != null
+                    && minecraft.player.containerMenu instanceof FilterMenu menu
+                    && minecraft.screen instanceof FilterScreen screen
+                    && menu.canScanAttachedStorage()) {
+                menu.applySyncedFilter(payload.filter());
+                screen.showScanResult(payload.added(), payload.storageFound(), payload.filterFull());
             }
         });
     }

@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.network;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.logic.AttachedStorageFilterScanner;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.filter.*;
@@ -769,6 +770,32 @@ public class ServerPayloadHandler {
                     (id, inv, p) -> new FilterMenu(id, inv, slotIndex),
                     stack.getHoverName()),
                     buf -> FilterMenu.writeMenuData(buf, slotIndex, slotCount, isMod, false, isName));
+        });
+    }
+
+    public static void handleScanAttachedStorage(ScanAttachedStoragePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof FilterMenu menu)
+                    || !menu.canScanAttachedStorage()) {
+                return;
+            }
+
+            LogisticsNodeEntity node = menu.getNodeSource();
+            ChannelData channel = node.getChannel(menu.getNodeChannel());
+            if (!(node.level() instanceof ServerLevel level) || channel == null) {
+                return;
+            }
+
+            ItemStack filter = menu.getOpenedStack();
+            AttachedStorageFilterScanner.Result result = AttachedStorageFilterScanner.scan(
+                    level, node, channel, filter);
+            if (result.added() > 0) {
+                menu.refreshFilterEntries();
+                markNetworkDirty(node);
+            }
+            PacketDistributor.sendToPlayer(player, new SyncFilterScanResultPayload(
+                    filter.copyWithCount(1), result.added(), result.storageFound(), result.filterFull()));
         });
     }
 
