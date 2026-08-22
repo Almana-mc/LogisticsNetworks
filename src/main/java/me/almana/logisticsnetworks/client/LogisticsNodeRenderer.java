@@ -51,7 +51,6 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
     private static final float BLOCK_MAX = 0.5f;
     private static final float BLOCK_BOTTOM = 0.0f;
     private static final float BLOCK_TOP = 1.0f;
-    private static final float HIGHLIGHT_EPS = 0.001f;
     private static final double SHAPE_SIDE_EPS = 1.0E-4;
     private final NodeModel<LogisticsNodeEntity> model;
 
@@ -104,9 +103,10 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         }
 
         if (isHighlighted) {
-            renderHighlightBox(poseStack, buffer, 0.15f, 0.45f, 1.0f, 0.35f, true);
+            NodeHighlightRenderer.queue(context, 0.15F, 0.45F, 1.0F, 0.35F, true);
         } else if (isHoldingWrench) {
-            renderWrenchOverlay(entity, context.rotation(), poseStack, buffer, light);
+            NodeHighlightRenderer.queue(context, 0.0F, 1.0F, 0.0F, 0.35F, false);
+            renderWrenchDebug(entity, context.rotation(), poseStack, buffer, light);
         }
         poseStack.popPose();
 
@@ -168,10 +168,8 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         return true;
     }
 
-    private void renderWrenchOverlay(LogisticsNodeEntity entity, Quaternionf rotation, PoseStack poseStack,
+    private void renderWrenchDebug(LogisticsNodeEntity entity, Quaternionf rotation, PoseStack poseStack,
             MultiBufferSource buffer, int light) {
-        renderHighlightBox(poseStack, buffer, 0f, 1f, 0f, 0.35f, false);
-
         if (Config.debugMode) {
             poseStack.pushPose();
             poseStack.translate(0.0, -0.75, 0.0);
@@ -200,55 +198,6 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         renderLabel(entity, channels.toString(), inverseRotation, poseStack, buffer, light);
 
         poseStack.popPose();
-    }
-
-    private void renderHighlightBox(PoseStack poseStack, MultiBufferSource buffer, float r, float g, float b,
-            float a, boolean xray) {
-        RenderBounds bounds = RenderBounds.fullBlock();
-
-        float minX = bounds.minX() - HIGHLIGHT_EPS;
-        float maxX = bounds.maxX() + HIGHLIGHT_EPS;
-        float minY = bounds.minY() - HIGHLIGHT_EPS;
-        float maxY = bounds.maxY() + HIGHLIGHT_EPS;
-        float minZ = bounds.minZ() - HIGHLIGHT_EPS;
-        float maxZ = bounds.maxZ() + HIGHLIGHT_EPS;
-
-        VertexConsumer builder = buffer.getBuffer(xray ? ModRenderTypes.OVERLAY_XRAY : ModRenderTypes.OVERLAY);
-        Matrix4f matrix = poseStack.last().pose();
-        renderHighlightCuboid(builder, matrix, minX, minY, minZ, maxX, maxY, maxZ, r, g, b, a);
-    }
-
-    private static void renderHighlightCuboid(VertexConsumer builder, Matrix4f matrix, float minX, float minY,
-            float minZ, float maxX, float maxY, float maxZ, float r, float g, float b, float a) {
-        builder.addVertex(matrix, minX, maxY, minZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, minX, maxY, maxZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, maxX, maxY, maxZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, maxX, maxY, minZ).setColor(r, g, b, a);
-
-        builder.addVertex(matrix, maxX, minY, minZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, maxX, minY, maxZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, minX, minY, maxZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, minX, minY, minZ).setColor(r, g, b, a);
-
-        builder.addVertex(matrix, minX, maxY, minZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, minX, minY, minZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, minX, minY, maxZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, minX, maxY, maxZ).setColor(r, g, b, a);
-
-        builder.addVertex(matrix, maxX, maxY, maxZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, maxX, minY, maxZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, maxX, minY, minZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, maxX, maxY, minZ).setColor(r, g, b, a);
-
-        builder.addVertex(matrix, maxX, maxY, minZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, maxX, minY, minZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, minX, minY, minZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, minX, maxY, minZ).setColor(r, g, b, a);
-
-        builder.addVertex(matrix, minX, maxY, maxZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, minX, minY, maxZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, maxX, minY, maxZ).setColor(r, g, b, a);
-        builder.addVertex(matrix, maxX, maxY, maxZ).setColor(r, g, b, a);
     }
 
     private void renderLabel(LogisticsNodeEntity entity, String text, Quaternionf inverseRotation,
@@ -508,10 +457,6 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     private record RenderBounds(float minX, float minY, float minZ, float maxX, float maxY, float maxZ,
             int connections) {
-        static RenderBounds fullBlock() {
-            return new RenderBounds(BLOCK_MIN, BLOCK_BOTTOM, BLOCK_MIN, BLOCK_MAX, BLOCK_TOP, BLOCK_MAX,
-                    NodeConnectionMask.NONE);
-        }
     }
 
     @Override
