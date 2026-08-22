@@ -50,10 +50,15 @@ public class TransferEngine {
     private record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
     }
 
-    private record ItemTransferTarget(IItemHandler handler, @Nullable IItemHandler bulkHandler,
+    public record ItemTransferTarget(IItemHandler handler, @Nullable IItemHandler bulkHandler,
             ItemStack[] importFilters,
             FilterMode importFilterMode, TransferAmountRules.Constraints constraints, boolean hasItemNbtFilter,
             boolean[] allowedSlots, boolean hasImportSlotMapping) {
+    }
+
+    @FunctionalInterface
+    public interface MoveRecorder {
+        void record(int sourceSlot, int targetIndex, ItemStack moved, boolean[] targetSlotMask);
     }
 
     public static long processNetwork(LogisticsNetwork network, MinecraftServer server) {
@@ -446,7 +451,7 @@ public class TransferEngine {
                 exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
-                sourceLevel, sourcePos, filterReadCache);
+                sourceLevel, sourcePos, filterReadCache, null);
     }
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -707,11 +712,13 @@ public class TransferEngine {
                 && targetPos.relative(ChestBlock.getConnectedDirection(targetState)).equals(sourcePos);
     }
 
-    private static int executeMove(IItemHandler source, List<ItemTransferTarget> targets, int limit,
+    public static int executeMove(IItemHandler source, List<ItemTransferTarget> targets, int limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             boolean[] sourceAllowedSlots,
             HolderLookup.Provider provider,
-            ServerLevel sourceLevel, BlockPos sourcePos, FilterItemData.ReadCache filterReadCache) {
+            @Nullable ServerLevel sourceLevel, @Nullable BlockPos sourcePos,
+            FilterItemData.ReadCache filterReadCache,
+            @Nullable MoveRecorder recorder) {
 
         int remaining = limit;
         boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, filterReadCache);
@@ -890,8 +897,10 @@ public class TransferEngine {
                                     LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
                                             + "target slot mask. Dropping at source pos {}.",
                                             forcedRemainder, sourcePos);
-                                    droppedToWorld = forcedRemainder.getCount();
-                                    Block.popResource(sourceLevel, sourcePos, forcedRemainder);
+                                    if (sourceLevel != null && sourcePos != null) {
+                                        droppedToWorld = forcedRemainder.getCount();
+                                        Block.popResource(sourceLevel, sourcePos, forcedRemainder);
+                                    }
                                 }
                             }
                         }
@@ -899,6 +908,9 @@ public class TransferEngine {
 
                     int sourceLost = targetAccepted + droppedToWorld;
                     if (sourceLost > 0) {
+                        if (recorder != null) {
+                            recorder.record(slot, targetIndex, toMove.copyWithCount(sourceLost), importAllowedSlots);
+                        }
                         movedAny = true;
                         movedForTarget = true;
                         remaining -= sourceLost;
