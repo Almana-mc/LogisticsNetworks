@@ -10,9 +10,13 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix3f;
+import org.joml.Quaternionf;
 
 import java.lang.ref.WeakReference;
 import java.util.UUID;
@@ -106,5 +110,35 @@ public final class CreateNodeAttachment {
     public static boolean isResolved(LogisticsNodeEntity node) {
         AbstractContraptionEntity entity = findContraption(node);
         return entity != null && entity.getContraption().getBlocks().containsKey(node.getCreateLocalPos());
+    }
+
+    @Nullable
+    public static NodeRenderContext getRenderContext(LogisticsNodeEntity node, float partialTick) {
+        AbstractContraptionEntity entity = findContraption(node);
+        if (entity == null || !entity.getContraption().getBlocks().containsKey(node.getCreateLocalPos())) {
+            return null;
+        }
+        Vec3 x = entity.applyRotation(new Vec3(1, 0, 0), partialTick);
+        Vec3 y = entity.applyRotation(new Vec3(0, 1, 0), partialTick);
+        Vec3 z = entity.applyRotation(new Vec3(0, 0, 1), partialTick);
+        Matrix3f matrix = new Matrix3f().set(
+                (float) x.x, (float) y.x, (float) z.x,
+                (float) x.y, (float) y.y, (float) z.y,
+                (float) x.z, (float) y.z, (float) z.z);
+        Quaternionf rotation = new Quaternionf().setFromNormalized(matrix);
+        BlockPos localPos = node.getCreateLocalPos();
+        return new NodeRenderContext(
+                entity.toGlobalVector(Vec3.atBottomCenterOf(localPos), partialTick),
+                rotation,
+                entity.getContraption().getContraptionWorld(),
+                localPos,
+                NodeAttachmentKey.mounted(entity.getUUID(), localPos));
+    }
+
+    public static BlockState getAttachedBlockState(LogisticsNodeEntity node) {
+        AbstractContraptionEntity entity = findContraption(node);
+        return entity == null
+                ? Blocks.AIR.defaultBlockState()
+                : entity.getContraption().getContraptionWorld().getBlockState(node.getCreateLocalPos());
     }
 }

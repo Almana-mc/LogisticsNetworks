@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.network;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.logic.AttachedStorageFilterScanner;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
@@ -886,11 +887,10 @@ public class ServerPayloadHandler {
                     Entity entity = level.getEntity(nodeId);
                     if (entity instanceof LogisticsNodeEntity node) {
                         BlockPos attachedPos = node.getAttachedPos();
-                        String blockName = "unknown";
-                        if (level.isLoaded(attachedPos)) {
-                            BlockState state = level.getBlockState(attachedPos);
-                            blockName = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-                        }
+                        BlockState state = CreateCompat.getAttachedBlockState(node);
+                        String blockName = state.isAir()
+                                ? "unknown"
+                                : BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                         nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
                                 nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
                                 level.dimension().location(), node.isRenderVisible(), node.isHighlighted()));
