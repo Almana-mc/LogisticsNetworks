@@ -29,6 +29,7 @@ val emi_version: String by project
 val guideme_version: String by project
 val sophisticated_core_version: String by project
 val create_version: String by project
+val ponder_version: String by project
 val create_runtime = providers.gradleProperty("create_runtime").orElse("true").map { it.toBoolean() }
 
 version = "${minecraft_version}-${mod_version}"
@@ -108,6 +109,9 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
 
     compileOnly("com.simibubi.create:create-${minecraft_version}:${create_version}") {
+        isTransitive = false
+    }
+    compileOnly("net.createmod.ponder:ponder-neoforge:${ponder_version}") {
         isTransitive = false
     }
     if (create_runtime.get()) {
