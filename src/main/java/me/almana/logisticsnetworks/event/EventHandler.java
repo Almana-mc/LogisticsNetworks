@@ -10,6 +10,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -30,7 +31,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -103,7 +103,7 @@ public class EventHandler {
         List<LogisticsNodeEntity> nodes = level.getEntitiesOfClass(LogisticsNodeEntity.class,
                 new AABB(pos).inflate(0.5));
         for (LogisticsNodeEntity node : nodes) {
-            if (node.getAttachedPos().equals(pos) && node.isActive()) {
+            if (!node.isMountedOnCreate() && node.getAttachedPos().equals(pos) && node.isActive()) {
                 event.setUseBlock(TriState.FALSE);
                 return;
             }
@@ -120,7 +120,7 @@ public class EventHandler {
         NetworkRegistry registry = NetworkRegistry.get(level);
 
         for (LogisticsNodeEntity node : nodes) {
-            if (!node.isActive() || node.getNetworkId() == null)
+            if (node.isMountedOnCreate() || !node.isActive() || node.getNetworkId() == null)
                 continue;
 
             if (node.getAttachedPos().equals(event.getPos())) {
@@ -154,7 +154,7 @@ public class EventHandler {
                 new AABB(pos).inflate(0.1));
 
         for (LogisticsNodeEntity node : nodes) {
-            if (node.getAttachedPos().equals(pos)) {
+            if (!node.isMountedOnCreate() && node.getAttachedPos().equals(pos)) {
                 if (node.getNetworkId() != null) {
                     NetworkRegistry registry = NetworkRegistry.get(serverLevel);
                     registry.removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
@@ -189,10 +189,11 @@ public class EventHandler {
         return warnings;
     }
 
-    private static List<String> getBlacklistedResourceIds(ServerLevel level, BlockPos pos) {
+    private static List<String> getBlacklistedResourceIds(ServerLevel level, LogisticsNodeEntity node) {
         List<String> ids = new ArrayList<>();
+        TransferCapabilityCache capabilities = NetworkRegistry.get(level).getCapabilityCache();
 
-        IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
+        IItemHandler itemHandler = capabilities.findItemHandler(node, null);
         if (itemHandler != null) {
             for (int slot = 0; slot < itemHandler.getSlots(); slot++) {
                 ItemStack stack = itemHandler.getStackInSlot(slot);
@@ -204,7 +205,7 @@ public class EventHandler {
             }
         }
 
-        IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null);
+        IFluidHandler fluidHandler = capabilities.findFluidHandler(node, null);
         if (fluidHandler != null) {
             for (int tank = 0; tank < fluidHandler.getTanks(); tank++) {
                 FluidStack fluid = fluidHandler.getFluidInTank(tank);
@@ -217,7 +218,9 @@ public class EventHandler {
             }
         }
 
-        ids.addAll(MekanismCompat.getBlacklistedChemicalNames(level, pos));
+        if (!node.isMountedOnCreate()) {
+            ids.addAll(MekanismCompat.getBlacklistedChemicalNames(level, node.getAttachedPos()));
+        }
         return ids;
     }
 
@@ -236,8 +239,7 @@ public class EventHandler {
                             Component.translatable("gui.logisticsnetworks.dimensional_upgrade_warning"));
                 }
 
-                BlockPos attachedPos = node.getAttachedPos();
-                List<String> blacklisted = getBlacklistedResourceIds(level, attachedPos);
+                List<String> blacklisted = getBlacklistedResourceIds(level, node);
                 if (!blacklisted.isEmpty()) {
                     MutableComponent msg = Component.translatable("gui.logisticsnetworks.blacklisted_resource_warning")
                             .withStyle(ChatFormatting.RED);
@@ -271,7 +273,8 @@ public class EventHandler {
             List<LogisticsNodeEntity> nodes = level.getEntitiesOfClass(LogisticsNodeEntity.class,
                     new AABB(containerPos).inflate(0.1));
             for (LogisticsNodeEntity node : nodes) {
-                if (node.isActive() && node.getNetworkId() != null && node.getAttachedPos().equals(containerPos)) {
+                if (!node.isMountedOnCreate() && node.isActive() && node.getNetworkId() != null
+                        && node.getAttachedPos().equals(containerPos)) {
                     NetworkRegistry.get(level).markNetworkDirty(node.getNetworkId());
                 }
             }

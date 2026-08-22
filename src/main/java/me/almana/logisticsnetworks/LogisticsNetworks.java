@@ -35,11 +35,13 @@ import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
 import me.almana.logisticsnetworks.network.SetNameFilterPayload;
+import me.almana.logisticsnetworks.network.ScanAttachedStoragePayload;
 import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncChannelDataPayload;
 import me.almana.logisticsnetworks.network.SyncChannelListPayload;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
+import me.almana.logisticsnetworks.network.SyncFilterScanResultPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
@@ -138,6 +140,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetNameFilter);
                 registrar.playToServer(OpenFilterInSlotPayload.TYPE, OpenFilterInSlotPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleOpenFilterInSlot);
+                registrar.playToServer(ScanAttachedStoragePayload.TYPE, ScanAttachedStoragePayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleScanAttachedStorage);
                 registrar.playToServer(ToggleNodeVisibilityPayload.TYPE, ToggleNodeVisibilityPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleToggleVisibility);
                 registrar.playToServer(SetDefaultNodeVisibilityPayload.TYPE,
@@ -190,6 +194,8 @@ public class LogisticsNetworks {
                                 ClientPayloadHandler::handleSyncNetworkLabels);
                 registrar.playToClient(SyncChannelDataPayload.TYPE, SyncChannelDataPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncChannelData);
+                registrar.playToClient(SyncFilterScanResultPayload.TYPE, SyncFilterScanResultPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncFilterScanResult);
                 registrar.playToClient(SyncTelemetryPayload.TYPE, SyncTelemetryPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncTelemetry);
                 registrar.playToClient(SyncChannelListPayload.TYPE, SyncChannelListPayload.STREAM_CODEC,

@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
@@ -139,8 +140,10 @@ public class TransferEngine {
             if (hasExport)
                 hasAnyExporter = true;
 
-            if (node.level() instanceof ServerLevel level) {
+            if (!node.isMountedOnCreate() && node.level() instanceof ServerLevel level) {
                 signalCache.put(node.getUUID(), needsSignal ? level.getBestNeighborSignal(node.getAttachedPos()) : 0);
+            } else if (node.isMountedOnCreate()) {
+                signalCache.put(node.getUUID(), 0);
             }
         }
 
@@ -185,6 +188,8 @@ public class TransferEngine {
                 ChannelData cd = node.getChannel(i);
                 if (cd == null)
                     continue;
+                if (!canRunChannel(node, cd) || !CreateCompat.isResolved(node))
+                    continue;
                 int sig = signalCache.getOrDefault(ref.nodeId(), 0);
                 if (!isRedstoneActive(cd.getRedstoneMode(), sig))
                     continue;
@@ -222,6 +227,8 @@ public class TransferEngine {
                 continue;
             if (channel.getMode() != ChannelMode.EXPORT)
                 continue;
+            if (!canRunChannel(sourceNode, channel) || !CreateCompat.isResolved(sourceNode))
+                continue;
             if (!isRedstoneActive(channel.getRedstoneMode(), redstoneSignal))
                 continue;
 
@@ -235,6 +242,16 @@ public class TransferEngine {
 
             if (targets == null || targets.isEmpty())
                 continue;
+
+            if (sourceNode.isMountedOnCreate()) {
+                boolean storageAvailable = switch (channel.getType()) {
+                    case ITEM -> capCache.findItemHandler(sourceNode, channel.getIoDirection()) != null;
+                    case FLUID -> capCache.findFluidHandler(sourceNode, channel.getIoDirection()) != null;
+                    default -> false;
+                };
+                if (!storageAvailable)
+                    continue;
+            }
 
             long cooldown = cooldownRemaining(sourceNode, channel, i, sourceTier, gameTime);
             if (cooldown > 0) {
@@ -357,14 +374,17 @@ public class TransferEngine {
             Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
-        if (!sourceLevel.isLoaded(sourcePos))
+        if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos))
             return -1;
-        IItemHandler sourceHandler = capCache.findItemHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
+        IItemHandler sourceHandler = capCache.findItemHandler(sourceNode, exportChannel.getIoDirection());
         if (sourceHandler == null)
             return -1;
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         boolean anyReachable = false;
+        boolean hasUsableTarget = false;
+        boolean hasUnavailableMountedTarget = false;
+        boolean hasStationaryTarget = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
         ItemStack[] exportFilters = exportChannel.getFilterItems();
         boolean[] sourceAllowedSlots = null;
@@ -379,15 +399,22 @@ public class TransferEngine {
                 continue;
 
             anyReachable = true;
+            hasStationaryTarget |= !target.node.isMountedOnCreate();
             ServerLevel targetLevel = (ServerLevel) target.node.level();
             BlockPos targetPos = target.node.getAttachedPos();
-            if (!targetLevel.isLoaded(targetPos))
+            if (!target.node.isMountedOnCreate() && !targetLevel.isLoaded(targetPos))
                 continue;
-            if (isSameItemStorage(sourceLevel, sourcePos, targetLevel, targetPos))
+            if (!sourceNode.isMountedOnCreate() && !target.node.isMountedOnCreate()
+                    && isSameItemStorage(sourceLevel, sourcePos, targetLevel, targetPos))
                 continue;
 
-            IItemHandler targetHandler = capCache.findItemHandler(targetLevel, targetPos, target.channel.getIoDirection());
-            if (targetHandler == null)
+            IItemHandler targetHandler = capCache.findItemHandler(target.node, target.channel.getIoDirection());
+            if (targetHandler == null) {
+                hasUnavailableMountedTarget |= target.node.isMountedOnCreate();
+                continue;
+            }
+            hasUsableTarget = true;
+            if (sourceHandler == targetHandler)
                 continue;
 
             ItemStack[] importFilters = target.channel.getFilterItems();
@@ -395,7 +422,7 @@ public class TransferEngine {
             boolean hasImportSlotMapping = FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache);
             IItemHandler bulkHandler = hasImportSlotMapping
                     ? null
-                    : capCache.findBulkItemHandler(targetLevel, targetPos, targetHandler);
+                    : capCache.findBulkItemHandler(target.node, targetHandler);
 
             reachableTargets.add(new ItemTransferTarget(
                     targetHandler,
@@ -408,6 +435,9 @@ public class TransferEngine {
                     hasImportSlotMapping));
         }
         if (!anyReachable)
+            return -1;
+        if (shouldPauseForUnavailableMountedTargets(hasUsableTarget, hasUnavailableMountedTarget,
+                hasStationaryTarget))
             return -1;
         if (reachableTargets.isEmpty())
             return 0;
@@ -424,9 +454,9 @@ public class TransferEngine {
             Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
-        if (!sourceLevel.isLoaded(sourcePos))
+        if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos))
             return -1;
-        IFluidHandler sourceHandler = capCache.findFluidHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
+        IFluidHandler sourceHandler = capCache.findFluidHandler(sourceNode, exportChannel.getIoDirection());
         if (sourceHandler == null)
             return -1;
 
@@ -434,6 +464,9 @@ public class TransferEngine {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitMb;
         boolean anyReachable = false;
+        boolean hasUsableTarget = false;
+        boolean hasUnavailableMountedTarget = false;
+        boolean hasStationaryTarget = false;
         FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
 
         for (ImportTarget target : targets) {
@@ -447,13 +480,19 @@ public class TransferEngine {
                 continue;
 
             anyReachable = true;
+            hasStationaryTarget |= !target.node.isMountedOnCreate();
             ServerLevel targetLevel = (ServerLevel) target.node.level();
             BlockPos targetPos = target.node.getAttachedPos();
-            if (!targetLevel.isLoaded(targetPos))
+            if (!target.node.isMountedOnCreate() && !targetLevel.isLoaded(targetPos))
                 continue;
 
-            IFluidHandler targetHandler = capCache.findFluidHandler(targetLevel, targetPos, target.channel.getIoDirection());
-            if (targetHandler == null)
+            IFluidHandler targetHandler = capCache.findFluidHandler(target.node, target.channel.getIoDirection());
+            if (targetHandler == null) {
+                hasUnavailableMountedTarget |= target.node.isMountedOnCreate();
+                continue;
+            }
+            hasUsableTarget = true;
+            if (sourceHandler == targetHandler)
                 continue;
 
             int filled = executeFluidMove(sourceHandler, targetHandler, remaining,
@@ -464,7 +503,8 @@ public class TransferEngine {
                 remaining -= filled;
         }
 
-        if (!anyReachable)
+        if (!anyReachable || shouldPauseForUnavailableMountedTargets(hasUsableTarget, hasUnavailableMountedTarget,
+                hasStationaryTarget))
             return -1;
         return batchLimitMb - remaining;
     }
@@ -709,6 +749,7 @@ public class TransferEngine {
         boolean[] openTargets = new boolean[targets.size()];
         Arrays.fill(openTargets, true);
         int openTargetCount = targets.size();
+        BulkInsertRejectionCache bulkInsertRejections = null;
 
         // Serialize each source slot once across the target loop
         CompoundTag[] slotComponents = hasNbtFilter ? new CompoundTag[source.getSlots()] : null;
@@ -723,6 +764,7 @@ public class TransferEngine {
                 }
 
                 ItemTransferTarget target = targets.get(targetIndex);
+                IItemHandler bulkHandler = target.bulkHandler();
                 boolean movedForTarget = false;
 
                 for (int slot = 0; slot < source.getSlots() && remaining > 0; slot++) {
@@ -801,8 +843,17 @@ public class TransferEngine {
                     }
 
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
-                    ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), target.bulkHandler(),
-                            simulatedInsert, true, importAllowedSlots);
+                    ItemStack simRemainder;
+                    if (bulkHandler != null) {
+                        if (bulkInsertRejections == null) {
+                            bulkInsertRejections = new BulkInsertRejectionCache(
+                                    (handler, stack) -> SophisticatedCoreCompat.insertItem(handler, stack, true));
+                        }
+                        simRemainder = bulkInsertRejections.simulate(bulkHandler, simulatedInsert);
+                    } else {
+                        simRemainder = insertItemWithAllowedSlots(target.handler(), null,
+                                simulatedInsert, true, importAllowedSlots);
+                    }
                     int acceptableCount = allowed - simRemainder.getCount();
                     if (acceptableCount <= 0) {
                         continue;
@@ -813,9 +864,12 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), target.bulkHandler(),
+                    ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), bulkHandler,
                             toMove, false, importAllowedSlots);
                     int targetAccepted = toMove.getCount() - uninserted.getCount();
+                    if (targetAccepted > 0 && bulkHandler != null) {
+                        bulkInsertRejections.clear(bulkHandler);
+                    }
                     int droppedToWorld = 0;
 
                     if (!uninserted.isEmpty()) {
@@ -826,9 +880,12 @@ public class TransferEngine {
                             }
                             if (!stillLeft.isEmpty()) {
                                 ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(),
-                                        target.bulkHandler(), stillLeft, false, importAllowedSlots);
+                                        bulkHandler, stillLeft, false, importAllowedSlots);
                                 int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
                                 targetAccepted += forcedIn;
+                                if (forcedIn > 0 && bulkHandler != null) {
+                                    bulkInsertRejections.clear(bulkHandler);
+                                }
                                 if (!forcedRemainder.isEmpty()) {
                                     LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
                                             + "target slot mask. Dropping at source pos {}.",
@@ -1122,5 +1179,22 @@ public class TransferEngine {
             case HIGH -> signalStrength > 0;
             case LOW -> signalStrength == 0;
         };
+    }
+
+    static boolean canRunChannel(boolean mounted, ChannelType type, RedstoneMode redstoneMode) {
+        if (!mounted) {
+            return true;
+        }
+        return redstoneMode == RedstoneMode.ALWAYS_ON
+                && (type == ChannelType.ITEM || type == ChannelType.FLUID);
+    }
+
+    private static boolean canRunChannel(LogisticsNodeEntity node, ChannelData channel) {
+        return canRunChannel(node.isMountedOnCreate(), channel.getType(), channel.getRedstoneMode());
+    }
+
+    static boolean shouldPauseForUnavailableMountedTargets(boolean hasUsableTarget,
+            boolean hasUnavailableMountedTarget, boolean hasStationaryTarget) {
+        return !hasUsableTarget && hasUnavailableMountedTarget && !hasStationaryTarget;
     }
 }

@@ -1,8 +1,10 @@
 package me.almana.logisticsnetworks.entity;
 
 import me.almana.logisticsnetworks.data.ChannelData;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -25,6 +27,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -53,6 +56,8 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_OWNER_UUID = "OwnerUUID";
     private static final String KEY_NODE_LABEL = "NodeLabel";
     private static final String KEY_HIGHLIGHTED = "Highlighted";
+    private static final String KEY_CREATE_CONTRAPTION_ID = "CreateContraptionId";
+    private static final String KEY_CREATE_LOCAL_POS = "CreateLocalPos";
 
     private static final EntityDataAccessor<BlockPos> ATTACHED_POS = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -70,6 +75,10 @@ public class LogisticsNodeEntity extends Entity {
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> HIGHLIGHTED = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Optional<UUID>> CREATE_CONTRAPTION_ID = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<BlockPos> CREATE_LOCAL_POS = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
 
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
@@ -105,6 +114,8 @@ public class LogisticsNodeEntity extends Entity {
         builder.define(OWNER_UUID, Optional.empty());
         builder.define(NODE_LABEL, "");
         builder.define(HIGHLIGHTED, false);
+        builder.define(CREATE_CONTRAPTION_ID, Optional.empty());
+        builder.define(CREATE_LOCAL_POS, BlockPos.ZERO);
     }
 
     @Override
@@ -131,6 +142,15 @@ public class LogisticsNodeEntity extends Entity {
         }
         if (compound.contains(KEY_HIGHLIGHTED)) {
             setHighlighted(compound.getBoolean(KEY_HIGHLIGHTED));
+        }
+        if (compound.contains(KEY_CREATE_CONTRAPTION_ID)) {
+            entityData.set(CREATE_CONTRAPTION_ID, Optional.of(compound.getUUID(KEY_CREATE_CONTRAPTION_ID)));
+            entityData.set(CREATE_LOCAL_POS, compound.contains(KEY_CREATE_LOCAL_POS)
+                    ? BlockPos.of(compound.getLong(KEY_CREATE_LOCAL_POS))
+                    : BlockPos.ZERO);
+        } else {
+            entityData.set(CREATE_CONTRAPTION_ID, Optional.empty());
+            entityData.set(CREATE_LOCAL_POS, BlockPos.ZERO);
         }
 
         HolderLookup.Provider provider = this.registryAccess();
@@ -184,6 +204,12 @@ public class LogisticsNodeEntity extends Entity {
         }
         compound.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
 
+        UUID createContraptionId = getCreateContraptionId();
+        if (createContraptionId != null) {
+            compound.putUUID(KEY_CREATE_CONTRAPTION_ID, createContraptionId);
+            compound.putLong(KEY_CREATE_LOCAL_POS, getCreateLocalPos().asLong());
+        }
+
         HolderLookup.Provider provider = registryAccess();
 
         CompoundTag channelsTag = new CompoundTag();
@@ -208,6 +234,10 @@ public class LogisticsNodeEntity extends Entity {
 
     @Override
     public void tick() {
+        if (isMountedOnCreate()) {
+            CreateCompat.tickMountedNode(this);
+            return;
+        }
         if (this.level().isClientSide()) return;
 
         BlockPos attached = getAttachedPos();
@@ -291,6 +321,47 @@ public class LogisticsNodeEntity extends Entity {
         }
     }
 
+    public boolean isMountedOnCreate() {
+        return entityData.get(CREATE_CONTRAPTION_ID).isPresent();
+    }
+
+    @Nullable
+    public UUID getCreateContraptionId() {
+        return entityData.get(CREATE_CONTRAPTION_ID).orElse(null);
+    }
+
+    public BlockPos getCreateLocalPos() {
+        return entityData.get(CREATE_LOCAL_POS);
+    }
+
+    public void mountOnCreate(UUID contraptionId, BlockPos localPos) {
+        entityData.set(CREATE_CONTRAPTION_ID, Optional.of(contraptionId));
+        entityData.set(CREATE_LOCAL_POS, localPos.immutable());
+        if (level() instanceof ServerLevel serverLevel && getNetworkId() != null) {
+            NetworkRegistry registry = NetworkRegistry.get(serverLevel);
+            registry.evictCapabilities(serverLevel, getAttachedPos());
+            registry.markNetworkDirty(getNetworkId());
+        }
+    }
+
+    public void updateMountedPosition(Vec3 position) {
+        setPos(position);
+        setAttachedPos(BlockPos.containing(position));
+    }
+
+    public void dismountFromCreate(BlockPos attachedPos, Vec3 position,
+            UnaryOperator<Direction> directionTransform) {
+        entityData.set(CREATE_CONTRAPTION_ID, Optional.empty());
+        entityData.set(CREATE_LOCAL_POS, BlockPos.ZERO);
+        for (ChannelData channel : channels) {
+            Direction direction = channel.getIoDirection();
+            if (direction != null) {
+                channel.setIoDirection(directionTransform.apply(direction));
+            }
+        }
+        moveAttachment(attachedPos, position);
+    }
+
     public void setValid(boolean valid) {
         this.entityData.set(VALID, valid);
     }
@@ -354,9 +425,7 @@ public class LogisticsNodeEntity extends Entity {
 
     public boolean isOwnedBy(Player player) {
         UUID owner = getOwnerUUID();
-        if (owner == null) return true;
-        if (owner.equals(player.getUUID())) return true;
-        if (FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(owner, player.getUUID())) return true;
+        if (NodeAccessPolicy.canAccess(owner, player.getUUID())) return true;
         if (player instanceof ServerPlayer sp && sp.hasPermissions(2)) return true;
         return false;
     }

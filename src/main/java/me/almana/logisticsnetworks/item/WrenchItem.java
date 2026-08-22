@@ -144,15 +144,8 @@ public class WrenchItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
-        if (!node.isOwnedBy(player)) {
-            player.displayClientMessage(Component.translatable("message.logisticsnetworks.not_owner"), true);
-            return InteractionResult.FAIL;
-        }
-
         ItemStack wrenchStack = context.getItemInHand();
-        return isSecondaryUse(player)
-                ? pasteToNode(node, player, wrenchStack)
-                : copyFromNode(node, player, wrenchStack);
+        return interactWithMountedNode(node, player, wrenchStack);
     }
 
     private InteractionResult useOnMassPlacementMode(UseOnContext context) {
@@ -519,20 +512,26 @@ public class WrenchItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
+        return interactWithMountedNode(node, player, context.getItemInHand());
+    }
+
+    public InteractionResult interactWithMountedNode(LogisticsNodeEntity node, Player player, ItemStack wrenchStack) {
         if (!node.isOwnedBy(player)) {
             player.displayClientMessage(Component.translatable("message.logisticsnetworks.not_owner"), true);
             return InteractionResult.FAIL;
         }
-
-        // Claim unowned nodes on first interaction
         if (node.getOwnerUUID() == null) {
             node.setOwnerUUID(player.getUUID());
         }
-
-        if (player.isShiftKeyDown()) {
-            return removeNode(level, node, player);
-        }
-        return openNodeGui(node, player);
+        return switch (getMode(wrenchStack)) {
+            case WRENCH -> player.isShiftKeyDown()
+                    ? removeNode(node.level(), node, player)
+                    : openNodeGui(node, player);
+            case COPY_PASTE -> isSecondaryUse(player)
+                    ? pasteToNode(node, player, wrenchStack)
+                    : copyFromNode(node, player, wrenchStack);
+            case MASS_PLACEMENT -> InteractionResult.CONSUME;
+        };
     }
 
     @Override

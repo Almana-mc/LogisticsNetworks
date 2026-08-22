@@ -2,8 +2,10 @@ package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.*;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.logic.AttachedStorageFilterScanner;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.item.*;
@@ -178,10 +180,7 @@ public class ServerPayloadHandler {
             LogisticsNetwork network = registry.getNetwork(payload.networkId().get());
             if (network == null)
                 return null;
-            if (network.getOwnerUuid() != null
-                    && !network.getOwnerUuid().equals(player.getUUID())
-                    && !(FTBTeamsCompat.isLoaded()
-                            && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
                     && !player.hasPermissions(2)) {
                 return null;
             }
@@ -206,10 +205,7 @@ public class ServerPayloadHandler {
             if (network == null)
                 return;
 
-            if (network.getOwnerUuid() != null
-                    && !network.getOwnerUuid().equals(player.getUUID())
-                    && !(FTBTeamsCompat.isLoaded()
-                            && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
                     && !player.hasPermissions(2)) {
                 return;
             }
@@ -778,6 +774,32 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleScanAttachedStorage(ScanAttachedStoragePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof FilterMenu menu)
+                    || !menu.canScanAttachedStorage()) {
+                return;
+            }
+
+            LogisticsNodeEntity node = menu.getNodeSource();
+            ChannelData channel = node.getChannel(menu.getNodeChannel());
+            if (!(node.level() instanceof ServerLevel level) || channel == null) {
+                return;
+            }
+
+            ItemStack filter = menu.getOpenedStack();
+            AttachedStorageFilterScanner.Result result = AttachedStorageFilterScanner.scan(
+                    level, node, channel, filter);
+            if (result.added() > 0) {
+                menu.refreshFilterEntries();
+                markNetworkDirty(node);
+            }
+            PacketDistributor.sendToPlayer(player, new SyncFilterScanResultPayload(
+                    filter.copyWithCount(1), result.added(), result.storageFound(), result.filterFull()));
+        });
+    }
+
     public static void handleApplyPattern(ApplyPatternPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof PatternSetterMenu menu) {
@@ -865,11 +887,10 @@ public class ServerPayloadHandler {
                     Entity entity = level.getEntity(nodeId);
                     if (entity instanceof LogisticsNodeEntity node) {
                         BlockPos attachedPos = node.getAttachedPos();
-                        String blockName = "unknown";
-                        if (level.isLoaded(attachedPos)) {
-                            BlockState state = level.getBlockState(attachedPos);
-                            blockName = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-                        }
+                        BlockState state = CreateCompat.getAttachedBlockState(node);
+                        String blockName = state.isAir()
+                                ? "unknown"
+                                : BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                         nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
                                 nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
                                 level.dimension().location(), node.isRenderVisible(), node.isHighlighted()));
@@ -1214,10 +1235,7 @@ public class ServerPayloadHandler {
     }
 
     private static boolean canAccessNetwork(ServerPlayer player, LogisticsNetwork network) {
-        return network.getOwnerUuid() == null
-                || network.getOwnerUuid().equals(player.getUUID())
-                || (FTBTeamsCompat.isLoaded()
-                        && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
+        return NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
                 || player.hasPermissions(2);
     }
 
