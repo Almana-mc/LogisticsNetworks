@@ -32,13 +32,13 @@ public class SlotNumberOverlay {
 
     private static void toggle() {
         showSlotNumbers = !showSlotNumbers;
+        if (!showSlotNumbers)
+            return;
         LocalPlayer player = Minecraft.getInstance().player;
         if (player != null) {
-            String key = showSlotNumbers
-                    ? "message.logisticsnetworks.slot_numbers.enabled"
-                    : "message.logisticsnetworks.slot_numbers.disabled";
             player.displayClientMessage(
-                    Component.translatable(key, TOGGLE_SLOT_NUMBERS.getTranslatedKeyMessage()), true);
+                    Component.translatable("message.logisticsnetworks.slot_numbers.enabled",
+                            TOGGLE_SLOT_NUMBERS.getTranslatedKeyMessage()), false);
         }
     }
 
