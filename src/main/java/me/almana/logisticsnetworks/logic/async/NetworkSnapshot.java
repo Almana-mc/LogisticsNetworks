@@ -1,0 +1,45 @@
+package me.almana.logisticsnetworks.logic.async;
+
+import me.almana.logisticsnetworks.data.FilterMode;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.world.item.ItemStack;
+
+import java.util.List;
+import java.util.UUID;
+
+public record NetworkSnapshot(
+        UUID networkId,
+        long generation,
+        long runtimeId,
+        long gameTime,
+        HolderLookup.Provider registries,
+        List<ChannelUnit> units) {
+
+    public record ChannelUnit(
+            UUID sourceNodeId,
+            int channelIndex,
+            int batchLimit,
+            ItemStack[] exportFilters,
+            FilterMode exportFilterMode,
+            ItemEndpoint source,
+            List<TargetUnit> targets) {
+    }
+
+    public record TargetUnit(
+            UUID nodeId,
+            int channelIndex,
+            ItemStack[] importFilters,
+            FilterMode importFilterMode,
+            boolean hasImportSlotMapping,
+            boolean bulk,
+            ItemEndpoint endpoint) {
+    }
+
+    public record ItemEndpoint(
+            int totalSlots,
+            int[] occupiedSlots,
+            ItemStack[] occupiedStacks,
+            int defaultSlotLimit,
+            int[] occupiedSlotLimits) {
+    }
+}
