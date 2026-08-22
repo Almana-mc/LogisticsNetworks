@@ -248,9 +248,7 @@ jobs:
           loaders: ${{ needs.build.outputs.loader }}
           game-versions: ${{ needs.build.outputs.minecraft_version }}
           java: ${{ needs.build.outputs.java_version }}
-          curseforge-environment: |
-            client
-            server
+          curseforge-environment: client, server
           curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
           curseforge-token: ${{ env.CURSEFORGE_TOKEN }}
 
