@@ -32,6 +32,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -96,6 +97,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         poseStack.pushPose();
         Vec3 offset = context.position().subtract(entity.getPosition(partialTick));
         poseStack.translate(offset.x, offset.y, offset.z);
+        poseStack.pushPose();
         poseStack.mulPose(context.rotation());
         if ((isVisible || isHoldingWrench || isHighlighted) && canRenderModel) {
             renderModel(entity, context, partialTick, poseStack, buffer, light, isVisible);
@@ -104,13 +106,14 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         if (isHighlighted) {
             renderHighlightBox(poseStack, buffer, 0.15f, 0.45f, 1.0f, 0.35f, true);
         } else if (isHoldingWrench) {
-            renderWrenchOverlay(entity, poseStack, buffer, light);
+            renderWrenchOverlay(entity, context.rotation(), poseStack, buffer, light);
         }
         poseStack.popPose();
 
         if (isHoldingWrench || isHighlighted) {
             super.render(entity, yaw, partialTick, poseStack, buffer, light);
         }
+        poseStack.popPose();
     }
 
     @Override
@@ -165,24 +168,25 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         return true;
     }
 
-    private void renderWrenchOverlay(LogisticsNodeEntity entity, PoseStack poseStack, MultiBufferSource buffer,
-            int light) {
+    private void renderWrenchOverlay(LogisticsNodeEntity entity, Quaternionf rotation, PoseStack poseStack,
+            MultiBufferSource buffer, int light) {
         renderHighlightBox(poseStack, buffer, 0f, 1f, 0f, 0.35f, false);
 
         if (Config.debugMode) {
             poseStack.pushPose();
             poseStack.translate(0.0, -0.75, 0.0);
-            renderDebugInfo(entity, poseStack, buffer, light);
+            renderDebugInfo(entity, new Quaternionf(rotation).conjugate(), poseStack, buffer, light);
             poseStack.popPose();
         }
     }
 
-    private void renderDebugInfo(LogisticsNodeEntity entity, PoseStack poseStack, MultiBufferSource buffer, int light) {
+    private void renderDebugInfo(LogisticsNodeEntity entity, Quaternionf inverseRotation, PoseStack poseStack,
+            MultiBufferSource buffer, int light) {
         poseStack.pushPose();
         poseStack.translate(0.0, -0.25, 0.0);
 
         String nodeId = "Node: " + entity.getUUID().toString().substring(0, 8);
-        renderLabel(entity, nodeId, poseStack, buffer, light);
+        renderLabel(entity, nodeId, inverseRotation, poseStack, buffer, light);
 
         poseStack.translate(0.0, -0.25, 0.0);
 
@@ -193,7 +197,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
                 channels.append(i).append(" ");
             }
         }
-        renderLabel(entity, channels.toString(), poseStack, buffer, light);
+        renderLabel(entity, channels.toString(), inverseRotation, poseStack, buffer, light);
 
         poseStack.popPose();
     }
@@ -247,9 +251,10 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         builder.addVertex(matrix, maxX, maxY, maxZ).setColor(r, g, b, a);
     }
 
-    private void renderLabel(LogisticsNodeEntity entity, String text, PoseStack poseStack, MultiBufferSource buffer,
-            int light) {
+    private void renderLabel(LogisticsNodeEntity entity, String text, Quaternionf inverseRotation,
+            PoseStack poseStack, MultiBufferSource buffer, int light) {
         poseStack.pushPose();
+        poseStack.mulPose(inverseRotation);
         poseStack.mulPose(this.entityRenderDispatcher.cameraOrientation());
         poseStack.scale(-0.025F, -0.025F, 0.025F);
 

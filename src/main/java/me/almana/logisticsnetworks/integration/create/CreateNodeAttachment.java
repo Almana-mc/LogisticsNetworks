@@ -121,11 +121,7 @@ public final class CreateNodeAttachment {
         Vec3 x = entity.applyRotation(new Vec3(1, 0, 0), partialTick);
         Vec3 y = entity.applyRotation(new Vec3(0, 1, 0), partialTick);
         Vec3 z = entity.applyRotation(new Vec3(0, 0, 1), partialTick);
-        Matrix3f matrix = new Matrix3f().set(
-                (float) x.x, (float) y.x, (float) z.x,
-                (float) x.y, (float) y.y, (float) z.y,
-                (float) x.z, (float) y.z, (float) z.z);
-        Quaternionf rotation = new Quaternionf().setFromNormalized(matrix);
+        Quaternionf rotation = rotationFromBasis(x, y, z);
         BlockPos localPos = node.getCreateLocalPos();
         return new NodeRenderContext(
                 entity.toGlobalVector(Vec3.atBottomCenterOf(localPos), partialTick),
@@ -133,6 +129,14 @@ public final class CreateNodeAttachment {
                 entity.getContraption().getContraptionWorld(),
                 localPos,
                 NodeAttachmentKey.mounted(entity.getUUID(), localPos));
+    }
+
+    static Quaternionf rotationFromBasis(Vec3 x, Vec3 y, Vec3 z) {
+        Matrix3f matrix = new Matrix3f().set(
+                (float) x.x, (float) x.y, (float) x.z,
+                (float) y.x, (float) y.y, (float) y.z,
+                (float) z.x, (float) z.y, (float) z.z);
+        return new Quaternionf().setFromNormalized(matrix);
     }
 
     public static BlockState getAttachedBlockState(LogisticsNodeEntity node) {
