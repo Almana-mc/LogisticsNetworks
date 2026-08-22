@@ -4,7 +4,9 @@
   "package": "me.almana.logisticsnetworks.integration.create.mixin",
   "plugin": "me.almana.logisticsnetworks.integration.create.mixin.CreateMixinPlugin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [],
+  "mixins": [
+    "ContraptionLifecycleMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
