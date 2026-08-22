@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlannerDifferentialTest {
 
@@ -34,14 +35,21 @@ class PlannerDifferentialTest {
     private record Scenario(ItemStackHandler source, List<ItemStackHandler> targets, int batchLimit) {
     }
 
-    private static Scenario scenario(int batchLimit, ItemStack[] sourceStacks, int targetCount, int targetSlots) {
+    private static Scenario scenario(int batchLimit, ItemStack[] sourceStacks, int targetCount, int targetSlots,
+            ItemStack... targetStacks) {
+        assertTrue(targetStacks.length == 0 || targetStacks.length == targetCount,
+                "Target seeds must match targets");
         ItemStackHandler source = new ItemStackHandler(Math.max(sourceStacks.length, 27));
         for (int i = 0; i < sourceStacks.length; i++) {
-            source.setStackInSlot(i, sourceStacks[i]);
+            source.setStackInSlot(i, sourceStacks[i].copy());
         }
         List<ItemStackHandler> targets = new ArrayList<>();
         for (int i = 0; i < targetCount; i++) {
-            targets.add(new ItemStackHandler(targetSlots));
+            ItemStackHandler target = new ItemStackHandler(targetSlots);
+            if (targetStacks.length > 0) {
+                target.setStackInSlot(0, targetStacks[i].copy());
+            }
+            targets.add(target);
         }
         return new Scenario(source, targets, batchLimit);
     }
@@ -84,11 +92,35 @@ class PlannerDifferentialTest {
         TransferPlan.ChannelMoves planned = planOnWorker(unit, snapshot);
 
         for (TransferPlan.ItemMove move : planned.moves()) {
-            ItemStack extracted = s.source().extractItem(move.sourceSlot(), move.amount(), false);
-            ItemStack leftover = s.targets().get(move.targetIndex()).insertItem(0, extracted, false);
-            for (int slot = 1; slot < s.targets().get(move.targetIndex()).getSlots() && !leftover.isEmpty(); slot++) {
-                leftover = s.targets().get(move.targetIndex()).insertItem(slot, leftover, false);
+            int sourceSlot = move.sourceSlot();
+            int targetIndex = move.targetIndex();
+            int amount = move.amount();
+            assertTrue(sourceSlot >= 0 && sourceSlot < s.source().getSlots(),
+                    "Intent source slot out of range");
+            assertTrue(targetIndex >= 0 && targetIndex < s.targets().size(),
+                    "Intent target index out of range");
+            assertTrue(amount > 0, "Intent amount must be positive");
+
+            ItemStack sourceStack = s.source().getStackInSlot(sourceSlot);
+            assertEquals(move.expectedItem(), sourceStack.getItem(), "Intent item mismatch");
+            assertEquals(move.expectedComponents(), sourceStack.getComponents(), "Intent components mismatch");
+
+            ItemStack extracted = s.source().extractItem(sourceSlot, amount, false);
+            assertEquals(amount, extracted.getCount(), "Intent extraction incomplete");
+
+            ItemStackHandler target = s.targets().get(targetIndex);
+            boolean[] targetSlotMask = move.targetSlotMask();
+            if (targetSlotMask != null) {
+                assertEquals(target.getSlots(), targetSlotMask.length, "Intent slot mask length mismatch");
             }
+
+            ItemStack leftover = extracted;
+            for (int slot = 0; slot < target.getSlots() && !leftover.isEmpty(); slot++) {
+                if (targetSlotMask == null || targetSlotMask[slot]) {
+                    leftover = target.insertItem(slot, leftover, false);
+                }
+            }
+            assertTrue(leftover.isEmpty(), "Intent insertion incomplete");
         }
 
         return describe(s.source(), s.targets());
@@ -128,10 +160,11 @@ class PlannerDifferentialTest {
         return out;
     }
 
-    private static void assertIdentical(int batchLimit, ItemStack[] stacks, int targetCount, int targetSlots) {
+    private static void assertIdentical(int batchLimit, ItemStack[] stacks, int targetCount, int targetSlots,
+            ItemStack... targetStacks) {
         assertEquals(
-                runSync(scenario(batchLimit, stacks, targetCount, targetSlots)),
-                runPlanned(scenario(batchLimit, stacks, targetCount, targetSlots)));
+                runSync(scenario(batchLimit, stacks, targetCount, targetSlots, targetStacks)),
+                runPlanned(scenario(batchLimit, stacks, targetCount, targetSlots, targetStacks)));
     }
 
     @Test
@@ -141,7 +174,12 @@ class PlannerDifferentialTest {
 
     @Test
     void multipleTargetsSplitBatch() {
-        assertIdentical(64, new ItemStack[] {new ItemStack(Items.IRON_INGOT, 64)}, 5, 27);
+        assertIdentical(64, new ItemStack[] {new ItemStack(Items.IRON_INGOT, 64)}, 5, 1,
+                new ItemStack(Items.IRON_INGOT, 51),
+                new ItemStack(Items.IRON_INGOT, 51),
+                new ItemStack(Items.IRON_INGOT, 51),
+                new ItemStack(Items.IRON_INGOT, 51),
+                new ItemStack(Items.IRON_INGOT, 51));
     }
 
     @Test
