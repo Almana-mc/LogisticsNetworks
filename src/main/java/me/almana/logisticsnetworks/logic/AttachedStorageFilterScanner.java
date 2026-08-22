@@ -7,6 +7,7 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.server.level.ServerLevel;
@@ -23,7 +24,10 @@ public final class AttachedStorageFilterScanner {
     }
 
     public static Result scan(ServerLevel level, LogisticsNodeEntity node, ChannelData channel, ItemStack filter) {
-        if (!level.isLoaded(node.getAttachedPos())) {
+        if (!node.isMountedOnCreate() && !level.isLoaded(node.getAttachedPos())) {
+            return new Result(0, false, false);
+        }
+        if (!CreateCompat.isResolved(node)) {
             return new Result(0, false, false);
         }
 
@@ -34,11 +38,12 @@ public final class AttachedStorageFilterScanner {
         }
 
         return switch (target) {
-            case ITEMS -> scanItems(capabilities.findItemHandler(level, node.getAttachedPos(), channel.getIoDirection()),
+            case ITEMS -> scanItems(capabilities.findItemHandler(node, channel.getIoDirection()),
                     filter, level.registryAccess());
-            case FLUIDS -> scanFluids(
-                    capabilities.findFluidHandler(level, node.getAttachedPos(), channel.getIoDirection()), filter);
-            case CHEMICALS -> scanChemicals(level, node, channel, capabilities, filter);
+            case FLUIDS -> scanFluids(capabilities.findFluidHandler(node, channel.getIoDirection()), filter);
+            case CHEMICALS -> node.isMountedOnCreate()
+                    ? new Result(0, false, false)
+                    : scanChemicals(level, node, channel, capabilities, filter);
         };
     }
 

@@ -1,7 +1,9 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -50,10 +52,26 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
+    IItemHandler findItemHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
+        if (node.isMountedOnCreate()) {
+            return CreateCompat.findMountedItemHandler(node);
+        }
+        return findItemHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
+    }
+
+    @Nullable
     IItemHandler findBulkItemHandler(ServerLevel level, BlockPos pos, IItemHandler sidedHandler) {
         if (!SophisticatedCoreCompat.isSidedWrapper(sidedHandler)) return null;
         IItemHandler unsidedHandler = getItemHandler(level, pos, null);
         return SophisticatedCoreCompat.isBulkHandler(unsidedHandler) ? unsidedHandler : null;
+    }
+
+    @Nullable
+    IItemHandler findBulkItemHandler(LogisticsNodeEntity node, IItemHandler sidedHandler) {
+        if (node.isMountedOnCreate()) {
+            return null;
+        }
+        return findBulkItemHandler((ServerLevel) node.level(), node.getAttachedPos(), sidedHandler);
     }
 
     IFluidHandler findFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
@@ -67,6 +85,14 @@ public final class TransferCapabilityCache {
         }
         if (found.isEmpty()) return null;
         return found.size() == 1 ? found.get(0) : new CombinedFluidHandler(found.toArray(IFluidHandler[]::new));
+    }
+
+    @Nullable
+    IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
+        if (node.isMountedOnCreate()) {
+            return CreateCompat.findMountedFluidHandler(node);
+        }
+        return findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
     }
 
     IEnergyStorage findEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
