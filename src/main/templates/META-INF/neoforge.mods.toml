@@ -38,6 +38,9 @@ description = '''${mod_description}'''
 [[mixins]]
 config="${mod_id}.mixins.json"
 
+[[mixins]]
+config="${mod_id}.create.mixins.json"
+
 # The [[accessTransformers]] block allows you to declare where your AT file is.
 # If this block is omitted, a fallback attempt will be made to load an AT from META-INF/accesstransformer.cfg
 #[[accessTransformers]]
@@ -118,6 +121,13 @@ side = "BOTH"
 modId = "sophisticatedcore"
 type = "optional"
 versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "create"
+type = "optional"
+versionRange = "[6.0.9,6.1.0)"
 ordering = "AFTER"
 side = "BOTH"
 

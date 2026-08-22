@@ -28,6 +28,8 @@ val ftb_teams_version: String by project
 val emi_version: String by project
 val guideme_version: String by project
 val sophisticated_core_version: String by project
+val create_version: String by project
+val create_runtime = providers.gradleProperty("create_runtime").orElse("true").map { it.toBoolean() }
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -40,6 +42,7 @@ repositories {
     maven("https://api.modrinth.com/maven")
     maven("https://maven.ftb.dev/releases")
     maven("https://maven.terraformersmc.com/releases")
+    maven("https://maven.createmod.net")
 }
 
 base {
@@ -103,6 +106,11 @@ sourceSets.main.get().resources.srcDir("src/generated/resources")
 
 dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+
+    compileOnly("com.simibubi.create:create-${minecraft_version}:${create_version}")
+    if (create_runtime.get()) {
+        runtimeOnly("com.simibubi.create:create-${minecraft_version}:${create_version}")
+    }
 
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
