@@ -13,8 +13,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.HashMap;
 import java.util.Map;
 
-final class TransferAmountRules {
-    record Constraints(boolean hasExportThreshold, int exportThreshold,
+public final class TransferAmountRules {
+    public record Constraints(boolean hasExportThreshold, int exportThreshold,
             boolean hasImportThreshold, int importThreshold,
             boolean hasPerEntryAmounts) {
     }
@@ -26,7 +26,7 @@ final class TransferAmountRules {
         return collect(exportFilters, importFilters, null);
     }
 
-    static Constraints collect(ItemStack[] exportFilters, ItemStack[] importFilters,
+    public static Constraints collect(ItemStack[] exportFilters, ItemStack[] importFilters,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         int exportThreshold = 0;
         boolean hasExportThreshold = false;
