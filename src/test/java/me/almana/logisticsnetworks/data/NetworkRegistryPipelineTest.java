@@ -143,6 +143,17 @@ class NetworkRegistryPipelineTest {
     }
 
     @Test
+    void stableDisabledModeStopsUnexpectedPublishedRuntime() {
+        dispatcher.refreshAsyncMode(false);
+        AsyncTransferRuntime.start();
+        assertNotNull(AsyncTransferRuntime.get());
+
+        dispatcher.refreshAsyncMode(false);
+
+        assertNull(AsyncTransferRuntime.get());
+    }
+
+    @Test
     void replacedRuntimeRequeuesItsInFlightNetwork() {
         dispatcher.refreshAsyncMode(true);
         UUID id = UUID.randomUUID();

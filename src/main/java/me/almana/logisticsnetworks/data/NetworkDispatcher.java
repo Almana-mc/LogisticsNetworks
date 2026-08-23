@@ -45,6 +45,8 @@ final class NetworkDispatcher {
             replaceRuntime(enabled);
         } else if (enabled) {
             refreshPublishedRuntime();
+        } else if (AsyncTransferRuntime.get() != null) {
+            AsyncTransferRuntime.stop();
         }
         return asyncEnabled;
     }
