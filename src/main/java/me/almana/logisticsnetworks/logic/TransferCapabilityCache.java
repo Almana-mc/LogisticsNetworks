@@ -67,7 +67,7 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
-    IItemHandler findBulkItemHandler(LogisticsNodeEntity node, IItemHandler sidedHandler) {
+    public IItemHandler findBulkItemHandler(LogisticsNodeEntity node, IItemHandler sidedHandler) {
         if (node.isMountedOnCreate()) {
             return null;
         }

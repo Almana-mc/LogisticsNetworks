@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
+import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
@@ -1006,6 +1007,68 @@ public class TransferEngine {
             }
         }
         return limit - remaining;
+    }
+
+    public static int commitSingleMove(IItemHandler source, IItemHandler target,
+            TransferPlan.ItemMove move, LogisticsNodeEntity sourceNode) {
+        return commitSingleMove(source, target, null, move, sourceNode);
+    }
+
+    public static int commitSingleMove(IItemHandler source, IItemHandler target,
+            @Nullable IItemHandler bulkTarget, TransferPlan.ItemMove move, LogisticsNodeEntity sourceNode) {
+        if (move.sourceSlot() < 0 || move.sourceSlot() >= source.getSlots() || move.amount() <= 0) {
+            return 0;
+        }
+
+        boolean[] targetSlotMask = move.targetSlotMask();
+        if (targetSlotMask != null
+                && (bulkTarget != null || targetSlotMask.length != target.getSlots())) {
+            return 0;
+        }
+
+        ItemStack available = source.extractItem(move.sourceSlot(), move.amount(), true);
+        if (available.isEmpty()) {
+            return 0;
+        }
+        if (available.getItem() != move.expectedItem()
+                || !available.getComponents().equals(move.expectedComponents())) {
+            return 0;
+        }
+
+        ItemStack simRemainder = insertItemWithAllowedSlots(target, bulkTarget,
+                available.copyWithCount(available.getCount()), true, targetSlotMask);
+        int acceptable = available.getCount() - simRemainder.getCount();
+        if (acceptable <= 0) {
+            return 0;
+        }
+
+        ItemStack toMove = source.extractItem(move.sourceSlot(), acceptable, false);
+        if (toMove.isEmpty()) {
+            return 0;
+        }
+
+        ItemStack uninserted = insertItemWithAllowedSlots(target, bulkTarget, toMove, false, targetSlotMask);
+        int accepted = toMove.getCount() - uninserted.getCount();
+
+        if (!uninserted.isEmpty()) {
+            ItemStack stillLeft = source.insertItem(move.sourceSlot(), uninserted, false);
+            for (int fallback = 0; fallback < source.getSlots() && !stillLeft.isEmpty(); fallback++) {
+                stillLeft = source.insertItem(fallback, stillLeft, false);
+            }
+            if (!stillLeft.isEmpty()) {
+                ItemStack forcedRemainder = insertItemWithAllowedSlots(target, bulkTarget, stillLeft, false,
+                        targetSlotMask);
+                accepted += stillLeft.getCount() - forcedRemainder.getCount();
+                if (!forcedRemainder.isEmpty() && sourceNode.level() instanceof ServerLevel level) {
+                    LOGGER.error("ITEM VOIDING PREVENTED: could not return {} to source or target. Dropping at {}.",
+                            forcedRemainder, sourceNode.getAttachedPos());
+                    Block.popResource(level, sourceNode.getAttachedPos(), forcedRemainder);
+                    accepted += forcedRemainder.getCount();
+                }
+            }
+        }
+
+        return accepted;
     }
 
     private static boolean[] computeImportAllowedSlots(IItemHandler handler, ItemStack[] importFilters,
