@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic.async;
 
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
@@ -13,16 +14,25 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public final class Snapshots {
 
+    private static final OccupiedSlotLimitExceeded OCCUPIED_SLOT_LIMIT =
+            new OccupiedSlotLimitExceeded();
+
     private Snapshots() {
     }
 
     public static NetworkSnapshot.ItemEndpoint captureItems(IItemHandler handler) {
+        return captureItems(handler, null);
+    }
+
+    static NetworkSnapshot.ItemEndpoint captureItems(
+            IItemHandler handler, @Nullable OccupiedSlotBudget budget) {
         ThreadGuard.requireServerThread();
 
         int slots = handler.getSlots();
@@ -34,6 +44,9 @@ public final class Snapshots {
             ItemStack stack = handler.getStackInSlot(slot);
             if (stack.isEmpty()) {
                 continue;
+            }
+            if (budget != null) {
+                budget.retain();
             }
             occupied.add(slot);
             copies.add(stack.copy());
@@ -74,33 +87,39 @@ public final class Snapshots {
         return copied;
     }
 
-    public static NetworkSnapshot captureNetwork(LogisticsNetwork network, MinecraftServer server,
+    public static NetworkCapture captureNetwork(LogisticsNetwork network, MinecraftServer server,
             long runtimeId, TransferCapabilityCache capCache) {
         ThreadGuard.requireServerThread();
 
         TransferEngine.NetworkContext context = TransferEngine.prepareNetwork(network, server);
         if (context == null) {
-            return null;
+            return NetworkCapture.unavailable();
         }
 
         ServerLevel overworld = server.overworld();
         List<NetworkSnapshot.ChannelUnit> units = new ArrayList<>();
+        OccupiedSlotBudget occupiedSlots = new OccupiedSlotBudget(Config.asyncMaxOccupiedSlots);
 
-        for (LogisticsNodeEntity node : context.sortedNodes()) {
-            captureNodeChannels(node, context, capCache, units);
+        try {
+            for (LogisticsNodeEntity node : context.sortedNodes()) {
+                captureNodeChannels(node, context, capCache, units, occupiedSlots);
+            }
+        } catch (OccupiedSlotLimitExceeded exception) {
+            return NetworkCapture.occupiedLimitExceeded();
         }
 
-        return new NetworkSnapshot(
+        return NetworkCapture.captured(new NetworkSnapshot(
                 network.getId(),
                 network.getGeneration(),
                 runtimeId,
                 overworld.getGameTime(),
                 overworld.registryAccess(),
-                units);
+                units));
     }
 
     private static void captureNodeChannels(LogisticsNodeEntity node, TransferEngine.NetworkContext context,
-            TransferCapabilityCache capCache, List<NetworkSnapshot.ChannelUnit> units) {
+            TransferCapabilityCache capCache, List<NetworkSnapshot.ChannelUnit> units,
+            OccupiedSlotBudget occupiedSlots) {
 
         ServerLevel level = (ServerLevel) node.level();
         long gameTime = level.getGameTime();
@@ -148,6 +167,7 @@ public final class Snapshots {
 
             int configuredBatch = TransferEngine.getBatchLimit(ChannelType.ITEM, tier);
             int batchLimit = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
+            NetworkSnapshot.ItemEndpoint sourceItems = captureItems(sourceHandler, occupiedSlots);
 
             List<NetworkSnapshot.TargetUnit> targetUnits = new ArrayList<>(resolved.refs().size());
             for (int t = 0; t < resolved.refs().size(); t++) {
@@ -160,7 +180,7 @@ public final class Snapshots {
                         engineTarget.importFilterMode(),
                         engineTarget.hasImportSlotMapping(),
                         engineTarget.bulkHandler() != null,
-                        captureItems(engineTarget.handler())));
+                        captureItems(engineTarget.handler(), occupiedSlots)));
             }
 
             units.add(new NetworkSnapshot.ChannelUnit(
@@ -169,8 +189,52 @@ public final class Snapshots {
                     batchLimit,
                     copyFilters(channel.getFilterItems()),
                     channel.getFilterMode(),
-                    captureItems(sourceHandler),
+                    sourceItems,
                     targetUnits));
+        }
+    }
+
+    public record NetworkCapture(CaptureStatus status, @Nullable NetworkSnapshot snapshot) {
+
+        public static NetworkCapture captured(NetworkSnapshot snapshot) {
+            return new NetworkCapture(CaptureStatus.CAPTURED, snapshot);
+        }
+
+        public static NetworkCapture unavailable() {
+            return new NetworkCapture(CaptureStatus.UNAVAILABLE, null);
+        }
+
+        public static NetworkCapture occupiedLimitExceeded() {
+            return new NetworkCapture(CaptureStatus.OCCUPIED_SLOT_LIMIT_EXCEEDED, null);
+        }
+    }
+
+    public enum CaptureStatus {
+        CAPTURED,
+        UNAVAILABLE,
+        OCCUPIED_SLOT_LIMIT_EXCEEDED
+    }
+
+    static final class OccupiedSlotBudget {
+
+        private int remaining;
+
+        OccupiedSlotBudget(int limit) {
+            remaining = limit;
+        }
+
+        void retain() {
+            if (remaining == 0) {
+                throw OCCUPIED_SLOT_LIMIT;
+            }
+            remaining--;
+        }
+    }
+
+    static final class OccupiedSlotLimitExceeded extends RuntimeException {
+
+        private OccupiedSlotLimitExceeded() {
+            super(null, null, false, false);
         }
     }
 }

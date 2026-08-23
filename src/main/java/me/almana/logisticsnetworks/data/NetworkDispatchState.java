@@ -1,5 +1,7 @@
 package me.almana.logisticsnetworks.data;
 
+import me.almana.logisticsnetworks.logic.async.TransferPlan;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -10,23 +12,33 @@ import java.util.function.Predicate;
 
 final class NetworkDispatchState {
 
+    private static final int MAX_ASYNC_FAILURES = 3;
+
     private final Set<UUID> dirtyNetworks = new HashSet<>();
     private final Set<UUID> inFlight = new HashSet<>();
     private final Set<UUID> dirtyAgain = new HashSet<>();
     private final Set<UUID> synchronousFallbacks = new HashSet<>();
     private final TreeMap<Long, Set<UUID>> wakeBuckets = new TreeMap<>();
     private final Map<UUID, Long> scheduledWake = new HashMap<>();
+    private final Map<UUID, Integer> asyncFailures = new HashMap<>();
+    private final Map<UUID, AsyncDisableReason> asyncDisabled = new HashMap<>();
 
     void markDirty(UUID id) {
         cancelWake(id);
         if (inFlight.contains(id)) {
             dirtyAgain.add(id);
-        } else if (!synchronousFallbacks.contains(id)) {
-            dirtyNetworks.add(id);
+        } else {
+            queuePending(id);
         }
     }
 
     boolean beginDispatch(UUID id) {
+        if (isAsyncDisabled(id)) {
+            if (dirtyNetworks.remove(id)) {
+                synchronousFallbacks.add(id);
+            }
+            return false;
+        }
         if (inFlight.contains(id)) {
             if (dirtyNetworks.remove(id)) {
                 dirtyAgain.add(id);
@@ -43,8 +55,37 @@ final class NetworkDispatchState {
     void finishDispatch(UUID id) {
         inFlight.remove(id);
         if (dirtyAgain.remove(id)) {
-            dirtyNetworks.add(id);
+            queuePending(id);
         }
+    }
+
+    boolean finishWorkerPlan(TransferPlan plan) {
+        UUID id = plan.networkId();
+        finishDispatch(id);
+        if (!plan.failed()) {
+            asyncFailures.remove(id);
+            return false;
+        }
+        if (isAsyncDisabled(id)) {
+            return false;
+        }
+        int failures = Math.min(MAX_ASYNC_FAILURES,
+                asyncFailures.getOrDefault(id, 0) + 1);
+        asyncFailures.put(id, failures);
+        if (failures != MAX_ASYNC_FAILURES) {
+            return false;
+        }
+        asyncDisabled.put(id, AsyncDisableReason.WORKER_FAILURES);
+        return true;
+    }
+
+    boolean disableForOccupiedSlots(UUID id) {
+        return asyncDisabled.putIfAbsent(
+                id, AsyncDisableReason.OCCUPIED_SLOT_LIMIT) == null;
+    }
+
+    boolean isAsyncDisabled(UUID id) {
+        return asyncDisabled.containsKey(id);
     }
 
     void fallbackSynchronously(UUID id) {
@@ -59,9 +100,11 @@ final class NetworkDispatchState {
         return Set.copyOf(dirtyNetworks);
     }
 
-    Set<UUID> takeDirtyNetworks() {
-        Set<UUID> ids = Set.copyOf(dirtyNetworks);
+    Set<UUID> takeAllPendingNetworks() {
+        Set<UUID> ids = new HashSet<>(dirtyNetworks);
+        ids.addAll(synchronousFallbacks);
         dirtyNetworks.clear();
+        synchronousFallbacks.clear();
         return ids;
     }
 
@@ -72,21 +115,24 @@ final class NetworkDispatchState {
     }
 
     void resetAsyncState() {
-        dirtyNetworks.addAll(inFlight);
-        dirtyNetworks.addAll(dirtyAgain);
-        dirtyNetworks.addAll(synchronousFallbacks);
+        Set<UUID> pending = new HashSet<>(dirtyNetworks);
+        pending.addAll(inFlight);
+        pending.addAll(dirtyAgain);
+        pending.addAll(synchronousFallbacks);
+        dirtyNetworks.clear();
         inFlight.clear();
         dirtyAgain.clear();
         synchronousFallbacks.clear();
+        pending.forEach(this::queuePending);
     }
 
     void scheduleResult(UUID id, long now, long delta) {
         cancelWake(id);
-        if (dirtyNetworks.contains(id)) {
+        if (dirtyNetworks.contains(id) || synchronousFallbacks.contains(id)) {
             return;
         }
         if (delta == 0L) {
-            dirtyNetworks.add(id);
+            queuePending(id);
         } else if (delta != Long.MAX_VALUE) {
             scheduleWake(id, now + delta);
         }
@@ -114,8 +160,8 @@ final class NetworkDispatchState {
                 }
                 if (inFlight.contains(id)) {
                     dirtyAgain.add(id);
-                } else if (!synchronousFallbacks.contains(id)) {
-                    dirtyNetworks.add(id);
+                } else {
+                    queuePending(id);
                 }
             }
         }
@@ -126,7 +172,17 @@ final class NetworkDispatchState {
         inFlight.remove(id);
         dirtyAgain.remove(id);
         synchronousFallbacks.remove(id);
+        asyncFailures.remove(id);
+        asyncDisabled.remove(id);
         cancelWake(id);
+    }
+
+    private void queuePending(UUID id) {
+        if (isAsyncDisabled(id)) {
+            synchronousFallbacks.add(id);
+        } else if (!synchronousFallbacks.contains(id)) {
+            dirtyNetworks.add(id);
+        }
     }
 
     private void cancelWake(UUID id) {
@@ -145,5 +201,10 @@ final class NetworkDispatchState {
         if (bucket.isEmpty()) {
             wakeBuckets.remove(tick);
         }
+    }
+
+    private enum AsyncDisableReason {
+        WORKER_FAILURES,
+        OCCUPIED_SLOT_LIMIT
     }
 }

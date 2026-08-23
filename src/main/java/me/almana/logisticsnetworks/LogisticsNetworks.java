@@ -65,6 +65,7 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
@@ -99,13 +100,26 @@ public class LogisticsNetworks {
         @SubscribeEvent
         public static void onServerStarted(ServerStartedEvent event) {
                 ThreadGuard.markServerThread();
-                AsyncTransferRuntime.start();
+                replaceAsyncRuntime();
+        }
+
+        @SubscribeEvent
+        public static void onDatapackReload(AddReloadListenerEvent event) {
+                replaceAsyncRuntime();
         }
 
         @SubscribeEvent
         public static void onServerStopping(ServerStoppingEvent event) {
                 AsyncTransferRuntime.stop();
                 ThreadGuard.clearServerThread();
+        }
+
+        private static void replaceAsyncRuntime() {
+                if (Config.asyncPlanning) {
+                        AsyncTransferRuntime.start();
+                } else {
+                        AsyncTransferRuntime.stop();
+                }
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {

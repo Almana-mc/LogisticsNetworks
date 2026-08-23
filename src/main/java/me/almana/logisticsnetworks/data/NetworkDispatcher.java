@@ -5,12 +5,10 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
-import me.almana.logisticsnetworks.logic.async.NetworkSnapshot;
 import me.almana.logisticsnetworks.logic.async.Snapshots;
 import me.almana.logisticsnetworks.logic.async.TransferCommitter;
 import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import net.minecraft.server.MinecraftServer;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.Map;
@@ -27,9 +25,7 @@ final class NetworkDispatcher {
     private static final int WARNING_DISPATCH_COUNT = 50;
 
     private final NetworkDispatchState state;
-    private boolean modeKnown;
-    private boolean asyncEnabled;
-    private long runtimeId = -1L;
+    private final AsyncDispatchRuntime asyncRuntime = new AsyncDispatchRuntime();
 
     NetworkDispatcher() {
         this(new NetworkDispatchState());
@@ -40,26 +36,13 @@ final class NetworkDispatcher {
     }
 
     boolean refreshAsyncMode(boolean enabled) {
-        if (!modeKnown) {
-            modeKnown = true;
-            asyncEnabled = enabled;
-            initializeRuntime(enabled);
-        } else if (asyncEnabled != enabled) {
-            state.resetAsyncState();
-            asyncEnabled = enabled;
-            replaceRuntime(enabled);
-        } else if (enabled) {
-            refreshPublishedRuntime();
-        } else if (AsyncTransferRuntime.get() != null) {
-            AsyncTransferRuntime.stop();
-        }
-        return asyncEnabled;
+        return asyncRuntime.refresh(enabled, state);
     }
 
     void processDirtyNetworks(Map<UUID, LogisticsNetwork> networks, MinecraftServer server) {
         long now = server.overworld().getGameTime();
         state.promoteDueWakes(now, networks::containsKey);
-        Set<UUID> ids = state.takeDirtyNetworks();
+        Set<UUID> ids = state.takeAllPendingNetworks();
         warnHighDispatch(ids.size());
 
         for (UUID id : ids) {
@@ -72,8 +55,8 @@ final class NetworkDispatcher {
 
     void dispatchDirty(NetworkRegistry registry, Map<UUID, LogisticsNetwork> networks,
             MinecraftServer server, TransferCapabilityCache capabilityCache) {
-        AsyncTransferRuntime runtime = AsyncTransferRuntime.get();
-        if (!asyncEnabled || runtime == null || runtime.runtimeId() != runtimeId) {
+        AsyncTransferRuntime runtime = asyncRuntime.current();
+        if (runtime == null) {
             return;
         }
 
@@ -94,9 +77,18 @@ final class NetworkDispatcher {
                     network.rebuildCache(registry);
                     network.clearCacheDirty();
                 }
-                NetworkSnapshot snapshot = Snapshots.captureNetwork(
+                Snapshots.NetworkCapture capture = Snapshots.captureNetwork(
                         network, server, runtime.runtimeId(), capabilityCache);
-                if (!hasAsyncItemWork(snapshot) || !runtime.submit(snapshot)) {
+                CaptureDisposition disposition = captureDisposition(capture);
+                if (disposition == CaptureDisposition.DISABLE_ASYNC) {
+                    if (state.disableForOccupiedSlots(id)) {
+                        LOGGER.warn("Network {} exceeded the async occupied-slot limit of {}; "
+                                + "falling back to synchronous transfers.",
+                                id, Config.asyncMaxOccupiedSlots);
+                    }
+                    state.fallbackSynchronously(id);
+                } else if (disposition == CaptureDisposition.SYNCHRONOUS
+                        || !runtime.submit(capture.snapshot())) {
                     state.fallbackSynchronously(id);
                 }
             } catch (Exception exception) {
@@ -108,8 +100,8 @@ final class NetworkDispatcher {
 
     void commitCompleted(Map<UUID, LogisticsNetwork> networks, MinecraftServer server,
             TransferCapabilityCache capabilityCache, BooleanSupplier hasTime) {
-        AsyncTransferRuntime runtime = AsyncTransferRuntime.get();
-        if (!asyncEnabled || runtime == null || runtime.runtimeId() != runtimeId) {
+        AsyncTransferRuntime runtime = asyncRuntime.current();
+        if (runtime == null) {
             return;
         }
 
@@ -150,8 +142,14 @@ final class NetworkDispatcher {
         state.delete(id);
     }
 
-    static boolean hasAsyncItemWork(@Nullable NetworkSnapshot snapshot) {
-        return snapshot != null && !snapshot.units().isEmpty();
+    static CaptureDisposition captureDisposition(Snapshots.NetworkCapture capture) {
+        if (capture.status() == Snapshots.CaptureStatus.OCCUPIED_SLOT_LIMIT_EXCEEDED) {
+            return CaptureDisposition.DISABLE_ASYNC;
+        }
+        if (capture.snapshot() == null || capture.snapshot().units().isEmpty()) {
+            return CaptureDisposition.SYNCHRONOUS;
+        }
+        return CaptureDisposition.ASYNC;
     }
 
     static boolean requiresSynchronousFallback(
@@ -163,11 +161,15 @@ final class NetworkDispatcher {
     private void commitOne(TransferPlan plan, Map<UUID, LogisticsNetwork> networks,
             MinecraftServer server, TransferCapabilityCache capabilityCache, long currentRuntimeId) {
         UUID id = plan.networkId();
-        state.finishDispatch(id);
+        boolean newlyDisabled = state.finishWorkerPlan(plan);
         LogisticsNetwork network = networks.get(id);
         if (network == null) {
             state.delete(id);
             return;
+        }
+        if (newlyDisabled) {
+            LOGGER.warn("Network {} failed async planning 3 consecutive times; "
+                    + "falling back to synchronous transfers.", id);
         }
         if (requiresSynchronousFallback(plan, network, currentRuntimeId)) {
             state.fallbackSynchronously(id);
@@ -182,7 +184,7 @@ final class NetworkDispatcher {
         long now = server.overworld().getGameTime();
         try {
             TransferCommitter.ItemCommitResult itemResult = TransferCommitter.commitItems(
-                    plan, network, server, capabilityCache, runtimeId);
+                    plan, network, server, capabilityCache, asyncRuntime.runtimeId());
             long synchronousDelta = TransferEngine.processNetworkWithoutItemTransfers(network, server);
             state.scheduleResult(id, now, Math.min(itemResult.wakeDelta(), synchronousDelta));
         } catch (Exception exception) {
@@ -200,43 +202,15 @@ final class NetworkDispatcher {
         }
     }
 
-    private void initializeRuntime(boolean enabled) {
-        if (!enabled) {
-            AsyncTransferRuntime.stop();
-            return;
-        }
-        AsyncTransferRuntime runtime = AsyncTransferRuntime.get();
-        if (runtime == null) {
-            AsyncTransferRuntime.start();
-            runtime = AsyncTransferRuntime.get();
-        }
-        runtimeId = runtime.runtimeId();
-    }
-
-    private void replaceRuntime(boolean enabled) {
-        AsyncTransferRuntime.stop();
-        runtimeId = -1L;
-        if (enabled) {
-            AsyncTransferRuntime.start();
-            runtimeId = AsyncTransferRuntime.get().runtimeId();
-        }
-    }
-
-    private void refreshPublishedRuntime() {
-        AsyncTransferRuntime runtime = AsyncTransferRuntime.get();
-        if (runtime == null) {
-            state.resetAsyncState();
-            AsyncTransferRuntime.start();
-            runtime = AsyncTransferRuntime.get();
-        } else if (runtime.runtimeId() != runtimeId) {
-            state.resetAsyncState();
-        }
-        runtimeId = runtime.runtimeId();
-    }
-
     private static void warnHighDispatch(int count) {
         if (count > WARNING_DISPATCH_COUNT) {
             LOGGER.warn("High load: Dispatching {} dirty networks in one tick.", count);
         }
+    }
+
+    enum CaptureDisposition {
+        ASYNC,
+        SYNCHRONOUS,
+        DISABLE_ASYNC
     }
 }

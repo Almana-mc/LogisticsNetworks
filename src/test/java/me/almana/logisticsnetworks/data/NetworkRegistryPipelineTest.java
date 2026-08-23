@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.data;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
 import me.almana.logisticsnetworks.logic.async.NetworkSnapshot;
+import me.almana.logisticsnetworks.logic.async.Snapshots;
 import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.world.item.ItemStack;
@@ -70,7 +71,7 @@ class NetworkRegistryPipelineTest {
     }
 
     @Test
-    void nullAndItemlessSnapshotsStaySynchronous() {
+    void unavailableAndItemlessSnapshotsStaySynchronous() {
         NetworkSnapshot empty = new NetworkSnapshot(
                 UUID.randomUUID(), 1L, 2L, 3L, RegistryAccess.EMPTY, List.of());
         NetworkSnapshot withItems = new NetworkSnapshot(
@@ -80,9 +81,12 @@ class NetworkRegistryPipelineTest {
                         new NetworkSnapshot.ItemEndpoint(0, new int[0], new ItemStack[0], 64, new int[0]),
                         List.of())));
 
-        assertFalse(NetworkDispatcher.hasAsyncItemWork(null));
-        assertFalse(NetworkDispatcher.hasAsyncItemWork(empty));
-        assertTrue(NetworkDispatcher.hasAsyncItemWork(withItems));
+        assertSame(NetworkDispatcher.CaptureDisposition.SYNCHRONOUS,
+                NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.unavailable()));
+        assertSame(NetworkDispatcher.CaptureDisposition.SYNCHRONOUS,
+                NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(empty)));
+        assertSame(NetworkDispatcher.CaptureDisposition.ASYNC,
+                NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(withItems)));
     }
 
     @Test

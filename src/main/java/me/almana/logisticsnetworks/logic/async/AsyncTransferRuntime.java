@@ -22,7 +22,7 @@ public final class AsyncTransferRuntime {
     private static final AtomicLong WORKER_IDS = new AtomicLong();
 
     @Nullable
-    private static AsyncTransferRuntime instance;
+    private static volatile AsyncTransferRuntime instance;
 
     private final long runtimeId;
     private final ThreadPoolExecutor executor;
@@ -45,7 +45,7 @@ public final class AsyncTransferRuntime {
                 new ThreadPoolExecutor.AbortPolicy());
     }
 
-    public static void start() {
+    public static synchronized void start() {
         stop();
         int configured = Config.asyncWorkerThreads;
         int workers = configured > 0
@@ -55,7 +55,7 @@ public final class AsyncTransferRuntime {
         LOGGER.info("Async transfer runtime started with {} worker threads", workers);
     }
 
-    public static void stop() {
+    public static synchronized void stop() {
         AsyncTransferRuntime current = instance;
         instance = null;
         if (current != null) {
