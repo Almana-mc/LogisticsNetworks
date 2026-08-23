@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
@@ -15,6 +16,10 @@ import org.slf4j.Logger;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 final class NetworkDispatcher {
 
@@ -102,26 +107,28 @@ final class NetworkDispatcher {
     }
 
     void commitCompleted(Map<UUID, LogisticsNetwork> networks, MinecraftServer server,
-            TransferCapabilityCache capabilityCache) {
+            TransferCapabilityCache capabilityCache, BooleanSupplier hasTime) {
         AsyncTransferRuntime runtime = AsyncTransferRuntime.get();
         if (!asyncEnabled || runtime == null || runtime.runtimeId() != runtimeId) {
             return;
         }
 
+        drainCompleted(runtime::pollCompleted,
+                plan -> commitOne(plan, networks, server, capabilityCache, runtime.runtimeId()),
+                System::nanoTime, hasTime, Config.asyncCommitBudgetUs);
+    }
+
+    static void drainCompleted(Supplier<TransferPlan> pollCompleted,
+            Consumer<TransferPlan> commit, LongSupplier nanoTime,
+            BooleanSupplier hasTime, int budgetUs) {
+        long startedAt = nanoTime.getAsLong();
+        long budgetNanos = (long) budgetUs * 1_000L;
         TransferPlan plan;
-        while ((plan = runtime.pollCompleted()) != null) {
-            UUID id = plan.networkId();
-            state.finishDispatch(id);
-            LogisticsNetwork network = networks.get(id);
-            if (network == null) {
-                state.delete(id);
-                continue;
+        while ((plan = pollCompleted.get()) != null) {
+            commit.accept(plan);
+            if (nanoTime.getAsLong() - startedAt >= budgetNanos && !hasTime.getAsBoolean()) {
+                return;
             }
-            if (requiresSynchronousFallback(plan, network, runtime.runtimeId())) {
-                state.fallbackSynchronously(id);
-                continue;
-            }
-            commitCurrentPlan(plan, network, server, capabilityCache);
         }
     }
 
@@ -151,6 +158,22 @@ final class NetworkDispatcher {
             TransferPlan plan, LogisticsNetwork network, long runtimeId) {
         return plan.failed() || plan.runtimeId() != runtimeId
                 || plan.generation() != network.getGeneration();
+    }
+
+    private void commitOne(TransferPlan plan, Map<UUID, LogisticsNetwork> networks,
+            MinecraftServer server, TransferCapabilityCache capabilityCache, long currentRuntimeId) {
+        UUID id = plan.networkId();
+        state.finishDispatch(id);
+        LogisticsNetwork network = networks.get(id);
+        if (network == null) {
+            state.delete(id);
+            return;
+        }
+        if (requiresSynchronousFallback(plan, network, currentRuntimeId)) {
+            state.fallbackSynchronously(id);
+            return;
+        }
+        commitCurrentPlan(plan, network, server, capabilityCache);
     }
 
     private void commitCurrentPlan(TransferPlan plan, LogisticsNetwork network,

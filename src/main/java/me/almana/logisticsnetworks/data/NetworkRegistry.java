@@ -18,6 +18,7 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
 import org.slf4j.Logger;
 
 import java.util.*;
+import java.util.function.BooleanSupplier;
 import org.jetbrains.annotations.Nullable;
 
 public class NetworkRegistry extends SavedData {
@@ -56,8 +57,8 @@ public class NetworkRegistry extends SavedData {
         dispatcher.dispatchDirty(this, networks, server, capabilityCache);
     }
 
-    public void commitCompleted(MinecraftServer server) {
-        dispatcher.commitCompleted(networks, server, capabilityCache);
+    public void commitCompleted(MinecraftServer server, BooleanSupplier hasTime) {
+        dispatcher.commitCompleted(networks, server, capabilityCache, hasTime);
     }
 
     public void processSynchronousFallbacks(MinecraftServer server) {

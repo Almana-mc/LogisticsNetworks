@@ -28,7 +28,7 @@ public class NetworkScheduler {
             return;
 
         if (registry.refreshAsyncPlanning()) {
-            registry.commitCompleted(event.getServer());
+            registry.commitCompleted(event.getServer(), event::hasTime);
             registry.dispatchDirty(event.getServer());
             registry.processSynchronousFallbacks(event.getServer());
         } else {
