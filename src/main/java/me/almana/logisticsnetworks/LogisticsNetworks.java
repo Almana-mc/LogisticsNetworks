@@ -51,6 +51,7 @@ import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
@@ -65,6 +66,7 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
 @Mod(LogisticsNetworks.MOD_ID)
 @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID)
@@ -97,6 +99,13 @@ public class LogisticsNetworks {
         @SubscribeEvent
         public static void onServerStarted(ServerStartedEvent event) {
                 ThreadGuard.markServerThread();
+                AsyncTransferRuntime.start();
+        }
+
+        @SubscribeEvent
+        public static void onServerStopping(ServerStoppingEvent event) {
+                AsyncTransferRuntime.stop();
+                ThreadGuard.clearServerThread();
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
