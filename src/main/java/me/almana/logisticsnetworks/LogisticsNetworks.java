@@ -51,18 +51,23 @@ import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
 
 @Mod(LogisticsNetworks.MOD_ID)
+@EventBusSubscriber(modid = LogisticsNetworks.MOD_ID)
 public class LogisticsNetworks {
 
         public static final String MOD_ID = "logisticsnetworks";
@@ -87,6 +92,11 @@ public class LogisticsNetworks {
 
         private void commonSetup(FMLCommonSetupEvent event) {
                 event.enqueueWork(AE2Compat::registerLinkable);
+        }
+
+        @SubscribeEvent
+        public static void onServerStarted(ServerStartedEvent event) {
+                ThreadGuard.markServerThread();
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {

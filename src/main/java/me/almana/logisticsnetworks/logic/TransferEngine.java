@@ -78,6 +78,14 @@ public class TransferEngine {
     }
 
     public static long processNetwork(LogisticsNetwork network, MinecraftServer server) {
+        return processNetwork(network, server, true);
+    }
+
+    public static long processNetworkWithoutItemTransfers(LogisticsNetwork network, MinecraftServer server) {
+        return processNetwork(network, server, false);
+    }
+
+    private static long processNetwork(LogisticsNetwork network, MinecraftServer server, boolean includeItemTransfers) {
         if (network == null || server == null) {
             return Long.MAX_VALUE;
         }
@@ -109,7 +117,7 @@ public class TransferEngine {
         for (LogisticsNodeEntity sourceNode : context.sortedNodes()) {
             long delta = processNode(sourceNode, context.itemImports(), fluidImports, energyImports, chemicalImports,
                     sourceImports, context.signalCache(), context.dimensionalCache(), context.tierCache(),
-                    telemetryActive, capCache);
+                    telemetryActive, capCache, includeItemTransfers);
             if (delta < minWakeDelta) {
                 minWakeDelta = delta;
             }
@@ -255,7 +263,8 @@ public class TransferEngine {
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache,
             boolean telemetryActive,
-            TransferCapabilityCache capCache) {
+            TransferCapabilityCache capCache,
+            boolean includeItemTransfers) {
 
         if (!sourceNode.isValidNode())
             return Long.MAX_VALUE;
@@ -304,6 +313,9 @@ public class TransferEngine {
                 continue;
             }
 
+            if (!includeItemTransfers && channel.getType() == ChannelType.ITEM)
+                continue;
+
             int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
             int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
 
@@ -323,22 +335,25 @@ public class TransferEngine {
             if (result < 0)
                 continue;
 
-            if (telemetryActive && result > 0) {
-                channel.getTelemetry().record(result);
-            }
-
-            updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier);
-
-            if (result > 0) {
-                minWakeDelta = 0;
-            } else {
-                long postCooldown = cooldownRemaining(sourceNode, channel, i, sourceTier, gameTime);
-                long wakeAt = Math.max(1L, postCooldown);
-                if (wakeAt < minWakeDelta) minWakeDelta = wakeAt;
-            }
+            long wakeDelta = finishChannelAttempt(
+                    sourceNode, channel, i, result, gameTime, sourceTier, telemetryActive);
+            if (wakeDelta < minWakeDelta) minWakeDelta = wakeDelta;
         }
 
         return minWakeDelta;
+    }
+
+    public static long finishChannelAttempt(LogisticsNodeEntity node, ChannelData channel, int index, int result,
+            long gameTime, int tier, boolean telemetryActive) {
+        if (telemetryActive && result > 0) {
+            channel.getTelemetry().record(result);
+        }
+
+        updateBackoff(node, channel, index, result > 0, gameTime, tier);
+        if (result > 0) {
+            return 0L;
+        }
+        return Math.max(1L, cooldownRemaining(node, channel, index, tier, gameTime));
     }
 
     public static long cooldownRemaining(LogisticsNodeEntity node, ChannelData channel, int index, int tier,

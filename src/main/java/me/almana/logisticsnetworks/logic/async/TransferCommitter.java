@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
+import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
@@ -17,45 +18,65 @@ import java.util.List;
 
 public final class TransferCommitter {
 
+    public record ItemCommitResult(int moved, long wakeDelta) {
+    }
+
+    private record ChannelCommitResult(int moved, long wakeDelta) {
+
+        private static final ChannelCommitResult SKIPPED = new ChannelCommitResult(0, Long.MAX_VALUE);
+    }
+
     private TransferCommitter() {
     }
 
     public static int commit(TransferPlan plan, LogisticsNetwork network, MinecraftServer server,
             TransferCapabilityCache capCache, long runtimeId) {
+        return commitItems(plan, network, server, capCache, runtimeId).moved();
+    }
+
+    public static ItemCommitResult commitItems(TransferPlan plan, LogisticsNetwork network, MinecraftServer server,
+            TransferCapabilityCache capCache, long runtimeId) {
         ThreadGuard.requireServerThread();
 
         if (plan.runtimeId() != runtimeId || plan.generation() != network.getGeneration()) {
-            return 0;
+            return new ItemCommitResult(0, Long.MAX_VALUE);
         }
 
         int total = 0;
+        long minWakeDelta = Long.MAX_VALUE;
+        boolean telemetryActive = NetworkRegistry.get((ServerLevel) server.overworld())
+                .getTelemetryManager().isActive(network.getId());
         for (TransferPlan.ChannelMoves channel : plan.channels()) {
-            total += commitChannel(channel, network, server, capCache);
+            ChannelCommitResult result = commitChannel(channel, network, server, capCache, telemetryActive);
+            total += result.moved();
+            if (result.wakeDelta() < minWakeDelta) {
+                minWakeDelta = result.wakeDelta();
+            }
         }
-        return total;
+        return new ItemCommitResult(total, minWakeDelta);
     }
 
-    private static int commitChannel(TransferPlan.ChannelMoves channel, LogisticsNetwork network,
-            MinecraftServer server, TransferCapabilityCache capCache) {
+    private static ChannelCommitResult commitChannel(TransferPlan.ChannelMoves channel, LogisticsNetwork network,
+            MinecraftServer server, TransferCapabilityCache capCache, boolean telemetryActive) {
         LogisticsNodeEntity sourceNode = TransferEngine.findNode(server, channel.sourceNodeId(),
                 network.getNodeDimension(channel.sourceNodeId()));
         if (sourceNode == null || !sourceNode.isValidNode()) {
-            return 0;
+            return ChannelCommitResult.SKIPPED;
         }
 
         ChannelData sourceChannel = sourceNode.getChannel(channel.channelIndex());
         if (!isItemChannel(sourceChannel, ChannelMode.EXPORT)
                 || !TransferEngine.canRunChannel(sourceNode, sourceChannel)) {
-            return 0;
+            return ChannelCommitResult.SKIPPED;
         }
 
         if (!isEndpointLoaded(sourceNode)) {
-            return 0;
+            return ChannelCommitResult.SKIPPED;
         }
 
         IItemHandler source = capCache.findItemHandler(sourceNode, sourceChannel.getIoDirection());
         if (source == null) {
-            return 0;
+            return ChannelCommitResult.SKIPPED;
         }
         IItemHandler sourceBulk = capCache.findBulkItemHandler(sourceNode, source);
 
@@ -75,10 +96,12 @@ public final class TransferCommitter {
                     source, target.handler(), target.bulkHandler(), move, sourceNode);
         }
 
-        if (moved > 0) {
-            sourceChannel.getTelemetry().record(moved);
-        }
-        return moved;
+        ServerLevel sourceLevel = (ServerLevel) sourceNode.level();
+        int tier = network.getTierCache().getOrDefault(sourceNode.getUUID(), 0);
+        long wakeDelta = TransferEngine.finishChannelAttempt(
+                sourceNode, sourceChannel, channel.channelIndex(), moved,
+                sourceLevel.getGameTime(), tier, telemetryActive);
+        return new ChannelCommitResult(moved, wakeDelta);
     }
 
     private static ResolvedTarget[] resolveTargets(List<TransferPlan.TargetRef> refs,

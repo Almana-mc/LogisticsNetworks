@@ -1,10 +1,16 @@
 package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
+import me.almana.logisticsnetworks.logic.async.NetworkPlanner;
+import me.almana.logisticsnetworks.logic.async.NetworkSnapshot;
+import me.almana.logisticsnetworks.logic.async.Snapshots;
+import me.almana.logisticsnetworks.logic.async.TransferCommitter;
+import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -18,6 +24,8 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
 import org.slf4j.Logger;
 
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import org.jetbrains.annotations.Nullable;
 
 public class NetworkRegistry extends SavedData {
@@ -68,7 +76,9 @@ public class NetworkRegistry extends SavedData {
                 continue;
 
             try {
-                long delta = TransferEngine.processNetwork(network, server);
+                long delta = Config.asyncPlanning
+                        ? processNetworkPipelined(network, server)
+                        : TransferEngine.processNetwork(network, server);
                 if (delta == 0L) {
                     dirtyNetworks.add(id);
                 } else if (delta != Long.MAX_VALUE) {
@@ -77,6 +87,38 @@ public class NetworkRegistry extends SavedData {
             } catch (Exception e) {
                 LOGGER.error("Error processing network {}: {}", id, e.getMessage(), e);
             }
+        }
+    }
+
+    private long processNetworkPipelined(LogisticsNetwork network, MinecraftServer server) {
+        NetworkSnapshot snapshot = Snapshots.captureNetwork(network, server, 0L, capabilityCache);
+        if (snapshot == null) {
+            return TransferEngine.processNetwork(network, server);
+        }
+
+        TransferPlan plan = planOffThread(snapshot);
+        if (plan == null) {
+            return TransferEngine.processNetwork(network, server);
+        }
+
+        TransferCommitter.ItemCommitResult itemResult = TransferCommitter.commitItems(
+                plan, network, server, capabilityCache, 0L);
+        long synchronousDelta = TransferEngine.processNetworkWithoutItemTransfers(network, server);
+        return Math.min(itemResult.wakeDelta(), synchronousDelta);
+    }
+
+    static TransferPlan planOffThread(NetworkSnapshot snapshot) {
+        FutureTask<TransferPlan> task = new FutureTask<>(() -> NetworkPlanner.plan(snapshot));
+        Thread worker = new Thread(task, "LogisticsNetworks-Planning-Gate");
+        worker.start();
+        try {
+            return task.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (ExecutionException e) {
+            LOGGER.error("Snapshot planning failed", e.getCause());
+            return null;
         }
     }
 

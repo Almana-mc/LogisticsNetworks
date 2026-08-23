@@ -13,10 +13,7 @@ public final class NetworkPlanner {
 
         List<TransferPlan.ChannelMoves> channels = new ArrayList<>(snapshot.units().size());
         for (NetworkSnapshot.ChannelUnit unit : snapshot.units()) {
-            TransferPlan.ChannelMoves moves = ItemPlanner.plan(unit, snapshot);
-            if (!moves.moves().isEmpty()) {
-                channels.add(moves);
-            }
+            channels.add(ItemPlanner.plan(unit, snapshot));
         }
 
         return new TransferPlan(

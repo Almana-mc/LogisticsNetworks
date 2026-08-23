@@ -142,7 +142,7 @@ public final class Snapshots {
             TransferEngine.ResolvedItemTargets resolved = TransferEngine.resolveItemTargets(
                     node, level, channel, targets, sourceHandler,
                     context.dimensionalCache(), capCache, readCache);
-            if (resolved.status() != TransferEngine.ResolvedItemTargets.OK || resolved.refs().isEmpty()) {
+            if (resolved.status() != TransferEngine.ResolvedItemTargets.OK) {
                 continue;
             }
 
