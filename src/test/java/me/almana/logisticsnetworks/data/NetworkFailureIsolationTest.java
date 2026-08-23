@@ -18,6 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NetworkFailureIsolationTest {
 
+    private static final long CURRENT_GENERATION = 1L;
+    private static final long CURRENT_RUNTIME = 2L;
+
     private NetworkDispatchState state;
 
     @BeforeEach
@@ -36,7 +39,8 @@ class NetworkFailureIsolationTest {
         assertTrue(fail(id));
         assertTrue(state.isAsyncDisabled(id));
 
-        assertFalse(state.finishWorkerPlan(failedPlan(id)));
+        assertFalse(state.finishWorkerPlan(
+                failedPlan(id), CURRENT_GENERATION, CURRENT_RUNTIME));
     }
 
     @Test
@@ -48,7 +52,8 @@ class NetworkFailureIsolationTest {
         state.takeSynchronousFallbacks();
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
-        assertFalse(state.finishWorkerPlan(successfulPlan(id)));
+        assertFalse(state.finishWorkerPlan(
+                successfulPlan(id), CURRENT_GENERATION, CURRENT_RUNTIME));
 
         assertFalse(fail(id));
         assertFalse(fail(id));
@@ -68,6 +73,38 @@ class NetworkFailureIsolationTest {
 
         assertTrue(state.isAsyncDisabled(broken));
         assertFalse(state.isAsyncDisabled(healthy));
+    }
+
+    @Test
+    void staleGenerationFailuresDoNotAdvanceTheFailureBudget() {
+        UUID id = UUID.randomUUID();
+        TransferPlan stale = new TransferPlan(
+                id, CURRENT_GENERATION + 1L, CURRENT_RUNTIME, true, List.of());
+
+        assertFalse(fail(stale));
+        assertFalse(fail(stale));
+        assertFalse(fail(stale));
+        assertFalse(state.isAsyncDisabled(id));
+
+        assertFalse(fail(id));
+        assertFalse(fail(id));
+        assertTrue(fail(id));
+    }
+
+    @Test
+    void wrongRuntimeFailuresDoNotAdvanceTheFailureBudget() {
+        UUID id = UUID.randomUUID();
+        TransferPlan wrongRuntime = new TransferPlan(
+                id, CURRENT_GENERATION, CURRENT_RUNTIME + 1L, true, List.of());
+
+        assertFalse(fail(wrongRuntime));
+        assertFalse(fail(wrongRuntime));
+        assertFalse(fail(wrongRuntime));
+        assertFalse(state.isAsyncDisabled(id));
+
+        assertFalse(fail(id));
+        assertFalse(fail(id));
+        assertTrue(fail(id));
     }
 
     @Test
@@ -96,7 +133,8 @@ class NetworkFailureIsolationTest {
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
 
-        assertFalse(state.finishWorkerPlan(failedPlan(id)));
+        assertFalse(state.finishWorkerPlan(
+                failedPlan(id), CURRENT_GENERATION, CURRENT_RUNTIME));
         state.fallbackSynchronously(id);
 
         assertEquals(Set.of(id), state.takeSynchronousFallbacks());
@@ -161,19 +199,25 @@ class NetworkFailureIsolationTest {
     }
 
     private boolean fail(UUID id) {
+        return fail(failedPlan(id));
+    }
+
+    private boolean fail(TransferPlan plan) {
+        UUID id = plan.networkId();
         state.takeSynchronousFallbacks();
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
-        boolean newlyDisabled = state.finishWorkerPlan(failedPlan(id));
+        boolean newlyDisabled = state.finishWorkerPlan(
+                plan, CURRENT_GENERATION, CURRENT_RUNTIME);
         state.fallbackSynchronously(id);
         return newlyDisabled;
     }
 
     private static TransferPlan failedPlan(UUID id) {
-        return new TransferPlan(id, 1L, 2L, true, List.of());
+        return new TransferPlan(id, CURRENT_GENERATION, CURRENT_RUNTIME, true, List.of());
     }
 
     private static TransferPlan successfulPlan(UUID id) {
-        return new TransferPlan(id, 1L, 2L, false, List.of());
+        return new TransferPlan(id, CURRENT_GENERATION, CURRENT_RUNTIME, false, List.of());
     }
 }

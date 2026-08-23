@@ -59,9 +59,14 @@ final class NetworkDispatchState {
         }
     }
 
-    boolean finishWorkerPlan(TransferPlan plan) {
+    boolean finishWorkerPlan(
+            TransferPlan plan, long currentGeneration, long currentRuntimeId) {
         UUID id = plan.networkId();
         finishDispatch(id);
+        if (plan.generation() != currentGeneration
+                || plan.runtimeId() != currentRuntimeId) {
+            return false;
+        }
         if (!plan.failed()) {
             asyncFailures.remove(id);
             return false;

@@ -161,12 +161,14 @@ final class NetworkDispatcher {
     private void commitOne(TransferPlan plan, Map<UUID, LogisticsNetwork> networks,
             MinecraftServer server, TransferCapabilityCache capabilityCache, long currentRuntimeId) {
         UUID id = plan.networkId();
-        boolean newlyDisabled = state.finishWorkerPlan(plan);
         LogisticsNetwork network = networks.get(id);
         if (network == null) {
+            state.finishDispatch(id);
             state.delete(id);
             return;
         }
+        boolean newlyDisabled = state.finishWorkerPlan(
+                plan, network.getGeneration(), currentRuntimeId);
         if (newlyDisabled) {
             LOGGER.warn("Network {} failed async planning 3 consecutive times; "
                     + "falling back to synchronous transfers.", id);
