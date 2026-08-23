@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
+import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -754,7 +755,7 @@ public class TransferEngine {
         return sourceDim && dimCache.getOrDefault(target.getUUID(), false);
     }
 
-    private static boolean isSameItemStorage(ServerLevel sourceLevel, BlockPos sourcePos,
+    public static boolean isSameItemStorage(ServerLevel sourceLevel, BlockPos sourcePos,
             ServerLevel targetLevel, BlockPos targetPos) {
         if (!sourceLevel.dimension().equals(targetLevel.dimension()))
             return false;
@@ -1016,6 +1017,8 @@ public class TransferEngine {
 
     public static int commitSingleMove(IItemHandler source, IItemHandler target,
             @Nullable IItemHandler bulkTarget, TransferPlan.ItemMove move, LogisticsNodeEntity sourceNode) {
+        ThreadGuard.requireServerThread();
+
         if (move.sourceSlot() < 0 || move.sourceSlot() >= source.getSlots() || move.amount() <= 0) {
             return 0;
         }

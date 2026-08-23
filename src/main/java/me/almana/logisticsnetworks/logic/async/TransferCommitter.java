@@ -57,6 +57,7 @@ public final class TransferCommitter {
         if (source == null) {
             return 0;
         }
+        IItemHandler sourceBulk = capCache.findBulkItemHandler(sourceNode, source);
 
         ResolvedTarget[] targets = resolveTargets(channel.targets(), sourceNode, network, server, capCache);
 
@@ -66,7 +67,8 @@ public final class TransferCommitter {
                 continue;
             }
             ResolvedTarget target = targets[move.targetIndex()];
-            if (target == null || target.handler() == source) {
+            if (target == null || sharesItemHandler(
+                    source, sourceBulk, target.handler(), target.bulkHandler())) {
                 continue;
             }
             moved += TransferEngine.commitSingleMove(
@@ -98,6 +100,12 @@ public final class TransferCommitter {
             if (!isEndpointLoaded(node)) {
                 continue;
             }
+            if (!sourceNode.isMountedOnCreate() && !node.isMountedOnCreate()
+                    && TransferEngine.isSameItemStorage(
+                            (ServerLevel) sourceNode.level(), sourceNode.getAttachedPos(),
+                            (ServerLevel) node.level(), node.getAttachedPos())) {
+                continue;
+            }
             IItemHandler handler = capCache.findItemHandler(node, channel.getIoDirection());
             if (handler == null) {
                 continue;
@@ -112,6 +120,12 @@ public final class TransferCommitter {
             targets[i] = new ResolvedTarget(handler, bulkHandler);
         }
         return targets;
+    }
+
+    static boolean sharesItemHandler(IItemHandler source, @Nullable IItemHandler sourceBulk,
+            IItemHandler target, @Nullable IItemHandler targetBulk) {
+        return source == target || source == targetBulk
+                || sourceBulk != null && (sourceBulk == target || sourceBulk == targetBulk);
     }
 
     private static boolean isItemChannel(@Nullable ChannelData channel, ChannelMode mode) {
