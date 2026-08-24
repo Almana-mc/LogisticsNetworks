@@ -11,10 +11,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -55,6 +57,49 @@ class NetworkRegistryPipelineTest {
         state.finishDispatch(id);
 
         assertTrue(state.beginDispatch(id));
+    }
+
+    @Test
+    void inventoryWakePreservesGeneration() {
+        NetworkRegistry registry = new NetworkRegistry();
+        LogisticsNetwork network = registry.createNetwork();
+        long generation = network.getGeneration();
+
+        registry.wakeNetwork(network.getId());
+
+        assertEquals(generation, network.getGeneration());
+    }
+
+    @Test
+    void invalidationAdvancesGenerationOnce() {
+        NetworkRegistry registry = new NetworkRegistry();
+        LogisticsNetwork network = registry.createNetwork();
+        long generation = network.getGeneration();
+
+        registry.invalidateNetwork(network.getId());
+
+        assertEquals(generation + 1L, network.getGeneration());
+    }
+
+    @Test
+    void membershipChangesAdvanceGenerationOnce() {
+        NetworkRegistry registry = new NetworkRegistry();
+        LogisticsNetwork network = registry.createNetwork();
+        registry.addNodeToNetwork(network.getId(), UUID.randomUUID());
+        UUID nodeId = UUID.randomUUID();
+        long generation = network.getGeneration();
+
+        registry.addNodeToNetwork(network.getId(), nodeId);
+
+        assertEquals(generation + 1L, network.getGeneration());
+        assertTrue(network.getNodeUuids().contains(nodeId));
+        assertTrue(isQueued(registry, network.getId()));
+
+        registry.removeNodeFromNetwork(network.getId(), nodeId);
+
+        assertEquals(generation + 2L, network.getGeneration());
+        assertFalse(network.getNodeUuids().contains(nodeId));
+        assertTrue(isQueued(registry, network.getId()));
     }
 
     @Test
@@ -222,5 +267,18 @@ class NetworkRegistryPipelineTest {
     private static TransferPlan plan(LogisticsNetwork network, long runtimeId, boolean failed) {
         return new TransferPlan(
                 network.getId(), network.getGeneration(), runtimeId, failed, List.of());
+    }
+
+    private static boolean isQueued(NetworkRegistry registry, UUID networkId) {
+        try {
+            Field dispatcherField = NetworkRegistry.class.getDeclaredField("dispatcher");
+            dispatcherField.setAccessible(true);
+            Field stateField = NetworkDispatcher.class.getDeclaredField("state");
+            stateField.setAccessible(true);
+            NetworkDispatchState state = (NetworkDispatchState) stateField.get(dispatcherField.get(registry));
+            return state.dirtySnapshot().contains(networkId);
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError(exception);
+        }
     }
 }

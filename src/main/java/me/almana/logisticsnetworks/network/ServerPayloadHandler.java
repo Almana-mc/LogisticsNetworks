@@ -67,7 +67,7 @@ public class ServerPayloadHandler {
             updateChannelData(channel, payload);
             clampChannelToUpgradeLimits(node, channel);
             propagateToLabelGroup(node, payload.channelIndex());
-            markNetworkDirty(node);
+            invalidateNetwork(node);
         });
     }
 
@@ -337,7 +337,7 @@ public class ServerPayloadHandler {
             if (channel != null) {
                 channel.setFilterItem(payload.filterSlot(), payload.filterItem().copyWithCount(1));
                 propagateToLabelGroup(node, payload.channelIndex());
-                markNetworkDirty(node);
+                invalidateNetwork(node);
             }
         });
     }
@@ -354,7 +354,7 @@ public class ServerPayloadHandler {
             channel.setFilterItem(payload.filterSlot(),
                     payload.filterItem().is(ModTags.FILTERS) ? payload.filterItem().copyWithCount(1) : ItemStack.EMPTY);
             propagateToLabelGroup(node, payload.channelIndex());
-            markNetworkDirty(node);
+            invalidateNetwork(node);
         });
     }
 
@@ -371,7 +371,7 @@ public class ServerPayloadHandler {
                 if (channel != null)
                     setChannelToUpgradeMax(node, channel);
             }
-            markNetworkDirty(node);
+            invalidateNetwork(node);
         });
     }
 
@@ -418,7 +418,7 @@ public class ServerPayloadHandler {
             }
             channel.setFilterItem(fs, filter);
             propagateToLabelGroup(node, payload.channel());
-            markNetworkDirty(node);
+            invalidateNetwork(node);
         });
     }
 
@@ -505,7 +505,7 @@ public class ServerPayloadHandler {
                 channel.setName(name);
             }
 
-            markNetworkDirty(node);
+            invalidateNetwork(node);
         });
     }
 
@@ -540,7 +540,7 @@ public class ServerPayloadHandler {
                 channel.setFilterItem(fs, stack);
                 sendChannelSyncToViewers(node, ch, channel);
                 propagateToLabelGroup(node, ch);
-                markNetworkDirty(node);
+                invalidateNetwork(node);
             }
 
             VirtualFilterType type = VirtualFilterType.fromStack(stack);
@@ -723,9 +723,9 @@ public class ServerPayloadHandler {
         return node.isOwnedBy(context.player()) ? node : null;
     }
 
-    public static void markNetworkDirty(LogisticsNodeEntity node) {
+    public static void invalidateNetwork(LogisticsNodeEntity node) {
         if (node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
-            NetworkRegistry.get(level).markNetworkDirty(node.getNetworkId());
+            NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
         }
     }
 
@@ -793,7 +793,7 @@ public class ServerPayloadHandler {
                     level, node, channel, filter);
             if (result.added() > 0) {
                 menu.refreshFilterEntries();
-                markNetworkDirty(node);
+                invalidateNetwork(node);
             }
             PacketDistributor.sendToPlayer(player, new SyncFilterScanResultPayload(
                     filter.copyWithCount(1), result.added(), result.storageFound(), result.filterFull()));
@@ -943,7 +943,7 @@ public class ServerPayloadHandler {
                                         sendChannelSyncToViewers(node, i, dst);
                                     }
                                 }
-                                markNetworkDirty(node);
+                                invalidateNetwork(node);
                                 return;
                             }
                         }

@@ -319,7 +319,7 @@ public class WrenchItem extends Item {
             switch (result) {
                 case SUCCESS -> {
                     pasted++;
-                    markNodeNetworkDirty(node);
+                    invalidateNodeNetwork(node);
                 }
                 case MISSING_ITEMS -> {
                     missingItems = true;
@@ -747,7 +747,7 @@ public class WrenchItem extends Item {
         NodeClipboardConfig.PasteResult result = clipboard.applyToNode(serverPlayer, node, wrenchStack, ae2Link);
         switch (result) {
             case SUCCESS -> {
-                markNodeNetworkDirty(node);
+                invalidateNodeNetwork(node);
                 player.displayClientMessage(Component.translatable("message.logisticsnetworks.clipboard.paste.success"),
                         true);
             }
@@ -764,9 +764,9 @@ public class WrenchItem extends Item {
         return InteractionResult.CONSUME;
     }
 
-    private static void markNodeNetworkDirty(LogisticsNodeEntity node) {
+    private static void invalidateNodeNetwork(LogisticsNodeEntity node) {
         if (node.getNetworkId() != null && node.level() instanceof ServerLevel serverLevel) {
-            NetworkRegistry.get(serverLevel).markNetworkDirty(node.getNetworkId());
+            NetworkRegistry.get(serverLevel).invalidateNetwork(node.getNetworkId());
         }
     }
 

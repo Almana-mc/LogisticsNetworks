@@ -120,7 +120,13 @@ public class NetworkRegistry extends SavedData {
         capabilityCache.evict(level.dimension(), attachedPos);
     }
 
-    public void markNetworkDirty(UUID networkId) {
+    public void wakeNetwork(UUID networkId) {
+        if (networks.containsKey(networkId)) {
+            dispatcher.markDirty(networkId);
+        }
+    }
+
+    public void invalidateNetwork(UUID networkId) {
         LogisticsNetwork network = networks.get(networkId);
         if (network != null) {
             dispatcher.markDirty(networkId);
@@ -136,7 +142,7 @@ public class NetworkRegistry extends SavedData {
                 LOGGER.warn("Network {} has exceeded {} nodes (Count: {}). Performance may degrade.",
                         networkId, WARNING_NODE_COUNT, network.getNodeUuids().size());
             }
-            markNetworkDirty(networkId);
+            dispatcher.markDirty(networkId);
             setDirty();
         }
     }
@@ -145,7 +151,7 @@ public class NetworkRegistry extends SavedData {
         LogisticsNetwork network = networks.get(networkId);
         if (network != null) {
             network.removeNode(nodeId);
-            markNetworkDirty(networkId);
+            dispatcher.markDirty(networkId);
 
             if (network.getNodeUuids().isEmpty()) {
                 LOGGER.info("Network {} is empty, deleting.", networkId);

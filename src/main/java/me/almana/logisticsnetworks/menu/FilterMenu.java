@@ -1140,7 +1140,7 @@ public class FilterMenu extends AbstractContainerMenu {
             if (channel != null) {
                 ServerPayloadHandler.sendChannelSyncToViewers(nodeSource, nodeChannel, channel);
             }
-            ServerPayloadHandler.markNetworkDirty(nodeSource);
+            ServerPayloadHandler.invalidateNetwork(nodeSource);
         }
     }
 

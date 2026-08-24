@@ -317,7 +317,7 @@ public class LogisticsNodeEntity extends Entity {
             NetworkRegistry registry = NetworkRegistry.get(serverLevel);
             registry.evictCapabilities(serverLevel, previousPos);
             registry.evictCapabilities(serverLevel, pos);
-            registry.markNetworkDirty(getNetworkId());
+            registry.invalidateNetwork(getNetworkId());
         }
     }
 
@@ -340,7 +340,7 @@ public class LogisticsNodeEntity extends Entity {
         if (level() instanceof ServerLevel serverLevel && getNetworkId() != null) {
             NetworkRegistry registry = NetworkRegistry.get(serverLevel);
             registry.evictCapabilities(serverLevel, getAttachedPos());
-            registry.markNetworkDirty(getNetworkId());
+            registry.invalidateNetwork(getNetworkId());
         }
     }
 
