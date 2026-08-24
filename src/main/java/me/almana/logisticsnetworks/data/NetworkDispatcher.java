@@ -145,7 +145,7 @@ final class NetworkDispatcher {
             dispatchStats.record(AsyncDispatchReason.OCCUPIED_SLOT_LIMIT, id);
             if (state.disableForOccupiedSlots(id)) {
                 LOGGER.warn("Network {} exceeded the async occupied-slot limit of {}; "
-                        + "falling back to synchronous transfers.",
+                        + "disabling async planning and scheduling degraded recovery.",
                         id, Config.asyncMaxOccupiedSlots);
             }
         } else if (disposition == CaptureDisposition.DEFER) {
@@ -169,7 +169,7 @@ final class NetworkDispatcher {
                 id, network.getGeneration(), runtimeId, true, Long.MAX_VALUE, List.of()),
                 network.getGeneration(), runtimeId);
         if (newlyDisabled) {
-            logWorkerFailureFallback(id);
+            logWorkerFailureDegradedRecovery(id);
         }
         retryWorkerFailure(id);
     }
@@ -216,7 +216,7 @@ final class NetworkDispatcher {
         boolean newlyDisabled = state.finishWorkerPlan(
                 plan, network.getGeneration(), currentRuntimeId);
         if (newlyDisabled) {
-            logWorkerFailureFallback(id);
+            logWorkerFailureDegradedRecovery(id);
         }
         AsyncDispatchReason reason = rejectedPlanReason(plan, network, currentRuntimeId);
         if (reason == AsyncDispatchReason.STALE_GENERATION
@@ -239,9 +239,9 @@ final class NetworkDispatcher {
         }
     }
 
-    private static void logWorkerFailureFallback(UUID id) {
+    private static void logWorkerFailureDegradedRecovery(UUID id) {
         LOGGER.warn("Network {} failed async planning 3 consecutive times; "
-                + "falling back to synchronous transfers.", id);
+                + "disabling async planning and scheduling degraded recovery.", id);
     }
 
     private void commitCurrentPlan(TransferPlan plan, LogisticsNetwork network,

@@ -216,16 +216,16 @@ class NetworkRegistryPipelineTest {
         state.markDirty(inFlight);
         assertTrue(state.beginDispatch(inFlight));
         state.markDirty(inFlight);
-        UUID fallback = UUID.randomUUID();
-        state.markDirty(fallback);
-        assertTrue(state.beginDispatch(fallback));
-        state.disableForOccupiedSlots(fallback);
+        UUID degraded = UUID.randomUUID();
+        state.markDirty(degraded);
+        assertTrue(state.beginDispatch(degraded));
+        state.disableForOccupiedSlots(degraded);
 
         dispatcher.refreshAsyncMode(false);
 
         assertNull(AsyncTransferRuntime.get());
         assertTrue(state.dirtySnapshot().contains(inFlight));
-        assertEquals(fallback, state.takeOneDegradedRecovery().orElseThrow());
+        assertEquals(degraded, state.takeOneDegradedRecovery().orElseThrow());
         assertTrue(state.takeOneDegradedRecovery().isEmpty());
 
         dispatcher.refreshAsyncMode(true);
@@ -234,7 +234,7 @@ class NetworkRegistryPipelineTest {
         assertNotNull(second);
         assertNotEquals(first.runtimeId(), second.runtimeId());
         assertTrue(state.beginDispatch(inFlight));
-        assertFalse(state.beginDispatch(fallback));
+        assertFalse(state.beginDispatch(degraded));
     }
 
     @Test

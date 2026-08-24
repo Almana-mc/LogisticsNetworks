@@ -111,7 +111,7 @@ class NetworkFailureIsolationTest {
     }
 
     @Test
-    void dispatcherExceptionRetriesBeforePermanentFallback() {
+    void dispatcherExceptionRetriesBeforePermanentDegradedRecovery() {
         LogisticsNetwork network = new LogisticsNetwork(UUID.randomUUID());
         UUID id = network.getId();
         for (int attempt = 0; attempt < 2; attempt++) {
