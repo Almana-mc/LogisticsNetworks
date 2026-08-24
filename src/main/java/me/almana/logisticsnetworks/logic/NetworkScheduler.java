@@ -30,7 +30,7 @@ public class NetworkScheduler {
         if (registry.refreshAsyncPlanning()) {
             registry.commitCompleted(event.getServer(), event::hasTime);
             registry.dispatchDirty(event.getServer());
-            registry.processSynchronousFallbacks(event.getServer());
+            registry.processDegradedRecovery(event.getServer());
         } else {
             registry.processDirtyNetworks(event.getServer());
         }

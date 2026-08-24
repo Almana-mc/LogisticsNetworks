@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
@@ -117,13 +118,15 @@ final class NetworkDispatcher {
         }
     }
 
-    void processSynchronousFallbacks(Map<UUID, LogisticsNetwork> networks, MinecraftServer server) {
+    void processDegradedRecovery(Map<UUID, LogisticsNetwork> networks, MinecraftServer server) {
         long now = server.overworld().getGameTime();
-        for (UUID id : state.takeSynchronousFallbacks()) {
-            LogisticsNetwork network = networks.get(id);
-            if (network != null) {
-                processSynchronously(id, network, server, now);
-            }
+        Optional<UUID> id = state.takeOneDegradedRecovery();
+        if (id.isEmpty()) {
+            return;
+        }
+        LogisticsNetwork network = networks.get(id.get());
+        if (network != null) {
+            processSynchronously(id.get(), network, server, now);
         }
     }
 
@@ -145,7 +148,6 @@ final class NetworkDispatcher {
                         + "falling back to synchronous transfers.",
                         id, Config.asyncMaxOccupiedSlots);
             }
-            state.fallbackSynchronously(id);
         } else if (disposition == CaptureDisposition.DEFER) {
             if (capture.status() == Snapshots.CaptureStatus.UNAVAILABLE) {
                 dispatchStats.record(AsyncDispatchReason.CAPTURE_UNAVAILABLE, id);
@@ -169,7 +171,7 @@ final class NetworkDispatcher {
         if (newlyDisabled) {
             logWorkerFailureFallback(id);
         }
-        recoverWorkerFailure(id);
+        retryWorkerFailure(id);
     }
 
     static CaptureDisposition captureDisposition(Snapshots.NetworkCapture capture) {
@@ -225,16 +227,14 @@ final class NetworkDispatcher {
         }
         if (reason != null) {
             dispatchStats.record(reason, id);
-            recoverWorkerFailure(id);
+            retryWorkerFailure(id);
             return false;
         }
         return true;
     }
 
-    private void recoverWorkerFailure(UUID id) {
-        if (state.isAsyncDisabled(id)) {
-            state.fallbackSynchronously(id);
-        } else {
+    private void retryWorkerFailure(UUID id) {
+        if (!state.isAsyncDisabled(id)) {
             state.retryCurrent(id);
         }
     }

@@ -4,7 +4,10 @@ import me.almana.logisticsnetworks.logic.async.TransferPlan;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -17,7 +20,7 @@ final class NetworkDispatchState {
     private final Set<UUID> dirtyNetworks = new HashSet<>();
     private final Set<UUID> inFlight = new HashSet<>();
     private final Set<UUID> dirtyAgain = new HashSet<>();
-    private final Set<UUID> synchronousFallbacks = new HashSet<>();
+    private final LinkedHashSet<UUID> degradedNetworks = new LinkedHashSet<>();
     private final TreeMap<Long, Set<UUID>> wakeBuckets = new TreeMap<>();
     private final Map<UUID, Long> scheduledWake = new HashMap<>();
     private final Map<UUID, Integer> asyncFailures = new HashMap<>();
@@ -35,7 +38,7 @@ final class NetworkDispatchState {
     boolean beginDispatch(UUID id) {
         if (isAsyncDisabled(id)) {
             if (dirtyNetworks.remove(id)) {
-                synchronousFallbacks.add(id);
+                degradedNetworks.add(id);
             }
             return false;
         }
@@ -95,25 +98,28 @@ final class NetworkDispatchState {
         if (failures != MAX_ASYNC_FAILURES) {
             return false;
         }
+        dirtyNetworks.remove(id);
+        dirtyAgain.remove(id);
+        cancelWake(id);
         asyncDisabled.put(id, AsyncDisableReason.WORKER_FAILURES);
+        degradedNetworks.add(id);
         return true;
     }
 
     boolean disableForOccupiedSlots(UUID id) {
-        return asyncDisabled.putIfAbsent(
-                id, AsyncDisableReason.OCCUPIED_SLOT_LIMIT) == null;
-    }
-
-    boolean isAsyncDisabled(UUID id) {
-        return asyncDisabled.containsKey(id);
-    }
-
-    void fallbackSynchronously(UUID id) {
+        if (asyncDisabled.putIfAbsent(id, AsyncDisableReason.OCCUPIED_SLOT_LIMIT) != null) {
+            return false;
+        }
         inFlight.remove(id);
         dirtyAgain.remove(id);
         dirtyNetworks.remove(id);
         cancelWake(id);
-        synchronousFallbacks.add(id);
+        degradedNetworks.add(id);
+        return true;
+    }
+
+    boolean isAsyncDisabled(UUID id) {
+        return asyncDisabled.containsKey(id);
     }
 
     Set<UUID> dirtySnapshot() {
@@ -122,33 +128,37 @@ final class NetworkDispatchState {
 
     Set<UUID> takeAllPendingNetworks() {
         Set<UUID> ids = new HashSet<>(dirtyNetworks);
-        ids.addAll(synchronousFallbacks);
+        ids.addAll(degradedNetworks);
         dirtyNetworks.clear();
-        synchronousFallbacks.clear();
+        degradedNetworks.clear();
         return ids;
     }
 
-    Set<UUID> takeSynchronousFallbacks() {
-        Set<UUID> ids = Set.copyOf(synchronousFallbacks);
-        synchronousFallbacks.clear();
-        return ids;
+    Optional<UUID> takeOneDegradedRecovery() {
+        Iterator<UUID> ids = degradedNetworks.iterator();
+        if (!ids.hasNext()) {
+            return Optional.empty();
+        }
+        UUID id = ids.next();
+        ids.remove();
+        return Optional.of(id);
     }
 
     void resetAsyncState() {
-        Set<UUID> pending = new HashSet<>(dirtyNetworks);
+        Set<UUID> pending = new LinkedHashSet<>(dirtyNetworks);
         pending.addAll(inFlight);
         pending.addAll(dirtyAgain);
-        pending.addAll(synchronousFallbacks);
+        pending.addAll(degradedNetworks);
         dirtyNetworks.clear();
         inFlight.clear();
         dirtyAgain.clear();
-        synchronousFallbacks.clear();
+        degradedNetworks.clear();
         pending.forEach(this::queuePending);
     }
 
     void scheduleResult(UUID id, long now, long delta) {
         cancelWake(id);
-        if (dirtyNetworks.contains(id) || synchronousFallbacks.contains(id)) {
+        if (dirtyNetworks.contains(id) || degradedNetworks.contains(id)) {
             return;
         }
         if (delta == 0L) {
@@ -191,7 +201,7 @@ final class NetworkDispatchState {
         dirtyNetworks.remove(id);
         inFlight.remove(id);
         dirtyAgain.remove(id);
-        synchronousFallbacks.remove(id);
+        degradedNetworks.remove(id);
         asyncFailures.remove(id);
         asyncDisabled.remove(id);
         cancelWake(id);
@@ -199,8 +209,8 @@ final class NetworkDispatchState {
 
     private void queuePending(UUID id) {
         if (isAsyncDisabled(id)) {
-            synchronousFallbacks.add(id);
-        } else if (!synchronousFallbacks.contains(id)) {
+            degradedNetworks.add(id);
+        } else if (!degradedNetworks.contains(id)) {
             dirtyNetworks.add(id);
         }
     }

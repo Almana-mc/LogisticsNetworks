@@ -9,7 +9,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,9 +40,11 @@ class NetworkFailureIsolationTest {
         assertFalse(state.isAsyncDisabled(id));
         assertTrue(fail(id));
         assertTrue(state.isAsyncDisabled(id));
+        assertEquals(id, state.takeOneDegradedRecovery().orElseThrow());
 
         assertFalse(state.finishWorkerPlan(
                 failedPlan(id), CURRENT_GENERATION, CURRENT_RUNTIME));
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
     }
 
     @Test
@@ -52,7 +53,6 @@ class NetworkFailureIsolationTest {
         assertFalse(fail(id));
         assertFalse(fail(id));
 
-        state.takeSynchronousFallbacks();
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
         assertFalse(state.finishWorkerPlan(
@@ -120,7 +120,7 @@ class NetworkFailureIsolationTest {
 
             dispatcher.recordDispatchException(network, CURRENT_RUNTIME);
 
-            assertTrue(state.takeSynchronousFallbacks().isEmpty());
+            assertTrue(state.takeOneDegradedRecovery().isEmpty());
             assertTrue(state.beginDispatch(id));
             state.finishDispatch(id);
         }
@@ -129,41 +129,53 @@ class NetworkFailureIsolationTest {
         assertTrue(state.beginDispatch(id));
         dispatcher.recordDispatchException(network, CURRENT_RUNTIME);
 
-        assertTrue(state.takeSynchronousFallbacks().contains(id));
+        assertEquals(id, state.takeOneDegradedRecovery().orElseThrow());
     }
 
     @Test
-    void disabledNetworksRemainEligibleForSynchronousScheduling() {
+    void disabledNetworksRemainEligibleForDegradedRecovery() {
         UUID id = UUID.randomUUID();
         assertTrue(state.disableForOccupiedSlots(id));
         assertFalse(state.disableForOccupiedSlots(id));
 
         state.markDirty(id);
         assertFalse(state.beginDispatch(id));
-        assertEquals(Set.of(id), state.takeSynchronousFallbacks());
+        assertEquals(id, state.takeOneDegradedRecovery().orElseThrow());
 
         state.scheduleResult(id, 10L, 0L);
-        assertEquals(Set.of(id), state.takeSynchronousFallbacks());
+        assertEquals(id, state.takeOneDegradedRecovery().orElseThrow());
 
         state.scheduleResult(id, 10L, 5L);
         state.promoteDueWakes(14L, ignored -> true);
-        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
         state.promoteDueWakes(15L, ignored -> true);
-        assertEquals(Set.of(id), state.takeSynchronousFallbacks());
+        assertEquals(id, state.takeOneDegradedRecovery().orElseThrow());
     }
 
     @Test
-    void failedPlanClearsInFlightAndQueuesOneSynchronousRecovery() {
+    void failedPlanRequeuesForAsyncRecovery() {
         UUID id = UUID.randomUUID();
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
 
         assertFalse(state.finishWorkerPlan(
                 failedPlan(id), CURRENT_GENERATION, CURRENT_RUNTIME));
-        state.fallbackSynchronously(id);
+        state.retryCurrent(id);
 
-        assertEquals(Set.of(id), state.takeSynchronousFallbacks());
-        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+        assertTrue(state.beginDispatch(id));
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
+    }
+
+    @Test
+    void degradedRecoveryYieldsOneNetwork() {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        state.disableForOccupiedSlots(first);
+        state.disableForOccupiedSlots(second);
+
+        assertEquals(first, state.takeOneDegradedRecovery().orElseThrow());
+        assertEquals(second, state.takeOneDegradedRecovery().orElseThrow());
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
     }
 
     @Test
@@ -178,14 +190,13 @@ class NetworkFailureIsolationTest {
         assertTrue(state.beginDispatch(id));
         state.finishDispatch(id);
         assertFalse(state.beginDispatch(id));
-        assertFalse(state.takeSynchronousFallbacks().contains(id));
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
     }
 
     @Test
     void deletionClearsFailureDisableAndSchedulingState() {
         UUID id = UUID.randomUUID();
         fail(id);
-        state.takeSynchronousFallbacks();
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
         state.markDirty(id);
@@ -196,14 +207,14 @@ class NetworkFailureIsolationTest {
         state.promoteDueWakes(12L, ignored -> true);
 
         assertFalse(state.beginDispatch(id));
-        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
         assertFalse(fail(id));
         assertFalse(fail(id));
         assertTrue(fail(id));
     }
 
     @Test
-    void transientCaptureOutcomesDeferWhileOccupiedLimitRecoversSynchronously() {
+    void transientCaptureOutcomesDeferWhileOccupiedLimitQueuesDegradedRecovery() {
         NetworkSnapshot itemless = new NetworkSnapshot(
                 UUID.randomUUID(), 1L, 2L, 3L, Long.MAX_VALUE, RegistryAccess.EMPTY, List.of());
         NetworkSnapshot withItems = new NetworkSnapshot(
@@ -273,12 +284,10 @@ class NetworkFailureIsolationTest {
 
     private boolean fail(TransferPlan plan) {
         UUID id = plan.networkId();
-        state.takeSynchronousFallbacks();
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
         boolean newlyDisabled = state.finishWorkerPlan(
                 plan, CURRENT_GENERATION, CURRENT_RUNTIME);
-        state.fallbackSynchronously(id);
         return newlyDisabled;
     }
 

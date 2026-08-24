@@ -116,7 +116,7 @@ class NetworkRegistryPipelineTest {
         assertFalse(state.beginDispatch(id));
         state.promoteDueWakes(11L, ignored -> true);
         assertTrue(state.beginDispatch(id));
-        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
     }
 
     @Test
@@ -146,7 +146,7 @@ class NetworkRegistryPipelineTest {
         assertFalse(state.beginDispatch(id));
         state.promoteDueWakes(20L, ignored -> true);
         assertTrue(state.beginDispatch(id));
-        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
     }
 
     @Test
@@ -157,7 +157,7 @@ class NetworkRegistryPipelineTest {
 
         dispatcher.dispatchCapture(id, Snapshots.NetworkCapture.unavailable(), 10L, () -> false);
 
-        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
         state.promoteDueWakes(29L, ignored -> true);
         assertFalse(state.beginDispatch(id));
         state.promoteDueWakes(30L, ignored -> true);
@@ -175,7 +175,7 @@ class NetworkRegistryPipelineTest {
         assertTrue(state.beginDispatch(id));
         state.finishDispatch(id);
         assertFalse(state.beginDispatch(id));
-        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
     }
 
     @Test
@@ -189,7 +189,7 @@ class NetworkRegistryPipelineTest {
         assertFalse(dispatcher.prepareCompletedPlan(stale, network, 7L));
 
         assertTrue(state.beginDispatch(network.getId()));
-        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
     }
 
     @Test
@@ -203,7 +203,7 @@ class NetworkRegistryPipelineTest {
         assertFalse(dispatcher.prepareCompletedPlan(wrongRuntime, network, 7L));
 
         assertTrue(state.beginDispatch(network.getId()));
-        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
     }
 
     @Test
@@ -219,12 +219,14 @@ class NetworkRegistryPipelineTest {
         UUID fallback = UUID.randomUUID();
         state.markDirty(fallback);
         assertTrue(state.beginDispatch(fallback));
-        state.fallbackSynchronously(fallback);
+        state.disableForOccupiedSlots(fallback);
 
         dispatcher.refreshAsyncMode(false);
 
         assertNull(AsyncTransferRuntime.get());
-        assertTrue(state.dirtySnapshot().containsAll(Set.of(inFlight, fallback)));
+        assertTrue(state.dirtySnapshot().contains(inFlight));
+        assertEquals(fallback, state.takeOneDegradedRecovery().orElseThrow());
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
 
         dispatcher.refreshAsyncMode(true);
         AsyncTransferRuntime second = AsyncTransferRuntime.get();
@@ -232,7 +234,7 @@ class NetworkRegistryPipelineTest {
         assertNotNull(second);
         assertNotEquals(first.runtimeId(), second.runtimeId());
         assertTrue(state.beginDispatch(inFlight));
-        assertTrue(state.beginDispatch(fallback));
+        assertFalse(state.beginDispatch(fallback));
     }
 
     @Test
@@ -277,13 +279,13 @@ class NetworkRegistryPipelineTest {
         state.scheduleWake(id, 5L);
         assertTrue(state.beginDispatch(id));
         state.markDirty(id);
-        state.fallbackSynchronously(id);
+        state.disableForOccupiedSlots(id);
 
         state.delete(id);
         state.promoteDueWakes(5L, ignored -> true);
 
         assertFalse(state.beginDispatch(id));
-        assertFalse(state.takeSynchronousFallbacks().contains(id));
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
     }
 
     @Test

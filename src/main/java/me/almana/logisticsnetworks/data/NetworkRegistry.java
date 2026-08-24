@@ -61,8 +61,8 @@ public class NetworkRegistry extends SavedData {
         dispatcher.commitCompleted(networks, server, capabilityCache, hasTime);
     }
 
-    public void processSynchronousFallbacks(MinecraftServer server) {
-        dispatcher.processSynchronousFallbacks(networks, server);
+    public void processDegradedRecovery(MinecraftServer server) {
+        dispatcher.processDegradedRecovery(networks, server);
     }
 
     public LogisticsNetwork createNetwork() {
