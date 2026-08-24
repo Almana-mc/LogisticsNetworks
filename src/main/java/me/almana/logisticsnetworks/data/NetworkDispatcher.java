@@ -156,9 +156,14 @@ final class NetworkDispatcher {
                 dispatchStats.record(AsyncDispatchReason.NO_READY_ITEM_WORK, id);
                 state.retryAt(id, gameTime + 1L);
             }
-        } else if (!submit.getAsBoolean()) {
-            dispatchStats.record(AsyncDispatchReason.QUEUE_REJECTED, id);
-            state.retryAt(id, gameTime + 1L);
+        } else {
+            if (capture.snapshot().units().isEmpty()) {
+                dispatchStats.record(AsyncDispatchReason.NO_READY_ITEM_WORK, id);
+            }
+            if (!submit.getAsBoolean()) {
+                dispatchStats.record(AsyncDispatchReason.QUEUE_REJECTED, id);
+                state.retryAt(id, gameTime + 1L);
+            }
         }
     }
 

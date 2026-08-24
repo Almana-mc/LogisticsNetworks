@@ -15,6 +15,7 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -116,6 +117,23 @@ class NetworkRegistryPipelineTest {
         assertFalse(state.beginDispatch(id));
         state.promoteDueWakes(11L, ignored -> true);
         assertTrue(state.beginDispatch(id));
+        assertTrue(state.takeOneDegradedRecovery().isEmpty());
+    }
+
+    @Test
+    void emptyCapturedSnapshotRecordsNoReadyItemWorkAndSubmitsWithoutDegradedRecovery() {
+        UUID id = UUID.randomUUID();
+        state.markDirty(id);
+        assertTrue(state.beginDispatch(id));
+        AtomicBoolean submitted = new AtomicBoolean();
+        NetworkSnapshot empty = new NetworkSnapshot(
+                id, 1L, 2L, 3L, 12L, RegistryAccess.EMPTY, List.of());
+
+        dispatcher.dispatchCapture(id, Snapshots.NetworkCapture.captured(empty), 10L,
+                () -> submitted.compareAndSet(false, true));
+
+        assertTrue(submitted.get());
+        assertEquals(1L, dispatchStats(dispatcher).count(AsyncDispatchReason.NO_READY_ITEM_WORK));
         assertTrue(state.takeOneDegradedRecovery().isEmpty());
     }
 
@@ -352,6 +370,16 @@ class NetworkRegistryPipelineTest {
             Field stateField = NetworkDispatcher.class.getDeclaredField("state");
             stateField.setAccessible(true);
             return (NetworkDispatchState) stateField.get(dispatcherField.get(registry));
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError(exception);
+        }
+    }
+
+    private static AsyncDispatchStats dispatchStats(NetworkDispatcher dispatcher) {
+        try {
+            Field field = NetworkDispatcher.class.getDeclaredField("dispatchStats");
+            field.setAccessible(true);
+            return (AsyncDispatchStats) field.get(dispatcher);
         } catch (ReflectiveOperationException exception) {
             throw new AssertionError(exception);
         }
