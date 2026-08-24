@@ -43,17 +43,19 @@ public final class TransferCommitter {
         }
 
         int total = 0;
-        long minWakeDelta = Long.MAX_VALUE;
+        long minWakeDelta = plan.itemWakeDelta();
         boolean telemetryActive = NetworkRegistry.get((ServerLevel) server.overworld())
                 .getTelemetryManager().isActive(network.getId());
         for (TransferPlan.ChannelMoves channel : plan.channels()) {
             ChannelCommitResult result = commitChannel(channel, network, server, capCache, telemetryActive);
             total += result.moved();
-            if (result.wakeDelta() < minWakeDelta) {
-                minWakeDelta = result.wakeDelta();
-            }
+            minWakeDelta = earlierWakeDelta(minWakeDelta, result.wakeDelta());
         }
         return new ItemCommitResult(total, minWakeDelta);
+    }
+
+    static long earlierWakeDelta(long currentMinimum, long channelWakeDelta) {
+        return Math.min(currentMinimum, channelWakeDelta);
     }
 
     private static ChannelCommitResult commitChannel(TransferPlan.ChannelMoves channel, LogisticsNetwork network,

@@ -82,7 +82,7 @@ class NetworkFailureIsolationTest {
     void staleGenerationFailuresDoNotAdvanceTheFailureBudget() {
         UUID id = UUID.randomUUID();
         TransferPlan stale = new TransferPlan(
-                id, CURRENT_GENERATION + 1L, CURRENT_RUNTIME, true, List.of());
+                id, CURRENT_GENERATION + 1L, CURRENT_RUNTIME, true, Long.MAX_VALUE, List.of());
 
         assertFalse(fail(stale));
         assertFalse(fail(stale));
@@ -98,7 +98,7 @@ class NetworkFailureIsolationTest {
     void wrongRuntimeFailuresDoNotAdvanceTheFailureBudget() {
         UUID id = UUID.randomUUID();
         TransferPlan wrongRuntime = new TransferPlan(
-                id, CURRENT_GENERATION, CURRENT_RUNTIME + 1L, true, List.of());
+                id, CURRENT_GENERATION, CURRENT_RUNTIME + 1L, true, Long.MAX_VALUE, List.of());
 
         assertFalse(fail(wrongRuntime));
         assertFalse(fail(wrongRuntime));
@@ -205,9 +205,9 @@ class NetworkFailureIsolationTest {
     @Test
     void transientCaptureOutcomesDeferWhileOccupiedLimitRecoversSynchronously() {
         NetworkSnapshot itemless = new NetworkSnapshot(
-                UUID.randomUUID(), 1L, 2L, 3L, RegistryAccess.EMPTY, List.of());
+                UUID.randomUUID(), 1L, 2L, 3L, Long.MAX_VALUE, RegistryAccess.EMPTY, List.of());
         NetworkSnapshot withItems = new NetworkSnapshot(
-                UUID.randomUUID(), 1L, 2L, 3L, RegistryAccess.EMPTY,
+                UUID.randomUUID(), 1L, 2L, 3L, Long.MAX_VALUE, RegistryAccess.EMPTY,
                 List.of(new NetworkSnapshot.ChannelUnit(
                         UUID.randomUUID(), 0, 1, new ItemStack[0], FilterMode.MATCH_ANY,
                         new NetworkSnapshot.ItemEndpoint(
@@ -218,7 +218,7 @@ class NetworkFailureIsolationTest {
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.unavailable()));
         assertEquals(NetworkDispatcher.CaptureDisposition.DISABLE_ASYNC,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.occupiedLimitExceeded()));
-        assertEquals(NetworkDispatcher.CaptureDisposition.DEFER,
+        assertEquals(NetworkDispatcher.CaptureDisposition.ASYNC,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(itemless)));
         assertEquals(NetworkDispatcher.CaptureDisposition.ASYNC,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(withItems)));
@@ -257,9 +257,9 @@ class NetworkFailureIsolationTest {
         UUID id = UUID.randomUUID();
         LogisticsNetwork network = new LogisticsNetwork(id);
         TransferPlan stale = new TransferPlan(
-                id, network.getGeneration() + 1L, CURRENT_RUNTIME, true, List.of());
+                id, network.getGeneration() + 1L, CURRENT_RUNTIME, true, Long.MAX_VALUE, List.of());
         TransferPlan wrongRuntime = new TransferPlan(
-                id, network.getGeneration(), CURRENT_RUNTIME + 1L, true, List.of());
+                id, network.getGeneration(), CURRENT_RUNTIME + 1L, true, Long.MAX_VALUE, List.of());
 
         assertEquals(AsyncDispatchReason.STALE_GENERATION,
                 NetworkDispatcher.rejectedPlanReason(stale, network, CURRENT_RUNTIME));
@@ -283,10 +283,10 @@ class NetworkFailureIsolationTest {
     }
 
     private static TransferPlan failedPlan(UUID id) {
-        return new TransferPlan(id, CURRENT_GENERATION, CURRENT_RUNTIME, true, List.of());
+        return new TransferPlan(id, CURRENT_GENERATION, CURRENT_RUNTIME, true, Long.MAX_VALUE, List.of());
     }
 
     private static TransferPlan successfulPlan(UUID id) {
-        return new TransferPlan(id, CURRENT_GENERATION, CURRENT_RUNTIME, false, List.of());
+        return new TransferPlan(id, CURRENT_GENERATION, CURRENT_RUNTIME, false, Long.MAX_VALUE, List.of());
     }
 }

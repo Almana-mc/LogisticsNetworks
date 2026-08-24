@@ -99,10 +99,12 @@ public final class Snapshots {
         ServerLevel overworld = server.overworld();
         List<NetworkSnapshot.ChannelUnit> units = new ArrayList<>();
         OccupiedSlotBudget occupiedSlots = new OccupiedSlotBudget(Config.asyncMaxOccupiedSlots);
+        long itemWakeDelta = Long.MAX_VALUE;
 
         try {
             for (LogisticsNodeEntity node : context.sortedNodes()) {
-                captureNodeChannels(node, context, capCache, units, occupiedSlots);
+                itemWakeDelta = captureNodeChannels(
+                        node, context, capCache, units, occupiedSlots, itemWakeDelta);
             }
         } catch (OccupiedSlotLimitExceeded exception) {
             return NetworkCapture.occupiedLimitExceeded();
@@ -113,13 +115,14 @@ public final class Snapshots {
                 network.getGeneration(),
                 runtimeId,
                 overworld.getGameTime(),
+                itemWakeDelta,
                 overworld.registryAccess(),
                 units));
     }
 
-    private static void captureNodeChannels(LogisticsNodeEntity node, TransferEngine.NetworkContext context,
+    private static long captureNodeChannels(LogisticsNodeEntity node, TransferEngine.NetworkContext context,
             TransferCapabilityCache capCache, List<NetworkSnapshot.ChannelUnit> units,
-            OccupiedSlotBudget occupiedSlots) {
+            OccupiedSlotBudget occupiedSlots, long itemWakeDelta) {
 
         ServerLevel level = (ServerLevel) node.level();
         long gameTime = level.getGameTime();
@@ -140,7 +143,9 @@ public final class Snapshots {
             if (!TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal)) {
                 continue;
             }
-            if (TransferEngine.cooldownRemaining(node, channel, i, tier, gameTime) > 0) {
+            long cooldown = TransferEngine.cooldownRemaining(node, channel, i, tier, gameTime);
+            if (cooldown > 0L) {
+                itemWakeDelta = earlierItemWakeDelta(itemWakeDelta, cooldown);
                 continue;
             }
 
@@ -192,6 +197,11 @@ public final class Snapshots {
                     sourceItems,
                     targetUnits));
         }
+        return itemWakeDelta;
+    }
+
+    static long earlierItemWakeDelta(long currentMinimum, long cooldown) {
+        return cooldown > 0L ? Math.min(currentMinimum, cooldown) : currentMinimum;
     }
 
     public record NetworkCapture(CaptureStatus status, @Nullable NetworkSnapshot snapshot) {

@@ -79,6 +79,6 @@ class NetworkCommitBudgetTest {
     }
 
     private static TransferPlan plan() {
-        return new TransferPlan(UUID.randomUUID(), 1L, 2L, false, List.of());
+        return new TransferPlan(UUID.randomUUID(), 1L, 2L, false, Long.MAX_VALUE, List.of());
     }
 }

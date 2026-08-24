@@ -164,7 +164,7 @@ final class NetworkDispatcher {
         UUID id = network.getId();
         dispatchStats.record(AsyncDispatchReason.WORKER_EXCEPTION, id);
         boolean newlyDisabled = state.finishWorkerPlan(new TransferPlan(
-                id, network.getGeneration(), runtimeId, true, List.of()),
+                id, network.getGeneration(), runtimeId, true, Long.MAX_VALUE, List.of()),
                 network.getGeneration(), runtimeId);
         if (newlyDisabled) {
             logWorkerFailureFallback(id);
@@ -176,7 +176,7 @@ final class NetworkDispatcher {
         if (capture.status() == Snapshots.CaptureStatus.OCCUPIED_SLOT_LIMIT_EXCEEDED) {
             return CaptureDisposition.DISABLE_ASYNC;
         }
-        if (capture.snapshot() == null || capture.snapshot().units().isEmpty()) {
+        if (capture.snapshot() == null) {
             return CaptureDisposition.DEFER;
         }
         return CaptureDisposition.ASYNC;

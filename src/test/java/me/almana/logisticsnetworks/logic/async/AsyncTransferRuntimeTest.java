@@ -84,7 +84,8 @@ class AsyncTransferRuntimeTest {
         AsyncTransferRuntime runtime = AsyncTransferRuntime.get();
         assertNotNull(runtime);
         NetworkSnapshot snapshot = new NetworkSnapshot(
-                UUID.randomUUID(), 29L, runtime.runtimeId(), 41L, RegistryAccess.EMPTY, null);
+                UUID.randomUUID(), 29L, runtime.runtimeId(), 41L,
+                Long.MAX_VALUE, RegistryAccess.EMPTY, null);
 
         assertTrue(runtime.submit(snapshot));
         TransferPlan plan = awaitCompletion(runtime);
@@ -152,7 +153,7 @@ class AsyncTransferRuntimeTest {
 
     private static NetworkSnapshot snapshot(long runtimeId, List<NetworkSnapshot.ChannelUnit> units) {
         return new NetworkSnapshot(
-                UUID.randomUUID(), 17L, runtimeId, 31L, RegistryAccess.EMPTY, units);
+                UUID.randomUUID(), 17L, runtimeId, 31L, Long.MAX_VALUE, RegistryAccess.EMPTY, units);
     }
 
     private static TransferPlan awaitCompletion(AsyncTransferRuntime runtime) throws InterruptedException {

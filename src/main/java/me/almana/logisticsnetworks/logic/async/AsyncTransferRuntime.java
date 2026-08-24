@@ -94,7 +94,8 @@ public final class AsyncTransferRuntime {
         } catch (Throwable throwable) {
             LOGGER.error("Failed to plan network {}", snapshot.networkId(), throwable);
             completed.offer(new TransferPlan(
-                    snapshot.networkId(), snapshot.generation(), snapshot.runtimeId(), true, List.of()));
+                    snapshot.networkId(), snapshot.generation(), snapshot.runtimeId(),
+                    true, Long.MAX_VALUE, List.of()));
         }
     }
 }

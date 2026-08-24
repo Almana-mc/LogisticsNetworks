@@ -87,7 +87,7 @@ class PlannerDifferentialTest {
                 Snapshots.captureItems(s.source()), targetUnits);
 
         NetworkSnapshot snapshot = new NetworkSnapshot(
-                UUID.randomUUID(), 0L, 0L, 0L, RegistryAccess.EMPTY, List.of(unit));
+                UUID.randomUUID(), 0L, 0L, 0L, Long.MAX_VALUE, RegistryAccess.EMPTY, List.of(unit));
 
         TransferPlan.ChannelMoves planned = planOnWorker(unit, snapshot);
 

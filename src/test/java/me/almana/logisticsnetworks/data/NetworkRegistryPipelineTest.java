@@ -122,9 +122,9 @@ class NetworkRegistryPipelineTest {
     @Test
     void unavailableCaptureRetriesAfterTwentyTicksWithoutDegradedRecovery() {
         NetworkSnapshot empty = new NetworkSnapshot(
-                UUID.randomUUID(), 1L, 2L, 3L, RegistryAccess.EMPTY, List.of());
+                UUID.randomUUID(), 1L, 2L, 3L, 12L, RegistryAccess.EMPTY, List.of());
         NetworkSnapshot withItems = new NetworkSnapshot(
-                UUID.randomUUID(), 1L, 2L, 3L, RegistryAccess.EMPTY,
+                UUID.randomUUID(), 1L, 2L, 3L, Long.MAX_VALUE, RegistryAccess.EMPTY,
                 List.of(new NetworkSnapshot.ChannelUnit(
                         UUID.randomUUID(), 0, 1, new ItemStack[0], FilterMode.MATCH_ANY,
                         new NetworkSnapshot.ItemEndpoint(0, new int[0], new ItemStack[0], 64, new int[0]),
@@ -132,7 +132,7 @@ class NetworkRegistryPipelineTest {
 
         assertSame(NetworkDispatcher.CaptureDisposition.DEFER,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.unavailable()));
-        assertSame(NetworkDispatcher.CaptureDisposition.DEFER,
+        assertSame(NetworkDispatcher.CaptureDisposition.ASYNC,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(empty)));
         assertSame(NetworkDispatcher.CaptureDisposition.ASYNC,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(withItems)));
@@ -182,7 +182,7 @@ class NetworkRegistryPipelineTest {
     void dispatcherRequeuesStalePlanWithoutDegradedRecovery() {
         LogisticsNetwork network = new LogisticsNetwork(UUID.randomUUID());
         TransferPlan stale = new TransferPlan(
-                network.getId(), network.getGeneration() + 1L, 7L, false, List.of());
+                network.getId(), network.getGeneration() + 1L, 7L, false, Long.MAX_VALUE, List.of());
         state.markDirty(network.getId());
         assertTrue(state.beginDispatch(network.getId()));
 
@@ -196,7 +196,7 @@ class NetworkRegistryPipelineTest {
     void dispatcherRequeuesWrongRuntimePlanWithoutDegradedRecovery() {
         LogisticsNetwork network = new LogisticsNetwork(UUID.randomUUID());
         TransferPlan wrongRuntime = new TransferPlan(
-                network.getId(), network.getGeneration(), 8L, false, List.of());
+                network.getId(), network.getGeneration(), 8L, false, Long.MAX_VALUE, List.of());
         state.markDirty(network.getId());
         assertTrue(state.beginDispatch(network.getId()));
 
@@ -331,7 +331,7 @@ class NetworkRegistryPipelineTest {
 
     private static Snapshots.NetworkCapture capturedNetwork(UUID id) {
         return Snapshots.NetworkCapture.captured(new NetworkSnapshot(
-                id, 1L, 2L, 3L, RegistryAccess.EMPTY,
+                id, 1L, 2L, 3L, Long.MAX_VALUE, RegistryAccess.EMPTY,
                 List.of(new NetworkSnapshot.ChannelUnit(
                         UUID.randomUUID(), 0, 1, new ItemStack[0], FilterMode.MATCH_ANY,
                         new NetworkSnapshot.ItemEndpoint(

@@ -21,6 +21,7 @@ public final class NetworkPlanner {
                 snapshot.generation(),
                 snapshot.runtimeId(),
                 false,
+                snapshot.itemWakeDelta(),
                 channels);
     }
 }

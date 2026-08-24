@@ -12,6 +12,7 @@ public record TransferPlan(
         long generation,
         long runtimeId,
         boolean failed,
+        long itemWakeDelta,
         List<ChannelMoves> channels) {
 
     public record ChannelMoves(

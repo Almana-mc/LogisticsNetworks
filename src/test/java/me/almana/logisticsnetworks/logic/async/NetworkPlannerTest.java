@@ -22,12 +22,31 @@ class NetworkPlannerTest {
         NetworkSnapshot.ChannelUnit channel = new NetworkSnapshot.ChannelUnit(
                 UUID.randomUUID(), 2, 64, new ItemStack[0], FilterMode.MATCH_ANY, endpoint, List.of());
         NetworkSnapshot snapshot = new NetworkSnapshot(
-                UUID.randomUUID(), 4L, 0L, 30L, RegistryAccess.EMPTY, List.of(channel));
+                UUID.randomUUID(), 4L, 0L, 30L, Long.MAX_VALUE, RegistryAccess.EMPTY, List.of(channel));
 
         TransferPlan plan = planOnWorker(snapshot);
 
         assertEquals(1, plan.channels().size());
         assertTrue(plan.channels().getFirst().moves().isEmpty());
+    }
+
+    @Test
+    void emptyPlanRetainsCapturedWake() throws Exception {
+        NetworkSnapshot snapshot = new NetworkSnapshot(
+                UUID.randomUUID(), 4L, 7L, 30L, 12L,
+                RegistryAccess.EMPTY, List.of());
+
+        TransferPlan plan = planOnWorker(snapshot);
+
+        assertTrue(plan.channels().isEmpty());
+        assertEquals(12L, plan.itemWakeDelta());
+    }
+
+    @Test
+    void cooldownAggregationKeepsTheEarliestPositiveDelta() {
+        assertEquals(8L, Snapshots.earlierItemWakeDelta(12L, 8L));
+        assertEquals(12L, Snapshots.earlierItemWakeDelta(12L, 0L));
+        assertEquals(12L, Snapshots.earlierItemWakeDelta(12L, -1L));
     }
 
     private static TransferPlan planOnWorker(NetworkSnapshot snapshot)

@@ -12,6 +12,7 @@ public record NetworkSnapshot(
         long generation,
         long runtimeId,
         long gameTime,
+        long itemWakeDelta,
         HolderLookup.Provider registries,
         List<ChannelUnit> units) {
 
