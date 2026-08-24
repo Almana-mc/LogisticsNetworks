@@ -4,7 +4,6 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
 import me.almana.logisticsnetworks.logic.async.NetworkSnapshot;
 import me.almana.logisticsnetworks.logic.async.Snapshots;
-import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.world.item.ItemStack;
 import org.junit.jupiter.api.AfterEach;
@@ -105,20 +104,22 @@ class NetworkRegistryPipelineTest {
     }
 
     @Test
-    void rejectedSubmissionFallsBackSynchronously() {
+    void rejectedSubmissionRetriesOnTheNextTickWithoutDegradedRecovery() {
         UUID id = UUID.randomUUID();
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
 
-        state.fallbackSynchronously(id);
+        state.retryAt(id, 11L);
 
-        assertTrue(state.takeSynchronousFallbacks().contains(id));
-        state.markDirty(id);
+        state.promoteDueWakes(10L, ignored -> true);
+        assertFalse(state.beginDispatch(id));
+        state.promoteDueWakes(11L, ignored -> true);
         assertTrue(state.beginDispatch(id));
+        assertTrue(state.takeSynchronousFallbacks().isEmpty());
     }
 
     @Test
-    void unavailableAndItemlessSnapshotsStaySynchronous() {
+    void unavailableCaptureRetriesAfterTwentyTicksWithoutDegradedRecovery() {
         NetworkSnapshot empty = new NetworkSnapshot(
                 UUID.randomUUID(), 1L, 2L, 3L, RegistryAccess.EMPTY, List.of());
         NetworkSnapshot withItems = new NetworkSnapshot(
@@ -128,29 +129,37 @@ class NetworkRegistryPipelineTest {
                         new NetworkSnapshot.ItemEndpoint(0, new int[0], new ItemStack[0], 64, new int[0]),
                         List.of())));
 
-        assertSame(NetworkDispatcher.CaptureDisposition.SYNCHRONOUS,
+        assertSame(NetworkDispatcher.CaptureDisposition.DEFER,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.unavailable()));
-        assertSame(NetworkDispatcher.CaptureDisposition.SYNCHRONOUS,
+        assertSame(NetworkDispatcher.CaptureDisposition.DEFER,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(empty)));
         assertSame(NetworkDispatcher.CaptureDisposition.ASYNC,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(withItems)));
+
+        UUID id = UUID.randomUUID();
+        state.markDirty(id);
+        assertTrue(state.beginDispatch(id));
+        state.retryAt(id, 20L);
+
+        state.promoteDueWakes(19L, ignored -> true);
+        assertFalse(state.beginDispatch(id));
+        state.promoteDueWakes(20L, ignored -> true);
+        assertTrue(state.beginDispatch(id));
+        assertTrue(state.takeSynchronousFallbacks().isEmpty());
     }
 
     @Test
-    void staleFailedAndWrongRuntimePlansRequireFallback() {
-        LogisticsNetwork network = new LogisticsNetwork(UUID.randomUUID());
-        long runtimeId = 7L;
-        TransferPlan current = plan(network, runtimeId, false);
-        TransferPlan stale = new TransferPlan(
-                network.getId(), network.getGeneration() + 1L, runtimeId, false, List.of());
-        TransferPlan wrongRuntime = new TransferPlan(
-                network.getId(), network.getGeneration(), runtimeId + 1L, false, List.of());
-        TransferPlan failed = plan(network, runtimeId, true);
+    void wrongRuntimePlanRequeuesWithoutDegradedRecovery() {
+        UUID id = UUID.randomUUID();
+        state.markDirty(id);
+        assertTrue(state.beginDispatch(id));
 
-        assertFalse(NetworkDispatcher.requiresSynchronousFallback(current, network, runtimeId));
-        assertTrue(NetworkDispatcher.requiresSynchronousFallback(stale, network, runtimeId));
-        assertTrue(NetworkDispatcher.requiresSynchronousFallback(wrongRuntime, network, runtimeId));
-        assertTrue(NetworkDispatcher.requiresSynchronousFallback(failed, network, runtimeId));
+        state.retryCurrent(id);
+
+        assertTrue(state.beginDispatch(id));
+        state.finishDispatch(id);
+        assertFalse(state.beginDispatch(id));
+        assertTrue(state.takeSynchronousFallbacks().isEmpty());
     }
 
     @Test
@@ -234,18 +243,24 @@ class NetworkRegistryPipelineTest {
     }
 
     @Test
-    void explicitRedirtyIsNotDuplicatedByAnOldWake() {
+    void explicitDirtyCancelsDelayedRetries() {
         UUID id = UUID.randomUUID();
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
         state.markDirty(id);
-        state.finishDispatch(id);
-
-        state.scheduleResult(id, 10L, 5L);
+        state.retryAt(id, 11L);
         assertTrue(state.beginDispatch(id));
-        state.promoteDueWakes(15L, ignored -> true);
         state.finishDispatch(id);
+        state.promoteDueWakes(11L, ignored -> true);
+        assertFalse(state.beginDispatch(id));
 
+        state.markDirty(id);
+        assertTrue(state.beginDispatch(id));
+        state.retryAt(id, 20L);
+        state.markDirty(id);
+        assertTrue(state.beginDispatch(id));
+        state.finishDispatch(id);
+        state.promoteDueWakes(20L, ignored -> true);
         assertFalse(state.beginDispatch(id));
     }
 
@@ -264,11 +279,6 @@ class NetworkRegistryPipelineTest {
 
         state.promoteDueWakes(12L, ignored -> true);
         assertFalse(state.beginDispatch(id));
-    }
-
-    private static TransferPlan plan(LogisticsNetwork network, long runtimeId, boolean failed) {
-        return new TransferPlan(
-                network.getId(), network.getGeneration(), runtimeId, failed, List.of());
     }
 
     private static boolean isQueued(NetworkRegistry registry, UUID networkId) {

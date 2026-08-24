@@ -143,17 +143,18 @@ class NetworkFailureIsolationTest {
     }
 
     @Test
-    void submissionFallbackDoesNotConsumeWorkerFailureBudget() {
+    void stalePlanRequeuesWithoutDegradedRecovery() {
         UUID id = UUID.randomUUID();
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
+        state.markDirty(id);
 
-        state.fallbackSynchronously(id);
+        state.retryCurrent(id);
 
-        assertEquals(Set.of(id), state.takeSynchronousFallbacks());
-        assertFalse(fail(id));
-        assertFalse(fail(id));
-        assertTrue(fail(id));
+        assertTrue(state.beginDispatch(id));
+        state.finishDispatch(id);
+        assertFalse(state.beginDispatch(id));
+        assertFalse(state.takeSynchronousFallbacks().contains(id));
     }
 
     @Test
@@ -178,7 +179,7 @@ class NetworkFailureIsolationTest {
     }
 
     @Test
-    void temporaryCaptureFailureAndOccupiedLimitHaveDifferentDisposition() {
+    void transientCaptureOutcomesDeferWhileOccupiedLimitRecoversSynchronously() {
         NetworkSnapshot itemless = new NetworkSnapshot(
                 UUID.randomUUID(), 1L, 2L, 3L, RegistryAccess.EMPTY, List.of());
         NetworkSnapshot withItems = new NetworkSnapshot(
@@ -189,11 +190,11 @@ class NetworkFailureIsolationTest {
                                 0, new int[0], new ItemStack[0], 64, new int[0]),
                         List.of())));
 
-        assertEquals(NetworkDispatcher.CaptureDisposition.SYNCHRONOUS,
+        assertEquals(NetworkDispatcher.CaptureDisposition.DEFER,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.unavailable()));
         assertEquals(NetworkDispatcher.CaptureDisposition.DISABLE_ASYNC,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.occupiedLimitExceeded()));
-        assertEquals(NetworkDispatcher.CaptureDisposition.SYNCHRONOUS,
+        assertEquals(NetworkDispatcher.CaptureDisposition.DEFER,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(itemless)));
         assertEquals(NetworkDispatcher.CaptureDisposition.ASYNC,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(withItems)));

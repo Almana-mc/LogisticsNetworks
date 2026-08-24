@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -90,17 +91,23 @@ final class NetworkDispatcher {
                                 id, Config.asyncMaxOccupiedSlots);
                     }
                     state.fallbackSynchronously(id);
-                } else if (disposition == CaptureDisposition.SYNCHRONOUS) {
-                    dispatchStats.record(capture.status() == Snapshots.CaptureStatus.UNAVAILABLE
-                            ? AsyncDispatchReason.CAPTURE_UNAVAILABLE
-                            : AsyncDispatchReason.NO_READY_ITEM_WORK, id);
-                    state.fallbackSynchronously(id);
+                } else if (disposition == CaptureDisposition.DEFER) {
+                    if (capture.status() == Snapshots.CaptureStatus.UNAVAILABLE) {
+                        dispatchStats.record(AsyncDispatchReason.CAPTURE_UNAVAILABLE, id);
+                        state.retryAt(id, gameTime + 20L);
+                    } else {
+                        dispatchStats.record(AsyncDispatchReason.NO_READY_ITEM_WORK, id);
+                        state.retryAt(id, gameTime + 1L);
+                    }
                 } else if (!runtime.submit(capture.snapshot())) {
                     dispatchStats.record(AsyncDispatchReason.QUEUE_REJECTED, id);
-                    state.fallbackSynchronously(id);
+                    state.retryAt(id, gameTime + 1L);
                 }
             } catch (Exception exception) {
                 dispatchStats.record(AsyncDispatchReason.WORKER_EXCEPTION, id);
+                state.finishWorkerPlan(new TransferPlan(
+                        id, network.getGeneration(), runtime.runtimeId(), true, List.of()),
+                        network.getGeneration(), runtime.runtimeId());
                 state.fallbackSynchronously(id);
                 LOGGER.error("Error dispatching network {}", id, exception);
             }
@@ -157,14 +164,9 @@ final class NetworkDispatcher {
             return CaptureDisposition.DISABLE_ASYNC;
         }
         if (capture.snapshot() == null || capture.snapshot().units().isEmpty()) {
-            return CaptureDisposition.SYNCHRONOUS;
+            return CaptureDisposition.DEFER;
         }
         return CaptureDisposition.ASYNC;
-    }
-
-    static boolean requiresSynchronousFallback(
-            TransferPlan plan, LogisticsNetwork network, long runtimeId) {
-        return rejectedPlanReason(plan, network, runtimeId) != null;
     }
 
     static AsyncDispatchReason rejectedPlanReason(
@@ -194,6 +196,12 @@ final class NetworkDispatcher {
                     + "falling back to synchronous transfers.", id);
         }
         AsyncDispatchReason reason = rejectedPlanReason(plan, network, currentRuntimeId);
+        if (reason == AsyncDispatchReason.STALE_GENERATION
+                || reason == AsyncDispatchReason.WRONG_RUNTIME) {
+            dispatchStats.record(reason, id);
+            state.retryCurrent(id);
+            return;
+        }
         if (reason != null) {
             dispatchStats.record(reason, id);
             state.fallbackSynchronously(id);
@@ -244,7 +252,7 @@ final class NetworkDispatcher {
 
     enum CaptureDisposition {
         ASYNC,
-        SYNCHRONOUS,
+        DEFER,
         DISABLE_ASYNC
     }
 }

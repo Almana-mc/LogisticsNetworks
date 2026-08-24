@@ -59,6 +59,21 @@ final class NetworkDispatchState {
         }
     }
 
+    void retryCurrent(UUID id) {
+        inFlight.remove(id);
+        dirtyAgain.remove(id);
+        queuePending(id);
+    }
+
+    void retryAt(UUID id, long tick) {
+        inFlight.remove(id);
+        if (dirtyAgain.remove(id)) {
+            queuePending(id);
+        } else {
+            scheduleWake(id, tick);
+        }
+    }
+
     boolean finishWorkerPlan(
             TransferPlan plan, long currentGeneration, long currentRuntimeId) {
         UUID id = plan.networkId();
