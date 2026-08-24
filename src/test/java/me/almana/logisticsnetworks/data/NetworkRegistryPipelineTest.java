@@ -86,6 +86,7 @@ class NetworkRegistryPipelineTest {
         NetworkRegistry registry = new NetworkRegistry();
         LogisticsNetwork network = registry.createNetwork();
         registry.addNodeToNetwork(network.getId(), UUID.randomUUID());
+        clearQueue(registry);
         UUID nodeId = UUID.randomUUID();
         long generation = network.getGeneration();
 
@@ -95,6 +96,7 @@ class NetworkRegistryPipelineTest {
         assertTrue(network.getNodeUuids().contains(nodeId));
         assertTrue(isQueued(registry, network.getId()));
 
+        clearQueue(registry);
         registry.removeNodeFromNetwork(network.getId(), nodeId);
 
         assertEquals(generation + 2L, network.getGeneration());
@@ -270,13 +272,20 @@ class NetworkRegistryPipelineTest {
     }
 
     private static boolean isQueued(NetworkRegistry registry, UUID networkId) {
+        return dispatchState(registry).dirtySnapshot().contains(networkId);
+    }
+
+    private static void clearQueue(NetworkRegistry registry) {
+        dispatchState(registry).takeAllPendingNetworks();
+    }
+
+    private static NetworkDispatchState dispatchState(NetworkRegistry registry) {
         try {
             Field dispatcherField = NetworkRegistry.class.getDeclaredField("dispatcher");
             dispatcherField.setAccessible(true);
             Field stateField = NetworkDispatcher.class.getDeclaredField("state");
             stateField.setAccessible(true);
-            NetworkDispatchState state = (NetworkDispatchState) stateField.get(dispatcherField.get(registry));
-            return state.dirtySnapshot().contains(networkId);
+            return (NetworkDispatchState) stateField.get(dispatcherField.get(registry));
         } catch (ReflectiveOperationException exception) {
             throw new AssertionError(exception);
         }
