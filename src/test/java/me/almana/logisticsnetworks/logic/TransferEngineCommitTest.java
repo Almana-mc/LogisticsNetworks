@@ -8,10 +8,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.concurrent.FutureTask;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -101,6 +104,110 @@ class TransferEngineCommitTest {
     }
 
     @Test
+    void bulkCommitUsesOneRealInsertion() throws ClassNotFoundException {
+        ItemStackHandler source = handler(new ItemStack(Items.IRON_INGOT, 8));
+        CountingBulkHandler target = new CountingBulkHandler(5);
+
+        int moved = TransferEngine.commitSingleMove(
+                source, target.handler, target.handler, move(source.getStackInSlot(0), 8, null), null);
+
+        assertEquals(5, moved);
+        assertEquals(0, target.simulations);
+        assertEquals(1, target.executions);
+        assertEquals(3, source.getStackInSlot(0).getCount());
+        assertEquals(5, target.getStackInSlot(0).getCount());
+        assertEquals(8, source.getStackInSlot(0).getCount() + target.getStackInSlot(0).getCount());
+    }
+
+    @Test
+    void validatesExpectedComponentsAfterSourceSimulationBeforeExtraction() throws ClassNotFoundException {
+        ItemStack live = new ItemStack(Items.IRON_INGOT, 8);
+        live.set(DataComponents.CUSTOM_NAME, Component.literal("live"));
+        ItemStack planned = live.copy();
+        planned.set(DataComponents.CUSTOM_NAME, Component.literal("planned"));
+        AccessTrackingHandler source = new AccessTrackingHandler();
+        source.setStackInSlot(0, live);
+        CountingBulkHandler target = new CountingBulkHandler(8);
+
+        int moved = TransferEngine.commitSingleMove(source, target.handler, target.handler, move(planned, 8, null), null);
+
+        assertEquals(0, moved);
+        assertEquals(1, source.simulations);
+        assertEquals(0, source.executions);
+        assertEquals(0, target.simulations + target.executions);
+        assertEquals(8, source.getStackInSlot(0).getCount());
+    }
+
+    @Test
+    void bulkCommitReturnsPartialRemainderToOtherSourceSlot() throws ClassNotFoundException {
+        ItemStackHandler source = new ItemStackHandler(2) {
+            @Override
+            public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+                return slot == 0 ? stack : super.insertItem(slot, stack, simulate);
+            }
+        };
+        source.setStackInSlot(0, new ItemStack(Items.IRON_INGOT, 8));
+        CountingBulkHandler target = new CountingBulkHandler(3);
+
+        int moved = TransferEngine.commitSingleMove(
+                source, target.handler, target.handler, move(source.getStackInSlot(0), 8, null), null);
+
+        assertEquals(3, moved);
+        assertTrue(source.getStackInSlot(0).isEmpty());
+        assertEquals(5, source.getStackInSlot(1).getCount());
+        assertEquals(3, target.getStackInSlot(0).getCount());
+        assertEquals(8, source.getStackInSlot(1).getCount() + target.getStackInSlot(0).getCount());
+    }
+
+    @Test
+    void maskedTargetRetainsLiveSimulation() {
+        ItemStackHandler source = handler(new ItemStack(Items.IRON_INGOT, 8));
+        ItemStackHandler delegate = new ItemStackHandler(2);
+        int[] simulations = {0};
+        IItemHandler target = new IItemHandler() {
+            @Override
+            public int getSlots() {
+                return delegate.getSlots();
+            }
+
+            @Override
+            public ItemStack getStackInSlot(int slot) {
+                return delegate.getStackInSlot(slot);
+            }
+
+            @Override
+            public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+                if (simulate) {
+                    simulations[0]++;
+                }
+                return delegate.insertItem(slot, stack, simulate);
+            }
+
+            @Override
+            public ItemStack extractItem(int slot, int amount, boolean simulate) {
+                return delegate.extractItem(slot, amount, simulate);
+            }
+
+            @Override
+            public int getSlotLimit(int slot) {
+                return delegate.getSlotLimit(slot);
+            }
+
+            @Override
+            public boolean isItemValid(int slot, ItemStack stack) {
+                return delegate.isItemValid(slot, stack);
+            }
+        };
+
+        int moved = TransferEngine.commitSingleMove(
+                source, target, move(source.getStackInSlot(0), 8, new boolean[] {false, true}), null);
+
+        assertEquals(8, moved);
+        assertEquals(8, delegate.getStackInSlot(1).getCount());
+        assertEquals(1, simulations[0]);
+    }
+
+    @Test
     void offServerThreadRejectedBeforeHandlerAccess() throws Exception {
         AccessTrackingHandler source = new AccessTrackingHandler();
         ItemStackHandler target = new ItemStackHandler(1);
@@ -134,6 +241,8 @@ class TransferEngineCommitTest {
     private static final class AccessTrackingHandler extends ItemStackHandler {
 
         private int reads;
+        private int simulations;
+        private int executions;
 
         private AccessTrackingHandler() {
             super(1);
@@ -148,7 +257,49 @@ class TransferEngineCommitTest {
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
             reads++;
+            if (simulate) {
+                simulations++;
+            } else {
+                executions++;
+            }
             return super.extractItem(slot, amount, simulate);
+        }
+    }
+
+    private static final class CountingBulkHandler {
+
+        private final int acceptedPerExecution;
+        private final ItemStackHandler delegate = new ItemStackHandler(1);
+        private final IItemHandler handler;
+        private int simulations;
+        private int executions;
+
+        private CountingBulkHandler(int acceptedPerExecution) throws ClassNotFoundException {
+            this.acceptedPerExecution = acceptedPerExecution;
+            Class<?> simpleInserter = Class.forName(
+                    "net.p3pp3rf1y.sophisticatedcore.inventory.IItemHandlerSimpleInserter");
+            handler = (IItemHandler) Proxy.newProxyInstance(simpleInserter.getClassLoader(),
+                    new Class<?>[] {IItemHandler.class, simpleInserter}, this::invoke);
+        }
+
+        private Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
+            if (method.getName().equals("insertItem") && method.getParameterCount() == 2) {
+                ItemStack stack = (ItemStack) arguments[0];
+                boolean simulate = (boolean) arguments[1];
+                if (simulate) {
+                    simulations++;
+                    return ItemStack.EMPTY;
+                }
+                executions++;
+                int accepted = Math.min(acceptedPerExecution, stack.getCount());
+                delegate.setStackInSlot(0, stack.copyWithCount(accepted));
+                return accepted == stack.getCount() ? ItemStack.EMPTY : stack.copyWithCount(stack.getCount() - accepted);
+            }
+            return method.invoke(delegate, arguments);
+        }
+
+        private ItemStack getStackInSlot(int slot) {
+            return delegate.getStackInSlot(slot);
         }
     }
 }

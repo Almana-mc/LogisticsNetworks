@@ -148,6 +148,9 @@ dependencies {
     compileOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") {
         isTransitive = false
     }
+    testRuntimeOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") {
+        isTransitive = false
+    }
 }
 
 tasks.test {

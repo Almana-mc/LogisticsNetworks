@@ -1053,9 +1053,14 @@ public class TransferEngine {
             return 0;
         }
 
-        ItemStack simRemainder = insertItemWithAllowedSlots(target, bulkTarget,
-                available.copyWithCount(available.getCount()), true, targetSlotMask);
-        int acceptable = available.getCount() - simRemainder.getCount();
+        int acceptable;
+        if (bulkTarget != null && targetSlotMask == null) {
+            acceptable = available.getCount();
+        } else {
+            ItemStack simRemainder = insertItemWithAllowedSlots(target, bulkTarget,
+                    available.copyWithCount(available.getCount()), true, targetSlotMask);
+            acceptable = available.getCount() - simRemainder.getCount();
+        }
         if (acceptable <= 0) {
             return 0;
         }
