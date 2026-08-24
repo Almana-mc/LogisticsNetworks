@@ -41,6 +41,9 @@ public final class TransferCommitter {
         if (plan.runtimeId() != runtimeId || plan.generation() != network.getGeneration()) {
             return new ItemCommitResult(0, Long.MAX_VALUE);
         }
+        if (plan.channels().isEmpty()) {
+            return new ItemCommitResult(0, plan.itemWakeDelta());
+        }
 
         int total = 0;
         long minWakeDelta = plan.itemWakeDelta();

@@ -8,6 +8,7 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.concurrent.FutureTask;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -125,6 +126,11 @@ class SnapshotsTest {
         assertNotSame(filters[0], copied[0]);
         assertEquals(1, copied[0].getCount());
         assertSame(ItemStack.EMPTY, copied[1]);
+    }
+
+    @Test
+    void coolingExporterWithoutTargetsDoesNotScheduleAnItemWake() {
+        assertEquals(12L, Snapshots.itemWakeDelta(12L, List.of(), 8L));
     }
 
     private static ItemStackHandler handlerWithLimits(int... limits) {

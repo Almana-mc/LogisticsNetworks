@@ -143,16 +143,16 @@ public final class Snapshots {
             if (!TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal)) {
                 continue;
             }
-            long cooldown = TransferEngine.cooldownRemaining(node, channel, i, tier, gameTime);
-            if (cooldown > 0L) {
-                itemWakeDelta = earlierItemWakeDelta(itemWakeDelta, cooldown);
-                continue;
-            }
-
             List<TransferEngine.ImportTarget> targets = context.itemImports()[i];
             if (targets == null || targets.isEmpty()) {
                 continue;
             }
+            long cooldown = TransferEngine.cooldownRemaining(node, channel, i, tier, gameTime);
+            if (cooldown > 0L) {
+                itemWakeDelta = itemWakeDelta(itemWakeDelta, targets, cooldown);
+                continue;
+            }
+
             if (!node.isMountedOnCreate() && !level.isLoaded(node.getAttachedPos())) {
                 continue;
             }
@@ -202,6 +202,12 @@ public final class Snapshots {
 
     static long earlierItemWakeDelta(long currentMinimum, long cooldown) {
         return cooldown > 0L ? Math.min(currentMinimum, cooldown) : currentMinimum;
+    }
+
+    static long itemWakeDelta(long currentMinimum, List<TransferEngine.ImportTarget> targets, long cooldown) {
+        return targets == null || targets.isEmpty()
+                ? currentMinimum
+                : earlierItemWakeDelta(currentMinimum, cooldown);
     }
 
     public record NetworkCapture(CaptureStatus status, @Nullable NetworkSnapshot snapshot) {
