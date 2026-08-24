@@ -14,6 +14,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NetworkFailureIsolationTest {
@@ -196,6 +197,49 @@ class NetworkFailureIsolationTest {
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(itemless)));
         assertEquals(NetworkDispatcher.CaptureDisposition.ASYNC,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.captured(withItems)));
+    }
+
+    @Test
+    void dispatchReasonsCountIndependently() {
+        AsyncDispatchStats stats = new AsyncDispatchStats();
+        UUID stale = UUID.randomUUID();
+        UUID rejected = UUID.randomUUID();
+
+        stats.record(AsyncDispatchReason.STALE_GENERATION, stale);
+        stats.record(AsyncDispatchReason.STALE_GENERATION, stale);
+        stats.record(AsyncDispatchReason.QUEUE_REJECTED, rejected);
+
+        assertEquals(2L, stats.count(AsyncDispatchReason.STALE_GENERATION));
+        assertEquals(1L, stats.count(AsyncDispatchReason.QUEUE_REJECTED));
+        assertEquals(stale, stats.latestNetwork(AsyncDispatchReason.STALE_GENERATION));
+        assertEquals(rejected, stats.latestNetwork(AsyncDispatchReason.QUEUE_REJECTED));
+    }
+
+    @Test
+    void dispatchSummaryIncludesOnlyNonZeroReasonsAtTheInterval() {
+        AsyncDispatchStats stats = new AsyncDispatchStats();
+        UUID unavailable = UUID.randomUUID();
+
+        stats.record(AsyncDispatchReason.CAPTURE_UNAVAILABLE, unavailable);
+
+        assertEquals("CAPTURE_UNAVAILABLE=1 (" + unavailable + ")", stats.summary(0L));
+        assertNull(stats.summary(1_199L));
+        assertEquals("CAPTURE_UNAVAILABLE=1 (" + unavailable + ")", stats.summary(1_200L));
+    }
+
+    @Test
+    void rejectedPlanReasonsDistinguishRuntimeAndGenerationMismatches() {
+        UUID id = UUID.randomUUID();
+        LogisticsNetwork network = new LogisticsNetwork(id);
+        TransferPlan stale = new TransferPlan(
+                id, network.getGeneration() + 1L, CURRENT_RUNTIME, true, List.of());
+        TransferPlan wrongRuntime = new TransferPlan(
+                id, network.getGeneration(), CURRENT_RUNTIME + 1L, true, List.of());
+
+        assertEquals(AsyncDispatchReason.STALE_GENERATION,
+                NetworkDispatcher.rejectedPlanReason(stale, network, CURRENT_RUNTIME));
+        assertEquals(AsyncDispatchReason.WRONG_RUNTIME,
+                NetworkDispatcher.rejectedPlanReason(wrongRuntime, network, CURRENT_RUNTIME));
     }
 
     private boolean fail(UUID id) {

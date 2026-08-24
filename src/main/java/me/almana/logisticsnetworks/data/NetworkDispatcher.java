@@ -26,6 +26,7 @@ final class NetworkDispatcher {
 
     private final NetworkDispatchState state;
     private final AsyncDispatchRuntime asyncRuntime = new AsyncDispatchRuntime();
+    private final AsyncDispatchStats dispatchStats = new AsyncDispatchStats();
 
     NetworkDispatcher() {
         this(new NetworkDispatchState());
@@ -60,7 +61,8 @@ final class NetworkDispatcher {
             return;
         }
 
-        state.promoteDueWakes(server.overworld().getGameTime(), networks::containsKey);
+        long gameTime = server.overworld().getGameTime();
+        state.promoteDueWakes(gameTime, networks::containsKey);
         Set<UUID> ids = state.dirtySnapshot();
         warnHighDispatch(ids.size());
         for (UUID id : ids) {
@@ -81,21 +83,29 @@ final class NetworkDispatcher {
                         network, server, runtime.runtimeId(), capabilityCache);
                 CaptureDisposition disposition = captureDisposition(capture);
                 if (disposition == CaptureDisposition.DISABLE_ASYNC) {
+                    dispatchStats.record(AsyncDispatchReason.OCCUPIED_SLOT_LIMIT, id);
                     if (state.disableForOccupiedSlots(id)) {
                         LOGGER.warn("Network {} exceeded the async occupied-slot limit of {}; "
                                 + "falling back to synchronous transfers.",
                                 id, Config.asyncMaxOccupiedSlots);
                     }
                     state.fallbackSynchronously(id);
-                } else if (disposition == CaptureDisposition.SYNCHRONOUS
-                        || !runtime.submit(capture.snapshot())) {
+                } else if (disposition == CaptureDisposition.SYNCHRONOUS) {
+                    dispatchStats.record(capture.status() == Snapshots.CaptureStatus.UNAVAILABLE
+                            ? AsyncDispatchReason.CAPTURE_UNAVAILABLE
+                            : AsyncDispatchReason.NO_READY_ITEM_WORK, id);
+                    state.fallbackSynchronously(id);
+                } else if (!runtime.submit(capture.snapshot())) {
+                    dispatchStats.record(AsyncDispatchReason.QUEUE_REJECTED, id);
                     state.fallbackSynchronously(id);
                 }
             } catch (Exception exception) {
+                dispatchStats.record(AsyncDispatchReason.WORKER_EXCEPTION, id);
                 state.fallbackSynchronously(id);
                 LOGGER.error("Error dispatching network {}", id, exception);
             }
         }
+        logDispatchSummary(gameTime);
     }
 
     void commitCompleted(Map<UUID, LogisticsNetwork> networks, MinecraftServer server,
@@ -154,8 +164,18 @@ final class NetworkDispatcher {
 
     static boolean requiresSynchronousFallback(
             TransferPlan plan, LogisticsNetwork network, long runtimeId) {
-        return plan.failed() || plan.runtimeId() != runtimeId
-                || plan.generation() != network.getGeneration();
+        return rejectedPlanReason(plan, network, runtimeId) != null;
+    }
+
+    static AsyncDispatchReason rejectedPlanReason(
+            TransferPlan plan, LogisticsNetwork network, long runtimeId) {
+        if (plan.runtimeId() != runtimeId) {
+            return AsyncDispatchReason.WRONG_RUNTIME;
+        }
+        if (plan.generation() != network.getGeneration()) {
+            return AsyncDispatchReason.STALE_GENERATION;
+        }
+        return plan.failed() ? AsyncDispatchReason.WORKER_EXCEPTION : null;
     }
 
     private void commitOne(TransferPlan plan, Map<UUID, LogisticsNetwork> networks,
@@ -173,7 +193,9 @@ final class NetworkDispatcher {
             LOGGER.warn("Network {} failed async planning 3 consecutive times; "
                     + "falling back to synchronous transfers.", id);
         }
-        if (requiresSynchronousFallback(plan, network, currentRuntimeId)) {
+        AsyncDispatchReason reason = rejectedPlanReason(plan, network, currentRuntimeId);
+        if (reason != null) {
+            dispatchStats.record(reason, id);
             state.fallbackSynchronously(id);
             return;
         }
@@ -207,6 +229,16 @@ final class NetworkDispatcher {
     private static void warnHighDispatch(int count) {
         if (count > WARNING_DISPATCH_COUNT) {
             LOGGER.warn("High load: Dispatching {} dirty networks in one tick.", count);
+        }
+    }
+
+    private void logDispatchSummary(long gameTime) {
+        if (!Config.debugMode) {
+            return;
+        }
+        String summary = dispatchStats.summary(gameTime);
+        if (summary != null) {
+            LOGGER.debug("Async dispatch outcomes: {}", summary);
         }
     }
 
