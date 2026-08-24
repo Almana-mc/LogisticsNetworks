@@ -23,10 +23,12 @@ class NetworkFailureIsolationTest {
     private static final long CURRENT_RUNTIME = 2L;
 
     private NetworkDispatchState state;
+    private NetworkDispatcher dispatcher;
 
     @BeforeEach
     void setUp() {
         state = new NetworkDispatchState();
+        dispatcher = new NetworkDispatcher(state);
     }
 
     @Test
@@ -106,6 +108,28 @@ class NetworkFailureIsolationTest {
         assertFalse(fail(id));
         assertFalse(fail(id));
         assertTrue(fail(id));
+    }
+
+    @Test
+    void dispatcherExceptionRetriesBeforePermanentFallback() {
+        LogisticsNetwork network = new LogisticsNetwork(UUID.randomUUID());
+        UUID id = network.getId();
+        for (int attempt = 0; attempt < 2; attempt++) {
+            state.markDirty(id);
+            assertTrue(state.beginDispatch(id));
+
+            dispatcher.recordDispatchException(network, CURRENT_RUNTIME);
+
+            assertTrue(state.takeSynchronousFallbacks().isEmpty());
+            assertTrue(state.beginDispatch(id));
+            state.finishDispatch(id);
+        }
+
+        state.markDirty(id);
+        assertTrue(state.beginDispatch(id));
+        dispatcher.recordDispatchException(network, CURRENT_RUNTIME);
+
+        assertTrue(state.takeSynchronousFallbacks().contains(id));
     }
 
     @Test

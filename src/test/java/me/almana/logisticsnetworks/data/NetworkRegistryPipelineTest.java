@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
 import me.almana.logisticsnetworks.logic.async.NetworkSnapshot;
 import me.almana.logisticsnetworks.logic.async.Snapshots;
+import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.world.item.ItemStack;
 import org.junit.jupiter.api.AfterEach;
@@ -109,7 +110,7 @@ class NetworkRegistryPipelineTest {
         state.markDirty(id);
         assertTrue(state.beginDispatch(id));
 
-        state.retryAt(id, 11L);
+        dispatcher.dispatchCapture(id, capturedNetwork(id), 10L, () -> false);
 
         state.promoteDueWakes(10L, ignored -> true);
         assertFalse(state.beginDispatch(id));
@@ -149,6 +150,21 @@ class NetworkRegistryPipelineTest {
     }
 
     @Test
+    void dispatcherDefersUnavailableCaptureWithoutDegradedRecovery() {
+        UUID id = UUID.randomUUID();
+        state.markDirty(id);
+        assertTrue(state.beginDispatch(id));
+
+        dispatcher.dispatchCapture(id, Snapshots.NetworkCapture.unavailable(), 10L, () -> false);
+
+        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+        state.promoteDueWakes(29L, ignored -> true);
+        assertFalse(state.beginDispatch(id));
+        state.promoteDueWakes(30L, ignored -> true);
+        assertTrue(state.beginDispatch(id));
+    }
+
+    @Test
     void wrongRuntimePlanRequeuesWithoutDegradedRecovery() {
         UUID id = UUID.randomUUID();
         state.markDirty(id);
@@ -159,6 +175,34 @@ class NetworkRegistryPipelineTest {
         assertTrue(state.beginDispatch(id));
         state.finishDispatch(id);
         assertFalse(state.beginDispatch(id));
+        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+    }
+
+    @Test
+    void dispatcherRequeuesStalePlanWithoutDegradedRecovery() {
+        LogisticsNetwork network = new LogisticsNetwork(UUID.randomUUID());
+        TransferPlan stale = new TransferPlan(
+                network.getId(), network.getGeneration() + 1L, 7L, false, List.of());
+        state.markDirty(network.getId());
+        assertTrue(state.beginDispatch(network.getId()));
+
+        assertFalse(dispatcher.prepareCompletedPlan(stale, network, 7L));
+
+        assertTrue(state.beginDispatch(network.getId()));
+        assertTrue(state.takeSynchronousFallbacks().isEmpty());
+    }
+
+    @Test
+    void dispatcherRequeuesWrongRuntimePlanWithoutDegradedRecovery() {
+        LogisticsNetwork network = new LogisticsNetwork(UUID.randomUUID());
+        TransferPlan wrongRuntime = new TransferPlan(
+                network.getId(), network.getGeneration(), 8L, false, List.of());
+        state.markDirty(network.getId());
+        assertTrue(state.beginDispatch(network.getId()));
+
+        assertFalse(dispatcher.prepareCompletedPlan(wrongRuntime, network, 7L));
+
+        assertTrue(state.beginDispatch(network.getId()));
         assertTrue(state.takeSynchronousFallbacks().isEmpty());
     }
 
@@ -283,6 +327,16 @@ class NetworkRegistryPipelineTest {
 
     private static boolean isQueued(NetworkRegistry registry, UUID networkId) {
         return dispatchState(registry).dirtySnapshot().contains(networkId);
+    }
+
+    private static Snapshots.NetworkCapture capturedNetwork(UUID id) {
+        return Snapshots.NetworkCapture.captured(new NetworkSnapshot(
+                id, 1L, 2L, 3L, RegistryAccess.EMPTY,
+                List.of(new NetworkSnapshot.ChannelUnit(
+                        UUID.randomUUID(), 0, 1, new ItemStack[0], FilterMode.MATCH_ANY,
+                        new NetworkSnapshot.ItemEndpoint(
+                                0, new int[0], new ItemStack[0], 64, new int[0]),
+                        List.of()))));
     }
 
     private static void clearQueue(NetworkRegistry registry) {

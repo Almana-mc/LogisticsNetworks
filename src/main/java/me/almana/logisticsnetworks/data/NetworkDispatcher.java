@@ -82,33 +82,9 @@ final class NetworkDispatcher {
                 }
                 Snapshots.NetworkCapture capture = Snapshots.captureNetwork(
                         network, server, runtime.runtimeId(), capabilityCache);
-                CaptureDisposition disposition = captureDisposition(capture);
-                if (disposition == CaptureDisposition.DISABLE_ASYNC) {
-                    dispatchStats.record(AsyncDispatchReason.OCCUPIED_SLOT_LIMIT, id);
-                    if (state.disableForOccupiedSlots(id)) {
-                        LOGGER.warn("Network {} exceeded the async occupied-slot limit of {}; "
-                                + "falling back to synchronous transfers.",
-                                id, Config.asyncMaxOccupiedSlots);
-                    }
-                    state.fallbackSynchronously(id);
-                } else if (disposition == CaptureDisposition.DEFER) {
-                    if (capture.status() == Snapshots.CaptureStatus.UNAVAILABLE) {
-                        dispatchStats.record(AsyncDispatchReason.CAPTURE_UNAVAILABLE, id);
-                        state.retryAt(id, gameTime + 20L);
-                    } else {
-                        dispatchStats.record(AsyncDispatchReason.NO_READY_ITEM_WORK, id);
-                        state.retryAt(id, gameTime + 1L);
-                    }
-                } else if (!runtime.submit(capture.snapshot())) {
-                    dispatchStats.record(AsyncDispatchReason.QUEUE_REJECTED, id);
-                    state.retryAt(id, gameTime + 1L);
-                }
+                dispatchCapture(id, capture, gameTime, () -> runtime.submit(capture.snapshot()));
             } catch (Exception exception) {
-                dispatchStats.record(AsyncDispatchReason.WORKER_EXCEPTION, id);
-                state.finishWorkerPlan(new TransferPlan(
-                        id, network.getGeneration(), runtime.runtimeId(), true, List.of()),
-                        network.getGeneration(), runtime.runtimeId());
-                state.fallbackSynchronously(id);
+                recordDispatchException(network, runtime.runtimeId());
                 LOGGER.error("Error dispatching network {}", id, exception);
             }
         }
@@ -159,6 +135,43 @@ final class NetworkDispatcher {
         state.delete(id);
     }
 
+    void dispatchCapture(UUID id, Snapshots.NetworkCapture capture, long gameTime,
+            BooleanSupplier submit) {
+        CaptureDisposition disposition = captureDisposition(capture);
+        if (disposition == CaptureDisposition.DISABLE_ASYNC) {
+            dispatchStats.record(AsyncDispatchReason.OCCUPIED_SLOT_LIMIT, id);
+            if (state.disableForOccupiedSlots(id)) {
+                LOGGER.warn("Network {} exceeded the async occupied-slot limit of {}; "
+                        + "falling back to synchronous transfers.",
+                        id, Config.asyncMaxOccupiedSlots);
+            }
+            state.fallbackSynchronously(id);
+        } else if (disposition == CaptureDisposition.DEFER) {
+            if (capture.status() == Snapshots.CaptureStatus.UNAVAILABLE) {
+                dispatchStats.record(AsyncDispatchReason.CAPTURE_UNAVAILABLE, id);
+                state.retryAt(id, gameTime + 20L);
+            } else {
+                dispatchStats.record(AsyncDispatchReason.NO_READY_ITEM_WORK, id);
+                state.retryAt(id, gameTime + 1L);
+            }
+        } else if (!submit.getAsBoolean()) {
+            dispatchStats.record(AsyncDispatchReason.QUEUE_REJECTED, id);
+            state.retryAt(id, gameTime + 1L);
+        }
+    }
+
+    void recordDispatchException(LogisticsNetwork network, long runtimeId) {
+        UUID id = network.getId();
+        dispatchStats.record(AsyncDispatchReason.WORKER_EXCEPTION, id);
+        boolean newlyDisabled = state.finishWorkerPlan(new TransferPlan(
+                id, network.getGeneration(), runtimeId, true, List.of()),
+                network.getGeneration(), runtimeId);
+        if (newlyDisabled) {
+            logWorkerFailureFallback(id);
+        }
+        recoverWorkerFailure(id);
+    }
+
     static CaptureDisposition captureDisposition(Snapshots.NetworkCapture capture) {
         if (capture.status() == Snapshots.CaptureStatus.OCCUPIED_SLOT_LIMIT_EXCEEDED) {
             return CaptureDisposition.DISABLE_ASYNC;
@@ -189,25 +202,46 @@ final class NetworkDispatcher {
             state.delete(id);
             return;
         }
+        if (!prepareCompletedPlan(plan, network, currentRuntimeId)) {
+            return;
+        }
+        commitCurrentPlan(plan, network, server, capabilityCache);
+    }
+
+    boolean prepareCompletedPlan(
+            TransferPlan plan, LogisticsNetwork network, long currentRuntimeId) {
+        UUID id = plan.networkId();
         boolean newlyDisabled = state.finishWorkerPlan(
                 plan, network.getGeneration(), currentRuntimeId);
         if (newlyDisabled) {
-            LOGGER.warn("Network {} failed async planning 3 consecutive times; "
-                    + "falling back to synchronous transfers.", id);
+            logWorkerFailureFallback(id);
         }
         AsyncDispatchReason reason = rejectedPlanReason(plan, network, currentRuntimeId);
         if (reason == AsyncDispatchReason.STALE_GENERATION
                 || reason == AsyncDispatchReason.WRONG_RUNTIME) {
             dispatchStats.record(reason, id);
             state.retryCurrent(id);
-            return;
+            return false;
         }
         if (reason != null) {
             dispatchStats.record(reason, id);
-            state.fallbackSynchronously(id);
-            return;
+            recoverWorkerFailure(id);
+            return false;
         }
-        commitCurrentPlan(plan, network, server, capabilityCache);
+        return true;
+    }
+
+    private void recoverWorkerFailure(UUID id) {
+        if (state.isAsyncDisabled(id)) {
+            state.fallbackSynchronously(id);
+        } else {
+            state.retryCurrent(id);
+        }
+    }
+
+    private static void logWorkerFailureFallback(UUID id) {
+        LOGGER.warn("Network {} failed async planning 3 consecutive times; "
+                + "falling back to synchronous transfers.", id);
     }
 
     private void commitCurrentPlan(TransferPlan plan, LogisticsNetwork network,
