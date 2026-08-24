@@ -13,6 +13,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 import java.util.HashMap;
@@ -80,6 +81,12 @@ public final class TransferVisuals {
         for (ActivePath path : ACTIVE.values()) {
             spawn(minecraft.level, path, tick);
         }
+    }
+
+    @SubscribeEvent
+    public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        ACTIVE.clear();
+        activeLevel = null;
     }
 
     private static boolean ready(Minecraft minecraft) {
