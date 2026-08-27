@@ -75,19 +75,24 @@ class PlannerDifferentialTest {
 
     private static List<String> runPlanned(Scenario s) {
         ItemStack[] noFilters = new ItemStack[0];
+        List<NetworkSnapshot.ItemEndpoint> endpoints = new ArrayList<>();
+        endpoints.add(Snapshots.captureItems(s.source()));
         List<NetworkSnapshot.TargetUnit> targetUnits = new ArrayList<>();
         for (int i = 0; i < s.targets().size(); i++) {
+            int endpoint = endpoints.size();
+            endpoints.add(Snapshots.captureItems(s.targets().get(i)));
             targetUnits.add(new NetworkSnapshot.TargetUnit(
                     UUID.randomUUID(), 0, noFilters, FilterMode.MATCH_ANY, false, false,
-                    Snapshots.captureItems(s.targets().get(i))));
+                    endpoint));
         }
 
         NetworkSnapshot.ChannelUnit unit = new NetworkSnapshot.ChannelUnit(
                 UUID.randomUUID(), 0, s.batchLimit(), noFilters, FilterMode.MATCH_ANY,
-                Snapshots.captureItems(s.source()), targetUnits);
+                0, targetUnits);
 
         NetworkSnapshot snapshot = new NetworkSnapshot(
-                UUID.randomUUID(), 0L, 0L, 0L, Long.MAX_VALUE, RegistryAccess.EMPTY, List.of(unit));
+                UUID.randomUUID(), 0L, 0L, 0L, Long.MAX_VALUE,
+                RegistryAccess.EMPTY, endpoints, List.of(unit));
 
         TransferPlan.ChannelMoves planned = planOnWorker(unit, snapshot);
 
@@ -128,7 +133,12 @@ class PlannerDifferentialTest {
 
     private static TransferPlan.ChannelMoves planOnWorker(NetworkSnapshot.ChannelUnit unit,
             NetworkSnapshot snapshot) {
-        FutureTask<TransferPlan.ChannelMoves> task = new FutureTask<>(() -> ItemPlanner.plan(unit, snapshot));
+        FutureTask<TransferPlan.ChannelMoves> task = new FutureTask<>(() -> {
+            List<SnapshotItemHandler> endpoints = snapshot.endpoints().stream()
+                    .map(SnapshotItemHandler::new)
+                    .toList();
+            return ItemPlanner.plan(unit, snapshot, endpoints);
+        });
         Thread worker = new Thread(task);
         worker.start();
         try {

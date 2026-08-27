@@ -256,6 +256,15 @@ final class NetworkDispatcher {
         try {
             TransferCommitter.ItemCommitResult itemResult = TransferCommitter.commitItems(
                     plan, network, server, capabilityCache, asyncRuntime.runtimeId());
+            if (itemResult.revalidatedChannels() > 0) {
+                dispatchStats.record(AsyncDispatchReason.COMMIT_REVALIDATION, id);
+                if (Config.debugMode) {
+                    LOGGER.debug("Async item commit revalidation for {}: channels={}, planned={}, committed={}, "
+                                    + "recovered={}",
+                            id, itemResult.revalidatedChannels(), itemResult.planned(),
+                            itemResult.committed(), itemResult.recovered());
+                }
+            }
             long synchronousDelta = TransferEngine.processNetworkWithoutItemTransfers(network, server);
             state.scheduleResult(id, now, Math.min(itemResult.wakeDelta(), synchronousDelta));
         } catch (Exception exception) {

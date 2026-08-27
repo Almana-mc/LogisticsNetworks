@@ -20,9 +20,10 @@ class NetworkPlannerTest {
         NetworkSnapshot.ItemEndpoint endpoint = new NetworkSnapshot.ItemEndpoint(
                 1, new int[0], new ItemStack[0], 64, new int[0]);
         NetworkSnapshot.ChannelUnit channel = new NetworkSnapshot.ChannelUnit(
-                UUID.randomUUID(), 2, 64, new ItemStack[0], FilterMode.MATCH_ANY, endpoint, List.of());
+                UUID.randomUUID(), 2, 64, new ItemStack[0], FilterMode.MATCH_ANY, 0, List.of());
         NetworkSnapshot snapshot = new NetworkSnapshot(
-                UUID.randomUUID(), 4L, 0L, 30L, Long.MAX_VALUE, RegistryAccess.EMPTY, List.of(channel));
+                UUID.randomUUID(), 4L, 0L, 30L, Long.MAX_VALUE,
+                RegistryAccess.EMPTY, List.of(endpoint), List.of(channel));
 
         TransferPlan plan = planOnWorker(snapshot);
 
@@ -34,7 +35,7 @@ class NetworkPlannerTest {
     void emptyPlanRetainsCapturedWake() throws Exception {
         NetworkSnapshot snapshot = new NetworkSnapshot(
                 UUID.randomUUID(), 4L, 7L, 30L, 12L,
-                RegistryAccess.EMPTY, List.of());
+                RegistryAccess.EMPTY, List.of(), List.of());
 
         TransferPlan plan = planOnWorker(snapshot);
 

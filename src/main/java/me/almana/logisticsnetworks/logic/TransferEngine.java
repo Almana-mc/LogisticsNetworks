@@ -432,6 +432,14 @@ public class TransferEngine {
     private static int transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
             Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
+        return transferItems(sourceNode, sourceLevel, exportChannel, channelIndex, targets,
+                batchLimit, dimensionalCache, capCache, Collections.emptyMap());
+    }
+
+    private static int transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
+            ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache,
+            Map<Item, Integer> priorBatchMoved) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos))
@@ -458,7 +466,59 @@ public class TransferEngine {
                 exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
-                sourceLevel, sourcePos, filterReadCache, null);
+                sourceLevel, sourcePos, filterReadCache, null, priorBatchMoved);
+    }
+
+    public static int recoverItemChannel(LogisticsNetwork network, MinecraftServer server,
+            TransferCapabilityCache capCache, UUID sourceNodeId, int channelIndex,
+            int plannedShortfall, int committed, Map<Item, Integer> committedByItem) {
+        ThreadGuard.requireServerThread();
+        if (plannedShortfall <= 0 || channelIndex < 0 || channelIndex >= LogisticsNodeEntity.CHANNEL_COUNT) {
+            return 0;
+        }
+
+        NetworkContext context = prepareNetwork(network, server);
+        if (context == null) {
+            return 0;
+        }
+
+        LogisticsNodeEntity sourceNode = null;
+        for (LogisticsNodeEntity node : context.sortedNodes()) {
+            if (node.getUUID().equals(sourceNodeId)) {
+                sourceNode = node;
+                break;
+            }
+        }
+        if (sourceNode == null || !sourceNode.isValidNode()) {
+            return 0;
+        }
+
+        ChannelData channel = sourceNode.getChannel(channelIndex);
+        int signal = context.signalCache().getOrDefault(sourceNodeId, 0);
+        if (channel == null || !channel.isEnabled()
+                || channel.getMode() != ChannelMode.EXPORT || channel.getType() != ChannelType.ITEM
+                || !canRunChannel(sourceNode, channel) || !CreateCompat.isResolved(sourceNode)
+                || !isRedstoneActive(channel.getRedstoneMode(), signal)) {
+            return 0;
+        }
+
+        List<ImportTarget> targets = context.itemImports()[channelIndex];
+        if (targets == null || targets.isEmpty()) {
+            return 0;
+        }
+
+        int tier = context.tierCache().getOrDefault(sourceNodeId, 0);
+        int configuredBatch = getBatchLimit(ChannelType.ITEM, tier);
+        int currentBatch = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
+        int recoveryLimit = Math.min(plannedShortfall, Math.max(0, currentBatch - committed));
+        if (recoveryLimit == 0) {
+            return 0;
+        }
+
+        int recovered = transferItems(
+                sourceNode, (ServerLevel) sourceNode.level(), channel, channelIndex,
+                targets, recoveryLimit, context.dimensionalCache(), capCache, committedByItem);
+        return Math.max(0, recovered);
     }
 
     public static ResolvedItemTargets resolveItemTargets(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -796,6 +856,19 @@ public class TransferEngine {
             @Nullable ServerLevel sourceLevel, @Nullable BlockPos sourcePos,
             FilterItemData.ReadCache filterReadCache,
             @Nullable MoveRecorder recorder) {
+        return executeMove(source, targets, limit, exportFilters, exportFilterMode,
+                sourceAllowedSlots, provider, sourceLevel, sourcePos, filterReadCache,
+                recorder, Collections.emptyMap());
+    }
+
+    public static int executeMove(IItemHandler source, List<ItemTransferTarget> targets, int limit,
+            ItemStack[] exportFilters, FilterMode exportFilterMode,
+            boolean[] sourceAllowedSlots,
+            HolderLookup.Provider provider,
+            @Nullable ServerLevel sourceLevel, @Nullable BlockPos sourcePos,
+            FilterItemData.ReadCache filterReadCache,
+            @Nullable MoveRecorder recorder,
+            Map<Item, Integer> priorBatchMoved) {
 
         int remaining = limit;
         boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, filterReadCache);
@@ -817,7 +890,7 @@ public class TransferEngine {
             }
         }
         Map<Item, Integer> sourceItemCounts = anyAmountConstraints ? TransferAmountRules.countItems(source) : null;
-        Map<Item, Integer> batchMoved = anyAmountConstraints ? new HashMap<>() : null;
+        Map<Item, Integer> batchMoved = anyAmountConstraints ? new HashMap<>(priorBatchMoved) : null;
         List<Map<Item, Integer>> targetItemCounts = null;
         if (anyAmountConstraints) {
             targetItemCounts = new ArrayList<>(targets.size());

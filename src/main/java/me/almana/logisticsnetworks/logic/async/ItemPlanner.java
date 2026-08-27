@@ -15,7 +15,7 @@ public final class ItemPlanner {
     }
 
     public static TransferPlan.ChannelMoves plan(NetworkSnapshot.ChannelUnit unit,
-            NetworkSnapshot snapshot) {
+            NetworkSnapshot snapshot, List<SnapshotItemHandler> endpoints) {
         ThreadGuard.requireWorkerThread();
 
         List<TransferPlan.TargetRef> targetRefs = new ArrayList<>(unit.targets().size());
@@ -23,7 +23,7 @@ public final class ItemPlanner {
         FilterItemData.ReadCache readCache = FilterItemData.createReadCache();
 
         for (NetworkSnapshot.TargetUnit target : unit.targets()) {
-            IItemHandler targetHandler = new SnapshotItemHandler(target.endpoint());
+            IItemHandler targetHandler = endpoints.get(target.endpoint());
             targetRefs.add(new TransferPlan.TargetRef(target.nodeId(), target.channelIndex(), target.bulk()));
             engineTargets.add(new TransferEngine.ItemTransferTarget(
                     targetHandler,
@@ -37,7 +37,7 @@ public final class ItemPlanner {
         }
 
         List<TransferPlan.ItemMove> moves = new ArrayList<>();
-        IItemHandler sourceHandler = new SnapshotItemHandler(unit.source());
+        IItemHandler sourceHandler = endpoints.get(unit.sourceEndpoint());
 
         TransferEngine.executeMove(
                 sourceHandler,

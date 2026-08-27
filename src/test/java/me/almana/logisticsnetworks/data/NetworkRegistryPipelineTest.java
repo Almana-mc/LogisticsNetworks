@@ -127,7 +127,7 @@ class NetworkRegistryPipelineTest {
         assertTrue(state.beginDispatch(id));
         AtomicBoolean submitted = new AtomicBoolean();
         NetworkSnapshot empty = new NetworkSnapshot(
-                id, 1L, 2L, 3L, 12L, RegistryAccess.EMPTY, List.of());
+                id, 1L, 2L, 3L, 12L, RegistryAccess.EMPTY, List.of(), List.of());
 
         dispatcher.dispatchCapture(id, Snapshots.NetworkCapture.captured(empty), 10L,
                 () -> submitted.compareAndSet(false, true));
@@ -140,13 +140,15 @@ class NetworkRegistryPipelineTest {
     @Test
     void unavailableCaptureRetriesAfterTwentyTicksWithoutDegradedRecovery() {
         NetworkSnapshot empty = new NetworkSnapshot(
-                UUID.randomUUID(), 1L, 2L, 3L, 12L, RegistryAccess.EMPTY, List.of());
+                UUID.randomUUID(), 1L, 2L, 3L, 12L, RegistryAccess.EMPTY, List.of(), List.of());
+        NetworkSnapshot.ItemEndpoint endpoint = new NetworkSnapshot.ItemEndpoint(
+                0, new int[0], new ItemStack[0], 64, new int[0]);
         NetworkSnapshot withItems = new NetworkSnapshot(
                 UUID.randomUUID(), 1L, 2L, 3L, Long.MAX_VALUE, RegistryAccess.EMPTY,
+                List.of(endpoint),
                 List.of(new NetworkSnapshot.ChannelUnit(
                         UUID.randomUUID(), 0, 1, new ItemStack[0], FilterMode.MATCH_ANY,
-                        new NetworkSnapshot.ItemEndpoint(0, new int[0], new ItemStack[0], 64, new int[0]),
-                        List.of())));
+                        0, List.of())));
 
         assertSame(NetworkDispatcher.CaptureDisposition.DEFER,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.unavailable()));
@@ -350,13 +352,14 @@ class NetworkRegistryPipelineTest {
     }
 
     private static Snapshots.NetworkCapture capturedNetwork(UUID id) {
+        NetworkSnapshot.ItemEndpoint endpoint = new NetworkSnapshot.ItemEndpoint(
+                0, new int[0], new ItemStack[0], 64, new int[0]);
         return Snapshots.NetworkCapture.captured(new NetworkSnapshot(
                 id, 1L, 2L, 3L, Long.MAX_VALUE, RegistryAccess.EMPTY,
+                List.of(endpoint),
                 List.of(new NetworkSnapshot.ChannelUnit(
                         UUID.randomUUID(), 0, 1, new ItemStack[0], FilterMode.MATCH_ANY,
-                        new NetworkSnapshot.ItemEndpoint(
-                                0, new int[0], new ItemStack[0], 64, new int[0]),
-                        List.of()))));
+                        0, List.of()))));
     }
 
     private static void clearQueue(NetworkRegistry registry) {

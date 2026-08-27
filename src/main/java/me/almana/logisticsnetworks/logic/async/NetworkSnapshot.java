@@ -14,6 +14,7 @@ public record NetworkSnapshot(
         long gameTime,
         long itemWakeDelta,
         HolderLookup.Provider registries,
+        List<ItemEndpoint> endpoints,
         List<ChannelUnit> units) {
 
     public record ChannelUnit(
@@ -22,7 +23,7 @@ public record NetworkSnapshot(
             int batchLimit,
             ItemStack[] exportFilters,
             FilterMode exportFilterMode,
-            ItemEndpoint source,
+            int sourceEndpoint,
             List<TargetUnit> targets) {
     }
 
@@ -33,7 +34,7 @@ public record NetworkSnapshot(
             FilterMode importFilterMode,
             boolean hasImportSlotMapping,
             boolean bulk,
-            ItemEndpoint endpoint) {
+            int endpoint) {
     }
 
     public record ItemEndpoint(

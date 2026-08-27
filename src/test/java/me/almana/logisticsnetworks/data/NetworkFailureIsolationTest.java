@@ -216,14 +216,16 @@ class NetworkFailureIsolationTest {
     @Test
     void transientCaptureOutcomesDeferWhileOccupiedLimitQueuesDegradedRecovery() {
         NetworkSnapshot itemless = new NetworkSnapshot(
-                UUID.randomUUID(), 1L, 2L, 3L, Long.MAX_VALUE, RegistryAccess.EMPTY, List.of());
+                UUID.randomUUID(), 1L, 2L, 3L, Long.MAX_VALUE,
+                RegistryAccess.EMPTY, List.of(), List.of());
+        NetworkSnapshot.ItemEndpoint endpoint = new NetworkSnapshot.ItemEndpoint(
+                0, new int[0], new ItemStack[0], 64, new int[0]);
         NetworkSnapshot withItems = new NetworkSnapshot(
                 UUID.randomUUID(), 1L, 2L, 3L, Long.MAX_VALUE, RegistryAccess.EMPTY,
+                List.of(endpoint),
                 List.of(new NetworkSnapshot.ChannelUnit(
                         UUID.randomUUID(), 0, 1, new ItemStack[0], FilterMode.MATCH_ANY,
-                        new NetworkSnapshot.ItemEndpoint(
-                                0, new int[0], new ItemStack[0], 64, new int[0]),
-                        List.of())));
+                        0, List.of())));
 
         assertEquals(NetworkDispatcher.CaptureDisposition.DEFER,
                 NetworkDispatcher.captureDisposition(Snapshots.NetworkCapture.unavailable()));

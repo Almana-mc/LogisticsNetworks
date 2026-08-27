@@ -33,50 +33,7 @@ public final class Snapshots {
 
     static NetworkSnapshot.ItemEndpoint captureItems(
             IItemHandler handler, @Nullable OccupiedSlotBudget budget) {
-        ThreadGuard.requireServerThread();
-
-        int slots = handler.getSlots();
-        List<Integer> occupied = new ArrayList<>();
-        List<ItemStack> copies = new ArrayList<>();
-        List<Integer> limits = new ArrayList<>();
-
-        for (int slot = 0; slot < slots; slot++) {
-            ItemStack stack = handler.getStackInSlot(slot);
-            if (stack.isEmpty()) {
-                continue;
-            }
-            if (budget != null) {
-                budget.retain();
-            }
-            occupied.add(slot);
-            copies.add(stack.copy());
-            limits.add(handler.getSlotLimit(slot));
-        }
-
-        int[] occupiedSlots = new int[occupied.size()];
-        int[] occupiedLimits = new int[occupied.size()];
-        for (int i = 0; i < occupied.size(); i++) {
-            occupiedSlots[i] = occupied.get(i);
-            occupiedLimits[i] = limits.get(i);
-        }
-
-        int defaultLimit = slots > 0 ? handler.getSlotLimit(firstEmptySlot(handler, slots)) : 64;
-
-        return new NetworkSnapshot.ItemEndpoint(
-                slots,
-                occupiedSlots,
-                copies.toArray(ItemStack[]::new),
-                defaultLimit,
-                occupiedLimits);
-    }
-
-    private static int firstEmptySlot(IItemHandler handler, int slots) {
-        for (int slot = 0; slot < slots; slot++) {
-            if (handler.getStackInSlot(slot).isEmpty()) {
-                return slot;
-            }
-        }
-        return 0;
+        return ItemEndpointTable.capture(handler, budget);
     }
 
     public static ItemStack[] copyFilters(ItemStack[] filters) {
@@ -98,13 +55,14 @@ public final class Snapshots {
 
         ServerLevel overworld = server.overworld();
         List<NetworkSnapshot.ChannelUnit> units = new ArrayList<>();
+        ItemEndpointTable endpoints = new ItemEndpointTable();
         OccupiedSlotBudget occupiedSlots = new OccupiedSlotBudget(Config.asyncMaxOccupiedSlots);
         long itemWakeDelta = Long.MAX_VALUE;
 
         try {
             for (LogisticsNodeEntity node : context.sortedNodes()) {
                 itemWakeDelta = captureNodeChannels(
-                        node, context, capCache, units, occupiedSlots, itemWakeDelta);
+                        node, context, capCache, endpoints, units, occupiedSlots, itemWakeDelta);
             }
         } catch (OccupiedSlotLimitExceeded exception) {
             return NetworkCapture.occupiedLimitExceeded();
@@ -117,11 +75,13 @@ public final class Snapshots {
                 overworld.getGameTime(),
                 itemWakeDelta,
                 overworld.registryAccess(),
+                endpoints.endpoints(),
                 units));
     }
 
     private static long captureNodeChannels(LogisticsNodeEntity node, TransferEngine.NetworkContext context,
-            TransferCapabilityCache capCache, List<NetworkSnapshot.ChannelUnit> units,
+            TransferCapabilityCache capCache, ItemEndpointTable endpoints,
+            List<NetworkSnapshot.ChannelUnit> units,
             OccupiedSlotBudget occupiedSlots, long itemWakeDelta) {
 
         ServerLevel level = (ServerLevel) node.level();
@@ -172,7 +132,8 @@ public final class Snapshots {
 
             int configuredBatch = TransferEngine.getBatchLimit(ChannelType.ITEM, tier);
             int batchLimit = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
-            NetworkSnapshot.ItemEndpoint sourceItems = captureItems(sourceHandler, occupiedSlots);
+            int sourceEndpoint = endpoints.capture(
+                    node, channel.getIoDirection(), sourceHandler, occupiedSlots);
 
             List<NetworkSnapshot.TargetUnit> targetUnits = new ArrayList<>(resolved.refs().size());
             for (int t = 0; t < resolved.refs().size(); t++) {
@@ -185,7 +146,8 @@ public final class Snapshots {
                         engineTarget.importFilterMode(),
                         engineTarget.hasImportSlotMapping(),
                         engineTarget.bulkHandler() != null,
-                        captureItems(engineTarget.handler(), occupiedSlots)));
+                        endpoints.capture(ref.node(), ref.channel().getIoDirection(),
+                                engineTarget.handler(), occupiedSlots)));
             }
 
             units.add(new NetworkSnapshot.ChannelUnit(
@@ -194,7 +156,7 @@ public final class Snapshots {
                     batchLimit,
                     copyFilters(channel.getFilterItems()),
                     channel.getFilterMode(),
-                    sourceItems,
+                    sourceEndpoint,
                     targetUnits));
         }
         return itemWakeDelta;
