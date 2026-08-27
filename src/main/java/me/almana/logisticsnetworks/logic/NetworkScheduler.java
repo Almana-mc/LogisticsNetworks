@@ -6,19 +6,34 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
-// Dirty-only dispatch, no scan
 @EventBusSubscriber
 public class NetworkScheduler {
 
     @SubscribeEvent
-    public static void onServerTick(ServerTickEvent.Post event) {
-        ServerLevel level = event.getServer().overworld();
+    public static void onServerTickPre(ServerTickEvent.Pre event) {
+        NetworkRegistry registry = NetworkRegistry.get(event.getServer().overworld());
+        if (registry == null)
+            return;
 
+        if (registry.refreshAsyncPlanning()) {
+            registry.dispatchDirty(event.getServer());
+        }
+    }
+
+    @SubscribeEvent
+    public static void onServerTickPost(ServerTickEvent.Post event) {
+        ServerLevel level = event.getServer().overworld();
         NetworkRegistry registry = NetworkRegistry.get(level);
         if (registry == null)
             return;
 
-        registry.processDirtyNetworks(event.getServer());
+        if (registry.refreshAsyncPlanning()) {
+            registry.commitCompleted(event.getServer(), event::hasTime);
+            registry.dispatchDirty(event.getServer());
+            registry.processDegradedRecovery(event.getServer());
+        } else {
+            registry.processDirtyNetworks(event.getServer());
+        }
         registry.getTelemetryManager().tick(registry, event.getServer());
     }
 }

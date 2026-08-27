@@ -154,7 +154,7 @@ public class NodeMenu extends AbstractContainerMenu {
 
     private void markDirty() {
         if (node != null && node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
-            NetworkRegistry.get(level).markNetworkDirty(node.getNetworkId());
+            NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
         }
     }
 
