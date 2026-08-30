@@ -14,6 +14,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -42,6 +43,7 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
@@ -49,8 +51,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class WrenchItem extends Item {
@@ -61,10 +65,47 @@ public class WrenchItem extends Item {
     private static final String KEY_MASS_SELECTIONS = "mass_selections";
     private static final String KEY_SELECTION_DIMENSION = "dimension";
     private static final String KEY_SELECTION_POS = "pos";
+    private static final String KEY_MASS_DIMENSION = "mass_dimension";
+    private static final String KEY_MASS_CORNER_A = "mass_corner_a";
+    private static final String KEY_MASS_CORNER_B = "mass_corner_b";
+    private static final String KEY_MASS_SELECTED_BLOCK = "mass_selected_block";
     private static final String KEY_AE2_LINK = "ae2_link";
-    private static final int MAX_MASS_SELECTIONS = 2048;
+    private static final int MAX_MASS_SELECTIONS = 10_000;
+    private static final int MAX_MASS_NODES = 2048;
 
     public record MassSelectionTarget(ResourceKey<Level> dimension, BlockPos pos) {
+    }
+
+    public record MassSelectionArea(ResourceKey<Level> dimension, BlockPos first, @Nullable BlockPos second) {
+        public boolean isComplete() {
+            return second != null;
+        }
+
+        public BlockPos min() {
+            BlockPos other = second == null ? first : second;
+            return new BlockPos(Math.min(first.getX(), other.getX()), Math.min(first.getY(), other.getY()),
+                    Math.min(first.getZ(), other.getZ()));
+        }
+
+        public BlockPos max() {
+            BlockPos other = second == null ? first : second;
+            return new BlockPos(Math.max(first.getX(), other.getX()), Math.max(first.getY(), other.getY()),
+                    Math.max(first.getZ(), other.getZ()));
+        }
+
+        public int volume() {
+            BlockPos min = min();
+            BlockPos max = max();
+            long sizeX = (long) max.getX() - min.getX() + 1L;
+            long sizeY = (long) max.getY() - min.getY() + 1L;
+            long sizeZ = (long) max.getZ() - min.getZ() + 1L;
+            long volume = sizeX * sizeY * sizeZ;
+            return volume > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) volume;
+        }
+    }
+
+    public record MassPlacementBlockChoice(ResourceLocation blockId, Component name, int targetCount,
+            boolean selected) {
     }
 
     public enum Mode {
@@ -158,38 +199,35 @@ public class WrenchItem extends Item {
             return InteractionResult.FAIL;
         }
 
-        ItemStack wrenchStack = context.getItemInHand();
-        MassSelectionTarget target = new MassSelectionTarget(player.level().dimension(), context.getClickedPos());
-
-        if (toggleMassSelection(wrenchStack, target)) {
-            int selectedCount = getMassSelectionCount(wrenchStack, player.level().dimension());
-            player.displayClientMessage(
-                    Component.translatable("message.logisticsnetworks.mass_placement.deselected", selectedCount), true);
+        if (isSecondaryUse(player)) {
+            openMassPlacementMenu(player, context.getHand());
             return InteractionResult.CONSUME;
         }
 
-        NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(level, target.pos(), player.isCreative());
-        switch (validation) {
-            case BLACKLISTED -> player.displayClientMessage(
-                    Component.translatable("message.logisticsnetworks.block_blacklisted"), true);
-            case NO_STORAGE_CAPABILITY -> player.displayClientMessage(
-                    Component.translatable("message.logisticsnetworks.no_storage_capability"), true);
-            case NODE_ALREADY_EXISTS -> player.displayClientMessage(
-                    Component.translatable("message.logisticsnetworks.node_already_exists"), true);
-            case AIR -> player.displayClientMessage(
-                    Component.translatable("message.logisticsnetworks.mass_placement.invalid_air"), true);
-            case OK -> {
-                if (addMassSelection(wrenchStack, target)) {
-                    int selectedCount = getMassSelectionCount(wrenchStack, player.level().dimension());
-                    player.displayClientMessage(
-                            Component.translatable("message.logisticsnetworks.mass_placement.selected", selectedCount),
-                            true);
-                } else {
-                    player.displayClientMessage(
-                            Component.translatable("message.logisticsnetworks.mass_placement.selection_limit"), true);
-                }
-            }
+        ItemStack wrenchStack = context.getItemInHand();
+        BlockPos clickedPos = context.getClickedPos();
+        MassSelectionArea area = getMassSelectionArea(wrenchStack, player.level().dimension());
+
+        if (area == null || area.isComplete()) {
+            setMassSelectionFirstCorner(wrenchStack, player.level().dimension(), clickedPos);
+            player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.mass_placement.corner_first",
+                            clickedPos.getX(), clickedPos.getY(), clickedPos.getZ()), true);
+            return InteractionResult.CONSUME;
         }
+
+        MassSelectionArea proposed = new MassSelectionArea(player.level().dimension(), area.first(), clickedPos);
+        if (proposed.volume() > MAX_MASS_SELECTIONS) {
+            player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.mass_placement.selection_limit",
+                            MAX_MASS_SELECTIONS), true);
+            return InteractionResult.CONSUME;
+        }
+
+        setMassSelectionSecondCorner(wrenchStack, clickedPos);
+        player.displayClientMessage(
+                Component.translatable("message.logisticsnetworks.mass_placement.corner_second",
+                        clickedPos.getX(), clickedPos.getY(), clickedPos.getZ(), proposed.volume()), true);
 
         return InteractionResult.CONSUME;
     }
@@ -573,12 +611,16 @@ public class WrenchItem extends Item {
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
         }
 
+        openMassPlacementMenu(serverPlayer, hand);
+
+        return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+    }
+
+    private void openMassPlacementMenu(ServerPlayer serverPlayer, InteractionHand hand) {
         serverPlayer.openMenu(new SimpleMenuProvider(
                 (id, inventory, p) -> new MassPlacementMenu(id, inventory, hand),
                 Component.translatable("gui.logisticsnetworks.mass_placement")),
                 buf -> buf.writeVarInt(hand.ordinal()));
-
-        return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
     }
 
     @Override
@@ -876,6 +918,163 @@ public class WrenchItem extends Item {
                 .result().map(com.mojang.datafixers.util.Pair::getFirst).orElse(null);
     }
 
+    public static int getMaxMassNodes() {
+        return MAX_MASS_NODES;
+    }
+
+    @Nullable
+    public static MassSelectionArea getMassSelectionArea(ItemStack stack, ResourceKey<Level> dimension) {
+        CompoundTag root = getRootTag(stack);
+        if (!root.contains(KEY_MASS_DIMENSION, Tag.TAG_STRING) || !root.contains(KEY_MASS_CORNER_A, Tag.TAG_LONG)) {
+            return null;
+        }
+
+        ResourceLocation dimensionId = ResourceLocation.tryParse(root.getString(KEY_MASS_DIMENSION));
+        if (dimensionId == null) {
+            return null;
+        }
+
+        ResourceKey<Level> storedDimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
+        if (!storedDimension.equals(dimension)) {
+            return null;
+        }
+
+        BlockPos first = BlockPos.of(root.getLong(KEY_MASS_CORNER_A));
+        BlockPos second = root.contains(KEY_MASS_CORNER_B, Tag.TAG_LONG)
+                ? BlockPos.of(root.getLong(KEY_MASS_CORNER_B))
+                : null;
+        return new MassSelectionArea(storedDimension, first, second);
+    }
+
+    public static void setMassSelectionFirstCorner(ItemStack stack, ResourceKey<Level> dimension, BlockPos pos) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof WrenchItem)) {
+            return;
+        }
+
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            root.putString(KEY_MASS_DIMENSION, dimension.location().toString());
+            root.putLong(KEY_MASS_CORNER_A, pos.asLong());
+            root.remove(KEY_MASS_CORNER_B);
+            root.remove(KEY_MASS_SELECTED_BLOCK);
+            root.remove(KEY_MASS_SELECTIONS);
+            writeRoot(customTag, root);
+        });
+    }
+
+    public static void setMassSelectionSecondCorner(ItemStack stack, BlockPos pos) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof WrenchItem)) {
+            return;
+        }
+
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            root.putLong(KEY_MASS_CORNER_B, pos.asLong());
+            root.remove(KEY_MASS_SELECTED_BLOCK);
+            root.remove(KEY_MASS_SELECTIONS);
+            writeRoot(customTag, root);
+        });
+    }
+
+    @Nullable
+    public static ResourceLocation getMassSelectedBlock(ItemStack stack) {
+        CompoundTag root = getRootTag(stack);
+        if (!root.contains(KEY_MASS_SELECTED_BLOCK, Tag.TAG_STRING)) {
+            return null;
+        }
+        return ResourceLocation.tryParse(root.getString(KEY_MASS_SELECTED_BLOCK));
+    }
+
+    public static void setMassSelectedBlock(ItemStack stack, ResourceLocation blockId) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof WrenchItem)) {
+            return;
+        }
+
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            if (blockId == null) {
+                root.remove(KEY_MASS_SELECTED_BLOCK);
+            } else {
+                root.putString(KEY_MASS_SELECTED_BLOCK, blockId.toString());
+            }
+            writeRoot(customTag, root);
+        });
+    }
+
+    public static List<MassPlacementBlockChoice> getMassPlacementBlockChoices(Level level, ItemStack stack) {
+        MassSelectionArea area = getMassSelectionArea(stack, level.dimension());
+        if (area == null || !area.isComplete() || area.volume() > MAX_MASS_SELECTIONS) {
+            return List.of();
+        }
+
+        ResourceLocation selectedBlock = getMassSelectedBlock(stack);
+        Map<Block, Integer> counts = new LinkedHashMap<>();
+        BlockPos min = area.min();
+        BlockPos max = area.max();
+
+        for (int y = min.getY(); y <= max.getY(); y++) {
+            for (int z = min.getZ(); z <= max.getZ(); z++) {
+                for (int x = min.getX(); x <= max.getX(); x++) {
+                    BlockPos pos = new BlockPos(x, y, z);
+                    if (NodePlacementHelper.validatePlacement(level, pos, false)
+                            != NodePlacementHelper.ValidationResult.OK) {
+                        continue;
+                    }
+
+                    Block block = level.getBlockState(pos).getBlock();
+                    int count = counts.getOrDefault(block, 0);
+                    counts.put(block, Math.min(count + 1, MAX_MASS_NODES + 1));
+                }
+            }
+        }
+
+        List<MassPlacementBlockChoice> choices = new ArrayList<>(counts.size());
+        for (Map.Entry<Block, Integer> entry : counts.entrySet()) {
+            ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(entry.getKey());
+            if (blockId == null) {
+                continue;
+            }
+            ItemStack displayStack = entry.getKey().asItem().getDefaultInstance();
+            Component name = displayStack.isEmpty() ? Component.literal(blockId.toString()) : displayStack.getHoverName();
+            choices.add(new MassPlacementBlockChoice(blockId, name, entry.getValue(), blockId.equals(selectedBlock)));
+        }
+        return choices;
+    }
+
+    public static List<MassSelectionTarget> getMassPlacementTargets(Level level, ItemStack stack) {
+        MassSelectionArea area = getMassSelectionArea(stack, level.dimension());
+        ResourceLocation selectedBlockId = getMassSelectedBlock(stack);
+        if (area == null || !area.isComplete() || selectedBlockId == null || area.volume() > MAX_MASS_SELECTIONS) {
+            return List.of();
+        }
+
+        Block selectedBlock = BuiltInRegistries.BLOCK.getOptional(selectedBlockId).orElse(null);
+        if (selectedBlock == null) {
+            return List.of();
+        }
+
+        List<MassSelectionTarget> targets = new ArrayList<>();
+        BlockPos min = area.min();
+        BlockPos max = area.max();
+
+        for (int y = min.getY(); y <= max.getY() && targets.size() < MAX_MASS_NODES; y++) {
+            for (int z = min.getZ(); z <= max.getZ() && targets.size() < MAX_MASS_NODES; z++) {
+                for (int x = min.getX(); x <= max.getX() && targets.size() < MAX_MASS_NODES; x++) {
+                    BlockPos pos = new BlockPos(x, y, z);
+                    if (level.getBlockState(pos).getBlock() != selectedBlock) {
+                        continue;
+                    }
+                    if (NodePlacementHelper.validatePlacement(level, pos, false)
+                            == NodePlacementHelper.ValidationResult.OK) {
+                        targets.add(new MassSelectionTarget(level.dimension(), pos));
+                    }
+                }
+            }
+        }
+
+        return targets;
+    }
+
     public static List<MassSelectionTarget> getMassSelections(ItemStack stack) {
         CompoundTag root = getRootTag(stack);
         if (!root.contains(KEY_MASS_SELECTIONS, Tag.TAG_LIST)) {
@@ -1026,6 +1225,10 @@ public class WrenchItem extends Item {
         CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
             CompoundTag root = getRootTag(customTag);
             root.remove(KEY_MASS_SELECTIONS);
+            root.remove(KEY_MASS_DIMENSION);
+            root.remove(KEY_MASS_CORNER_A);
+            root.remove(KEY_MASS_CORNER_B);
+            root.remove(KEY_MASS_SELECTED_BLOCK);
             writeRoot(customTag, root);
         });
     }

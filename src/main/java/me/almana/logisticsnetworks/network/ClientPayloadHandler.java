@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
+import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -64,6 +65,17 @@ public class ClientPayloadHandler {
             var screen = Minecraft.getInstance().screen;
             if (screen instanceof ComputerScreen computerScreen) {
                 computerScreen.receiveChannelList(payload.networkId(), payload.channels());
+            }
+        });
+    }
+
+    public static void handleSyncMassPlacementChoices(SyncMassPlacementChoicesPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var screen = Minecraft.getInstance().screen;
+            if (screen instanceof MassPlacementScreen massPlacementScreen
+                    && massPlacementScreen.hasContainerId(payload.containerId())) {
+                massPlacementScreen.receiveBlockChoices(payload.choices(), payload.maxNodes());
             }
         });
     }

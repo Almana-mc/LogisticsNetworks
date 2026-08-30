@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
+import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -18,15 +19,18 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class MassPlacementMenu extends AbstractContainerMenu {
 
     public static final int ID_PLACE_NODES = 0;
     public static final int ID_CLEAR_SELECTION = 1;
+    public static final int ID_SELECT_BLOCK_BASE = 100;
 
     private static final int DATA_SELECTED = 0;
     private static final int DATA_NODES_REQUIRED = 1;
@@ -39,6 +43,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
     private final Player player;
     private final int lockedSlot;
     private final ContainerData data = new SimpleContainerData(DATA_SIZE);
+    private String lastChoicesKey = "";
 
     public record RequirementView(Component name, int required, int available, int fromAE2, boolean missing) {
     }
@@ -136,6 +141,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         if (id == ID_PLACE_NODES) {
             boolean placed = placeSelectedNodes();
             refreshState();
+            sendBlockChoices();
             broadcastChanges();
             return placed;
         }
@@ -148,9 +154,25 @@ public class MassPlacementMenu extends AbstractContainerMenu {
                 player.displayClientMessage(
                         Component.translatable("message.logisticsnetworks.mass_placement.cleared"), true);
                 refreshState();
+                sendBlockChoices();
                 broadcastChanges();
             }
             return true;
+        }
+
+        if (id >= ID_SELECT_BLOCK_BASE) {
+            ItemStack wrenchStack = getWrenchStack();
+            int choiceIndex = id - ID_SELECT_BLOCK_BASE;
+            List<WrenchItem.MassPlacementBlockChoice> choices =
+                    WrenchItem.getMassPlacementBlockChoices(player.level(), wrenchStack);
+            if (choiceIndex >= 0 && choiceIndex < choices.size()) {
+                WrenchItem.setMassSelectedBlock(wrenchStack, choices.get(choiceIndex).blockId());
+                player.getInventory().setChanged();
+                refreshState();
+                sendBlockChoices();
+                broadcastChanges();
+                return true;
+            }
         }
 
         return false;
@@ -160,6 +182,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
     public void broadcastChanges() {
         if (!player.level().isClientSide) {
             refreshState();
+            sendBlockChoices();
         }
         super.broadcastChanges();
     }
@@ -171,15 +194,15 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             return;
         }
 
-        List<WrenchItem.MassSelectionTarget> selected = WrenchItem.getMassSelections(wrenchStack, player.level().dimension());
-        int selectedCount = selected.size();
-
-        List<WrenchItem.MassSelectionTarget> validTargets = getValidTargets(selected);
-        int nodeCount = validTargets.size();
+        WrenchItem.MassSelectionArea area = WrenchItem.getMassSelectionArea(wrenchStack, player.level().dimension());
+        int selectedCount = area == null ? 0 : area.volume();
+        List<WrenchItem.MassSelectionTarget> targets = WrenchItem.getMassPlacementTargets(player.level(), wrenchStack);
+        int nodeCount = targets.size();
 
         NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrenchStack, player.registryAccess());
         boolean clipboardPresent = clipboard != null && !clipboard.isEffectivelyEmpty();
         boolean clipboardValid = !clipboardPresent || clipboard.isStructurallyValid();
+        boolean hasBlockSelection = WrenchItem.getMassSelectedBlock(wrenchStack) != null;
 
         int upgradesRequired = clipboardPresent && clipboardValid ? clipboard.getTotalUpgradeCount() * nodeCount : 0;
         int filtersRequired = clipboardPresent && clipboardValid ? clipboard.getTotalFilterCount() * nodeCount : 0;
@@ -188,7 +211,8 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         int protectedSlot = findProtectedSlot(player.getInventory(), wrenchStack);
         List<Requirement> requirements = buildRequirements(nodeCount, clipboardPresent && clipboardValid ? clipboard : null);
         boolean hasItems = creative || hasCombinedRequirements(player.getInventory(), requirements, protectedSlot);
-        boolean canPlace = selectedCount > 0 && selectedCount == nodeCount && clipboardValid && hasItems;
+        boolean canPlace = area != null && area.isComplete() && hasBlockSelection && nodeCount > 0
+                && clipboardValid && hasItems;
 
         data.set(DATA_SELECTED, selectedCount);
         data.set(DATA_NODES_REQUIRED, nodeCount);
@@ -215,15 +239,21 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             return false;
         }
 
-        List<WrenchItem.MassSelectionTarget> selected = WrenchItem.getMassSelections(wrenchStack, player.level().dimension());
-        if (selected.isEmpty()) {
+        WrenchItem.MassSelectionArea area = WrenchItem.getMassSelectionArea(wrenchStack, player.level().dimension());
+        if (area == null || !area.isComplete()) {
             player.displayClientMessage(Component.translatable("message.logisticsnetworks.mass_placement.none_selected"),
                     true);
             return false;
         }
 
-        List<WrenchItem.MassSelectionTarget> validTargets = getValidTargets(selected);
-        if (validTargets.size() != selected.size()) {
+        if (WrenchItem.getMassSelectedBlock(wrenchStack) == null) {
+            player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.mass_placement.no_block_selected"), true);
+            return false;
+        }
+
+        List<WrenchItem.MassSelectionTarget> validTargets = WrenchItem.getMassPlacementTargets(level, wrenchStack);
+        if (validTargets.isEmpty()) {
             player.displayClientMessage(
                     Component.translatable("message.logisticsnetworks.mass_placement.invalid_targets"), true);
             return false;
@@ -253,7 +283,6 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         }
 
         int placedCount = 0;
-        List<WrenchItem.MassSelectionTarget> placedTargets = new ArrayList<>();
 
         for (WrenchItem.MassSelectionTarget target : validTargets) {
             LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, target.pos(), player.getUUID());
@@ -265,14 +294,12 @@ public class MassPlacementMenu extends AbstractContainerMenu {
                 clipboard.applyToNodeWithoutInventory(node);
             }
 
-            placedTargets.add(target);
             placedCount++;
         }
 
-        WrenchItem.removeMassSelections(wrenchStack, placedTargets);
-        player.getInventory().setChanged();
-
         if (placedCount > 0) {
+            WrenchItem.clearMassSelections(wrenchStack);
+            player.getInventory().setChanged();
             player.displayClientMessage(
                     Component.translatable("message.logisticsnetworks.mass_placement.placed", placedCount), true);
             return true;
@@ -280,18 +307,6 @@ public class MassPlacementMenu extends AbstractContainerMenu {
 
         player.displayClientMessage(Component.translatable("message.logisticsnetworks.mass_placement.failed"), true);
         return false;
-    }
-
-    private List<WrenchItem.MassSelectionTarget> getValidTargets(List<WrenchItem.MassSelectionTarget> selected) {
-        boolean creative = player.isCreative();
-        List<WrenchItem.MassSelectionTarget> validTargets = new ArrayList<>();
-        for (WrenchItem.MassSelectionTarget target : selected) {
-            NodePlacementHelper.ValidationResult validation = NodePlacementHelper.validatePlacement(player.level(), target.pos(), creative);
-            if (validation == NodePlacementHelper.ValidationResult.OK) {
-                validTargets.add(target);
-            }
-        }
-        return validTargets;
     }
 
     private List<Requirement> buildRequirements(int nodeCount, NodeClipboardConfig clipboard) {
@@ -367,6 +382,31 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             return player.getOffhandItem();
         }
         return lockedSlot >= 0 ? player.getInventory().getItem(lockedSlot) : player.getMainHandItem();
+    }
+
+    private void sendBlockChoices() {
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return;
+        }
+
+        ItemStack wrenchStack = getWrenchStack();
+        List<WrenchItem.MassPlacementBlockChoice> choices =
+                WrenchItem.getMassPlacementBlockChoices(player.level(), wrenchStack);
+        String key = choices.stream()
+                .map(choice -> choice.blockId() + ":" + choice.targetCount() + ":" + choice.selected())
+                .collect(Collectors.joining("|"));
+        if (key.equals(lastChoicesKey)) {
+            return;
+        }
+
+        lastChoicesKey = key;
+        List<SyncMassPlacementChoicesPayload.BlockChoice> payloadChoices = new ArrayList<>(choices.size());
+        for (WrenchItem.MassPlacementBlockChoice choice : choices) {
+            payloadChoices.add(new SyncMassPlacementChoicesPayload.BlockChoice(
+                    choice.blockId(), choice.name().getString(), choice.targetCount(), choice.selected()));
+        }
+        PacketDistributor.sendToPlayer(serverPlayer,
+                new SyncMassPlacementChoicesPayload(containerId, payloadChoices, WrenchItem.getMaxMassNodes()));
     }
 
     private static class Requirement {
