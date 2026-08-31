@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
@@ -27,8 +28,6 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
     private static final int COLOR_DIM = 0xFF888888;
     private static final int COLOR_HOVER = 0x30FFFFFF;
     private static final Component EDITOR_TITLE = Component.translatable("gui.logisticsnetworks.clipboard.editor");
-    private static final Component VISUAL_SLOTS_HINT = Component
-            .translatable("gui.logisticsnetworks.clipboard.visual_slots_hint");
 
     public ClipboardScreen(ClipboardMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -142,7 +141,9 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
                 topPos + 118, COLOR_DIM, false);
         drawSlotGrid(graphics, upgradeX, upgradeY, 2, 2);
 
-        graphics.drawString(font, VISUAL_SLOTS_HINT, leftPos + 10, topPos + 182, COLOR_DIM, false);
+        graphics.drawString(font,
+                Component.translatable("gui.logisticsnetworks.clipboard.visual_slots_hint"),
+                leftPos + 10, topPos + 182, COLOR_DIM, false);
     }
 
     private void drawButton(GuiGraphics graphics, int x, int y, int width, int height, String label, int mouseX,
@@ -187,6 +188,12 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (key == 256) return super.keyPressed(key, scan, modifiers);
+
+        int action = ClientControls.resolveKeyAction(key, scan);
+        if (action != -1) {
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
+            return true;
+        }
         return true;
     }
 
@@ -196,18 +203,23 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
             return super.mouseClicked(mouseX, mouseY, button);
         }
 
-        if (button == 0 || button == 1) {
-            if (handleUtilityClick(mouseX, mouseY)) {
-                return true;
-            }
-            if (handleHeaderClick(mouseX, mouseY)) {
-                return true;
-            }
-            if (handleSettingsClick(mouseX, mouseY, button)) {
-                return true;
-            }
-        }
+        int action = ClientControls.resolveMouseAction(button);
+        if (action != -1 && handleInteraction(mouseX, mouseY, action))
+            return true;
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean handleInteraction(double mouseX, double mouseY, int action) {
+        if (action != 0 && action != 1)
+            return false;
+
+        if (handleUtilityClick(mouseX, mouseY)) {
+            return true;
+        }
+        if (handleHeaderClick(mouseX, mouseY)) {
+            return true;
+        }
+        return handleSettingsClick(mouseX, mouseY, action);
     }
 
     private boolean handleUtilityClick(double mouseX, double mouseY) {
@@ -233,7 +245,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
         return false;
     }
 
-    private boolean handleSettingsClick(double mouseX, double mouseY, int mouseButton) {
+    private boolean handleSettingsClick(double mouseX, double mouseY, int action) {
         int panelX = leftPos + 12;
         int panelY = topPos + 44;
         int rowH = 14;
@@ -245,7 +257,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> {
                 continue;
             }
 
-            int id = mapRowToButton(row, mouseButton == 0);
+            int id = mapRowToButton(row, action == 0);
             if (id != -1) {
                 sendButton(id);
                 return true;

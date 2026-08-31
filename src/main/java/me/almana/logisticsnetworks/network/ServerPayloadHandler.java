@@ -54,6 +54,7 @@ public class ServerPayloadHandler {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<UUID, Boolean> DEFAULT_NODE_VISIBILITY = new HashMap<>();
+    private static final Map<UUID, Integer> MODIFIER_KEYS = new HashMap<>();
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -274,6 +275,42 @@ public class ServerPayloadHandler {
 
     public static void clearDefaultNodeVisibility(Player player) {
         DEFAULT_NODE_VISIBILITY.remove(player.getUUID());
+    }
+
+    public static void handleSyncModifierKeys(SyncModifierKeysPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player) {
+                setModifierKeys(player.getUUID(), payload.mask());
+            }
+        });
+    }
+
+    static void setModifierKeys(UUID playerId, int mask) {
+        MODIFIER_KEYS.put(playerId, mask & 0b111);
+    }
+
+    static boolean isModifierDown(UUID playerId, int index) {
+        return index >= 0 && index < 3
+                && (MODIFIER_KEYS.getOrDefault(playerId, 0) & (1 << index)) != 0;
+    }
+
+    public static boolean isModifierDown(Player player, int index) {
+        if (!MODIFIER_KEYS.containsKey(player.getUUID())) {
+            return index == 0 && player.isShiftKeyDown();
+        }
+        return isModifierDown(player.getUUID(), index);
+    }
+
+    public static void clearModifierKeys(Player player) {
+        clearModifierKeys(player.getUUID());
+    }
+
+    static void clearModifierKeys(UUID playerId) {
+        MODIFIER_KEYS.remove(playerId);
+    }
+
+    public static void clearModifierKeys() {
+        MODIFIER_KEYS.clear();
     }
 
     public static void handleCycleWrenchMode(CycleWrenchModePayload payload, IPayloadContext context) {

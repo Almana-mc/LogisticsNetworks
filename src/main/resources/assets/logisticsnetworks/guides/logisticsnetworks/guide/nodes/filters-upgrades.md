@@ -19,10 +19,10 @@ The right-hand panel of the node configuration screen holds four things: a 3x2 g
 
 **What it does:** the filter buttons decide which resources this channel is allowed to move.
 
-- **Left-click an empty button** to open a small picker and choose a type — **Normal**, **Mod**, or **Regex**. The filter is created and its configuration opens.
-- **Left-click a configured button** to edit that filter.
-- **Right-click a configured button** to remove it (the slot goes back to **+**).
-- **Drop an item onto a button** (carry it and left-click) to add that item straight into the filter.
+- Use **Primary Interaction (default: Left Click)** on an empty button to open a small picker and choose a type — **Normal**, **Mod**, or **Regex**. The filter is created and its configuration opens.
+- Use Primary Interaction on a configured button to edit that filter.
+- Use **Secondary Interaction (default: Right Click)** on a configured button to remove it (the slot goes back to **+**).
+- **Drop an item onto a button** by carrying it and using Primary Interaction to add that item straight into the filter.
 
 **Per-channel, not per-node.** The filter slots belong to **one channel at a time** — whichever channel is selected in the [Header](header.md). Switch to a different channel number and the 6 slots re-fill with that channel's filters. This means every channel has its own independent set of 6 filter slots, so a single node can run 6 completely different filter configurations.
 
@@ -35,7 +35,7 @@ The right-hand panel of the node configuration screen holds four things: a 3x2 g
 
 ### The Any / All button
 
-Click the button above the filter grid to toggle between the two match modes:
+Use Primary Interaction on the button above the filter grid to toggle between the two match modes:
 
 - **Match Any** (default) — a resource is allowed if it passes **at least one** filter. Filters work like a checklist of acceptable items; any filter that says "yes" is enough.
 - **Match All** — a resource is allowed only if it passes **every** filter in the grid. Filters work like a stack of conditions that all have to be true at once.
@@ -45,7 +45,7 @@ Click the button above the filter grid to toggle between the two match modes:
 - **Match Any**: the channel will move anything tagged `c:ores`, **or** anything the Amount Filter allows. Either rule triggers.
 - **Match All**: the channel will only move items that are **both** tagged `c:ores` **and** pass the Amount Filter's threshold.
 
-**How to change it:** left-click the button to flip between Any and All. The change takes effect instantly for the current channel.
+**How to change it:** use Primary Interaction on the button to flip between Any and All. The change takes effect instantly for the current channel.
 
 ## Upgrades
 
@@ -74,7 +74,7 @@ Click the button above the filter grid to toggle between the two match modes:
 
 **What it does:** opens the Logistics Networks guidebook — the very book you are reading right now. Useful as a shortcut if you have a question mid-setup and do not want to close the node screen and find the book in your inventory.
 
-**How to use it:** left-click. The book opens. Close it to return to the node screen.
+**How to use it:** use Primary Interaction. The book opens. Close it to return to the node screen.
 
 ## Tweaks
 
@@ -84,6 +84,6 @@ Click the button above the filter grid to toggle between the two match modes:
 
 **What it does:** opens a small dialog with theme swatches. Themes recolor the node screen UI — Filters, Upgrades, Header, and Channel Settings all follow the selected theme.
 
-**How to use it:** left-click to open the dialog. Click any swatch to apply that theme. Close the dialog with the × button in the corner or by clicking outside it. The theme choice is client-side and sticks across sessions.
+**How to use it:** use Primary Interaction to open the dialog and on any swatch to apply that theme. Close the dialog with the × button in the corner or by using Primary Interaction outside it. The theme choice is client-side and sticks across sessions.
 
 Tweaks is purely cosmetic — the theme has no effect on transfers, filters, or upgrades.

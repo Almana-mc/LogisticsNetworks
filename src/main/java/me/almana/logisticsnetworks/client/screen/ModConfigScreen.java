@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.client.screen;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.NodeAccessMode;
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.DefaultNodeVisibilitySync;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
@@ -538,33 +539,41 @@ public class ModConfigScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int action = ClientControls.resolveMouseAction(button);
+        if (action != -1 && handleInteraction(mouseX, mouseY, action))
+            return true;
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean handleInteraction(double mouseX, double mouseY, int action) {
+        if (action != 0)
+            return false;
+
         EditBox prev = findFocusedEditBox();
 
-        if (button == 0) {
-            if (handleTabClick(mouseX, mouseY)) {
-                unfocusEditBoxes();
-                return true;
-            }
+        if (handleTabClick(mouseX, mouseY)) {
+            unfocusEditBoxes();
+            return true;
+        }
 
-            int contentX = x0 + 10;
-            int contentY = y0 + 36;
-            int contentW = GUI_WIDTH - 20;
+        int contentX = x0 + 10;
+        int contentY = y0 + 36;
+        int contentW = GUI_WIDTH - 20;
 
-            if (canEditServerConfig) {
-                switch (currentTab) {
-                    case COMMON -> { if (handleCommonClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
-                    case UPGRADES -> { if (handleUpgradesClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
-                    case CLIENT -> { /* handled below */ }
-                }
-            }
-
-            if (currentTab == Tab.CLIENT && handleClientClick(mouseX, mouseY, contentX, contentY, contentW)) {
-                unfocusEditBoxes();
-                return true;
+        if (canEditServerConfig) {
+            switch (currentTab) {
+                case COMMON -> { if (handleCommonClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
+                case UPGRADES -> { if (handleUpgradesClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
+                case CLIENT -> { /* handled below */ }
             }
         }
 
-        boolean result = super.mouseClicked(mouseX, mouseY, button);
+        if (currentTab == Tab.CLIENT && handleClientClick(mouseX, mouseY, contentX, contentY, contentW)) {
+            unfocusEditBoxes();
+            return true;
+        }
+
+        boolean result = super.mouseClicked(mouseX, mouseY, action);
 
         EditBox now = findFocusedEditBox();
         if (now != null && now != prev) {
@@ -756,6 +765,12 @@ public class ModConfigScreen extends Screen {
         }
         if (keyCode == 256) {
             cancel();
+            return true;
+        }
+
+        int action = ClientControls.resolveKeyAction(keyCode, scanCode);
+        if (action != -1) {
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);

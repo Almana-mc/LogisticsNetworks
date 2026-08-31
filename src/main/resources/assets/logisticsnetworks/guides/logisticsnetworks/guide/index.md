@@ -19,7 +19,7 @@ Logistics Networks is an item, fluid, energy, and chemical transfer mod built ar
 
 1. Craft a [Wrench](wrench/index.md) and a [Logistics Node](nodes/index.md)
 2. Place the node on any block with an inventory, tank, or energy storage
-3. Right-click the node with the wrench to open configuration
+3. Use **Secondary Interaction (default: Right Click)** on the node with the wrench to open configuration
 4. Assign the node to a network (or create a new one)
 5. Configure channels to import or export resources
 

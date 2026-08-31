@@ -2,7 +2,6 @@ package me.almana.logisticsnetworks.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import me.almana.logisticsnetworks.LogisticsNetworks;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,21 +13,11 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
-import net.neoforged.neoforge.client.settings.KeyConflictContext;
-import net.neoforged.neoforge.client.settings.KeyModifier;
 
 public class SlotNumberOverlay {
 
     private static boolean showSlotNumbers = false;
-
-    public static final KeyMapping TOGGLE_SLOT_NUMBERS = new KeyMapping(
-            "key.logisticsnetworks.toggle_slot_numbers",
-            KeyConflictContext.UNIVERSAL,
-            KeyModifier.ALT,
-            InputConstants.Type.KEYSYM.getOrCreate(InputConstants.KEY_I),
-            "key.categories.logisticsnetworks");
 
     private static void toggle() {
         showSlotNumbers = !showSlotNumbers;
@@ -38,15 +27,7 @@ public class SlotNumberOverlay {
         if (player != null) {
             player.displayClientMessage(
                     Component.translatable("message.logisticsnetworks.slot_numbers.enabled",
-                            TOGGLE_SLOT_NUMBERS.getTranslatedKeyMessage()), false);
-        }
-    }
-
-    @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
-    public static class ModEvents {
-        @SubscribeEvent
-        public static void registerKeys(RegisterKeyMappingsEvent event) {
-            event.register(TOGGLE_SLOT_NUMBERS);
+                            ClientControls.TOGGLE_SLOT_NUMBERS.getTranslatedKeyMessage()), false);
         }
     }
 
@@ -55,7 +36,7 @@ public class SlotNumberOverlay {
 
         @SubscribeEvent
         public static void onScreenKey(ScreenEvent.KeyPressed.Pre event) {
-            if (TOGGLE_SLOT_NUMBERS.isActiveAndMatches(
+            if (ClientControls.TOGGLE_SLOT_NUMBERS.isActiveAndMatches(
                     InputConstants.Type.KEYSYM.getOrCreate(event.getKeyCode()))) {
                 toggle();
                 event.setCanceled(true);
@@ -64,7 +45,7 @@ public class SlotNumberOverlay {
 
         @SubscribeEvent
         public static void onKeyInput(InputEvent.Key event) {
-            if (TOGGLE_SLOT_NUMBERS.consumeClick()) {
+            if (ClientControls.TOGGLE_SLOT_NUMBERS.consumeClick()) {
                 toggle();
             }
         }

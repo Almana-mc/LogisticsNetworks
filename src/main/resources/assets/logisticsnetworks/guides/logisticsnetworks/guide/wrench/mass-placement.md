@@ -9,20 +9,20 @@ navigation:
 
 The mode for building out large, repetitive setups in one action. You mark a rectangular area with two corners, choose which block type inside that area should receive nodes, then place configured nodes on every valid matching block.
 
-Switch to Mass Placement with **Shift + mouse wheel**. The HUD overlay shows the current wrench mode.
+Switch to Mass Placement with **Modifier Key 1 (default: Shift) + Mouse Wheel**. The HUD overlay shows the current wrench mode.
 
 ## Select an Area
 
-**Right-click a block** to set the first corner. **Right-click another block** to set the second corner. The wrench draws a green cuboid border around the selected area so you can see exactly what will be scanned.
+Use **Secondary Interaction (default: Right Click)** on a block to set the first corner, then on another block to set the second corner. The wrench draws a green cuboid border around the selected area so you can see exactly what will be scanned.
 
 - The selected area is stored on the wrench until you clear it or place nodes.
 - Selections are **per-dimension**: an area selected in the Overworld does not apply in the Nether.
 - The selected area can contain up to **10,000 blocks**.
-- Starting a new area is simple: right-click again after both corners are set, and that click becomes the new first corner.
+- Starting a new area is simple: use Secondary Interaction again after both corners are set, and that interaction becomes the new first corner.
 
 ## Open the Placement Menu
 
-Open the Mass Placement menu with **Shift + right-click**. This works on blocks and in air, so you do not have to aim away from your build.
+Open the Mass Placement menu with **Modifier Key 1 + Secondary Interaction**. This works on blocks and in air, so you do not have to aim away from your build.
 
 Once two corners are selected, the menu lists block types inside the area that can accept a node. Pick the block type you want, such as chests, barrels, furnaces, or machines. Blocks without item, fluid, energy, chemical, or source capability are not shown.
 
@@ -42,7 +42,7 @@ The menu shows:
 
 ## Place Nodes
 
-Click **Place Nodes** and the wrench:
+Use **Primary Interaction (default: Left Click)** on **Place Nodes** and the wrench:
 
 1. Pays the required items out of your inventory or linked AE2 network.
 2. Places a node on every valid matching target block, up to 2048 nodes.
@@ -58,10 +58,10 @@ Typical workflow:
 
 1. Build a template in the [Clipboard Editor](copy-paste.md#clipboard-editor) or copy from a working node.
 2. Give the template a label like `furnace_row`.
-3. Switch to Mass Placement and right-click two corners around the build area.
-4. Shift + right-click to open the menu.
+3. Switch to Mass Placement and use Secondary Interaction on two corners around the build area.
+4. Use Modifier Key 1 + Secondary Interaction to open the menu.
 5. Choose the target block type.
-6. Click Place Nodes.
+6. Use Primary Interaction on **Place Nodes**.
 
 Every node that appears already has nine configured channels, the right filters, the right upgrades, and the shared label. Future edits to any one of them propagate to all the others automatically.
 

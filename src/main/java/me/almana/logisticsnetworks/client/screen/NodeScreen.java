@@ -34,6 +34,7 @@ import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
@@ -273,7 +274,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
         if (filterAddHover && currentPage == Page.CHANNEL_CONFIG) {
             g.renderTooltip(font,
-                    Component.translatable("gui.logisticsnetworks.node.filter.add.hint"), mx, my);
+                    Component.translatable("gui.logisticsnetworks.node.filter.add.hint",
+                            ClientControls.PRIMARY_INTERACTION.getTranslatedKeyMessage()), mx, my);
         }
         if (System.currentTimeMillis() < filterAddedToastUntil && currentPage == Page.CHANNEL_CONFIG) {
             g.renderTooltip(font,
@@ -590,7 +592,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                         if (!ch.getName().isEmpty()) {
                             hoveredChannelName = Component.literal(ch.getName());
                         } else {
-                            hoveredChannelName = Component.translatable("gui.logisticsnetworks.node.channel_name.set_tooltip");
+                            hoveredChannelName = Component.translatable(
+                                    "gui.logisticsnetworks.node.channel_name.set_tooltip",
+                                    ClientControls.PRIMARY_INTERACTION.getTranslatedKeyMessage());
                         }
                     }
                 }
@@ -1148,18 +1152,28 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
+        int action = ClientControls.resolveMouseAction(btn);
+        if (action != -1 && handleInteraction(mx, my, action))
+            return true;
+        return super.mouseClicked(mx, my, btn);
+    }
+
+    private boolean handleInteraction(double mx, double my, int action) {
+        if (action != 0 && action != 1)
+            return false;
+
         if (tweaksOpen) {
-            if (btn == 0) return handleTweaksClick(mx, my);
+            if (action == 0) return handleTweaksClick(mx, my);
             return true;
         }
-        if (currentPage == Page.CHANNEL_CONFIG && btn == 0 && isInDocsFab(mx, my)) {
+        if (currentPage == Page.CHANNEL_CONFIG && action == 0 && isInDocsFab(mx, my)) {
             if (minecraft != null && minecraft.player != null) {
                 GuideMeCompat.openGuide(minecraft.player,
                         ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "guide"));
             }
             return true;
         }
-        if (currentPage == Page.CHANNEL_CONFIG && btn == 0 && isInTweaksFab(mx, my)) {
+        if (currentPage == Page.CHANNEL_CONFIG && action == 0 && isInTweaksFab(mx, my)) {
             tweaksOpen = true;
             return true;
         }
@@ -1171,17 +1185,17 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         }
 
         if (isHoveringMenuSlot(mx, my)) {
-            return super.mouseClicked(mx, my, btn);
+            return false;
         }
 
         if (currentPage == Page.NETWORK_SELECT) {
             if (handleNetworkPageClick(mx, my))
                 return true;
         } else {
-            if (handleChannelPageClick(mx, my, btn))
+            if (handleChannelPageClick(mx, my, action))
                 return true;
         }
-        return super.mouseClicked(mx, my, btn);
+        return false;
     }
 
     private boolean handleNetworkPageClick(double mx, double my) {
@@ -1337,7 +1351,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         this.labelScrollOffset = 0;
     }
 
-    private boolean handleChannelPageClick(double mx, double my, int btn) {
+    private boolean handleChannelPageClick(double mx, double my, int action) {
         LogisticsNodeEntity node = getMenu().getNode();
         if (node == null)
             return false;
@@ -1397,7 +1411,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             }
         }
 
-        if (btn == 0 || btn == 1) {
+        if (action == 0 || action == 1) {
             ChannelData channel = node.getChannel(selectedChannel);
             if (channel != null
                     && channel.getType() != ChannelType.ENERGY
@@ -1412,12 +1426,12 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                         }
                         ItemStack current = channel.getFilterItem(i);
                         if (isFilterButtonEmpty(current)) {
-                            if (btn == 0) {
+                            if (action == 0) {
                                 openFilterPicker(i);
                             }
                             return true;
                         }
-                        if (btn == 1) {
+                        if (action == 1) {
                             channel.setFilterItem(i, ItemStack.EMPTY);
                             PacketDistributor.sendToServer(new SetChannelFilterItemPayload(
                                     node.getId(), selectedChannel, i, ItemStack.EMPTY));
@@ -1431,12 +1445,12 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             }
         }
 
-        return handleSettingsClick(node, mx, my, btn);
+        return handleSettingsClick(node, mx, my, action);
     }
 
-    private boolean handleSettingsClick(LogisticsNodeEntity node, double mx, double my, int btn) {
+    private boolean handleSettingsClick(LogisticsNodeEntity node, double mx, double my, int action) {
         ChannelData ch = node.getChannel(selectedChannel);
-        if (ch == null || (btn != 0 && btn != 1))
+        if (ch == null || (action != 0 && action != 1))
             return false;
 
         int rowH = 14;
@@ -1454,8 +1468,8 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                     return true;
 
                 if (row >= 6 && row <= 8) {
-                    if (hasAltDown()) {
-                        setNumericExtremum(ch, row, btn == 0);
+                    if (ClientControls.modifier3Down()) {
+                        setNumericExtremum(ch, row, action == 0);
                         commitChannelUpdate(node, ch);
                         return true;
                     }
@@ -1465,7 +1479,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                     }
                 }
 
-                int dir = (btn == 0) ? 1 : -1;
+                int dir = (action == 0) ? 1 : -1;
                 cycleSetting(ch, row, dir);
                 commitChannelUpdate(node, ch);
                 return true;
@@ -1478,7 +1492,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
         int modeBtnW = font.width(modeLabel) + 8;
 
         if (isHoveringAbs(modeBtnX, modeBtnY, modeBtnW, 10, mx, my)) {
-            ch.setFilterMode(cycleEnum(ch.getFilterMode(), (btn == 0) ? 1 : -1));
+            ch.setFilterMode(cycleEnum(ch.getFilterMode(), (action == 0) ? 1 : -1));
             commitChannelUpdate(node, ch);
             return true;
         }
@@ -1498,9 +1512,9 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
             case 3 -> ch.setIoDirection(cycleSide(ch.getIoDirection(), dir));
             case 4 -> ch.setRedstoneMode(cycleEnum(ch.getRedstoneMode(), dir));
             case 5 -> ch.setDistributionMode(cycleEnum(ch.getDistributionMode(), dir));
-            case 6 -> ch.setPriority(ch.getPriority() + (hasShiftDown() ? 10 : 1) * dir);
-            case 7 -> ch.setBatchSize(ch.getBatchSize() + (hasShiftDown() ? 8 : 1) * dir);
-            case 8 -> ch.setTickDelay(ch.getTickDelay() + (hasShiftDown() ? 10 : 1) * dir);
+            case 6 -> ch.setPriority(ch.getPriority() + (ClientControls.modifier1Down() ? 10 : 1) * dir);
+            case 7 -> ch.setBatchSize(ch.getBatchSize() + (ClientControls.modifier1Down() ? 8 : 1) * dir);
+            case 8 -> ch.setTickDelay(ch.getTickDelay() + (ClientControls.modifier1Down() ? 10 : 1) * dir);
         }
     }
 
@@ -1789,6 +1803,12 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
                 networkNameField.setFocused(false);
             else
                 networkNameField.keyPressed(key, scan, modifiers);
+            return true;
+        }
+
+        int action = ClientControls.resolveKeyAction(key, scan);
+        if (action != -1) {
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
             return true;
         }
         return true;

@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
 import net.minecraft.client.gui.GuiGraphics;
@@ -145,7 +146,8 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
         }
 
         int hintY = panelY + panelH + 6;
-        drawWrappedLine(graphics, Component.translatable("gui.logisticsnetworks.mass_placement.hint"),
+        drawWrappedLine(graphics, Component.translatable("gui.logisticsnetworks.mass_placement.hint",
+                        ClientControls.SECONDARY_INTERACTION.getTranslatedKeyMessage()),
                 textX, hintY, textW, COLOR_MUTED);
 
         String clearLabel = Component.translatable("gui.logisticsnetworks.mass_placement.clear").getString();
@@ -165,44 +167,58 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (key == 256) return super.keyPressed(key, scan, modifiers);
+
+        int action = ClientControls.resolveKeyAction(key, scan);
+        if (action != -1) {
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
+            return true;
+        }
         return true;
     }
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        if (button == 0) {
-            int choiceIndex = hoveredChoiceIndex(mx, my);
-            if (choiceIndex >= 0 && choiceIndex < blockChoices.size()) {
-                if (minecraft != null && minecraft.gameMode != null) {
-                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId,
-                            MassPlacementMenu.ID_SELECT_BLOCK_BASE + choiceIndex);
-                }
-                return true;
-            }
-
-            String clearLabel = Component.translatable("gui.logisticsnetworks.mass_placement.clear").getString();
-            String placeLabel = Component.translatable("gui.logisticsnetworks.mass_placement.place").getString();
-            int clearW = font.width(clearLabel) + BTN_PAD * 2;
-            int placeW = font.width(placeLabel) + BTN_PAD * 2;
-            int totalW = clearW + BTN_GAP + placeW;
-            int startX = leftPos + (GUI_WIDTH - totalW) / 2;
-            int btnY = topPos + GUI_HEIGHT - BTN_H - 6;
-
-            if (menu.getSelectedCount() > 0 && isHoveringAbs(startX, btnY, clearW, BTN_H, mx, my)) {
-                if (minecraft != null && minecraft.gameMode != null) {
-                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_CLEAR_SELECTION);
-                }
-                return true;
-            }
-
-            if (menu.canPlace() && isHoveringAbs(startX + clearW + BTN_GAP, btnY, placeW, BTN_H, mx, my)) {
-                if (minecraft != null && minecraft.gameMode != null) {
-                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_PLACE_NODES);
-                }
-                return true;
-            }
-        }
+        int action = ClientControls.resolveMouseAction(button);
+        if (action != -1 && handleInteraction(mx, my, action))
+            return true;
         return super.mouseClicked(mx, my, button);
+    }
+
+    private boolean handleInteraction(double mx, double my, int action) {
+        if (action != 0)
+            return false;
+
+        int choiceIndex = hoveredChoiceIndex(mx, my);
+        if (choiceIndex >= 0 && choiceIndex < blockChoices.size()) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId,
+                        MassPlacementMenu.ID_SELECT_BLOCK_BASE + choiceIndex);
+            }
+            return true;
+        }
+
+        String clearLabel = Component.translatable("gui.logisticsnetworks.mass_placement.clear").getString();
+        String placeLabel = Component.translatable("gui.logisticsnetworks.mass_placement.place").getString();
+        int clearW = font.width(clearLabel) + BTN_PAD * 2;
+        int placeW = font.width(placeLabel) + BTN_PAD * 2;
+        int totalW = clearW + BTN_GAP + placeW;
+        int startX = leftPos + (GUI_WIDTH - totalW) / 2;
+        int btnY = topPos + GUI_HEIGHT - BTN_H - 6;
+
+        if (menu.getSelectedCount() > 0 && isHoveringAbs(startX, btnY, clearW, BTN_H, mx, my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_CLEAR_SELECTION);
+            }
+            return true;
+        }
+
+        if (menu.canPlace() && isHoveringAbs(startX + clearW + BTN_GAP, btnY, placeW, BTN_H, mx, my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_PLACE_NODES);
+            }
+            return true;
+        }
+        return false;
     }
 
     @Override

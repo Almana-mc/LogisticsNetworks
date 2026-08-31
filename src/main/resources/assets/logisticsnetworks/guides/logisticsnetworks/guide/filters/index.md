@@ -109,7 +109,7 @@ Leave Batch or Stock at `0` to fall back to the channel settings or disable the 
 
 ## Copy & Paste a Filter
 
-While a filter screen is open you can copy its whole configuration and paste it into another open filter. Use **Ctrl + C** to copy and **Ctrl + V** to paste, or click the **copy** and **paste** icon buttons in the top-right of the filter header. Hover either button for a tooltip; the paste button is dimmed until something has been copied.
+While a filter screen is open you can copy its whole configuration and paste it into another open filter. Use **Ctrl+C** to copy and **Ctrl+V** to paste, or use **Primary Interaction (default: Left Click)** on the **copy** and **paste** icon buttons in the top-right of the filter header. Hover either button for a tooltip; the paste button is dimmed until something has been copied.
 
 This clipboard lives only in your current game session. It is **not** saved to the filter item, to a config, or to your operating system clipboard, and it is cleared when you leave the game. It is separate from the wrench [Copy / Paste](../wrench/copy-paste.md) clipboard.
 
@@ -126,7 +126,7 @@ Notes:
 - Pasting **replaces** the destination filter. Standard-filter slots are cleared first, then filled from the clipboard.
 - If the copied filter has more entries than the destination can hold, paste fills the destination to capacity and reports the truncation, for example `Filter pasted: 6/8 slots copied`.
 - Pasting into a different filter type (a standard filter into a Regex filter, for example) is rejected with an incompatible-type message.
-- Ctrl + C and Ctrl + V are ignored while a text box such as the regex or mod-id field is focused, so typing is never hijacked.
+- Ctrl+C and Ctrl+V are ignored while a text box such as the regex or mod-id field is focused, so typing is never hijacked.
 
 ## Copying Filters Between Nodes
 

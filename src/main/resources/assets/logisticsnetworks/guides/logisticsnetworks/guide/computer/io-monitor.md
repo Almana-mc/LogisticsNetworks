@@ -23,13 +23,13 @@ Each row shows one channel index that has at least one node on this network runn
 
 The left edge of each row has a **colored bar** matching the channel type — green for items, blue for fluids, and so on. Handy for spotting the type at a glance without reading the right-hand text.
 
-Aggregation is **per channel index**, not per node. If you have 10 nodes all running an Item transfer on CH0, the list shows one `CH0 Items 10 nodes` row, not 10 rows. Click the row to drill into the graph.
+Aggregation is **per channel index**, not per node. If you have 10 nodes all running an Item transfer on CH0, the list shows one `CH0 Items 10 nodes` row, not 10 rows. Use **Primary Interaction (default: Left Click)** on the row to drill into the graph.
 
 ## Throughput Graph
 
 ![I/O Monitor throughput graph — live bars for CH0 peaking around 200K/s](../computer/images/io-monitor-graph.png)
 
-Clicking a channel row opens its graph. The graph shows a **live timeline of transfer throughput** for that channel:
+Using Primary Interaction on a channel row opens its graph. The graph shows a **live timeline of transfer throughput** for that channel:
 
 - **120 data points** total. Each bar is one sample; the rightmost bar is the newest.
 - Updates roughly once per second as telemetry streams in.

@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.item;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.filter.SlotFilterData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -46,7 +47,9 @@ public class SlotFilterItem extends Item {
 
         tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated.line1")
                 .withStyle(ChatFormatting.RED));
-        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated.line2")
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.deprecated.line2",
+                        ClientControls.MODIFIER_2.getTranslatedKeyMessage(),
+                        ClientControls.PRIMARY_INTERACTION.getTranslatedKeyMessage())
                 .withStyle(ChatFormatting.RED));
     }
 }

@@ -39,6 +39,9 @@ description = '''${mod_description}'''
 config="${mod_id}.mixins.json"
 
 [[mixins]]
+config="${mod_id}.client.mixins.json"
+
+[[mixins]]
 config="${mod_id}.create.mixins.json"
 
 # The [[accessTransformers]] block allows you to declare where your AT file is.

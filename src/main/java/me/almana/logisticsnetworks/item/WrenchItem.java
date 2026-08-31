@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.item;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -9,6 +10,7 @@ import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -544,7 +546,7 @@ public class WrenchItem extends Item {
 
         LogisticsNodeEntity node = findNodeAt(level, clickedPos);
         if (node == null) {
-            if (player.isShiftKeyDown() && AE2Compat.isLoaded() && AE2Compat.isGridHost(level, clickedPos)) {
+            if (isSecondaryUse(player) && AE2Compat.isLoaded() && AE2Compat.isGridHost(level, clickedPos)) {
                 return toggleAE2Link(context.getItemInHand(), player, level, clickedPos);
             }
             return InteractionResult.SUCCESS;
@@ -562,7 +564,7 @@ public class WrenchItem extends Item {
             node.setOwnerUUID(player.getUUID());
         }
         return switch (getMode(wrenchStack)) {
-            case WRENCH -> player.isShiftKeyDown()
+            case WRENCH -> isSecondaryUse(player)
                     ? removeNode(node.level(), node, player)
                     : openNodeGui(node, player);
             case COPY_PASTE -> isSecondaryUse(player)
@@ -694,7 +696,7 @@ public class WrenchItem extends Item {
         tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.mode", getModeDisplayName(getMode(stack))));
         GlobalPos ae2Link = getAE2LinkPos(stack);
         if (ae2Link != null) {
-            if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+            if (ClientControls.modifier1Down()) {
                 BlockPos p = ae2Link.pos();
                 String dim = ae2Link.dimension().location().toString();
                 tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_linked_detail",
@@ -1295,7 +1297,7 @@ public class WrenchItem extends Item {
     }
 
     private static boolean isSecondaryUse(Player player) {
-        return player.isSecondaryUseActive() || player.isShiftKeyDown() || player.isCrouching();
+        return ServerPayloadHandler.isModifierDown(player, 0);
     }
 
 }

@@ -1,9 +1,7 @@
 package me.almana.logisticsnetworks.client;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.item.WrenchItem;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -13,7 +11,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 
@@ -21,25 +18,12 @@ public class WrenchHudOverlay {
 
     private static boolean hudVisible = true;
 
-    public static final KeyMapping TOGGLE_HUD = new KeyMapping(
-            "key.logisticsnetworks.toggle_wrench_hud",
-            InputConstants.KEY_H,
-            "key.categories.logisticsnetworks");
-
-    @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
-    public static class ModEvents {
-        @SubscribeEvent
-        public static void registerKeys(RegisterKeyMappingsEvent event) {
-            event.register(TOGGLE_HUD);
-        }
-    }
-
     @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
     public static class GameEvents {
 
         @SubscribeEvent
         public static void onKeyInput(InputEvent.Key event) {
-            if (TOGGLE_HUD.consumeClick()) {
+            if (ClientControls.TOGGLE_WRENCH_HUD.consumeClick()) {
                 hudVisible = !hudVisible;
                 Player player = Minecraft.getInstance().player;
                 if (player != null) {
@@ -47,7 +31,8 @@ public class WrenchHudOverlay {
                             ? "message.logisticsnetworks.wrench_hud.enabled"
                             : "message.logisticsnetworks.wrench_hud.disabled";
                     player.displayClientMessage(
-                            Component.translatable(key, TOGGLE_HUD.getTranslatedKeyMessage()), true);
+                            Component.translatable(key,
+                                    ClientControls.TOGGLE_WRENCH_HUD.getTranslatedKeyMessage()), true);
                 }
             }
         }

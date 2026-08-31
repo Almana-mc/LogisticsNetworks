@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.item;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.filter.ModFilterData;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import net.minecraft.ChatFormatting;
@@ -63,7 +64,8 @@ public class ModFilterItem extends Item {
                 "tooltip.logisticsnetworks.filter.mod",
                 selected).withStyle(ChatFormatting.DARK_GRAY));
 
-        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.open_hint")
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.open_hint",
+                        ClientControls.SECONDARY_INTERACTION.getTranslatedKeyMessage())
                 .withStyle(ChatFormatting.DARK_GRAY));
     }
 }

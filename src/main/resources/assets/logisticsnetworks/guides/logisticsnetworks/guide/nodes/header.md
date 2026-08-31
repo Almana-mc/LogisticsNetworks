@@ -20,11 +20,11 @@ The header is the top row of the node configuration screen. It handles three job
 **What it does:**
 
 - **Visible** (the default): the node renders **always**, at full opacity, whether or not you are holding a wrench.
-- **Hidden**: the node does **not** render normally. It only appears when you hold a wrench, and while shown that way it is drawn at about one-third opacity so you can still see and click it.
+- **Hidden**: the node does **not** render normally. It only appears when you hold a wrench, and while shown that way it is drawn at about one-third opacity so you can still see and interact with it.
 
 Visibility is cosmetic only. Hidden nodes still transfer resources exactly the same as visible ones.
 
-**How to change it:** left-click the button. The text flips between **Visible** and **Hidden** and the change takes effect instantly. You can also bulk-toggle every node on a network using the **SHOW** / **HIDE** buttons in the Computer's Node Table.
+**How to change it:** use **Primary Interaction (default: Left Click)** on the button. The text flips between **Visible** and **Hidden** and the change takes effect instantly. You can also bulk-toggle every node on a network using the **SHOW** / **HIDE** buttons in the Computer's Node Table.
 
 Use Hidden once a setup is finished to clean up the view, then pull out a wrench when you need to find the nodes again.
 
@@ -52,7 +52,7 @@ A node that is not assigned to a network does nothing — all 9 channels stay in
 - Type a new name (up to 32 characters) to create a fresh network and join it.
 - Leave the current network so the node becomes unassigned.
 
-**How to change networks:** click **Change**, then either select a listed network or type a new name and confirm. The node moves immediately and the main screen returns to the channel configuration view.
+**How to change networks:** use Primary Interaction on **Change**, then either select a listed network or type a new name and confirm. The node moves immediately and the main screen returns to the channel configuration view.
 
 Use this to split a setup into separate networks, merge several nodes onto one shared network, or rename the network the node is on.
 
@@ -74,10 +74,10 @@ All 9 channels run at the same time once enabled. The selector is only about whi
 
 **How to change channels:**
 
-- **Single click** a channel number to select it. Settings below swap to that channel's config.
-- **Double click** a channel number that is already selected to rename it. A text box appears where you can type a custom name (up to 24 characters). Press Enter to save, click outside to cancel.
+- Use Primary Interaction once on a channel number to select it. Settings below swap to that channel's config.
+- Use Primary Interaction twice on a channel number that is already selected to rename it. A text box appears where you can type a custom name (up to 24 characters). Press Enter to save, or use Primary Interaction outside to cancel.
 
-**Channel naming:** each channel can be given its own short name, independent of the node's label. The name shows up only when you hover the channel button — a tooltip pops up with the channel's name. If no name is set, the tooltip prompts you to double-click to set one.
+**Channel naming:** each channel can be given its own short name, independent of the node's label. The name shows up only when you hover the channel button — a tooltip pops up with the channel's name. If no name is set, the tooltip prompts you to use Primary Interaction twice to set one.
 
 Names are purely cosmetic — they do not affect transfers. Use them to tag channels by purpose, for example `in`, `out`, `fuel`, `buffer`, or `overflow`, so you can remember what each channel does when you come back to the node later.
 
@@ -89,7 +89,7 @@ Names are purely cosmetic — they do not affect transfers. Use them to tag chan
 
 **What it does:** assigns a text label to the whole node. Labels are separate from both the network name and channel names — they are a way to group identical nodes so their channel settings stay in sync.
 
-**How to change it:** click **Set Label**. A text box opens with a dropdown of all labels already in use on this network. Either:
+**How to change it:** use Primary Interaction on **Set Label**. A text box opens with a dropdown of all labels already in use on this network. Either:
 
 - Pick an existing label from the dropdown to join that group.
 - Type a new label (up to 48 characters) and press Enter to create a fresh group.

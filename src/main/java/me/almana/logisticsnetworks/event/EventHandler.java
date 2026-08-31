@@ -81,6 +81,7 @@ public class EventHandler {
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             ServerPayloadHandler.clearDefaultNodeVisibility(player);
+            ServerPayloadHandler.clearModifierKeys(player);
         }
     }
 

@@ -55,11 +55,11 @@ public class FlatEditBox extends EditBox {
     }
 
     @Override
-    public boolean mouseClicked(double mx, double my, int btn) {
+    public boolean mouseClicked(double mx, double my, int action) {
         if (!isVisible()) return false;
         boolean hit = mx >= getX() && mx < getX() + getWidth() && my >= getY() && my < getY() + getHeight();
         setFocused(hit);
-        if (isFocused() && hit && btn == 0) {
+        if (isFocused() && hit && action == 0) {
             int relX = Mth.floor(mx) - getX();
             String value = getValue();
             String view = font.plainSubstrByWidth(value.substring(displayPos), getWidth());

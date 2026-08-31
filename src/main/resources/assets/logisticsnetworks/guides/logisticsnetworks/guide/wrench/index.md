@@ -10,17 +10,17 @@ navigation:
 
 The Wrench is the tool you use for everything related to nodes — opening their configuration, removing them, copying setups between nodes, and bulk-placing lots of nodes at once.
 
-It has three modes, and every mode does something different. Cycle through them with **Shift + Mouse Wheel** while holding the wrench. The current mode is shown in the HUD overlay at the top of the screen.
+It has three modes, and every mode does something different. Cycle through them with **Modifier Key 1 (default: Shift) + Mouse Wheel** while holding the wrench. The current mode is shown in the HUD overlay at the top of the screen.
 
 ## Modes at a Glance
 
 - [Wrench](wrench-mode.md) — the default. Open a node's configuration, remove nodes, and (with AE2 installed) toggle AE2 linking.
 - [Copy / Paste](copy-paste.md) — clone a node's entire setup — channels, filters, upgrades, label — onto another node. Supports bulk-paste to every connected node of the same block type.
-- [Mass Placement](mass-placement.md) — select a two-corner area, choose a target block type, then place configured nodes on matching blocks in one click.
+- [Mass Placement](mass-placement.md) — select a two-corner area, choose a target block type, then place configured nodes on matching blocks with **Primary Interaction (default: Left Click)**.
 
 ## Quick Reference
 
-| Mode | Right-click | Shift + Right-click | Ctrl + Right-click |
+| Mode | Secondary Interaction (default: Right Click) | Modifier Key 1 + Secondary Interaction | Modifier Key 2 (default: Ctrl) + Secondary Interaction |
 |------|-------------|---------------------|--------------------|
 | Wrench | Open node config | Remove node (or toggle AE2 link) | — |
 | Copy / Paste | Copy node → clipboard (or open Clipboard Editor on air) | Paste clipboard → node | Paste to every connected same-block-type node |

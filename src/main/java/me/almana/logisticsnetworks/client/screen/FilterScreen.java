@@ -2,6 +2,8 @@ package me.almana.logisticsnetworks.client.screen;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 
+import me.almana.logisticsnetworks.client.ClientControls;
+import me.almana.logisticsnetworks.client.FilterClickHandler;
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
@@ -1035,8 +1037,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return false;
     }
 
-    private boolean handleClipboardButtonClick(double mx, double my, int btn) {
-        if (btn != 0) {
+    private boolean handleClipboardButtonClick(double mx, double my, int action) {
+        if (action != 0) {
             return false;
         }
         if (isHovering(scanStorageButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
@@ -1406,73 +1408,83 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
+        int action = ClientControls.resolveMouseAction(btn);
+        if (action != -1 && handleInteraction(mx, my, action))
+            return true;
+        return super.mouseClicked(mx, my, btn);
+    }
+
+    private boolean handleInteraction(double mx, double my, int action) {
+        if (action != 0 && action != 1)
+            return false;
+
         if (blurManualInputIfNeeded(mx, my))
             return true;
-        if (btn == 0 && isHoveringBackButton(mx, my)) {
+        if (action == 0 && isHoveringBackButton(mx, my)) {
             return returnToNodeScreen();
         }
-        if (detailEditSlot < 0 && handleClipboardButtonClick(mx, my, btn)) {
+        if (detailEditSlot < 0 && handleClipboardButtonClick(mx, my, action)) {
             return true;
         }
-        boolean handled = false;
+
         if (menu.isTagMode())
-            handled = handleTagClick(mx, my, btn);
-        else if (menu.isModMode())
-            handled = handleModClick(mx, my, btn);
-        else if (menu.isAmountMode())
-            handled = handleAmountClick(mx, my, btn);
-        else if (menu.isDurabilityMode())
-            handled = handleDurabilityClick(mx, my, btn);
-        else if (menu.isNameMode())
-            handled = handleNameClick(mx, my, btn);
-        else {
-            if (detailEditSlot >= 0) {
-                handled = handleDetailPageClick(mx, my, btn);
-                if (!handled) {
-                    closeDetailPage();
-                    return true;
-                }
+            return finishInteraction(handleTagClick(mx, my, action), mx, my);
+        if (menu.isModMode())
+            return finishInteraction(handleModClick(mx, my, action), mx, my);
+        if (menu.isAmountMode())
+            return finishInteraction(handleAmountClick(mx, my, action), mx, my);
+        if (menu.isDurabilityMode())
+            return finishInteraction(handleDurabilityClick(mx, my, action), mx, my);
+        if (menu.isNameMode())
+            return finishInteraction(handleNameClick(mx, my, action), mx, my);
+        return handleDefaultModeInteraction(mx, my, action);
+    }
+
+    private boolean handleDefaultModeInteraction(double mx, double my, int action) {
+        if (detailEditSlot >= 0)
+            return handleDetailPageInteraction(mx, my, action);
+        if (tagEditSlot >= 0)
+            return handleTagPageInteraction(mx, my, action);
+        if (nbtEditSlot >= 0)
+            return handleNbtPageInteraction(mx, my, action);
+
+        if (action == 0 && ClientControls.modifier2Down()) {
+            int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
+            if (hoveredSlot >= 0) {
+                enterDetailPage(hoveredSlot);
                 return true;
             }
-
-            if (tagEditSlot >= 0) {
-                handled = handleTagSubModeClick(mx, my, btn);
-                if (!handled) {
-                    closeTagSubMode();
-                    return true;
-                }
-                return true;
-            }
-            if (nbtEditSlot >= 0) {
-                handled = handleNbtSubModeClick(mx, my, btn);
-                if (!handled) {
-                    closeNbtSubMode();
-                    return true;
-                }
-                return true;
-            }
-
-            if (hasControlDown()) {
-                int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
-                if (hoveredSlot >= 0) {
-                    if (btn == 0) {
-                        enterDetailPage(hoveredSlot);
-                        return true;
-                    }
-                }
-            }
-
-            handled = handleModeControlClick(mx, my, !menu.isNodeFilter());
         }
 
-        if (!handled) {
-            if (isDropdownOpen && !isHoveringDropdown(mx, my)) {
-                isDropdownOpen = false;
-                return true;
-            }
-            return super.mouseClicked(mx, my, btn);
-        }
+        return finishInteraction(handleModeControlClick(mx, my, !menu.isNodeFilter()), mx, my);
+    }
+
+    private boolean handleDetailPageInteraction(double mx, double my, int action) {
+        if (!handleDetailPageClick(mx, my, action))
+            closeDetailPage();
         return true;
+    }
+
+    private boolean handleTagPageInteraction(double mx, double my, int action) {
+        if (!handleTagSubModeClick(mx, my, action))
+            closeTagSubMode();
+        return true;
+    }
+
+    private boolean handleNbtPageInteraction(double mx, double my, int action) {
+        if (!handleNbtSubModeClick(mx, my, action))
+            closeNbtSubMode();
+        return true;
+    }
+
+    private boolean finishInteraction(boolean handled, double mx, double my) {
+        if (handled)
+            return true;
+        if (isDropdownOpen && !isHoveringDropdown(mx, my)) {
+            isDropdownOpen = false;
+            return true;
+        }
+        return false;
     }
 
     private boolean handleModeControlClick(double mx, double my, boolean hasTargetType) {
@@ -1526,7 +1538,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return false;
     }
 
-    private boolean handleModClick(double mx, double my, int btn) {
+    private boolean handleModClick(double mx, double my, int action) {
         int x = getSelectorInputX();
         int y = getSelectorInputY();
         int w = getSelectorInputWidth();
@@ -1555,7 +1567,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 }
             }
         }
-        if (btn == 1 && isHovering(x, y, w, 14, (int) mx, (int) my)) {
+        if (action == 1 && isHovering(x, y, w, 14, (int) mx, (int) my)) {
             String toRemove = menu.getSelectedMod();
             menu.setSelectedMod(null);
             sendModRemove(toRemove);
@@ -1667,7 +1679,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         drawButton(g, modeBtnX, btnY, modeBtnW, btnH, modeLabel, mx, my, true);
     }
 
-    private boolean handleNameClick(double mx, double my, int btn) {
+    private boolean handleNameClick(double mx, double my, int action) {
         int contentX = leftPos + 8;
         int inputY = topPos + 38;
         int contentW = imageWidth - 16;
@@ -1675,7 +1687,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (handleNameButtonsClick(mx, my))
             return true;
 
-        if (btn == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
+        if (action == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
             manualInputBox.setValue("");
             sendNameUpdate("");
             return true;
@@ -1829,8 +1841,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return true;
         }
 
-        if (detailEditSlot >= 0) {
-            return handleDetailPageKey(key, scan, modifiers);
+        if (detailEditSlot >= 0 && handleDetailPageKey(key, scan, modifiers)) {
+            return true;
         }
 
         if (nbtValueEditBox != null && nbtValueEditBox.isFocused()) {
@@ -1857,6 +1869,15 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 return true;
             }
             return manualInputBox.keyPressed(key, scan, modifiers);
+        }
+
+        int action = ClientControls.resolveKeyAction(key, scan);
+        if (action != -1) {
+            if (action == 1 && FilterClickHandler.openHoveredFilter(this)) {
+                return true;
+            }
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
+            return true;
         }
         return true;
     }
@@ -1927,7 +1948,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (hoveredSlot >= 0 && hasEntryInSlot(hoveredSlot)) {
                 int current = menu.getEntryAmount(hoveredSlot);
                 int next;
-                if (hasAltDown()) {
+                if (ClientControls.modifier3Down()) {
                     next = sy > 0 ? getMaxAmountForType(menu.getTargetType()) : (current > 0 ? 1 : 0);
                 } else {
                     int delta = computeScrollDelta(sy, menu.getTargetType());
@@ -1978,15 +1999,15 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private int computeScrollDelta(double scrollDirection, FilterTargetType targetType) {
         int sign = scrollDirection > 0 ? 1 : -1;
         if (targetType == FilterTargetType.FLUIDS || targetType == FilterTargetType.CHEMICALS) {
-            if (hasControlDown())
+            if (ClientControls.modifier2Down())
                 return sign * 1000;
-            if (hasShiftDown())
+            if (ClientControls.modifier1Down())
                 return sign * 500;
             return sign * 50;
         }
-        if (hasControlDown())
+        if (ClientControls.modifier2Down())
             return sign * 64;
-        if (hasShiftDown())
+        if (ClientControls.modifier1Down())
             return sign * 8;
         return sign;
     }
@@ -2410,7 +2431,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         g.pose().popPose();
     }
 
-    private boolean handleTagSubModeClick(double mx, double my, int btn) {
+    private boolean handleTagSubModeClick(double mx, double my, int action) {
         int panelX = leftPos + 4;
         int panelY = topPos + 20;
         int panelW = imageWidth - 8;
@@ -2441,7 +2462,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (tagInputBox != null && tagInputBox.isVisible()) {
             int inputW = panelW - 60;
             if (isHovering(panelX + 4, inputY, inputW, 14, (int) mx, (int) my)) {
-                tagInputBox.mouseClicked(mx, my, btn);
+                tagInputBox.mouseClicked(mx, my, action);
                 return true;
             }
         }
@@ -2683,7 +2704,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
     }
 
-    private boolean handleNbtSubModeClick(double mx, double my, int btn) {
+    private boolean handleNbtSubModeClick(double mx, double my, int action) {
         int panelW = getNbtPanelW();
         int panelX = getNbtPanelX();
         int panelY = topPos + 20;
@@ -2709,7 +2730,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int listY = panelY + 16;
         int listW = panelW - 8;
         int listH = panelH - 34;
-        if (handleNbtEntryListClick(listX, listY, listW, listH, activeRules, mx, my, btn))
+        if (handleNbtEntryListClick(listX, listY, listW, listH, activeRules, mx, my, action))
             return true;
 
         // Match mode button
@@ -2732,7 +2753,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private boolean handleNbtEntryListClick(int listX, int listY, int listW, int listH,
-            List<FilterItemData.SlotNbtRule> activeRules, double mx, double my, int btn) {
+            List<FilterItemData.SlotNbtRule> activeRules, double mx, double my, int action) {
         int totalEntries = cachedSlotNbtEntries.size();
         int maxRows = Math.max(1, listH / LIST_ROW_H);
         int drawH = maxRows * LIST_ROW_H;
@@ -2793,7 +2814,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
 
             // Click value area of active rule
-            if (active && btn == 0 && mx >= valX) {
+            if (active && action == 0 && mx >= valX) {
                 String displayVal = formatNbtValue(activeRules.get(ruleIdx).value().toString());
 
                 // Boolean toggle
@@ -2808,7 +2829,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
                 // Edit value
                 if (nbtEditingRuleIndex == ruleIdx) {
-                    nbtValueEditBox.mouseClicked(mx, my, btn);
+                    nbtValueEditBox.mouseClicked(mx, my, action);
                     return true;
                 }
                 commitNbtValueEditIfActive();
@@ -2820,7 +2841,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
 
             // Click toggle indicator or path area = toggle rule
-            if (btn == 0 && mx < opX) {
+            if (action == 0 && mx < opX) {
                 commitNbtValueEditIfActive();
                 if (active) {
                     PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(nbtEditSlot, ruleIdx));
@@ -2835,7 +2856,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
 
             // Right-click = cycle operator (if active)
-            if (active && btn == 1) {
+            if (active && action == 1) {
                 commitNbtValueEditIfActive();
                 String savedVal = formatNbtValue(activeRules.get(ruleIdx).value().toString());
                 String currentOp = activeRules.get(ruleIdx).operator();
@@ -3945,9 +3966,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
     }
 
-    private boolean handleDetailPageClick(double mx, double my, int btn) {
+    private boolean handleDetailPageClick(double mx, double my, int action) {
         if (detailNbtPageOpen) {
-            return handleNbtSubPageClick(mx, my, btn);
+            return handleNbtSubPageClick(mx, my, action);
         }
 
         FilterTargetType targetType = menu.getTargetType();
@@ -4101,28 +4122,28 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (detailIdInputBox.isMouseOver(mx, my)) {
             detailIdInputBox.setFocused(true);
-            detailIdInputBox.mouseClicked(mx, my, btn);
+            detailIdInputBox.mouseClicked(mx, my, action);
             return true;
         }
         if (detailBatchInputBox.isMouseOver(mx, my)) {
             detailBatchInputBox.setFocused(true);
-            detailBatchInputBox.mouseClicked(mx, my, btn);
+            detailBatchInputBox.mouseClicked(mx, my, action);
             return true;
         }
         if (detailStockInputBox.isMouseOver(mx, my)) {
             detailStockInputBox.setFocused(true);
-            detailStockInputBox.mouseClicked(mx, my, btn);
+            detailStockInputBox.mouseClicked(mx, my, action);
             return true;
         }
         if (!isFluidOrChemical && detailSlotMappingInputBox.isMouseOver(mx, my)) {
             detailSlotMappingInputBox.setFocused(true);
-            detailSlotMappingInputBox.mouseClicked(mx, my, btn);
+            detailSlotMappingInputBox.mouseClicked(mx, my, action);
             return true;
         }
         return true;
     }
 
-    private boolean handleNbtSubPageClick(double mx, double my, int btn) {
+    private boolean handleNbtSubPageClick(double mx, double my, int action) {
         int panelX = leftPos + 4;
         int panelY = topPos + 20;
         int panelW = imageWidth - 8;
@@ -4180,7 +4201,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (detailNbtRawMode) {
             if (detailNbtInputBox.active) {
-                detailNbtInputBox.mouseClicked(mx, my, btn);
+                detailNbtInputBox.mouseClicked(mx, my, action);
             }
 
             int nbtH = panelY + panelH - y - 20;
@@ -4192,13 +4213,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 return true;
             }
         } else {
-            return handleNbtTableClick(mx, my, btn, contentX, y, contentW, panelY + panelH - y - 4);
+            return handleNbtTableClick(mx, my, action, contentX, y, contentW, panelY + panelH - y - 4);
         }
 
         return true;
     }
 
-    private boolean handleNbtTableClick(double mx, double my, int btn,
+    private boolean handleNbtTableClick(double mx, double my, int action,
                                          int tableX, int tableY, int tableW, int tableH) {
         Set<String> activePaths = detailNbtActiveOps.keySet();
         List<NbtRow> visible = getVisibleNbtRows();
@@ -4256,7 +4277,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                         detailNbtValueBox.setValue(getBuiltinDefault(builtinEditId));
                     }
                     detailNbtValueBox.setFocused(true);
-                    detailNbtValueBox.mouseClicked(mx, my, btn);
+                    detailNbtValueBox.mouseClicked(mx, my, action);
                     return true;
                 }
                 return true;
@@ -4320,7 +4341,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 }
                 nbtTableEditingRow = entryIdx;
                 detailNbtValueBox.setFocused(true);
-                detailNbtValueBox.mouseClicked(mx, my, btn);
+                detailNbtValueBox.mouseClicked(mx, my, action);
                 return true;
             }
 
@@ -4531,7 +4552,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 detailNbtValueBox.keyPressed(key, scan, modifiers);
                 return true;
             }
-            return true;
+            return false;
         }
 
         if (key == 257) {
@@ -4574,7 +4595,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return true;
         }
 
-        return true;
+        return false;
     }
 
     private boolean handleDetailPageScroll(double mx, double my, double delta) {
