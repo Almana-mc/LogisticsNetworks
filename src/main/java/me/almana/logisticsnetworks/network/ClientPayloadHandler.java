@@ -69,6 +69,15 @@ public class ClientPayloadHandler {
         });
     }
 
+    public static void handleSyncNetworkExport(SyncNetworkExportPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var screen = Minecraft.getInstance().screen;
+            if (screen instanceof ComputerScreen computerScreen) {
+                computerScreen.receiveNetworkExport(payload);
+            }
+        });
+    }
+
     public static void handleSyncMassPlacementChoices(SyncMassPlacementChoicesPayload payload,
             IPayloadContext context) {
         context.enqueueWork(() -> {

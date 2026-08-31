@@ -26,6 +26,8 @@ Once you pick a network from the directory, you can jump into either of the two 
 - [I/O Monitor](io-monitor.md) — aggregated channel throughput with live graphs (120 data points per channel).
 - [Node Table](node-table.md) — every node on the mounted network, grouped by label, with per-row actions.
 
+See [Saving & Loading Networks](save-load.md) to back up node configurations or load them onto the Computer's wrench.
+
 Until a network is mounted, the right-hand pane just says **No Network Mounted**. Pick one from the directory and the subsystem buttons unlock.
 
 ## Starred Networks
