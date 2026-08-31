@@ -47,7 +47,7 @@ Loading does **not** auto-build a network. It pulls one saved node config onto t
 2. Pick a file from the **FILES** column. Its node labels fill the **LABELS** column.
 3. Pick a label. The **PREVIEW** column shows that node's summary — channel count, filter count, upgrades, and any required items.
 4. Click **COPY TO WRENCH**. The selected label's config is loaded into the Computer's wrench slot.
-5. Take the wrench and paste the config onto a node with right-click. See [Copy & Paste](../wrench/copy-paste.md) for how pasting works.
+5. Take the wrench. Use **Modifier Key 1 + Secondary Interaction** (default: **Shift + Right Click**) to paste the config onto a node. See [Copy & Paste](../wrench/copy-paste.md) for how pasting works.
 
 Repeat per label to rebuild each node of the saved network.
 
