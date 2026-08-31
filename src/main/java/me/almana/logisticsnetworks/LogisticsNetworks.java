@@ -31,6 +31,8 @@ import me.almana.logisticsnetworks.network.RequestChannelListPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
+import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
+import me.almana.logisticsnetworks.network.SetComputerWrenchClipboardPayload;
 import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
@@ -218,6 +220,12 @@ public class LogisticsNetworks {
                 registrar.playToServer(ToggleComputerPinnedNetworkPayload.TYPE,
                                 ToggleComputerPinnedNetworkPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleToggleComputerPinnedNetwork);
+                registrar.playToServer(RequestNetworkExportPayload.TYPE,
+                                RequestNetworkExportPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleRequestNetworkExport);
+                registrar.playToServer(SetComputerWrenchClipboardPayload.TYPE,
+                                SetComputerWrenchClipboardPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetComputerWrenchClipboard);
 
                 // Server -> Client
                 registrar.playToClient(SyncMassPlacementChoicesPayload.TYPE,
