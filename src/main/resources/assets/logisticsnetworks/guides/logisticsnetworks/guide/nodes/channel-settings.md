@@ -128,11 +128,11 @@ Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but r
 - **Priority** — sort by each Receiver's **Priority** value. Higher numbers are served first. Ties are broken in no particular order.
 - **Nearest First** — serve the Receivers closest to the Sender first (by straight-line distance).
 - **Farthest First** — opposite of Nearest First: serve the furthest Receiver first.
-- **Round Robin** — rotate through Receivers evenly. Each successful transfer advances the rotation pointer to the next Receiver.
+- **Round Robin** — distribute each operation's item batch as evenly as possible across matching Receivers.
 
 **How to change it:** use Primary Interaction to cycle to the next mode.
 
-**Gotcha:** Round Robin's rotation pointer **persists across ticks**. It does not reset between game ticks — it just keeps advancing. This gives you a genuinely fair rotation across long runtimes, not a re-started loop every tick.
+**Gotcha:** Round Robin does not keep a rotation pointer. Available items are divided during the same operation, and unused shares flow to Receivers with storage space.
 
 **Disabled on Receivers:** this row is greyed out when Mode is Receiver. Distribution only makes sense on the Sender side.
 
