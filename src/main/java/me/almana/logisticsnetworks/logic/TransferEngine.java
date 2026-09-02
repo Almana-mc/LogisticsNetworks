@@ -423,7 +423,6 @@ public class TransferEngine {
                 return sorted;
             }
             default -> {
-                // PRIORITY: pre-sorted at rebuild. ROUND_ROBIN: fixed order, no cursor.
                 return targets;
             }
         }
@@ -466,7 +465,9 @@ public class TransferEngine {
                 exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
-                sourceLevel, sourcePos, filterReadCache, null, priorBatchMoved);
+                sourceLevel, sourcePos, filterReadCache,
+                exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN,
+                null, priorBatchMoved);
     }
 
     public static int recoverItemChannel(LogisticsNetwork network, MinecraftServer server,
@@ -526,6 +527,7 @@ public class TransferEngine {
             Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache,
             FilterItemData.ReadCache filterReadCache) {
 
+        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         BlockPos sourcePos = sourceNode.getAttachedPos();
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         boolean anyReachable = false;
@@ -855,10 +857,11 @@ public class TransferEngine {
             HolderLookup.Provider provider,
             @Nullable ServerLevel sourceLevel, @Nullable BlockPos sourcePos,
             FilterItemData.ReadCache filterReadCache,
+            boolean roundRobin,
             @Nullable MoveRecorder recorder) {
         return executeMove(source, targets, limit, exportFilters, exportFilterMode,
                 sourceAllowedSlots, provider, sourceLevel, sourcePos, filterReadCache,
-                recorder, Collections.emptyMap());
+                roundRobin, recorder, Collections.emptyMap());
     }
 
     public static int executeMove(IItemHandler source, List<ItemTransferTarget> targets, int limit,
@@ -867,6 +870,7 @@ public class TransferEngine {
             HolderLookup.Provider provider,
             @Nullable ServerLevel sourceLevel, @Nullable BlockPos sourcePos,
             FilterItemData.ReadCache filterReadCache,
+            boolean roundRobin,
             @Nullable MoveRecorder recorder,
             Map<Item, Integer> priorBatchMoved) {
 
@@ -890,11 +894,20 @@ public class TransferEngine {
             }
         }
         Map<Item, Integer> sourceItemCounts = anyAmountConstraints ? TransferAmountRules.countItems(source) : null;
-        Map<Item, Integer> batchMoved = anyAmountConstraints ? new HashMap<>(priorBatchMoved) : null;
+        Map<Item, Integer> batchMoved = anyAmountConstraints && !roundRobin
+                ? new HashMap<>(priorBatchMoved)
+                : null;
+        List<Map<Item, Integer>> targetBatchMoved = null;
         List<Map<Item, Integer>> targetItemCounts = null;
         if (anyAmountConstraints) {
+            if (roundRobin) {
+                targetBatchMoved = new ArrayList<>(targets.size());
+            }
             targetItemCounts = new ArrayList<>(targets.size());
             for (ItemTransferTarget t : targets) {
+                if (roundRobin) {
+                    targetBatchMoved.add(new HashMap<>());
+                }
                 targetItemCounts.add(
                         (t.constraints().hasImportThreshold() || t.constraints().hasPerEntryAmounts())
                                 ? TransferAmountRules.countItems(t.handler())
@@ -914,6 +927,7 @@ public class TransferEngine {
 
         while (remaining > 0 && openTargetCount > 0) {
             movedAny = false;
+            int targetsLeft = openTargetCount;
 
             for (int targetIndex = 0; targetIndex < targets.size() && remaining > 0; targetIndex++) {
                 if (!openTargets[targetIndex]) {
@@ -923,14 +937,16 @@ public class TransferEngine {
                 ItemTransferTarget target = targets.get(targetIndex);
                 IItemHandler bulkHandler = target.bulkHandler();
                 boolean movedForTarget = false;
+                int targetRemaining = roundRobin ? Math.ceilDiv(remaining, targetsLeft) : remaining;
+                targetsLeft--;
 
-                for (int slot = 0; slot < source.getSlots() && remaining > 0; slot++) {
+                for (int slot = 0; slot < source.getSlots() && remaining > 0 && targetRemaining > 0; slot++) {
                     if (sourceAllowedSlots != null
                             && (slot >= sourceAllowedSlots.length || !sourceAllowedSlots[slot])) {
                         continue;
                     }
 
-                    ItemStack extracted = source.extractItem(slot, remaining, true);
+                    ItemStack extracted = source.extractItem(slot, Math.min(remaining, targetRemaining), true);
                     if (extracted.isEmpty() || extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
                         continue;
                     }
@@ -985,7 +1001,10 @@ public class TransferEngine {
                             int batchLimit = TransferAmountRules.perEntryItemBatch(extracted, exportFilters, provider,
                                     candidateComponents, filterReadCache);
                             if (batchLimit > 0) {
-                                int alreadyMoved = batchMoved.getOrDefault(extracted.getItem(), 0);
+                                Map<Item, Integer> movedByItem = roundRobin
+                                        ? targetBatchMoved.get(targetIndex)
+                                        : batchMoved;
+                                int alreadyMoved = movedByItem.getOrDefault(extracted.getItem(), 0);
                                 allowedByAmount = Math.min(allowedByAmount, Math.max(0, batchLimit - alreadyMoved));
                             }
                         }
@@ -1064,6 +1083,7 @@ public class TransferEngine {
                         movedAny = true;
                         movedForTarget = true;
                         remaining -= sourceLost;
+                        targetRemaining -= sourceLost;
 
                         if (anyAmountConstraints) {
                             Item movedItem = extracted.getItem();
@@ -1074,14 +1094,19 @@ public class TransferEngine {
                             if (tgtCache != null && targetAccepted > 0) {
                                 tgtCache.merge(movedItem, targetAccepted, Integer::sum);
                             }
-                            batchMoved.merge(movedItem, sourceLost, Integer::sum);
+                            Map<Item, Integer> movedByItem = roundRobin
+                                    ? targetBatchMoved.get(targetIndex)
+                                    : batchMoved;
+                            movedByItem.merge(movedItem, sourceLost, Integer::sum);
                         }
 
                         if (slotComponentsCached != null) {
                             slotComponentsCached[slot] = false;
                         }
 
-                        break;
+                        if (!roundRobin) {
+                            break;
+                        }
                     }
                 }
 

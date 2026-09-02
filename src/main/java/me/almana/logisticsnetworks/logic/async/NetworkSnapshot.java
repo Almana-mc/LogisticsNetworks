@@ -24,6 +24,7 @@ public record NetworkSnapshot(
             ItemStack[] exportFilters,
             FilterMode exportFilterMode,
             int sourceEndpoint,
+            boolean roundRobin,
             List<TargetUnit> targets) {
     }
 

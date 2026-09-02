@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
@@ -157,6 +158,7 @@ public final class Snapshots {
                     copyFilters(channel.getFilterItems()),
                     channel.getFilterMode(),
                     sourceEndpoint,
+                    channel.getDistributionMode() == DistributionMode.ROUND_ROBIN,
                     targetUnits));
         }
         return itemWakeDelta;
