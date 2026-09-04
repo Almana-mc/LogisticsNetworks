@@ -26,7 +26,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
@@ -1046,8 +1045,6 @@ public class TransferEngine {
                     if (targetAccepted > 0 && bulkHandler != null) {
                         bulkInsertRejections.clear(bulkHandler);
                     }
-                    int droppedToWorld = 0;
-
                     if (!uninserted.isEmpty()) {
                         ItemStack stillLeft = source.insertItem(slot, uninserted, false);
                         if (!stillLeft.isEmpty()) {
@@ -1062,33 +1059,28 @@ public class TransferEngine {
                                 if (forcedIn > 0 && bulkHandler != null) {
                                     bulkInsertRejections.clear(bulkHandler);
                                 }
-                                if (!forcedRemainder.isEmpty()) {
-                                    LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
-                                            + "target slot mask. Dropping at source pos {}.",
+                                if (!forcedRemainder.isEmpty() && Config.debugMode) {
+                                    LOGGER.debug("ITEM ROLLBACK FAILED: Could not return {} to source or fit into "
+                                            + "target slot mask at {}.",
                                             forcedRemainder, sourcePos);
-                                    if (sourceLevel != null && sourcePos != null) {
-                                        droppedToWorld = forcedRemainder.getCount();
-                                        Block.popResource(sourceLevel, sourcePos, forcedRemainder);
-                                    }
                                 }
                             }
                         }
                     }
 
-                    int sourceLost = targetAccepted + droppedToWorld;
-                    if (sourceLost > 0) {
+                    if (targetAccepted > 0) {
                         if (recorder != null) {
-                            recorder.record(slot, targetIndex, toMove.copyWithCount(sourceLost), importAllowedSlots);
+                            recorder.record(slot, targetIndex, toMove.copyWithCount(targetAccepted), importAllowedSlots);
                         }
                         movedAny = true;
                         movedForTarget = true;
-                        remaining -= sourceLost;
-                        targetRemaining -= sourceLost;
+                        remaining -= targetAccepted;
+                        targetRemaining -= targetAccepted;
 
                         if (anyAmountConstraints) {
                             Item movedItem = extracted.getItem();
                             if (sourceItemCounts != null) {
-                                sourceItemCounts.merge(movedItem, -sourceLost, Integer::sum);
+                                sourceItemCounts.merge(movedItem, -targetAccepted, Integer::sum);
                             }
                             Map<Item, Integer> tgtCache = targetItemCounts.get(targetIndex);
                             if (tgtCache != null && targetAccepted > 0) {
@@ -1097,7 +1089,7 @@ public class TransferEngine {
                             Map<Item, Integer> movedByItem = roundRobin
                                     ? targetBatchMoved.get(targetIndex)
                                     : batchMoved;
-                            movedByItem.merge(movedItem, sourceLost, Integer::sum);
+                            movedByItem.merge(movedItem, targetAccepted, Integer::sum);
                         }
 
                         if (slotComponentsCached != null) {
@@ -1151,14 +1143,9 @@ public class TransferEngine {
             return 0;
         }
 
-        int acceptable;
-        if (bulkTarget != null && targetSlotMask == null) {
-            acceptable = available.getCount();
-        } else {
-            ItemStack simRemainder = insertItemWithAllowedSlots(target, bulkTarget,
-                    available.copyWithCount(available.getCount()), true, targetSlotMask);
-            acceptable = available.getCount() - simRemainder.getCount();
-        }
+        ItemStack simRemainder = insertItemWithAllowedSlots(target, bulkTarget,
+                available.copyWithCount(available.getCount()), true, targetSlotMask);
+        int acceptable = available.getCount() - simRemainder.getCount();
         if (acceptable <= 0) {
             return 0;
         }
@@ -1180,11 +1167,9 @@ public class TransferEngine {
                 ItemStack forcedRemainder = insertItemWithAllowedSlots(target, bulkTarget, stillLeft, false,
                         targetSlotMask);
                 accepted += stillLeft.getCount() - forcedRemainder.getCount();
-                if (!forcedRemainder.isEmpty() && sourceNode.level() instanceof ServerLevel level) {
-                    LOGGER.error("ITEM VOIDING PREVENTED: could not return {} to source or target. Dropping at {}.",
-                            forcedRemainder, sourceNode.getAttachedPos());
-                    Block.popResource(level, sourceNode.getAttachedPos(), forcedRemainder);
-                    accepted += forcedRemainder.getCount();
+                if (!forcedRemainder.isEmpty() && Config.debugMode) {
+                    LOGGER.debug("ITEM ROLLBACK FAILED: Could not return {} to source or target after simulation.",
+                            forcedRemainder);
                 }
             }
         }
