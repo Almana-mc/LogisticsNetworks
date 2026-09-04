@@ -4155,6 +4155,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return false;
         }
 
+        if (detailNbtRawMode && detailNbtInputBox.isFocused()
+                && !detailNbtInputBox.isMouseOver(mx, my)) {
+            flushNbtSubPage();
+            detailNbtInputBox.setFocused(false);
+        }
+
         int backW = 50;
         if (isHovering(panelX + 4, panelY + 4, backW, 12, (int) mx, (int) my)) {
             closeNbtSubPage();
@@ -4200,8 +4206,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         y += 16;
 
         if (detailNbtRawMode) {
-            if (detailNbtInputBox.active) {
+            if (detailNbtInputBox.active && detailNbtInputBox.isMouseOver(mx, my)) {
+                if (action == 0) {
+                    detailNbtInputBox.setFocused(true);
+                }
                 detailNbtInputBox.mouseClicked(mx, my, action);
+                return true;
             }
 
             int nbtH = panelY + panelH - y - 20;
@@ -4496,6 +4506,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, false));
                     menu.setEntryNbtStrict(detailEditSlot, false);
                 }
+                menu.setEntryNbtRaw(minecraft.player, detailEditSlot, "", nbtVal);
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setRaw(detailEditSlot, nbtVal));
             } else if (nbtVal.isEmpty() && existingRaw != null) {
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(detailEditSlot));
@@ -4537,6 +4548,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private boolean handleDetailPageKey(int key, int scan, int modifiers) {
         if (detailNbtPageOpen) {
             if (detailNbtInputBox.isFocused()) {
+                if (key == InputConstants.KEY_RETURN || key == InputConstants.KEY_NUMPADENTER) {
+                    flushNbtSubPage();
+                    detailNbtInputBox.setFocused(false);
+                    return true;
+                }
                 detailNbtInputBox.keyPressed(key, scan, modifiers);
                 return true;
             }
