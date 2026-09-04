@@ -1,17 +1,17 @@
 package me.almana.logisticsnetworks.filter;
 
+import me.almana.logisticsnetworks.component.FilterSettings;
+import me.almana.logisticsnetworks.component.FilterSettingsData;
+import me.almana.logisticsnetworks.component.LegacyComponentMigration;
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
+import me.almana.logisticsnetworks.component.NameFilterConfig;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.NameFilterItem;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -19,12 +19,6 @@ public final class NameFilterData {
 
     public static final int MAX_EXPRESSION_LENGTH = 128;
     public static final int MAX_CANDIDATE_LENGTH = 512;
-
-    private static final String KEY_ROOT = "ln_name_filter";
-    private static final String KEY_IS_BLACKLIST = "blacklist";
-    private static final String KEY_NAME = "name";
-    private static final String KEY_TARGET_TYPE = "target";
-    private static final String KEY_MATCH_SCOPE = "scope";
 
     public enum ValidationError {
         NONE,
@@ -50,80 +44,62 @@ public final class NameFilterData {
     public static boolean isBlacklist(ItemStack stack) {
         if (!isNameFilter(stack))
             return false;
-        return getRoot(stack).getBoolean(KEY_IS_BLACKLIST);
+        LegacyComponentMigration.migrateNameFilter(stack);
+        return FilterSettingsData.get(stack).blacklist();
     }
 
     public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
         if (!isNameFilter(stack))
             return;
 
-        updateRoot(stack, root -> {
-            if (isBlacklist) {
-                root.putBoolean(KEY_IS_BLACKLIST, true);
-            } else {
-                root.remove(KEY_IS_BLACKLIST);
-            }
-        });
+        LegacyComponentMigration.migrateNameFilter(stack);
+        FilterSettingsData.setBlacklist(stack, isBlacklist);
     }
 
     public static FilterTargetType getTargetType(ItemStack stack) {
         if (!isNameFilter(stack))
             return FilterTargetType.ITEMS;
-        return FilterTargetType.fromOrdinal(getRoot(stack).getInt(KEY_TARGET_TYPE));
+        LegacyComponentMigration.migrateNameFilter(stack);
+        return FilterSettingsData.get(stack).target();
     }
 
     public static void setTargetType(ItemStack stack, FilterTargetType type) {
         if (!isNameFilter(stack))
             return;
 
-        FilterTargetType target = type == null ? FilterTargetType.ITEMS : type;
-        updateRoot(stack, root -> {
-            if (target == FilterTargetType.ITEMS) {
-                root.remove(KEY_TARGET_TYPE);
-            } else {
-                root.putInt(KEY_TARGET_TYPE, target.ordinal());
-            }
-        });
+        LegacyComponentMigration.migrateNameFilter(stack);
+        FilterSettingsData.setTarget(stack, type);
     }
 
     public static NameMatchScope getMatchScope(ItemStack stack) {
         if (!isNameFilter(stack))
             return NameMatchScope.NAME;
-        return NameMatchScope.fromOrdinal(getRoot(stack).getInt(KEY_MATCH_SCOPE));
+        LegacyComponentMigration.migrateNameFilter(stack);
+        return getConfig(stack).scope();
     }
 
     public static void setMatchScope(ItemStack stack, NameMatchScope scope) {
         if (!isNameFilter(stack))
             return;
 
-        NameMatchScope s = scope == null ? NameMatchScope.NAME : scope;
-        updateRoot(stack, root -> {
-            if (s == NameMatchScope.NAME) {
-                root.remove(KEY_MATCH_SCOPE);
-            } else {
-                root.putInt(KEY_MATCH_SCOPE, s.ordinal());
-            }
-        });
+        LegacyComponentMigration.migrateNameFilter(stack);
+        NameFilterConfig current = getConfig(stack);
+        setConfig(stack, new NameFilterConfig(current.expression(), scope));
     }
 
     public static String getNameFilter(ItemStack stack) {
         if (!isNameFilter(stack))
             return "";
-        return getRoot(stack).getString(KEY_NAME);
+        LegacyComponentMigration.migrateNameFilter(stack);
+        return getConfig(stack).expression();
     }
 
     public static void setNameFilter(ItemStack stack, String name) {
         if (!isNameFilter(stack))
             return;
 
-        updateRoot(stack, root -> {
-            String normalized = normalizeName(name);
-            if (normalized == null || normalized.isEmpty()) {
-                root.remove(KEY_NAME);
-            } else {
-                root.putString(KEY_NAME, normalized);
-            }
-        });
+        LegacyComponentMigration.migrateNameFilter(stack);
+        setConfig(stack, new NameFilterConfig(normalizeName(name), getConfig(stack).scope()));
     }
 
     public static boolean hasNameFilter(ItemStack stack) {
@@ -134,20 +110,22 @@ public final class NameFilterData {
             ValidationResult pattern) {
     }
 
-    record CachedNameView(@Nullable CustomData key, NameFilterView view) {
+    record CachedNameView(@Nullable FilterSettings settings, @Nullable NameFilterConfig config, NameFilterView view) {
     }
 
     private static NameFilterView getNameFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
         if (readCache == null)
             return buildNameFilterView(stack, null);
 
-        CustomData currentKey = stack.get(DataComponents.CUSTOM_DATA);
+        LegacyComponentMigration.migrateNameFilter(stack);
+        FilterSettings settings = stack.get(LogisticsDataComponents.FILTER_SETTINGS);
+        NameFilterConfig config = stack.get(LogisticsDataComponents.NAME_FILTER);
         CachedNameView cached = readCache.nameViews.get(stack);
-        if (cached != null && cached.key() == currentKey)
+        if (cached != null && cached.settings() == settings && cached.config() == config)
             return cached.view();
 
         NameFilterView built = buildNameFilterView(stack, readCache);
-        readCache.nameViews.put(stack, new CachedNameView(currentKey, built));
+        readCache.nameViews.put(stack, new CachedNameView(settings, config, built));
         return built;
     }
 
@@ -155,11 +133,10 @@ public final class NameFilterData {
         if (!isNameFilter(stack))
             return new NameFilterView(FilterTargetType.ITEMS, false, "", validateRegex(""));
 
-        CompoundTag root = getRoot(stack);
-        FilterTargetType targetType = FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE));
-        boolean blacklist = root.getBoolean(KEY_IS_BLACKLIST);
-        String expression = root.getString(KEY_NAME);
-        return new NameFilterView(targetType, blacklist, expression, resolveRegex(expression, readCache));
+        LegacyComponentMigration.migrateNameFilter(stack);
+        FilterSettings settings = FilterSettingsData.get(stack);
+        String expression = getConfig(stack).expression();
+        return new NameFilterView(settings.target(), settings.blacklist(), expression, resolveRegex(expression, readCache));
     }
 
     public static boolean hasNameFilter(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
@@ -344,24 +321,15 @@ public final class NameFilterData {
         return s.isEmpty() ? null : s;
     }
 
-    private static CompoundTag getRoot(ItemStack stack) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
-        return custom.get(KEY_ROOT) instanceof CompoundTag root ? root : new CompoundTag();
+    private static NameFilterConfig getConfig(ItemStack stack) {
+        return stack.getOrDefault(LogisticsDataComponents.NAME_FILTER, new NameFilterConfig("", NameMatchScope.NAME));
     }
 
-    private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
-                    ? customTag.getCompound(KEY_ROOT)
-                    : new CompoundTag();
-
-            modifier.accept(root);
-
-            if (root.isEmpty()) {
-                customTag.remove(KEY_ROOT);
-            } else {
-                customTag.put(KEY_ROOT, root);
-            }
-        });
+    private static void setConfig(ItemStack stack, NameFilterConfig config) {
+        if (config.expression().isEmpty() && config.scope() == NameMatchScope.NAME) {
+            stack.remove(LogisticsDataComponents.NAME_FILTER);
+        } else {
+            stack.set(LogisticsDataComponents.NAME_FILTER, config);
+        }
     }
 }

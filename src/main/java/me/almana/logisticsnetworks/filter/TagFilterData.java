@@ -1,18 +1,17 @@
 package me.almana.logisticsnetworks.filter;
 
+import me.almana.logisticsnetworks.component.FilterSettings;
+import me.almana.logisticsnetworks.component.FilterSettingsData;
+import me.almana.logisticsnetworks.component.LegacyComponentMigration;
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
+import me.almana.logisticsnetworks.component.TagFilterConfig;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.TagFilterItem;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
@@ -23,11 +22,6 @@ import java.util.List;
 import java.util.Set;
 
 public final class TagFilterData {
-
-    private static final String ROOT_KEY = "ln_tag_filter";
-    private static final String MODE_KEY = "blacklist";
-    private static final String TAGS_KEY = "tags";
-    private static final String TARGET_KEY = "target";
 
     public record View(@Nullable String tag, @Nullable TagKey<Item> itemTag, @Nullable TagKey<Fluid> fluidTag,
             FilterTargetType target, boolean blacklist) {
@@ -41,18 +35,9 @@ public final class TagFilterData {
     }
 
     private static View buildView(ItemStack stack) {
-        CompoundTag root = getRootTag(stack);
-        String tag = null;
-        if (root.contains(TAGS_KEY, Tag.TAG_LIST)) {
-            ListTag list = root.getList(TAGS_KEY, Tag.TAG_STRING);
-            for (int i = 0; i < list.size(); i++) {
-                String normalized = normalizeTag(list.getString(i));
-                if (normalized != null) {
-                    tag = normalized;
-                    break;
-                }
-            }
-        }
+        LegacyComponentMigration.migrateTagFilter(stack);
+        TagFilterConfig config = stack.get(LogisticsDataComponents.TAG_FILTER);
+        String tag = config == null || config.tag().isEmpty() ? null : config.tag();
         TagKey<Item> itemTag = null;
         TagKey<Fluid> fluidTag = null;
         if (tag != null) {
@@ -62,55 +47,40 @@ public final class TagFilterData {
                 fluidTag = TagKey.create(Registries.FLUID, id);
             }
         }
-        return new View(tag, itemTag, fluidTag,
-                FilterTargetType.fromOrdinal(root.getInt(TARGET_KEY)),
-                root.getBoolean(MODE_KEY));
+        FilterSettings settings = FilterSettingsData.get(stack);
+        return new View(tag, itemTag, fluidTag, settings.target(), settings.blacklist());
     }
 
     public static boolean isBlacklist(ItemStack stack) {
         if (!isTagFilterItem(stack)) {
             return false;
         }
-        return getRootTag(stack).getBoolean(MODE_KEY);
+        LegacyComponentMigration.migrateTagFilter(stack);
+        return FilterSettingsData.get(stack).blacklist();
     }
 
     public static void setBlacklist(ItemStack stack, boolean blacklist) {
         if (!isTagFilterItem(stack)) {
             return;
         }
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (blacklist) {
-                root.putBoolean(MODE_KEY, true);
-            } else {
-                root.remove(MODE_KEY);
-            }
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.migrateTagFilter(stack);
+        FilterSettingsData.setBlacklist(stack, blacklist);
     }
 
     public static FilterTargetType getTargetType(ItemStack stack) {
         if (!isTagFilterItem(stack)) {
             return FilterTargetType.ITEMS;
         }
-        CompoundTag root = getRootTag(stack);
-        return FilterTargetType.fromOrdinal(root.getInt(TARGET_KEY));
+        LegacyComponentMigration.migrateTagFilter(stack);
+        return FilterSettingsData.get(stack).target();
     }
 
     public static void setTargetType(ItemStack stack, FilterTargetType targetType) {
         if (!isTagFilterItem(stack)) {
             return;
         }
-        FilterTargetType normalized = targetType == null ? FilterTargetType.ITEMS : targetType;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (normalized == FilterTargetType.ITEMS) {
-                root.remove(TARGET_KEY);
-            } else {
-                root.putInt(TARGET_KEY, normalized.ordinal());
-            }
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.migrateTagFilter(stack);
+        FilterSettingsData.setTarget(stack, targetType);
     }
 
     public static List<String> getTagFilters(ItemStack filterStack) {
@@ -118,21 +88,12 @@ public final class TagFilterData {
             return List.of();
         }
 
-        CompoundTag root = getRootTag(filterStack);
-        if (!root.contains(TAGS_KEY, Tag.TAG_LIST)) {
+        LegacyComponentMigration.migrateTagFilter(filterStack);
+        TagFilterConfig config = filterStack.get(LogisticsDataComponents.TAG_FILTER);
+        if (config == null || config.tag().isEmpty()) {
             return List.of();
         }
-
-        ListTag list = root.getList(TAGS_KEY, Tag.TAG_STRING);
-        List<String> tags = new ArrayList<>(1);
-        for (int i = 0; i < list.size(); i++) {
-            String normalized = normalizeTag(list.getString(i));
-            if (normalized != null) {
-                tags.add(normalized);
-                break;
-            }
-        }
-        return tags;
+        return List.of(config.tag());
     }
 
     public static int getTagFilterCount(ItemStack filterStack) {
@@ -153,20 +114,13 @@ public final class TagFilterData {
             return false;
         }
 
-        final boolean[] changed = { false };
-        CustomData.update(DataComponents.CUSTOM_DATA, filterStack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            ListTag current = root.getList(TAGS_KEY, Tag.TAG_STRING);
-            boolean alreadySingle = current.size() == 1 && normalized.equals(current.getString(0));
-            if (!alreadySingle) {
-                ListTag single = new ListTag();
-                single.add(StringTag.valueOf(normalized));
-                root.put(TAGS_KEY, single);
-                changed[0] = true;
-            }
-            writeRoot(customTag, root);
-        });
-        return changed[0];
+        LegacyComponentMigration.migrateTagFilter(filterStack);
+        TagFilterConfig current = filterStack.get(LogisticsDataComponents.TAG_FILTER);
+        if (current != null && normalized.equals(current.tag())) {
+            return false;
+        }
+        filterStack.set(LogisticsDataComponents.TAG_FILTER, new TagFilterConfig(normalized));
+        return true;
     }
 
     public static boolean removeTagFilter(ItemStack filterStack, String tagValue) {
@@ -179,30 +133,13 @@ public final class TagFilterData {
             return false;
         }
 
-        final boolean[] changed = { false };
-        CustomData.update(DataComponents.CUSTOM_DATA, filterStack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            ListTag list = root.getList(TAGS_KEY, Tag.TAG_STRING);
-            String current = null;
-            for (int i = 0; i < list.size(); i++) {
-                String entry = normalizeTag(list.getString(i));
-                if (entry != null) {
-                    current = entry;
-                    break;
-                }
-            }
-
-            if (current == null || !normalized.equals(current)) {
-                writeRoot(customTag, root);
-                return;
-            }
-
-            changed[0] = true;
-            root.remove(TAGS_KEY);
-            writeRoot(customTag, root);
-        });
-
-        return changed[0];
+        LegacyComponentMigration.migrateTagFilter(filterStack);
+        TagFilterConfig current = filterStack.get(LogisticsDataComponents.TAG_FILTER);
+        if (current == null || !normalized.equals(current.tag())) {
+            return false;
+        }
+        filterStack.remove(LogisticsDataComponents.TAG_FILTER);
+        return true;
     }
 
     public static boolean containsTag(ItemStack filterStack, ItemStack candidate) {
@@ -264,23 +201,4 @@ public final class TagFilterData {
         return FilterTagUtil.normalizeTag(tagValue);
     }
 
-    private static CompoundTag getRootTag(ItemStack stack) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
-        return custom.get(ROOT_KEY) instanceof CompoundTag root ? root : new CompoundTag();
-    }
-
-    private static CompoundTag getRootTag(CompoundTag customTag) {
-        if (customTag.contains(ROOT_KEY, Tag.TAG_COMPOUND)) {
-            return customTag.getCompound(ROOT_KEY).copy();
-        }
-        return new CompoundTag();
-    }
-
-    private static void writeRoot(CompoundTag customTag, CompoundTag root) {
-        if (root.isEmpty()) {
-            customTag.remove(ROOT_KEY);
-        } else {
-            customTag.put(ROOT_KEY, root);
-        }
-    }
 }

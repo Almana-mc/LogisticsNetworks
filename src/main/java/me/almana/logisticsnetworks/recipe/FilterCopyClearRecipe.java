@@ -1,31 +1,18 @@
 package me.almana.logisticsnetworks.recipe;
 
+import me.almana.logisticsnetworks.component.FilterComponentData;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.level.Level;
 
-import java.util.Set;
-
 public class FilterCopyClearRecipe extends CustomRecipe {
-
-    private static final Set<String> FILTER_ROOT_KEYS = Set.of(
-            "ln_filter",
-            "ln_tag_filter",
-            "ln_mod_filter",
-            "ln_amount_filter",
-            "ln_durability_filter",
-            "ln_nbt_filter");
 
     public FilterCopyClearRecipe(CraftingBookCategory category) {
         super(category);
@@ -33,12 +20,12 @@ public class FilterCopyClearRecipe extends CustomRecipe {
 
     @Override
     public boolean matches(CraftingInput input, Level level) {
-        return !buildResult(input).isEmpty();
+        return !buildResult(input, level.registryAccess()).isEmpty();
     }
 
     @Override
     public ItemStack assemble(CraftingInput input, HolderLookup.Provider registries) {
-        return buildResult(input);
+        return buildResult(input, registries);
     }
 
     @Override
@@ -56,7 +43,7 @@ public class FilterCopyClearRecipe extends CustomRecipe {
         return true;
     }
 
-    private static ItemStack buildResult(CraftingInput input) {
+    private static ItemStack buildResult(CraftingInput input, HolderLookup.Provider provider) {
         Item targetItem = null;
         ItemStack configuredSource = ItemStack.EMPTY;
         int configuredCount = 0;
@@ -80,10 +67,11 @@ public class FilterCopyClearRecipe extends CustomRecipe {
             }
 
             filterCount++;
-            if (isConfiguredFilter(stack)) {
+            ItemStack migrated = stack.copy();
+            if (FilterComponentData.isConfigured(migrated, provider)) {
                 configuredCount++;
                 if (configuredSource.isEmpty()) {
-                    configuredSource = stack;
+                    configuredSource = migrated;
                 }
             }
         }
@@ -101,20 +89,5 @@ public class FilterCopyClearRecipe extends CustomRecipe {
         }
 
         return ItemStack.EMPTY;
-    }
-
-    private static boolean isConfiguredFilter(ItemStack stack) {
-        if (!stack.has(DataComponents.CUSTOM_DATA)) {
-            return false;
-        }
-
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        for (String rootKey : FILTER_ROOT_KEYS) {
-            if (custom.contains(rootKey, Tag.TAG_COMPOUND) && !custom.getCompound(rootKey).isEmpty()) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
