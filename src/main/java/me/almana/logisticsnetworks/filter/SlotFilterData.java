@@ -1,22 +1,17 @@
 package me.almana.logisticsnetworks.filter;
 
+import me.almana.logisticsnetworks.component.FilterSettingsData;
+import me.almana.logisticsnetworks.component.LegacyComponentMigration;
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
+import me.almana.logisticsnetworks.component.SlotFilterConfig;
 import me.almana.logisticsnetworks.item.SlotFilterItem;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
-import java.util.function.Consumer;
 
 public final class SlotFilterData {
-
-    private static final String KEY_ROOT = "ln_slot_filter";
-    private static final String KEY_IS_BLACKLIST = "blacklist";
-    private static final String KEY_SLOTS = "slots";
 
     public static final int MIN_SLOT = 0;
     public static final int MAX_SLOT = 53;
@@ -35,7 +30,8 @@ public final class SlotFilterData {
         if (!isSlotFilterItem(stack)) {
             return false;
         }
-        return getRoot(stack).getBoolean(KEY_IS_BLACKLIST);
+        LegacyComponentMigration.migrateSlotFilter(stack);
+        return FilterSettingsData.get(stack).blacklist();
     }
 
     public static void setBlacklist(ItemStack stack, boolean blacklist) {
@@ -43,13 +39,8 @@ public final class SlotFilterData {
             return;
         }
 
-        updateRoot(stack, root -> {
-            if (blacklist) {
-                root.putBoolean(KEY_IS_BLACKLIST, true);
-            } else {
-                root.remove(KEY_IS_BLACKLIST);
-            }
-        });
+        LegacyComponentMigration.migrateSlotFilter(stack);
+        FilterSettingsData.setBlacklist(stack, blacklist);
     }
 
     public static boolean hasAnySlots(ItemStack stack) {
@@ -64,27 +55,8 @@ public final class SlotFilterData {
             return List.of();
         }
 
-        int[] stored = getRoot(stack).getIntArray(KEY_SLOTS);
-        if (stored.length == 0) {
-            return List.of();
-        }
-
-        BitSet bits = new BitSet(MAX_SLOT + 1);
-        for (int slot : stored) {
-            if (slot >= MIN_SLOT && slot <= MAX_SLOT) {
-                bits.set(slot);
-            }
-        }
-
-        if (bits.isEmpty()) {
-            return List.of();
-        }
-
-        List<Integer> slots = new ArrayList<>();
-        for (int slot = bits.nextSetBit(MIN_SLOT); slot >= 0; slot = bits.nextSetBit(slot + 1)) {
-            slots.add(slot);
-        }
-        return slots;
+        LegacyComponentMigration.migrateSlotFilter(stack);
+        return stack.getOrDefault(LogisticsDataComponents.SLOT_FILTER, new SlotFilterConfig(List.of())).slots();
     }
 
     public static String getSlotExpression(ItemStack stack) {
@@ -125,14 +97,12 @@ public final class SlotFilterData {
             return false;
         }
 
-        int[] compact = slots.stream().mapToInt(Integer::intValue).toArray();
-        updateRoot(stack, root -> {
-            if (compact.length == 0) {
-                root.remove(KEY_SLOTS);
-            } else {
-                root.putIntArray(KEY_SLOTS, compact);
-            }
-        });
+        LegacyComponentMigration.migrateSlotFilter(stack);
+        if (slots.isEmpty()) {
+            stack.remove(LogisticsDataComponents.SLOT_FILTER);
+        } else {
+            stack.set(LogisticsDataComponents.SLOT_FILTER, new SlotFilterConfig(slots));
+        }
         return true;
     }
 
@@ -140,24 +110,4 @@ public final class SlotFilterData {
         return SlotExpressionUtil.parseSlots(expression);
     }
 
-    private static CompoundTag getRoot(ItemStack stack) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
-    }
-
-    private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
-                    ? customTag.getCompound(KEY_ROOT)
-                    : new CompoundTag();
-
-            modifier.accept(root);
-
-            if (root.isEmpty()) {
-                customTag.remove(KEY_ROOT);
-            } else {
-                customTag.put(KEY_ROOT, root);
-            }
-        });
-    }
 }

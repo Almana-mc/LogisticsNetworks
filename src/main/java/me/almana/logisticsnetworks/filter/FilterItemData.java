@@ -1,9 +1,13 @@
 package me.almana.logisticsnetworks.filter;
 
+import me.almana.logisticsnetworks.component.FilterSettings;
+import me.almana.logisticsnetworks.component.FilterSettingsData;
+import me.almana.logisticsnetworks.component.GeneralFilterConfig;
+import me.almana.logisticsnetworks.component.LegacyComponentMigration;
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -11,7 +15,6 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
 import java.util.List;
 import java.util.ArrayList;
@@ -24,7 +27,6 @@ import org.jetbrains.annotations.Nullable;
 
 public final class FilterItemData {
 
-    private static final String KEY_ROOT = "ln_filter";
     private static final String KEY_IS_BLACKLIST = "blacklist";
     private static final String KEY_TARGET_TYPE = "target";
     private static final String KEY_ITEMS = "items";
@@ -55,13 +57,17 @@ public final class FilterItemData {
     private static final String NBT_OP_EQUALS = "=";
 
     public static final class ReadCache {
-        private final IdentityHashMap<ItemStack, ItemFilterView> itemViews = new IdentityHashMap<>();
+        private final IdentityHashMap<ItemStack, CachedItemView> itemViews = new IdentityHashMap<>();
         final IdentityHashMap<ItemStack, ModFilterData.CachedModView> modViews = new IdentityHashMap<>();
         final IdentityHashMap<ItemStack, NameFilterData.CachedNameView> nameViews = new IdentityHashMap<>();
         final Map<String, NameFilterData.ValidationResult> namePatterns = new HashMap<>();
 
         private ReadCache() {
         }
+    }
+
+    private record CachedItemView(@Nullable FilterSettings settings, @Nullable GeneralFilterConfig config,
+            ItemFilterView view) {
     }
 
     private record ItemFilterSlot(
@@ -129,7 +135,8 @@ public final class FilterItemData {
     public static boolean isBlacklist(ItemStack stack) {
         if (!isFilterItem(stack))
             return false;
-        return getRoot(stack).getBoolean(KEY_IS_BLACKLIST);
+        LegacyComponentMigration.migrateGeneralFilter(stack, null);
+        return FilterSettingsData.get(stack).blacklist();
     }
 
     public static boolean isBlacklist(ItemStack stack, @Nullable ReadCache readCache) {
@@ -142,39 +149,29 @@ public final class FilterItemData {
         if (!isFilterItem(stack))
             return;
 
-        updateRoot(stack, root -> {
-            if (isBlacklist) {
-                root.putBoolean(KEY_IS_BLACKLIST, true);
-            } else {
-                root.remove(KEY_IS_BLACKLIST);
-            }
-        });
+        LegacyComponentMigration.migrateGeneralFilter(stack, null);
+        FilterSettingsData.setBlacklist(stack, isBlacklist);
     }
 
     public static FilterTargetType getTargetType(ItemStack stack) {
         if (!isFilterItem(stack))
             return FilterTargetType.ITEMS;
-        return FilterTargetType.fromOrdinal(getRoot(stack).getInt(KEY_TARGET_TYPE));
+        LegacyComponentMigration.migrateGeneralFilter(stack, null);
+        return FilterSettingsData.get(stack).target();
     }
 
     public static void setTargetType(ItemStack stack, FilterTargetType type) {
         if (!isFilterItem(stack))
             return;
-        FilterTargetType target = type == null ? FilterTargetType.ITEMS : type;
-        updateRoot(stack, root -> {
-            if (target == FilterTargetType.ITEMS) {
-                root.remove(KEY_TARGET_TYPE);
-            } else {
-                root.putInt(KEY_TARGET_TYPE, target.ordinal());
-            }
-        });
+        LegacyComponentMigration.migrateGeneralFilter(stack, null);
+        FilterSettingsData.setTarget(stack, type);
     }
 
     public static ItemStack getEntry(ItemStack stack, int slot, @Nullable HolderLookup.Provider provider) {
         if (!isFilterItem(stack) || provider == null)
             return ItemStack.EMPTY;
 
-        CompoundTag root = getRoot(stack);
+        CompoundTag root = getRoot(stack, provider);
         ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
 
         for (Tag t : list) {
@@ -195,7 +192,7 @@ public final class FilterItemData {
 
         ItemStack item = (value == null || value.isEmpty()) ? ItemStack.EMPTY : value.copyWithCount(1);
 
-        updateRoot(stack, root -> {
+        updateRoot(stack, provider, root -> {
             ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
 
             CompoundTag existing = null;
@@ -1998,13 +1995,16 @@ public final class FilterItemData {
             return buildItemFilterView(stack);
         }
 
-        ItemFilterView cached = readCache.itemViews.get(stack);
-        if (cached != null) {
-            return cached;
+        LegacyComponentMigration.migrateGeneralFilter(stack, null);
+        FilterSettings settings = stack.get(LogisticsDataComponents.FILTER_SETTINGS);
+        GeneralFilterConfig config = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
+        CachedItemView cached = readCache.itemViews.get(stack);
+        if (cached != null && cached.settings() == settings && cached.config() == config) {
+            return cached.view();
         }
 
         ItemFilterView built = buildItemFilterView(stack);
-        readCache.itemViews.put(stack, built);
+        readCache.itemViews.put(stack, new CachedItemView(settings, config, built));
         return built;
     }
 
@@ -2249,23 +2249,19 @@ public final class FilterItemData {
     }
 
     private static CompoundTag getRoot(ItemStack stack) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
-        return custom.get(KEY_ROOT) instanceof CompoundTag root ? root : new CompoundTag();
+        return getRoot(stack, null);
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)
-                    ? customTag.getCompound(KEY_ROOT)
-                    : new CompoundTag();
+        updateRoot(stack, null, modifier);
+    }
 
-            modifier.accept(root);
+    private static CompoundTag getRoot(ItemStack stack, @Nullable HolderLookup.Provider provider) {
+        return LegacyComponentMigration.getGeneralFilterRoot(stack, provider);
+    }
 
-            if (root.isEmpty()) {
-                customTag.remove(KEY_ROOT);
-            } else {
-                customTag.put(KEY_ROOT, root);
-            }
-        });
+    private static void updateRoot(ItemStack stack, @Nullable HolderLookup.Provider provider,
+            Consumer<CompoundTag> modifier) {
+        LegacyComponentMigration.updateGeneralFilterRoot(stack, provider, modifier);
     }
 }

@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.registration;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.item.AmountFilterItem;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
@@ -186,6 +187,7 @@ public class Registration {
                                         .build());
 
         public static void init(IEventBus modEventBus) {
+                LogisticsDataComponents.REGISTRAR.register(modEventBus);
                 ENTITIES.register(modEventBus);
                 BLOCKS.register(modEventBus);
                 ITEMS.register(modEventBus);

@@ -1,20 +1,14 @@
 package me.almana.logisticsnetworks.filter;
 
+import me.almana.logisticsnetworks.component.DurabilityFilterConfig;
+import me.almana.logisticsnetworks.component.FilterSettingsData;
+import me.almana.logisticsnetworks.component.LegacyComponentMigration;
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.item.DurabilityFilterItem;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import org.jetbrains.annotations.Nullable;
 
 public final class DurabilityFilterData {
-
-    private static final String ROOT_KEY = "ln_durability_filter";
-    private static final String KEY_VALUE = "value";
-    private static final String KEY_OPERATOR = "operator";
-    private static final String KEY_IS_BLACKLIST = "blacklist";
-    private static final String KEY_TARGET_TYPE = "target";
 
     private static final int DEFAULT_VALUE = 0;
     private static final int MIN_VALUE = 0;
@@ -71,54 +65,37 @@ public final class DurabilityFilterData {
     public static boolean isBlacklist(ItemStack stack) {
         if (!isDurabilityFilterItem(stack))
             return false;
-        return getRootTag(stack).getBoolean(KEY_IS_BLACKLIST);
+        LegacyComponentMigration.migrateDurabilityFilter(stack);
+        return FilterSettingsData.get(stack).blacklist();
     }
 
     public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
         if (!isDurabilityFilterItem(stack))
             return;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (isBlacklist) {
-                root.putBoolean(KEY_IS_BLACKLIST, true);
-            } else {
-                root.remove(KEY_IS_BLACKLIST);
-            }
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.migrateDurabilityFilter(stack);
+        FilterSettingsData.setBlacklist(stack, isBlacklist);
     }
 
     public static FilterTargetType getTargetType(ItemStack stack) {
         if (!isDurabilityFilterItem(stack))
             return FilterTargetType.ITEMS;
-        CompoundTag root = getRootTag(stack);
-        return FilterTargetType.fromOrdinal(root.getInt(KEY_TARGET_TYPE));
+        LegacyComponentMigration.migrateDurabilityFilter(stack);
+        return FilterSettingsData.get(stack).target();
     }
 
     public static void setTargetType(ItemStack stack, FilterTargetType type) {
         if (!isDurabilityFilterItem(stack))
             return;
-        FilterTargetType target = type == null ? FilterTargetType.ITEMS : type;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (target == FilterTargetType.ITEMS) {
-                root.remove(KEY_TARGET_TYPE);
-            } else {
-                root.putInt(KEY_TARGET_TYPE, target.ordinal());
-            }
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.migrateDurabilityFilter(stack);
+        FilterSettingsData.setTarget(stack, type);
     }
 
     public static int getValue(ItemStack stack) {
         if (!isDurabilityFilterItem(stack))
             return DEFAULT_VALUE;
 
-        CompoundTag root = getRootTag(stack);
-        if (!root.contains(KEY_VALUE, Tag.TAG_INT))
-            return DEFAULT_VALUE;
-
-        return clamp(root.getInt(KEY_VALUE));
+        LegacyComponentMigration.migrateDurabilityFilter(stack);
+        return getConfig(stack).value();
     }
 
     public static void setValue(ItemStack stack, int value) {
@@ -126,26 +103,16 @@ public final class DurabilityFilterData {
             return;
 
         int clamped = clamp(value);
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (clamped == DEFAULT_VALUE) {
-                root.remove(KEY_VALUE);
-            } else {
-                root.putInt(KEY_VALUE, clamped);
-            }
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.migrateDurabilityFilter(stack);
+        setConfig(stack, new DurabilityFilterConfig(clamped, getConfig(stack).operator()));
     }
 
     public static Operator getOperator(ItemStack stack) {
         if (!isDurabilityFilterItem(stack))
             return DEFAULT_OPERATOR;
 
-        CompoundTag root = getRootTag(stack);
-        if (!root.contains(KEY_OPERATOR, Tag.TAG_STRING))
-            return DEFAULT_OPERATOR;
-
-        return Operator.fromId(root.getString(KEY_OPERATOR));
+        LegacyComponentMigration.migrateDurabilityFilter(stack);
+        return getConfig(stack).operator();
     }
 
     public static void setOperator(ItemStack stack, @Nullable Operator operator) {
@@ -153,15 +120,8 @@ public final class DurabilityFilterData {
             return;
 
         Operator normalized = operator == null ? DEFAULT_OPERATOR : operator;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (normalized == DEFAULT_OPERATOR) {
-                root.remove(KEY_OPERATOR);
-            } else {
-                root.putString(KEY_OPERATOR, normalized.id());
-            }
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.migrateDurabilityFilter(stack);
+        setConfig(stack, new DurabilityFilterConfig(getConfig(stack).value(), normalized));
     }
 
     public static int minValue() {
@@ -192,23 +152,16 @@ public final class DurabilityFilterData {
         return Math.max(MIN_VALUE, Math.min(MAX_VALUE, value));
     }
 
-    private static CompoundTag getRootTag(ItemStack stack) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe();
-        return custom.get(ROOT_KEY) instanceof CompoundTag root ? root : new CompoundTag();
+    private static DurabilityFilterConfig getConfig(ItemStack stack) {
+        return stack.getOrDefault(LogisticsDataComponents.DURABILITY_FILTER,
+                new DurabilityFilterConfig(DEFAULT_VALUE, DEFAULT_OPERATOR));
     }
 
-    private static CompoundTag getRootTag(CompoundTag customTag) {
-        if (customTag.contains(ROOT_KEY, Tag.TAG_COMPOUND)) {
-            return customTag.getCompound(ROOT_KEY).copy();
-        }
-        return new CompoundTag();
-    }
-
-    private static void writeRoot(CompoundTag customTag, CompoundTag root) {
-        if (root.isEmpty()) {
-            customTag.remove(ROOT_KEY);
+    private static void setConfig(ItemStack stack, DurabilityFilterConfig config) {
+        if (config.value() == DEFAULT_VALUE && config.operator() == DEFAULT_OPERATOR) {
+            stack.remove(LogisticsDataComponents.DURABILITY_FILTER);
         } else {
-            customTag.put(ROOT_KEY, root);
+            stack.set(LogisticsDataComponents.DURABILITY_FILTER, config);
         }
     }
 }

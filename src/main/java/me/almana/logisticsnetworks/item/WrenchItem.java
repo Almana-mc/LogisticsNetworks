@@ -1,6 +1,11 @@
 package me.almana.logisticsnetworks.item;
 
+import com.mojang.serialization.Codec;
 import me.almana.logisticsnetworks.client.ClientControls;
+import me.almana.logisticsnetworks.component.LegacyComponentMigration;
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
+import me.almana.logisticsnetworks.component.WrenchClipboard;
+import me.almana.logisticsnetworks.component.WrenchMassPlacement;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -17,12 +22,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -42,7 +41,6 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -57,21 +55,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 public class WrenchItem extends Item {
 
-    private static final String KEY_ROOT = "ln_wrench";
-    private static final String KEY_MODE = "mode";
-    private static final String KEY_CLIPBOARD = "clipboard";
-    private static final String KEY_MASS_SELECTIONS = "mass_selections";
-    private static final String KEY_SELECTION_DIMENSION = "dimension";
-    private static final String KEY_SELECTION_POS = "pos";
-    private static final String KEY_MASS_DIMENSION = "mass_dimension";
-    private static final String KEY_MASS_CORNER_A = "mass_corner_a";
-    private static final String KEY_MASS_CORNER_B = "mass_corner_b";
-    private static final String KEY_MASS_SELECTED_BLOCK = "mass_selected_block";
-    private static final String KEY_AE2_LINK = "ae2_link";
     private static final int MAX_MASS_SELECTIONS = 10_000;
     private static final int MAX_MASS_NODES = 2048;
 
@@ -114,6 +102,8 @@ public class WrenchItem extends Item {
         WRENCH("wrench"),
         COPY_PASTE("copy_paste"),
         MASS_PLACEMENT("mass_placement");
+
+        public static final Codec<Mode> CODEC = Codec.STRING.xmap(Mode::fromId, Mode::id);
 
         private final String id;
 
@@ -647,11 +637,8 @@ public class WrenchItem extends Item {
     }
 
     public static Mode getMode(ItemStack stack) {
-        CompoundTag root = getRootTag(stack);
-        if (!root.contains(KEY_MODE, Tag.TAG_STRING)) {
-            return Mode.WRENCH;
-        }
-        return Mode.fromId(root.getString(KEY_MODE));
+        LegacyComponentMigration.migrateWrench(stack, null);
+        return stack.getOrDefault(LogisticsDataComponents.WRENCH_MODE, Mode.WRENCH);
     }
 
     public static void setMode(ItemStack stack, Mode mode) {
@@ -659,16 +646,13 @@ public class WrenchItem extends Item {
             return;
         }
 
+        LegacyComponentMigration.migrateWrench(stack, null);
         Mode resolved = mode == null ? Mode.WRENCH : mode;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (resolved == Mode.WRENCH) {
-                root.remove(KEY_MODE);
-            } else {
-                root.putString(KEY_MODE, resolved.id());
-            }
-            writeRoot(customTag, root);
-        });
+        if (resolved == Mode.WRENCH) {
+            stack.remove(LogisticsDataComponents.WRENCH_MODE);
+        } else {
+            stack.set(LogisticsDataComponents.WRENCH_MODE, resolved);
+        }
     }
 
     public static Mode cycleMode(ItemStack stack, boolean forward) {
@@ -814,36 +798,19 @@ public class WrenchItem extends Item {
         }
     }
 
-    private static CompoundTag getRootTag(ItemStack stack) {
-        return getRootTag(stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag());
-    }
-
     private static boolean hasClipboardPayload(ItemStack stack) {
-        return getRootTag(stack).contains(KEY_CLIPBOARD, Tag.TAG_COMPOUND);
-    }
-
-    private static CompoundTag getRootTag(CompoundTag customTag) {
-        if (customTag.contains(KEY_ROOT, Tag.TAG_COMPOUND)) {
-            return customTag.getCompound(KEY_ROOT).copy();
-        }
-        return new CompoundTag();
-    }
-
-    private static void writeRoot(CompoundTag customTag, CompoundTag root) {
-        if (root.isEmpty()) {
-            customTag.remove(KEY_ROOT);
-        } else {
-            customTag.put(KEY_ROOT, root);
-        }
+        return LegacyComponentMigration.hasWrenchClipboard(stack);
     }
 
     @Nullable
     public static NodeClipboardConfig getClipboard(ItemStack stack, HolderLookup.Provider provider) {
-        CompoundTag root = getRootTag(stack);
-        if (!root.contains(KEY_CLIPBOARD, Tag.TAG_COMPOUND)) {
+        LegacyComponentMigration.migrateWrench(stack, provider);
+        WrenchClipboard clipboard = stack.get(LogisticsDataComponents.WRENCH_CLIPBOARD);
+        if (clipboard == null || !clipboard.valid() || clipboard.snapshot().isEmpty()) {
             return null;
         }
-        return NodeClipboardConfig.load(root.getCompound(KEY_CLIPBOARD), provider);
+        NodeClipboardConfig result = NodeClipboardConfig.fromComponentSnapshot(clipboard.snapshot().get());
+        return result.isStructurallyValid() ? result : null;
     }
 
     public static void setClipboard(ItemStack stack, NodeClipboardConfig clipboard, HolderLookup.Provider provider) {
@@ -851,26 +818,20 @@ public class WrenchItem extends Item {
             return;
         }
 
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (clipboard == null) {
-                root.remove(KEY_CLIPBOARD);
-            } else {
-                root.put(KEY_CLIPBOARD, clipboard.save(provider));
-            }
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.migrateWrench(stack, provider);
+        if (clipboard == null) {
+            LegacyComponentMigration.clearWrenchClipboard(stack);
+        } else {
+            stack.set(LogisticsDataComponents.WRENCH_CLIPBOARD,
+                    WrenchClipboard.valid(clipboard.toComponentSnapshot(provider)));
+        }
     }
 
     public static void clearClipboard(ItemStack stack) {
         if (stack.isEmpty() || !(stack.getItem() instanceof WrenchItem)) {
             return;
         }
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            root.remove(KEY_CLIPBOARD);
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.clearWrenchClipboard(stack);
     }
 
     private InteractionResult toggleAE2Link(ItemStack wrenchStack, Player player, Level level, BlockPos clickedPos) {
@@ -888,36 +849,25 @@ public class WrenchItem extends Item {
 
     public static void setAE2Link(ItemStack stack, ResourceKey<Level> dimension, BlockPos pos) {
         if (stack.isEmpty()) return;
-        GlobalPos globalPos = GlobalPos.of(dimension, pos);
-        Tag encoded = GlobalPos.CODEC.encodeStart(NbtOps.INSTANCE, globalPos)
-                .result().orElse(null);
-        if (encoded == null) return;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            root.put(KEY_AE2_LINK, encoded);
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.migrateWrench(stack, null);
+        stack.set(LogisticsDataComponents.WRENCH_AE2_LINK, GlobalPos.of(dimension, pos));
     }
 
     public static void clearAE2Link(ItemStack stack) {
         if (stack.isEmpty()) return;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            root.remove(KEY_AE2_LINK);
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.migrateWrench(stack, null);
+        stack.remove(LogisticsDataComponents.WRENCH_AE2_LINK);
     }
 
     public static boolean hasAE2Link(ItemStack stack) {
-        return getRootTag(stack).contains(KEY_AE2_LINK);
+        LegacyComponentMigration.migrateWrench(stack, null);
+        return stack.has(LogisticsDataComponents.WRENCH_AE2_LINK);
     }
 
     @Nullable
     public static GlobalPos getAE2LinkPos(ItemStack stack) {
-        CompoundTag root = getRootTag(stack);
-        if (!root.contains(KEY_AE2_LINK)) return null;
-        return GlobalPos.CODEC.decode(NbtOps.INSTANCE, root.get(KEY_AE2_LINK))
-                .result().map(com.mojang.datafixers.util.Pair::getFirst).orElse(null);
+        LegacyComponentMigration.migrateWrench(stack, null);
+        return stack.get(LogisticsDataComponents.WRENCH_AE2_LINK);
     }
 
     public static int getMaxMassNodes() {
@@ -926,26 +876,11 @@ public class WrenchItem extends Item {
 
     @Nullable
     public static MassSelectionArea getMassSelectionArea(ItemStack stack, ResourceKey<Level> dimension) {
-        CompoundTag root = getRootTag(stack);
-        if (!root.contains(KEY_MASS_DIMENSION, Tag.TAG_STRING) || !root.contains(KEY_MASS_CORNER_A, Tag.TAG_LONG)) {
+        WrenchMassPlacement.Area area = getMassPlacement(stack).area().orElse(null);
+        if (area == null || !area.first().dimension().equals(dimension)) {
             return null;
         }
-
-        ResourceLocation dimensionId = ResourceLocation.tryParse(root.getString(KEY_MASS_DIMENSION));
-        if (dimensionId == null) {
-            return null;
-        }
-
-        ResourceKey<Level> storedDimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
-        if (!storedDimension.equals(dimension)) {
-            return null;
-        }
-
-        BlockPos first = BlockPos.of(root.getLong(KEY_MASS_CORNER_A));
-        BlockPos second = root.contains(KEY_MASS_CORNER_B, Tag.TAG_LONG)
-                ? BlockPos.of(root.getLong(KEY_MASS_CORNER_B))
-                : null;
-        return new MassSelectionArea(storedDimension, first, second);
+        return new MassSelectionArea(dimension, area.first().pos(), area.second().orElse(null));
     }
 
     public static void setMassSelectionFirstCorner(ItemStack stack, ResourceKey<Level> dimension, BlockPos pos) {
@@ -953,15 +888,9 @@ public class WrenchItem extends Item {
             return;
         }
 
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            root.putString(KEY_MASS_DIMENSION, dimension.location().toString());
-            root.putLong(KEY_MASS_CORNER_A, pos.asLong());
-            root.remove(KEY_MASS_CORNER_B);
-            root.remove(KEY_MASS_SELECTED_BLOCK);
-            root.remove(KEY_MASS_SELECTIONS);
-            writeRoot(customTag, root);
-        });
+        setMassPlacement(stack, new WrenchMassPlacement(
+                Optional.of(new WrenchMassPlacement.Area(GlobalPos.of(dimension, pos), Optional.empty())),
+                Optional.empty(), List.of()));
     }
 
     public static void setMassSelectionSecondCorner(ItemStack stack, BlockPos pos) {
@@ -969,22 +898,19 @@ public class WrenchItem extends Item {
             return;
         }
 
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            root.putLong(KEY_MASS_CORNER_B, pos.asLong());
-            root.remove(KEY_MASS_SELECTED_BLOCK);
-            root.remove(KEY_MASS_SELECTIONS);
-            writeRoot(customTag, root);
-        });
+        WrenchMassPlacement current = getMassPlacement(stack);
+        WrenchMassPlacement.Area area = current.area().orElse(null);
+        if (area == null) {
+            return;
+        }
+        setMassPlacement(stack, new WrenchMassPlacement(
+                Optional.of(new WrenchMassPlacement.Area(area.first(), Optional.of(pos))),
+                Optional.empty(), List.of()));
     }
 
     @Nullable
     public static ResourceLocation getMassSelectedBlock(ItemStack stack) {
-        CompoundTag root = getRootTag(stack);
-        if (!root.contains(KEY_MASS_SELECTED_BLOCK, Tag.TAG_STRING)) {
-            return null;
-        }
-        return ResourceLocation.tryParse(root.getString(KEY_MASS_SELECTED_BLOCK));
+        return getMassPlacement(stack).selectedBlock().orElse(null);
     }
 
     public static void setMassSelectedBlock(ItemStack stack, ResourceLocation blockId) {
@@ -992,15 +918,9 @@ public class WrenchItem extends Item {
             return;
         }
 
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (blockId == null) {
-                root.remove(KEY_MASS_SELECTED_BLOCK);
-            } else {
-                root.putString(KEY_MASS_SELECTED_BLOCK, blockId.toString());
-            }
-            writeRoot(customTag, root);
-        });
+        WrenchMassPlacement current = getMassPlacement(stack);
+        setMassPlacement(stack, new WrenchMassPlacement(
+                current.area(), Optional.ofNullable(blockId), current.selections()));
     }
 
     public static List<MassPlacementBlockChoice> getMassPlacementBlockChoices(Level level, ItemStack stack) {
@@ -1078,32 +998,9 @@ public class WrenchItem extends Item {
     }
 
     public static List<MassSelectionTarget> getMassSelections(ItemStack stack) {
-        CompoundTag root = getRootTag(stack);
-        if (!root.contains(KEY_MASS_SELECTIONS, Tag.TAG_LIST)) {
-            return List.of();
-        }
-
-        ListTag list = root.getList(KEY_MASS_SELECTIONS, Tag.TAG_COMPOUND);
-        List<MassSelectionTarget> targets = new ArrayList<>(list.size());
-        for (Tag tag : list) {
-            if (!(tag instanceof CompoundTag entry)) {
-                continue;
-            }
-
-            if (!entry.contains(KEY_SELECTION_DIMENSION, Tag.TAG_STRING)) {
-                continue;
-            }
-
-            ResourceLocation dimensionId = ResourceLocation.tryParse(entry.getString(KEY_SELECTION_DIMENSION));
-            if (dimensionId == null) {
-                continue;
-            }
-
-            ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
-            BlockPos pos = BlockPos.of(entry.getLong(KEY_SELECTION_POS));
-            targets.add(new MassSelectionTarget(dimension, pos));
-        }
-        return targets;
+        return getMassPlacement(stack).selections().stream()
+                .map(value -> new MassSelectionTarget(value.dimension(), value.pos()))
+                .toList();
     }
 
     public static List<MassSelectionTarget> getMassSelections(ItemStack stack, ResourceKey<Level> dimension) {
@@ -1124,32 +1021,16 @@ public class WrenchItem extends Item {
             return false;
         }
 
-        boolean[] removed = { false };
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            ListTag list = root.getList(KEY_MASS_SELECTIONS, Tag.TAG_COMPOUND);
-
-            ListTag updated = new ListTag();
-            for (Tag tag : list) {
-                if (!(tag instanceof CompoundTag entry)) {
-                    continue;
-                }
-                MassSelectionTarget existing = readSelection(entry);
-                if (existing != null && existing.equals(target)) {
-                    removed[0] = true;
-                    continue;
-                }
-                updated.add(entry.copy());
-            }
-
-            if (updated.isEmpty()) {
-                root.remove(KEY_MASS_SELECTIONS);
-            } else {
-                root.put(KEY_MASS_SELECTIONS, updated);
-            }
-            writeRoot(customTag, root);
-        });
-        return removed[0];
+        WrenchMassPlacement current = getMassPlacement(stack);
+        GlobalPos selected = GlobalPos.of(target.dimension(), target.pos());
+        if (!current.selections().contains(selected)) {
+            return false;
+        }
+        List<GlobalPos> updated = current.selections().stream()
+                .filter(value -> !value.equals(selected))
+                .toList();
+        setMassPlacement(stack, new WrenchMassPlacement(current.area(), current.selectedBlock(), updated));
+        return true;
     }
 
     public static boolean addMassSelection(ItemStack stack, MassSelectionTarget target) {
@@ -1157,35 +1038,15 @@ public class WrenchItem extends Item {
             return false;
         }
 
-        boolean[] added = { false };
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            ListTag list = root.getList(KEY_MASS_SELECTIONS, Tag.TAG_COMPOUND);
-
-            for (Tag tag : list) {
-                if (tag instanceof CompoundTag entry) {
-                    MassSelectionTarget existing = readSelection(entry);
-                    if (target.equals(existing)) {
-                        writeRoot(customTag, root);
-                        return;
-                    }
-                }
-            }
-
-            if (list.size() >= MAX_MASS_SELECTIONS) {
-                writeRoot(customTag, root);
-                return;
-            }
-
-            CompoundTag entry = new CompoundTag();
-            entry.putString(KEY_SELECTION_DIMENSION, target.dimension().location().toString());
-            entry.putLong(KEY_SELECTION_POS, target.pos().asLong());
-            list.add(entry);
-            root.put(KEY_MASS_SELECTIONS, list);
-            writeRoot(customTag, root);
-            added[0] = true;
-        });
-        return added[0];
+        WrenchMassPlacement current = getMassPlacement(stack);
+        GlobalPos selected = GlobalPos.of(target.dimension(), target.pos());
+        if (current.selections().contains(selected) || current.selections().size() >= MAX_MASS_SELECTIONS) {
+            return false;
+        }
+        List<GlobalPos> updated = new ArrayList<>(current.selections());
+        updated.add(selected);
+        setMassPlacement(stack, new WrenchMassPlacement(current.area(), current.selectedBlock(), updated));
+        return true;
     }
 
     public static void removeMassSelections(ItemStack stack, List<MassSelectionTarget> targetsToRemove) {
@@ -1194,29 +1055,15 @@ public class WrenchItem extends Item {
             return;
         }
 
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            ListTag list = root.getList(KEY_MASS_SELECTIONS, Tag.TAG_COMPOUND);
-            ListTag updated = new ListTag();
-
-            for (Tag tag : list) {
-                if (!(tag instanceof CompoundTag entry)) {
-                    continue;
-                }
-                MassSelectionTarget existing = readSelection(entry);
-                if (existing == null || targetsToRemove.contains(existing)) {
-                    continue;
-                }
-                updated.add(entry.copy());
-            }
-
-            if (updated.isEmpty()) {
-                root.remove(KEY_MASS_SELECTIONS);
-            } else {
-                root.put(KEY_MASS_SELECTIONS, updated);
-            }
-            writeRoot(customTag, root);
-        });
+        WrenchMassPlacement current = getMassPlacement(stack);
+        Set<GlobalPos> removed = new HashSet<>();
+        for (MassSelectionTarget target : targetsToRemove) {
+            removed.add(GlobalPos.of(target.dimension(), target.pos()));
+        }
+        List<GlobalPos> updated = current.selections().stream()
+                .filter(value -> !removed.contains(value))
+                .toList();
+        setMassPlacement(stack, new WrenchMassPlacement(current.area(), current.selectedBlock(), updated));
     }
 
     public static void clearMassSelections(ItemStack stack) {
@@ -1224,31 +1071,22 @@ public class WrenchItem extends Item {
             return;
         }
 
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            root.remove(KEY_MASS_SELECTIONS);
-            root.remove(KEY_MASS_DIMENSION);
-            root.remove(KEY_MASS_CORNER_A);
-            root.remove(KEY_MASS_CORNER_B);
-            root.remove(KEY_MASS_SELECTED_BLOCK);
-            writeRoot(customTag, root);
-        });
+        LegacyComponentMigration.migrateWrench(stack, null);
+        stack.remove(LogisticsDataComponents.WRENCH_MASS_PLACEMENT);
     }
 
-    @Nullable
-    private static MassSelectionTarget readSelection(CompoundTag entry) {
-        if (!entry.contains(KEY_SELECTION_DIMENSION, Tag.TAG_STRING)) {
-            return null;
-        }
+    private static WrenchMassPlacement getMassPlacement(ItemStack stack) {
+        LegacyComponentMigration.migrateWrench(stack, null);
+        return stack.getOrDefault(LogisticsDataComponents.WRENCH_MASS_PLACEMENT, WrenchMassPlacement.EMPTY);
+    }
 
-        ResourceLocation dimensionId = ResourceLocation.tryParse(entry.getString(KEY_SELECTION_DIMENSION));
-        if (dimensionId == null) {
-            return null;
+    private static void setMassPlacement(ItemStack stack, WrenchMassPlacement value) {
+        LegacyComponentMigration.migrateWrench(stack, null);
+        if (value.isEmpty()) {
+            stack.remove(LogisticsDataComponents.WRENCH_MASS_PLACEMENT);
+        } else {
+            stack.set(LogisticsDataComponents.WRENCH_MASS_PLACEMENT, value);
         }
-
-        ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
-        BlockPos pos = BlockPos.of(entry.getLong(KEY_SELECTION_POS));
-        return new MassSelectionTarget(dimension, pos);
     }
 
     private void sendClipboardPreview(ServerPlayer player, ItemStack wrenchStack) {
