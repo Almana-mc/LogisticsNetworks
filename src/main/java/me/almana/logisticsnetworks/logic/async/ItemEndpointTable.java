@@ -27,6 +27,11 @@ final class ItemEndpointTable {
 
     int capture(LogisticsNodeEntity node, @Nullable Direction direction, IItemHandler handler,
             Snapshots.OccupiedSlotBudget budget) {
+        return capture(node, direction, handler, budget, false);
+    }
+
+    int capture(LogisticsNodeEntity node, @Nullable Direction direction, IItemHandler handler,
+            Snapshots.OccupiedSlotBudget budget, boolean bulk) {
         EndpointKey key = EndpointKey.of(node, direction);
         Integer existing = indexes.get(key);
         if (existing == null && !node.isMountedOnCreate()) {
@@ -35,11 +40,15 @@ final class ItemEndpointTable {
         }
         if (existing != null) {
             indexes.put(key, existing);
+            NetworkSnapshot.ItemEndpoint endpoint = endpoints.get(existing);
+            if (bulk && endpoint.bulkSlotLimits() == null) {
+                endpoints.set(existing, withBulkSlotLimits(endpoint, handler));
+            }
             return existing;
         }
 
         int index = endpoints.size();
-        endpoints.add(capture(handler, budget));
+        endpoints.add(capture(handler, budget, bulk));
         indexes.put(key, index);
         if (!node.isMountedOnCreate()) {
             handlerIndexes.computeIfAbsent(handler, ignored -> new HashMap<>())
@@ -54,15 +63,25 @@ final class ItemEndpointTable {
 
     static NetworkSnapshot.ItemEndpoint capture(IItemHandler handler,
             @Nullable Snapshots.OccupiedSlotBudget budget) {
+        return capture(handler, budget, false);
+    }
+
+    static NetworkSnapshot.ItemEndpoint capture(IItemHandler handler,
+            @Nullable Snapshots.OccupiedSlotBudget budget, boolean bulk) {
         ThreadGuard.requireServerThread();
 
         int slots = handler.getSlots();
         List<Integer> occupied = new ArrayList<>();
         List<ItemStack> copies = new ArrayList<>();
         List<Integer> limits = new ArrayList<>();
+        int[] bulkSlotLimits = bulk ? new int[slots] : null;
 
         for (int slot = 0; slot < slots; slot++) {
             ItemStack stack = handler.getStackInSlot(slot);
+            int slotLimit = bulk ? handler.getSlotLimit(slot) : 0;
+            if (bulk) {
+                bulkSlotLimits[slot] = slotLimit;
+            }
             if (stack.isEmpty()) {
                 continue;
             }
@@ -71,7 +90,7 @@ final class ItemEndpointTable {
             }
             occupied.add(slot);
             copies.add(stack.copy());
-            limits.add(handler.getSlotLimit(slot));
+            limits.add(bulk ? slotLimit : handler.getSlotLimit(slot));
         }
 
         int[] occupiedSlots = new int[occupied.size()];
@@ -83,7 +102,25 @@ final class ItemEndpointTable {
 
         int defaultLimit = slots > 0 ? handler.getSlotLimit(firstEmptySlot(handler, slots)) : 64;
         return new NetworkSnapshot.ItemEndpoint(
-                slots, occupiedSlots, copies.toArray(ItemStack[]::new), defaultLimit, occupiedLimits);
+                slots, occupiedSlots, copies.toArray(ItemStack[]::new), defaultLimit, occupiedLimits,
+                bulkSlotLimits);
+    }
+
+    private static NetworkSnapshot.ItemEndpoint withBulkSlotLimits(
+            NetworkSnapshot.ItemEndpoint endpoint, IItemHandler handler) {
+        ThreadGuard.requireServerThread();
+
+        int[] bulkSlotLimits = new int[handler.getSlots()];
+        for (int slot = 0; slot < bulkSlotLimits.length; slot++) {
+            bulkSlotLimits[slot] = handler.getSlotLimit(slot);
+        }
+        return new NetworkSnapshot.ItemEndpoint(
+                endpoint.totalSlots(),
+                endpoint.occupiedSlots(),
+                endpoint.occupiedStacks(),
+                endpoint.defaultSlotLimit(),
+                endpoint.occupiedSlotLimits(),
+                bulkSlotLimits);
     }
 
     private static int firstEmptySlot(IItemHandler handler, int slots) {

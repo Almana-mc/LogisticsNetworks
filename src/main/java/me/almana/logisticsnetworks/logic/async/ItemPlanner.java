@@ -27,7 +27,7 @@ public final class ItemPlanner {
             targetRefs.add(new TransferPlan.TargetRef(target.nodeId(), target.channelIndex(), target.bulk()));
             engineTargets.add(new TransferEngine.ItemTransferTarget(
                     targetHandler,
-                    null,
+                    target.bulk() ? targetHandler : null,
                     target.importFilters(),
                     target.importFilterMode(),
                     TransferAmountRules.collect(unit.exportFilters(), target.importFilters(), readCache),

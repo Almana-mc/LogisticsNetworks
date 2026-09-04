@@ -10,9 +10,11 @@ public final class SnapshotItemHandler implements IItemHandlerModifiable {
     private final int totalSlots;
     private final Int2ObjectOpenHashMap<ItemStack> stacks;
     private final Int2IntOpenHashMap slotLimits;
+    private final int[] bulkSlotLimits;
 
     public SnapshotItemHandler(NetworkSnapshot.ItemEndpoint endpoint) {
         totalSlots = endpoint.totalSlots();
+        bulkSlotLimits = endpoint.bulkSlotLimits();
         int[] occupied = endpoint.occupiedSlots();
         stacks = new Int2ObjectOpenHashMap<>(occupied.length);
         slotLimits = new Int2IntOpenHashMap(occupied.length);
@@ -83,6 +85,49 @@ public final class SnapshotItemHandler implements IItemHandlerModifiable {
             }
         }
         return inserted >= stack.getCount()
+                ? ItemStack.EMPTY
+                : stack.copyWithCount(stack.getCount() - inserted);
+    }
+
+    public ItemStack insertBulkItem(ItemStack stack, boolean simulate) {
+        ItemStack remaining = stack.copy();
+
+        for (int slot = 0; slot < totalSlots && !remaining.isEmpty(); slot++) {
+            if (getStackInSlot(slot).isEmpty()) {
+                continue;
+            }
+            remaining = insertBulkItem(slot, remaining, simulate);
+        }
+        for (int slot = 0; slot < totalSlots && !remaining.isEmpty(); slot++) {
+            if (!getStackInSlot(slot).isEmpty()) {
+                continue;
+            }
+            remaining = insertBulkItem(slot, remaining, simulate);
+        }
+        return remaining;
+    }
+
+    private ItemStack insertBulkItem(int slot, ItemStack stack, boolean simulate) {
+        ItemStack existing = getStackInSlot(slot);
+        if (!existing.isEmpty() && !ItemStack.isSameItemSameComponents(existing, stack)) {
+            return stack;
+        }
+
+        int currentCount = existing.isEmpty() ? 0 : existing.getCount();
+        int inserted = Math.min(bulkSlotLimits[slot] - currentCount, stack.getCount());
+        if (inserted <= 0) {
+            return stack;
+        }
+        if (!simulate) {
+            if (existing.isEmpty()) {
+                setStackInSlot(slot, stack.copyWithCount(inserted));
+            } else {
+                ItemStack grown = existing.copy();
+                grown.grow(inserted);
+                setStackInSlot(slot, grown);
+            }
+        }
+        return inserted == stack.getCount()
                 ? ItemStack.EMPTY
                 : stack.copyWithCount(stack.getCount() - inserted);
     }

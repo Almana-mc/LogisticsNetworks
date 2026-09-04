@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
+import me.almana.logisticsnetworks.logic.async.SnapshotItemHandler;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -1022,7 +1023,7 @@ public class TransferEngine {
                     if (bulkHandler != null) {
                         if (bulkInsertRejections == null) {
                             bulkInsertRejections = new BulkInsertRejectionCache(
-                                    (handler, stack) -> SophisticatedCoreCompat.insertItem(handler, stack, true));
+                                    (handler, stack) -> insertBulkItem(handler, stack, true));
                         }
                         simRemainder = bulkInsertRejections.simulate(bulkHandler, simulatedInsert);
                     } else {
@@ -1200,7 +1201,7 @@ public class TransferEngine {
         }
         if (allowedSlots == null) {
             if (bulkHandler != null) {
-                return SophisticatedCoreCompat.insertItem(bulkHandler, stack, simulate);
+                return insertBulkItem(bulkHandler, stack, simulate);
             }
             return ItemHandlerHelper.insertItemStacked(handler, stack, simulate);
         }
@@ -1236,6 +1237,13 @@ public class TransferEngine {
         }
 
         return remaining;
+    }
+
+    private static ItemStack insertBulkItem(IItemHandler handler, ItemStack stack, boolean simulate) {
+        if (handler instanceof SnapshotItemHandler snapshot) {
+            return snapshot.insertBulkItem(stack, simulate);
+        }
+        return SophisticatedCoreCompat.insertItem(handler, stack, simulate);
     }
 
     private static ItemStack insertItemStrictAllowedSlots(IItemHandlerModifiable handler, ItemStack stack,

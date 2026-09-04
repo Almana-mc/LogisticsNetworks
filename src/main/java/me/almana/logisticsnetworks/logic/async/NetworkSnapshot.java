@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.logic.async;
 import me.almana.logisticsnetworks.data.FilterMode;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.UUID;
@@ -43,6 +44,7 @@ public record NetworkSnapshot(
             int[] occupiedSlots,
             ItemStack[] occupiedStacks,
             int defaultSlotLimit,
-            int[] occupiedSlotLimits) {
+            int[] occupiedSlotLimits,
+            @Nullable int[] bulkSlotLimits) {
     }
 }

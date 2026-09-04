@@ -148,7 +148,7 @@ public final class Snapshots {
                         engineTarget.hasImportSlotMapping(),
                         engineTarget.bulkHandler() != null,
                         endpoints.capture(ref.node(), ref.channel().getIoDirection(),
-                                engineTarget.handler(), occupiedSlots)));
+                                engineTarget.handler(), occupiedSlots, engineTarget.bulkHandler() != null)));
             }
 
             units.add(new NetworkSnapshot.ChannelUnit(
