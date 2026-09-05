@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.logic;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.ChestBlock;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.transfer.CombinedResourceHandler;
@@ -42,6 +43,9 @@ public final class TransferCapabilityCache {
         }
         if (dir != null) {
             return itemSide(level, dir);
+        }
+        if (level.getBlockState(node.getAttachedPos()).getBlock() instanceof ChestBlock) {
+            return itemSide(level, Direction.UP);
         }
         List<ResourceHandler<ItemResource>> found = new ArrayList<>(6);
         for (Direction side : Direction.values()) {

@@ -369,7 +369,7 @@ public class LogisticsNetwork {
 
         List<LogisticsNodeEntity> resolved = new ArrayList<>();
 
-        for (UUID nodeId : nodeUuids) {
+        for (UUID nodeId : sortedUuids) {
             LogisticsNodeEntity node = null;
             for (ServerLevel level : server.getAllLevels()) {
                 Entity entity = level.getEntity(nodeId);

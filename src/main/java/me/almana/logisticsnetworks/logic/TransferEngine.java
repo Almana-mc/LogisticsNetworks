@@ -24,6 +24,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.ChestType;
 
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.transfer.ResourceHandler;
@@ -387,8 +390,11 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
+            if (isSameItemStorage(sourceLevel, sourcePos, targetLevel, targetPos))
+                continue;
+
             ResourceHandler<ItemResource> targetHandler = target.node.capabilities().findItemHandler(target.channel.getIoDirection());
-            if (targetHandler == null)
+            if (targetHandler == null || targetHandler == sourceHandler)
                 continue;
 
             ItemStack[] importFilters = target.channel.getFilterItems();
@@ -635,6 +641,25 @@ public class TransferEngine {
         return sourceDim && dimCache.getOrDefault(target.getUUID(), false);
     }
 
+    public static boolean isSameItemStorage(ServerLevel sourceLevel, BlockPos sourcePos,
+            ServerLevel targetLevel, BlockPos targetPos) {
+        if (!sourceLevel.dimension().equals(targetLevel.dimension()))
+            return false;
+        if (sourcePos.equals(targetPos))
+            return true;
+
+        BlockState sourceState = sourceLevel.getBlockState(sourcePos);
+        BlockState targetState = targetLevel.getBlockState(targetPos);
+        if (!(sourceState.getBlock() instanceof ChestBlock) || !(targetState.getBlock() instanceof ChestBlock))
+            return false;
+        if (sourceState.getValue(ChestBlock.TYPE) == ChestType.SINGLE
+                || targetState.getValue(ChestBlock.TYPE) == ChestType.SINGLE)
+            return false;
+
+        return sourcePos.relative(ChestBlock.getConnectedDirection(sourceState)).equals(targetPos)
+                && targetPos.relative(ChestBlock.getConnectedDirection(targetState)).equals(sourcePos);
+    }
+
     private static int executeMove(ResourceHandler<ItemResource> source, List<ItemTransferTarget> targets, int limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             boolean[] sourceAllowedSlots,
@@ -689,6 +714,7 @@ public class TransferEngine {
         try (var tx = Transaction.openRoot()) {
             while (remaining > 0 && openTargetCount > 0) {
                 movedAny = false;
+                int targetsLeft = openTargetCount;
 
                 for (int targetIndex = 0; targetIndex < targets.size() && remaining > 0; targetIndex++) {
                     if (!openTargets[targetIndex]) {
@@ -697,8 +723,10 @@ public class TransferEngine {
 
                     ItemTransferTarget target = targets.get(targetIndex);
                     boolean movedForTarget = false;
+                    int targetRemaining = roundRobin ? Math.ceilDiv(remaining, targetsLeft) : remaining;
+                    targetsLeft--;
 
-                    for (int slot = 0; slot < source.size() && remaining > 0; slot++) {
+                    for (int slot = 0; slot < source.size() && remaining > 0 && targetRemaining > 0; slot++) {
                         if (sourceAllowedSlots != null
                                 && (slot >= sourceAllowedSlots.length || !sourceAllowedSlots[slot])) {
                             continue;
@@ -708,7 +736,7 @@ public class TransferEngine {
                         if (inSlot.isEmpty() || inSlot.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
                             continue;
                         }
-                        ItemStack extracted = inSlot.copyWithCount(Math.min(remaining, inSlot.getCount()));
+                        ItemStack extracted = inSlot.copyWithCount(Math.min(targetRemaining, inSlot.getCount()));
 
                         CompoundTag candidateComponents = (provider != null && hasNbtFilter)
                                 ? NbtFilterData.getSerializedComponents(extracted, provider)
@@ -797,6 +825,7 @@ public class TransferEngine {
                             movedAny = true;
                             movedForTarget = true;
                             remaining -= movedCount;
+                            targetRemaining -= movedCount;
 
                             if (anyAmountConstraints) {
                                 Item movedItem = extracted.getItem();
@@ -810,8 +839,9 @@ public class TransferEngine {
                                 Map<Item, Integer> movedByItem = roundRobin ? targetBatchMoved.get(targetIndex) : batchMoved;
                                 movedByItem.merge(movedItem, movedCount, Integer::sum);
                             }
-
-                            break;
+                            if (!roundRobin) {
+                                break;
+                            }
                         }
                     }
 
