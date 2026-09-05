@@ -1,6 +1,10 @@
 package me.almana.logisticsnetworks.data;
 
+import me.almana.logisticsnetworks.component.ClipboardSnapshot;
+import me.almana.logisticsnetworks.component.FilterComponentData;
+import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import net.minecraft.nbt.NbtOps;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.registration.ModTags;
 import net.minecraft.core.Direction;
@@ -18,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public final class NodeClipboardConfig {
@@ -112,6 +117,94 @@ public final class NodeClipboardConfig {
         }
         Arrays.fill(upgrades, ItemStack.EMPTY);
         return new NodeClipboardConfig(channels, filters, upgrades, null, null);
+    }
+
+    public ClipboardSnapshot toComponentSnapshot(@Nullable HolderLookup.Provider provider) {
+        List<ClipboardSnapshot.ChannelState> channelStates = new ArrayList<>(channels.length);
+        for (int channel = 0; channel < channels.length; channel++) {
+            ChannelConfig config = getChannelConfig(channel);
+            channelStates.add(new ClipboardSnapshot.ChannelState(
+                    config.enabled,
+                    config.mode,
+                    config.type,
+                    config.batchSize,
+                    config.tickDelay,
+                    Optional.ofNullable(config.ioDirection),
+                    config.redstoneMode,
+                    config.distributionMode,
+                    config.filterMode,
+                    config.priority,
+                    config.name));
+        }
+
+        List<ClipboardSnapshot.ItemSlot> upgrades = new ArrayList<>();
+        for (int slot = 0; slot < upgradeItems.length; slot++) {
+            ItemStack stack = upgradeItems[slot];
+            if (!stack.isEmpty()) {
+                upgrades.add(new ClipboardSnapshot.ItemSlot(slot, StackSnapshot.of(stack.copyWithCount(1))));
+            }
+        }
+
+        return new ClipboardSnapshot(
+                channelStates,
+                snapshotFilters(provider),
+                upgrades,
+                Optional.ofNullable(networkId),
+                Optional.ofNullable(networkName),
+                renderVisible,
+                nodeLabel);
+    }
+
+    private List<ClipboardSnapshot.FilterSlot> snapshotFilters(@Nullable HolderLookup.Provider provider) {
+        List<ClipboardSnapshot.FilterSlot> filters = new ArrayList<>();
+        for (int channel = 0; channel < filterItems.length; channel++) {
+            for (int slot = 0; slot < filterItems[channel].length; slot++) {
+                ItemStack stack = filterItems[channel][slot];
+                if (stack.isEmpty()) {
+                    continue;
+                }
+                ItemStack copy = stack.copyWithCount(1);
+                FilterComponentData.migrate(copy, provider);
+                filters.add(new ClipboardSnapshot.FilterSlot(channel, slot, StackSnapshot.of(copy)));
+            }
+        }
+        return filters;
+    }
+
+    public static NodeClipboardConfig fromComponentSnapshot(ClipboardSnapshot snapshot) {
+        NodeClipboardConfig result = createEmpty();
+        int channelCount = Math.min(result.channels.length, snapshot.channels().size());
+        for (int channel = 0; channel < channelCount; channel++) {
+            ClipboardSnapshot.ChannelState state = snapshot.channels().get(channel);
+            ChannelConfig config = result.channels[channel];
+            config.enabled = state.enabled();
+            config.mode = state.mode();
+            config.type = state.type();
+            config.batchSize = state.batchSize();
+            config.tickDelay = state.tickDelay();
+            config.ioDirection = state.direction().orElse(null);
+            config.redstoneMode = state.redstoneMode();
+            config.distributionMode = state.distributionMode();
+            config.filterMode = state.filterMode();
+            config.priority = state.priority();
+            config.name = state.name();
+        }
+        for (ClipboardSnapshot.FilterSlot filter : snapshot.filters()) {
+            if (filter.channel() >= 0 && filter.channel() < result.filterItems.length
+                    && filter.slot() >= 0 && filter.slot() < ChannelData.FILTER_SIZE) {
+                result.filterItems[filter.channel()][filter.slot()] = filter.stack().toStack().copyWithCount(1);
+            }
+        }
+        for (ClipboardSnapshot.ItemSlot upgrade : snapshot.upgrades()) {
+            if (upgrade.slot() >= 0 && upgrade.slot() < result.upgradeItems.length) {
+                result.upgradeItems[upgrade.slot()] = upgrade.stack().toStack().copyWithCount(1);
+            }
+        }
+        result.networkId = snapshot.networkId().orElse(null);
+        result.networkName = snapshot.networkName().orElse(null);
+        result.renderVisible = snapshot.renderVisible();
+        result.nodeLabel = snapshot.nodeLabel();
+        return result;
     }
 
     public int getChannelCount() {
@@ -454,6 +547,7 @@ public final class NodeClipboardConfig {
     }
 
     public CompoundTag save(HolderLookup.Provider provider) {
+        var ops = provider == null ? NbtOps.INSTANCE : provider.createSerializationContext(NbtOps.INSTANCE);
         CompoundTag root = new CompoundTag();
         root.putInt(KEY_VERSION, VERSION);
         if (networkId != null) {
@@ -498,7 +592,7 @@ public final class NodeClipboardConfig {
                 CompoundTag entry = new CompoundTag();
                 entry.putInt(KEY_CHANNEL, channelIndex);
                 entry.putInt(KEY_SLOT, slot);
-                entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, stack);
+                entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, ops, stack);
                 filtersTag.add(entry);
             }
         }
@@ -514,7 +608,7 @@ public final class NodeClipboardConfig {
             }
             CompoundTag entry = new CompoundTag();
             entry.putInt(KEY_SLOT, slot);
-            entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, stack);
+            entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, ops, stack);
             upgradesTag.add(entry);
         }
         if (!upgradesTag.isEmpty()) {
@@ -524,7 +618,7 @@ public final class NodeClipboardConfig {
         ListTag requiredTag = new ListTag();
         for (Requirement requirement : buildUpgradeRequirements(null)) {
             CompoundTag entry = new CompoundTag();
-            entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, requirement.stack());
+            entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, ops, requirement.stack());
             entry.putInt(KEY_COUNT, requirement.count());
             requiredTag.add(entry);
         }
@@ -535,8 +629,26 @@ public final class NodeClipboardConfig {
         return root;
     }
 
+    public static boolean canDecodeItems(CompoundTag root, @Nullable HolderLookup.Provider provider) {
+        var ops = provider == null ? NbtOps.INSTANCE : provider.createSerializationContext(NbtOps.INSTANCE);
+        for (String key : List.of(KEY_FILTERS, KEY_UPGRADES)) {
+            for (Tag tag : root.getListOrEmpty(key)) {
+                if (!(tag instanceof CompoundTag entry) || !entry.contains(KEY_ITEM)) continue;
+                int slot = entry.getIntOr(KEY_SLOT, -1);
+                int limit = key.equals(KEY_FILTERS) ? ChannelData.FILTER_SIZE : LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
+                if (slot < 0 || slot >= limit) continue;
+                if (key.equals(KEY_FILTERS)) {
+                    int channel = entry.getIntOr(KEY_CHANNEL, -1);
+                    if (channel < 0 || channel >= LogisticsNodeEntity.CHANNEL_COUNT) continue;
+                }
+                if (ItemStack.OPTIONAL_CODEC.parse(ops, entry.get(KEY_ITEM)).result().isEmpty()) return false;
+            }
+        }
+        return true;
+    }
+
     public static NodeClipboardConfig load(CompoundTag root, HolderLookup.Provider provider) {
-        if (root == null || root.isEmpty()) {
+        if (root == null || root.isEmpty() || !canDecodeItems(root, provider)) {
             return null;
         }
 
@@ -544,6 +656,7 @@ public final class NodeClipboardConfig {
             return null;
         }
 
+        var ops = provider == null ? NbtOps.INSTANCE : provider.createSerializationContext(NbtOps.INSTANCE);
         ChannelConfig[] channels = new ChannelConfig[LogisticsNodeEntity.CHANNEL_COUNT];
         ItemStack[][] filters = new ItemStack[LogisticsNodeEntity.CHANNEL_COUNT][ChannelData.FILTER_SIZE];
         ItemStack[] upgrades = new ItemStack[LogisticsNodeEntity.UPGRADE_SLOT_COUNT];
@@ -613,7 +726,7 @@ public final class NodeClipboardConfig {
                     continue;
                 }
 
-                ItemStack stack = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+                ItemStack stack = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY);
                 filters[channel][slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
             }
         }
@@ -629,7 +742,7 @@ public final class NodeClipboardConfig {
                     continue;
                 }
 
-                ItemStack stack = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+                ItemStack stack = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY);
                 upgrades[slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
             }
         }

@@ -4,6 +4,15 @@ import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
+import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -13,6 +22,7 @@ import net.minecraft.world.item.component.CustomData;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Locale;
 import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
@@ -29,6 +39,149 @@ public final class LegacyComponentMigration {
     private static final String SLOT_ROOT = "ln_slot_filter";
 
     private LegacyComponentMigration() {
+    }
+
+    public static boolean migrateWrench(ItemStack stack, @Nullable HolderLookup.Provider provider) {
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        if (!(custom.get("ln_wrench") instanceof CompoundTag root)) {
+            return true;
+        }
+        CompoundTag before = root.copy();
+        if (!stack.has(LogisticsDataComponents.WRENCH_MODE)) {
+            WrenchItem.Mode mode = WrenchItem.Mode.fromId(root.getStringOr("mode", ""));
+            if (mode != WrenchItem.Mode.WRENCH) {
+                stack.set(LogisticsDataComponents.WRENCH_MODE, mode);
+            }
+        }
+        root.remove("mode");
+        migrateWrenchPositions(stack, root);
+        boolean complete = migrateWrenchClipboard(stack, root, provider);
+        if (!before.equals(root)) {
+            if (root.isEmpty()) {
+                custom.remove("ln_wrench");
+            }
+            writeCustomData(stack, custom);
+        }
+        return complete;
+    }
+
+    private static void migrateWrenchPositions(ItemStack stack, CompoundTag root) {
+        if (root.get("ae2_link") instanceof CompoundTag link) {
+            if (!stack.has(LogisticsDataComponents.WRENCH_AE2_LINK)) {
+                GlobalPos.CODEC.parse(NbtOps.INSTANCE, link).result().ifPresent(value ->
+                        stack.set(LogisticsDataComponents.WRENCH_AE2_LINK,
+                                GlobalPos.of(value.dimension(), value.pos().immutable())));
+            }
+            link.remove("dimension");
+            link.remove("pos");
+            if (link.isEmpty()) root.remove("ae2_link");
+        }
+        if (!stack.has(LogisticsDataComponents.WRENCH_MASS_PLACEMENT)) {
+            WrenchMassPlacement value = readMassPlacement(root);
+            if (!value.isEmpty()) stack.set(LogisticsDataComponents.WRENCH_MASS_PLACEMENT, value);
+        }
+        for (String key : List.of("mass_dimension", "mass_corner_a", "mass_corner_b", "mass_selected_block")) {
+            root.remove(key);
+        }
+        stripWrenchEntries(root, "mass_selections", List.of("dimension", "pos"));
+    }
+
+    private static boolean migrateWrenchClipboard(ItemStack stack, CompoundTag root,
+            @Nullable HolderLookup.Provider provider) {
+        if (!hasLegacyClipboard(root)) return true;
+        if (!stack.has(LogisticsDataComponents.WRENCH_CLIPBOARD)) {
+            Tag tag = root.get("clipboard");
+            if (tag instanceof CompoundTag clipboard) {
+                if (!NodeClipboardConfig.canDecodeItems(clipboard, provider)) return false;
+                NodeClipboardConfig config = NodeClipboardConfig.load(clipboard, provider);
+                stack.set(LogisticsDataComponents.WRENCH_CLIPBOARD, config == null
+                        ? WrenchClipboard.invalid() : WrenchClipboard.valid(config.toComponentSnapshot(provider)));
+            } else {
+                stack.set(LogisticsDataComponents.WRENCH_CLIPBOARD, WrenchClipboard.invalid());
+            }
+        }
+        stripWrenchClipboard(root);
+        return true;
+    }
+
+    public static boolean hasWrenchClipboard(ItemStack stack) {
+        return stack.has(LogisticsDataComponents.WRENCH_CLIPBOARD)
+                || hasLegacyClipboard(getLegacyRoot(stack, "ln_wrench"));
+    }
+
+    private static boolean hasLegacyClipboard(CompoundTag root) {
+        Tag tag = root.get("clipboard");
+        if (tag == null) return false;
+        if (!(tag instanceof CompoundTag clipboard)) return true;
+        if (clipboard.isEmpty() || clipboard.contains("version")) return true;
+        if (!(clipboard.get("channels") instanceof ListTag channels)) return false;
+        return channels.isEmpty() || channels.stream().anyMatch(value ->
+                value instanceof CompoundTag channel && channel.contains("index"));
+    }
+
+    public static void clearWrenchClipboard(ItemStack stack) {
+        migrateWrench(stack, null);
+        stack.remove(LogisticsDataComponents.WRENCH_CLIPBOARD);
+        if (hasLegacyClipboard(getLegacyRoot(stack, "ln_wrench"))) {
+            updateLegacyRoot(stack, "ln_wrench", LegacyComponentMigration::stripWrenchClipboard);
+        }
+    }
+
+    private static void stripWrenchClipboard(CompoundTag root) {
+        if (!(root.get("clipboard") instanceof CompoundTag clipboard)) {
+            root.remove("clipboard");
+            return;
+        }
+        for (String key : List.of("version", "network_id", "network_name", "renderVisible", "node_label")) {
+            clipboard.remove(key);
+        }
+        stripWrenchEntries(clipboard, "channels", List.of("index", "enabled", "mode", "type", "batch", "delay",
+                "io", "redstone", "distribution", "filter_mode", "priority", "name"));
+        stripWrenchEntries(clipboard, "filters", List.of("channel", "slot", "item"));
+        stripWrenchEntries(clipboard, "upgrades", List.of("slot", "item"));
+        stripWrenchEntries(clipboard, "required_items", List.of("item", "count"));
+        if (clipboard.isEmpty()) root.remove("clipboard");
+    }
+
+    private static void stripWrenchEntries(CompoundTag root, String key, List<String> fields) {
+        if (!(root.get(key) instanceof ListTag entries)) return;
+        ListTag residual = new ListTag();
+        for (Tag entry : entries) {
+            if (entry instanceof CompoundTag compound) {
+                CompoundTag remaining = compound.copy();
+                fields.forEach(remaining::remove);
+                if (!remaining.isEmpty()) residual.add(remaining);
+            } else {
+                residual.add(entry.copy());
+            }
+        }
+        if (residual.isEmpty()) root.remove(key);
+        else root.put(key, residual);
+    }
+
+    private static WrenchMassPlacement readMassPlacement(CompoundTag root) {
+        Optional<WrenchMassPlacement.Area> area = Optional.empty();
+        Identifier dimensionId = root.getString("mass_dimension").filter(value -> !value.isBlank())
+                .map(Identifier::tryParse).orElse(null);
+        if (dimensionId != null && root.getLong("mass_corner_a").isPresent()) {
+            ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
+            GlobalPos first = GlobalPos.of(dimension, BlockPos.of(root.getLongOr("mass_corner_a", 0)));
+            Optional<BlockPos> second = root.getLong("mass_corner_b").map(BlockPos::of);
+            area = Optional.of(new WrenchMassPlacement.Area(first, second));
+        }
+        Optional<Identifier> selectedBlock = root.getString("mass_selected_block").filter(value -> !value.isBlank())
+                .map(Identifier::tryParse);
+        List<GlobalPos> selections = new ArrayList<>();
+        for (Tag value : root.getListOrEmpty("mass_selections")) {
+            if (!(value instanceof CompoundTag entry)) continue;
+            Identifier dimension = entry.getString("dimension").filter(id -> !id.isBlank())
+                    .map(Identifier::tryParse).orElse(null);
+            if (dimension != null && entry.getLong("pos").isPresent()) {
+                selections.add(GlobalPos.of(ResourceKey.create(Registries.DIMENSION, dimension),
+                        BlockPos.of(entry.getLongOr("pos", 0))));
+            }
+        }
+        return new WrenchMassPlacement(area, selectedBlock, selections);
     }
 
     public static void migrateTagFilter(ItemStack stack) {
