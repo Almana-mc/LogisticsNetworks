@@ -166,6 +166,41 @@ class ComponentCodecTest {
         assertEquals(before, pending.getComponentsPatch());
     }
 
+    @Test
+    void clearedMigratedFilterKeepsUnknownMetadataWithoutConfiguringRecipe() {
+        ItemStack cleared = new ItemStack(Registration.SMALL_FILTER.get());
+        CompoundTag root = ComponentMigrationTest.itemRoot("minecraft:iron_ingot");
+        CompoundTag entry = root.getListOrEmpty("items").getCompoundOrEmpty(0);
+        entry.putString("future_entry", "preserve-entry");
+        CompoundTag rule = new CompoundTag();
+        rule.putString("p", "minecraft:damage");
+        rule.putString("o", ">=");
+        rule.putInt("v", 1);
+        rule.putString("future_rule", "preserve-rule");
+        var rules = new net.minecraft.nbt.ListTag(); rules.add(rule); entry.put("nbt_rules", rules);
+        ComponentMigrationTest.legacy(cleared, "ln_filter", root);
+        FilterComponentData.migrate(cleared, ComponentMigrationTest.registries());
+        FilterItemData.setEntry(cleared, 0, ItemStack.EMPTY, ComponentMigrationTest.registries());
+        assertFalse(cleared.has(LogisticsDataComponents.FILTER_ENTRIES));
+        CompoundTag residual = cleared.get(DataComponents.CUSTOM_DATA).copyTag().getCompoundOrEmpty("ln_filter")
+                .getListOrEmpty("items").getCompoundOrEmpty(0);
+        assertEquals("preserve-entry", residual.getStringOr("future_entry", ""));
+        assertEquals("preserve-rule", residual.getListOrEmpty("nbt_rules").getCompoundOrEmpty(0)
+                .getStringOr("future_rule", ""));
+        var before = cleared.getComponentsPatch();
+        assertFalse(FilterComponentData.isConfigured(cleared, ComponentMigrationTest.registries()));
+        ItemStack blank = new ItemStack(Registration.SMALL_FILTER.get());
+        assertFalse(FilterCopyClearRecipe.INSTANCE.matches(CraftingInput.of(2, 1, List.of(cleared, blank)), null));
+        ItemStack configured = new ItemStack(Registration.SMALL_FILTER.get());
+        FilterItemData.setEntry(configured, 0, new ItemStack(Items.GOLD_INGOT), ComponentMigrationTest.registries());
+        var input = CraftingInput.of(2, 1, List.of(configured, cleared));
+        assertTrue(FilterCopyClearRecipe.INSTANCE.matches(input, null));
+        ItemStack result = FilterCopyClearRecipe.INSTANCE.assemble(input);
+        assertEquals(2, result.getCount());
+        assertTrue(ItemStack.isSameItemSameComponents(configured, result));
+        assertEquals(before, cleared.getComponentsPatch());
+    }
+
     private static ItemStack populatedStack() {
         ItemStack filter = new ItemStack(Registration.SMALL_FILTER.get());
         FilterItemData.setEntry(filter, 0, new ItemStack(Items.IRON_PICKAXE), ComponentMigrationTest.registries());

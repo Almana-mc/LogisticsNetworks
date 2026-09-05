@@ -316,13 +316,15 @@ public final class LegacyComponentMigration {
             case NAME_ROOT -> List.of("name", "scope");
             case AMOUNT_ROOT -> List.of("amount");
             case DURABILITY_ROOT -> List.of("operator", "value");
-            case NBT_ROOT -> List.of("path", "value", "rules");
+            case NBT_ROOT -> List.of("path", "value");
             case SLOT_ROOT -> List.of("slots");
             default -> List.of();
         };
         fields.forEach(remaining::remove);
         if (rootKey.equals(GENERAL_ROOT)) {
             retainUnknownEntries(remaining);
+        } else if (rootKey.equals(NBT_ROOT)) {
+            retainUnknownNbtRules(remaining);
         }
         if (remaining.isEmpty()) {
             custom.remove(rootKey);
@@ -354,6 +356,23 @@ public final class LegacyComponentMigration {
         }
         remaining.remove("items");
         if (!entries.isEmpty()) remaining.put("items", entries);
+    }
+
+    private static void retainUnknownNbtRules(CompoundTag remaining) {
+        ListTag rules = new ListTag();
+        for (Tag tag : remaining.getListOrEmpty("rules")) {
+            if (tag instanceof CompoundTag rule) {
+                CompoundTag extra = rule.copy();
+                if (!rule.getStringOr("path", "").trim().isEmpty() && rule.contains("value")) {
+                    List.of("path", "operator", "value", "enabled").forEach(extra::remove);
+                }
+                if (!extra.isEmpty()) rules.add(extra);
+            } else {
+                rules.add(tag.copy());
+            }
+        }
+        remaining.remove("rules");
+        if (!rules.isEmpty()) remaining.put("rules", rules);
     }
 
     private static void writeCustomData(ItemStack stack, CompoundTag custom) {

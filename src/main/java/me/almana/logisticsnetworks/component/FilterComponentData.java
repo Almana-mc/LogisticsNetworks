@@ -32,7 +32,7 @@ public final class FilterComponentData {
     public static boolean isConfigured(ItemStack stack, @Nullable HolderLookup.Provider provider) {
         ItemStack working = stack.copy();
         migrate(working, provider);
-        return hasConfiguredComponents(working) || hasPendingConfiguration(working);
+        return hasConfiguredComponents(working) || hasPendingConfiguration(working, provider);
     }
 
     private static boolean hasConfiguredComponents(ItemStack stack) {
@@ -56,11 +56,12 @@ public final class FilterComponentData {
                 || slots != null && !slots.slots().isEmpty();
     }
 
-    private static boolean hasPendingConfiguration(ItemStack stack) {
+    private static boolean hasPendingConfiguration(ItemStack stack, @Nullable HolderLookup.Provider provider) {
         var legacy = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
                 .getCompoundOrEmpty("ln_filter");
         return !stack.has(LogisticsDataComponents.FILTER_SETTINGS)
                 && (legacy.getBooleanOr("blacklist", false) || legacy.getIntOr("target", 0) != 0)
-                || !stack.has(LogisticsDataComponents.FILTER_ENTRIES) && !legacy.getListOrEmpty("items").isEmpty();
+                || !stack.has(LogisticsDataComponents.FILTER_ENTRIES)
+                && !GeneralFilterBridge.read(legacy, provider, null).complete();
     }
 }

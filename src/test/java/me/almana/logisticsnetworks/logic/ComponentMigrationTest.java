@@ -325,6 +325,41 @@ class ComponentMigrationTest {
         assertEquals("third", FilterItemData.getSlotNbtRules(filter, 0).getFirst().path());
     }
 
+    @Test
+    void standaloneNbtMigrationPreservesUnknownRuleFieldsAsInertResiduals() {
+        ItemStack filter = new ItemStack(Registration.SMALL_FILTER.get());
+        CompoundTag rule = new CompoundTag();
+        rule.putString("path", "minecraft:damage");
+        rule.putInt("operator", NbtFilterData.Operator.NOT_EQUALS.ordinal());
+        rule.putInt("value", 3);
+        rule.putBoolean("enabled", false);
+        rule.putString("future_rule", "preserve");
+        ListTag rules = new ListTag(); rules.add(rule);
+        CompoundTag root = new CompoundTag(); root.put("rules", rules);
+        legacy(filter, "ln_nbt_filter", root);
+        FilterComponentData.migrate(filter, registries());
+        var configured = filter.get(LogisticsDataComponents.NBT_FILTER);
+        assertEquals(1, configured.rules().size());
+        assertEquals("minecraft:damage", configured.rules().getFirst().path());
+        assertEquals(NbtFilterData.Operator.NOT_EQUALS, configured.rules().getFirst().operator());
+        assertEquals(net.minecraft.nbt.IntTag.valueOf(3), configured.rules().getFirst().value());
+        assertFalse(configured.rules().getFirst().enabled());
+        CompoundTag residual = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
+                .getCompoundOrEmpty("ln_nbt_filter").getListOrEmpty("rules").getCompoundOrEmpty(0);
+        assertEquals("preserve", residual.getStringOr("future_rule", ""));
+        assertEquals(java.util.Set.of("future_rule"), residual.keySet());
+        var before = filter.getComponentsPatch();
+        var custom = filter.get(DataComponents.CUSTOM_DATA);
+        FilterComponentData.migrate(filter, registries());
+        assertEquals(before, filter.getComponentsPatch());
+        assertSame(custom, filter.get(DataComponents.CUSTOM_DATA));
+        filter.remove(LogisticsDataComponents.NBT_FILTER);
+        FilterComponentData.migrate(filter, registries());
+        assertFalse(filter.has(LogisticsDataComponents.NBT_FILTER));
+        assertFalse(FilterComponentData.isConfigured(filter, registries()));
+        assertSame(custom, filter.get(DataComponents.CUSTOM_DATA));
+    }
+
     static RegistryAccess.Frozen registries() {
         return RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
     }
