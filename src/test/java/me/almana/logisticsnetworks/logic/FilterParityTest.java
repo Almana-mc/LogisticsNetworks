@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.logic;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
+import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
@@ -57,6 +58,29 @@ class FilterParityTest {
         assertAmounts(filter, components, 0, 0);
         components.putInt("quality", 1);
         assertAmounts(filter, components, 7, 3);
+    }
+
+    @Test
+    void amountLookupsSerializeOnceAcrossRejectedTagEntries() {
+        var filter = amountFilter();
+        FilterItemData.setEntryNbt(filter, 0, "quality", IntTag.valueOf(1));
+        FilterItemData.setEntryTag(filter, 1, "parity:tools");
+        FilterItemData.setEntryNbt(filter, 1, "quality", IntTag.valueOf(2));
+        FilterItemData.setEntryStock(filter, 1, 7);
+        FilterItemData.setEntryBatch(filter, 1, 3);
+        var candidate = new ItemStack(Items.IRON_PICKAXE);
+        var components = new CompoundTag();
+        components.putInt("quality", 2);
+        try (var nbt = mockStatic(NbtFilterData.class, CALLS_REAL_METHODS)) {
+            nbt.when(() -> NbtFilterData.getSerializedComponents(candidate, provider)).thenReturn(components);
+            assertEquals(7, FilterItemData.getItemAmountThresholdFull(filter, candidate, provider, null));
+            nbt.verify(() -> NbtFilterData.getSerializedComponents(candidate, provider), times(1));
+            assertEquals(3, FilterItemData.getItemBatchLimitFull(filter, candidate, provider, null, null));
+            nbt.verify(() -> NbtFilterData.getSerializedComponents(candidate, provider), times(2));
+            assertEquals(7, FilterItemData.getItemAmountThresholdFull(filter, candidate, provider, components));
+            assertEquals(3, FilterItemData.getItemBatchLimitFull(filter, candidate, provider, components, null));
+            nbt.verify(() -> NbtFilterData.getSerializedComponents(candidate, provider), times(2));
+        }
     }
 
     @Test
