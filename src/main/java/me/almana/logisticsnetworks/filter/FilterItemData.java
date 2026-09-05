@@ -1523,6 +1523,14 @@ public final class FilterItemData {
             String tag = slot.tag();
             if (tag != null) {
                 if (slot.fluidTag() != null && candidate.is(slot.fluidTag())) {
+                    if (slot.hasNbt()) {
+                        if (!candidateComponentsResolved) {
+                            candidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
+                            candidateComponentsResolved = true;
+                        }
+                        if (!checkNbtConstraint(slot, candidateComponents))
+                            continue;
+                    }
                     return true;
                 }
                 continue;
@@ -1594,8 +1602,19 @@ public final class FilterItemData {
 
             String tag = entry.tag();
             if (tag != null) {
-                if (entry.itemTag() != null && candidate.is(entry.itemTag()))
+                if (entry.itemTag() != null && candidate.is(entry.itemTag())) {
+                    if (entry.hasNbt()) {
+                        if (!candidateComponentsResolved) {
+                            resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
+                            candidateComponentsResolved = true;
+                        }
+                        if (!checkNbtConstraint(entry, resolvedCandidateComponents))
+                            continue;
+                    }
+                    if (!checkDurabilityConstraint(entry, candidate) || !checkEnchantedConstraint(entry, candidate))
+                        continue;
                     return entry.stock();
+                }
                 continue;
             }
 
@@ -1646,8 +1665,19 @@ public final class FilterItemData {
 
             String tag = entry.tag();
             if (tag != null) {
-                if (entry.itemTag() != null && candidate.is(entry.itemTag()))
+                if (entry.itemTag() != null && candidate.is(entry.itemTag())) {
+                    if (entry.hasNbt()) {
+                        if (!candidateComponentsResolved) {
+                            resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
+                            candidateComponentsResolved = true;
+                        }
+                        if (!checkNbtConstraint(entry, resolvedCandidateComponents))
+                            continue;
+                    }
+                    if (!checkDurabilityConstraint(entry, candidate) || !checkEnchantedConstraint(entry, candidate))
+                        continue;
                     return entry.batch();
+                }
                 continue;
             }
 

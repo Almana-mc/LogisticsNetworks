@@ -76,8 +76,11 @@ public final class FilterLogic {
                     hasWhitelist = true;
                     if (matched)
                         anyWhitelistMatched = true;
-                    else
+                    else {
+                        if (matchAll)
+                            return false;
                         allWhitelistsMatched = false;
+                    }
                 }
             }
         }
@@ -141,6 +144,8 @@ public final class FilterLogic {
                     if (matched) {
                         anyWhitelistMatched = true;
                     } else {
+                        if (matchAll)
+                            return false;
                         allWhitelistsMatched = false;
                     }
                 }
@@ -210,6 +215,8 @@ public final class FilterLogic {
                     if (matched) {
                         anyWhitelistMatched = true;
                     } else {
+                        if (matchAll)
+                            return false;
                         allWhitelistsMatched = false;
                     }
                 }
@@ -277,6 +284,8 @@ public final class FilterLogic {
                     if (matched) {
                         anyWhitelistMatched = true;
                     } else {
+                        if (matchAll)
+                            return false;
                         allWhitelistsMatched = false;
                     }
                 }
