@@ -500,5 +500,11 @@
   "tooltip.logisticsnetworks.wrench.ae2_linked_detail": "Linked to [%s, %s, %s] in %s",
   "tooltip.logisticsnetworks.wrench.ae2_unlinked": "Unlinked",
   "message.logisticsnetworks.ae2.linked": "Linked wrench to ME Network at [%s, %s, %s]",
-  "message.logisticsnetworks.ae2.unlinked": "Unlinked wrench from ME Network"
+  "message.logisticsnetworks.ae2.unlinked": "Unlinked wrench from ME Network",
+  "gui.logisticsnetworks.filter.scan_storage": "Scan attached storage",
+  "gui.logisticsnetworks.filter.scan_storage.unavailable": "Scan attached storage (standard node filters only)",
+  "message.logisticsnetworks.filter.scan_storage.success": "Added %s entries from attached storage",
+  "message.logisticsnetworks.filter.scan_storage.full": "Added %s entries; the filter is full",
+  "message.logisticsnetworks.filter.scan_storage.no_new_entries": "No new contents found in attached storage",
+  "message.logisticsnetworks.filter.scan_storage.unavailable": "No compatible attached storage found"
 }

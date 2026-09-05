@@ -261,12 +261,7 @@ public final class FilterItemData {
             }
         }
         for (int i = 0; i < cap; i++) {
-            if (getEntry(filter, i, provider).isEmpty()
-                    && getFluidEntry(filter, i).isEmpty()
-                    && getChemicalEntry(filter, i) == null
-                    && getEntryTag(filter, i) == null
-                    && !isNbtOnlySlot(filter, i)
-                    && getEntrySlotMapping(filter, i) == null) {
+            if (isEntrySlotAvailable(filter, i)) {
                 setEntry(filter, i, entry, provider);
                 return true;
             }
@@ -343,6 +338,26 @@ public final class FilterItemData {
                 root.put(KEY_ITEMS, list);
             }
         });
+    }
+
+    public static boolean addFluid(ItemStack filter, FluidStack fluid) {
+        if (!isFilterItem(filter) || fluid == null || fluid.isEmpty()) {
+            return false;
+        }
+        int cap = getCapacity(filter);
+        for (int i = 0; i < cap; i++) {
+            FluidStack existing = getFluidEntry(filter, i);
+            if (!existing.isEmpty() && FluidStack.isSameFluidSameComponents(existing, fluid)) {
+                return false;
+            }
+        }
+        for (int i = 0; i < cap; i++) {
+            if (isEntrySlotAvailable(filter, i)) {
+                setFluidEntry(filter, i, fluid);
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean hasAnyEntries(ItemStack stack) {
@@ -453,6 +468,25 @@ public final class FilterItemData {
         for (int i = 0; i < cap; i++) {
             FluidStack entry = getFluidEntry(filter, i);
             if (!entry.isEmpty() && FluidStack.isSameFluidSameComponents(entry, candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isEntrySlotAvailable(ItemStack filter, int slot) {
+        return !hasEntryItem(filter, slot)
+                && getFluidEntry(filter, slot).isEmpty()
+                && getChemicalEntry(filter, slot) == null
+                && getEntryTag(filter, slot) == null
+                && !isNbtOnlySlot(filter, slot)
+                && getEntrySlotMapping(filter, slot) == null;
+    }
+
+    public static boolean hasAvailableEntrySlot(ItemStack filter) {
+        int cap = getCapacity(filter);
+        for (int i = 0; i < cap; i++) {
+            if (isEntrySlotAvailable(filter, i)) {
                 return true;
             }
         }

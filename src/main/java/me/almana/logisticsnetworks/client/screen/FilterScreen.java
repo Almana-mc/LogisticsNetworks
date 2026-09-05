@@ -90,6 +90,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             LogisticsNetworks.MOD_ID, "textures/gui/filter_copy.png");
     private static final Identifier PASTE_ICON = Identifier.fromNamespaceAndPath(
             LogisticsNetworks.MOD_ID, "textures/gui/filter_paste.png");
+    private static final Identifier SCAN_STORAGE_ICON = Identifier.fromNamespaceAndPath(
+            LogisticsNetworks.MOD_ID, "textures/gui/filter_scan_storage.png");
     private static final int CLIPBOARD_BUTTON_SIZE = 12;
     private static final int CLIPBOARD_BUTTON_GAP = 2;
     private static FilterClipboardSnapshot copiedFilter;
@@ -842,6 +844,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private void renderClipboardButtons(GuiGraphics g, int mx, int my) {
+        drawIconButton(g, scanStorageButtonX(), clipboardButtonY(), SCAN_STORAGE_ICON, mx, my,
+                menu.canScanAttachedStorage());
         drawIconButton(g, copyButtonX(), clipboardButtonY(), COPY_ICON, mx, my, true);
         drawIconButton(g, pasteButtonX(), clipboardButtonY(), PASTE_ICON, mx, my, copiedFilter != null);
     }
@@ -855,6 +859,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     private int copyButtonX() {
         return pasteButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
+    }
+
+    private int scanStorageButtonX() {
+        return copyButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
     }
 
     private int pasteButtonX() {
@@ -987,6 +995,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (btn != 0) {
             return false;
         }
+        if (isHovering(scanStorageButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
+                (int) mx, (int) my)) {
+            return scanAttachedStorage();
+        }
         if (isHovering(copyButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, (int) mx, (int) my)) {
             return copyOpenFilter();
         }
@@ -994,6 +1006,27 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return pasteOpenFilter();
         }
         return false;
+    }
+
+    private boolean scanAttachedStorage() {
+        if (!menu.canScanAttachedStorage()) {
+            return true;
+        }
+        flushOpenEditors();
+        ClientPacketDistributor.sendToServer(ScanAttachedStoragePayload.INSTANCE);
+        return true;
+    }
+
+    public void showScanResult(int added, boolean storageFound, boolean filterFull) {
+        if (!storageFound) {
+            showFilterMessage("message.logisticsnetworks.filter.scan_storage.unavailable");
+        } else if (filterFull) {
+            showFilterMessage("message.logisticsnetworks.filter.scan_storage.full", added);
+        } else if (added == 0) {
+            showFilterMessage("message.logisticsnetworks.filter.scan_storage.no_new_entries");
+        } else {
+            showFilterMessage("message.logisticsnetworks.filter.scan_storage.success", added);
+        }
     }
 
     private boolean returnToNodeScreen() {
@@ -1710,6 +1743,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private boolean renderClipboardTooltip(GuiGraphics g, int mx, int my) {
+        if (isHovering(scanStorageButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
+                mx, my)) {
+            String key = menu.canScanAttachedStorage()
+                    ? "gui.logisticsnetworks.filter.scan_storage"
+                    : "gui.logisticsnetworks.filter.scan_storage.unavailable";
+            g.renderTooltip(font, Component.translatable(key), mx, my);
+            return true;
+        }
         if (isHovering(copyButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my)) {
             g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.copy"), mx, my);
             return true;
