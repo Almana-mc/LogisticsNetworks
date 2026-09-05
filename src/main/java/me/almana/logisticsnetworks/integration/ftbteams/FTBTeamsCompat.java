@@ -59,16 +59,20 @@ public final class FTBTeamsCompat {
     public static Set<UUID> getTeammateIds(UUID playerUuid) {
         if (!isLoaded())
             return Collections.emptySet();
-        FTBTeamsAPI.API api = FTBTeamsAPI.api();
-        if (!api.isManagerLoaded())
+        try {
+            FTBTeamsAPI.API api = FTBTeamsAPI.api();
+            if (!api.isManagerLoaded())
+                return Collections.emptySet();
+            return api.getManager().getTeamForPlayerID(playerUuid)
+                    .map(Team::getMembers)
+                    .map(members -> {
+                        Set<UUID> teammates = new HashSet<>(members);
+                        teammates.remove(playerUuid);
+                        return teammates;
+                    })
+                    .orElse(Collections.emptySet());
+        } catch (Exception e) {
             return Collections.emptySet();
-        return api.getManager().getTeamForPlayerID(playerUuid)
-                .map(Team::getMembers)
-                .map(members -> {
-                    Set<UUID> teammates = new HashSet<>(members);
-                    teammates.remove(playerUuid);
-                    return teammates;
-                })
-                .orElse(Collections.emptySet());
+        }
     }
 }

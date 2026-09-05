@@ -13,6 +13,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -99,6 +100,21 @@ class NodeAccessPolicyTest {
                 .map(LogisticsNetwork::getId)
                 .toList();
         assertEquals(expected, registry.getNetworksForPlayer(player).stream().map(LogisticsNetwork::getId).toList());
+    }
+
+    @Test
+    void precomputedTeammatesUseTheSamePolicy() {
+        UUID owner = UUID.randomUUID();
+        UUID player = UUID.randomUUID();
+
+        Config.nodeAccessMode = NodeAccessMode.TEAMS;
+        assertTrue(NodeAccessPolicy.canAccess(owner, player, Set.of(owner)));
+        assertFalse(NodeAccessPolicy.canAccess(owner, player, Set.of()));
+        Config.nodeAccessMode = NodeAccessMode.ALLIES;
+        assertTrue(NodeAccessPolicy.canAccess(owner, player, Set.of(owner)));
+        assertFalse(NodeAccessPolicy.canAccess(owner, player, Set.of()));
+        Config.nodeAccessMode = NodeAccessMode.ALL;
+        assertTrue(NodeAccessPolicy.canAccess(owner, player, Set.of()));
     }
 
     @Test
