@@ -4,7 +4,7 @@ import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.network.protocol.Packet;
@@ -339,9 +339,7 @@ public class LogisticsNodeEntity extends Entity {
 
     public boolean isOwnedBy(Player player) {
         UUID owner = getOwnerUUID();
-        if (owner == null) return true;
-        if (owner.equals(player.getUUID())) return true;
-        if (FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(owner, player.getUUID())) return true;
+        if (NodeAccessPolicy.canAccess(owner, player.getUUID())) return true;
         if (player instanceof ServerPlayer sp && sp.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) return true;
         return false;
     }

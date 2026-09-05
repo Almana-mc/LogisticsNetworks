@@ -6,6 +6,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.Set;
+
 @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID)
 public class Config {
 
@@ -18,6 +20,12 @@ public class Config {
     public static final ModConfigSpec.BooleanValue debugModeSpec = builder
             .comment("Enable debug overlays and diagnostic logging.")
             .define("debugMode", false);
+
+    private static final Set<String> NODE_ACCESS_MODES = Set.of("Teams", "All", "Allies");
+
+    public static final ModConfigSpec.ConfigValue<String> nodeAccessModeSpec = builder
+            .comment("Controls who can access nodes and networks. Allowed values: Teams, All, Allies.")
+            .define("nodeAccessMode", "Teams", value -> value instanceof String name && NODE_ACCESS_MODES.contains(name));
 
     public static final ModConfigSpec.BooleanValue juneAwarenessMessageSpec = builder
             .comment("Send June awareness message.")
@@ -52,6 +60,7 @@ public class Config {
 
     public static boolean dropNodeItem;
     public static boolean debugMode;
+    public static NodeAccessMode nodeAccessMode = NodeAccessMode.TEAMS;
     public static boolean juneAwarenessMessage;
     public static boolean networkTickingEnabled;
     public static int backoffMaxTicks = 40;
@@ -66,6 +75,7 @@ public class Config {
     public static void refresh() {
         dropNodeItem = dropNodeItemSpec.get();
         debugMode = debugModeSpec.get();
+        nodeAccessMode = NodeAccessMode.fromSerializedName(nodeAccessModeSpec.get());
         juneAwarenessMessage = juneAwarenessMessageSpec.get();
         networkTickingEnabled = networkTickingEnabledSpec.get();
         backoffMaxTicks = backoffMaxTicksSpec.get();

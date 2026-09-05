@@ -2,7 +2,7 @@ package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.nbt.CompoundTag;
@@ -138,13 +138,9 @@ public class NetworkRegistry extends SavedData {
     }
 
     public List<LogisticsNetwork> getNetworksForPlayer(UUID playerUuid) {
-        Set<UUID> teammateIds = FTBTeamsCompat.isLoaded()
-                ? FTBTeamsCompat.getTeammateIds(playerUuid)
-                : Collections.emptySet();
         List<LogisticsNetwork> result = new ArrayList<>();
         for (LogisticsNetwork network : networks.values()) {
-            UUID owner = network.getOwnerUuid();
-            if (owner == null || owner.equals(playerUuid) || teammateIds.contains(owner)) {
+            if (NodeAccessPolicy.canAccess(network.getOwnerUuid(), playerUuid)) {
                 result.add(network);
             }
         }

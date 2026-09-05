@@ -27,10 +27,33 @@ public final class FTBTeamsCompat {
     public static boolean arePlayersInSameTeam(UUID player1, UUID player2) {
         if (!isLoaded())
             return false;
-        FTBTeamsAPI.API api = FTBTeamsAPI.api();
-        if (!api.isManagerLoaded())
+        try {
+            FTBTeamsAPI.API api = FTBTeamsAPI.api();
+            if (!api.isManagerLoaded())
+                return false;
+            return api.getManager().arePlayersInSameTeam(player1, player2);
+        } catch (Exception e) {
             return false;
-        return api.getManager().arePlayersInSameTeam(player1, player2);
+        }
+    }
+
+    public static boolean arePlayersAllied(UUID player1, UUID player2) {
+        if (!isLoaded())
+            return false;
+        try {
+            FTBTeamsAPI.API api = FTBTeamsAPI.api();
+            if (!api.isManagerLoaded())
+                return false;
+
+            boolean firstTeamAllied = api.getManager().getTeamForPlayerID(player1)
+                    .map(team -> team.getRankForPlayer(player2).isAllyOrBetter())
+                    .orElse(false);
+            return firstTeamAllied || api.getManager().getTeamForPlayerID(player2)
+                    .map(team -> team.getRankForPlayer(player1).isAllyOrBetter())
+                    .orElse(false);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public static Set<UUID> getTeammateIds(UUID playerUuid) {

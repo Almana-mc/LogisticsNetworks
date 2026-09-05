@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.ClientConfig;
+import me.almana.logisticsnetworks.NodeAccessMode;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.DefaultNodeVisibilitySync;
 import me.almana.logisticsnetworks.client.theme.Theme;
@@ -63,6 +64,7 @@ public class ModConfigScreen extends Screen {
     private static final Component TEXT_DROP_NODE = Component.translatable("gui.logisticsnetworks.config.common.dropNodeItem");
     private static final Component TEXT_DEBUG = Component.translatable("gui.logisticsnetworks.config.common.debugMode");
     private static final Component TEXT_NETWORK_TICKING = Component.translatable("gui.logisticsnetworks.config.common.networkTicking");
+    private static final Component TEXT_NODE_ACCESS = Component.translatable("gui.logisticsnetworks.config.common.nodeAccessMode");
     private static final Component TEXT_BACKOFF_TICKS = Component.translatable("gui.logisticsnetworks.config.common.backoffMaxTicks");
     private static final Component TEXT_BACKOFF_ITEM = Component.translatable("gui.logisticsnetworks.config.common.backoffItem");
     private static final Component TEXT_BACKOFF_FLUID = Component.translatable("gui.logisticsnetworks.config.common.backoffFluid");
@@ -106,6 +108,7 @@ public class ModConfigScreen extends Screen {
     private boolean pendingDropNodeItem;
     private boolean pendingDebugMode;
     private boolean pendingNetworkTicking;
+    private NodeAccessMode pendingNodeAccessMode;
     private boolean pendingBackoffItem;
     private boolean pendingBackoffFluid;
     private boolean pendingBackoffEnergy;
@@ -151,6 +154,7 @@ public class ModConfigScreen extends Screen {
         pendingDropNodeItem = Config.dropNodeItemSpec.get();
         pendingDebugMode = Config.debugModeSpec.get();
         pendingNetworkTicking = Config.networkTickingEnabledSpec.get();
+        pendingNodeAccessMode = NodeAccessMode.fromSerializedName(Config.nodeAccessModeSpec.get());
         pendingBackoffItem = Config.backoffItemSpec.get();
         pendingBackoffFluid = Config.backoffFluidSpec.get();
         pendingBackoffEnergy = Config.backoffEnergySpec.get();
@@ -203,8 +207,16 @@ public class ModConfigScreen extends Screen {
     }
 
     private void buildCommonTab(int cx, int cy, int cw) {
+        Button accessModeButton = Button.builder(nodeAccessModeText(pendingNodeAccessMode), button -> {
+            NodeAccessMode[] modes = NodeAccessMode.values();
+            pendingNodeAccessMode = modes[(pendingNodeAccessMode.ordinal() + 1) % modes.length];
+            button.setMessage(nodeAccessModeText(pendingNodeAccessMode));
+        }).bounds(cx + cw - 104, cy + 53, 100, 16).build();
+        accessModeButton.active = canEditServerConfig;
+        addRenderableWidget(accessModeButton);
+
         if (canEditServerConfig) {
-            backoffMaxTicksBox = new EditBox(font, cx + 130, cy + 60, 60, 14, Component.empty());
+            backoffMaxTicksBox = new EditBox(font, cx + 130, cy + 74, 60, 14, Component.empty());
             backoffMaxTicksBox.setMaxLength(4);
             backoffMaxTicksBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
             backoffMaxTicksBox.setValue(String.valueOf(pendingBackoffMaxTicks));
@@ -368,19 +380,19 @@ public class ModConfigScreen extends Screen {
         y = renderCheckbox(g, cx, y, cw, TEXT_NETWORK_TICKING, pendingNetworkTicking, mx, my, locked);
 
         int labelColor = locked ? COL_INK_LOCKED : COL_INK;
-        g.text(font, TEXT_BACKOFF_TICKS, cx, cy + 64, labelColor, false);
+        g.text(font, TEXT_NODE_ACCESS, cx, cy + 57, labelColor, false);
+        g.text(font, TEXT_BACKOFF_TICKS, cx, cy + 78, labelColor, false);
         if (locked) {
-            g.text(font, String.valueOf(pendingBackoffMaxTicks), cx + 130, cy + 63, COL_INK_LOCKED, false);
+            g.text(font, String.valueOf(pendingBackoffMaxTicks), cx + 130, cy + 77, COL_INK_LOCKED, false);
         } else {
-            renderUnderline(g, cx + 130, cy + 60 + 14, 60);
+            renderUnderline(g, cx + 130, cy + 74 + 14, 60);
         }
 
-        y = cy + 80;
-        y = renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_ITEM, pendingBackoffItem, mx, my, locked);
-        y = renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_FLUID, pendingBackoffFluid, mx, my, locked);
-        y = renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_ENERGY, pendingBackoffEnergy, mx, my, locked);
-        y = renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_CHEMICAL, pendingBackoffChemical, mx, my, locked);
-        renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_SOURCE, pendingBackoffSource, mx, my, locked);
+        renderCheckbox(g, cx, cy + 94, cw, TEXT_BACKOFF_ITEM, pendingBackoffItem, mx, my, locked);
+        renderCheckbox(g, cx, cy + 110, cw, TEXT_BACKOFF_FLUID, pendingBackoffFluid, mx, my, locked);
+        renderCheckbox(g, cx, cy + 126, cw, TEXT_BACKOFF_ENERGY, pendingBackoffEnergy, mx, my, locked);
+        renderCheckbox(g, cx, cy + 142, cw, TEXT_BACKOFF_CHEMICAL, pendingBackoffChemical, mx, my, locked);
+        renderCheckbox(g, cx, cy + 158, cw, TEXT_BACKOFF_SOURCE, pendingBackoffSource, mx, my, locked);
     }
 
     private void renderClientTab(GuiGraphicsExtractor g, int cx, int cy, int cw, int mx, int my) {
@@ -618,15 +630,15 @@ public class ModConfigScreen extends Screen {
         y += 18;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingNetworkTicking = !pendingNetworkTicking; return true; }
 
-        y = cy + 80;
+        y = cy + 94;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingBackoffItem = !pendingBackoffItem; return true; }
-        y += 18;
+        y += 16;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingBackoffFluid = !pendingBackoffFluid; return true; }
-        y += 18;
+        y += 16;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingBackoffEnergy = !pendingBackoffEnergy; return true; }
-        y += 18;
+        y += 16;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingBackoffChemical = !pendingBackoffChemical; return true; }
-        y += 18;
+        y += 16;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingBackoffSource = !pendingBackoffSource; return true; }
 
         return false;
@@ -701,6 +713,7 @@ public class ModConfigScreen extends Screen {
             Config.dropNodeItemSpec.set(pendingDropNodeItem);
             Config.debugModeSpec.set(pendingDebugMode);
             Config.networkTickingEnabledSpec.set(pendingNetworkTicking);
+            Config.nodeAccessModeSpec.set(pendingNodeAccessMode.serializedName());
             Config.backoffItemSpec.set(pendingBackoffItem);
             Config.backoffFluidSpec.set(pendingBackoffFluid);
             Config.backoffEnergySpec.set(pendingBackoffEnergy);
@@ -769,6 +782,14 @@ public class ModConfigScreen extends Screen {
         } catch (NumberFormatException e) {
             return fallback;
         }
+    }
+
+    private Component nodeAccessModeText(NodeAccessMode mode) {
+        return switch (mode) {
+            case TEAMS -> Component.translatable("gui.logisticsnetworks.config.common.nodeAccessMode.teams");
+            case ALL -> Component.translatable("gui.logisticsnetworks.config.common.nodeAccessMode.all");
+            case ALLIES -> Component.translatable("gui.logisticsnetworks.config.common.nodeAccessMode.allies");
+        };
     }
 
     private int parseIntClamped(String s, int min, int max, int fallback) {

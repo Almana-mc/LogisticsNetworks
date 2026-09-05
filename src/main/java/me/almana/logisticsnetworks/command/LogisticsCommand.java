@@ -9,7 +9,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -161,9 +161,7 @@ public class LogisticsCommand {
         // Check ownership: must own the network, be a teammate, or be op
         if (!source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)
                 && source.getEntity() instanceof ServerPlayer player) {
-            if (target.getOwnerUuid() != null
-                    && !target.getOwnerUuid().equals(player.getUUID())
-                    && !(FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(target.getOwnerUuid(), player.getUUID()))) {
+            if (!NodeAccessPolicy.canAccess(target.getOwnerUuid(), player.getUUID())) {
                 source.sendFailure(Component.literal("You do not own this network."));
                 return 0;
             }
