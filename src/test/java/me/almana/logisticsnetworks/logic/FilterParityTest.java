@@ -46,6 +46,13 @@ class FilterParityTest {
         FilterItemData.setEntryTag(filter, 0, "parity:water");
         FilterItemData.setEntryNbt(filter, 0, "missing", IntTag.valueOf(1));
         assertFalse(FilterItemData.containsFluidFull(filter, new FluidStack(Fluids.WATER, 1000), provider));
+        CompoundTag quality = new CompoundTag();
+        quality.putInt("quality", 1);
+        FluidStack matching = new FluidStack(Fluids.WATER, 1000);
+        matching.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
+                net.minecraft.world.item.component.CustomData.of(quality));
+        FilterItemData.setEntryNbt(filter, 0, "minecraft:custom_data", quality);
+        assertTrue(FilterItemData.containsFluidFull(filter, matching, provider));
         FilterItemData.setEntryNbt(filter, 0, null, null);
         assertTrue(FilterItemData.containsFluidFull(filter, new FluidStack(Fluids.WATER, 1000), provider));
     }

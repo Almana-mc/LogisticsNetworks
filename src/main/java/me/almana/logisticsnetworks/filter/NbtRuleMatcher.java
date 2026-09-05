@@ -6,7 +6,7 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import org.jetbrains.annotations.Nullable;
 
-final class NbtRuleMatcher {
+public final class NbtRuleMatcher {
     private static final String OP_EQUALS = "=";
     private static final String OP_NOT_EQUALS = "!=";
     private static final String[] OPS = { "=", "!=", ">", "<", ">=", "<=" };
@@ -14,7 +14,7 @@ final class NbtRuleMatcher {
     private NbtRuleMatcher() {
     }
 
-    static String normalizeOperator(@Nullable String operator) {
+    public static String normalizeOperator(@Nullable String operator) {
         if (operator == null) {
             return OP_EQUALS;
         }

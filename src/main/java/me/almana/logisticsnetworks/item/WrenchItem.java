@@ -118,6 +118,8 @@ public class WrenchItem extends Item {
         COPY_PASTE("copy_paste"),
         MASS_PLACEMENT("mass_placement");
 
+        public static final com.mojang.serialization.Codec<Mode> CODEC = com.mojang.serialization.Codec.STRING.xmap(Mode::fromId, Mode::id);
+
         private final String id;
 
         Mode(String id) {

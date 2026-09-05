@@ -1,6 +1,10 @@
 package me.almana.logisticsnetworks.filter;
 
 import com.google.common.base.Suppliers;
+import me.almana.logisticsnetworks.component.FilterSettings;
+import me.almana.logisticsnetworks.component.GeneralFilterConfig;
+import me.almana.logisticsnetworks.component.LegacyComponentMigration;
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
@@ -32,7 +36,6 @@ import org.jetbrains.annotations.Nullable;
 
 public final class FilterItemData {
 
-    private static final String KEY_ROOT = "ln_filter";
     private static final String KEY_IS_BLACKLIST = "blacklist";
     private static final String KEY_TARGET_TYPE = "target";
     private static final String KEY_ITEMS = "items";
@@ -72,7 +75,8 @@ public final class FilterItemData {
         }
     }
 
-    private record CachedView(@Nullable CustomData key, ItemFilterView view) {
+    private record CachedView(@Nullable CustomData key, @Nullable FilterSettings settings,
+            @Nullable GeneralFilterConfig config, ItemFilterView view) {
     }
 
     private record ItemFilterSlot(
@@ -187,7 +191,7 @@ public final class FilterItemData {
         if (!isFilterItem(stack) || provider == null)
             return ItemStack.EMPTY;
 
-        CompoundTag root = getRoot(stack);
+        CompoundTag root = getRoot(stack, provider);
         ListTag list = getItemEntries(root);
 
         for (Tag t : list) {
@@ -210,7 +214,7 @@ public final class FilterItemData {
         ItemStack item = (value == null || value.isEmpty()) ? ItemStack.EMPTY : value.copyWithCount(1);
         RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, provider);
 
-        updateRoot(stack, root -> {
+        updateRoot(stack, provider, root -> {
             ListTag list = getItemEntries(root);
 
             CompoundTag existing = null;
@@ -1208,6 +1212,7 @@ public final class FilterItemData {
             ListTag items = getItemEntries(root);
             for (Tag t : items) {
                 if (t instanceof CompoundTag entry && getSlotIndex(entry) == slot) {
+                    migrateToNbtRules(entry);
                     if (!entry.contains(KEY_NBT_RULES))
                         return;
                     ListTag rules = entry.getListOrEmpty(KEY_NBT_RULES);
@@ -2022,14 +2027,17 @@ public final class FilterItemData {
             return buildItemFilterView(stack);
         }
 
+        LegacyComponentMigration.migrateGeneralFilter(stack, null);
         CustomData currentKey = stack.get(DataComponents.CUSTOM_DATA);
+        FilterSettings settings = stack.get(LogisticsDataComponents.FILTER_SETTINGS);
+        GeneralFilterConfig config = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
         CachedView cached = readCache.itemViews.get(stack);
-        if (cached != null && cached.key() == currentKey) {
+        if (cached != null && cached.key() == currentKey && cached.settings() == settings && cached.config() == config) {
             return cached.view();
         }
 
         ItemFilterView built = buildItemFilterView(stack);
-        readCache.itemViews.put(stack, new CachedView(currentKey, built));
+        readCache.itemViews.put(stack, new CachedView(currentKey, settings, config, built));
         return built;
     }
 
@@ -2287,21 +2295,19 @@ public final class FilterItemData {
     }
 
     private static CompoundTag getRoot(ItemStack stack) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
+        return getRoot(stack, null);
+    }
+
+    private static CompoundTag getRoot(ItemStack stack, @Nullable HolderLookup.Provider provider) {
+        return LegacyComponentMigration.getGeneralFilterRoot(stack, provider);
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
+        updateRoot(stack, null, modifier);
+    }
 
-            modifier.accept(root);
-
-            if (root.isEmpty()) {
-                customTag.remove(KEY_ROOT);
-            } else {
-                customTag.put(KEY_ROOT, root);
-            }
-        });
+    private static void updateRoot(ItemStack stack, @Nullable HolderLookup.Provider provider,
+            Consumer<CompoundTag> modifier) {
+        LegacyComponentMigration.updateGeneralFilterRoot(stack, provider, modifier);
     }
 }

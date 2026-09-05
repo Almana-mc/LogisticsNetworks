@@ -2,20 +2,15 @@ package me.almana.logisticsnetworks.recipe;
 
 import com.mojang.serialization.MapCodec;
 import me.almana.logisticsnetworks.registration.ModTags;
-import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.level.Level;
 
-import java.util.Set;
 
 public class FilterCopyClearRecipe extends CustomRecipe {
 
@@ -23,10 +18,6 @@ public class FilterCopyClearRecipe extends CustomRecipe {
     public static final MapCodec<FilterCopyClearRecipe> MAP_CODEC = MapCodec.unit(INSTANCE);
     public static final StreamCodec<RegistryFriendlyByteBuf, FilterCopyClearRecipe> STREAM_CODEC = StreamCodec.unit(INSTANCE);
     public static final RecipeSerializer<FilterCopyClearRecipe> SERIALIZER = new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
-
-    private static final Set<String> FILTER_ROOT_KEYS = Set.of(
-            "ln_filter",
-            "ln_mod_filter");
 
     @Override
     public boolean matches(CraftingInput input, Level level) {
@@ -91,17 +82,6 @@ public class FilterCopyClearRecipe extends CustomRecipe {
     }
 
     private static boolean isConfiguredFilter(ItemStack stack) {
-        if (!stack.has(DataComponents.CUSTOM_DATA)) {
-            return false;
-        }
-
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        for (String rootKey : FILTER_ROOT_KEYS) {
-            if (custom.contains(rootKey) && !custom.getCompound(rootKey).orElseGet(CompoundTag::new).isEmpty()) {
-                return true;
-            }
-        }
-
-        return false;
+        return me.almana.logisticsnetworks.component.FilterComponentData.isConfigured(stack, null);
     }
 }

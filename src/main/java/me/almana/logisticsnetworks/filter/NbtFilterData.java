@@ -75,6 +75,9 @@ public final class NbtFilterData {
         EQUALS("="),
         NOT_EQUALS("!=");
 
+        public static final com.mojang.serialization.Codec<Operator> CODEC = com.mojang.serialization.Codec.STRING.xmap(
+                symbol -> "!=".equals(symbol) ? NOT_EQUALS : EQUALS, Operator::symbol);
+
         private final String symbol;
 
         Operator(String symbol) {

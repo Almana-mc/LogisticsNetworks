@@ -170,6 +170,7 @@ public class Registration {
                                         .build());
 
         public static void init(IEventBus modEventBus) {
+                me.almana.logisticsnetworks.component.LogisticsDataComponents.REGISTRAR.register(modEventBus);
                 ENTITIES.register(modEventBus);
                 BLOCKS.register(modEventBus);
                 ITEMS.register(modEventBus);

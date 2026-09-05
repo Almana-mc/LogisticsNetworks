@@ -1,28 +1,22 @@
 package me.almana.logisticsnetworks.filter;
 
+import me.almana.logisticsnetworks.component.FilterSettings;
+import me.almana.logisticsnetworks.component.FilterSettingsData;
+import me.almana.logisticsnetworks.component.LegacyComponentMigration;
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
+import me.almana.logisticsnetworks.component.ModFilterConfig;
 import me.almana.logisticsnetworks.item.ModFilterItem;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
+
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 public final class ModFilterData {
-
-    private static final String KEY_ROOT = "ln_mod_filter";
-    private static final String KEY_IS_BLACKLIST = "blacklist";
-    private static final String KEY_MODS = "mods";
-    private static final String KEY_TARGET_TYPE = "target";
 
     private ModFilterData() {
     }
@@ -34,66 +28,38 @@ public final class ModFilterData {
     public static boolean isBlacklist(ItemStack stack) {
         if (!isModFilter(stack))
             return false;
-        return getRoot(stack).getBooleanOr(KEY_IS_BLACKLIST, false);
+        LegacyComponentMigration.migrateModFilter(stack);
+        return FilterSettingsData.get(stack).blacklist();
     }
 
     public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
         if (!isModFilter(stack))
             return;
 
-        updateRoot(stack, root -> {
-            if (isBlacklist) {
-                root.putBoolean(KEY_IS_BLACKLIST, true);
-            } else {
-                root.remove(KEY_IS_BLACKLIST);
-            }
-        });
+        LegacyComponentMigration.migrateModFilter(stack);
+        FilterSettingsData.setBlacklist(stack, isBlacklist);
     }
 
     public static FilterTargetType getTargetType(ItemStack stack) {
         if (!isModFilter(stack))
             return FilterTargetType.ITEMS;
-        CompoundTag root = getRoot(stack);
-        return FilterTargetType.fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
+        LegacyComponentMigration.migrateModFilter(stack);
+        return FilterSettingsData.get(stack).target();
     }
 
     public static void setTargetType(ItemStack stack, FilterTargetType type) {
         if (!isModFilter(stack))
             return;
 
-        FilterTargetType target = type == null ? FilterTargetType.ITEMS : type;
-        updateRoot(stack, root -> {
-            if (target == FilterTargetType.ITEMS) {
-                root.remove(KEY_TARGET_TYPE);
-            } else {
-                root.putInt(KEY_TARGET_TYPE, target.ordinal());
-            }
-        });
+        LegacyComponentMigration.migrateModFilter(stack);
+        FilterSettingsData.setTarget(stack, type);
     }
 
     public static List<String> getModFilters(ItemStack stack) {
         if (!isModFilter(stack))
             return List.of();
-        return readNamespaces(getRoot(stack));
-    }
-
-    private static List<String> readNamespaces(CompoundTag root) {
-        if (!root.contains(KEY_MODS))
-            return List.of();
-
-        ListTag list = root.getListOrEmpty(KEY_MODS);
-        List<String> mods = new ArrayList<>(list.size());
-
-        for (int i = 0; i < list.size(); i++) {
-            Tag tag = list.get(i);
-            if (tag instanceof StringTag st) {
-                String modId = normalizeModId(st.value());
-                if (modId != null) {
-                    mods.add(modId);
-                }
-            }
-        }
-        return mods;
+        LegacyComponentMigration.migrateModFilter(stack);
+        return stack.getOrDefault(LogisticsDataComponents.MOD_FILTER, new ModFilterConfig(List.of())).namespaces();
     }
 
     public static boolean hasAnyMods(ItemStack stack) {
@@ -103,20 +69,22 @@ public final class ModFilterData {
     record ModFilterView(FilterTargetType targetType, boolean blacklist, List<String> namespaces) {
     }
 
-    record CachedModView(@Nullable CustomData key, ModFilterView view) {
+    record CachedModView(@Nullable FilterSettings settings, @Nullable ModFilterConfig config, ModFilterView view) {
     }
 
     private static ModFilterView getModFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
         if (readCache == null)
             return buildModFilterView(stack);
 
-        CustomData currentKey = stack.get(DataComponents.CUSTOM_DATA);
+        LegacyComponentMigration.migrateModFilter(stack);
+        FilterSettings settings = stack.get(LogisticsDataComponents.FILTER_SETTINGS);
+        ModFilterConfig config = stack.get(LogisticsDataComponents.MOD_FILTER);
         CachedModView cached = readCache.modViews.get(stack);
-        if (cached != null && cached.key() == currentKey)
+        if (cached != null && cached.settings() == settings && cached.config() == config)
             return cached.view();
 
         ModFilterView built = buildModFilterView(stack);
-        readCache.modViews.put(stack, new CachedModView(currentKey, built));
+        readCache.modViews.put(stack, new CachedModView(settings, config, built));
         return built;
     }
 
@@ -124,11 +92,9 @@ public final class ModFilterData {
         if (!isModFilter(stack))
             return new ModFilterView(FilterTargetType.ITEMS, false, List.of());
 
-        CompoundTag root = getRoot(stack);
-        FilterTargetType targetType = FilterTargetType
-                .fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
-        boolean blacklist = root.getBooleanOr(KEY_IS_BLACKLIST, false);
-        return new ModFilterView(targetType, blacklist, readNamespaces(root));
+        LegacyComponentMigration.migrateModFilter(stack);
+        FilterSettings settings = FilterSettingsData.get(stack);
+        return new ModFilterView(settings.target(), settings.blacklist(), getModFilters(stack));
     }
 
     public static boolean hasAnyMods(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
@@ -180,20 +146,14 @@ public final class ModFilterData {
         if (modId == null)
             return false;
 
-        boolean[] changed = { false };
-        updateRoot(stack, root -> {
-            ListTag list = root.getListOrEmpty(KEY_MODS);
-
-            for (Tag t : list) {
-                if (t instanceof StringTag st && st.value().equals(modId))
-                    return;
-            }
-
-            list.add(StringTag.valueOf(modId));
-            root.put(KEY_MODS, list);
-            changed[0] = true;
-        });
-        return changed[0];
+        LegacyComponentMigration.migrateModFilter(stack);
+        List<String> mods = new ArrayList<>(getModFilters(stack));
+        if (mods.contains(modId)) {
+            return false;
+        }
+        mods.add(modId);
+        stack.set(LogisticsDataComponents.MOD_FILTER, new ModFilterConfig(mods));
+        return true;
     }
 
     public static boolean setSingleModFilter(ItemStack stack, String rawModId) {
@@ -203,22 +163,12 @@ public final class ModFilterData {
         if (modId == null)
             return false;
 
-        boolean[] changed = { false };
-        updateRoot(stack, root -> {
-            ListTag list = root.getListOrEmpty(KEY_MODS);
-            boolean alreadySingle = list.size() == 1
-                    && list.get(0) instanceof StringTag st
-                    && modId.equals(st.value());
-            if (alreadySingle) {
-                return;
-            }
-
-            ListTag single = new ListTag();
-            single.add(StringTag.valueOf(modId));
-            root.put(KEY_MODS, single);
-            changed[0] = true;
-        });
-        return changed[0];
+        LegacyComponentMigration.migrateModFilter(stack);
+        if (getModFilters(stack).equals(List.of(modId))) {
+            return false;
+        }
+        stack.set(LogisticsDataComponents.MOD_FILTER, new ModFilterConfig(List.of(modId)));
+        return true;
     }
 
     public static boolean removeModFilter(ItemStack stack, String rawModId) {
@@ -228,24 +178,17 @@ public final class ModFilterData {
         if (modId == null)
             return false;
 
-        boolean[] changed = { false };
-        updateRoot(stack, root -> {
-            if (!root.contains(KEY_MODS))
-                return;
-
-            ListTag list = root.getListOrEmpty(KEY_MODS);
-            boolean removed = list.removeIf(t -> t instanceof StringTag st && st.value().equals(modId));
-
-            if (removed) {
-                if (list.isEmpty()) {
-                    root.remove(KEY_MODS);
-                } else {
-                    root.put(KEY_MODS, list);
-                }
-                changed[0] = true;
-            }
-        });
-        return changed[0];
+        LegacyComponentMigration.migrateModFilter(stack);
+        List<String> mods = new ArrayList<>(getModFilters(stack));
+        if (!mods.remove(modId)) {
+            return false;
+        }
+        if (mods.isEmpty()) {
+            stack.remove(LogisticsDataComponents.MOD_FILTER);
+        } else {
+            stack.set(LogisticsDataComponents.MOD_FILTER, new ModFilterConfig(mods));
+        }
+        return true;
     }
 
     public static boolean containsMod(ItemStack stack, ItemStack candidate) {
@@ -307,22 +250,4 @@ public final class ModFilterData {
         return s;
     }
 
-    private static CompoundTag getRoot(ItemStack stack) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
-    }
-
-    private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = customTag.getCompound(KEY_ROOT).orElseGet(CompoundTag::new);
-
-            modifier.accept(root);
-
-            if (root.isEmpty()) {
-                customTag.remove(KEY_ROOT);
-            } else {
-                customTag.put(KEY_ROOT, root);
-            }
-        });
-    }
 }
