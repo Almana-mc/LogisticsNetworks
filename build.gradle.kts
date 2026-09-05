@@ -23,6 +23,7 @@ val mekanism_version: String by project
 val ars_nouveau_version: String by project
 val ae2_version: String by project
 val ftb_teams_version: String by project
+val ftb_library_version: String by project
 val emi_version: String by project
 val guideme_version: String by project
 
@@ -116,6 +117,9 @@ dependencies {
     runtimeOnly("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
 
     compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftb_teams_version}") {
+        isTransitive = false
+    }
+    compileOnly("dev.ftb.mods:ftb-library-neoforge:${ftb_library_version}") {
         isTransitive = false
     }
 
