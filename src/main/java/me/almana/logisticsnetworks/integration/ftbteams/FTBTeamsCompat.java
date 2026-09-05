@@ -1,8 +1,10 @@
 package me.almana.logisticsnetworks.integration.ftbteams;
 
+import com.mojang.logging.LogUtils;
 import dev.ftb.mods.ftbteams.api.FTBTeamsAPI;
 import dev.ftb.mods.ftbteams.api.Team;
 import net.neoforged.fml.ModList;
+import org.slf4j.Logger;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -11,6 +13,7 @@ import java.util.UUID;
 
 public final class FTBTeamsCompat {
 
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final String FTB_TEAMS_MOD_ID = "ftbteams";
     private static Boolean loaded = null;
 
@@ -33,6 +36,7 @@ public final class FTBTeamsCompat {
                 return false;
             return api.getManager().arePlayersInSameTeam(player1, player2);
         } catch (Exception e) {
+            LOGGER.error("FTB Teams same-team lookup failed for players {} and {}", player1, player2, e);
             return false;
         }
     }
@@ -52,6 +56,7 @@ public final class FTBTeamsCompat {
                     .map(team -> team.getRankForPlayer(player1).isAllyOrBetter())
                     .orElse(false);
         } catch (Exception e) {
+            LOGGER.error("FTB Teams ally lookup failed for players {} and {}", player1, player2, e);
             return false;
         }
     }
@@ -72,6 +77,7 @@ public final class FTBTeamsCompat {
                     })
                     .orElse(Collections.emptySet());
         } catch (Exception e) {
+            LOGGER.error("FTB Teams teammate lookup failed for player {}", playerUuid, e);
             return Collections.emptySet();
         }
     }
