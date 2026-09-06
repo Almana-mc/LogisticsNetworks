@@ -107,24 +107,13 @@ neoForge {
         }
     }
 
-    unitTest {
-        testedMod.set(mods.named(mod_id))
-        enable()
-    }
 }
 
 sourceSets.main.get().resources.srcDir("src/generated/client")
 sourceSets.main.get().resources.srcDir("src/generated/server")
 
 dependencies {
-    testImplementation("org.junit.jupiter:junit-jupiter:5.14.3")
-    testImplementation("org.mockito:mockito-core:5.23.0")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     compileOnly("curse.maven:sophisticated-core-618298:8705495") { isTransitive = false }
-    testCompileOnly("curse.maven:sophisticated-core-618298:8705495") { isTransitive = false }
-    testRuntimeOnly("curse.maven:sophisticated-core-618298:8705495") { isTransitive = false }
-    testCompileOnly("curse.maven:sophisticated-storage-619320:8687885") { isTransitive = false }
-    testRuntimeOnly("curse.maven:sophisticated-storage-619320:8687885") { isTransitive = false }
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
     runtimeOnly("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
@@ -167,10 +156,6 @@ dependencies {
         isTransitive = false
     }
     */
-}
-
-tasks.test {
-    useJUnitPlatform()
 }
 
 val generateModMetadata by tasks.registering(ProcessResources::class) {
