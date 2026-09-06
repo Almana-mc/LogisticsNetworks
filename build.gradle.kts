@@ -38,6 +38,10 @@ repositories {
     maven("https://api.modrinth.com/maven")
     maven("https://maven.ftb.dev/releases")
     maven("https://maven.terraformersmc.com/releases")
+    exclusiveContent {
+        forRepository { maven("https://www.cursemaven.com") }
+        filter { includeGroup("curse.maven") }
+    }
 }
 
 base {
@@ -112,6 +116,11 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.14.3")
     testImplementation("org.mockito:mockito-core:5.23.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    compileOnly("curse.maven:sophisticated-core-618298:8705495") { isTransitive = false }
+    testCompileOnly("curse.maven:sophisticated-core-618298:8705495") { isTransitive = false }
+    testRuntimeOnly("curse.maven:sophisticated-core-618298:8705495") { isTransitive = false }
+    testCompileOnly("curse.maven:sophisticated-storage-619320:8687885") { isTransitive = false }
+    testRuntimeOnly("curse.maven:sophisticated-storage-619320:8687885") { isTransitive = false }
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
     runtimeOnly("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
