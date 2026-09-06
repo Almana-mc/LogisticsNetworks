@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
@@ -668,6 +669,7 @@ public class TransferEngine {
             FilterItemData.ReadCache filterReadCache) {
 
         int remaining = limit;
+        BulkInsertRejectionCache bulkRejections = new BulkInsertRejectionCache();
         boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, filterReadCache);
         boolean hasAnyImportNbtFilter = false;
         for (ItemTransferTarget target : targets) {
@@ -805,13 +807,22 @@ public class TransferEngine {
                             continue;
                         }
 
+                        ItemStack toMove = extracted.copyWithCount(Math.min(allowed, extractable));
+                        ItemResource candidate = ItemResource.of(toMove);
+                        boolean bulk = importAllowedSlots == null && SophisticatedCoreCompat.isBulkHandler(target.handler());
+                        if (bulk && bulkRejections.isRejected(target.handler(), candidate, toMove.getCount())) {
+                            continue;
+                        }
+
                         int movedCount;
                         try (var move = Transaction.open(tx)) {
-                            ItemStack toMove = extracted.copyWithCount(Math.min(allowed, extractable));
                             ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, move,
                                     importAllowedSlots);
                             int targetAccepted = toMove.getCount() - uninserted.getCount();
                             if (targetAccepted <= 0) {
+                                if (bulk) {
+                                    bulkRejections.reject(target.handler(), candidate, toMove.getCount());
+                                }
                                 continue;
                             }
                             if (extractItem(source, slot, targetAccepted, move).getCount() != targetAccepted) {
@@ -822,6 +833,7 @@ public class TransferEngine {
                         }
 
                         if (movedCount > 0) {
+                            bulkRejections.clear();
                             movedAny = true;
                             movedForTarget = true;
                             remaining -= movedCount;
