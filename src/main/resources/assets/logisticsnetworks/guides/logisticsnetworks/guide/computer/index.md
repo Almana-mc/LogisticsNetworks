@@ -14,7 +14,7 @@ The Computer is a placeable block that gives you a terminal interface for watchi
 
 ## Opening The Computer
 
-Use **Secondary Interaction** on a placed Computer block to open the **Network Manager** screen. If you have a [Wrench](../wrench/index.md) anywhere in your inventory, the Computer **auto-loads** one copy of it into the drive bay slot in the top-right corner. The wrench is borrowed, not consumed — close the screen and the wrench stays on the Computer until you retrieve it manually.
+Use **Secondary Interaction** on a placed Computer block to open the **Network Manager** screen. If you have a [Wrench](../wrench/index.md) anywhere in your inventory, the Computer temporarily moves one wrench into its internal drive bay slot in the top-right corner. The wrench cannot be picked up from that slot. Closing the screen automatically returns the updated wrench to your inventory.
 
 The drive bay slot is only interactable on the Network Directory page. If you switch to the I/O Monitor or Node Table view you will not be able to touch the wrench slot until you back out.
 

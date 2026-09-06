@@ -28,7 +28,7 @@ The right-hand panel of the node configuration screen holds four things: a 3x2 g
 
 **Available filter types:**
 
-- The button picker creates **Normal**, **Mod**, or **Regex** filters. Inside a Normal filter you configure item, fluid, tag, NBT, durability, enchanted, slot, batch, and stock rules, and adjust its capacity.
+- The button picker creates **Normal**, **Mod**, or **Regex** filters. A Normal filter has a fixed 45-entry grid. Each entry can select an item, fluid, or tag and add NBT, durability, enchanted, slot, batch, or stock rules.
 - For detail on each filter type and how to configure them, see [Filters](../filters/index.md).
 
 **Empty slots = pass everything.** If all 6 slots are empty, the channel transfers any matching resource (subject to Type — an Item channel still only moves items, obviously). Filters are an optional narrowing, not a requirement.
@@ -40,10 +40,10 @@ Use Primary Interaction on the button above the filter grid to toggle between th
 - **Match Any** (default) — a resource is allowed if it passes **at least one** filter. Filters work like a checklist of acceptable items; any filter that says "yes" is enough.
 - **Match All** — a resource is allowed only if it passes **every** filter in the grid. Filters work like a stack of conditions that all have to be true at once.
 
-**Quick example:** suppose you put a **Tag Filter** set to `c:ores` and an **Amount Filter** set to "keep 64 in the chest" in the same channel's grid.
+**Quick example:** suppose you put a **Normal** filter with an entry set to `#c:ores` and a **Mod** filter set to `minecraft` in the same channel's grid.
 
-- **Match Any**: the channel will move anything tagged `c:ores`, **or** anything the Amount Filter allows. Either rule triggers.
-- **Match All**: the channel will only move items that are **both** tagged `c:ores` **and** pass the Amount Filter's threshold.
+- **Match Any**: the channel will move anything tagged `c:ores`, **or** anything from `minecraft`. Either filter can accept the resource.
+- **Match All**: the channel will only move resources that are **both** tagged `c:ores` **and** from `minecraft`.
 
 **How to change it:** use Primary Interaction on the button to flip between Any and All. The change takes effect instantly for the current channel.
 
