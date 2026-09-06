@@ -105,6 +105,7 @@ public final class TransferCommitter {
             Map<ResourceHandler<ItemResource>, Map<Item, Integer>> movedByTarget) {
         ThreadGuard.requireServerThread();
         if (shortfall <= 0) return 0;
+        long generation = network.getGeneration();
         var context = TransferEngine.prepareNetwork(network, server);
         if (context == null) return 0;
         var node = sourceNode(plan, network, context);
@@ -120,7 +121,7 @@ public final class TransferCommitter {
         return TransferEngine.executeMove(source, targets.targets(), limit, channel.getFilterItems(),
                 channel.getFilterMode(), null, ((ServerLevel) node.level()).registryAccess(),
                 channel.getDistributionMode() == DistributionMode.ROUND_ROBIN, cache, null,
-                movedByItem, movedByTarget);
+                movedByItem, movedByTarget, () -> network.getGeneration() == generation);
     }
 
     private static int batchLimit(ChannelData channel, int tier) {

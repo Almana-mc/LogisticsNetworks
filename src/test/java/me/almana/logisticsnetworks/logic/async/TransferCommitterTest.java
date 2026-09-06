@@ -220,6 +220,43 @@ class TransferCommitterTest extends SnapshotFixture {
     }
 
     @Test
+    void generationChangeDuringPartialRecoveryStopsLaterSlotsAndDestinations() throws Exception {
+        for (boolean roundRobin : new boolean[]{false, true}) {
+            var source = inventory(8, 8);
+            var original = inventory(0);
+            var recovery = spy(inventory(64));
+            var later = spy(inventory(64));
+            try (var f = new CommitFixture(source, original, recovery, later)) {
+                f.export.setBatchSize(16);
+                if (roundRobin) f.export.setDistributionMode(DistributionMode.ROUND_ROBIN);
+                var plan = f.plan();
+                original.set(0, IRON, 64);
+                recovery.set(0, ItemResource.EMPTY, 0);
+                later.set(0, ItemResource.EMPTY, 0);
+                doAnswer(call -> {
+                    int accepted = recovery.insert(0, call.getArgument(0),
+                            Math.min(4, (int) call.getArgument(1)), call.getArgument(2));
+                    if (accepted > 0) f.network.markCacheDirty();
+                    return accepted;
+                }).when(recovery).insert(any(ItemResource.class), anyInt(), any());
+                var result = f.commit(plan);
+                assertEquals(16, result.planned());
+                assertEquals(0, result.committed());
+                assertEquals(4, result.recovered());
+                assertEquals(4, result.moved());
+                assertEquals(4, recovery.getAmountAsInt(0));
+                assertEquals(0, later.getAmountAsInt(0));
+                assertEquals(4, source.getAmountAsInt(0));
+                assertEquals(8, source.getAmountAsInt(1));
+                assertEquals(4, f.export.getTelemetry().drainFlow());
+                assertEquals(0, result.wakeDelta());
+                verify(recovery, times(1)).insert(any(ItemResource.class), anyInt(), any());
+                verify(later, never()).insert(any(ItemResource.class), anyInt(), any());
+            }
+        }
+    }
+
+    @Test
     void recoverySharesCurrentStockAcrossAliasesOfOneHandler() throws Exception {
         var source = inventory(16);
         var shared = inventory(4);

@@ -46,6 +46,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.*;
+import java.util.function.BooleanSupplier;
 
 public class TransferEngine {
 
@@ -725,16 +726,17 @@ public class TransferEngine {
             FilterItemData.ReadCache filterReadCache, @Nullable MoveRecorder recorder) {
 
         return executeMove(source, targets, limit, exportFilters, exportFilterMode, sourceAllowedSlots,
-                provider, roundRobin, filterReadCache, recorder, Map.of(), null);
+                provider, roundRobin, filterReadCache, recorder, Map.of(), null, null);
     }
 
     public static int executeMove(ResourceHandler<ItemResource> source, List<ItemTransferTarget> targets, int limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode, boolean[] sourceAllowedSlots,
             HolderLookup.Provider provider, boolean roundRobin, FilterItemData.ReadCache filterReadCache,
             @Nullable MoveRecorder recorder, Map<Item, Integer> priorBatchMoved,
-            @Nullable Map<ResourceHandler<ItemResource>, Map<Item, Integer>> priorTargetBatchMoved) {
+            @Nullable Map<ResourceHandler<ItemResource>, Map<Item, Integer>> priorTargetBatchMoved,
+            @Nullable BooleanSupplier isCurrent) {
         return executeMove(source, targets, limit, exportFilters, exportFilterMode, sourceAllowedSlots,
-                provider, roundRobin, filterReadCache, recorder, priorBatchMoved, priorTargetBatchMoved, -1);
+                provider, roundRobin, filterReadCache, recorder, priorBatchMoved, priorTargetBatchMoved, isCurrent, -1);
     }
 
     private static int executeMove(ResourceHandler<ItemResource> source, List<ItemTransferTarget> targets, int limit,
@@ -742,7 +744,7 @@ public class TransferEngine {
             HolderLookup.Provider provider, boolean roundRobin, FilterItemData.ReadCache filterReadCache,
             @Nullable MoveRecorder recorder, Map<Item, Integer> priorBatchMoved,
             @Nullable Map<ResourceHandler<ItemResource>, Map<Item, Integer>> priorTargetBatchMoved,
-            int intentSlot) {
+            @Nullable BooleanSupplier isCurrent, int intentSlot) {
         int remaining = limit;
         int firstSourceSlot = Math.max(0, intentSlot);
         int sourceSlotEnd = intentSlot < 0 ? source.size() : intentSlot + 1;
@@ -810,6 +812,7 @@ public class TransferEngine {
                     targetsLeft--;
 
                     for (int slot = firstSourceSlot; slot < sourceSlotEnd && remaining > 0 && targetRemaining > 0; slot++) {
+                        if (isCurrent != null && !isCurrent.getAsBoolean()) break transfer;
                         if (sourceAllowedSlots != null
                                 && (slot >= sourceAllowedSlots.length || !sourceAllowedSlots[slot])) {
                             continue;
@@ -896,6 +899,7 @@ public class TransferEngine {
                             continue;
                         }
 
+                        if (isCurrent != null && !isCurrent.getAsBoolean()) break transfer;
                         int movedCount;
                         try (var move = Transaction.open(tx)) {
                             ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, move,
@@ -981,7 +985,7 @@ public class TransferEngine {
         }
         if (!Arrays.equals(mask, intent.targetSlotMask())) return 0;
         return executeMove(source, List.of(target), candidate.getCount(), exportFilters, exportMode,
-                null, provider, false, cache, null, priorBatchMoved, null, slot);
+                null, provider, false, cache, null, priorBatchMoved, null, null, slot);
     }
 
     private static ItemStack extractItem(ResourceHandler<ItemResource> handler, int slot, int amount,
