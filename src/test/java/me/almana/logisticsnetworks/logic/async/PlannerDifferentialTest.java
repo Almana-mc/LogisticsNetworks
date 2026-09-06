@@ -101,7 +101,7 @@ class PlannerDifferentialTest extends SnapshotFixture {
         var snapshot = snapshot(source, List.of(target), 64, false, NONE, NONE);
         var first = snapshot.units().getFirst();
         var second = new NetworkSnapshot.ChannelUnit(first.sourceNodeId(), 1, 64, NONE,
-                FilterMode.MATCH_ALL, 0, false, first.targets());
+                FilterMode.MATCH_ALL, 0, false, first.targets(), first.sourceBinding(), first.distributionMode());
         var shared = new NetworkSnapshot(snapshot.networkId(), 4, 12, 100, 7, provider(),
                 snapshot.endpoints(), List.of(first, second));
         var plan = worker(() -> NetworkPlanner.plan(shared));
@@ -162,10 +162,10 @@ class PlannerDifferentialTest extends SnapshotFixture {
         var refs = new ArrayList<NetworkSnapshot.TargetUnit>();
         for (var target : targets) {
             refs.add(new NetworkSnapshot.TargetUnit(UUID.randomUUID(), 0, imports, FilterMode.MATCH_ALL,
-                    FilterLogic.hasConfiguredSlotMapping(imports, FilterItemData.createReadCache()), false, endpoints.size()));
+                    FilterLogic.hasConfiguredSlotMapping(imports, FilterItemData.createReadCache()), false, endpoints.size(), null));
             endpoints.add(Snapshots.captureItems(target));
         }
-        var unit = new NetworkSnapshot.ChannelUnit(UUID.randomUUID(), 0, limit, exports, FilterMode.MATCH_ALL, 0, robin, refs);
+        var unit = new NetworkSnapshot.ChannelUnit(UUID.randomUUID(), 0, limit, exports, FilterMode.MATCH_ALL, 0, robin, refs, null, robin ? me.almana.logisticsnetworks.data.DistributionMode.ROUND_ROBIN : me.almana.logisticsnetworks.data.DistributionMode.PRIORITY);
         return new NetworkSnapshot(UUID.randomUUID(), 0, 0, 0, Long.MAX_VALUE, provider(), endpoints, List.of(unit));
     }
 

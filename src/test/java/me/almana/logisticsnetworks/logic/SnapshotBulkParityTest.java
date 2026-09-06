@@ -127,8 +127,8 @@ class SnapshotBulkParityTest {
 
     private static NetworkSnapshot snapshot(NetworkSnapshot.ItemEndpoint source, NetworkSnapshot.ItemEndpoint target) {
         var noFilters = new ItemStack[0];
-        var ref = new NetworkSnapshot.TargetUnit(UUID.randomUUID(), 0, noFilters, FilterMode.MATCH_ALL, false, true, 1);
-        var unit = new NetworkSnapshot.ChannelUnit(UUID.randomUUID(), 0, 128, noFilters, FilterMode.MATCH_ALL, 0, false, List.of(ref));
+        var ref = new NetworkSnapshot.TargetUnit(UUID.randomUUID(), 0, noFilters, FilterMode.MATCH_ALL, false, true, 1, null);
+        var unit = new NetworkSnapshot.ChannelUnit(UUID.randomUUID(), 0, 128, noFilters, FilterMode.MATCH_ALL, 0, false, List.of(ref), null, me.almana.logisticsnetworks.data.DistributionMode.PRIORITY);
         return new NetworkSnapshot(UUID.randomUUID(), 0, 0, 0, Long.MAX_VALUE,
                 RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY), List.of(source, target), List.of(unit));
     }

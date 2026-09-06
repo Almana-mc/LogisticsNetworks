@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.logic.async;
 
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.DistributionMode;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
@@ -31,7 +32,7 @@ public record NetworkSnapshot(
             FilterMode exportFilterMode,
             int sourceEndpoint,
             boolean roundRobin,
-            List<TargetUnit> targets) {
+            List<TargetUnit> targets, TransferPlan.EndpointBinding sourceBinding, DistributionMode distributionMode) {
         public ChannelUnit {
             exportFilters = Snapshots.copyFilters(exportFilters);
             targets = List.copyOf(targets);
@@ -50,7 +51,7 @@ public record NetworkSnapshot(
             FilterMode importFilterMode,
             boolean hasImportSlotMapping,
             boolean bulk,
-            int endpoint) {
+            int endpoint, TransferPlan.EndpointBinding binding) {
         public TargetUnit {
             importFilters = Snapshots.copyFilters(importFilters);
         }

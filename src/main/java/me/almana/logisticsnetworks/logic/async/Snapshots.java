@@ -126,7 +126,7 @@ public final class Snapshots {
         return new NetworkSnapshot.ChannelUnit(node.getUUID(), index, batchLimit,
                 channel.getFilterItems(), channel.getFilterMode(), sourceEndpoint,
                 channel.getDistributionMode() == DistributionMode.ROUND_ROBIN,
-                captureTargets(resolved, endpoints, occupiedSlots));
+                captureTargets(resolved, endpoints, occupiedSlots), binding(node, channel), channel.getDistributionMode());
     }
 
     private static List<NetworkSnapshot.TargetUnit> captureTargets(TransferEngine.ResolvedItemTargets resolved,
@@ -140,9 +140,14 @@ public final class Snapshots {
             units.add(new NetworkSnapshot.TargetUnit(ref.node().getUUID(), ref.channelIndex(),
                     target.importFilters(), target.importFilterMode(), target.hasImportSlotMapping(), bulk,
                     endpoints.capture(ref.node(), ref.channel().getIoDirection(), target.handler(),
-                            occupiedSlots, upgradedCapacity)));
+                            occupiedSlots, upgradedCapacity), binding(ref.node(), ref.channel())));
         }
         return units;
+    }
+
+    static TransferPlan.EndpointBinding binding(LogisticsNodeEntity node, ChannelData channel) {
+        return new TransferPlan.EndpointBinding(node.level().dimension(), node.getAttachedPos().asLong(),
+                channel.getIoDirection());
     }
 
     static long earlierItemWakeDelta(long currentMinimum, long cooldown) {

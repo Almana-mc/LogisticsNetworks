@@ -26,7 +26,7 @@ public final class ItemPlanner {
 
         var exportFilters = unit.exportFilters();
         for (NetworkSnapshot.TargetUnit target : unit.targets()) {
-            targetRefs.add(new TransferPlan.TargetRef(target.nodeId(), target.channelIndex(), target.bulk()));
+            targetRefs.add(new TransferPlan.TargetRef(target.nodeId(), target.channelIndex(), target.bulk(), target.binding()));
             engineTargets.add(engineTarget(target, exportFilters, endpoints, readCache));
         }
 
@@ -38,7 +38,8 @@ public final class ItemPlanner {
                 (sourceSlot, targetIndex, moved, mask) -> moves.add(new TransferPlan.MoveIntent(
                         sourceSlot, targetIndex, ItemResource.of(moved), moved.getCount(), mask)));
 
-        return new TransferPlan.ChannelMoves(unit.sourceNodeId(), unit.channelIndex(), targetRefs, moves);
+        return new TransferPlan.ChannelMoves(unit.sourceNodeId(), unit.channelIndex(), targetRefs, moves,
+                unit.sourceBinding(), unit.distributionMode());
     }
 
     private static TransferEngine.ItemTransferTarget engineTarget(NetworkSnapshot.TargetUnit target,
