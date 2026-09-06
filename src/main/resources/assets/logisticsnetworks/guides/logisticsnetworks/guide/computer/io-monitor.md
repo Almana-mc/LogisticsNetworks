@@ -18,18 +18,18 @@ Open it from the mounted network's subsystem buttons. Hit **EXIT** in the top-le
 Each row shows one channel index that has at least one node on this network running something:
 
 - **CH0** / **CH1** / ... — the channel index (0 through 8). Matches the channel-slot numbers on the node screen.
-- **Type** — what the channel is moving: **Items**, **Fluids**, **Energy**, **Chemicals**, or **Source**. Colored to match the type.
+- **Type** — what the channel is moving: **Items**, **Fluids**, or **Energy**. Colored to match the type.
 - **Node count** — how many nodes on this network have this channel enabled.
 
 The left edge of each row has a **colored bar** matching the channel type — green for items, blue for fluids, and so on. Handy for spotting the type at a glance without reading the right-hand text.
 
-Aggregation is **per channel index**, not per node. If you have 10 nodes all running an Item transfer on CH0, the list shows one `CH0 Items 10 nodes` row, not 10 rows. Click the row to drill into the graph.
+Aggregation is **per channel index**, not per node. If you have 10 nodes all running an Item transfer on CH0, the list shows one `CH0 Items 10 nodes` row, not 10 rows. Use **Primary Interaction (default: Left Click)** on the row to drill into the graph.
 
 ## Throughput Graph
 
 ![I/O Monitor throughput graph — live bars for CH0 peaking around 200K/s](../computer/images/io-monitor-graph.png)
 
-Clicking a channel row opens its graph. The graph shows a **live timeline of transfer throughput** for that channel:
+Using Primary Interaction on a channel row opens its graph. The graph shows a **live timeline of transfer throughput** for that channel:
 
 - **120 data points** total. Each bar is one sample; the rightmost bar is the newest.
 - Updates roughly once per second as telemetry streams in.
@@ -37,8 +37,6 @@ Clicking a channel row opens its graph. The graph shows a **live timeline of tra
   - **Items** — items per second.
   - **Fluids** — millibuckets per second (`mB/s`).
   - **Energy** — Forge Energy / RF per second.
-  - **Chemicals** — millibuckets per second.
-  - **Source** — source per second.
 - The **LIVE** indicator in the bottom-left lights up when new data is coming in.
 
 ## Reading The Graph

@@ -25,12 +25,12 @@ Each row shows one node on the network. Columns:
 
 ### Row Actions
 
-- **Highlight** (the lamp icon) — toggles a glowing outline on the node in the world, making it easy to find. The outline stays on until you click the lamp again or close the Computer screen.
+- **Highlight** (the lamp icon) — use **Primary Interaction (default: Left Click)** to toggle a glowing outline on the node in the world, making it easy to find. The outline stays on until you use Primary Interaction on the lamp again or close the Computer screen.
 - **Settings** (the gear / terminal icon) — opens that node's full configuration screen **remotely**, from wherever you are. You do not have to go stand next to the node to edit its channels or filters.
 
 ## Label Grouping
 
-Nodes with a label are grouped together under that label. The label name shows as a header row; click the header to collapse the whole group into one line, click it again to expand. Nodes without a label render flat at the bottom of the list.
+Nodes with a label are grouped together under that label. The label name shows as a header row; use Primary Interaction on the header to collapse the whole group into one line, then use it again to expand. Nodes without a label render flat at the bottom of the list.
 
 Collapse state is remembered for the session — expand the groups you are working on and collapse the rest to keep the table readable on big networks.
 

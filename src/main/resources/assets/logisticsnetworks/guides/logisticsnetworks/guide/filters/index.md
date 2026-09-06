@@ -55,6 +55,8 @@ Small, Medium, and Big filters all use the same exact-match behavior and the sam
 
 Each entry can also open a Detail page for tag matching, batch overrides, stock thresholds, NBT rules, and attached-inventory slot restrictions.
 
+When one of these filters is opened from a node channel, the **Scan attached storage** button can fill empty entries from the attached inventory or fluid tank. The screen reports how many entries were added, whether the filter filled up, whether nothing new was found, or whether no compatible storage was available. Scanning is active for item and fluid channels.
+
 ### Mod
 
 Mod filters match every item or fluid from one configured mod id.
@@ -109,13 +111,13 @@ Leave Batch or Stock at `0` to fall back to the channel settings or disable the 
 
 ## Copy & Paste a Filter
 
-While a filter screen is open you can copy its whole configuration and paste it into another open filter. Use **Ctrl + C** to copy and **Ctrl + V** to paste, or click the **copy** and **paste** icon buttons in the top-right of the filter header. Hover either button for a tooltip; the paste button is dimmed until something has been copied.
+While a filter screen is open you can copy its whole configuration and paste it into another open filter. Use **Ctrl+C** to copy and **Ctrl+V** to paste, or use **Primary Interaction (default: Left Click)** on the **copy** and **paste** icon buttons in the top-right of the filter header. Hover either button for a tooltip; the paste button is dimmed until something has been copied.
 
 This clipboard lives only in your current game session. It is **not** saved to the filter item, to a config, or to your operating system clipboard, and it is cleared when you leave the game. It is separate from the wrench [Copy / Paste](../wrench/copy-paste.md) clipboard.
 
 What gets copied depends on the filter type:
 
-- **Small / Medium / Big**: every entry plus its per-entry rules — item, fluid, chemical, or `#tag`, batch and stock amounts, slot mapping, NBT (strict flag, raw SNBT, rules, and Match Any/All mode), durability, and enchanted state — along with the filter's Whitelist/Blacklist mode and Type.
+- **Small / Medium / Big**: every entry plus its per-entry rules — item, fluid, or `#tag`, batch and stock amounts, slot mapping, NBT (strict flag, raw SNBT, rules, and Match Any/All mode), durability, and enchanted state — along with the filter's Whitelist/Blacklist mode and Type.
 - **Mod**: Whitelist/Blacklist mode, Type, and the selected mod id.
 - **Regex**: Whitelist/Blacklist mode, Type, the regex pattern, and the match scope.
 
@@ -126,7 +128,7 @@ Notes:
 - Pasting **replaces** the destination filter. Standard-filter slots are cleared first, then filled from the clipboard.
 - If the copied filter has more entries than the destination can hold, paste fills the destination to capacity and reports the truncation, for example `Filter pasted: 6/8 slots copied`.
 - Pasting into a different filter type (a standard filter into a Regex filter, for example) is rejected with an incompatible-type message.
-- Ctrl + C and Ctrl + V are ignored while a text box such as the regex or mod-id field is focused, so typing is never hijacked.
+- Ctrl+C and Ctrl+V are ignored while a text box such as the regex or mod-id field is focused, so typing is never hijacked.
 
 ## Copying Filters Between Nodes
 

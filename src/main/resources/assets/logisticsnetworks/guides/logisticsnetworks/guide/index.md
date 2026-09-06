@@ -6,7 +6,7 @@ navigation:
 
 # Logistics Networks
 
-Logistics Networks is an item, fluid, energy, and chemical transfer mod built around nodes and channels.
+Logistics Networks is an item, fluid, and energy transfer mod built around nodes and channels.
 
 ## Core Concepts
 
@@ -19,7 +19,7 @@ Logistics Networks is an item, fluid, energy, and chemical transfer mod built ar
 
 1. Craft a [Wrench](wrench/index.md) and a [Logistics Node](nodes/index.md)
 2. Place the node on any block with an inventory, tank, or energy storage
-3. Right-click the node with the wrench to open configuration
+3. Use **Secondary Interaction (default: Right Click)** on the node with the wrench to open configuration
 4. Assign the node to a network (or create a new one)
 5. Configure channels to import or export resources
 
@@ -45,6 +45,10 @@ So a Sender on channel 3 only sends to Receivers on channel 3. A Sender on chann
 Both nodes use channel 1, so they are linked. The Sender pulls iron out of the chest. The network hands it to the Receiver on channel 1. The Receiver pushes the iron into the furnace.
 
 That is all a transfer is: a Sender pulls out, a Receiver on the same channel number pushes in, and the network connects them.
+
+## Network Access
+
+Server owners choose who may use another player's nodes with the **Node Access** setting. The default is **Teams**, which follows FTB Teams membership when that mod is available. **All** allows every player, while **Allies** allows teammates and allied FTB Teams. Without FTB Teams, Teams remains owner-only and Allies adds no extra players.
 
 ## Guides
 

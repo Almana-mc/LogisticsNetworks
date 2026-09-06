@@ -24,7 +24,7 @@ A node picks its effective **tier** as the **highest** upgrade installed:
 | 3 | Diamond |
 | 4 | Netherite |
 
-If you install Iron + Gold + Diamond all at once, the node uses the **Diamond** caps. The Iron and Gold upgrades sit idle — they do not stack. Fill the other slots with [special upgrades](upgrades-special.md) instead (Dimensional, Mekanism Chemical, Ars Source) to get more mileage out of the extra slots.
+If you install Iron + Gold + Diamond all at once, the node uses the **Diamond** caps. The Iron and Gold upgrades sit idle — they do not stack. Use a [Dimensional Upgrade](upgrades-special.md#dimensional-upgrade) when the node needs to transfer across dimensions; the retained Chemical and Source upgrades are currently inactive.
 
 ## Tier Comparison
 
