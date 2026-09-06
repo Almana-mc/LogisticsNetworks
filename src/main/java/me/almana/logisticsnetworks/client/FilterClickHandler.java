@@ -42,6 +42,9 @@ public class FilterClickHandler {
         if (event.getScreen() instanceof FilterScreen)
             return;
 
+        if (event.getScreen() instanceof NodeScreen)
+            return;
+
         if (!shouldDispatchKeyboardAction(event.getScreen().getFocused()))
             return;
 

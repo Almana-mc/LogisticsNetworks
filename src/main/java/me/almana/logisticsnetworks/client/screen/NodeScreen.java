@@ -15,6 +15,7 @@ import me.almana.logisticsnetworks.data.RedstoneMode;
 
 import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.ClientControls;
+import me.almana.logisticsnetworks.client.FilterClickHandler;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.filter.FilterItemData;
@@ -1842,9 +1843,8 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
                 editor = null;
                 return true;
             }
-            if (editor.keyPressed(key, scan, modifiers)) {
-                return true;
-            }
+            editor.keyPressed(key, scan, modifiers);
+            return true;
         }
         if (key == 256) {
             if (channelNameEditing) {
@@ -1895,7 +1895,11 @@ public class NodeScreen extends LegacyContainerScreen<NodeMenu> {
         }
         int action = ClientControls.resolveKeyAction(key, scan, modifiers);
         if (action != -1) {
-            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
+            double cursorX = ClientControls.cursorX(minecraft);
+            double cursorY = ClientControls.cursorY(minecraft);
+            if (!handleInteraction(cursorX, cursorY, action) && action == 1) {
+                FilterClickHandler.openHoveredFilter(this);
+            }
             return true;
         }
         return true;
