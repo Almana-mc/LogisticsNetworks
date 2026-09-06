@@ -47,6 +47,15 @@ if (targetHandler == null) {
     continue;
 }
 hasUsableTarget = true;
+if (sourceHandler == targetHandler)
+    continue;
+
+ItemStack[] importFilters = target.channel.getFilterItems();
+boolean[] targetAllowedSlots = null;
+boolean hasImportSlotMapping = FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache);
+IItemHandler bulkHandler = hasImportSlotMapping
+        ? null
+        : capCache.findBulkItemHandler(target.node, targetHandler);
 
 if (shouldPauseForUnavailableMountedTargets(hasUsableTarget, hasUnavailableMountedTarget,
         hasStationaryTarget)) {
@@ -58,11 +67,34 @@ if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos)) {
 }
 IFluidHandler sourceHandler = capCache.findFluidHandler(sourceNode, exportChannel.getIoDirection());
 
+anyReachable = true;
+hasStationaryTarget |= !target.node.isMountedOnCreate();
+ServerLevel targetLevel = (ServerLevel) target.node.level();
+BlockPos targetPos = target.node.getAttachedPos();
+if (!target.node.isMountedOnCreate() && !targetLevel.isLoaded(targetPos)) {
+    continue;
+}
+
 IFluidHandler targetHandler = capCache.findFluidHandler(target.node, target.channel.getIoDirection());
 if (targetHandler == null) {
     hasUnavailableMountedTarget |= target.node.isMountedOnCreate();
     continue;
 }
+hasUsableTarget = true;
+if (sourceHandler == targetHandler)
+    continue;
+
+int filled = executeFluidMove(sourceHandler, targetHandler, remaining,
+        exportChannel.getFilterItems(), exportChannel.getFilterMode(),
+        target.channel.getFilterItems(), target.channel.getFilterMode(),
+        sourceLevel.registryAccess(), filterReadCache);
+if (filled > 0)
+    remaining -= filled;
+
+if (!anyReachable || shouldPauseForUnavailableMountedTargets(hasUsableTarget, hasUnavailableMountedTarget,
+        hasStationaryTarget))
+    return -1;
+return batchLimitMb - remaining;
 
 public static boolean canRunChannel(boolean mounted, ChannelType type, RedstoneMode redstoneMode) {
     if (!mounted) {
