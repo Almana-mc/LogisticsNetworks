@@ -8,7 +8,7 @@ public final class SourceTransferHelper {
     private SourceTransferHelper() {
     }
 
-    // 26.1 Ars API pending
+    // Enable when 26.1.2 is supported.
     /*
     @Nullable
     public static ISourceTile getSourceTile(ServerLevel level, BlockPos pos) {
@@ -21,7 +21,7 @@ public final class SourceTransferHelper {
     */
 
     public static boolean hasSourceTile(ServerLevel level, BlockPos pos) {
-        // 26.1 Ars API pending
+        // Enable when 26.1.2 is supported.
         /*
         return getSourceTile(level, pos) != null;
         */
@@ -30,7 +30,7 @@ public final class SourceTransferHelper {
 
     public static int transferBetween(ServerLevel sourceLevel, BlockPos sourcePos,
             ServerLevel targetLevel, BlockPos targetPos, int limit) {
-        // 26.1 Ars API pending
+        // Enable when 26.1.2 is supported.
         /*
         ISourceTile source = getSourceTile(sourceLevel, sourcePos);
         if (source == null) {

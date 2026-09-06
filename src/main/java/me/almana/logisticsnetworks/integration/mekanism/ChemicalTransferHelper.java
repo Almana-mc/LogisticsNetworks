@@ -14,7 +14,7 @@ import java.util.List;
 
 public final class ChemicalTransferHelper {
 
-    // 26.1 Mek API pending
+    // Enable when 26.1.2 is supported.
     /*
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -26,7 +26,7 @@ public final class ChemicalTransferHelper {
     private ChemicalTransferHelper() {
     }
 
-    // 26.1 Mek API pending
+    // Enable when 26.1.2 is supported.
     /*
     @Nullable
     public static IChemicalHandler getHandler(ServerLevel level, BlockPos pos, @Nullable Direction side) {
@@ -41,7 +41,7 @@ public final class ChemicalTransferHelper {
     */
 
     public static boolean hasHandler(ServerLevel level, BlockPos pos) {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         if (getHandler(level, pos, null) != null)
             return true;
@@ -54,7 +54,7 @@ public final class ChemicalTransferHelper {
     }
 
     public static List<String> getBlacklistedChemicalNames(ServerLevel level, BlockPos pos) {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         List<String> names = new ArrayList<>();
         IChemicalHandler handler = getHandler(level, pos, null);
@@ -74,7 +74,7 @@ public final class ChemicalTransferHelper {
     }
 
     public static boolean chemicalHasTag(String chemicalId, String tagId) {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         if (chemicalId == null || tagId == null)
             return false;
@@ -95,7 +95,7 @@ public final class ChemicalTransferHelper {
 
     @Nullable
     public static String getChemicalIdFromItem(ItemStack itemStack) {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         if (itemStack.isEmpty())
             return null;
@@ -114,7 +114,7 @@ public final class ChemicalTransferHelper {
 
     @Nullable
     public static List<String> getChemicalTagsFromItem(ItemStack itemStack) {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         if (itemStack.isEmpty())
             return null;
@@ -135,7 +135,7 @@ public final class ChemicalTransferHelper {
             ServerLevel targetLevel, BlockPos targetPos, @Nullable Direction targetSide, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode) {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         IChemicalHandler source = getHandler(sourceLevel, sourcePos, sourceSide);
         if (source == null) {
@@ -160,7 +160,7 @@ public final class ChemicalTransferHelper {
 
     @Nullable
     public static Identifier getChemicalIcon(String chemicalId) {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         ResourceLocation id = ResourceLocation.tryParse(chemicalId);
         if (id == null)
@@ -171,7 +171,7 @@ public final class ChemicalTransferHelper {
     }
 
     public static int getChemicalTint(String chemicalId) {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         ResourceLocation id = ResourceLocation.tryParse(chemicalId);
         if (id == null)
@@ -183,7 +183,7 @@ public final class ChemicalTransferHelper {
 
     @Nullable
     public static Component getChemicalTextComponent(String chemicalId) {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         ResourceLocation id = ResourceLocation.tryParse(chemicalId);
         if (id == null)
@@ -194,7 +194,7 @@ public final class ChemicalTransferHelper {
     }
 
     public static boolean isValidChemicalId(String chemicalId) {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         if (chemicalId == null) return false;
         ResourceLocation id = ResourceLocation.tryParse(chemicalId);
@@ -205,7 +205,7 @@ public final class ChemicalTransferHelper {
     }
 
     public static List<String> getAllChemicalIds() {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         List<String> ids = new ArrayList<>();
         for (Chemical chemical : MekanismAPI.CHEMICAL_REGISTRY) {
@@ -218,7 +218,7 @@ public final class ChemicalTransferHelper {
     }
 
     public static List<String> getAllChemicalTags() {
-        // 26.1 Mek API pending
+        // Enable when 26.1.2 is supported.
         /*
         java.util.Set<String> tags = new java.util.LinkedHashSet<>();
         for (Chemical chemical : MekanismAPI.CHEMICAL_REGISTRY) {
@@ -229,7 +229,7 @@ public final class ChemicalTransferHelper {
         return Collections.emptyList();
     }
 
-    // 26.1 Mek API pending
+    // Enable when 26.1.2 is supported.
     /*
     @Nullable
     public static String getChemicalId(ChemicalStack stack) {

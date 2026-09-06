@@ -3,7 +3,6 @@ package me.almana.logisticsnetworks.integration.mekanism;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
@@ -13,17 +12,24 @@ import net.minecraft.resources.Identifier;
 
 public final class MekanismCompat {
 
+    // Enable when 26.1.2 is supported.
+    /*
     private static final String MEKANISM_MOD_ID = "mekanism";
     private static Boolean loaded = null;
+    */
 
     private MekanismCompat() {
     }
 
     public static boolean isLoaded() {
+        // Enable when 26.1.2 is supported.
+        /*
         if (loaded == null) {
             loaded = ModList.get().isLoaded(MEKANISM_MOD_ID);
         }
         return loaded;
+        */
+        return false;
     }
 
     public static boolean hasChemicalStorage(ServerLevel level, BlockPos pos) {

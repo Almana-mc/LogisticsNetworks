@@ -38,6 +38,10 @@ repositories {
     maven("https://api.modrinth.com/maven")
     maven("https://maven.ftb.dev/releases")
     maven("https://maven.terraformersmc.com/releases")
+    // Enable when 26.1.2 is supported.
+    /*
+    maven("https://maven.createmod.net")
+    */
     exclusiveContent {
         forRepository { maven("https://www.cursemaven.com") }
         filter { includeGroup("curse.maven") }
@@ -146,8 +150,15 @@ dependencies {
         isTransitive = false
     }
 
-    // 26.1 compat deps pending
+    // Enable when 26.1.2 is supported.
     /*
+    compileOnly("com.simibubi.create:create-${minecraft_version}:${create_version}") {
+        isTransitive = false
+    }
+    compileOnly("net.createmod.ponder:ponder-neoforge:${ponder_version}") {
+        isTransitive = false
+    }
+
     compileOnly("mekanism:Mekanism:${mekanism_version}")
 
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")

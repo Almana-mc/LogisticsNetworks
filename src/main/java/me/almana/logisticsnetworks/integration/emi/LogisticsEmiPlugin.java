@@ -1,4 +1,4 @@
-// EMI has no 26.1 build yet; re-enable with the emi-neoforge dependency once available.
+// Enable when 26.1.2 is supported.
 /*
 package me.almana.logisticsnetworks.integration.emi;
 

@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "me.almana.logisticsnetworks.integration.create.mixin",
+  "plugin": "me.almana.logisticsnetworks.integration.create.mixin.CreateMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ContraptionLifecycleMixin",
+    "ContraptionInteractionMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -41,6 +41,10 @@ config = "${mod_id}.mixins.json"
 [[mixins]]
 config = "${mod_id}.client.mixins.json"
 
+# Enable when 26.1.2 is supported.
+#[[mixins]]
+#config = "${mod_id}.create.mixins.json"
+
 # The [[accessTransformers]] block allows you to declare where your AT file is.
 # If this block is omitted, a fallback attempt will be made to load an AT from META-INF/accesstransformer.cfg
 #[[accessTransformers]]
@@ -82,19 +86,29 @@ versionRange = "[29.5.0,)"
 ordering = "NONE"
 side = "CLIENT"
 
-[[dependencies."${mod_id}"]]
-modId = "mekanism"
-type = "optional"
-versionRange = "[10.7.0,)"
-ordering = "NONE"
-side = "BOTH"
+# Enable when 26.1.2 is supported.
+#[[dependencies."${mod_id}"]]
+#modId = "create"
+#type = "optional"
+#versionRange = "[6.0.9,6.1.0)"
+#ordering = "AFTER"
+#side = "BOTH"
 
-[[dependencies."${mod_id}"]]
-modId = "ars_nouveau"
-type = "optional"
-versionRange = "[5.0.0,)"
-ordering = "NONE"
-side = "BOTH"
+# Enable when 26.1.2 is supported.
+#[[dependencies."${mod_id}"]]
+#modId = "mekanism"
+#type = "optional"
+#versionRange = "[10.7.0,)"
+#ordering = "NONE"
+#side = "BOTH"
+
+# Enable when 26.1.2 is supported.
+#[[dependencies."${mod_id}"]]
+#modId = "ars_nouveau"
+#type = "optional"
+#versionRange = "[5.0.0,)"
+#ordering = "NONE"
+#side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "ftbteams"

@@ -21,7 +21,7 @@ public final class AttachedStorageFilterScanner {
     }
 
     public static Result scan(ServerLevel level, LogisticsNodeEntity node, ChannelData channel, ItemStack filter) {
-        // Enable Create storage later
+        // Enable when 26.1.2 is supported.
         /*
         if (node.isMountedOnCreate()) {
             return CreateCompat.isResolved(node)
@@ -43,7 +43,7 @@ public final class AttachedStorageFilterScanner {
                     level.registryAccess());
             case FLUIDS -> scanFluids(node.capabilities().findFluidHandler(channel.getIoDirection()), filter);
             case CHEMICALS -> {
-                // Enable Mekanism scanning later
+                // Enable when 26.1.2 is supported.
                 /*
                 yield scanChemicals(level, node, channel, filter);
                 */
