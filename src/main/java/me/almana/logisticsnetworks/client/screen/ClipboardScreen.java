@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.client.theme.Theme;
@@ -190,6 +191,11 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (key == 256) return super.keyPressed(key, scan, modifiers);
+        int action = ClientControls.resolveKeyAction(key, scan, modifiers);
+        if (action != -1) {
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
+            return true;
+        }
         return true;
     }
 
@@ -199,18 +205,20 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
             return super.mouseClicked(mouseX, mouseY, button);
         }
 
-        if (button == 0 || button == 1) {
-            if (handleUtilityClick(mouseX, mouseY)) {
-                return true;
-            }
-            if (handleHeaderClick(mouseX, mouseY)) {
-                return true;
-            }
-            if (handleSettingsClick(mouseX, mouseY, button)) {
-                return true;
-            }
-        }
+        int action = ClientControls.resolveMouseAction(mouseX, mouseY, button);
+        if (action != -1 && handleInteraction(mouseX, mouseY, action))
+            return true;
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean handleInteraction(double mouseX, double mouseY, int action) {
+        if (action != 0 && action != 1)
+            return false;
+        if (handleUtilityClick(mouseX, mouseY))
+            return true;
+        if (handleHeaderClick(mouseX, mouseY))
+            return true;
+        return handleSettingsClick(mouseX, mouseY, action);
     }
 
     private boolean handleUtilityClick(double mouseX, double mouseY) {
@@ -236,7 +244,7 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
         return false;
     }
 
-    private boolean handleSettingsClick(double mouseX, double mouseY, int mouseButton) {
+    private boolean handleSettingsClick(double mouseX, double mouseY, int action) {
         int panelX = leftPos + 12;
         int panelY = topPos + 44;
         int rowH = 14;
@@ -248,7 +256,7 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> {
                 continue;
             }
 
-            int id = mapRowToButton(row, mouseButton == 0);
+            int id = mapRowToButton(row, action == 0);
             if (id != -1) {
                 sendButton(id);
                 return true;

@@ -4,6 +4,8 @@ import com.mojang.blaze3d.platform.InputConstants;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.ClientInput;
+import me.almana.logisticsnetworks.client.ClientControls;
+import me.almana.logisticsnetworks.client.FilterClickHandler;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.client.theme.Theme;
@@ -1039,14 +1041,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return true;
     }
 
-    private boolean hasControlDown() {
-        return minecraft != null
-                && (InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LCONTROL)
-                        || InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_RCONTROL));
-    }
-
     private boolean handleClipboardShortcut(int key) {
-        if (!hasControlDown() || isTextInputFocused()) {
+        if (!ClientControls.modifier2Down() || isTextInputFocused()) {
             return false;
         }
         if (key == InputConstants.KEY_C) {
@@ -1071,87 +1067,90 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 || detailNbtInputBox != null && detailNbtInputBox.isFocused();
     }
 
-    private boolean hasAltDown() {
-        return minecraft != null
-                && (InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LALT)
-                        || InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_RALT));
-    }
-
-    private boolean hasShiftDown() {
-        return minecraft != null
-                && (InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LSHIFT)
-                        || InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_RSHIFT));
-    }
-
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
+        int action = ClientControls.resolveMouseAction(mx, my, btn);
+        if (action != -1 && handleInteraction(mx, my, action))
+            return true;
+        return super.mouseClicked(mx, my, btn);
+    }
+
+    private boolean handleInteraction(double mx, double my, int action) {
+        if (action != 0 && action != 1)
+            return false;
         if (blurManualInputIfNeeded(mx, my))
             return true;
-        if (btn == 0 && isHoveringBackButton(mx, my)) {
+        if (action == 0 && isHoveringBackButton(mx, my)) {
             return returnToNodeScreen();
         }
-        if (detailEditSlot < 0 && handleClipboardButtonClick(mx, my, btn)) {
+        if (detailEditSlot < 0 && handleClipboardButtonClick(mx, my, action)) {
             return true;
         }
-        boolean handled = false;
+        if (menu.isTagMode())
+            return finishInteraction(handleTagClick(mx, my, action), mx, my);
         if (menu.isModMode())
-            handled = handleModClick(mx, my, btn);
-        else if (menu.isNameMode())
-            handled = handleNameClick(mx, my, btn);
-        else {
-            if (detailEditSlot >= 0) {
-                handled = handleDetailPageClick(mx, my, btn);
-                if (!handled) {
-                    closeDetailPage();
-                    return true;
-                }
-                return true;
-            }
+            return finishInteraction(handleModClick(mx, my, action), mx, my);
+        if (menu.isAmountMode())
+            return finishInteraction(handleAmountClick(mx, my, action), mx, my);
+        if (menu.isDurabilityMode())
+            return finishInteraction(handleDurabilityClick(mx, my, action), mx, my);
+        if (menu.isNameMode())
+            return finishInteraction(handleNameClick(mx, my, action), mx, my);
+        return handleDefaultModeInteraction(mx, my, action);
+    }
 
-            if (tagEditSlot >= 0) {
-                handled = handleTagSubModeClick(mx, my, btn);
-                if (!handled) {
-                    closeTagSubMode();
-                    return true;
-                }
-                return true;
-            }
-            if (nbtEditSlot >= 0) {
-                handled = handleNbtSubModeClick(mx, my, btn);
-                if (!handled) {
-                    closeNbtSubMode();
-                    return true;
-                }
-                return true;
-            }
+    private boolean handleDefaultModeInteraction(double mx, double my, int action) {
+        if (detailEditSlot >= 0)
+            return handleDetailPageInteraction(mx, my, action);
+        if (tagEditSlot >= 0)
+            return handleTagPageInteraction(mx, my, action);
+        if (nbtEditSlot >= 0)
+            return handleNbtPageInteraction(mx, my, action);
 
-            if (hasControlDown()) {
-                int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
-                if (hoveredSlot >= 0) {
-                    if (btn == 0) {
-                        enterDetailPage(hoveredSlot);
-                        return true;
-                    }
-                }
-            }
-
+        if (action == 0 && ClientControls.modifier2Down()) {
             int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
             if (hoveredSlot >= 0) {
-                minecraft.gameMode.handleContainerInput(menu.containerId, hoveredSlot, btn, net.minecraft.world.inventory.ContainerInput.PICKUP, minecraft.player);
+                enterDetailPage(hoveredSlot);
                 return true;
             }
-
-            handled = handleModeControlClick(mx, my, !menu.isNodeFilter());
         }
 
-        if (!handled) {
-            if (isDropdownOpen && !isHoveringDropdown(mx, my)) {
-                isDropdownOpen = false;
-                return true;
-            }
-            return super.mouseClicked(mx, my, btn);
+        int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
+        if (hoveredSlot >= 0) {
+            minecraft.gameMode.handleContainerInput(menu.containerId, hoveredSlot, action,
+                    net.minecraft.world.inventory.ContainerInput.PICKUP, minecraft.player);
+            return true;
         }
+
+        return finishInteraction(handleModeControlClick(mx, my, !menu.isNodeFilter()), mx, my);
+    }
+
+    private boolean handleDetailPageInteraction(double mx, double my, int action) {
+        if (!handleDetailPageClick(mx, my, action))
+            closeDetailPage();
         return true;
+    }
+
+    private boolean handleTagPageInteraction(double mx, double my, int action) {
+        if (!handleTagSubModeClick(mx, my, action))
+            closeTagSubMode();
+        return true;
+    }
+
+    private boolean handleNbtPageInteraction(double mx, double my, int action) {
+        if (!handleNbtSubModeClick(mx, my, action))
+            closeNbtSubMode();
+        return true;
+    }
+
+    private boolean finishInteraction(boolean handled, double mx, double my) {
+        if (handled)
+            return true;
+        if (isDropdownOpen && !isHoveringDropdown(mx, my)) {
+            isDropdownOpen = false;
+            return true;
+        }
+        return false;
     }
 
     private boolean blurManualInputIfNeeded(double mx, double my) {
@@ -1601,6 +1600,13 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             manualInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
             return true;
         }
+        int action = ClientControls.resolveKeyAction(key, scan, modifiers);
+        if (action != -1) {
+            if (action == 1 && FilterClickHandler.openHoveredFilter(this))
+                return true;
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
+            return true;
+        }
         return true;
     }
 
@@ -1672,7 +1678,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             if (hoveredSlot >= 0 && hasEntryInSlot(hoveredSlot)) {
                 int current = menu.getEntryAmount(hoveredSlot);
                 int next;
-                if (hasAltDown()) {
+                if (ClientControls.modifier3Down()) {
                     next = sy > 0 ? getMaxAmountForType(menu.getTargetType()) : (current > 0 ? 1 : 0);
                 } else {
                     int delta = computeScrollDelta(sy, menu.getTargetType());
@@ -1722,15 +1728,15 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private int computeScrollDelta(double scrollDirection, FilterTargetType targetType) {
         int sign = scrollDirection > 0 ? 1 : -1;
         if (targetType == FilterTargetType.FLUIDS || targetType == FilterTargetType.CHEMICALS) {
-            if (hasControlDown())
+            if (ClientControls.modifier2Down())
                 return sign * 1000;
-            if (hasShiftDown())
+            if (ClientControls.modifier1Down())
                 return sign * 500;
             return sign * 50;
         }
-        if (hasControlDown())
+        if (ClientControls.modifier2Down())
             return sign * 64;
-        if (hasShiftDown())
+        if (ClientControls.modifier1Down())
             return sign * 8;
         return sign;
     }
@@ -4078,6 +4084,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return false;
         }
 
+        if (detailNbtRawMode && detailNbtInputBox.isFocused()
+                && !detailNbtInputBox.isMouseOver(mx, my)) {
+            flushNbtSubPage();
+            detailNbtInputBox.setFocused(false);
+        }
+
         int backW = 50;
         if (isHovering(panelX + 4, panelY + 4, backW, 12, (int) mx, (int) my)) {
             closeNbtSubPage();
@@ -4121,8 +4133,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         y += 16;
 
         if (detailNbtRawMode) {
-            if (detailNbtInputBox.active) {
+            if (detailNbtInputBox.active && detailNbtInputBox.isMouseOver(mx, my)) {
+                if (btn == 0) {
+                    detailNbtInputBox.setFocused(true);
+                }
                 detailNbtInputBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
+                return true;
             }
 
             int nbtH = panelY + panelH - y - 20;
@@ -4417,6 +4433,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, false));
                     menu.setEntryNbtStrict(detailEditSlot, false);
                 }
+                menu.setEntryNbtRaw(minecraft.player, detailEditSlot, "", nbtVal);
                 ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setRaw(detailEditSlot, nbtVal));
             } else if (nbtVal.isEmpty() && existingRaw != null) {
                 ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(detailEditSlot));
@@ -4458,6 +4475,11 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private boolean handleDetailPageKey(int key, int scan, int modifiers) {
         if (detailNbtPageOpen) {
             if (detailNbtInputBox.isFocused()) {
+                if (key == InputConstants.KEY_RETURN || key == InputConstants.KEY_NUMPADENTER) {
+                    flushNbtSubPage();
+                    detailNbtInputBox.setFocused(false);
+                    return true;
+                }
                 detailNbtInputBox.keyPressed(ClientInput.key(key, scan, modifiers));
                 return true;
             }

@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.Config;
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
@@ -1057,6 +1058,11 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             return true;
         }
         if (keyCode == 256) return super.keyPressed(keyCode, scanCode, modifiers);
+        int action = ClientControls.resolveKeyAction(keyCode, scanCode, modifiers);
+        if (action != -1) {
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
+            return true;
+        }
         return true;
     }
 
@@ -1122,68 +1128,72 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (currentPage == Page.NETWORK_LIST && button == 0 && handleSearchBoxClick(mouseX, mouseY)) {
+        int action = ClientControls.resolveMouseAction(mouseX, mouseY, button);
+        if (action != -1 && handleInteraction(mouseX, mouseY, action))
+            return true;
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean handleInteraction(double mouseX, double mouseY, int action) {
+        if (action != 0)
+            return false;
+        return switch (currentPage) {
+            case NETWORK_LIST -> handleNetworkListInteraction(mouseX, mouseY);
+            case IO_CHANNEL_LIST -> handleChannelListInteraction(mouseX, mouseY);
+            case IO_CHANNEL_GRAPH -> handleChannelGraphInteraction(mouseX, mouseY);
+            case NODE_MAP -> handleNodeMapInteraction(mouseX, mouseY);
+            case LNET_FILES -> handleLnetInteraction(mouseX, mouseY);
+        };
+    }
+
+    private boolean handleNetworkListInteraction(double mouseX, double mouseY) {
+        if (handleSearchBoxClick(mouseX, mouseY))
+            return true;
+        if (handleNetworkListClick(mouseX, mouseY))
+            return true;
+        if (selectedNetworkId != null)
+            return handleOptionButtonClick(mouseX, mouseY);
+        return handleLoadButtonClick(mouseX, mouseY);
+    }
+
+    private boolean handleChannelListInteraction(double mouseX, double mouseY) {
+        if (isBackButtonClicked(mouseX, mouseY)) {
+            currentPage = Page.NETWORK_LIST;
+            channelList.clear();
+            channelListScrollOffset = 0;
             return true;
         }
-        if (button == 0) {
-            switch (currentPage) {
-                case NETWORK_LIST -> {
-                    if (handleNetworkListClick(mouseX, mouseY)) {
-                        return true;
-                    }
-                    if (selectedNetworkId != null && handleOptionButtonClick(mouseX, mouseY)) {
-                        return true;
-                    }
-                    if (selectedNetworkId == null && handleLoadButtonClick(mouseX, mouseY)) {
-                        return true;
-                    }
-                }
-                case IO_CHANNEL_LIST -> {
-                    if (isBackButtonClicked(mouseX, mouseY)) {
-                        currentPage = Page.NETWORK_LIST;
-                        channelList.clear();
-                        channelListScrollOffset = 0;
-                        return true;
-                    }
-                    if (handleChannelListClick(mouseX, mouseY)) {
-                        return true;
-                    }
-                }
-                case IO_CHANNEL_GRAPH -> {
-                    if (isBackButtonClicked(mouseX, mouseY)) {
-                        unsubscribeTelemetry();
-                        currentPage = Page.IO_CHANNEL_LIST;
-                        channelListScrollOffset = 0;
-                        ClientPacketDistributor.sendToServer(new RequestChannelListPayload(selectedNetworkId));
-                        return true;
-                    }
-                }
-                case NODE_MAP -> {
-                    if (isBackButtonClicked(mouseX, mouseY)) {
-                        currentPage = Page.NETWORK_LIST;
-                        nodeInfoList.clear();
-                        nodeMapScrollOffset = 0;
-                        return true;
-                    }
-                    if (handleVisibilityButtonClick(mouseX, mouseY)) {
-                        return true;
-                    }
-                    if (handleNodeMapClick(mouseX, mouseY)) {
-                        return true;
-                    }
-                }
-                case LNET_FILES -> {
-                    if (isBackButtonClicked(mouseX, mouseY)) {
-                        currentPage = Page.NETWORK_LIST;
-                        return true;
-                    }
-                    if (handleLnetFilesClick(mouseX, mouseY)) {
-                        return true;
-                    }
-                }
-            }
+        return handleChannelListClick(mouseX, mouseY);
+    }
+
+    private boolean handleChannelGraphInteraction(double mouseX, double mouseY) {
+        if (!isBackButtonClicked(mouseX, mouseY))
+            return false;
+        unsubscribeTelemetry();
+        currentPage = Page.IO_CHANNEL_LIST;
+        channelListScrollOffset = 0;
+        ClientPacketDistributor.sendToServer(new RequestChannelListPayload(selectedNetworkId));
+        return true;
+    }
+
+    private boolean handleNodeMapInteraction(double mouseX, double mouseY) {
+        if (isBackButtonClicked(mouseX, mouseY)) {
+            currentPage = Page.NETWORK_LIST;
+            nodeInfoList.clear();
+            nodeMapScrollOffset = 0;
+            return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        if (handleVisibilityButtonClick(mouseX, mouseY))
+            return true;
+        return handleNodeMapClick(mouseX, mouseY);
+    }
+
+    private boolean handleLnetInteraction(double mouseX, double mouseY) {
+        if (isBackButtonClicked(mouseX, mouseY)) {
+            currentPage = Page.NETWORK_LIST;
+            return true;
+        }
+        return handleLnetFilesClick(mouseX, mouseY);
     }
 
     private void layoutSearchBox() {

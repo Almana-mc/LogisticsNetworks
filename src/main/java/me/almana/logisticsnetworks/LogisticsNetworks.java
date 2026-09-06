@@ -56,6 +56,7 @@ import me.almana.logisticsnetworks.network.SyncChannelListPayload;
 import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkExportPayload;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
+import me.almana.logisticsnetworks.network.SyncModifierKeysPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
@@ -128,6 +129,7 @@ public class LogisticsNetworks {
         @SubscribeEvent
         public static void onServerStopping(ServerStoppingEvent event) {
                 NetworkRegistry.get(event.getServer().overworld()).stopAsyncPlanning();
+                ServerPayloadHandler.clearModifierKeys();
                 ThreadGuard.clearServerThread();
         }
 
@@ -188,6 +190,8 @@ public class LogisticsNetworks {
                 registrar.playToServer(SetDefaultNodeVisibilityPayload.TYPE,
                                 SetDefaultNodeVisibilityPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetDefaultNodeVisibility);
+                registrar.playToServer(SyncModifierKeysPayload.TYPE, SyncModifierKeysPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSyncModifierKeys);
                 registrar.playToServer(CycleWrenchModePayload.TYPE, CycleWrenchModePayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleCycleWrenchMode);
                 registrar.playToServer(SetWrenchColorsPayload.TYPE, SetWrenchColorsPayload.STREAM_CODEC,

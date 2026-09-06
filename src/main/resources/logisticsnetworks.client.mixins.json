@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8.5",
+  "package": "me.almana.logisticsnetworks.mixin.client",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "MinecraftInvoker"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

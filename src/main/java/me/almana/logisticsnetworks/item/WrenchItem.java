@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.item;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.component.LegacyComponentMigration;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.WrenchClipboard;
@@ -13,6 +14,7 @@ import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -548,7 +550,7 @@ public class WrenchItem extends Item {
 
         LogisticsNodeEntity node = findNodeAt(level, clickedPos);
         if (node == null) {
-            if (player.isShiftKeyDown() && AE2Compat.isLoaded() && AE2Compat.isGridHost(level, clickedPos)) {
+            if (isSecondaryUse(player) && AE2Compat.isLoaded() && AE2Compat.isGridHost(level, clickedPos)) {
                 return toggleAE2Link(context.getItemInHand(), player, level, clickedPos);
             }
             return InteractionResult.SUCCESS;
@@ -564,7 +566,7 @@ public class WrenchItem extends Item {
             node.setOwnerUUID(player.getUUID());
         }
 
-        if (player.isShiftKeyDown()) {
+        if (isSecondaryUse(player)) {
             return removeNode(level, node, player);
         }
         return openNodeGui(node, player, context.getItemInHand());
@@ -686,9 +688,7 @@ public class WrenchItem extends Item {
         tooltip.accept(Component.translatable("tooltip.logisticsnetworks.wrench.mode", getModeDisplayName(getMode(stack))));
         GlobalPos ae2Link = getAE2LinkPos(stack);
         if (ae2Link != null) {
-            var window = net.minecraft.client.Minecraft.getInstance().getWindow();
-            if (com.mojang.blaze3d.platform.InputConstants.isKeyDown(window, com.mojang.blaze3d.platform.InputConstants.KEY_LSHIFT)
-                    || com.mojang.blaze3d.platform.InputConstants.isKeyDown(window, com.mojang.blaze3d.platform.InputConstants.KEY_RSHIFT)) {
+            if (ClientControls.modifier1Down()) {
                 BlockPos p = ae2Link.pos();
                 String dim = ae2Link.dimension().identifier().toString();
                 tooltip.accept(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_linked_detail",
@@ -1194,7 +1194,7 @@ public class WrenchItem extends Item {
     }
 
     private static boolean isSecondaryUse(Player player) {
-        return player.isSecondaryUseActive() || player.isShiftKeyDown() || player.isCrouching();
+        return ServerPayloadHandler.isModifierDown(player, 0);
     }
 
 }

@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.SlotNumberOverlay;
 import me.almana.logisticsnetworks.client.WrenchHudOverlay;
 import me.almana.logisticsnetworks.client.WrenchInputHandler;
@@ -52,6 +53,11 @@ public final class LogisticsClientEvents {
         WrenchHudOverlay.registerKeys(event);
         SlotNumberOverlay.registerKeys(event);
         event.register(WrenchInputHandler.OPEN_COLOR_EDITOR);
+        event.register(ClientControls.MODIFIER_1);
+        event.register(ClientControls.MODIFIER_2);
+        event.register(ClientControls.MODIFIER_3);
+        event.register(ClientControls.PRIMARY_INTERACTION);
+        event.register(ClientControls.SECONDARY_INTERACTION);
     }
 
     @SubscribeEvent

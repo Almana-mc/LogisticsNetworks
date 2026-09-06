@@ -3,6 +3,8 @@ package me.almana.logisticsnetworks.client.screen;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.NodeAccessMode;
+import me.almana.logisticsnetworks.client.ClientControls;
+import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.DefaultNodeVisibilitySync;
 import me.almana.logisticsnetworks.client.theme.Theme;
@@ -557,38 +559,44 @@ public class ModConfigScreen extends Screen {
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         double mouseX = event.x();
         double mouseY = event.y();
-        int button = event.button();
+        int action = ClientControls.resolveMouseAction(event);
+        if (action != -1 && handleInteraction(mouseX, mouseY, action, event.modifiers(), doubleClick))
+            return true;
+        return super.mouseClicked(event, doubleClick);
+    }
+
+    private boolean handleInteraction(double mouseX, double mouseY, int action, int modifiers, boolean doubleClick) {
+        if (action != 0)
+            return false;
         EditBox prev = findFocusedEditBox();
 
-        if (button == 0) {
-            if (handleTabClick(mouseX, mouseY)) {
-                unfocusEditBoxes();
-                return true;
-            }
+        if (handleTabClick(mouseX, mouseY)) {
+            unfocusEditBoxes();
+            return true;
+        }
 
-            int contentX = x0 + 10;
-            int contentY = y0 + 36;
-            int contentW = GUI_WIDTH - 20;
+        int contentX = x0 + 10;
+        int contentY = y0 + 36;
+        int contentW = GUI_WIDTH - 20;
 
-            if (canEditServerConfig) {
-                switch (currentTab) {
-                    case COMMON -> { if (handleCommonClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
-                    case UPGRADES -> { if (handleUpgradesClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
-                    case CLIENT, VISUALS -> { }
-                }
-            }
-
-            if (currentTab == Tab.CLIENT && handleClientClick(mouseX, mouseY, contentX, contentY, contentW)) {
-                unfocusEditBoxes();
-                return true;
-            }
-            if (currentTab == Tab.VISUALS && handleVisualsClick(mouseX, mouseY, contentX, contentY, contentW)) {
-                unfocusEditBoxes();
-                return true;
+        if (canEditServerConfig) {
+            switch (currentTab) {
+                case COMMON -> { if (handleCommonClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
+                case UPGRADES -> { if (handleUpgradesClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
+                case CLIENT, VISUALS -> { }
             }
         }
 
-        boolean result = super.mouseClicked(event, doubleClick);
+        if (currentTab == Tab.CLIENT && handleClientClick(mouseX, mouseY, contentX, contentY, contentW)) {
+            unfocusEditBoxes();
+            return true;
+        }
+        if (currentTab == Tab.VISUALS && handleVisualsClick(mouseX, mouseY, contentX, contentY, contentW)) {
+            unfocusEditBoxes();
+            return true;
+        }
+
+        boolean result = super.mouseClicked(ClientInput.mouse(mouseX, mouseY, action, modifiers), doubleClick);
 
         EditBox now = findFocusedEditBox();
         if (now != null && now != prev) {
@@ -815,6 +823,12 @@ public class ModConfigScreen extends Screen {
         }
         if (keyCode == 256) {
             save();
+            return true;
+        }
+        int action = ClientControls.resolveKeyAction(event);
+        if (action != -1) {
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft),
+                    action, event.modifiers(), false);
             return true;
         }
         return super.keyPressed(event);

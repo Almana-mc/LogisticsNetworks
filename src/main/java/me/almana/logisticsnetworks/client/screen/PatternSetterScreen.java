@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
@@ -93,30 +94,39 @@ public class PatternSetterScreen extends LegacyContainerScreen<PatternSetterMenu
         if (multiplierField != null && multiplierField.isFocused()) {
             return multiplierField.keyPressed(ClientInput.key(key, scan, modifiers));
         }
+        int action = ClientControls.resolveKeyAction(key, scan, modifiers);
+        if (action != -1) {
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
+            return true;
+        }
         return true;
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0) {
-            int relX = (int) mouseX - leftPos;
-            int relY = (int) mouseY - topPos;
-
-            // Input button
-            if (relX >= BTN_X && relX < BTN_X + BTN_WIDTH && relY >= BTN_Y && relY < BTN_Y + BTN_HEIGHT) {
-                ClientPacketDistributor.sendToServer(new ApplyPatternPayload(false, getMultiplier()));
-                feedbackTimer = 40;
-                return true;
-            }
-            // Output button
-            int btn2X = BTN_X + BTN_WIDTH + BTN_GAP;
-            if (relX >= btn2X && relX < btn2X + BTN_WIDTH && relY >= BTN_Y && relY < BTN_Y + BTN_HEIGHT) {
-                ClientPacketDistributor.sendToServer(new ApplyPatternPayload(true, getMultiplier()));
-                feedbackTimer = 40;
-                return true;
-            }
-        }
+        int action = ClientControls.resolveMouseAction(mouseX, mouseY, button);
+        if (action != -1 && handleInteraction(mouseX, mouseY, action))
+            return true;
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean handleInteraction(double mouseX, double mouseY, int action) {
+        if (action != 0)
+            return false;
+        int relX = (int) mouseX - leftPos;
+        int relY = (int) mouseY - topPos;
+        if (relX >= BTN_X && relX < BTN_X + BTN_WIDTH && relY >= BTN_Y && relY < BTN_Y + BTN_HEIGHT) {
+            ClientPacketDistributor.sendToServer(new ApplyPatternPayload(false, getMultiplier()));
+            feedbackTimer = 40;
+            return true;
+        }
+        int btn2X = BTN_X + BTN_WIDTH + BTN_GAP;
+        if (relX >= btn2X && relX < btn2X + BTN_WIDTH && relY >= BTN_Y && relY < BTN_Y + BTN_HEIGHT) {
+            ClientPacketDistributor.sendToServer(new ApplyPatternPayload(true, getMultiplier()));
+            feedbackTimer = 40;
+            return true;
+        }
+        return false;
     }
 
     @Override
