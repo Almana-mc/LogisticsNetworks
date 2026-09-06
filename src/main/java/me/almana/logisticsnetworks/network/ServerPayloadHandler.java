@@ -786,7 +786,7 @@ public class ServerPayloadHandler {
 
     public static void markNetworkDirty(LogisticsNodeEntity node) {
         if (node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
-            NetworkRegistry.get(level).markNetworkDirty(node.getNetworkId());
+            NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
         }
     }
 

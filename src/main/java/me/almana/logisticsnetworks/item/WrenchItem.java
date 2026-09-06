@@ -803,7 +803,7 @@ public class WrenchItem extends Item {
 
     private static void markNodeNetworkDirty(LogisticsNodeEntity node) {
         if (node.getNetworkId() != null && node.level() instanceof ServerLevel serverLevel) {
-            NetworkRegistry.get(serverLevel).markNetworkDirty(node.getNetworkId());
+            NetworkRegistry.get(serverLevel).invalidateNetwork(node.getNetworkId());
         }
     }
 

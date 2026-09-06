@@ -147,7 +147,7 @@ class AttachedStorageScanHandlerTest {
             runRequest(context);
 
             verify(menu).refreshFilterEntries();
-            verify(registry).markNetworkDirty(networkId);
+            verify(registry).invalidateNetwork(networkId);
             packets.verify(() -> PacketDistributor.sendToPlayer(same(player), any(SyncFilterScanResultPayload.class),
                     any(CustomPacketPayload[].class)));
         }

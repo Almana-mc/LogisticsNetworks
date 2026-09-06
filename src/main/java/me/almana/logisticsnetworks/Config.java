@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks;
 
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.config.ModConfigEvent;
@@ -43,6 +44,11 @@ public class Config {
     public static final ModConfigSpec.BooleanValue backoffChemicalSpec;
     public static final ModConfigSpec.BooleanValue backoffSourceSpec;
 
+    public static final ModConfigSpec.BooleanValue asyncPlanningSpec;
+    public static final ModConfigSpec.IntValue asyncWorkerThreadsSpec;
+    public static final ModConfigSpec.IntValue asyncCommitBudgetUsSpec;
+    public static final ModConfigSpec.IntValue asyncMaxOccupiedSlotsSpec;
+
     static {
         builder.push("backoff");
         backoffMaxTicksSpec = builder
@@ -54,6 +60,21 @@ public class Config {
         backoffChemicalSpec = builder.comment("Enable backoff for chemical transfers").define("backoffChemical", true);
         backoffSourceSpec = builder.comment("Enable backoff for source transfers").define("backoffSource", true);
         builder.pop();
+
+        builder.push("async");
+        asyncPlanningSpec = builder
+                .comment("Plan item transfers on worker threads. Disable to force the synchronous path.")
+                .define("asyncPlanning", true);
+        asyncWorkerThreadsSpec = builder
+                .comment("Worker threads for transfer planning. 0 = auto (min(4, cores - 2)).")
+                .defineInRange("asyncWorkerThreads", 0, 0, 16);
+        asyncCommitBudgetUsSpec = builder
+                .comment("Microseconds per tick spent committing plans. At least one plan always commits.")
+                .defineInRange("asyncCommitBudgetUs", 2000, 100, 50000);
+        asyncMaxOccupiedSlotsSpec = builder
+                .comment("Safety valve. A network with more occupied slots than this falls back to synchronous.")
+                .defineInRange("asyncMaxOccupiedSlots", 200000, 1000, 5000000);
+        builder.pop();
     }
 
     public static final ModConfigSpec SPEC = builder.build();
@@ -64,6 +85,10 @@ public class Config {
     public static boolean juneAwarenessMessage;
     public static boolean networkTickingEnabled;
     public static int backoffMaxTicks = 40;
+    public static boolean asyncPlanning = true;
+    public static int asyncWorkerThreads = 0;
+    public static int asyncCommitBudgetUs = 2000;
+    public static int asyncMaxOccupiedSlots = 200000;
     public static boolean[] backoffEnabled = {true, true, true, true, true};
 
     @SubscribeEvent
@@ -79,10 +104,15 @@ public class Config {
         juneAwarenessMessage = juneAwarenessMessageSpec.get();
         networkTickingEnabled = networkTickingEnabledSpec.get();
         backoffMaxTicks = backoffMaxTicksSpec.get();
+        asyncPlanning = asyncPlanningSpec.get();
+        asyncWorkerThreads = asyncWorkerThreadsSpec.get();
+        asyncCommitBudgetUs = asyncCommitBudgetUsSpec.get();
+        asyncMaxOccupiedSlots = asyncMaxOccupiedSlotsSpec.get();
         backoffEnabled[ChannelType.ITEM.ordinal()] = backoffItemSpec.get();
         backoffEnabled[ChannelType.FLUID.ordinal()] = backoffFluidSpec.get();
         backoffEnabled[ChannelType.ENERGY.ordinal()] = backoffEnergySpec.get();
         backoffEnabled[ChannelType.CHEMICAL.ordinal()] = backoffChemicalSpec.get();
         backoffEnabled[ChannelType.SOURCE.ordinal()] = backoffSourceSpec.get();
+        AsyncTransferRuntime.requestReload();
     }
 }

@@ -1,6 +1,14 @@
 package me.almana.logisticsnetworks;
 
 import me.almana.logisticsnetworks.network.AssignNetworkPayload;
+import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
+import me.almana.logisticsnetworks.logic.async.ThreadGuard;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.AddServerReloadListenersEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import me.almana.logisticsnetworks.network.ClientPayloadHandler;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
@@ -71,6 +79,7 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 @Mod(LogisticsNetworks.MOD_ID)
+@EventBusSubscriber(modid = LogisticsNetworks.MOD_ID)
 public class LogisticsNetworks {
 
         public static final String MOD_ID = "logisticsnetworks";
@@ -99,6 +108,27 @@ public class LogisticsNetworks {
 
         private void commonSetup(FMLCommonSetupEvent event) {
                 event.enqueueWork(AE2Compat::registerLinkable);
+        }
+
+        @SubscribeEvent
+        public static void onServerStarted(ServerStartedEvent event) {
+                ThreadGuard.markServerThread();
+                if (Config.asyncPlanning && Config.networkTickingEnabled) {
+                        AsyncTransferRuntime.start();
+                } else {
+                        AsyncTransferRuntime.stop();
+                }
+        }
+
+        @SubscribeEvent
+        public static void onDatapackReload(AddServerReloadListenersEvent event) {
+                AsyncTransferRuntime.requestReload();
+        }
+
+        @SubscribeEvent
+        public static void onServerStopping(ServerStoppingEvent event) {
+                NetworkRegistry.get(event.getServer().overworld()).stopAsyncPlanning();
+                ThreadGuard.clearServerThread();
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
