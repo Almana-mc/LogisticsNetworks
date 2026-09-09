@@ -21,18 +21,22 @@ public abstract class LegacyContainerScreen<T extends AbstractContainerMenu> ext
     @Override
     public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         super.extractBackground(graphics, mouseX, mouseY, partialTick);
-        renderBg(new GuiGraphics(graphics), partialTick, mouseX, mouseY);
+        renderBg(guiGraphics(graphics), partialTick, mouseX, mouseY);
     }
 
     @Override
     protected void extractLabels(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-        renderLabels(new GuiGraphics(graphics), mouseX, mouseY);
+        renderLabels(guiGraphics(graphics), mouseX, mouseY);
     }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-        render(new GuiGraphics(graphics), mouseX, mouseY, partialTick);
+        render(guiGraphics(graphics), mouseX, mouseY, partialTick);
+    }
+
+    protected GuiGraphics guiGraphics(GuiGraphicsExtractor graphics) {
+        return new GuiGraphics(graphics);
     }
 
     @Override
@@ -67,6 +71,10 @@ public abstract class LegacyContainerScreen<T extends AbstractContainerMenu> ext
         return super.keyPressed(event);
     }
 
+    protected boolean handleScreenKey(KeyEvent event) {
+        return super.keyPressed(event);
+    }
+
     @Override
     public boolean charTyped(CharacterEvent event) {
         if (charTyped((char) event.codepoint(), 0)) {
@@ -87,7 +95,7 @@ public abstract class LegacyContainerScreen<T extends AbstractContainerMenu> ext
     }
 
     protected void renderTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
-        super.extractTooltip(graphics.raw(), mouseX, mouseY);
+        extractTooltip(graphics.raw(), mouseX, mouseY);
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {

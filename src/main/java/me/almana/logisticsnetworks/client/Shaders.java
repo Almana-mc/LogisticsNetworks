@@ -9,6 +9,10 @@ public final class Shaders {
     private Shaders() {
     }
 
+    public static boolean renderingShadowPass() {
+        return IRIS_LOADED && IrisHook.renderingShadowPass();
+    }
+
     public static boolean shadersActive() {
         return IRIS_LOADED && IrisHook.shaderPackInUse();
     }

@@ -4,10 +4,10 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
-import me.almana.logisticsnetworks.client.screen.NodeScreen;
+import me.almana.logisticsnetworks.client.screen.NodeEditorScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
-import me.almana.logisticsnetworks.client.TransferVisuals;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
@@ -18,8 +18,10 @@ public class ClientPayloadHandler {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public static void handleTransferVisual(TransferVisualPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> TransferVisuals.accept(payload));
+    public static void handleSyncNetworkGraph(SyncNetworkGraphPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof NodeGraphMenu menu) menu.receiveGraph(payload);
+        });
     }
 
     public static void handleSyncNetworkList(SyncNetworkListPayload payload, IPayloadContext context) {
@@ -27,14 +29,14 @@ public class ClientPayloadHandler {
         context.enqueueWork(() -> {
             var screen = Minecraft.getInstance().screen;
             if (Config.debugMode) LOGGER.debug("Current screen: {}", screen != null ? screen.getClass().getSimpleName() : "null");
-            if (screen instanceof NodeScreen nodeScreen) {
-                if (Config.debugMode) LOGGER.debug("Passing to NodeScreen");
+            if (screen instanceof NodeEditorScreen<?> nodeScreen) {
+                if (Config.debugMode) LOGGER.debug("Passing to NodeEditorScreen");
                 nodeScreen.receiveNetworkList(payload.networks());
             } else if (screen instanceof ComputerScreen computerScreen) {
                 if (Config.debugMode) LOGGER.debug("Passing to ComputerScreen");
                 computerScreen.receiveNetworkList(payload.networks());
             } else {
-                if (Config.debugMode) LOGGER.debug("Screen is not NodeScreen or ComputerScreen, ignoring");
+                if (Config.debugMode) LOGGER.debug("Screen is not NodeEditorScreen or ComputerScreen, ignoring");
             }
         });
     }
@@ -51,7 +53,7 @@ public class ClientPayloadHandler {
     public static void handleSyncNetworkLabels(SyncNetworkLabelsPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             var screen = Minecraft.getInstance().screen;
-            if (screen instanceof NodeScreen nodeScreen) {
+            if (screen instanceof NodeEditorScreen<?> nodeScreen) {
                 nodeScreen.receiveNetworkLabels(payload.labels());
             }
         });

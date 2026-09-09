@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.Shaders;
+import me.almana.logisticsnetworks.client.flow.FlowAnchor;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -25,9 +26,11 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -68,6 +71,11 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
     @Override
     public void extractRenderState(LogisticsNodeEntity entity, LogisticsNodeRenderState state, float partialTicks) {
         super.extractRenderState(entity, state, partialTicks);
+        state.flowNodeId = entity.getUUID();
+        state.flowNetworkId = entity.getNetworkId();
+        state.flowChannels = entity.isActive() ? entity.getRouteChannels() : 0L;
+        state.flowAnchor = new FlowAnchor(
+                new Vec3(state.x, state.y + 0.5, state.z), new Quaternionf());
         state.renderVisible = entity.isRenderVisible();
         state.highlighted = entity.isHighlighted();
         state.wrenchVisible = isWrenchVisible(entity);

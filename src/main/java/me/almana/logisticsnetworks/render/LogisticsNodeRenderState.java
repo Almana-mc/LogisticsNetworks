@@ -1,8 +1,15 @@
 package me.almana.logisticsnetworks.render;
 
+import me.almana.logisticsnetworks.client.flow.FlowAnchor;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 
+import java.util.UUID;
+
 public class LogisticsNodeRenderState extends EntityRenderState {
+    public UUID flowNodeId;
+    public UUID flowNetworkId;
+    public long flowChannels;
+    public FlowAnchor flowAnchor;
     public boolean renderVisible;
     public boolean wrenchVisible;
     public boolean highlighted;

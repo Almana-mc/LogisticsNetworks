@@ -2,7 +2,7 @@ plugins {
     `java-library`
     `maven-publish`
     idea
-    id("net.neoforged.moddev") version "2.0.141"
+    id("net.neoforged.moddev") version "2.0.146"
 }
 
 val minecraft_version: String by project
@@ -19,6 +19,7 @@ val mod_authors: String by project
 val mod_description: String by project
 val jei_version: String by project
 val jade_version: String by project
+val iris_version: String by project
 val mekanism_version: String by project
 val ars_nouveau_version: String by project
 val ae2_version: String by project
@@ -26,6 +27,7 @@ val ftb_teams_version: String by project
 val ftb_library_version: String by project
 val emi_version: String by project
 val guideme_version: String by project
+val sophisticated_core_version: String by project
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -42,10 +44,6 @@ repositories {
     /*
     maven("https://maven.createmod.net")
     */
-    exclusiveContent {
-        forRepository { maven("https://www.cursemaven.com") }
-        filter { includeGroup("curse.maven") }
-    }
 }
 
 base {
@@ -113,7 +111,7 @@ sourceSets.main.get().resources.srcDir("src/generated/client")
 sourceSets.main.get().resources.srcDir("src/generated/server")
 
 dependencies {
-    compileOnly("curse.maven:sophisticated-core-618298:8705495") { isTransitive = false }
+    compileOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") { isTransitive = false }
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
     runtimeOnly("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
@@ -135,7 +133,7 @@ dependencies {
     runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
 
     // Iris API — compile-only; shaders are an optional runtime dependency.
-    compileOnly("maven.modrinth:iris:1.10.9+26.1-neoforge") {
+    compileOnly("maven.modrinth:iris:${iris_version}") {
         isTransitive = false
     }
 

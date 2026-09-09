@@ -2,7 +2,7 @@ package me.almana.logisticsnetworks.client;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
-import me.almana.logisticsnetworks.client.screen.NodeScreen;
+import me.almana.logisticsnetworks.client.screen.NodeEditorScreen;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.OpenFilterInSlotPayload;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
@@ -42,7 +42,7 @@ public class FilterClickHandler {
         if (event.getScreen() instanceof FilterScreen)
             return;
 
-        if (event.getScreen() instanceof NodeScreen)
+        if (event.getScreen() instanceof NodeEditorScreen<?>)
             return;
 
         if (!shouldDispatchKeyboardAction(event.getScreen().getFocused()))
@@ -68,7 +68,7 @@ public class FilterClickHandler {
         if (!stack.is(ModTags.FILTERS))
             return false;
 
-        if (screen instanceof NodeScreen nodeScreen && screen.getMenu() instanceof NodeMenu nodeMenu
+        if (screen instanceof NodeEditorScreen<?> nodeScreen && screen.getMenu() instanceof NodeMenu nodeMenu
                 && !isPlayerInventorySlot(screen, hoveredSlot)) {
             int filterSlot = hoveredSlot.getSlotIndex();
             if (filterSlot >= 0 && filterSlot < 9) {

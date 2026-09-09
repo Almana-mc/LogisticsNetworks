@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.entity;
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.NodeRouteChannels;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import net.minecraft.core.BlockPos;
@@ -73,6 +74,9 @@ public class LogisticsNodeEntity extends Entity {
     private static final EntityDataAccessor<Integer> NETWORK_COLOR = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.INT);
 
+    private static final EntityDataAccessor<Long> ROUTE_CHANNELS = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.LONG);
+
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
 
@@ -109,6 +113,7 @@ public class LogisticsNodeEntity extends Entity {
         builder.define(OWNER_UUID, "");
         builder.define(NODE_LABEL, "");
         builder.define(HIGHLIGHTED, false);
+        builder.define(ROUTE_CHANNELS, 0L);
         builder.define(NETWORK_COLOR, me.almana.logisticsnetworks.data.NetworkColors.DEFAULT);
     }
 
@@ -139,6 +144,7 @@ public class LogisticsNodeEntity extends Entity {
             }
             upgradeItems[slot] = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
         }
+        refreshRouteChannels();
     }
 
     @Override
@@ -186,6 +192,7 @@ public class LogisticsNodeEntity extends Entity {
     @Override
     public void tick() {
         if (this.level().isClientSide()) return;
+        if (this.tickCount <= 1 || this.tickCount % 5 == 0) refreshRouteChannels();
 
         BlockPos attached = getAttachedPos();
         if (!attached.equals(BlockPos.ZERO)) {
@@ -208,6 +215,17 @@ public class LogisticsNodeEntity extends Entity {
                 }
             }
         }
+    }
+
+    public void refreshRouteChannels() {
+        if (level().isClientSide()) return;
+        long bits = isValidNode() && getNetworkId() != null
+                ? NodeRouteChannels.encode(channels, false, false, false) : 0L;
+        entityData.set(ROUTE_CHANNELS, bits);
+    }
+
+    public long getRouteChannels() {
+        return entityData.get(ROUTE_CHANNELS);
     }
 
     @Override
@@ -269,6 +287,7 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setValid(boolean valid) {
         entityData.set(VALID, valid);
+        refreshRouteChannels();
     }
 
     public boolean isValid() {
@@ -290,6 +309,7 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setNetworkId(@Nullable UUID networkId) {
         entityData.set(NETWORK_ID, networkId == null ? "" : networkId.toString());
+        refreshRouteChannels();
         if (networkId == null) {
             setNetworkName("");
             setNetworkColor(me.almana.logisticsnetworks.data.NetworkColors.DEFAULT);

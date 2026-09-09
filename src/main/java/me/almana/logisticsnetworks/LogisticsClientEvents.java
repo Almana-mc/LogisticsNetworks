@@ -10,6 +10,9 @@ import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
+import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
+import net.neoforged.fml.ModList;
+import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.client.screen.PatternSetterScreen;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.render.LogisticsNodeRenderer;
@@ -35,6 +38,7 @@ public final class LogisticsClientEvents {
 
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(Registration.NODE_MENU.get(), NodeScreen::new);
+        event.register(Registration.NODE_GRAPH_MENU.get(), NodeGraphScreen::new);
         event.register(Registration.FILTER_MENU.get(), FilterScreen::new);
         event.register(Registration.CLIPBOARD_MENU.get(), ClipboardScreen::new);
         event.register(Registration.MASS_PLACEMENT_MENU.get(), MassPlacementScreen::new);
@@ -45,8 +49,25 @@ public final class LogisticsClientEvents {
     public static void clientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             ThemeState.load();
+            reserveGraphCanvas();
             DefaultNodeVisibilitySync.send();
         });
+    }
+
+    private static void reserveGraphCanvas() {
+        if (!ModList.get().isLoaded("ftblibrary")) return;
+        try {
+            Class<?> api = Class.forName("dev.ftb.mods.ftblibrary.api.client.FTBLibraryClientApi");
+            api.getMethod("addSidebarScreenBlacklist", String[].class).invoke(api.getMethod("get").invoke(null),
+                    (Object) new String[]{NodeGraphScreen.class.getName()});
+        } catch (ReflectiveOperationException exception) {
+            LogUtils.getLogger().debug("Unable to reserve graph canvas from FTB sidebar", exception);
+        }
+    }
+
+    @SubscribeEvent
+    public static void clientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        NodeGraphScreen.clearSession();
     }
 
     public static void registerKeyMappings(RegisterKeyMappingsEvent event) {

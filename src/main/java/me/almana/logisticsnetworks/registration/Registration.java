@@ -20,6 +20,7 @@ import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
+import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.GuideRecipe;
@@ -124,6 +125,8 @@ public class Registration {
 
         public static final DeferredHolder<MenuType<?>, MenuType<NodeMenu>> NODE_MENU = MENUS.register("node_menu",
                         () -> IMenuTypeExtension.create(NodeMenu::new));
+        public static final DeferredHolder<MenuType<?>, MenuType<NodeGraphMenu>> NODE_GRAPH_MENU = MENUS.register("node_graph_menu",
+                        () -> IMenuTypeExtension.create(NodeGraphMenu::new));
         public static final DeferredHolder<MenuType<?>, MenuType<FilterMenu>> FILTER_MENU = MENUS.register(
                         "filter_menu",
                         () -> IMenuTypeExtension.create(FilterMenu::new));

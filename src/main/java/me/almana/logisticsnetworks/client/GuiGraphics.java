@@ -15,10 +15,16 @@ import org.joml.Matrix3x2fStack;
 public final class GuiGraphics {
     private final GuiGraphicsExtractor raw;
     private final Pose pose;
+    private final double tooltipScale;
 
     public GuiGraphics(GuiGraphicsExtractor raw) {
+        this(raw, 1.0);
+    }
+
+    public GuiGraphics(GuiGraphicsExtractor raw, double tooltipScale) {
         this.raw = raw;
         this.pose = new Pose(raw.pose(), raw);
+        this.tooltipScale = tooltipScale;
     }
 
     public GuiGraphicsExtractor raw() {
@@ -74,15 +80,19 @@ public final class GuiGraphics {
     }
 
     public void renderTooltip(Font font, Component text, int x, int y) {
-        raw.setTooltipForNextFrame(font, text, x, y);
+        raw.setTooltipForNextFrame(font, text, tooltipCoordinate(x), tooltipCoordinate(y));
     }
 
     public void renderTooltip(Font font, List<Component> lines, Optional<net.minecraft.world.inventory.tooltip.TooltipComponent> image, int x, int y) {
-        raw.setTooltipForNextFrame(font, lines, image, x, y);
+        raw.setTooltipForNextFrame(font, lines, image, tooltipCoordinate(x), tooltipCoordinate(y));
     }
 
     public void renderTooltip(Font font, List<Component> lines, int x, int y) {
-        raw.setTooltipForNextFrame(font, lines, Optional.empty(), x, y);
+        raw.setTooltipForNextFrame(font, lines, Optional.empty(), tooltipCoordinate(x), tooltipCoordinate(y));
+    }
+
+    private int tooltipCoordinate(int coordinate) {
+        return (int) Math.round(coordinate * tooltipScale);
     }
 
     public void blit(int x, int y, int z, int width, int height, TextureAtlasSprite sprite) {

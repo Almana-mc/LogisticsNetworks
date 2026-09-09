@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -20,6 +21,8 @@ public final class NodeMenuSync {
     public static void write(FriendlyByteBuf buf, LogisticsNodeEntity node, HolderLookup.Provider provider,
             int selectedChannel) {
         buf.writeVarInt(node.getId());
+        buf.writeUUID(node.getUUID());
+        buf.writeIdentifier(node.level().dimension().identifier());
         buf.writeVarInt(selectedChannel);
 
         UUID networkId = node.getNetworkId();
@@ -43,8 +46,10 @@ public final class NodeMenuSync {
 
     public static ClientNodeState read(FriendlyByteBuf buf, Player player) {
         int entityId = buf.readVarInt();
+        UUID nodeId = buf.readUUID();
+        Identifier dimension = buf.readIdentifier();
         int selectedChannel = Math.max(0, Math.min(LogisticsNodeEntity.CHANNEL_COUNT - 1, buf.readVarInt()));
-        LogisticsNodeEntity node = findOrCreateClientNode(player, entityId);
+        LogisticsNodeEntity node = findOrCreateClientNode(player, entityId, nodeId, dimension);
 
         UUID networkId = buf.readBoolean() ? buf.readUUID() : null;
         node.setNetworkId(networkId);
@@ -69,14 +74,17 @@ public final class NodeMenuSync {
         return new ClientNodeState(entityId, selectedChannel, node);
     }
 
-    public static LogisticsNodeEntity findOrCreateClientNode(Player player, int entityId) {
+    public static LogisticsNodeEntity findOrCreateClientNode(Player player, int entityId, UUID nodeId,
+            Identifier dimension) {
         Entity entity = player.level().getEntity(entityId);
-        if (entity instanceof LogisticsNodeEntity node) {
+        if (player.level().dimension().identifier().equals(dimension)
+                && entity instanceof LogisticsNodeEntity node && node.getUUID().equals(nodeId)) {
             return node;
         }
 
         LogisticsNodeEntity node = new LogisticsNodeEntity(Registration.LOGISTICS_NODE.get(), player.level());
         node.setId(entityId);
+        node.setUUID(nodeId);
         return node;
     }
 

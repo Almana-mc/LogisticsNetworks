@@ -66,7 +66,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         LNET_FILES
     }
 
-    private static final int GUI_WIDTH = 320;
+    private static final int GUI_WIDTH = 332;
     private static final int GUI_HEIGHT = 240;
     private static final int NETWORKS_PER_PAGE = 4;
     private static final int NETWORK_ENTRY_HEIGHT = 30;
@@ -75,10 +75,11 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     private static final int NETWORK_LIST_WIDTH = 116;
     private static final int DETAIL_PANEL_X = 136;
     private static final int DETAIL_PANEL_Y = 38;
-    private static final int DETAIL_PANEL_WIDTH = 172;
+    private static final int DETAIL_PANEL_WIDTH = 184;
     private static final int DETAIL_PANEL_HEIGHT = 194;
-    private static final int OPTION_BTN_HEIGHT = 28;
-    private static final int OPTION_BTN_GAP = 6;
+    private static final int OPTION_BTN_HEIGHT = 26;
+    private static final int OPTION_BTN_GAP = 2;
+    private static final int OPTION_BTN_START_Y = 72;
     private static final int NODE_ENTRY_HEIGHT = 22;
     private static final int NODES_PER_PAGE = 7;
     private static final int VIS_BTN_W = 54;
@@ -363,8 +364,6 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                 : line("gui.logisticsnetworks.computer.nodes_badge", selectedEntry.nodeCount());
         renderStatusBadge(g, textX, panelY + 56, 58, 10, nodeCount);
         renderStatusBadge(g, textX + 66, panelY + 56, 54, 10, line("gui.logisticsnetworks.computer.status.synced"));
-        g.drawString(font, label("gui.logisticsnetworks.computer.choose_subsystem"), textX, panelY + 72,
-                pal().textSecondary());
         renderOptionButtons(g, mouseX, mouseY);
 
         if (!lnetStatus.isEmpty()) {
@@ -378,9 +377,10 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int panelY = topPos + DETAIL_PANEL_Y;
         int buttonX = panelX + 12;
         int buttonWidth = DETAIL_PANEL_WIDTH - 24;
-        int button1Y = panelY + 84;
+        int button1Y = panelY + OPTION_BTN_START_Y;
         int button2Y = button1Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
         int button3Y = button2Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
+        int button4Y = button3Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
 
         boolean button1Hovered = mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button1Y && mouseY < button1Y + OPTION_BTN_HEIGHT;
@@ -388,6 +388,9 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                 && mouseY >= button2Y && mouseY < button2Y + OPTION_BTN_HEIGHT;
         boolean button3Hovered = mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button3Y && mouseY < button3Y + OPTION_BTN_HEIGHT;
+
+        boolean button4Hovered = mouseX >= buttonX && mouseX < buttonX + buttonWidth
+                && mouseY >= button4Y && mouseY < button4Y + OPTION_BTN_HEIGHT;
 
         renderCommandCard(g, buttonX, button1Y, buttonWidth, OPTION_BTN_HEIGHT,
                 line("gui.logisticsnetworks.computer.open_io_monitor"),
@@ -398,6 +401,9 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         renderCommandCard(g, buttonX, button3Y, buttonWidth, OPTION_BTN_HEIGHT,
                 line("gui.logisticsnetworks.computer.open_lnet_files"),
                 line("gui.logisticsnetworks.computer.lnet_file_ops"), button3Hovered);
+        renderCommandCard(g, buttonX, button4Y, buttonWidth, OPTION_BTN_HEIGHT,
+                line("gui.logisticsnetworks.graph.open"),
+                line("gui.logisticsnetworks.graph.description"), button4Hovered);
     }
 
     private void renderCommandCard(GuiGraphics g, int x, int y, int w, int h,
@@ -1501,9 +1507,10 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int panelY = topPos + DETAIL_PANEL_Y;
         int buttonX = panelX + 12;
         int buttonWidth = DETAIL_PANEL_WIDTH - 24;
-        int button1Y = panelY + 84;
+        int button1Y = panelY + OPTION_BTN_START_Y;
         int button2Y = button1Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
         int button3Y = button2Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
+        int button4Y = button3Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
 
         if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button1Y && mouseY < button1Y + OPTION_BTN_HEIGHT) {
@@ -1527,6 +1534,14 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             return true;
         }
 
+        if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
+                && mouseY >= button4Y && mouseY < button4Y + OPTION_BTN_HEIGHT) {
+            NodeGraphSession.begin(selectedNetworkId);
+            ClientPacketDistributor.sendToServer(new me.almana.logisticsnetworks.network.RequestOpenGraphPayload(
+                    menu.getComputerPos(), minecraft.level.dimension().identifier(), selectedNetworkId,
+                    java.util.Optional.empty(), 0));
+            return true;
+        }
         return false;
     }
 
@@ -1815,6 +1830,13 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             for (SyncNetworkListPayload.NetworkEntry entry : networks) {
                 LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
             }
+        }
+        UUID returningNetwork = NodeGraphSession.takeReturningNetwork();
+        if (returningNetwork != null) {
+            networks.stream().filter(network -> network.id().equals(returningNetwork)).findFirst().ifPresent(network -> {
+                selectedNetworkId = network.id();
+                selectedNetworkName = network.name();
+            });
         }
         this.networkList = new ArrayList<>(networks);
         this.networkScrollOffset = Math.min(this.networkScrollOffset,

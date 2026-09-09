@@ -2,7 +2,7 @@ package me.almana.logisticsnetworks.integration.jei;
 
 import mezz.jei.api.gui.handlers.IGhostIngredientHandler;
 import mezz.jei.api.ingredients.ITypedIngredient;
-import me.almana.logisticsnetworks.client.screen.NodeScreen;
+import me.almana.logisticsnetworks.client.screen.NodeEditorScreen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.world.item.ItemStack;
 
@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-public class NodeGhostIngredientHandler implements IGhostIngredientHandler<NodeScreen> {
+public class NodeGhostIngredientHandler<T extends NodeEditorScreen<?>> implements IGhostIngredientHandler<T> {
 
     @Override
-    public <I> List<Target<I>> getTargetsTyped(NodeScreen screen, ITypedIngredient<I> ingredient, boolean doStart) {
+    public <I> List<Target<I>> getTargetsTyped(T screen, ITypedIngredient<I> ingredient, boolean doStart) {
         Optional<ItemStack> item = ingredient.getItemStack();
         if (item.isEmpty() || item.get().isEmpty()) {
             return List.of();

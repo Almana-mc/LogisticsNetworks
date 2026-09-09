@@ -1,6 +1,10 @@
 package me.almana.logisticsnetworks.menu;
 
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.permissions.Permissions;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
@@ -74,6 +78,8 @@ public class FilterMenu extends AbstractContainerMenu {
     private final LogisticsNodeEntity nodeSource;
     private final int nodeChannel;
     private final int nodeFilterSlot;
+    @Nullable
+    private GraphMenuContext graphContext;
 
     private boolean slotsHidden;
 
@@ -210,13 +216,16 @@ public class FilterMenu extends AbstractContainerMenu {
         int handOrdinal = buf.readVarInt();
         if (handOrdinal == -2) {
             int entityId = buf.readVarInt();
+            java.util.UUID nodeId = buf.readUUID();
+            net.minecraft.resources.Identifier dimension = buf.readIdentifier();
+            this.graphContext = buf.readBoolean() ? GraphMenuContext.read(buf) : null;
             this.nodeChannel = buf.readVarInt();
             this.nodeFilterSlot = buf.readVarInt();
             this.inventorySlotIndex = -1;
             this.hand = InteractionHand.MAIN_HAND;
             this.lockedSlot = -1;
             this.nodeAE2Link = null;
-            this.nodeSource = NodeMenuSync.findOrCreateClientNode(playerInv.player, entityId);
+            this.nodeSource = NodeMenuSync.findOrCreateClientNode(playerInv.player, entityId, nodeId, dimension);
             CompoundTag stackTag = buf.readNbt();
             ItemStack openedStack = stackTag != null
                     ? stackTag.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY)
@@ -818,6 +827,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
+        if (graphContext != null && !stillValid(player)) return false;
         if (player.level().isClientSide())
             return false;
 
@@ -961,6 +971,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
     @Override
     public void clicked(int slotId, int dragType, ContainerInput clickType, Player player) {
+        if (graphContext != null && !stillValid(player)) return;
         if (clickType == ContainerInput.PICKUP && slotId >= 0 && slotId < slots.size()) {
 
             if (!isSpecialMode && slotId < slotCount) {
@@ -1079,6 +1090,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
+        if (graphContext != null && !stillValid(player)) return ItemStack.EMPTY;
         if (isSpecialMode)
             return ItemStack.EMPTY;
 
@@ -1135,6 +1147,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
+        if (graphContext != null) return graphContext.canEdit(player, nodeSource);
         if (nodeSource != null)
             return nodeSource.isAlive();
         ItemStack stack = getOpenedStack();
@@ -1147,6 +1160,17 @@ public class FilterMenu extends AbstractContainerMenu {
     @Override
     public void removed(Player player) {
         super.removed(player);
+        if (!player.level().isClientSide() && graphContext != null) {
+            if (nodeSource == null || !nodeSource.isActive()
+                    || !(nodeSource.level() instanceof ServerLevel level)
+                    || level.getEntity(nodeSource.getUUID()) != nodeSource
+                    || !graphContext.networkId().equals(nodeSource.getNetworkId())
+                    || !nodeSource.isOwnedBy(player)) return;
+            var network = NetworkRegistry.get(level).getNetwork(graphContext.networkId());
+            if (network == null || !network.getNodeUuids().contains(nodeSource.getUUID())
+                    || !(NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
+                    || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))) return;
+        }
         if (!player.level().isClientSide() && !isSpecialMode) {
             saveFilterItems(getOpenedStack(), player.level().registryAccess());
         }
@@ -1161,6 +1185,15 @@ public class FilterMenu extends AbstractContainerMenu {
             }
             ServerPayloadHandler.markNetworkDirty(nodeSource);
         }
+    }
+
+    @Nullable
+    public GraphMenuContext getGraphContext() {
+        return graphContext;
+    }
+
+    public void setGraphContext(GraphMenuContext graphContext) {
+        this.graphContext = graphContext;
     }
 
     private boolean hasConfiguredRules() {

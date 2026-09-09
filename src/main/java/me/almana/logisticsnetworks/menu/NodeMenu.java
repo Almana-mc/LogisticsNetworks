@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
+import me.almana.logisticsnetworks.network.GraphPayloadHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -16,6 +17,7 @@ import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -55,9 +57,20 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     public NodeMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node, @Nullable GlobalPos ae2Link) {
-        super(Registration.NODE_MENU.get(), containerId);
+        this(Registration.NODE_MENU.get(), containerId, playerInv, node, 0, ae2Link);
+    }
+
+    protected NodeMenu(MenuType<?> type, int containerId, Inventory playerInv,
+            LogisticsNodeEntity node, int selectedChannel) {
+        this(type, containerId, playerInv, node, selectedChannel, null);
+    }
+
+    private NodeMenu(MenuType<?> type, int containerId, Inventory playerInv,
+            LogisticsNodeEntity node, int selectedChannel, @Nullable GlobalPos ae2Link) {
+        super(type, containerId);
         this.node = node;
-        this.nodeId = node.getId();
+        this.nodeId = node == null ? -1 : node.getId();
+        this.selectedChannel = Math.clamp(selectedChannel, 0, LogisticsNodeEntity.CHANNEL_COUNT - 1);
         this.serverPlayer = playerInv.player instanceof ServerPlayer player ? player : null;
         this.ae2Link = ae2Link;
         this.upgradeContainer = new UpgradeItemsContainer();
@@ -99,13 +112,30 @@ public class NodeMenu extends AbstractContainerMenu {
         // Main Inventory (rows)
         for (int r = 0; r < 3; r++) {
             for (int c = 0; c < 9; c++) {
-                addSlot(new Slot(inv, c + r * 9 + 9, PLAYER_INV_X + c * 18, PLAYER_INV_Y + r * 18));
+                addSlot(playerSlot(inv, c + r * 9 + 9, PLAYER_INV_X + c * 18, PLAYER_INV_Y + r * 18));
             }
         }
         // Hotbar
         for (int c = 0; c < 9; c++) {
-            addSlot(new Slot(inv, c, PLAYER_INV_X + c * 18, PLAYER_INV_Y + 58));
+            addSlot(playerSlot(inv, c, PLAYER_INV_X + c * 18, PLAYER_INV_Y + 58));
         }
+    }
+
+    private Slot playerSlot(Inventory inventory, int index, int x, int y) {
+        return new Slot(inventory, index, x, y) {
+            @Override
+            public boolean isActive() {
+                return hasVisibleInventory();
+            }
+        };
+    }
+
+    protected boolean hasVisibleInventory() {
+        return true;
+    }
+
+    public GraphMenuContext getGraphContext() {
+        return null;
     }
 
     public LogisticsNodeEntity getNode() {
@@ -177,19 +207,23 @@ public class NodeMenu extends AbstractContainerMenu {
     private void markDirty() {
         if (node != null && node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
             NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
+            GraphPayloadHandler.broadcast(level.getServer(), node.getNetworkId());
         }
     }
 
     @Override
     public void removed(Player player) {
         super.removed(player);
-        if (serverPlayer != null) {
+        GraphMenuContext graph = getGraphContext();
+        if (graph != null && !graph.canEdit(player, node)) return;
+        if (serverPlayer != null && node != null) {
             ServerPayloadHandler.handleNodeMenuClosed(serverPlayer, node, ae2Link);
         }
     }
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
+        if (!nodeSlotsActive || !hasAvailableNode()) return ItemStack.EMPTY;
         Slot fromSlot = slots.get(index);
         if (fromSlot == null || !fromSlot.hasItem())
             return ItemStack.EMPTY;
@@ -325,12 +359,17 @@ public class NodeMenu extends AbstractContainerMenu {
 
         @Override
         public boolean isActive() {
-            return nodeSlotsActive;
+            return nodeSlotsActive && hasAvailableNode();
+        }
+
+        @Override
+        public boolean mayPickup(Player player) {
+            return isActive();
         }
 
         @Override
         public boolean mayPlace(ItemStack stack) {
-            if (stack.isEmpty() || !stack.is(ModTags.UPGRADES)) {
+            if (!isActive() || stack.isEmpty() || !stack.is(ModTags.UPGRADES)) {
                 return false;
             }
             for (int i = 0; i < UPGRADE_SLOTS; i++) {
@@ -348,5 +387,9 @@ public class NodeMenu extends AbstractContainerMenu {
         public int getMaxStackSize() {
             return 1;
         }
+    }
+
+    protected boolean hasAvailableNode() {
+        return node != null;
     }
 }
