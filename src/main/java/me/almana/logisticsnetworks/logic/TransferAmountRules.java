@@ -60,7 +60,7 @@ public final class TransferAmountRules {
         for (int i = 0; i < handler.getSlots(); i++) {
             ItemStack stack = handler.getStackInSlot(i);
             if (!stack.isEmpty()) {
-                counts.merge(stack.getItem(), stack.getCount(), Integer::sum);
+                counts.merge(stack.getItem(), stack.getCount(), TransferAmountRules::saturatingAdd);
             }
         }
         return counts;
@@ -222,9 +222,13 @@ public final class TransferAmountRules {
         for (int i = 0; i < handler.getTanks(); i++) {
             FluidStack stack = handler.getFluidInTank(i);
             if (!stack.isEmpty() && FluidStack.isSameFluidSameComponents(stack, candidate)) {
-                amount += stack.getAmount();
+                amount = saturatingAdd(amount, stack.getAmount());
             }
         }
         return amount;
+    }
+
+    private static int saturatingAdd(int left, int right) {
+        return (int) Math.min((long) left + right, Integer.MAX_VALUE);
     }
 }

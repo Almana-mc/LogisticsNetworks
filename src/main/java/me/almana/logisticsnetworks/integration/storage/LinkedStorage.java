@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.integration.ae2.AE2StorageAdapter;
 import me.almana.logisticsnetworks.integration.refinedstorage.RefinedStorageAdapter;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -96,6 +97,15 @@ public final class LinkedStorage {
     public static StorageAccess resolve(ServerLevel level, StorageLink link) {
         StorageAdapter adapter = ADAPTERS.get(link.backend());
         return adapter == null ? null : adapter.resolve(level, link);
+    }
+
+    public static InterfaceStorageResolution resolveInterface(ServerLevel level, BlockPos pos,
+            @Nullable Direction direction) {
+        for (StorageAdapter adapter : ADAPTERS.values()) {
+            InterfaceStorageResolution resolution = adapter.resolveInterface(level, pos, direction);
+            if (resolution.status() != InterfaceStorageResolution.Status.UNSUPPORTED) return resolution;
+        }
+        return InterfaceStorageResolution.unsupported();
     }
 
     public static boolean isAccessible(ServerLevel level, StorageLink link) {

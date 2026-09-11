@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.server.MinecraftServer;
@@ -118,12 +119,15 @@ public final class Snapshots {
                 continue;
             }
 
-            IItemHandler sourceHandler = capCache.findItemHandler(node, channel.getIoDirection());
+            FilterItemData.ReadCache readCache = FilterItemData.createReadCache();
+            boolean directSource = !FilterLogic.hasConfiguredSlotMapping(
+                    channel.getFilterItems(), readCache);
+            IItemHandler sourceHandler = capCache.findItemExportHandler(
+                    node, channel.getIoDirection(), directSource);
             if (sourceHandler == null) {
                 continue;
             }
 
-            FilterItemData.ReadCache readCache = FilterItemData.createReadCache();
             TransferEngine.ResolvedItemTargets resolved = TransferEngine.resolveItemTargets(
                     node, level, channel, targets, sourceHandler,
                     context.dimensionalCache(), capCache, readCache);

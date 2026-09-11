@@ -2,6 +2,9 @@ package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
+import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import mekanism.api.chemical.IChemicalHandler;
@@ -53,14 +56,43 @@ public final class TransferCapabilityCache {
 
     @Nullable
     public IItemHandler findItemHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
+        return findItemHandler(node, direction, false, false);
+    }
+
+    @Nullable
+    public IItemHandler findItemExportHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+            boolean directInterfaces) {
+        return findItemHandler(node, direction, directInterfaces, true);
+    }
+
+    @Nullable
+    public IItemHandler findItemImportHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+            boolean directInterfaces) {
+        return findItemHandler(node, direction, directInterfaces, false);
+    }
+
+    @Nullable
+    private IItemHandler findItemHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+            boolean directInterfaces, boolean exporting) {
         if (node.isMountedOnCreate()) {
             return CreateCompat.findMountedItemHandler(node);
         }
+        InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(
+                (ServerLevel) node.level(), node.getAttachedPos(), direction);
+        if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE) {
+            if (directInterfaces) {
+                return exporting
+                        ? DirectStorageHandlers.exportItems(resolution.endpoint())
+                        : DirectStorageHandlers.importItems(resolution.endpoint());
+            }
+        }
+        if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
         return findItemHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
     }
 
     @Nullable
     IItemHandler findBulkItemHandler(ServerLevel level, BlockPos pos, IItemHandler sidedHandler) {
+        if (DirectStorageHandlers.isDirect(sidedHandler)) return sidedHandler;
         if (!SophisticatedCoreCompat.isSidedWrapper(sidedHandler)) return null;
         IItemHandler unsidedHandler = getItemHandler(level, pos, null);
         return SophisticatedCoreCompat.isBulkHandler(unsidedHandler) ? unsidedHandler : null;
@@ -68,6 +100,7 @@ public final class TransferCapabilityCache {
 
     @Nullable
     public IItemHandler findBulkItemHandler(LogisticsNodeEntity node, IItemHandler sidedHandler) {
+        if (DirectStorageHandlers.isDirect(sidedHandler)) return sidedHandler;
         if (node.isMountedOnCreate()) {
             return null;
         }
@@ -89,9 +122,37 @@ public final class TransferCapabilityCache {
 
     @Nullable
     public IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
+        return findFluidHandler(node, direction, false, false);
+    }
+
+    @Nullable
+    public IFluidHandler findFluidExportHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+            boolean directInterfaces) {
+        return findFluidHandler(node, direction, directInterfaces, true);
+    }
+
+    @Nullable
+    public IFluidHandler findFluidImportHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+            boolean directInterfaces) {
+        return findFluidHandler(node, direction, directInterfaces, false);
+    }
+
+    @Nullable
+    private IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+            boolean directInterfaces, boolean exporting) {
         if (node.isMountedOnCreate()) {
             return CreateCompat.findMountedFluidHandler(node);
         }
+        InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(
+                (ServerLevel) node.level(), node.getAttachedPos(), direction);
+        if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE) {
+            if (directInterfaces) {
+                return exporting
+                        ? DirectStorageHandlers.exportFluids(resolution.endpoint())
+                        : DirectStorageHandlers.importFluids(resolution.endpoint());
+            }
+        }
+        if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
         return findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
     }
 

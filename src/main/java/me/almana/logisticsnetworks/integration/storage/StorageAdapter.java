@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.integration.storage;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -16,6 +17,11 @@ public interface StorageAdapter {
 
     @Nullable
     StorageAccess resolve(ServerLevel level, StorageLink link);
+
+    default InterfaceStorageResolution resolveInterface(ServerLevel level, BlockPos pos,
+            @Nullable Direction direction) {
+        return InterfaceStorageResolution.unsupported();
+    }
 
     boolean isPattern(ItemStack stack, Level level);
 

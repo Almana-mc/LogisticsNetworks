@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
+import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.logic.async.SnapshotItemHandler;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.logic.async.TransferPlan;
@@ -443,13 +444,15 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos))
             return -1;
-        IItemHandler sourceHandler = capCache.findItemHandler(sourceNode, exportChannel.getIoDirection());
+        ItemStack[] exportFilters = exportChannel.getFilterItems();
+        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
+        boolean directSource = !FilterLogic.hasConfiguredSlotMapping(exportFilters, filterReadCache);
+        IItemHandler sourceHandler = capCache.findItemExportHandler(
+                sourceNode, exportChannel.getIoDirection(), directSource);
         if (sourceHandler == null)
             return -1;
 
-        ItemStack[] exportFilters = exportChannel.getFilterItems();
         boolean[] sourceAllowedSlots = null;
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
 
         ResolvedItemTargets resolved = resolveItemTargets(sourceNode, sourceLevel, exportChannel, targets,
                 sourceHandler, dimensionalCache, capCache, filterReadCache);
@@ -556,18 +559,19 @@ public class TransferEngine {
                     && isSameItemStorage(sourceLevel, sourcePos, targetLevel, targetPos))
                 continue;
 
-            IItemHandler targetHandler = capCache.findItemHandler(target.node, target.channel.getIoDirection());
+            ItemStack[] importFilters = target.channel.getFilterItems();
+            boolean hasImportSlotMapping = FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache);
+            IItemHandler targetHandler = capCache.findItemImportHandler(
+                    target.node, target.channel.getIoDirection(), !hasImportSlotMapping);
             if (targetHandler == null) {
                 hasUnavailableMountedTarget |= target.node.isMountedOnCreate();
                 continue;
             }
             hasUsableTarget = true;
-            if (sourceHandler == targetHandler)
+            if (sourceHandler == targetHandler || DirectStorageHandlers.shareNetwork(sourceHandler, targetHandler))
                 continue;
 
-            ItemStack[] importFilters = target.channel.getFilterItems();
             boolean[] targetAllowedSlots = null;
-            boolean hasImportSlotMapping = FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache);
             IItemHandler bulkHandler = hasImportSlotMapping
                     ? null
                     : capCache.findBulkItemHandler(target.node, targetHandler);
@@ -600,7 +604,8 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos))
             return -1;
-        IFluidHandler sourceHandler = capCache.findFluidHandler(sourceNode, exportChannel.getIoDirection());
+        IFluidHandler sourceHandler = capCache.findFluidExportHandler(
+                sourceNode, exportChannel.getIoDirection(), true);
         if (sourceHandler == null)
             return -1;
 
@@ -630,13 +635,14 @@ public class TransferEngine {
             if (!target.node.isMountedOnCreate() && !targetLevel.isLoaded(targetPos))
                 continue;
 
-            IFluidHandler targetHandler = capCache.findFluidHandler(target.node, target.channel.getIoDirection());
+            IFluidHandler targetHandler = capCache.findFluidImportHandler(
+                    target.node, target.channel.getIoDirection(), true);
             if (targetHandler == null) {
                 hasUnavailableMountedTarget |= target.node.isMountedOnCreate();
                 continue;
             }
             hasUsableTarget = true;
-            if (sourceHandler == targetHandler)
+            if (sourceHandler == targetHandler || DirectStorageHandlers.shareNetwork(sourceHandler, targetHandler))
                 continue;
 
             int filled = executeFluidMove(sourceHandler, targetHandler, remaining,
@@ -1242,6 +1248,9 @@ public class TransferEngine {
     private static ItemStack insertBulkItem(IItemHandler handler, ItemStack stack, boolean simulate) {
         if (handler instanceof SnapshotItemHandler snapshot) {
             return snapshot.insertBulkItem(stack, simulate);
+        }
+        if (DirectStorageHandlers.isDirect(handler)) {
+            return DirectStorageHandlers.insertItem(handler, stack, simulate);
         }
         return SophisticatedCoreCompat.insertItem(handler, stack, simulate);
     }

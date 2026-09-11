@@ -142,7 +142,7 @@ public final class SnapshotItemHandler implements IItemHandlerModifiable {
             return ItemStack.EMPTY;
         }
 
-        int extracted = Math.min(amount, Math.min(existing.getMaxStackSize(), existing.getCount()));
+        int extracted = Math.min(amount, Math.min(getSlotLimit(slot), existing.getCount()));
         if (!simulate) {
             ItemStack left = existing.copy();
             left.shrink(extracted);

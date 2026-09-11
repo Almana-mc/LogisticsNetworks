@@ -69,6 +69,12 @@ Use Primary Interaction on the channel number buttons at the top of the screen t
 
 **Gotcha:** not every block supports every type. If the block has no matching capability on the chosen side, the channel will silently do nothing. Put an item node on a fluid tank and it won't transfer — because the tank has no item inventory.
 
+### AE2 and Refined Storage Interfaces
+
+Nodes on Applied Energistics 2 and Refined Storage Interfaces transfer items and fluids directly through the connected storage network. The Interface's configured export resources decide what a Sender may pull, including its native fuzzy setting, but the configured quantity does not limit the Logistics batch. Receivers may insert any resource accepted by their Logistics channel filters.
+
+This direct path ignores the Interface's exposed slots and tanks. Adding an explicit Logistics slot mapping switches that item channel back to the exposed Interface inventory. A disconnected or inactive storage network waits without using the Interface buffer, and direct transfers never request autocrafting.
+
 Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but require specific upgrades to unlock. They are covered on the Upgrades page.
 
 ## Side
