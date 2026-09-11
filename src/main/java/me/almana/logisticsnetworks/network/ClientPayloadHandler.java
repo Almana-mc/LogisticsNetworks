@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeEditorScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
+import me.almana.logisticsnetworks.client.QueuedNodePlacementRenderer;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
@@ -96,6 +97,31 @@ public class ClientPayloadHandler {
                 massPlacementScreen.receiveBlockChoices(payload.choices(), payload.maxNodes());
             }
         });
+    }
+
+    public static void handleSyncMassPlacementRequirements(SyncMassPlacementRequirementsPayload payload,
+                                                            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var screen = Minecraft.getInstance().screen;
+            if (screen instanceof MassPlacementScreen massPlacementScreen
+                    && massPlacementScreen.hasContainerId(payload.containerId())) {
+                massPlacementScreen.receiveRequirements(payload.requirements(), payload.pending());
+            }
+        });
+    }
+
+    public static void handleSyncStorageUpgradeCatalog(SyncStorageUpgradeCatalogPayload payload,
+                                                   IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (Minecraft.getInstance().screen instanceof NodeEditorScreen<?> screen) {
+                screen.receiveStorageUpgradeCatalog(payload);
+            }
+        });
+    }
+
+    public static void handleSyncQueuedNodePlacement(SyncQueuedNodePlacementPayload payload,
+                                                      IPayloadContext context) {
+        context.enqueueWork(() -> QueuedNodePlacementRenderer.update(payload));
     }
 
     public static void handleSyncChannelData(SyncChannelDataPayload payload, IPayloadContext context) {

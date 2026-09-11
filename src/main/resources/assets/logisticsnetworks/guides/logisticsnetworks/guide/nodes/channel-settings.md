@@ -61,7 +61,7 @@ Use Primary Interaction on the channel number buttons at the top of the screen t
 
 **What it does:** tells the engine which capability to look for on the attached block:
 
-- **Item** — stacks of items from an inventory (chests, furnaces, hoppers, AE2 interfaces, etc.).
+- **Item** — stacks of items from an inventory (chests, furnaces, hoppers, AE2 interfaces, Refined Storage interfaces, etc.).
 - **Fluid** — millibuckets (mB) from a tank.
 - **Energy** — Forge Energy / RF from an energy buffer.
 

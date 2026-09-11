@@ -165,7 +165,7 @@ public class NetworkRegistry extends SavedData {
     public CompoundTag save(CompoundTag compoundTag, HolderLookup.Provider provider) {
         ListTag list = new ListTag();
         for (LogisticsNetwork network : networks.values()) {
-            list.add(network.save());
+            list.add(network.save(provider));
         }
         compoundTag.put(KEY_NETWORKS, list);
         return compoundTag;
@@ -182,7 +182,7 @@ public class NetworkRegistry extends SavedData {
                         if (!ct.contains("Color")) {
                             assignedDefaultColor = true;
                         }
-                        LogisticsNetwork network = LogisticsNetwork.load(ct);
+                        LogisticsNetwork network = LogisticsNetwork.load(ct, provider);
                         registry.networks.put(network.getId(), network);
                     } catch (Exception e) {
                         LOGGER.error("Skipping malformed network: {}", e.getMessage());

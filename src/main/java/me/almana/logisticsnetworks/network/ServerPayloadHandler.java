@@ -4,8 +4,11 @@ import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.logic.AttachedStorageFilterScanner;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.item.*;
@@ -19,6 +22,7 @@ import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -57,6 +61,75 @@ public class ServerPayloadHandler {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<UUID, Boolean> DEFAULT_NODE_VISIBILITY = new HashMap<>();
     private static final Map<UUID, Integer> MODIFIER_KEYS = new HashMap<>();
+
+    public static void handleRequestStorageUpgradeCatalog(RequestStorageUpgradeCatalogPayload payload,
+                                                     IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof NodeMenu menu)
+                    || menu.containerId != payload.containerId()
+                    || menu.getNodeId() != payload.entityId()
+                    || !menu.canEditNode(player)
+                    || payload.preferredSlot() < 0
+                    || payload.preferredSlot() >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT) {
+                return;
+            }
+            StorageLink link = menu.getAccessibleStorageLink(player);
+            boolean available = link != null;
+            List<SyncStorageUpgradeCatalogPayload.Entry> entries = new ArrayList<>();
+            if (available) {
+                for (LinkedStorage.UpgradeEntry entry : LinkedStorage.listUpgrades(
+                        player, link, menu.getInstalledUpgrades())) {
+                    entries.add(new SyncStorageUpgradeCatalogPayload.Entry(
+                            entry.item(), entry.stored(), entry.craftable()));
+                }
+            }
+            PacketDistributor.sendToPlayer(player, new SyncStorageUpgradeCatalogPayload(
+                    payload.containerId(), payload.entityId(), payload.preferredSlot(),
+                    link == null ? null : link.backend(), available, entries));
+        });
+    }
+
+    public static void handleInstallStorageUpgrade(InstallStorageUpgradePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof NodeMenu menu)
+                    || menu.containerId != payload.containerId()
+                    || menu.getNodeId() != payload.entityId()
+                    || !menu.canEditNode(player)
+                    || payload.preferredSlot() < 0
+                    || payload.preferredSlot() >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT
+                    || !BuiltInRegistries.ITEM.containsKey(payload.upgradeId())) {
+                return;
+            }
+            ItemStack upgrade = BuiltInRegistries.ITEM.get(payload.upgradeId()).getDefaultInstance();
+            if (!upgrade.is(ModTags.UPGRADES)) return;
+            StorageLink link = menu.getAccessibleStorageLink(player);
+            if (link == null) {
+                player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.unavailable"), true);
+                return;
+            }
+
+            LinkedStorage.UpgradeInstallResult result = LinkedStorage.installUpgrade(
+                    player, menu.getNode(), link, payload.preferredSlot(), upgrade.getItem());
+            switch (result) {
+                case CRAFTING -> player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.crafting",
+                                upgrade.getHoverName()), true);
+                case DUPLICATE -> player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.duplicate"), true);
+                case PENDING -> player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.pending"), true);
+                case NO_SLOT -> player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.no_slot"), true);
+                case UNAVAILABLE -> player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.unavailable"), true);
+                case INSTALLED -> {
+                }
+            }
+        });
+    }
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -464,6 +537,7 @@ public class ServerPayloadHandler {
             if (node == null)
                 return;
 
+            List<ItemStack> original = LabelUpgradeSync.snapshotUpgrades(node);
             node.setUpgradeItem(payload.upgradeSlot(), payload.upgradeItem());
 
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
@@ -471,7 +545,14 @@ public class ServerPayloadHandler {
                 if (channel != null)
                     setChannelToUpgradeMax(node, channel);
             }
-            invalidateNetwork(node);
+            if (context.player() instanceof ServerPlayer player) {
+                StorageLink link = player.containerMenu instanceof NodeMenu menu
+                        ? menu.getAccessibleStorageLink(player)
+                        : null;
+                LabelUpgradeSync.synchronizeMenuClose(player, node, original, link);
+            } else {
+                invalidateNetwork(node);
+            }
         });
     }
 
@@ -720,6 +801,9 @@ public class ServerPayloadHandler {
                 }
                 return;
             }
+            StorageLink preferredStorageLink = player.containerMenu instanceof NodeMenu currentMenu
+                    ? currentMenu.getAccessibleStorageLink(player)
+                    : null;
             player.openMenu(new MenuProvider() {
                 @Override
                 public Component getDisplayName() {
@@ -728,7 +812,7 @@ public class ServerPayloadHandler {
 
                 @Override
                 public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
-                    NodeMenu menu = new NodeMenu(containerId, playerInv, node);
+                    NodeMenu menu = new NodeMenu(containerId, playerInv, node, preferredStorageLink);
                     menu.setSelectedChannel(selectedChannel);
                     return menu;
                 }
@@ -928,7 +1012,7 @@ public class ServerPayloadHandler {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof PatternSetterMenu menu) {
                 menu.applyPattern(payload.useOutputs(), payload.multiplier(),
-                        context.player().level().registryAccess());
+                        context.player().level().registryAccess(), context.player().level());
             }
         });
     }
@@ -964,7 +1048,7 @@ public class ServerPayloadHandler {
         channel.setTickDelay(channel.getType() == ChannelType.ENERGY ? 1 : NodeUpgradeData.getMinTickDelay(node));
     }
 
-    private static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
+    public static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
         int maxBatch = getMaxBatch(node, channel.getType());
 
         if (channel.getType() == ChannelType.ENERGY) {
@@ -1070,6 +1154,7 @@ public class ServerPayloadHandler {
                                     }
                                 }
                                 invalidateNetwork(node);
+                                LabelUpgradeSync.synchronizeOnLoad(node);
                                 return;
                             }
                         }
@@ -1078,6 +1163,7 @@ public class ServerPayloadHandler {
                 }
             }
             invalidateNetwork(node);
+            LabelUpgradeSync.synchronizeOnLoad(node);
         });
     }
 
