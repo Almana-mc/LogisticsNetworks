@@ -53,6 +53,7 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_VISIBLE = "RenderVisible";
     private static final String KEY_CHANNELS = "Channels";
     private static final String KEY_UPGRADES = "Upgrades";
+    private static final String KEY_LABEL_REVISION = "LabelRevision";
     private static final String KEY_CHANNEL_PREFIX = "Channel";
     private static final String KEY_SLOT = "Slot";
     private static final String KEY_ITEM = "Item";
@@ -89,6 +90,7 @@ public class LogisticsNodeEntity extends Entity {
 
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
+    private long labelRevision;
 
     private final long[] channelCooldowns = new long[CHANNEL_COUNT];
     private final float[] backoffTicks = new float[CHANNEL_COUNT];
@@ -152,6 +154,9 @@ public class LogisticsNodeEntity extends Entity {
         }
         if (compound.contains(KEY_NODE_LABEL, Tag.TAG_STRING)) {
             setNodeLabel(compound.getString(KEY_NODE_LABEL));
+        }
+        if (compound.contains(KEY_LABEL_REVISION, Tag.TAG_ANY_NUMERIC)) {
+            labelRevision = Math.max(0, compound.getLong(KEY_LABEL_REVISION));
         }
         if (compound.contains(KEY_HIGHLIGHTED)) {
             setHighlighted(compound.getBoolean(KEY_HIGHLIGHTED));
@@ -217,6 +222,7 @@ public class LogisticsNodeEntity extends Entity {
         if (!label.isEmpty()) {
             compound.putString(KEY_NODE_LABEL, label);
         }
+        if (labelRevision > 0) compound.putLong(KEY_LABEL_REVISION, labelRevision);
         compound.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
 
         UUID createContraptionId = getCreateContraptionId();
@@ -480,7 +486,16 @@ public class LogisticsNodeEntity extends Entity {
         if (sanitized.length() > 48) {
             sanitized = sanitized.substring(0, 48);
         }
+        if (!sanitized.equals(getNodeLabel())) labelRevision = 0;
         this.entityData.set(NODE_LABEL, sanitized);
+    }
+
+    public long getLabelRevision() {
+        return labelRevision;
+    }
+
+    public void setLabelRevision(long revision) {
+        labelRevision = Math.max(0, revision);
     }
 
     @Nullable

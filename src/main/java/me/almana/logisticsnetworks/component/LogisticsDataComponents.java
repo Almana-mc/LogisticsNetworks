@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.component;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
@@ -37,6 +38,8 @@ public final class LogisticsDataComponents {
             REGISTRAR.registerComponentType("wrench_clipboard", builder -> builder.persistent(WrenchClipboard.CODEC));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> WRENCH_AE2_LINK =
             REGISTRAR.registerComponentType("wrench_ae2_link", builder -> builder.persistent(GlobalPos.CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<StorageLink>> WRENCH_STORAGE_LINK =
+            REGISTRAR.registerComponentType("wrench_storage_link", builder -> builder.persistent(StorageLink.CODEC));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<WrenchMassPlacement>> WRENCH_MASS_PLACEMENT =
             REGISTRAR.registerComponentType("wrench_mass_placement",
                     builder -> builder.persistent(WrenchMassPlacement.CODEC));

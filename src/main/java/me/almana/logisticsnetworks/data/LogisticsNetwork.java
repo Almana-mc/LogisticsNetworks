@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.core.HolderLookup;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,6 +37,9 @@ public class LogisticsNetwork {
     private static final String KEY_GRAPH_POSITIONS = "GraphPositions";
     private static final String KEY_GRAPH_X = "X";
     private static final String KEY_GRAPH_Y = "Y";
+    private static final String KEY_LABEL_TEMPLATES = "LabelTemplates";
+    private static final String KEY_LABEL = "Label";
+    private static final String KEY_TEMPLATE = "Template";
     private static final float MAX_GRAPH_COORDINATE = 1_000_000.0F;
 
     private final UUID id;
@@ -44,6 +48,7 @@ public class LogisticsNetwork {
     private int color = NetworkColors.randomColor();
     private final Set<UUID> nodeUuids = new HashSet<>();
     private final Map<String, GraphPosition> graphPositions = new HashMap<>();
+    private final Map<String, LabelUpgradeTemplate> labelTemplates = new HashMap<>();
     private boolean sleeping = true;
 
     // Runtime flags
@@ -98,7 +103,7 @@ public class LogisticsNetwork {
         rebuildViews();
     }
 
-    public CompoundTag save() {
+    public CompoundTag save(HolderLookup.Provider provider) {
         CompoundTag tag = new CompoundTag();
         tag.putUUID(KEY_ID, id);
         tag.putString(KEY_NAME, name);
@@ -135,10 +140,21 @@ public class LogisticsNetwork {
             tag.put(KEY_GRAPH_POSITIONS, positionsTag);
         }
 
+        if (!labelTemplates.isEmpty()) {
+            ListTag templatesTag = new ListTag();
+            for (Map.Entry<String, LabelUpgradeTemplate> entry : new TreeMap<>(labelTemplates).entrySet()) {
+                CompoundTag templateTag = new CompoundTag();
+                templateTag.putString(KEY_LABEL, entry.getKey());
+                templateTag.put(KEY_TEMPLATE, entry.getValue().save(provider));
+                templatesTag.add(templateTag);
+            }
+            tag.put(KEY_LABEL_TEMPLATES, templatesTag);
+        }
+
         return tag;
     }
 
-    public static LogisticsNetwork load(CompoundTag tag) {
+    public static LogisticsNetwork load(CompoundTag tag, HolderLookup.Provider provider) {
         UUID id = tag.getUUID(KEY_ID);
         LogisticsNetwork network = new LogisticsNetwork(id);
 
@@ -182,6 +198,16 @@ public class LogisticsNetwork {
                 if (validGraphKey(key) && validGraphPosition(position)) {
                     network.graphPositions.put(key, position);
                 }
+            }
+        }
+        if (tag.contains(KEY_LABEL_TEMPLATES, Tag.TAG_LIST)) {
+            ListTag templatesTag = tag.getList(KEY_LABEL_TEMPLATES, Tag.TAG_COMPOUND);
+            for (Tag value : templatesTag) {
+                if (!(value instanceof CompoundTag templateTag)) continue;
+                String label = templateTag.getString(KEY_LABEL);
+                LabelUpgradeTemplate template = LabelUpgradeTemplate.load(
+                        templateTag.getCompound(KEY_TEMPLATE), provider);
+                if (!label.isBlank() && template != null) network.labelTemplates.put(label, template);
             }
         }
 
@@ -267,6 +293,14 @@ public class LogisticsNetwork {
 
     public Set<UUID> getNodeUuids() {
         return Collections.unmodifiableSet(nodeUuids);
+    }
+
+    public LabelUpgradeTemplate getLabelTemplate(String label) {
+        return labelTemplates.get(label);
+    }
+
+    public void setLabelTemplate(String label, LabelUpgradeTemplate template) {
+        if (!label.isBlank()) labelTemplates.put(label, template);
     }
 
     public boolean isSleeping() {

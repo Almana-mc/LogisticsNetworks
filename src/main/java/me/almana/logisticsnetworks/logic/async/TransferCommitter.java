@@ -6,7 +6,10 @@ import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
+import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.server.MinecraftServer;
@@ -111,7 +114,10 @@ public final class TransferCommitter {
             return ChannelCommitResult.skipped(planned);
         }
 
-        IItemHandler source = capCache.findItemHandler(sourceNode, sourceChannel.getIoDirection());
+        boolean directSource = !FilterLogic.hasConfiguredSlotMapping(
+                sourceChannel.getFilterItems(), FilterItemData.createReadCache());
+        IItemHandler source = capCache.findItemExportHandler(
+                sourceNode, sourceChannel.getIoDirection(), directSource);
         if (source == null) {
             return ChannelCommitResult.skipped(planned);
         }
@@ -138,16 +144,22 @@ public final class TransferCommitter {
             }
         }
 
-        boolean revalidated = committed < planned;
+        ServerLevel sourceLevel = (ServerLevel) sourceNode.level();
+        int tier = network.getTierCache().getOrDefault(sourceNode.getUUID(), 0);
+        int recoveryGoal = planned;
+        if (DirectStorageHandlers.isDirect(source)) {
+            int configuredBatch = TransferEngine.getBatchLimit(ChannelType.ITEM, tier);
+            recoveryGoal = Math.max(planned,
+                    Math.max(1, Math.min(sourceChannel.getBatchSize(), configuredBatch)));
+        }
+        boolean revalidated = committed < recoveryGoal;
         int recovered = revalidated
                 ? TransferEngine.recoverItemChannel(
                         network, server, capCache, channel.sourceNodeId(), channel.channelIndex(),
-                        planned - committed, committed, committedByItem)
+                        recoveryGoal - committed, committed, committedByItem)
                 : 0;
         int totalMoved = committed + recovered;
 
-        ServerLevel sourceLevel = (ServerLevel) sourceNode.level();
-        int tier = network.getTierCache().getOrDefault(sourceNode.getUUID(), 0);
         long wakeDelta = TransferEngine.finishChannelAttempt(
                 sourceNode, sourceChannel, channel.channelIndex(), totalMoved,
                 sourceLevel.getGameTime(), tier, telemetryActive);
@@ -179,7 +191,10 @@ public final class TransferCommitter {
                             (ServerLevel) node.level(), node.getAttachedPos())) {
                 continue;
             }
-            IItemHandler handler = capCache.findItemHandler(node, channel.getIoDirection());
+            boolean directTarget = !FilterLogic.hasConfiguredSlotMapping(
+                    channel.getFilterItems(), FilterItemData.createReadCache());
+            IItemHandler handler = capCache.findItemImportHandler(
+                    node, channel.getIoDirection(), directTarget);
             if (handler == null) {
                 continue;
             }
@@ -198,7 +213,8 @@ public final class TransferCommitter {
     static boolean sharesItemHandler(IItemHandler source, @Nullable IItemHandler sourceBulk,
             IItemHandler target, @Nullable IItemHandler targetBulk) {
         return source == target || source == targetBulk
-                || sourceBulk != null && (sourceBulk == target || sourceBulk == targetBulk);
+                || sourceBulk != null && (sourceBulk == target || sourceBulk == targetBulk)
+                || DirectStorageHandlers.shareNetwork(source, target);
     }
 
     private static boolean isItemChannel(@Nullable ChannelData channel, ChannelMode mode) {

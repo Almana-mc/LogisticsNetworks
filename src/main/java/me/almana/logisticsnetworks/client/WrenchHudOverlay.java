@@ -61,9 +61,11 @@ public class WrenchHudOverlay {
             WrenchItem.Mode mode = WrenchItem.getMode(wrenchStack);
             Component modeText = Component.translatable("tooltip.logisticsnetworks.wrench.mode",
                     WrenchItem.getModeDisplayName(mode));
-            Component text = WrenchItem.hasAE2Link(wrenchStack)
+            var storageLink = WrenchItem.getStorageLink(wrenchStack);
+            Component text = storageLink != null
                     ? Component.empty().append(modeText).append(" ").append(
-                            Component.literal("[ME]").withStyle(net.minecraft.ChatFormatting.DARK_PURPLE))
+                            Component.literal("[").append(storageLink.backend().displayName()).append("]")
+                                    .withStyle(net.minecraft.ChatFormatting.DARK_PURPLE))
                     : modeText;
 
             GuiGraphics g = event.getGuiGraphics();

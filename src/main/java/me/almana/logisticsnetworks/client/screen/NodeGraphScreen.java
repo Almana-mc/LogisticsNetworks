@@ -308,6 +308,7 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         double x = mouseX / uiScale;
         double y = mouseY / uiScale;
+        if (isStorageUpgradePickerOpen()) return super.mouseClicked(x, y, button);
         if (openingSelection) return true;
         for (var child : children()) {
             if (child instanceof Button control && control.mouseClicked(x, y, button)) {
@@ -324,6 +325,9 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
         double x = mouseX / uiScale;
         double y = mouseY / uiScale;
+        if (isStorageUpgradePickerOpen()) {
+            return super.mouseDragged(x, y, button, deltaX / uiScale, deltaY / uiScale);
+        }
         if (canvas().mouseDragged(x, y, button, deltaX / uiScale, deltaY / uiScale)) return true;
         return menu.getNode() != null && super.mouseDragged(x, y, button, deltaX / uiScale, deltaY / uiScale);
     }
@@ -332,6 +336,7 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         double x = mouseX / uiScale;
         double y = mouseY / uiScale;
+        if (isStorageUpgradePickerOpen()) return super.mouseReleased(x, y, button);
         if (canvas().mouseReleased(x, y, button)) return true;
         return menu.getNode() != null && super.mouseReleased(x, y, button);
     }
@@ -340,12 +345,14 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
         double x = mouseX / uiScale;
         double y = mouseY / uiScale;
+        if (isStorageUpgradePickerOpen()) return super.mouseScrolled(x, y, deltaX, deltaY);
         if (canvas().mouseScrolled(x, y, deltaY)) return true;
         return menu.getNode() != null && super.mouseScrolled(x, y, deltaX, deltaY);
     }
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
+        if (isStorageUpgradePickerOpen()) return super.keyPressed(key, scan, modifiers);
         if (openingSelection) return true;
         if (key == 258 || getFocused() instanceof Button) return handleScreenKey(key, scan, modifiers);
         return super.keyPressed(key, scan, modifiers);

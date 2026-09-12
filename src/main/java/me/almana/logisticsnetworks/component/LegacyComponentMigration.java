@@ -4,6 +4,8 @@ import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
+import me.almana.logisticsnetworks.integration.storage.StorageBackend;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
@@ -83,6 +85,14 @@ public final class LegacyComponentMigration {
     }
 
     public static boolean migrateWrench(ItemStack stack, @Nullable HolderLookup.Provider provider) {
+        StorageLink currentLink = stack.get(LogisticsDataComponents.WRENCH_STORAGE_LINK);
+        GlobalPos componentLink = stack.get(LogisticsDataComponents.WRENCH_AE2_LINK);
+        if (currentLink == null && componentLink != null) {
+            stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK,
+                    new StorageLink(StorageBackend.AE2, componentLink));
+        }
+        stack.remove(LogisticsDataComponents.WRENCH_AE2_LINK);
+
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         if (!(custom.get(WRENCH_ROOT) instanceof CompoundTag root)) {
             return true;
@@ -94,9 +104,10 @@ public final class LegacyComponentMigration {
                 stack.set(LogisticsDataComponents.WRENCH_MODE, mode);
             }
         }
-        if (!stack.has(LogisticsDataComponents.WRENCH_AE2_LINK) && root.contains("ae2_link")) {
+        if (!stack.has(LogisticsDataComponents.WRENCH_STORAGE_LINK) && root.contains("ae2_link")) {
             GlobalPos.CODEC.parse(NbtOps.INSTANCE, root.get("ae2_link")).result()
-                    .ifPresent(value -> stack.set(LogisticsDataComponents.WRENCH_AE2_LINK, value));
+                    .map(value -> new StorageLink(StorageBackend.AE2, value))
+                    .ifPresent(value -> stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK, value));
         }
         if (!stack.has(LogisticsDataComponents.WRENCH_MASS_PLACEMENT)) {
             WrenchMassPlacement massPlacement = readMassPlacement(root);

@@ -10,7 +10,11 @@ import me.almana.logisticsnetworks.component.WrenchMassPlacement;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageAccess;
+import me.almana.logisticsnetworks.integration.storage.StorageAction;
+import me.almana.logisticsnetworks.integration.storage.StorageBackend;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -33,6 +37,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.Container;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.Entity;
@@ -348,10 +353,10 @@ public class WrenchItem extends Item {
         boolean missingItems = false;
         boolean inventoryFull = false;
         boolean incompatibleOnly = false;
-        GlobalPos ae2Link = getAE2LinkPos(wrenchStack);
+        StorageLink storageLink = getStorageLink(wrenchStack);
 
         for (LogisticsNodeEntity node : targets) {
-            NodeClipboardConfig.PasteResult result = clipboard.applyToNode(player, node, wrenchStack, ae2Link);
+            NodeClipboardConfig.PasteResult result = clipboard.applyToNode(player, node, wrenchStack, storageLink);
             switch (result) {
                 case SUCCESS -> {
                     pasted++;
@@ -542,13 +547,78 @@ public class WrenchItem extends Item {
 
         LogisticsNodeEntity node = findNodeAt(level, clickedPos);
         if (node == null) {
-            if (isSecondaryUse(player) && AE2Compat.isLoaded() && AE2Compat.isGridHost(level, clickedPos)) {
-                return toggleAE2Link(context.getItemInHand(), player, level, clickedPos);
+            if (isSecondaryUse(player)) {
+                StorageBackend backend = LinkedStorage.detect(level, clickedPos);
+                if (backend != null) {
+                    return toggleStorageLink(context.getItemInHand(), player, level, clickedPos, backend);
+                }
+                if (player instanceof ServerPlayer serverPlayer) {
+                    return placeNodeFromWrench(context, serverPlayer, clickedPos);
+                }
             }
             return InteractionResult.SUCCESS;
         }
 
         return interactWithMountedNode(node, player, context.getItemInHand());
+    }
+
+    private InteractionResult placeNodeFromWrench(UseOnContext context, ServerPlayer player, BlockPos pos) {
+        ServerLevel level = player.serverLevel();
+        if (NodePlacementHelper.validatePlacement(level, pos) != NodePlacementHelper.ValidationResult.OK) {
+            return InteractionResult.SUCCESS;
+        }
+
+        GlobalPos target = GlobalPos.of(level.dimension(), pos);
+        if (LinkedStorage.isNodePlacementQueued(target)) {
+            player.displayClientMessage(Component.translatable(
+                    "message.logisticsnetworks.wrench.place_node.duplicate"), true);
+            return InteractionResult.CONSUME;
+        }
+
+        Item nodeItem = Registration.LOGISTICS_NODE_ITEM.get();
+        int inventorySlot = findNodeItemSlot(player.getInventory());
+        StorageLink storageLink = null;
+        StorageAccess access = null;
+        boolean renderVisible = ServerPayloadHandler.getDefaultNodeVisibility(player);
+        if (inventorySlot < 0) {
+            storageLink = getStorageLink(context.getItemInHand());
+            if (storageLink == null) {
+                return InteractionResult.SUCCESS;
+            }
+            access = LinkedStorage.resolve(level, storageLink);
+            if (access == null || !access.allows(player, StorageAction.EXTRACT)) {
+                return InteractionResult.SUCCESS;
+            }
+            if (access.count(nodeItem) < 1) {
+                LinkedStorage.NodePlacementRequestResult result = LinkedStorage.requestNodePlacement(player,
+                        target, storageLink, renderVisible);
+                player.displayClientMessage(Component.translatable(switch (result) {
+                    case QUEUED -> "message.logisticsnetworks.wrench.place_node.queued";
+                    case DUPLICATE -> "message.logisticsnetworks.wrench.place_node.duplicate";
+                    case UNAVAILABLE -> "message.logisticsnetworks.wrench.place_node.unavailable";
+                }), true);
+                return InteractionResult.CONSUME;
+            }
+        }
+
+        LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, pos, player.getUUID());
+        if (node == null) return InteractionResult.FAIL;
+
+        boolean fromInventory = inventorySlot >= 0;
+        if (fromInventory) {
+            player.getInventory().getItem(inventorySlot).shrink(1);
+            player.getInventory().setChanged();
+        } else if (access == null || access.extractOne(nodeItem, player).isEmpty()) {
+            node.discard();
+            return InteractionResult.SUCCESS;
+        }
+
+        node.setRenderVisible(renderVisible);
+        level.playSound(null, pos, SoundEvents.METAL_PLACE, SoundSource.BLOCKS, 1.0f, 1.0f);
+        player.displayClientMessage(Component.translatable(fromInventory
+                ? "message.logisticsnetworks.wrench.place_node.inventory"
+                : "message.logisticsnetworks.wrench.place_node.storage_network"), true);
+        return InteractionResult.CONSUME;
     }
 
     public InteractionResult interactWithMountedNode(LogisticsNodeEntity node, Player player, ItemStack wrenchStack) {
@@ -562,7 +632,7 @@ public class WrenchItem extends Item {
         return switch (getMode(wrenchStack)) {
             case WRENCH -> isSecondaryUse(player)
                     ? removeNode(node.level(), node, player)
-                    : openNodeGui(node, player);
+                    : openNodeGui(node, player, wrenchStack);
             case COPY_PASTE -> isSecondaryUse(player)
                     ? pasteToNode(node, player, wrenchStack)
                     : copyFromNode(node, player, wrenchStack);
@@ -706,19 +776,22 @@ public class WrenchItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.mode", getModeDisplayName(getMode(stack))));
-        GlobalPos ae2Link = getAE2LinkPos(stack);
-        if (ae2Link != null) {
+        StorageLink storageLink = getStorageLink(stack);
+        if (storageLink != null) {
             if (ClientControls.modifier1Down()) {
-                BlockPos p = ae2Link.pos();
-                String dim = ae2Link.dimension().location().toString();
-                tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_linked_detail",
-                        p.getX(), p.getY(), p.getZ(), dim).withStyle(ChatFormatting.GREEN));
+                BlockPos pos = storageLink.position().pos();
+                String dimension = storageLink.position().dimension().location().toString();
+                tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.storage_linked_detail",
+                        storageLink.backend().displayName(), pos.getX(), pos.getY(), pos.getZ(), dimension)
+                        .withStyle(ChatFormatting.GREEN));
             } else {
-                tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_linked")
+                tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.storage_linked",
+                                storageLink.backend().displayName())
                         .withStyle(ChatFormatting.GREEN));
             }
-        } else if (AE2Compat.isLoaded()) {
-            tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_unlinked")
+        } else if (LinkedStorage.isBackendLoaded(StorageBackend.AE2)
+                || LinkedStorage.isBackendLoaded(StorageBackend.REFINED_STORAGE)) {
+            tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.storage_unlinked")
                     .withStyle(ChatFormatting.RED));
         }
     }
@@ -733,6 +806,13 @@ public class WrenchItem extends Item {
             }
         }
         return null;
+    }
+
+    static int findNodeItemSlot(Container inventory) {
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            if (inventory.getItem(slot).is(Registration.LOGISTICS_NODE_ITEM.get())) return slot;
+        }
+        return -1;
     }
 
     private InteractionResult removeNode(Level level, LogisticsNodeEntity node, Player player) {
@@ -753,8 +833,9 @@ public class WrenchItem extends Item {
         return InteractionResult.CONSUME;
     }
 
-    private InteractionResult openNodeGui(LogisticsNodeEntity node, Player player) {
+    private InteractionResult openNodeGui(LogisticsNodeEntity node, Player player, ItemStack wrenchStack) {
         if (player instanceof ServerPlayer serverPlayer) {
+            StorageLink preferredStorageLink = getStorageLink(wrenchStack);
             serverPlayer.openMenu(new MenuProvider() {
                 @Override
                 public Component getDisplayName() {
@@ -763,7 +844,7 @@ public class WrenchItem extends Item {
 
                 @Override
                 public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
-                    return new NodeMenu(containerId, playerInv, node);
+                    return new NodeMenu(containerId, playerInv, node, preferredStorageLink);
                 }
             }, buf -> NodeMenuSync.write(buf, node, player.registryAccess(), 0));
 
@@ -799,8 +880,8 @@ public class WrenchItem extends Item {
             return InteractionResult.CONSUME;
         }
 
-        GlobalPos ae2Link = getAE2LinkPos(wrenchStack);
-        NodeClipboardConfig.PasteResult result = clipboard.applyToNode(serverPlayer, node, wrenchStack, ae2Link);
+        StorageLink storageLink = getStorageLink(wrenchStack);
+        NodeClipboardConfig.PasteResult result = clipboard.applyToNode(serverPlayer, node, wrenchStack, storageLink);
         switch (result) {
             case SUCCESS -> {
                 invalidateNodeNetwork(node);
@@ -862,40 +943,46 @@ public class WrenchItem extends Item {
         LegacyComponentMigration.clearWrenchClipboard(stack);
     }
 
-    private InteractionResult toggleAE2Link(ItemStack wrenchStack, Player player, Level level, BlockPos clickedPos) {
-        GlobalPos current = getAE2LinkPos(wrenchStack);
-        if (current != null && current.pos().equals(clickedPos) && current.dimension().equals(level.dimension())) {
-            clearAE2Link(wrenchStack);
-            player.displayClientMessage(Component.translatable("message.logisticsnetworks.ae2.unlinked"), true);
+    private InteractionResult toggleStorageLink(ItemStack wrenchStack, Player player, Level level,
+                                                BlockPos clickedPos, StorageBackend backend) {
+        StorageLink current = getStorageLink(wrenchStack);
+        StorageLink clicked = new StorageLink(backend, GlobalPos.of(level.dimension(), clickedPos));
+        if (clicked.equals(current)) {
+            clearStorageLink(wrenchStack);
+            player.displayClientMessage(Component.translatable("message.logisticsnetworks.storage.unlinked",
+                    backend.displayName()), true);
+        } else if (current != null) {
+            player.displayClientMessage(Component.translatable("message.logisticsnetworks.storage.link_conflict",
+                    current.backend().displayName()), true);
         } else {
-            setAE2Link(wrenchStack, level.dimension(), clickedPos);
-            player.displayClientMessage(Component.translatable("message.logisticsnetworks.ae2.linked",
-                    clickedPos.getX(), clickedPos.getY(), clickedPos.getZ()), true);
+            setStorageLink(wrenchStack, clicked);
+            player.displayClientMessage(Component.translatable("message.logisticsnetworks.storage.linked",
+                    backend.displayName(), clickedPos.getX(), clickedPos.getY(), clickedPos.getZ()), true);
         }
         return InteractionResult.CONSUME;
     }
 
-    public static void setAE2Link(ItemStack stack, ResourceKey<Level> dimension, BlockPos pos) {
+    public static void setStorageLink(ItemStack stack, StorageLink link) {
         if (stack.isEmpty()) return;
         LegacyComponentMigration.migrateWrench(stack, null);
-        stack.set(LogisticsDataComponents.WRENCH_AE2_LINK, GlobalPos.of(dimension, pos));
+        stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK, link);
     }
 
-    public static void clearAE2Link(ItemStack stack) {
+    public static void clearStorageLink(ItemStack stack) {
         if (stack.isEmpty()) return;
         LegacyComponentMigration.migrateWrench(stack, null);
-        stack.remove(LogisticsDataComponents.WRENCH_AE2_LINK);
+        stack.remove(LogisticsDataComponents.WRENCH_STORAGE_LINK);
     }
 
-    public static boolean hasAE2Link(ItemStack stack) {
+    public static boolean hasStorageLink(ItemStack stack) {
         LegacyComponentMigration.migrateWrench(stack, null);
-        return stack.has(LogisticsDataComponents.WRENCH_AE2_LINK);
+        return stack.has(LogisticsDataComponents.WRENCH_STORAGE_LINK);
     }
 
     @Nullable
-    public static GlobalPos getAE2LinkPos(ItemStack stack) {
+    public static StorageLink getStorageLink(ItemStack stack) {
         LegacyComponentMigration.migrateWrench(stack, null);
-        return stack.get(LogisticsDataComponents.WRENCH_AE2_LINK);
+        return stack.get(LogisticsDataComponents.WRENCH_STORAGE_LINK);
     }
 
     public static int getMaxMassNodes() {
