@@ -1025,6 +1025,8 @@ public class TransferEngine {
                     }
 
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
+                    StackedInsertion insertion = prepareStackedInsertion(
+                            target.handler(), bulkHandler, importAllowedSlots);
                     ItemStack simRemainder;
                     if (bulkHandler != null) {
                         if (bulkInsertRejections == null) {
@@ -1032,6 +1034,8 @@ public class TransferEngine {
                                     (handler, stack) -> insertBulkItem(handler, stack, true));
                         }
                         simRemainder = bulkInsertRejections.simulate(bulkHandler, simulatedInsert);
+                    } else if (insertion != null) {
+                        simRemainder = insertion.simulate(simulatedInsert);
                     } else {
                         simRemainder = insertItemWithAllowedSlots(target.handler(), null,
                                 simulatedInsert, true, importAllowedSlots);
@@ -1046,8 +1050,9 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), bulkHandler,
-                            toMove, false, importAllowedSlots);
+                    ItemStack uninserted = insertion != null ? insertion.commit(toMove)
+                            : insertItemWithAllowedSlots(target.handler(), bulkHandler,
+                                    toMove, false, importAllowedSlots);
                     int targetAccepted = toMove.getCount() - uninserted.getCount();
                     if (targetAccepted > 0 && bulkHandler != null) {
                         bulkInsertRejections.clear(bulkHandler);
@@ -1150,8 +1155,10 @@ public class TransferEngine {
             return 0;
         }
 
-        ItemStack simRemainder = insertItemWithAllowedSlots(target, bulkTarget,
-                available.copyWithCount(available.getCount()), true, targetSlotMask);
+        StackedInsertion insertion = prepareStackedInsertion(target, bulkTarget, targetSlotMask);
+        ItemStack simulatedInsert = available.copyWithCount(available.getCount());
+        ItemStack simRemainder = insertion != null ? insertion.simulate(simulatedInsert)
+                : insertItemWithAllowedSlots(target, bulkTarget, simulatedInsert, true, targetSlotMask);
         int acceptable = available.getCount() - simRemainder.getCount();
         if (acceptable <= 0) {
             return 0;
@@ -1162,7 +1169,8 @@ public class TransferEngine {
             return 0;
         }
 
-        ItemStack uninserted = insertItemWithAllowedSlots(target, bulkTarget, toMove, false, targetSlotMask);
+        ItemStack uninserted = insertion != null ? insertion.commit(toMove)
+                : insertItemWithAllowedSlots(target, bulkTarget, toMove, false, targetSlotMask);
         int accepted = toMove.getCount() - uninserted.getCount();
 
         if (!uninserted.isEmpty()) {
@@ -1182,6 +1190,12 @@ public class TransferEngine {
         }
 
         return accepted;
+    }
+
+    private static @Nullable StackedInsertion prepareStackedInsertion(IItemHandler handler,
+            @Nullable IItemHandler bulkHandler, @Nullable boolean[] allowedSlots) {
+        return bulkHandler == null && allowedSlots == null && handler.getSlots() > 64
+                && !(handler instanceof SnapshotItemHandler) ? new StackedInsertion(handler) : null;
     }
 
     private static boolean[] computeImportAllowedSlots(IItemHandler handler, ItemStack[] importFilters,

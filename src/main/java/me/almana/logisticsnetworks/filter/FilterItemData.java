@@ -3,11 +3,14 @@ package me.almana.logisticsnetworks.filter;
 import me.almana.logisticsnetworks.component.FilterSettings;
 import me.almana.logisticsnetworks.component.FilterSettingsData;
 import me.almana.logisticsnetworks.component.GeneralFilterConfig;
+import me.almana.logisticsnetworks.component.GeneralFilterEntry;
 import me.almana.logisticsnetworks.component.LegacyComponentMigration;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -15,6 +18,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
 import java.util.List;
 import java.util.ArrayList;
@@ -67,13 +71,14 @@ public final class FilterItemData {
     }
 
     private record CachedItemView(@Nullable FilterSettings settings, @Nullable GeneralFilterConfig config,
-            ItemFilterView view) {
+            @Nullable CustomData customData, ItemFilterView view) {
     }
 
     private record ItemFilterSlot(
             int slotIndex,
             @Nullable String tag,
             @Nullable Item item,
+            @Nullable DataComponentMap expectedComponents,
             @Nullable String chemicalId,
             @Nullable FluidStack fluidEntry,
             int batch,
@@ -1750,6 +1755,8 @@ public final class FilterItemData {
     private static boolean itemEntryConstraintsMatch(ItemStack filter, ItemFilterSlot entry, ItemStack candidate,
             HolderLookup.Provider provider, LazyComponents components) {
         if (entry.nbtStrict()) {
+            if (entry.expectedComponents() != null)
+                return entry.expectedComponents().equals(candidate.getComponents());
             ItemStack expected = getEntry(filter, entry.slotIndex(), provider);
             return !expected.isEmpty() && ItemStack.isSameItemSameComponents(expected, candidate);
         }
@@ -1991,24 +1998,132 @@ public final class FilterItemData {
     }
 
     private static ItemFilterView getItemFilterView(ItemStack stack, @Nullable ReadCache readCache) {
-        if (readCache == null) {
-            return buildItemFilterView(stack);
-        }
-
-        LegacyComponentMigration.migrateGeneralFilter(stack, null);
         FilterSettings settings = stack.get(LogisticsDataComponents.FILTER_SETTINGS);
         GeneralFilterConfig config = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
-        CachedItemView cached = readCache.itemViews.get(stack);
-        if (cached != null && cached.settings() == settings && cached.config() == config) {
-            return cached.view();
+        CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+        if (readCache != null) {
+            CachedItemView cached = readCache.itemViews.get(stack);
+            if (cached != null && cached.settings() == settings && cached.config() == config
+                    && cached.customData() == customData) {
+                return cached.view();
+            }
         }
 
-        ItemFilterView built = buildItemFilterView(stack);
-        readCache.itemViews.put(stack, new CachedItemView(settings, config, built));
+        boolean migrated = LegacyComponentMigration.migrateGeneralFilter(stack, null);
+        settings = stack.get(LogisticsDataComponents.FILTER_SETTINGS);
+        config = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
+        customData = stack.get(DataComponents.CUSTOM_DATA);
+        ItemFilterView built = migrated
+                ? buildItemFilterView(stack, settings, config)
+                : buildLegacyItemFilterView(stack);
+        if (readCache != null) {
+            readCache.itemViews.put(stack, new CachedItemView(settings, config, customData, built));
+        }
         return built;
     }
 
-    private static ItemFilterView buildItemFilterView(ItemStack stack) {
+    private static ItemFilterView buildItemFilterView(ItemStack stack, @Nullable FilterSettings settings,
+            @Nullable GeneralFilterConfig config) {
+        int cap = getCapacity(stack);
+        ItemFilterSlot[] entriesBySlot = new ItemFilterSlot[Math.max(cap, 0)];
+        if (!isFilterItem(stack) || cap <= 0) {
+            return emptyItemFilterView(entriesBySlot);
+        }
+
+        if (config != null) {
+            for (GeneralFilterEntry entry : config.entries()) {
+                int slot = entry.slot();
+                if (slot >= 0 && slot < cap && entriesBySlot[slot] == null) {
+                    entriesBySlot[slot] = buildItemFilterSlot(entry);
+                }
+            }
+        }
+        return summarizeItemFilterView(settings != null && settings.blacklist(), entriesBySlot);
+    }
+
+    private static ItemFilterSlot buildItemFilterSlot(GeneralFilterEntry entry) {
+        ItemStack expected = entry.item() == null ? ItemStack.EMPTY : entry.item().toStack();
+        Item item = expected.isEmpty() ? null : expected.getItem();
+        DataComponentMap expectedComponents = expected.isEmpty() ? null : expected.getComponents();
+        String tag = FilterTagUtil.normalizeTag(entry.tag());
+        String fluidId = nonEmpty(entry.fluidId());
+        String chemicalId = nonEmpty(entry.chemicalId());
+        FluidStack fluid = resolveFluidEntry(fluidId);
+        List<SlotNbtRule> rules = entry.nbt().rules().stream()
+                .filter(rule -> !rule.path().isEmpty())
+                .map(rule -> new SlotNbtRule(rule.path(), normalizeNbtOperator(rule.operator()), rule.value()))
+                .toList();
+        ParsedRawNbt raw = parseRawNbt(entry.nbt().raw());
+        String durOp = entry.durability() == null ? null : entry.durability().operator().id();
+        int durVal = entry.durability() == null ? 0 : entry.durability().value();
+        int stock = entry.counts().stock() != 0 ? entry.counts().stock() : entry.counts().amount();
+        int[] mapping = entry.slotMapping().slots().isEmpty()
+                ? null
+                : entry.slotMapping().slots().stream().mapToInt(Integer::intValue).toArray();
+        boolean hasNbt = !rules.isEmpty() || !entry.nbt().raw().isEmpty();
+        boolean hasDur = entry.durability() != null;
+        boolean nbtOnly = (hasNbt || hasDur || entry.enchanted() != null) && tag == null && item == null
+                && fluidId == null && chemicalId == null;
+        boolean strict = item != null && entry.nbt().strict().orElse(
+                !hasNbt && !hasDur && entry.enchanted() == null);
+        boolean slotOnly = mapping != null && tag == null && item == null && fluidId == null
+                && chemicalId == null && !hasNbt && !hasDur && entry.enchanted() == null;
+        return new ItemFilterSlot(entry.slot(), tag, item, expectedComponents, chemicalId, fluid,
+                entry.counts().batch(), stock, null, null, NBT_OP_EQUALS, raw.value(), raw.invalid(), durOp,
+                durVal, hasNbt, nbtOnly, strict, rules, entry.nbt().matchAny(), mapping, slotOnly,
+                entry.enchanted());
+    }
+
+    private static ItemFilterView summarizeItemFilterView(boolean blacklist, ItemFilterSlot[] entriesBySlot) {
+        boolean item = false, fluid = false, chemical = false, tag = false;
+        boolean nbt = false, amount = false, slotOnly = false;
+        for (ItemFilterSlot entry : entriesBySlot) {
+            if (entry == null)
+                continue;
+            item |= entry.item() != null;
+            fluid |= entry.fluidEntry() != null;
+            chemical |= entry.chemicalId() != null;
+            tag |= entry.tag() != null;
+            nbt |= entry.hasNbt();
+            amount |= entry.batch() > 0 || entry.stock() > 0 || entry.enchanted() != null;
+            slotOnly |= entry.slotOnly();
+        }
+        return new ItemFilterView(blacklist, item, fluid, chemical, tag, nbt, amount, slotOnly, entriesBySlot);
+    }
+
+    private static ItemFilterView emptyItemFilterView(ItemFilterSlot[] entriesBySlot) {
+        return new ItemFilterView(false, false, false, false, false, false, false, false, entriesBySlot);
+    }
+
+    @Nullable
+    private static FluidStack resolveFluidEntry(@Nullable String fluidId) {
+        if (fluidId == null)
+            return null;
+        ResourceLocation id = ResourceLocation.tryParse(fluidId);
+        return id == null ? FluidStack.EMPTY : BuiltInRegistries.FLUID.getOptional(id)
+                .map(fluid -> new FluidStack(fluid, 1000))
+                .orElse(FluidStack.EMPTY);
+    }
+
+    @Nullable
+    private static String nonEmpty(@Nullable String value) {
+        return value == null || value.isEmpty() ? null : value;
+    }
+
+    private static ParsedRawNbt parseRawNbt(String raw) {
+        if (raw.isEmpty())
+            return new ParsedRawNbt(null, false);
+        try {
+            return new ParsedRawNbt(TagParser.parseTag(raw), false);
+        } catch (Exception e) {
+            return new ParsedRawNbt(null, true);
+        }
+    }
+
+    private record ParsedRawNbt(@Nullable CompoundTag value, boolean invalid) {
+    }
+
+    private static ItemFilterView buildLegacyItemFilterView(ItemStack stack) {
         int cap = getCapacity(stack);
         ItemFilterSlot[] entriesBySlot = new ItemFilterSlot[Math.max(cap, 0)];
         if (!isFilterItem(stack) || cap <= 0) {
@@ -2085,7 +2200,7 @@ public final class FilterItemData {
             boolean slotOnly = slotMapping != null && tag == null && item == null && !hasFluid
                     && !hasChemical && !hasNbt && !hasDur && enchanted == null;
 
-            entriesBySlot[slot] = new ItemFilterSlot(slot, tag, item, chemicalId, fluidEntry, batch, stock, nbtPath,
+            entriesBySlot[slot] = new ItemFilterSlot(slot, tag, item, null, chemicalId, fluidEntry, batch, stock, nbtPath,
                     nbtValue, nbtOp, rawNbt, invalidRawNbt, durOp, durVal, hasNbt, nbtOnly, nbtStrict, nbtRules,
                     nbtMatchAny, slotMapping, slotOnly, enchanted);
 
