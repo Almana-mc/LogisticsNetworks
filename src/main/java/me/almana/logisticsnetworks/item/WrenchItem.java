@@ -633,7 +633,7 @@ public class WrenchItem extends Item {
             case WRENCH -> isSecondaryUse(player)
                     ? removeNode(node.level(), node, player)
                     : openNodeGui(node, player, wrenchStack);
-            case COPY_PASTE -> isSecondaryUse(player)
+            case COPY_PASTE -> shouldPaste(isSecondaryUse(player), ServerPayloadHandler.isModifierDown(player, 3))
                     ? pasteToNode(node, player, wrenchStack)
                     : copyFromNode(node, player, wrenchStack);
             case MASS_PLACEMENT -> InteractionResult.CONSUME;
@@ -1251,6 +1251,10 @@ public class WrenchItem extends Item {
 
     private static boolean isSecondaryUse(Player player) {
         return ServerPayloadHandler.isModifierDown(player, 0);
+    }
+
+    static boolean shouldPaste(boolean secondaryUse, boolean invertedControls) {
+        return secondaryUse != invertedControls;
     }
 
 }

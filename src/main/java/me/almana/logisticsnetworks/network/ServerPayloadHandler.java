@@ -421,11 +421,11 @@ public class ServerPayloadHandler {
     }
 
     static void setModifierKeys(UUID playerId, int mask) {
-        MODIFIER_KEYS.put(playerId, mask & 0b111);
+        MODIFIER_KEYS.put(playerId, mask & 0b1111);
     }
 
     static boolean isModifierDown(UUID playerId, int index) {
-        return index >= 0 && index < 3
+        return index >= 0 && index < 4
                 && (MODIFIER_KEYS.getOrDefault(playerId, 0) & (1 << index)) != 0;
     }
 
