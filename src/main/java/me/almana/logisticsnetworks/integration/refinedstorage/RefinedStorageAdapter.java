@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.integration.refinedstorage;
 import com.refinedmods.refinedstorage.api.network.Network;
 import com.refinedmods.refinedstorage.api.network.impl.node.iface.InterfaceNetworkNode;
 import com.refinedmods.refinedstorage.api.network.node.NetworkNode;
+import com.refinedmods.refinedstorage.common.controller.ControllerBlockEntity;
 import com.refinedmods.refinedstorage.neoforge.api.RefinedStorageNeoForgeApi;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
@@ -33,7 +34,7 @@ public final class RefinedStorageAdapter implements StorageAdapter {
 
     @Override
     public boolean detects(Level level, BlockPos pos) {
-        return RefinedStorageAccess.findNode(level, pos) != null;
+        return level.getBlockEntity(pos) instanceof ControllerBlockEntity;
     }
 
     @Nullable

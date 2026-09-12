@@ -1,11 +1,11 @@
 package me.almana.logisticsnetworks.integration.ae2;
 
 import appeng.api.networking.IGridNode;
-import appeng.api.networking.IInWorldGridNodeHost;
 import appeng.api.networking.security.IActionHost;
 import appeng.api.parts.IPart;
 import appeng.api.parts.IPartHost;
 import appeng.blockentity.misc.InterfaceBlockEntity;
+import appeng.blockentity.networking.ControllerBlockEntity;
 import appeng.helpers.InterfaceLogicHost;
 import appeng.parts.misc.InterfacePart;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
@@ -38,7 +38,7 @@ public final class AE2StorageAdapter implements StorageAdapter {
 
     @Override
     public boolean detects(Level level, BlockPos pos) {
-        return level.getBlockEntity(pos) instanceof IInWorldGridNodeHost;
+        return level.getBlockEntity(pos) instanceof ControllerBlockEntity;
     }
 
     @Nullable
