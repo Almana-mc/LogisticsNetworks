@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -84,6 +85,7 @@ public final class ClientControls {
         if (modifier1Down()) mask |= 1;
         if (modifier2Down()) mask |= 2;
         if (modifier3Down()) mask |= 4;
+        if (ClientConfig.invertCopyPasteControls) mask |= 8;
         return mask;
     }
 

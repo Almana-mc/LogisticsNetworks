@@ -461,6 +461,7 @@
   "gui.logisticsnetworks.config.client.maxRenderedNodes": "Max Rendered Nodes",
   "gui.logisticsnetworks.config.client.maxVisibleNodes": "Max Visible Nodes",
   "gui.logisticsnetworks.config.client.connectedNodeTextures": "Connected Node Textures",
+  "gui.logisticsnetworks.config.client.invertCopyPasteControls": "Invert Copy/Paste Controls",
   "gui.logisticsnetworks.config.client.flowLines": "Flow Lines",
   "gui.logisticsnetworks.config.client.flowLinesEnabled": "Enable Flow Lines",
   "gui.logisticsnetworks.config.client.flowLinesEnabled.tooltip": "Show resource connections while holding a wrench. Connections follow the nodes rendered on screen.",
