@@ -6,6 +6,9 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.UUID;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -27,6 +30,7 @@ public final class AsyncTransferRuntime {
     private final long runtimeId;
     private final ThreadPoolExecutor executor;
     private final Queue<TransferPlan> completed = new ConcurrentLinkedQueue<>();
+    private final Map<UUID, List<DirectStorageBinding>> bindings = new HashMap<>();
 
     private AsyncTransferRuntime(long runtimeId, int workers) {
         this.runtimeId = runtimeId;
@@ -61,6 +65,7 @@ public final class AsyncTransferRuntime {
         if (current != null) {
             current.executor.shutdownNow();
             current.completed.clear();
+            current.bindings.clear();
             LOGGER.info("Async transfer runtime stopped");
         }
     }
@@ -75,12 +80,25 @@ public final class AsyncTransferRuntime {
     }
 
     public boolean submit(NetworkSnapshot snapshot) {
+        return submit(snapshot, List.of());
+    }
+
+    public boolean submit(NetworkSnapshot snapshot, List<DirectStorageBinding> capturedBindings) {
+        ThreadGuard.requireServerThread();
+        bindings.put(snapshot.networkId(), capturedBindings);
         try {
             executor.execute(() -> plan(snapshot));
             return true;
         } catch (RejectedExecutionException exception) {
+            bindings.remove(snapshot.networkId());
             return false;
         }
+    }
+
+    public List<DirectStorageBinding> takeBindings(UUID network) {
+        ThreadGuard.requireServerThread();
+        List<DirectStorageBinding> result = bindings.remove(network);
+        return result == null ? List.of() : result;
     }
 
     @Nullable

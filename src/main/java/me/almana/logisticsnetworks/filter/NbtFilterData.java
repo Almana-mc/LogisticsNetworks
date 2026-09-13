@@ -411,7 +411,7 @@ public final class NbtFilterData {
         if (stack.isEmpty() || provider == null)
             return null;
 
-        Tag tag = stack.save(provider);
+        Tag tag = stack.copyWithCount(1).save(provider);
         CompoundTag components = new CompoundTag();
         if (tag instanceof CompoundTag c && c.contains("components", Tag.TAG_COMPOUND)) {
             components = c.getCompound("components").copy();

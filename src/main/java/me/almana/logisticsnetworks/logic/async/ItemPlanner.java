@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.TransferAmountRules;
 import me.almana.logisticsnetworks.logic.TransferEngine;
+import me.almana.logisticsnetworks.integration.storage.ItemResource;
 import net.neoforged.neoforge.items.IItemHandler;
 
 import java.util.ArrayList;
@@ -15,7 +16,7 @@ public final class ItemPlanner {
     }
 
     public static TransferPlan.ChannelMoves plan(NetworkSnapshot.ChannelUnit unit,
-            NetworkSnapshot snapshot, List<SnapshotItemHandler> endpoints) {
+            NetworkSnapshot snapshot, List<IItemHandler> endpoints) {
         ThreadGuard.requireWorkerThread();
 
         List<TransferPlan.TargetRef> targetRefs = new ArrayList<>(unit.targets().size());
@@ -24,7 +25,9 @@ public final class ItemPlanner {
 
         for (NetworkSnapshot.TargetUnit target : unit.targets()) {
             IItemHandler targetHandler = endpoints.get(target.endpoint());
-            targetRefs.add(new TransferPlan.TargetRef(target.nodeId(), target.channelIndex(), target.bulk()));
+            var direct = snapshot.endpoints().get(target.endpoint()).direct();
+            targetRefs.add(new TransferPlan.TargetRef(target.nodeId(), target.channelIndex(), target.bulk(),
+                    direct == null ? -1 : direct.binding()));
             engineTargets.add(new TransferEngine.ItemTransferTarget(
                     targetHandler,
                     target.bulk() ? targetHandler : null,
@@ -54,11 +57,12 @@ public final class ItemPlanner {
                 (sourceSlot, targetIndex, moved, mask) -> moves.add(new TransferPlan.ItemMove(
                         sourceSlot,
                         targetIndex,
-                        moved.getItem(),
-                        moved.getComponents(),
+                        new ItemResource(moved),
                         moved.getCount(),
                         mask)));
 
-        return new TransferPlan.ChannelMoves(unit.sourceNodeId(), unit.channelIndex(), targetRefs, moves);
+        var directSource = snapshot.endpoints().get(unit.sourceEndpoint()).direct();
+        return new TransferPlan.ChannelMoves(unit.sourceNodeId(), unit.channelIndex(),
+                directSource == null ? -1 : directSource.binding(), targetRefs, moves);
     }
 }

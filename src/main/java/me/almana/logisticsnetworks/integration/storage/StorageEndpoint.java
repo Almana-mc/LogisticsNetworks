@@ -1,9 +1,12 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public interface StorageEndpoint {
 
@@ -15,15 +18,29 @@ public interface StorageEndpoint {
 
     Object networkIdentity();
 
+    Object endpointIdentity();
+
     boolean isValid();
 
-    List<StoredItem> exportableItems();
+    default List<StoredItem> exportableItems() {
+        return exportableItems(false);
+    }
 
-    List<StoredItem> storedItems();
+    List<StoredItem> exportableItems(boolean fresh);
 
-    List<StoredFluid> exportableFluids();
+    Map<Item, Long> itemCounts(Set<Item> items, boolean fresh);
 
-    List<StoredFluid> storedFluids();
+    default List<StoredFluid> exportableFluids() {
+        return exportableFluids(false);
+    }
+
+    List<StoredFluid> exportableFluids(boolean fresh);
+
+    long fluidCount(FluidStack stack, boolean fresh);
+
+    boolean canExportItem(ItemStack stack);
+
+    boolean canExportFluid(FluidStack stack);
 
     long insertItem(ItemStack stack, long amount, boolean simulate);
 

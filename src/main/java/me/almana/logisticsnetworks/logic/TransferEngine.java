@@ -13,6 +13,7 @@ import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
+import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.logic.async.SnapshotItemHandler;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.logic.async.TransferPlan;
@@ -114,17 +115,19 @@ public class TransferEngine {
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
         TransferCapabilityCache capCache = registry.getCapabilityCache();
 
-        long minWakeDelta = Long.MAX_VALUE;
-        for (LogisticsNodeEntity sourceNode : context.sortedNodes()) {
-            long delta = processNode(sourceNode, context.itemImports(), fluidImports, energyImports, chemicalImports,
-                    sourceImports, context.signalCache(), context.dimensionalCache(), context.tierCache(),
-                    telemetryActive, capCache, includeItemTransfers);
-            if (delta < minWakeDelta) {
-                minWakeDelta = delta;
+        try (var operation = capCache.storageOperation(true)) {
+            long minWakeDelta = Long.MAX_VALUE;
+            for (LogisticsNodeEntity sourceNode : context.sortedNodes()) {
+                long delta = processNode(sourceNode, context.itemImports(), fluidImports, energyImports, chemicalImports,
+                        sourceImports, context.signalCache(), context.dimensionalCache(), context.tierCache(),
+                        telemetryActive, capCache, includeItemTransfers);
+                if (delta < minWakeDelta) {
+                    minWakeDelta = delta;
+                }
             }
-        }
 
-        return minWakeDelta;
+            return minWakeDelta;
+        }
     }
 
     @Nullable
@@ -433,13 +436,13 @@ public class TransferEngine {
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
             Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
         return transferItems(sourceNode, sourceLevel, exportChannel, channelIndex, targets,
-                batchLimit, dimensionalCache, capCache, Collections.emptyMap());
+                batchLimit, dimensionalCache, capCache, Collections.emptyMap(), Collections.emptyMap());
     }
 
     private static int transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
             Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache,
-            Map<Item, Integer> priorBatchMoved) {
+            Map<Item, Integer> priorBatchMoved, Map<UUID, Map<Item, Integer>> priorTargetBatches) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos))
@@ -470,12 +473,14 @@ public class TransferEngine {
                 sourceLevel.registryAccess(),
                 sourceLevel, sourcePos, filterReadCache,
                 exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN,
-                null, priorBatchMoved);
+                null, priorBatchMoved, resolved.refs().stream()
+                        .map(ref -> priorTargetBatches.getOrDefault(ref.node().getUUID(), Map.of())).toList());
     }
 
     public static int recoverItemChannel(LogisticsNetwork network, MinecraftServer server,
             TransferCapabilityCache capCache, UUID sourceNodeId, int channelIndex,
-            int plannedShortfall, int committed, Map<Item, Integer> committedByItem) {
+            int plannedShortfall, int committed, Map<Item, Integer> committedByItem,
+            Map<UUID, Map<Item, Integer>> committedByTarget) {
         ThreadGuard.requireServerThread();
         if (plannedShortfall <= 0 || channelIndex < 0 || channelIndex >= LogisticsNodeEntity.CHANNEL_COUNT) {
             return 0;
@@ -521,7 +526,7 @@ public class TransferEngine {
 
         int recovered = transferItems(
                 sourceNode, (ServerLevel) sourceNode.level(), channel, channelIndex,
-                targets, recoveryLimit, context.dimensionalCache(), capCache, committedByItem);
+                targets, recoveryLimit, context.dimensionalCache(), capCache, committedByItem, committedByTarget);
         return Math.max(0, recovered);
     }
 
@@ -867,7 +872,7 @@ public class TransferEngine {
             @Nullable MoveRecorder recorder) {
         return executeMove(source, targets, limit, exportFilters, exportFilterMode,
                 sourceAllowedSlots, provider, sourceLevel, sourcePos, filterReadCache,
-                roundRobin, recorder, Collections.emptyMap());
+                roundRobin, recorder, Collections.emptyMap(), List.of());
     }
 
     public static int executeMove(IItemHandler source, List<ItemTransferTarget> targets, int limit,
@@ -878,7 +883,7 @@ public class TransferEngine {
             FilterItemData.ReadCache filterReadCache,
             boolean roundRobin,
             @Nullable MoveRecorder recorder,
-            Map<Item, Integer> priorBatchMoved) {
+            Map<Item, Integer> priorBatchMoved, List<Map<Item, Integer>> priorTargetBatches) {
 
         int remaining = limit;
         boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, filterReadCache);
@@ -892,14 +897,26 @@ public class TransferEngine {
         boolean hasNbtFilter = hasExportNbtFilter || hasAnyImportNbtFilter;
 
         boolean anyAmountConstraints = false;
+        boolean sourceNeedsCounts = TransferAmountRules.hasStockFilter(exportFilters, filterReadCache);
+        boolean anyCountsNeeded = sourceNeedsCounts;
         for (ItemTransferTarget t : targets) {
+            sourceNeedsCounts |= t.constraints().hasExportThreshold();
+            anyCountsNeeded |= t.constraints().hasExportThreshold() || t.constraints().hasImportThreshold()
+                    || TransferAmountRules.hasStockFilter(t.importFilters(), filterReadCache);
             if (t.constraints().hasExportThreshold() || t.constraints().hasImportThreshold()
                     || t.constraints().hasPerEntryAmounts()) {
                 anyAmountConstraints = true;
-                break;
             }
         }
-        Map<Item, Integer> sourceItemCounts = anyAmountConstraints ? TransferAmountRules.countItems(source) : null;
+        Set<Item> countCandidates = new HashSet<>();
+        if (anyCountsNeeded) {
+            for (int slot = 0; slot < source.getSlots(); slot++) {
+                ItemStack candidate = source.getStackInSlot(slot);
+                if (!candidate.isEmpty()) countCandidates.add(candidate.getItem());
+            }
+        }
+        Map<Item, Integer> sourceItemCounts = sourceNeedsCounts
+                ? TransferAmountRules.countItems(source, countCandidates) : null;
         Map<Item, Integer> batchMoved = anyAmountConstraints && !roundRobin
                 ? new HashMap<>(priorBatchMoved)
                 : null;
@@ -912,11 +929,14 @@ public class TransferEngine {
             targetItemCounts = new ArrayList<>(targets.size());
             for (ItemTransferTarget t : targets) {
                 if (roundRobin) {
-                    targetBatchMoved.add(new HashMap<>());
+                    int index = targetBatchMoved.size();
+                    targetBatchMoved.add(new HashMap<>(index < priorTargetBatches.size()
+                            ? priorTargetBatches.get(index) : Map.of()));
                 }
                 targetItemCounts.add(
-                        (t.constraints().hasImportThreshold() || t.constraints().hasPerEntryAmounts())
-                                ? TransferAmountRules.countItems(t.handler())
+                        (t.constraints().hasImportThreshold()
+                                || TransferAmountRules.hasStockFilter(t.importFilters(), filterReadCache))
+                                ? TransferAmountRules.countItems(t.handler(), countCandidates)
                                 : null);
             }
         }
@@ -994,6 +1014,10 @@ public class TransferEngine {
                                     && !target.constraints().hasPerEntryAmounts())) {
                         allowedByAmount = extracted.getCount();
                     } else {
+                        if (targetItemCounts.get(targetIndex) != null
+                                && target.handler() instanceof DirectItemAccess direct) {
+                            targetItemCounts.set(targetIndex, direct.countItems(countCandidates));
+                        }
                         allowedByAmount = TransferAmountRules.allowedItems(extracted, target.constraints(),
                                 sourceItemCounts, targetItemCounts.get(targetIndex));
                         if (target.constraints().hasPerEntryAmounts() && provider != null) {
@@ -1136,7 +1160,8 @@ public class TransferEngine {
             @Nullable IItemHandler bulkTarget, TransferPlan.ItemMove move, LogisticsNodeEntity sourceNode) {
         ThreadGuard.requireServerThread();
 
-        if (move.sourceSlot() < 0 || move.sourceSlot() >= source.getSlots() || move.amount() <= 0) {
+        if (move.amount() <= 0 || !(source instanceof DirectItemAccess)
+                && (move.sourceSlot() < 0 || move.sourceSlot() >= source.getSlots())) {
             return 0;
         }
 
@@ -1146,12 +1171,14 @@ public class TransferEngine {
             return 0;
         }
 
-        ItemStack available = source.extractItem(move.sourceSlot(), move.amount(), true);
+        ItemStack expected = move.resource().toStack(move.amount());
+        ItemStack available = source instanceof DirectItemAccess direct
+                ? direct.extract(expected, move.amount(), true)
+                : source.extractItem(move.sourceSlot(), move.amount(), true);
         if (available.isEmpty()) {
             return 0;
         }
-        if (available.getItem() != move.expectedItem()
-                || !available.getComponents().equals(move.expectedComponents())) {
+        if (!ItemStack.isSameItemSameComponents(available, expected)) {
             return 0;
         }
 
@@ -1164,7 +1191,9 @@ public class TransferEngine {
             return 0;
         }
 
-        ItemStack toMove = source.extractItem(move.sourceSlot(), acceptable, false);
+        ItemStack toMove = source instanceof DirectItemAccess direct
+                ? direct.extract(expected, acceptable, false)
+                : source.extractItem(move.sourceSlot(), acceptable, false);
         if (toMove.isEmpty()) {
             return 0;
         }
@@ -1174,7 +1203,8 @@ public class TransferEngine {
         int accepted = toMove.getCount() - uninserted.getCount();
 
         if (!uninserted.isEmpty()) {
-            ItemStack stillLeft = source.insertItem(move.sourceSlot(), uninserted, false);
+            ItemStack stillLeft = source instanceof DirectItemAccess direct ? direct.insert(uninserted, false)
+                    : source.insertItem(move.sourceSlot(), uninserted, false);
             for (int fallback = 0; fallback < source.getSlots() && !stillLeft.isEmpty(); fallback++) {
                 stillLeft = source.insertItem(fallback, stillLeft, false);
             }
@@ -1195,10 +1225,11 @@ public class TransferEngine {
     private static @Nullable StackedInsertion prepareStackedInsertion(IItemHandler handler,
             @Nullable IItemHandler bulkHandler, @Nullable boolean[] allowedSlots) {
         return bulkHandler == null && allowedSlots == null && handler.getSlots() > 64
-                && !(handler instanceof SnapshotItemHandler) ? new StackedInsertion(handler) : null;
+                && !(handler instanceof SnapshotItemHandler) && !(handler instanceof DirectItemAccess)
+                ? new StackedInsertion(handler) : null;
     }
 
-    private static boolean[] computeImportAllowedSlots(IItemHandler handler, ItemStack[] importFilters,
+    static boolean[] computeImportAllowedSlots(IItemHandler handler, ItemStack[] importFilters,
             FilterMode importFilterMode, ItemStack candidate, HolderLookup.Provider provider,
             @Nullable CompoundTag candidateComponents, @Nullable FilterItemData.ReadCache filterReadCache) {
         int size = handler.getSlots();
@@ -1220,6 +1251,9 @@ public class TransferEngine {
             return ItemStack.EMPTY;
         }
         if (allowedSlots == null) {
+            if (handler instanceof DirectItemAccess direct) {
+                return direct.insert(stack, simulate);
+            }
             if (bulkHandler != null) {
                 return insertBulkItem(bulkHandler, stack, simulate);
             }

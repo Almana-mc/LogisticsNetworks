@@ -650,6 +650,14 @@ public final class FilterItemData {
         return getItemFilterView(stack, readCache).hasAmountEntries();
     }
 
+    public static boolean hasAnyStockEntries(ItemStack stack, @Nullable ReadCache readCache) {
+        if (!isFilterItem(stack)) return false;
+        for (ItemFilterSlot entry : getItemFilterView(stack, readCache).entriesBySlot()) {
+            if (entry != null && entry.stock() > 0) return true;
+        }
+        return false;
+    }
+
     // ── Batch/Stock per-slot methods ──
 
     public static int getEntryBatch(ItemStack stack, int slot) {

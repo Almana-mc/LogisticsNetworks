@@ -3,6 +3,8 @@ package me.almana.logisticsnetworks.logic;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
+import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
+import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
@@ -25,6 +27,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +40,40 @@ public final class TransferCapabilityCache {
     private final Map<CapKey, BlockCapabilityCache<IItemHandler, Direction>> items = new HashMap<>();
     private final Map<CapKey, BlockCapabilityCache<IFluidHandler, Direction>> fluids = new HashMap<>();
     private final Map<CapKey, BlockCapabilityCache<IEnergyStorage, Direction>> energy = new HashMap<>();
+    private StorageOperation storageOperation;
+
+    public StorageOperation storageOperation(boolean fresh) {
+        return new StorageOperation(fresh);
+    }
+
+    public final class StorageOperation implements AutoCloseable {
+        private final StorageOperation previous;
+        private final DirectStorageReads reads;
+        private final Map<Object, IItemHandler[]> handlers = new IdentityHashMap<>();
+
+        private StorageOperation(boolean fresh) {
+            previous = storageOperation;
+            reads = new DirectStorageReads(fresh);
+            storageOperation = this;
+        }
+
+        private IItemHandler itemHandler(StorageEndpoint endpoint, boolean exporting) {
+            IItemHandler[] views = handlers.computeIfAbsent(endpoint.endpointIdentity(), ignored -> new IItemHandler[2]);
+            int index = exporting ? 0 : 1;
+            IItemHandler existing = views[index];
+            if (existing == null || DirectStorageHandlers.networkIdentity(existing) != endpoint.networkIdentity()) {
+                views[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, reads)
+                        : DirectStorageHandlers.importItems(endpoint, reads);
+            }
+            return views[index];
+        }
+
+        @Override
+        public void close() {
+            storageOperation = previous;
+            handlers.clear();
+        }
+    }
 
     IItemHandler findItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
         if (dir != null) return getItemHandler(level, pos, dir);
@@ -81,6 +118,7 @@ public final class TransferCapabilityCache {
                 (ServerLevel) node.level(), node.getAttachedPos(), direction);
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE) {
             if (directInterfaces) {
+                if (storageOperation != null) return storageOperation.itemHandler(resolution.endpoint(), exporting);
                 return exporting
                         ? DirectStorageHandlers.exportItems(resolution.endpoint())
                         : DirectStorageHandlers.importItems(resolution.endpoint());

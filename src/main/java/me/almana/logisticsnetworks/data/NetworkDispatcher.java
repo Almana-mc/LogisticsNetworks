@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
 import me.almana.logisticsnetworks.logic.async.Snapshots;
 import me.almana.logisticsnetworks.logic.async.TransferCommitter;
 import me.almana.logisticsnetworks.logic.async.TransferPlan;
+import me.almana.logisticsnetworks.logic.async.DirectStorageBinding;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
 
@@ -83,7 +84,7 @@ final class NetworkDispatcher {
                 }
                 Snapshots.NetworkCapture capture = Snapshots.captureNetwork(
                         network, server, runtime.runtimeId(), capabilityCache);
-                dispatchCapture(id, capture, gameTime, () -> runtime.submit(capture.snapshot()));
+                dispatchCapture(id, capture, gameTime, () -> runtime.submit(capture.snapshot(), capture.bindings()));
             } catch (Exception exception) {
                 recordDispatchException(network, runtime.runtimeId());
                 LOGGER.error("Error dispatching network {}", id, exception);
@@ -203,6 +204,7 @@ final class NetworkDispatcher {
     private void commitOne(TransferPlan plan, Map<UUID, LogisticsNetwork> networks,
             MinecraftServer server, TransferCapabilityCache capabilityCache, long currentRuntimeId) {
         UUID id = plan.networkId();
+        List<DirectStorageBinding> bindings = asyncRuntime.current().takeBindings(id);
         LogisticsNetwork network = networks.get(id);
         if (network == null) {
             state.finishDispatch(id);
@@ -212,7 +214,7 @@ final class NetworkDispatcher {
         if (!prepareCompletedPlan(plan, network, currentRuntimeId)) {
             return;
         }
-        commitCurrentPlan(plan, network, server, capabilityCache);
+        commitCurrentPlan(plan, network, server, capabilityCache, bindings);
     }
 
     boolean prepareCompletedPlan(
@@ -250,12 +252,12 @@ final class NetworkDispatcher {
     }
 
     private void commitCurrentPlan(TransferPlan plan, LogisticsNetwork network,
-            MinecraftServer server, TransferCapabilityCache capabilityCache) {
+            MinecraftServer server, TransferCapabilityCache capabilityCache, List<DirectStorageBinding> bindings) {
         UUID id = plan.networkId();
         long now = server.overworld().getGameTime();
         try {
             TransferCommitter.ItemCommitResult itemResult = TransferCommitter.commitItems(
-                    plan, network, server, capabilityCache, asyncRuntime.runtimeId());
+                    plan, network, server, capabilityCache, asyncRuntime.runtimeId(), bindings);
             if (itemResult.revalidatedChannels() > 0) {
                 dispatchStats.record(AsyncDispatchReason.COMMIT_REVALIDATION, id);
                 if (Config.debugMode) {

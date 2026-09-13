@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
+import me.almana.logisticsnetworks.logic.TransferAmountRules;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -49,6 +50,13 @@ public final class Snapshots {
     public static NetworkCapture captureNetwork(LogisticsNetwork network, MinecraftServer server,
             long runtimeId, TransferCapabilityCache capCache) {
         ThreadGuard.requireServerThread();
+        try (var operation = capCache.storageOperation(false)) {
+            return captureNetworkInOperation(network, server, runtimeId, capCache);
+        }
+    }
+
+    private static NetworkCapture captureNetworkInOperation(LogisticsNetwork network, MinecraftServer server,
+            long runtimeId, TransferCapabilityCache capCache) {
 
         TransferEngine.NetworkContext context = TransferEngine.prepareNetwork(network, server);
         if (context == null) {
@@ -78,7 +86,7 @@ public final class Snapshots {
                 itemWakeDelta,
                 overworld.registryAccess(),
                 endpoints.endpoints(),
-                units));
+                units), endpoints.bindings());
     }
 
     private static long captureNodeChannels(LogisticsNodeEntity node, TransferEngine.NetworkContext context,
@@ -144,6 +152,12 @@ public final class Snapshots {
             for (int t = 0; t < resolved.refs().size(); t++) {
                 TransferEngine.ImportTarget ref = resolved.refs().get(t);
                 TransferEngine.ItemTransferTarget engineTarget = resolved.targets().get(t);
+                int targetEndpoint = endpoints.capture(ref.node(), ref.channel().getIoDirection(),
+                        engineTarget.handler(), occupiedSlots, engineTarget.bulkHandler() != null);
+                if (engineTarget.constraints().hasImportThreshold()
+                        || TransferAmountRules.hasStockFilter(engineTarget.importFilters(), readCache)) {
+                    endpoints.requireCounts(targetEndpoint, sourceEndpoint);
+                }
                 targetUnits.add(new NetworkSnapshot.TargetUnit(
                         ref.node().getUUID(),
                         ref.channelIndex(),
@@ -151,8 +165,7 @@ public final class Snapshots {
                         engineTarget.importFilterMode(),
                         engineTarget.hasImportSlotMapping(),
                         engineTarget.bulkHandler() != null,
-                        endpoints.capture(ref.node(), ref.channel().getIoDirection(),
-                                engineTarget.handler(), occupiedSlots, engineTarget.bulkHandler() != null)));
+                        targetEndpoint));
             }
 
             units.add(new NetworkSnapshot.ChannelUnit(
@@ -178,18 +191,23 @@ public final class Snapshots {
                 : earlierItemWakeDelta(currentMinimum, cooldown);
     }
 
-    public record NetworkCapture(CaptureStatus status, @Nullable NetworkSnapshot snapshot) {
+    public record NetworkCapture(CaptureStatus status, @Nullable NetworkSnapshot snapshot,
+            List<DirectStorageBinding> bindings) {
 
         public static NetworkCapture captured(NetworkSnapshot snapshot) {
-            return new NetworkCapture(CaptureStatus.CAPTURED, snapshot);
+            return captured(snapshot, List.of());
+        }
+
+        public static NetworkCapture captured(NetworkSnapshot snapshot, List<DirectStorageBinding> bindings) {
+            return new NetworkCapture(CaptureStatus.CAPTURED, snapshot, bindings);
         }
 
         public static NetworkCapture unavailable() {
-            return new NetworkCapture(CaptureStatus.UNAVAILABLE, null);
+            return new NetworkCapture(CaptureStatus.UNAVAILABLE, null, List.of());
         }
 
         public static NetworkCapture occupiedLimitExceeded() {
-            return new NetworkCapture(CaptureStatus.OCCUPIED_SLOT_LIMIT_EXCEEDED, null);
+            return new NetworkCapture(CaptureStatus.OCCUPIED_SLOT_LIMIT_EXCEEDED, null, List.of());
         }
     }
 

@@ -3,6 +3,8 @@ package me.almana.logisticsnetworks.logic.async;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.DistributionMode;
+import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -10,6 +12,7 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.logic.FilterLogic;
+import me.almana.logisticsnetworks.logic.PlannedItemValidation;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.server.MinecraftServer;
@@ -21,6 +24,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public final class TransferCommitter {
 
@@ -59,6 +63,11 @@ public final class TransferCommitter {
 
     public static ItemCommitResult commitItems(TransferPlan plan, LogisticsNetwork network, MinecraftServer server,
             TransferCapabilityCache capCache, long runtimeId) {
+        return commitItems(plan, network, server, capCache, runtimeId, List.of());
+    }
+
+    public static ItemCommitResult commitItems(TransferPlan plan, LogisticsNetwork network, MinecraftServer server,
+            TransferCapabilityCache capCache, long runtimeId, List<DirectStorageBinding> bindings) {
         ThreadGuard.requireServerThread();
 
         if (plan.runtimeId() != runtimeId || plan.generation() != network.getGeneration()) {
@@ -77,7 +86,10 @@ public final class TransferCommitter {
         boolean telemetryActive = NetworkRegistry.get((ServerLevel) server.overworld())
                 .getTelemetryManager().isActive(network.getId());
         for (TransferPlan.ChannelMoves channel : plan.channels()) {
-            ChannelCommitResult result = commitChannel(channel, network, server, capCache, telemetryActive);
+            ChannelCommitResult result;
+            try (var operation = capCache.storageOperation(true)) {
+                result = commitChannel(channel, network, server, capCache, telemetryActive, bindings);
+            }
             total += result.moved();
             planned += result.planned();
             committed += result.committed();
@@ -96,7 +108,8 @@ public final class TransferCommitter {
     }
 
     private static ChannelCommitResult commitChannel(TransferPlan.ChannelMoves channel, LogisticsNetwork network,
-            MinecraftServer server, TransferCapabilityCache capCache, boolean telemetryActive) {
+            MinecraftServer server, TransferCapabilityCache capCache, boolean telemetryActive,
+            List<DirectStorageBinding> bindings) {
         int planned = channel.moves().stream().mapToInt(TransferPlan.ItemMove::amount).sum();
         LogisticsNodeEntity sourceNode = TransferEngine.findNode(server, channel.sourceNodeId(),
                 network.getNodeDimension(channel.sourceNodeId()));
@@ -110,7 +123,7 @@ public final class TransferCommitter {
             return ChannelCommitResult.skipped(planned);
         }
 
-        if (!isEndpointLoaded(sourceNode)) {
+        if (!isEndpointLoaded(sourceNode) || !isActive(sourceNode, sourceChannel)) {
             return ChannelCommitResult.skipped(planned);
         }
 
@@ -121,13 +134,30 @@ public final class TransferCommitter {
         if (source == null) {
             return ChannelCommitResult.skipped(planned);
         }
+        if (!matchesBinding(channel.sourceBinding(), source, bindings)) {
+            return new ChannelCommitResult(planned, 0, 0, 1, true);
+        }
         IItemHandler sourceBulk = capCache.findBulkItemHandler(sourceNode, source);
 
         ResolvedTarget[] targets = resolveTargets(channel.targets(), sourceNode, network, server, capCache);
+        for (int i = 0; i < targets.length; i++) {
+            int binding = channel.targets().get(i).binding();
+            if (targets[i] == null ? binding >= 0 : !matchesBinding(binding, targets[i].handler(), bindings)) {
+                return new ChannelCommitResult(planned, 0, 0, 1, true);
+            }
+        }
 
         int committed = 0;
+        int tier = network.getTierCache().getOrDefault(sourceNode.getUUID(), 0);
+        int currentBatch = Math.max(1, Math.min(sourceChannel.getBatchSize(),
+                TransferEngine.getBatchLimit(ChannelType.ITEM, tier)));
+        boolean roundRobin = sourceChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN;
         Map<Item, Integer> committedByItem = new HashMap<>();
+        Map<UUID, Map<Item, Integer>> committedByTarget = new HashMap<>();
+        PlannedItemValidation validation = new PlannedItemValidation(
+                source, sourceChannel, sourceNode.level().registryAccess(), channel.moves());
         for (TransferPlan.ItemMove move : channel.moves()) {
+            if (committed >= currentBatch) break;
             if (move.targetIndex() < 0 || move.targetIndex() >= targets.length) {
                 continue;
             }
@@ -136,28 +166,36 @@ public final class TransferCommitter {
                     source, sourceBulk, target.handler(), target.bulkHandler())) {
                 continue;
             }
+            Map<Item, Integer> batchMoved = roundRobin
+                    ? committedByTarget.computeIfAbsent(channel.targets().get(move.targetIndex()).nodeId(),
+                            ignored -> new HashMap<>())
+                    : committedByItem;
+            TransferPlan.ItemMove validated = validation.validate(
+                    move, target.handler(), target.channel(), batchMoved, currentBatch - committed);
             int moved = TransferEngine.commitSingleMove(
-                    source, target.handler(), target.bulkHandler(), move, sourceNode);
+                    source, target.handler(), target.bulkHandler(), validated, sourceNode);
             committed += moved;
             if (moved > 0) {
                 committedByItem.merge(move.expectedItem(), moved, Integer::sum);
+                if (roundRobin) batchMoved.merge(move.expectedItem(), moved, Integer::sum);
+                validation.moved(move.expectedItem(), moved, target.handler());
             }
         }
 
         ServerLevel sourceLevel = (ServerLevel) sourceNode.level();
-        int tier = network.getTierCache().getOrDefault(sourceNode.getUUID(), 0);
-        int recoveryGoal = planned;
+        int recoveryGoal = Math.min(planned, currentBatch);
         if (DirectStorageHandlers.isDirect(source)) {
-            int configuredBatch = TransferEngine.getBatchLimit(ChannelType.ITEM, tier);
-            recoveryGoal = Math.max(planned,
-                    Math.max(1, Math.min(sourceChannel.getBatchSize(), configuredBatch)));
+            recoveryGoal = currentBatch;
         }
         boolean revalidated = committed < recoveryGoal;
-        int recovered = revalidated
-                ? TransferEngine.recoverItemChannel(
+        int recovered = 0;
+        if (revalidated) {
+            try (var operation = capCache.storageOperation(true)) {
+                recovered = TransferEngine.recoverItemChannel(
                         network, server, capCache, channel.sourceNodeId(), channel.channelIndex(),
-                        recoveryGoal - committed, committed, committedByItem)
-                : 0;
+                        recoveryGoal - committed, committed, committedByItem, committedByTarget);
+            }
+        }
         int totalMoved = committed + recovered;
 
         long wakeDelta = TransferEngine.finishChannelAttempt(
@@ -182,9 +220,12 @@ public final class TransferCommitter {
                     || !TransferEngine.canRunChannel(node, channel)) {
                 continue;
             }
-            if (!isEndpointLoaded(node)) {
+            if (!isEndpointLoaded(node) || !isActive(node, channel)) {
                 continue;
             }
+            if (!sourceNode.level().dimension().equals(node.level().dimension())
+                    && !(network.getDimensionalCache().getOrDefault(sourceNode.getUUID(), false)
+                    && network.getDimensionalCache().getOrDefault(node.getUUID(), false))) continue;
             if (!sourceNode.isMountedOnCreate() && !node.isMountedOnCreate()
                     && TransferEngine.isSameItemStorage(
                             (ServerLevel) sourceNode.level(), sourceNode.getAttachedPos(),
@@ -205,7 +246,7 @@ public final class TransferCommitter {
                     continue;
                 }
             }
-            targets[i] = new ResolvedTarget(handler, bulkHandler);
+            targets[i] = new ResolvedTarget(handler, bulkHandler, channel);
         }
         return targets;
     }
@@ -229,6 +270,18 @@ public final class TransferCommitter {
         return node.level() instanceof ServerLevel level && level.isLoaded(node.getAttachedPos());
     }
 
-    private record ResolvedTarget(IItemHandler handler, @Nullable IItemHandler bulkHandler) {
+    private static boolean matchesBinding(int index, IItemHandler handler, List<DirectStorageBinding> bindings) {
+        return index < 0 ? DirectStorageHandlers.snapshotView(handler) == 0
+                : index < bindings.size() && bindings.get(index).matches(handler);
+    }
+
+    private static boolean isActive(LogisticsNodeEntity node, ChannelData channel) {
+        if (channel.getRedstoneMode() == RedstoneMode.ALWAYS_ON) return true;
+        if (channel.getRedstoneMode() == RedstoneMode.ALWAYS_OFF) return false;
+        int signal = node.isMountedOnCreate() ? 0 : node.level().getBestNeighborSignal(node.getAttachedPos());
+        return TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal);
+    }
+
+    private record ResolvedTarget(IItemHandler handler, @Nullable IItemHandler bulkHandler, ChannelData channel) {
     }
 }
