@@ -1,6 +1,8 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.storage.DirectFluidHandler;
+import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.Item;
@@ -14,6 +16,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public final class TransferAmountRules {
     public record Constraints(boolean hasExportThreshold, int exportThreshold,
@@ -58,10 +61,22 @@ public final class TransferAmountRules {
         for (int i = 0; i < handler.size(); i++) {
             ItemStack stack = ItemUtil.getStack(handler, i);
             if (!stack.isEmpty()) {
-                counts.merge(stack.getItem(), stack.getCount(), Integer::sum);
+                counts.merge(stack.getItem(), stack.getCount(), TransferAmountRules::saturatingAdd);
             }
         }
         return counts;
+    }
+
+    public static Map<Item, Integer> countItems(ResourceHandler<ItemResource> handler, Set<Item> candidates) {
+        return handler instanceof DirectItemAccess direct ? direct.countItems(candidates) : countItems(handler);
+    }
+
+    public static boolean hasStockFilter(ItemStack[] filters, @Nullable FilterItemData.ReadCache readCache) {
+        if (filters == null) return false;
+        for (ItemStack filter : filters) {
+            if (FilterItemData.hasAnyStockEntries(filter, readCache)) return true;
+        }
+        return false;
     }
 
     static int allowedItems(ItemStack candidate, Constraints constraints,
@@ -234,13 +249,18 @@ public final class TransferAmountRules {
     }
 
     private static int countFluids(ResourceHandler<FluidResource> handler, FluidStack candidate) {
+        if (handler instanceof DirectFluidHandler direct) return direct.count(candidate);
         int amount = 0;
         for (int i = 0; i < handler.size(); i++) {
             FluidResource resource = handler.getResource(i);
             if (!resource.isEmpty() && resource.matches(candidate)) {
-                amount += handler.getAmountAsInt(i);
+                amount = saturatingAdd(amount, handler.getAmountAsInt(i));
             }
         }
         return amount;
+    }
+
+    private static int saturatingAdd(int left, int right) {
+        return (int) Math.min((long) left + right, Integer.MAX_VALUE);
     }
 }

@@ -446,7 +446,7 @@ public final class NbtFilterData {
 
         CompoundTag wrapper = new CompoundTag();
         RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, provider);
-        wrapper.store("stack", ItemStack.OPTIONAL_CODEC, ops, stack);
+        wrapper.store("stack", ItemStack.OPTIONAL_CODEC, ops, stack.copyWithCount(1));
         CompoundTag components = new CompoundTag();
         if (wrapper.contains("stack")) {
             CompoundTag stackTag = wrapper.getCompound("stack").orElseGet(CompoundTag::new);

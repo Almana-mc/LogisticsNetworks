@@ -42,10 +42,12 @@ import me.almana.logisticsnetworks.network.SetFilterPayload;
 import me.almana.logisticsnetworks.network.SetNodeUpgradeItemPayload;
 import me.almana.logisticsnetworks.network.SetWrenchColorsPayload;
 import me.almana.logisticsnetworks.network.ApplyPatternPayload;
+import me.almana.logisticsnetworks.network.InstallStorageUpgradePayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.SetNetworkColorPayload;
 import me.almana.logisticsnetworks.network.RequestChannelListPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
+import me.almana.logisticsnetworks.network.RequestStorageUpgradeCatalogPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
@@ -58,6 +60,9 @@ import me.almana.logisticsnetworks.network.SetNameFilterPayload;
 import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncChannelDataPayload;
+import me.almana.logisticsnetworks.network.SyncMassPlacementRequirementsPayload;
+import me.almana.logisticsnetworks.network.SyncStorageUpgradeCatalogPayload;
+import me.almana.logisticsnetworks.network.SyncQueuedNodePlacementPayload;
 import me.almana.logisticsnetworks.network.SyncFilterScanResultPayload;
 import me.almana.logisticsnetworks.network.SyncChannelListPayload;
 import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
@@ -73,7 +78,7 @@ import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.datagen.ModDataGenerators;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import net.neoforged.api.distmarker.Dist;
@@ -114,7 +119,7 @@ public class LogisticsNetworks {
         }
 
         private void commonSetup(FMLCommonSetupEvent event) {
-                event.enqueueWork(AE2Compat::registerLinkable);
+                event.enqueueWork(LinkedStorage::initialize);
         }
 
         @SubscribeEvent
@@ -135,12 +140,13 @@ public class LogisticsNetworks {
         @SubscribeEvent
         public static void onServerStopping(ServerStoppingEvent event) {
                 NetworkRegistry.get(event.getServer().overworld()).stopAsyncPlanning();
+                LinkedStorage.stopCraftingRequests();
                 ServerPayloadHandler.clearModifierKeys();
                 ThreadGuard.clearServerThread();
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("3");
+                final var registrar = event.registrar(MOD_ID).versioned("5");
 
                 // Client -> Server
                 registrar.playToServer(RequestOpenGraphPayload.TYPE, RequestOpenGraphPayload.STREAM_CODEC,
@@ -255,6 +261,12 @@ public class LogisticsNetworks {
                 registrar.playToServer(SetComputerWrenchClipboardPayload.TYPE,
                                 SetComputerWrenchClipboardPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetComputerWrenchClipboard);
+                registrar.playToServer(RequestStorageUpgradeCatalogPayload.TYPE,
+                                RequestStorageUpgradeCatalogPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleRequestStorageUpgradeCatalog);
+                registrar.playToServer(InstallStorageUpgradePayload.TYPE,
+                                InstallStorageUpgradePayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleInstallStorageUpgrade);
 
                 // Server -> Client
                 registrar.playToClient(SyncNetworkGraphPayload.TYPE, SyncNetworkGraphPayload.STREAM_CODEC,
@@ -262,6 +274,9 @@ public class LogisticsNetworks {
                 registrar.playToClient(SyncMassPlacementChoicesPayload.TYPE,
                                 SyncMassPlacementChoicesPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncMassPlacementChoices);
+                registrar.playToClient(SyncMassPlacementRequirementsPayload.TYPE,
+                                SyncMassPlacementRequirementsPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncMassPlacementRequirements);
                 registrar.playToClient(SyncNetworkListPayload.TYPE, SyncNetworkListPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkList);
                 registrar.playToClient(SyncNetworkNodesPayload.TYPE, SyncNetworkNodesPayload.STREAM_CODEC,
@@ -278,5 +293,11 @@ public class LogisticsNetworks {
                                 ClientPayloadHandler::handleSyncChannelList);
                 registrar.playToClient(SyncNetworkExportPayload.TYPE, SyncNetworkExportPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkExport);
+                registrar.playToClient(SyncStorageUpgradeCatalogPayload.TYPE,
+                                SyncStorageUpgradeCatalogPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncStorageUpgradeCatalog);
+                registrar.playToClient(SyncQueuedNodePlacementPayload.TYPE,
+                                SyncQueuedNodePlacementPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncQueuedNodePlacement);
         }
 }

@@ -17,7 +17,7 @@ public final class ItemPlanner {
     }
 
     public static TransferPlan.ChannelMoves plan(NetworkSnapshot.ChannelUnit unit,
-            NetworkSnapshot snapshot, List<SnapshotItemHandler> endpoints) {
+            NetworkSnapshot snapshot, List<ResourceHandler<ItemResource>> endpoints) {
         ThreadGuard.requireWorkerThread();
 
         List<TransferPlan.TargetRef> targetRefs = new ArrayList<>(unit.targets().size());
@@ -26,7 +26,9 @@ public final class ItemPlanner {
 
         var exportFilters = unit.exportFilters();
         for (NetworkSnapshot.TargetUnit target : unit.targets()) {
-            targetRefs.add(new TransferPlan.TargetRef(target.nodeId(), target.channelIndex(), target.bulk(), target.binding()));
+            NetworkSnapshot.DirectEndpoint direct = snapshot.endpoints().get(target.endpoint()).direct();
+            targetRefs.add(new TransferPlan.TargetRef(target.nodeId(), target.channelIndex(), target.bulk(),
+                    target.binding(), direct == null ? -1 : direct.binding()));
             engineTargets.add(engineTarget(target, exportFilters, endpoints, readCache));
         }
 
@@ -38,12 +40,13 @@ public final class ItemPlanner {
                 (sourceSlot, targetIndex, moved, mask) -> moves.add(new TransferPlan.MoveIntent(
                         sourceSlot, targetIndex, ItemResource.of(moved), moved.getCount(), mask)));
 
+        NetworkSnapshot.DirectEndpoint directSource = snapshot.endpoints().get(unit.sourceEndpoint()).direct();
         return new TransferPlan.ChannelMoves(unit.sourceNodeId(), unit.channelIndex(), targetRefs, moves,
-                unit.sourceBinding(), unit.distributionMode());
+                unit.sourceBinding(), unit.distributionMode(), directSource == null ? -1 : directSource.binding());
     }
 
     private static TransferEngine.ItemTransferTarget engineTarget(NetworkSnapshot.TargetUnit target,
-            ItemStack[] exportFilters, List<SnapshotItemHandler> endpoints,
+            ItemStack[] exportFilters, List<ResourceHandler<ItemResource>> endpoints,
             FilterItemData.ReadCache readCache) {
         var importFilters = target.importFilters();
         return new TransferEngine.ItemTransferTarget(endpoints.get(target.endpoint()), importFilters,

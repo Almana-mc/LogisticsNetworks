@@ -30,7 +30,9 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.AssignNetworkPayload;
 import me.almana.logisticsnetworks.network.AddNodeFilterItemPayload;
+import me.almana.logisticsnetworks.network.InstallStorageUpgradePayload;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
+import me.almana.logisticsnetworks.network.RequestStorageUpgradeCatalogPayload;
 import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.SetNetworkColorPayload;
@@ -39,6 +41,7 @@ import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
 import me.almana.logisticsnetworks.network.SetChannelNamePayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
+import me.almana.logisticsnetworks.network.SyncStorageUpgradeCatalogPayload;
 import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.theme.Theme;
@@ -50,6 +53,7 @@ import net.minecraft.client.gui.components.EditBox;
 import me.almana.logisticsnetworks.registration.ModTags;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.renderer.Rect2i;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
@@ -142,6 +146,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private int filterPickerSlot = -1;
     private boolean filterAddHover = false;
     private long filterAddedToastUntil = 0;
+    private final StorageUpgradePicker storageUpgradePicker = new StorageUpgradePicker();
     private static final long TOOLTIP_DELAY = 1000L;
 
     private long lastTabClickTime = 0;
@@ -270,12 +275,18 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        super.render(g, mx, my, pt);
+        boolean backgroundInteractive = editor == null && !storageUpgradePicker.isOpen();
+        int backgroundMouseX = backgroundInteractive ? mx : Integer.MIN_VALUE;
+        int backgroundMouseY = backgroundInteractive ? my : Integer.MIN_VALUE;
+        super.render(g, backgroundMouseX, backgroundMouseY, pt);
         if (labelPickerOpen && currentPage == Page.CHANNEL_CONFIG) {
             renderLabelPicker(g, mx, my, pt);
         }
         if (filterPickerOpen && currentPage == Page.CHANNEL_CONFIG) {
             renderFilterPicker(g, mx, my);
+        }
+        if (currentPage == Page.CHANNEL_CONFIG) {
+            storageUpgradePicker.render(g, font, theme(), leftPos, topPos, mx, my);
         }
         if (tweaksOpen) {
             renderTweaksPanel(g, mx, my);
@@ -283,30 +294,33 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         if (editor != null) {
             editor.render(g, mx, my, pt, theme());
         }
-        this.renderTooltip(g, mx, my);
-        if (hoveredChannelName != null && currentPage == Page.CHANNEL_CONFIG) {
-            g.renderTooltip(font, hoveredChannelName, mx, my);
+        if (!storageUpgradePicker.isOpen()) {
+            this.renderTooltip(g, mx, my);
+            if (hoveredChannelName != null && currentPage == Page.CHANNEL_CONFIG) {
+                g.renderTooltip(font, hoveredChannelName, mx, my);
+            }
+            if (settingsHoverRow >= 0 && currentPage == Page.CHANNEL_CONFIG
+                    && System.currentTimeMillis() - settingsHoverStartTime >= TOOLTIP_DELAY && !tweaksOpen) {
+                LogisticsNodeEntity node = getMenu().getNode();
+                List<Component> tip = getSettingTooltip(node.getChannel(selectedChannel), settingsHoverRow);
+                g.renderTooltip(font, tip, mx, my);
+            }
+            if (filterDisabledHover && currentPage == Page.CHANNEL_CONFIG) {
+                g.renderTooltip(font,
+                        Component.translatable("gui.logisticsnetworks.node.filter.unfilterable"), mx, my);
+            }
+            if (filterAddHover && currentPage == Page.CHANNEL_CONFIG) {
+                g.renderTooltip(font,
+                        Component.translatable("gui.logisticsnetworks.node.filter.add.hint",
+                                ClientControls.PRIMARY_INTERACTION.getTranslatedKeyMessage()), mx, my);
+            }
+            if (System.currentTimeMillis() < filterAddedToastUntil && currentPage == Page.CHANNEL_CONFIG) {
+                g.renderTooltip(font,
+                        Component.translatable("gui.logisticsnetworks.node.filter.add.done")
+                                .withStyle(ChatFormatting.GREEN), mx, my);
+            }
         }
-        if (settingsHoverRow >= 0 && currentPage == Page.CHANNEL_CONFIG
-                && System.currentTimeMillis() - settingsHoverStartTime >= TOOLTIP_DELAY && !tweaksOpen) {
-            LogisticsNodeEntity node = getMenu().getNode();
-            List<Component> tip = getSettingTooltip(node.getChannel(selectedChannel), settingsHoverRow);
-            g.renderTooltip(font, tip, mx, my);
-        }
-        if (filterDisabledHover && currentPage == Page.CHANNEL_CONFIG) {
-            g.renderTooltip(font,
-                    Component.translatable("gui.logisticsnetworks.node.filter.unfilterable"), mx, my);
-        }
-        if (filterAddHover && currentPage == Page.CHANNEL_CONFIG) {
-            g.renderTooltip(font,
-                    Component.translatable("gui.logisticsnetworks.node.filter.add.hint",
-                            ClientControls.PRIMARY_INTERACTION.getTranslatedKeyMessage()), mx, my);
-        }
-        if (System.currentTimeMillis() < filterAddedToastUntil && currentPage == Page.CHANNEL_CONFIG) {
-            g.renderTooltip(font,
-                    Component.translatable("gui.logisticsnetworks.node.filter.add.done")
-                            .withStyle(ChatFormatting.GREEN), mx, my);
-        }
+        storageUpgradePicker.renderTooltip(g, font, leftPos, topPos, mx, my);
     }
 
     @Override
@@ -996,6 +1010,18 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         int gridW2 = 2 * 19 - 1;
         ThemePaint.sunkPanel(g, x - 2, upgY + 8, gridW2 + 4, 2 * 19 + 2, t);
         drawSlotGrid(g, x, upgY + 10, 2, 2, mx, my);
+        if (menu.hasStorageUpgradeAccess()) {
+            LogisticsNodeEntity node = menu.getNode();
+            for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+                if (!node.getUpgradeItem(slot).isEmpty()) continue;
+                int slotX = x + (slot % 2) * 19;
+                int slotY = upgY + 10 + (slot / 2) * 19;
+                boolean hovered = !storageUpgradePicker.isOpen() && menu.getCarried().isEmpty()
+                        && mx >= slotX && mx < slotX + 16 && my >= slotY && my < slotY + 16;
+                ThemePaint.drawCentered(g, font, "+", slotX + 8, slotY + 5,
+                        hovered ? cAccent() : cMuted());
+            }
+        }
     }
 
     private void drawSlotGrid(GuiGraphics g, int startX, int startY, int rows, int cols, int mx, int my) {
@@ -1251,6 +1277,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         if (editor != null) {
             return editor.mouseClicked(mx, my, action);
         }
+        if (storageUpgradePicker.isOpen()) {
+            handleStorageUpgradePickerAction(mx, my, action);
+            return true;
+        }
         if (tweaksOpen) {
             if (action == 0) return handleTweaksClick(mx, my);
             return true;
@@ -1271,6 +1301,17 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         }
         if (channelNameEditing && channelNameEditBox != null && !channelNameEditBox.isMouseOver(mx, my)) {
             stopChannelNameEdit(true);
+        }
+
+        int storageSlot = hoveredStorageUpgradeSlot(mx, my);
+        if (currentPage == Page.CHANNEL_CONFIG && action == 0 && storageSlot >= 0
+                && !labelPickerOpen && !filterPickerOpen
+                && menu.hasStorageUpgradeAccess() && menu.getCarried().isEmpty()
+                && menu.getNode().getUpgradeItem(storageSlot).isEmpty()) {
+            storageUpgradePicker.open(storageSlot);
+            ClientPacketDistributor.sendToServer(new RequestStorageUpgradeCatalogPayload(
+                    menu.containerId, menu.getNodeId(), storageSlot));
+            return true;
         }
 
         if (currentPage == Page.CHANNEL_CONFIG && (labelPickerOpen || filterPickerOpen)
@@ -1294,14 +1335,30 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     protected boolean hasEditorOverlay() {
         return editor != null || tweaksOpen || labelPickerOpen || filterPickerOpen
-                || channelNameEditing || editingRow != -1;
+                || channelNameEditing || editingRow != -1 || storageUpgradePicker.isOpen();
     }
 
     protected EditBox editorTextField() {
-        if (editor != null || tweaksOpen || filterPickerOpen) return null;
+        if (editor != null || tweaksOpen || filterPickerOpen || storageUpgradePicker.isOpen()) return null;
         if (labelPickerOpen) return labelEditBox;
         if (channelNameEditing) return channelNameEditBox;
         return editingRow != -1 ? numericEditBox : null;
+    }
+
+    private void handleStorageUpgradePickerAction(double mx, double my, int action) {
+        if (action == 0) {
+            SyncStorageUpgradeCatalogPayload.Entry entry = storageUpgradePicker.entryAt(mx, my, leftPos, topPos);
+            if (entry != null) {
+                ClientPacketDistributor.sendToServer(new InstallStorageUpgradePayload(
+                        menu.containerId, menu.getNodeId(), storageUpgradePicker.preferredSlot(),
+                        BuiltInRegistries.ITEM.getKey(entry.item().getItem())));
+                storageUpgradePicker.close();
+                return;
+            }
+        }
+        if (!storageUpgradePicker.contains(mx, my, leftPos, topPos)) {
+            storageUpgradePicker.close();
+        }
     }
 
     private boolean handleNetworkPageClick(double mx, double my) {
@@ -1836,11 +1893,20 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         return false;
     }
 
+    private int hoveredStorageUpgradeSlot(double mx, double my) {
+        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+            Slot menuSlot = menu.slots.get(slot);
+            if (isHovering(menuSlot.x, menuSlot.y, 16, 16, mx, my)) return slot;
+        }
+        return -1;
+    }
+
     @Override
     public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
         if (editor != null && editor.mouseDragged(mx, my, btn)) {
             return true;
         }
+        if (storageUpgradePicker.isOpen()) return true;
         return super.mouseDragged(mx, my, btn, dx, dy);
     }
 
@@ -1849,6 +1915,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         if (editor != null && editor.mouseReleased(mx, my, btn)) {
             return true;
         }
+        if (storageUpgradePicker.isOpen()) return true;
         return super.mouseReleased(mx, my, btn);
     }
 
@@ -1865,6 +1932,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         return ClientControls.cursorY(minecraft);
     }
 
+    protected boolean isStorageUpgradePickerOpen() {
+        return storageUpgradePicker.isOpen();
+    }
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (editor != null) {
@@ -1873,6 +1943,15 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
                 return true;
             }
             editor.keyPressed(key, scan, modifiers);
+            return true;
+        }
+        if (storageUpgradePicker.isOpen()) {
+            if (key == 256) {
+                storageUpgradePicker.close();
+            } else {
+                int action = ClientControls.resolveKeyAction(key, scan, modifiers);
+                if (action != -1) handleStorageUpgradePickerAction(editorMouseX(), editorMouseY(), action);
+            }
             return true;
         }
         if (key == 256) {
@@ -1943,6 +2022,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         if (editor != null) {
             return editor.charTyped(ch);
         }
+        if (storageUpgradePicker.isOpen()) return true;
         if (channelNameEditing && channelNameEditBox != null) {
             return channelNameEditBox.charTyped(ClientInput.character(ch));
         }
@@ -1962,6 +2042,13 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
+        if (editor != null) {
+            return true;
+        }
+        if (storageUpgradePicker.isOpen()) {
+            storageUpgradePicker.scroll(mx, my, sy, leftPos, topPos);
+            return true;
+        }
         if (labelPickerOpen && networkLabels.size() > LABEL_PICKER_MAX_VISIBLE) {
             int pickerW = getLabelPickerWidth();
             int pickerX = leftPos + 10 + (148 - pickerW) / 2;
@@ -2008,6 +2095,12 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
         this.networkList = new ArrayList<>(networks);
+    }
+
+    public void receiveStorageUpgradeCatalog(SyncStorageUpgradeCatalogPayload payload) {
+        if (menu.containerId == payload.containerId() && menu.getNodeId() == payload.entityId()) {
+            storageUpgradePicker.receive(payload.preferredSlot(), payload.backend(), payload.available(), payload.entries());
+        }
     }
 
     private List<SyncNetworkListPayload.NetworkEntry> getFilteredNetworks() {

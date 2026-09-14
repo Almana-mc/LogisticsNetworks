@@ -9,7 +9,9 @@ import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -67,6 +69,7 @@ public class EventHandler {
                 node.setNetworkName(network.getName());
                 node.setNetworkColor(network.getColor());
                 registry.invalidateNetwork(networkId);
+                LabelUpgradeSync.synchronizeOnLoad(node);
             } else {
                 node.setNetworkName("Network-" + networkId.toString().substring(0, 6));
             }
@@ -93,6 +96,7 @@ public class EventHandler {
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player))
             return;
+        LinkedStorage.restoreCraftingRequests(player);
         if (!Config.juneAwarenessMessage)
             return;
 

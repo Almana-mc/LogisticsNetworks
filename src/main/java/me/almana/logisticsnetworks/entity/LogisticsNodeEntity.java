@@ -47,6 +47,7 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_VISIBLE = "RenderVisible";
     private static final String KEY_CHANNELS = "Channels";
     private static final String KEY_UPGRADES = "Upgrades";
+    private static final String KEY_LABEL_REVISION = "LabelRevision";
     private static final String KEY_CHANNEL_PREFIX = "Channel";
     private static final String KEY_SLOT = "Slot";
     private static final String KEY_ITEM = "Item";
@@ -79,6 +80,7 @@ public class LogisticsNodeEntity extends Entity {
 
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
+    private long labelRevision;
 
     private final long[] channelCooldowns = new long[CHANNEL_COUNT];
     private final float[] backoffTicks = new float[CHANNEL_COUNT];
@@ -128,6 +130,7 @@ public class LogisticsNodeEntity extends Entity {
         setRenderVisible(input.getBooleanOr(KEY_VISIBLE, true));
         setOwnerUUID(parseOptionalUuid(input.getStringOr(KEY_OWNER_UUID, "")));
         setNodeLabel(input.getStringOr(KEY_NODE_LABEL, ""));
+        labelRevision = Math.max(0, input.getLongOr(KEY_LABEL_REVISION, 0));
         setHighlighted(input.getBooleanOr(KEY_HIGHLIGHTED, false));
         setNetworkColor(input.getIntOr(KEY_NETWORK_COLOR, me.almana.logisticsnetworks.data.NetworkColors.DEFAULT));
 
@@ -169,6 +172,9 @@ public class LogisticsNodeEntity extends Entity {
         String label = getNodeLabel();
         if (!label.isEmpty()) {
             output.putString(KEY_NODE_LABEL, label);
+        }
+        if (labelRevision > 0) {
+            output.putLong(KEY_LABEL_REVISION, labelRevision);
         }
         output.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
         output.putInt(KEY_NETWORK_COLOR, getNetworkColor());
@@ -373,7 +379,16 @@ public class LogisticsNodeEntity extends Entity {
         if (sanitized.length() > 48) {
             sanitized = sanitized.substring(0, 48);
         }
+        if (!sanitized.equals(getNodeLabel())) labelRevision = 0;
         entityData.set(NODE_LABEL, sanitized);
+    }
+
+    public long getLabelRevision() {
+        return labelRevision;
+    }
+
+    public void setLabelRevision(long revision) {
+        labelRevision = Math.max(0, revision);
     }
 
     @Nullable
