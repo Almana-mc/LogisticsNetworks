@@ -160,6 +160,7 @@ jobs:
               "jade": {"slug": "jade", "projectID": 324717},
               "jei": {"slug": "jei", "projectID": 238222},
               "mekanism": {"slug": "mekanism", "projectID": 268560},
+              "refinedstorage": {"slug": "refined-storage", "projectID": 243076},
           }
           modrinth_projects = {
               "ae2": "ae2",
@@ -168,6 +169,7 @@ jobs:
               "jade": "jade",
               "jei": "jei",
               "mekanism": "mekanism",
+              "refinedstorage": "refined-storage",
           }
           curseforge_types = {
               "required": "requiredDependency",
