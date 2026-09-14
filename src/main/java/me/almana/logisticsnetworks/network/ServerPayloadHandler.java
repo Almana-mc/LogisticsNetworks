@@ -3,10 +3,12 @@ package me.almana.logisticsnetworks.network;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.*;
-import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
-import me.almana.logisticsnetworks.logic.AttachedStorageFilterScanner;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.logic.AttachedStorageFilterScanner;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.item.*;
@@ -20,7 +22,6 @@ import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
@@ -59,6 +60,75 @@ public class ServerPayloadHandler {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<UUID, Boolean> DEFAULT_NODE_VISIBILITY = new HashMap<>();
     private static final Map<UUID, Integer> MODIFIER_KEYS = new HashMap<>();
+
+    public static void handleRequestStorageUpgradeCatalog(RequestStorageUpgradeCatalogPayload payload,
+                                                     IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof NodeMenu menu)
+                    || menu.containerId != payload.containerId()
+                    || menu.getNodeId() != payload.entityId()
+                    || !menu.canEditNode(player)
+                    || payload.preferredSlot() < 0
+                    || payload.preferredSlot() >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT) {
+                return;
+            }
+            StorageLink link = menu.getAccessibleStorageLink(player);
+            boolean available = link != null;
+            List<SyncStorageUpgradeCatalogPayload.Entry> entries = new ArrayList<>();
+            if (available) {
+                for (LinkedStorage.UpgradeEntry entry : LinkedStorage.listUpgrades(
+                        player, link, menu.getInstalledUpgrades())) {
+                    entries.add(new SyncStorageUpgradeCatalogPayload.Entry(
+                            entry.item(), entry.stored(), entry.craftable()));
+                }
+            }
+            PacketDistributor.sendToPlayer(player, new SyncStorageUpgradeCatalogPayload(
+                    payload.containerId(), payload.entityId(), payload.preferredSlot(),
+                    link == null ? null : link.backend(), available, entries));
+        });
+    }
+
+    public static void handleInstallStorageUpgrade(InstallStorageUpgradePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof NodeMenu menu)
+                    || menu.containerId != payload.containerId()
+                    || menu.getNodeId() != payload.entityId()
+                    || !menu.canEditNode(player)
+                    || payload.preferredSlot() < 0
+                    || payload.preferredSlot() >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT
+                    || !BuiltInRegistries.ITEM.containsKey(payload.upgradeId())) {
+                return;
+            }
+            ItemStack upgrade = BuiltInRegistries.ITEM.getValue(payload.upgradeId()).getDefaultInstance();
+            if (!upgrade.is(ModTags.UPGRADES)) return;
+            StorageLink link = menu.getAccessibleStorageLink(player);
+            if (link == null) {
+                player.sendSystemMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.unavailable"), true);
+                return;
+            }
+
+            LinkedStorage.UpgradeInstallResult result = LinkedStorage.installUpgrade(
+                    player, menu.getNode(), link, payload.preferredSlot(), upgrade.getItem());
+            switch (result) {
+                case CRAFTING -> player.sendSystemMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.crafting",
+                                upgrade.getHoverName()), true);
+                case DUPLICATE -> player.sendSystemMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.duplicate"), true);
+                case PENDING -> player.sendSystemMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.pending"), true);
+                case NO_SLOT -> player.sendSystemMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.no_slot"), true);
+                case UNAVAILABLE -> player.sendSystemMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.unavailable"), true);
+                case INSTALLED -> {
+                }
+            }
+        });
+    }
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -329,11 +399,11 @@ public class ServerPayloadHandler {
     }
 
     static void setModifierKeys(UUID playerId, int mask) {
-        MODIFIER_KEYS.put(playerId, mask & 0b111);
+        MODIFIER_KEYS.put(playerId, mask & 0b1111);
     }
 
     static boolean isModifierDown(UUID playerId, int index) {
-        return index >= 0 && index < 3
+        return index >= 0 && index < 4
                 && (MODIFIER_KEYS.getOrDefault(playerId, 0) & (1 << index)) != 0;
     }
 
@@ -463,6 +533,41 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleSetNodeUpgradeItem(SetNodeUpgradeItemPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            if (node == null)
+                return;
+
+            List<ItemStack> original = LabelUpgradeSync.snapshotUpgrades(node);
+            node.setUpgradeItem(payload.upgradeSlot(), payload.upgradeItem());
+
+            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                ChannelData channel = node.getChannel(i);
+                if (channel != null)
+                    setChannelToUpgradeMax(node, channel);
+            }
+            if (context.player() instanceof ServerPlayer player) {
+                StorageLink link = player.containerMenu instanceof NodeMenu menu
+                        ? menu.getAccessibleStorageLink(player)
+                        : null;
+                LabelUpgradeSync.synchronizeMenuClose(player, node, original, link);
+            } else {
+                markNetworkDirty(node);
+            }
+        });
+    }
+
+    public static void handleSelectNodeChannel(SelectNodeChannelPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof NodeMenu menu
+                    && menu.getNode() != null
+                    && menu.getNode().getId() == payload.entityId()) {
+                menu.setSelectedChannel(payload.channelIndex());
+            }
+        });
+    }
+
     public static void handleAddNodeFilterItem(AddNodeFilterItemPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
@@ -497,27 +602,6 @@ public class ServerPayloadHandler {
             channel.setFilterItem(fs, filter);
             propagateToLabelGroup(node, payload.channel());
             markNetworkDirty(node);
-        });
-    }
-
-    public static void handleSetNodeUpgradeItem(SetNodeUpgradeItemPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            if (node == null)
-                return;
-
-            node.setUpgradeItem(payload.upgradeSlot(), payload.upgradeItem());
-            handleNodeUpgradeChanged(node);
-        });
-    }
-
-    public static void handleSelectNodeChannel(SelectNodeChannelPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof NodeMenu menu
-                    && menu.getNode() != null
-                    && menu.getNode().getId() == payload.entityId()) {
-                menu.setSelectedChannel(payload.channelIndex());
-            }
         });
     }
 
@@ -611,7 +695,6 @@ public class ServerPayloadHandler {
     public static void handleOpenNodeFilter(OpenNodeFilterPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer serverPlayer)) return;
-            GlobalPos ae2Link = serverPlayer.containerMenu instanceof NodeMenu menu ? menu.getAE2Link() : null;
             GraphMenuContext graphContext = GraphPayloadHandler.getContext(serverPlayer.containerMenu);
 
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
@@ -655,7 +738,7 @@ public class ServerPayloadHandler {
 
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> {
-                        FilterMenu menu = new FilterMenu(id, inv, node, ch, fs, ae2Link);
+                        FilterMenu menu = new FilterMenu(id, inv, node, ch, fs);
                         menu.setGraphContext(graphContext);
                         return menu;
                     },
@@ -709,8 +792,6 @@ public class ServerPayloadHandler {
     public static void handleOpenNodeMenu(OpenNodeMenuPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)) return;
-            GlobalPos ae2Link = player.containerMenu instanceof FilterMenu menu ? menu.getNodeAE2Link() : null;
-
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null) return;
 
@@ -722,6 +803,9 @@ public class ServerPayloadHandler {
                 }
                 return;
             }
+            StorageLink preferredStorageLink = player.containerMenu instanceof NodeMenu currentMenu
+                    ? currentMenu.getAccessibleStorageLink(player)
+                    : null;
             player.openMenu(new MenuProvider() {
                 @Override
                 public Component getDisplayName() {
@@ -730,7 +814,7 @@ public class ServerPayloadHandler {
 
                 @Override
                 public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
-                    NodeMenu menu = new NodeMenu(containerId, playerInv, node, ae2Link);
+                    NodeMenu menu = new NodeMenu(containerId, playerInv, node, preferredStorageLink);
                     menu.setSelectedChannel(selectedChannel);
                     return menu;
                 }
@@ -856,6 +940,10 @@ public class ServerPayloadHandler {
         }
     }
 
+    public static void invalidateNetwork(LogisticsNodeEntity node) {
+        markNetworkDirty(node);
+    }
+
     public static void handleSetNameFilter(SetNameFilterPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && menu.stillValid(context.player()) && menu.isNameMode()) {
@@ -935,7 +1023,7 @@ public class ServerPayloadHandler {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof PatternSetterMenu menu) {
                 menu.applyPattern(payload.useOutputs(), payload.multiplier(),
-                        context.player().level().registryAccess());
+                        context.player().level().registryAccess(), context.player().level());
             }
         });
     }
@@ -971,7 +1059,7 @@ public class ServerPayloadHandler {
         channel.setTickDelay(channel.getType() == ChannelType.ENERGY ? 1 : NodeUpgradeData.getMinTickDelay(node));
     }
 
-    private static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
+    public static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
         int maxBatch = getMaxBatch(node, channel.getType());
 
         if (channel.getType() == ChannelType.ENERGY) {
@@ -998,228 +1086,14 @@ public class ServerPayloadHandler {
     }
 
     public static void handleNodeUpgradeChanged(LogisticsNodeEntity node) {
-        LogisticsNodeEntity template = findLabelTemplate(node);
-        if (template != null) {
-            copyTemplateChannels(template, node);
-        } else {
-            for (int channelIndex = 0; channelIndex < LogisticsNodeEntity.CHANNEL_COUNT; channelIndex++) {
-                ChannelData channel = node.getChannel(channelIndex);
-                if (channel != null) {
-                    setChannelToUpgradeMax(node, channel);
-                    sendChannelSyncToViewers(node, channelIndex, channel);
-                }
+        for (int channelIndex = 0; channelIndex < LogisticsNodeEntity.CHANNEL_COUNT; channelIndex++) {
+            ChannelData channel = node.getChannel(channelIndex);
+            if (channel != null) {
+                setChannelToUpgradeMax(node, channel);
+                sendChannelSyncToViewers(node, channelIndex, channel);
             }
         }
         markNetworkDirty(node);
-    }
-
-    @Nullable
-    private static LogisticsNodeEntity findLabelTemplate(LogisticsNodeEntity target) {
-        String label = target.getNodeLabel();
-        if (label.isEmpty() || target.getNetworkId() == null || !(target.level() instanceof ServerLevel level)) {
-            return null;
-        }
-
-        LogisticsNetwork network = NetworkRegistry.get(level).getNetwork(target.getNetworkId());
-        if (network == null) {
-            return null;
-        }
-
-        LogisticsNodeEntity best = null;
-        int bestTier = -1;
-        for (UUID nodeId : network.getNodeUuids()) {
-            if (nodeId.equals(target.getUUID())) {
-                continue;
-            }
-            LogisticsNodeEntity candidate = findNode(level, nodeId);
-            if (candidate == null || !candidate.isValidNode() || !label.equals(candidate.getNodeLabel())) {
-                continue;
-            }
-
-            int tier = NodeUpgradeData.getUpgradeTier(candidate);
-            if (tier > bestTier || (tier == bestTier
-                    && (best == null || candidate.getUUID().compareTo(best.getUUID()) < 0))) {
-                best = candidate;
-                bestTier = tier;
-            }
-        }
-        return best;
-    }
-
-    @Nullable
-    private static LogisticsNodeEntity findNode(ServerLevel sourceLevel, UUID nodeId) {
-        for (ServerLevel level : sourceLevel.getServer().getAllLevels()) {
-            Entity entity = level.getEntity(nodeId);
-            if (entity instanceof LogisticsNodeEntity node) {
-                return node;
-            }
-        }
-        return null;
-    }
-
-    private static List<UpgradeRequirement> applyTemplateUpgrades(ServerPlayer player, LogisticsNodeEntity target,
-            LogisticsNodeEntity template, @Nullable GlobalPos ae2Link) {
-        UpgradeChanges changes = getUpgradeChanges(target, template);
-        List<UpgradeRequirement> missing = getMissingUpgrades(player, changes.required(), ae2Link);
-        if (!missing.isEmpty()) {
-            return missing;
-        }
-
-        Inventory inventory = player.getInventory();
-        for (UpgradeRequirement requirement : changes.required()) {
-            AE2Compat.consumeCombined(inventory, requirement.stack(), requirement.count(), -1, ae2Link, player);
-        }
-        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
-            target.setUpgradeItem(slot, template.getUpgradeItem(slot));
-        }
-        for (ItemStack stack : changes.returned()) {
-            ItemStack returned = stack.copy();
-            inventory.add(returned);
-            if (!returned.isEmpty()) {
-                player.drop(returned, false);
-            }
-        }
-        inventory.setChanged();
-        return List.of();
-    }
-
-    private static UpgradeChanges getUpgradeChanges(LogisticsNodeEntity target, LogisticsNodeEntity template) {
-        boolean[] reused = new boolean[LogisticsNodeEntity.UPGRADE_SLOT_COUNT];
-        List<UpgradeRequirement> required = new ArrayList<>();
-
-        for (int templateSlot = 0; templateSlot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; templateSlot++) {
-            ItemStack expected = template.getUpgradeItem(templateSlot);
-            if (expected.isEmpty()) {
-                continue;
-            }
-            int reusableSlot = findReusableUpgrade(target, expected, reused);
-            if (reusableSlot >= 0) {
-                reused[reusableSlot] = true;
-            } else {
-                addUpgradeRequirement(required, expected, 1);
-            }
-        }
-
-        List<ItemStack> returned = new ArrayList<>();
-        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
-            ItemStack current = target.getUpgradeItem(slot);
-            if (!current.isEmpty() && !reused[slot]) {
-                returned.add(current.copyWithCount(1));
-            }
-        }
-        return new UpgradeChanges(required, returned);
-    }
-
-    private static int findReusableUpgrade(LogisticsNodeEntity target, ItemStack expected, boolean[] reused) {
-        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
-            if (!reused[slot] && ItemStack.isSameItem(target.getUpgradeItem(slot), expected)) {
-                return slot;
-            }
-        }
-        return -1;
-    }
-
-    private static void addUpgradeRequirement(List<UpgradeRequirement> requirements, ItemStack stack, int count) {
-        for (int index = 0; index < requirements.size(); index++) {
-            UpgradeRequirement requirement = requirements.get(index);
-            if (ItemStack.isSameItem(requirement.stack(), stack)) {
-                requirements.set(index, new UpgradeRequirement(requirement.stack(), requirement.count() + count));
-                return;
-            }
-        }
-        requirements.add(new UpgradeRequirement(stack.copyWithCount(1), count));
-    }
-
-    private static List<UpgradeRequirement> getMissingUpgrades(ServerPlayer player,
-            List<UpgradeRequirement> requirements, @Nullable GlobalPos ae2Link) {
-        List<UpgradeRequirement> missing = new ArrayList<>();
-        Inventory inventory = player.getInventory();
-        ServerLevel level = player.level() instanceof ServerLevel serverLevel ? serverLevel : null;
-
-        for (UpgradeRequirement requirement : requirements) {
-            long available = AE2Compat.countInInventory(inventory, requirement.stack(), -1);
-            if (ae2Link != null && level != null) {
-                available += AE2Compat.countAvailable(level, ae2Link, requirement.stack());
-            }
-            if (available < requirement.count()) {
-                addUpgradeRequirement(missing, requirement.stack(), (int) (requirement.count() - available));
-            }
-        }
-        return missing;
-    }
-
-    private static Component formatUpgradeRequirements(List<UpgradeRequirement> requirements) {
-        var result = Component.empty();
-        for (int index = 0; index < requirements.size(); index++) {
-            if (index > 0) {
-                result.append(", ");
-            }
-            UpgradeRequirement requirement = requirements.get(index);
-            result.append(Component.literal(requirement.count() + "x "));
-            result.append(requirement.stack().getHoverName());
-        }
-        return result;
-    }
-
-    public static void handleNodeMenuClosed(ServerPlayer player, LogisticsNodeEntity source,
-            @Nullable GlobalPos ae2Link) {
-        String label = source.getNodeLabel();
-        if (label.isEmpty() || source.getNetworkId() == null || !(source.level() instanceof ServerLevel level)) {
-            return;
-        }
-
-        LogisticsNetwork network = NetworkRegistry.get(level).getNetwork(source.getNetworkId());
-        if (network == null) {
-            return;
-        }
-
-        List<LogisticsNodeEntity> targets = new ArrayList<>();
-        List<UpgradeRequirement> required = new ArrayList<>();
-        for (UUID nodeId : network.getNodeUuids()) {
-            if (nodeId.equals(source.getUUID())) {
-                continue;
-            }
-            LogisticsNodeEntity target = findNode(level, nodeId);
-            if (target == null || !target.isValidNode() || !label.equals(target.getNodeLabel())) {
-                continue;
-            }
-            targets.add(target);
-            for (UpgradeRequirement requirement : getUpgradeChanges(target, source).required()) {
-                addUpgradeRequirement(required, requirement.stack(), requirement.count());
-            }
-        }
-
-        List<UpgradeRequirement> missing = getMissingUpgrades(player, required, ae2Link);
-        if (!missing.isEmpty()) {
-            player.sendSystemMessage(Component.translatable(
-                    "message.logisticsnetworks.label.missing_upgrades", formatUpgradeRequirements(missing)));
-            return;
-        }
-
-        for (LogisticsNodeEntity target : targets) {
-            applyTemplateUpgrades(player, target, source, ae2Link);
-            copyTemplateChannels(source, target);
-        }
-        markNetworkDirty(source);
-    }
-
-    private static void copyTemplateChannels(LogisticsNodeEntity template, LogisticsNodeEntity target) {
-        for (int channelIndex = 0; channelIndex < LogisticsNodeEntity.CHANNEL_COUNT; channelIndex++) {
-            ChannelData source = template.getChannel(channelIndex);
-            ChannelData destination = target.getChannel(channelIndex);
-            if (source != null && destination != null) {
-                destination.copyFrom(source);
-                clampChannelToUpgradeLimits(target, destination);
-                sendChannelSyncToViewers(target, channelIndex, destination);
-            }
-        }
-        target.refreshRouteChannels();
-    }
-
-    private record UpgradeRequirement(ItemStack stack, int count) {
-    }
-
-    private record UpgradeChanges(List<UpgradeRequirement> required, List<ItemStack> returned) {
     }
 
     public static void handleRequestNetworkNodes(RequestNetworkNodesPayload payload, IPayloadContext context) {
@@ -1321,8 +1195,6 @@ public class ServerPayloadHandler {
 
     public static void handleSetNodeLabel(SetNodeLabelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player))
-                return;
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
@@ -1335,20 +1207,8 @@ public class ServerPayloadHandler {
                     label, node.getUUID(), node.getNetworkId());
             GraphPayloadHandler.preserveLabelPosition(node, label);
             node.setNodeLabel(label);
-
-            if (!label.isEmpty() && node.getNetworkId() != null) {
-                LogisticsNodeEntity template = findLabelTemplate(node);
-                if (template != null) {
-                    GlobalPos ae2Link = player.containerMenu instanceof NodeMenu menu ? menu.getAE2Link() : null;
-                    List<UpgradeRequirement> missing = applyTemplateUpgrades(player, node, template, ae2Link);
-                    copyTemplateChannels(template, node);
-                    if (!missing.isEmpty()) {
-                        player.sendSystemMessage(Component.translatable(
-                                "message.logisticsnetworks.label.missing_upgrades", formatUpgradeRequirements(missing)));
-                    }
-                }
-            }
             markNetworkDirty(node);
+            LabelUpgradeSync.synchronizeOnLoad(node);
         });
     }
 

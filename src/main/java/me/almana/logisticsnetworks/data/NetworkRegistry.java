@@ -10,12 +10,14 @@ import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.world.level.storage.SavedDataStorage;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import org.slf4j.Logger;
 
@@ -171,8 +173,10 @@ public class NetworkRegistry extends SavedData {
     public CompoundTag saveTag() {
         CompoundTag compoundTag = new CompoundTag();
         ListTag list = new ListTag();
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        HolderLookup.Provider provider = server == null ? null : server.registryAccess();
         for (LogisticsNetwork network : networks.values()) {
-            list.add(network.save());
+            list.add(network.save(provider));
         }
         compoundTag.put(KEY_NETWORKS, list);
         return compoundTag;
@@ -180,6 +184,8 @@ public class NetworkRegistry extends SavedData {
 
     public static NetworkRegistry load(CompoundTag compoundTag) {
         NetworkRegistry registry = new NetworkRegistry();
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        HolderLookup.Provider provider = server == null ? null : server.registryAccess();
         boolean assignedDefaultColor = false;
         if (compoundTag.contains(KEY_NETWORKS)) {
             ListTag list = compoundTag.getListOrEmpty(KEY_NETWORKS);
@@ -189,7 +195,7 @@ public class NetworkRegistry extends SavedData {
                         if (!ct.contains("Color")) {
                             assignedDefaultColor = true;
                         }
-                        LogisticsNetwork network = LogisticsNetwork.load(ct);
+                        LogisticsNetwork network = LogisticsNetwork.load(ct, provider);
                         registry.networks.put(network.getId(), network);
                     } catch (Exception e) {
                         if (Config.debugMode) LOGGER.error("Skipping malformed network: {}", e.getMessage());

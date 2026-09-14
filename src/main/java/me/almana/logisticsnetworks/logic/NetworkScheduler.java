@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -18,6 +19,7 @@ public class NetworkScheduler {
 
     @SubscribeEvent
     public static void onServerTickPost(ServerTickEvent.Post event) {
+        LinkedStorage.tickCraftingRequests(event.getServer());
         ServerLevel level = event.getServer().overworld();
         NetworkRegistry registry = NetworkRegistry.get(level);
         boolean async = registry.refreshAsyncPlanning();

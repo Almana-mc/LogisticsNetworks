@@ -7,13 +7,13 @@ navigation:
 
 # Wrench Mode
 
-The default mode. If you just crafted a wrench and picked it up, it is already in this mode. This is where you go to open a node's settings, remove a node, or link up an AE2 controller if AE2 is installed.
+The default mode. If you just crafted a wrench and picked it up, it is already in this mode. Use it to open node settings, remove or place nodes, and link an AE2 or Refined Storage network.
 
 ## Open Node Configuration
 
 Use **Secondary Interaction (default: Right Click)** on a placed node with the wrench in Wrench mode. The node configuration screen opens and you can edit all 9 channels, filters, upgrades, labels, and so on.
 
-Nothing happens if you use Secondary Interaction on a block that does not have a node on it — the wrench does not place nodes. Place nodes by holding a **Logistics Node** item in your hand and using Secondary Interaction on the block instead.
+Use **Modifier Key 1 + Secondary Interaction** on a compatible block without a node to place one. The wrench first consumes a Logistics Node from your inventory, then checks the linked storage network, and finally requests autocrafting when a pattern is available.
 
 ## Remove a Node
 
@@ -21,17 +21,19 @@ Use **Modifier Key 1 (default: Shift) + Secondary Interaction** on a node with t
 
 This is the clean way to pick up a node. Breaking the block the node is attached to also removes the node, but Modifier Key 1 + Secondary Interaction is preferred — you stay in control of which side of the block the node was on, and you do not need to break and replace the block itself.
 
-## AE2 Linking (if Applied Energistics 2 is installed)
+## Storage Linking
 
-When AE2 is installed alongside Logistics Networks, the wrench gains one extra use in this mode: use **Modifier Key 1 + Secondary Interaction** on an AE2 block (drive, controller, interface, subnet-capable block) to toggle the AE2 link.
+With Applied Energistics 2 or Refined Storage installed, use **Modifier Key 1 + Secondary Interaction** on an active block from that network to toggle the wrench link.
 
-- Linking an AE2 block lets the logistics network treat it as a bridged storage destination.
-- Unlinking severs that bridge.
-- The HUD overlay at the top of the screen shows whether the wrench is currently "AE2-linked" — useful for checking before you start interacting.
+- A wrench holds exactly one storage link: either AE2 or Refined Storage.
+- Use the same linked endpoint again to unlink it.
+- Trying another endpoint while a link exists leaves the original link unchanged and tells you to unlink first.
+- The HUD and tooltip show which backend is linked.
+- Linked storage supplies node placement, mass placement, clipboard and label upgrade synchronization, and the upgrade picker. Missing items can be autocrafted when the backend supports it.
 
-If AE2 is not installed, Modifier Key 1 + Secondary Interaction on non-node blocks does nothing.
+Refined Storage actions honor its extract, insert, and autocrafting security permissions.
 
 ## Good to Know
 
-- The wrench in this mode is purely **configuration and removal**. It never places nodes, never copies, and never selects — those are the other modes.
+- Copying and area selection remain in the other wrench modes.
 - Switch to another mode any time with **Modifier Key 1 + Mouse Wheel**; the HUD overlay updates to show the new mode.

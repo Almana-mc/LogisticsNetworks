@@ -23,11 +23,14 @@ val iris_version: String by project
 val mekanism_version: String by project
 val ars_nouveau_version: String by project
 val ae2_version: String by project
+val refined_storage_version: String by project
 val ftb_teams_version: String by project
 val ftb_library_version: String by project
 val emi_version: String by project
 val guideme_version: String by project
 val sophisticated_core_version: String by project
+val ae2Runtime = providers.gradleProperty("ae2_runtime").orElse("true").map { it.toBoolean() }
+val refinedStorageRuntime = providers.gradleProperty("refined_storage_runtime").orElse("true").map { it.toBoolean() }
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -40,6 +43,7 @@ repositories {
     maven("https://api.modrinth.com/maven")
     maven("https://maven.ftb.dev/releases")
     maven("https://maven.terraformersmc.com/releases")
+    maven("https://maven.creeperhost.net")
     // Enable when 26.1.2 is supported.
     /*
     maven("https://maven.createmod.net")
@@ -130,7 +134,14 @@ dependencies {
     runtimeOnly("maven.modrinth:jade:${jade_version}")
 
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
-    runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+    if (ae2Runtime.get()) {
+        runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+    }
+
+    compileOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+    if (refinedStorageRuntime.get()) {
+        runtimeOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+    }
 
     // Iris API — compile-only; shaders are an optional runtime dependency.
     compileOnly("maven.modrinth:iris:${iris_version}") {
@@ -169,7 +180,8 @@ val generateModMetadata by tasks.registering(ProcessResources::class) {
         "mod_version" to mod_version,
         "mod_authors" to mod_authors,
         "mod_description" to mod_description,
-        "ae2_version" to ae2_version
+        "ae2_version" to ae2_version,
+        "refined_storage_version" to refined_storage_version
     )
     inputs.properties(replaceProperties)
     expand(replaceProperties)

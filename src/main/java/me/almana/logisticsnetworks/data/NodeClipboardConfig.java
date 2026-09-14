@@ -4,14 +4,17 @@ import me.almana.logisticsnetworks.component.ClipboardSnapshot;
 import me.almana.logisticsnetworks.component.FilterComponentData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import net.minecraft.nbt.NbtOps;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageAccess;
+import me.almana.logisticsnetworks.integration.storage.StorageAction;
+import me.almana.logisticsnetworks.integration.storage.StorageInventory;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.registration.ModTags;
 import net.minecraft.core.Direction;
-import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -758,11 +761,11 @@ public final class NodeClipboardConfig {
     }
 
     public PasteResult applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack) {
-        return applyToNode(player, node, protectedStack, null);
+        return applyToNode(player, node, protectedStack, (StorageLink) null);
     }
 
     public PasteResult applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack,
-                                   @Nullable GlobalPos ae2Link) {
+                                   @Nullable StorageLink storageLink) {
         if (player == null || node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT) {
             return PasteResult.CLIPBOARD_INVALID;
         }
@@ -780,10 +783,12 @@ public final class NodeClipboardConfig {
         List<Requirement> requirements = buildUpgradeRequirements(node);
         List<ItemStack> returnedItems = collectReturnedItems(node);
 
-        ServerLevel level = player.level() instanceof ServerLevel sl ? sl : null;
+        StorageAccess access = storageLink == null ? null : LinkedStorage.resolve(player.level(), storageLink);
+        if (access != null && !access.allows(player, StorageAction.EXTRACT)) access = null;
         for (Requirement requirement : requirements) {
-            if (!AE2Compat.hasCombinedStock(inventory, requirement.stack(), requirement.count(),
-                    protectedSlot, ae2Link, level)) {
+            int available = StorageInventory.count(inventory, requirement.stack(), protectedSlot);
+            long stored = access == null ? 0 : access.count(requirement.stack());
+            if ((long) available + stored < requirement.count()) {
                 return PasteResult.MISSING_ITEMS;
             }
         }
@@ -791,9 +796,22 @@ public final class NodeClipboardConfig {
             return PasteResult.INVENTORY_FULL;
         }
 
+        List<ItemStack> inventoryReserved = new ArrayList<>();
+        List<ItemStack> storageReserved = new ArrayList<>();
         for (Requirement requirement : requirements) {
-            AE2Compat.consumeCombined(inventory, requirement.stack(), requirement.count(),
-                    protectedSlot, ae2Link, player);
+            List<ItemStack> fromInventory = StorageInventory.reserve(
+                    inventory, requirement.stack(), requirement.count(), protectedSlot);
+            inventoryReserved.addAll(fromInventory);
+            int remaining = requirement.count() - StorageInventory.count(fromInventory);
+            List<ItemStack> fromStorage = access == null ? List.of()
+                    : access.extract(requirement.stack(), remaining, player);
+            storageReserved.addAll(fromStorage);
+            if (StorageInventory.count(fromStorage) != remaining) {
+                StorageInventory.returnToPlayer(player, inventoryReserved);
+                if (access == null) StorageInventory.returnToPlayer(player, storageReserved);
+                else StorageInventory.returnToStorageOrPlayer(access, player, storageReserved);
+                return PasteResult.MISSING_ITEMS;
+            }
         }
         applyToNode(node);
         applyNetworkToNode(node);

@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks.menu;
 
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
@@ -13,6 +13,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 import java.util.List;
 
@@ -72,19 +73,17 @@ public class PatternSetterMenu extends AbstractContainerMenu {
         }
     }
 
-    public void applyPattern(boolean useOutputs, int multiplier, HolderLookup.Provider provider) {
+    public void applyPattern(boolean useOutputs, int multiplier, HolderLookup.Provider provider, Level level) {
         ItemStack pattern = container.getItem(SLOT_PATTERN);
         ItemStack filter = container.getItem(SLOT_FILTER);
 
         if (pattern.isEmpty() || filter.isEmpty()) return;
         if (!FilterItemData.isFilterItem(filter)) return;
-        if (!AE2Compat.isLoaded()) return;
-
         int mult = Math.max(1, Math.min(multiplier, 10_000));
 
-        List<AE2Compat.PatternEntry> entries = useOutputs
-                ? AE2Compat.readPatternOutputs(pattern)
-                : AE2Compat.readPatternInputs(pattern);
+        List<LinkedStorage.PatternEntry> entries = useOutputs
+                ? LinkedStorage.readPatternOutputs(pattern, level)
+                : LinkedStorage.readPatternInputs(pattern, level);
 
         if (entries.isEmpty()) return;
 
@@ -98,7 +97,7 @@ public class PatternSetterMenu extends AbstractContainerMenu {
         // Write new entries with multiplier applied
         int count = Math.min(entries.size(), capacity);
         for (int i = 0; i < count; i++) {
-            AE2Compat.PatternEntry entry = entries.get(i);
+            LinkedStorage.PatternEntry entry = entries.get(i);
             FilterItemData.setEntry(filter, i, entry.item(), provider);
             FilterItemData.setEntryAmount(filter, i, entry.amount() * mult);
         }

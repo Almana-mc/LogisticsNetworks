@@ -3,12 +3,14 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.network.ServerPayloadHandler;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.network.GraphPayloadHandler;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.core.GlobalPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,15 +19,16 @@ import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.jetbrains.annotations.Nullable;
 
 public class NodeMenu extends AbstractContainerMenu {
 
@@ -40,10 +43,11 @@ public class NodeMenu extends AbstractContainerMenu {
 
     private final LogisticsNodeEntity node;
     private final int nodeId;
+    private final Inventory playerInventory;
+    private final List<ItemStack> openingUpgrades;
     @Nullable
-    private final ServerPlayer serverPlayer;
-    @Nullable
-    private final GlobalPos ae2Link;
+    private final StorageLink preferredStorageLink;
+    private int storageUpgradeAccess;
     private boolean remoteAccess;
     private int selectedChannel = 0;
     private boolean nodeSlotsActive = true;
@@ -56,8 +60,9 @@ public class NodeMenu extends AbstractContainerMenu {
         this(containerId, playerInv, node, null);
     }
 
-    public NodeMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node, @Nullable GlobalPos ae2Link) {
-        this(Registration.NODE_MENU.get(), containerId, playerInv, node, 0, ae2Link);
+    public NodeMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node,
+                    @Nullable StorageLink preferredStorageLink) {
+        this(Registration.NODE_MENU.get(), containerId, playerInv, node, 0, preferredStorageLink);
     }
 
     protected NodeMenu(MenuType<?> type, int containerId, Inventory playerInv,
@@ -65,18 +70,20 @@ public class NodeMenu extends AbstractContainerMenu {
         this(type, containerId, playerInv, node, selectedChannel, null);
     }
 
-    private NodeMenu(MenuType<?> type, int containerId, Inventory playerInv,
-            LogisticsNodeEntity node, int selectedChannel, @Nullable GlobalPos ae2Link) {
+    protected NodeMenu(MenuType<?> type, int containerId, Inventory playerInv,
+            LogisticsNodeEntity node, int selectedChannel, @Nullable StorageLink preferredStorageLink) {
         super(type, containerId);
         this.node = node;
         this.nodeId = node == null ? -1 : node.getId();
+        this.playerInventory = playerInv;
+        this.preferredStorageLink = preferredStorageLink;
         this.selectedChannel = Math.clamp(selectedChannel, 0, LogisticsNodeEntity.CHANNEL_COUNT - 1);
-        this.serverPlayer = playerInv.player instanceof ServerPlayer player ? player : null;
-        this.ae2Link = ae2Link;
         this.upgradeContainer = new UpgradeItemsContainer();
+        this.openingUpgrades = node == null ? List.of() : LabelUpgradeSync.snapshotUpgrades(node);
 
         layoutNodeSlots();
         layoutPlayerSlots(playerInv);
+        addStorageAccessData();
     }
 
     // Client-side
@@ -86,13 +93,15 @@ public class NodeMenu extends AbstractContainerMenu {
         this.nodeId = state.entityId();
         this.selectedChannel = state.selectedChannel();
         this.node = state.node();
-        this.serverPlayer = null;
-        this.ae2Link = null;
+        this.playerInventory = playerInv;
+        this.preferredStorageLink = null;
 
         this.upgradeContainer = new UpgradeItemsContainer();
+        this.openingUpgrades = node == null ? List.of() : LabelUpgradeSync.snapshotUpgrades(node);
 
         layoutNodeSlots();
         layoutPlayerSlots(playerInv);
+        addStorageAccessData();
     }
 
     // Slot Layout
@@ -146,13 +155,30 @@ public class NodeMenu extends AbstractContainerMenu {
         return nodeId;
     }
 
-    @Nullable
-    public GlobalPos getAE2Link() {
-        return ae2Link;
-    }
-
     public int getSelectedChannel() {
         return selectedChannel;
+    }
+
+    public boolean hasStorageUpgradeAccess() {
+        return storageUpgradeAccess != 0;
+    }
+
+    @Nullable
+    public StorageLink getAccessibleStorageLink(ServerPlayer player) {
+        return LinkedStorage.findAccessibleLink(player, preferredStorageLink);
+    }
+
+    public List<ItemStack> getInstalledUpgrades() {
+        List<ItemStack> installed = new ArrayList<>(UPGRADE_SLOTS);
+        for (int slot = 0; slot < UPGRADE_SLOTS; slot++) {
+            installed.add(upgradeContainer.getItem(slot));
+        }
+        return installed;
+    }
+
+    public boolean canEditNode(Player player) {
+        return node != null && node.isValidNode() && node.isOwnedBy(player)
+                && stillValid(player) && hasAvailableNode();
     }
 
     public void setSelectedChannel(int channelIndex) {
@@ -204,6 +230,23 @@ public class NodeMenu extends AbstractContainerMenu {
         PacketDistributor.sendToPlayer(player, new SyncNetworkListPayload(entries));
     }
 
+    private void addStorageAccessData() {
+        addDataSlot(new DataSlot() {
+            @Override
+            public int get() {
+                if (playerInventory.player instanceof ServerPlayer player) {
+                    return getAccessibleStorageLink(player) == null ? 0 : 1;
+                }
+                return storageUpgradeAccess;
+            }
+
+            @Override
+            public void set(int value) {
+                storageUpgradeAccess = value;
+            }
+        });
+    }
+
     private void markDirty() {
         if (node != null && node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
             NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
@@ -212,18 +255,8 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     @Override
-    public void removed(Player player) {
-        super.removed(player);
-        GraphMenuContext graph = getGraphContext();
-        if (graph != null && !graph.canEdit(player, node)) return;
-        if (serverPlayer != null && node != null) {
-            ServerPayloadHandler.handleNodeMenuClosed(serverPlayer, node, ae2Link);
-        }
-    }
-
-    @Override
     public ItemStack quickMoveStack(Player player, int index) {
-        if (!nodeSlotsActive || !hasAvailableNode()) return ItemStack.EMPTY;
+        if (!nodeSlotsActive || !hasAvailableNode() || isUpgradeEditPending()) return ItemStack.EMPTY;
         Slot fromSlot = slots.get(index);
         if (fromSlot == null || !fromSlot.hasItem())
             return ItemStack.EMPTY;
@@ -277,7 +310,7 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     private void refreshUpgradeChannels() {
-        if (serverPlayer != null) {
+        if (playerInventory.player instanceof ServerPlayer player) {
             ServerPayloadHandler.handleNodeUpgradeChanged(node);
         }
     }
@@ -364,12 +397,13 @@ public class NodeMenu extends AbstractContainerMenu {
 
         @Override
         public boolean mayPickup(Player player) {
-            return isActive();
+            return isActive() && !isUpgradeEditPending();
         }
 
         @Override
         public boolean mayPlace(ItemStack stack) {
-            if (!isActive() || stack.isEmpty() || !stack.is(ModTags.UPGRADES)) {
+            if (!isActive() || isUpgradeEditPending()
+                    || stack.isEmpty() || !stack.is(ModTags.UPGRADES)) {
                 return false;
             }
             for (int i = 0; i < UPGRADE_SLOTS; i++) {
@@ -391,5 +425,21 @@ public class NodeMenu extends AbstractContainerMenu {
 
     protected boolean hasAvailableNode() {
         return node != null;
+    }
+
+    private boolean isUpgradeEditPending() {
+        return node != null && (LabelUpgradeSync.isPending(node)
+                || LinkedStorage.isUpgradeCraftingPending(node));
+    }
+
+    @Override
+    public void removed(Player player) {
+        super.removed(player);
+        GraphMenuContext graph = getGraphContext();
+        if (graph != null && !graph.canEdit(player, node)) return;
+        if (player instanceof ServerPlayer serverPlayer && node != null && node.isAlive()) {
+            LabelUpgradeSync.synchronizeMenuClose(
+                    serverPlayer, node, openingUpgrades, getAccessibleStorageLink(serverPlayer));
+        }
     }
 }

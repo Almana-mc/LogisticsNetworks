@@ -3,6 +3,8 @@ package me.almana.logisticsnetworks.component;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
+import me.almana.logisticsnetworks.integration.storage.StorageBackend;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
@@ -42,6 +44,14 @@ public final class LegacyComponentMigration {
     }
 
     public static boolean migrateWrench(ItemStack stack, @Nullable HolderLookup.Provider provider) {
+        StorageLink currentLink = stack.get(LogisticsDataComponents.WRENCH_STORAGE_LINK);
+        GlobalPos componentLink = stack.get(LogisticsDataComponents.WRENCH_AE2_LINK);
+        if (currentLink == null && componentLink != null) {
+            stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK,
+                    new StorageLink(StorageBackend.AE2, componentLink));
+        }
+        stack.remove(LogisticsDataComponents.WRENCH_AE2_LINK);
+
         CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         if (!(custom.get("ln_wrench") instanceof CompoundTag root)) {
             return true;
@@ -67,10 +77,11 @@ public final class LegacyComponentMigration {
 
     private static void migrateWrenchPositions(ItemStack stack, CompoundTag root) {
         if (root.get("ae2_link") instanceof CompoundTag link) {
-            if (!stack.has(LogisticsDataComponents.WRENCH_AE2_LINK)) {
+            if (!stack.has(LogisticsDataComponents.WRENCH_STORAGE_LINK)) {
                 GlobalPos.CODEC.parse(NbtOps.INSTANCE, link).result().ifPresent(value ->
-                        stack.set(LogisticsDataComponents.WRENCH_AE2_LINK,
-                                GlobalPos.of(value.dimension(), value.pos().immutable())));
+                        stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK,
+                                new StorageLink(StorageBackend.AE2,
+                                        GlobalPos.of(value.dimension(), value.pos().immutable()))));
             }
             link.remove("dimension");
             link.remove("pos");

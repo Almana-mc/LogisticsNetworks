@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.core.HolderLookup;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,6 +37,11 @@ public class LogisticsNetwork {
     private static final String KEY_CREATED = "CreatedAt";
     private static final String KEY_COLOR = "Color";
     private static final String KEY_GRAPH_POSITIONS = "GraphPositions";
+    private static final String KEY_GRAPH_X = "X";
+    private static final String KEY_GRAPH_Y = "Y";
+    private static final String KEY_LABEL_TEMPLATES = "LabelTemplates";
+    private static final String KEY_LABEL = "Label";
+    private static final String KEY_TEMPLATE = "Template";
     private static final float MAX_GRAPH_COORDINATE = 1_000_000.0F;
 
     private final UUID id;
@@ -45,6 +51,7 @@ public class LogisticsNetwork {
     private int color = NetworkColors.randomColor();
     private final Set<UUID> nodeUuids = new HashSet<>();
     private final Map<String, GraphPosition> graphPositions = new HashMap<>();
+    private final Map<String, LabelUpgradeTemplate> labelTemplates = new HashMap<>();
     private boolean sleeping = true;
 
     // Runtime flags
@@ -99,7 +106,7 @@ public class LogisticsNetwork {
         rebuildViews();
     }
 
-    public CompoundTag save() {
+    public CompoundTag save(@org.jetbrains.annotations.Nullable HolderLookup.Provider provider) {
         CompoundTag tag = new CompoundTag();
         tag.putString(KEY_ID, id.toString());
         tag.putString(KEY_NAME, name);
@@ -130,17 +137,29 @@ public class LogisticsNetwork {
             CompoundTag positionsTag = new CompoundTag();
             for (Map.Entry<String, GraphPosition> entry : new TreeMap<>(graphPositions).entrySet()) {
                 CompoundTag positionTag = new CompoundTag();
-                positionTag.putFloat("X", entry.getValue().x());
-                positionTag.putFloat("Y", entry.getValue().y());
+                positionTag.putFloat(KEY_GRAPH_X, entry.getValue().x());
+                positionTag.putFloat(KEY_GRAPH_Y, entry.getValue().y());
                 positionsTag.put(entry.getKey(), positionTag);
             }
             tag.put(KEY_GRAPH_POSITIONS, positionsTag);
         }
 
+        if (!labelTemplates.isEmpty()) {
+            ListTag templatesTag = new ListTag();
+            for (Map.Entry<String, LabelUpgradeTemplate> entry : new TreeMap<>(labelTemplates).entrySet()) {
+                CompoundTag templateTag = new CompoundTag();
+                templateTag.putString(KEY_LABEL, entry.getKey());
+                templateTag.put(KEY_TEMPLATE, entry.getValue().save(provider));
+                templatesTag.add(templateTag);
+            }
+            tag.put(KEY_LABEL_TEMPLATES, templatesTag);
+        }
+
         return tag;
     }
 
-    public static LogisticsNetwork load(CompoundTag tag) {
+    public static LogisticsNetwork load(CompoundTag tag,
+                                        @org.jetbrains.annotations.Nullable HolderLookup.Provider provider) {
         UUID id = parseRequiredUuid(tag.getStringOr(KEY_ID, null));
         LogisticsNetwork network = new LogisticsNetwork(id);
 
@@ -177,12 +196,21 @@ public class LogisticsNetwork {
                 }
             }
         }
+        if (tag.get(KEY_LABEL_TEMPLATES) instanceof ListTag templatesTag) {
+            for (Tag value : templatesTag) {
+                if (!(value instanceof CompoundTag templateTag)) continue;
+                String label = templateTag.getStringOr(KEY_LABEL, "");
+                LabelUpgradeTemplate template = LabelUpgradeTemplate.load(
+                        templateTag.getCompoundOrEmpty(KEY_TEMPLATE), provider);
+                if (!label.isBlank() && template != null) network.labelTemplates.put(label, template);
+            }
+        }
 
         CompoundTag positionsTag = tag.getCompoundOrEmpty(KEY_GRAPH_POSITIONS);
         for (String key : positionsTag.keySet()) {
             if (!(positionsTag.get(key) instanceof CompoundTag positionTag)) continue;
-            GraphPosition position = new GraphPosition(positionTag.getFloatOr("X", Float.NaN),
-                    positionTag.getFloatOr("Y", Float.NaN));
+            GraphPosition position = new GraphPosition(positionTag.getFloatOr(KEY_GRAPH_X, Float.NaN),
+                    positionTag.getFloatOr(KEY_GRAPH_Y, Float.NaN));
             if (validGraphKey(key) && validGraphPosition(position)) network.graphPositions.put(key, position);
         }
         return network;
@@ -271,6 +299,14 @@ public class LogisticsNetwork {
 
     public Set<UUID> getNodeUuids() {
         return Collections.unmodifiableSet(nodeUuids);
+    }
+
+    public LabelUpgradeTemplate getLabelTemplate(String label) {
+        return labelTemplates.get(label);
+    }
+
+    public void setLabelTemplate(String label, LabelUpgradeTemplate template) {
+        if (!label.isBlank()) labelTemplates.put(label, template);
     }
 
     public boolean isSleeping() {

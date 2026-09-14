@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.logic.async;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import org.jetbrains.annotations.Nullable;
@@ -17,14 +18,15 @@ public record TransferPlan(UUID networkId, long generation, long runtimeId, bool
 
     public record ChannelMoves(UUID sourceNodeId, int channelIndex,
             List<TargetRef> targets, List<MoveIntent> moves, EndpointBinding sourceBinding,
-            DistributionMode distributionMode) {
+            DistributionMode distributionMode, int sourceStorageBinding) {
         public ChannelMoves {
             targets = List.copyOf(targets);
             moves = List.copyOf(moves);
         }
     }
 
-    public record TargetRef(UUID nodeId, int channelIndex, boolean bulk, EndpointBinding binding) {
+    public record TargetRef(UUID nodeId, int channelIndex, boolean bulk, EndpointBinding binding,
+            int storageBinding) {
     }
 
     public record EndpointBinding(ResourceKey<Level> dimension, long attachedPos, @Nullable Direction direction) {
@@ -39,6 +41,14 @@ public record TransferPlan(UUID networkId, long generation, long runtimeId, bool
         @Override
         public boolean[] targetSlotMask() {
             return targetSlotMask == null ? null : targetSlotMask.clone();
+        }
+
+        public Item getItem() {
+            return resource.getItem();
+        }
+
+        public MoveIntent withAmount(int count, @Nullable boolean[] mask) {
+            return new MoveIntent(sourceSlot, targetIndex, resource, count, mask);
         }
     }
 }

@@ -2,11 +2,14 @@ package me.almana.logisticsnetworks.logic.async;
 
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.data.DistributionMode;
+import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public record NetworkSnapshot(
@@ -68,7 +71,14 @@ public record NetworkSnapshot(
             ItemStack[] occupiedStacks,
             int defaultSlotLimit,
             int[] occupiedSlotLimits,
-            @Nullable int[] bulkSlotLimits) {
+            @Nullable int[] bulkSlotLimits,
+            @Nullable DirectEndpoint direct) {
+        public ItemEndpoint(int totalSlots, int[] occupiedSlots, ItemStack[] occupiedStacks,
+                int defaultSlotLimit, int[] occupiedSlotLimits, @Nullable int[] bulkSlotLimits) {
+            this(totalSlots, occupiedSlots, occupiedStacks, defaultSlotLimit, occupiedSlotLimits,
+                    bulkSlotLimits, null);
+        }
+
         public ItemEndpoint {
             occupiedSlots = occupiedSlots.clone();
             occupiedStacks = Snapshots.copyFilters(occupiedStacks);
@@ -87,5 +97,13 @@ public record NetworkSnapshot(
 
         @Override
         public int[] bulkSlotLimits() { return bulkSlotLimits == null ? null : bulkSlotLimits.clone(); }
+    }
+
+    public record DirectEndpoint(int network, int binding, boolean exporting,
+            List<StorageEndpoint.StoredItem> exports, Map<Item, Long> counts) {
+        public DirectEndpoint {
+            exports = List.copyOf(exports);
+            counts = Map.copyOf(counts);
+        }
     }
 }

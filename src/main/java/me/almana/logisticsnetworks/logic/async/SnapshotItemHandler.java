@@ -92,7 +92,7 @@ public final class SnapshotItemHandler implements ResourceHandler<ItemResource> 
         if (amount <= 0 || !isValid(index, resource)) return 0;
         ItemStack current = stack(index);
         if (!resource.matches(current)) return 0;
-        int extracted = Math.min(amount, Math.min(current.getCount(), resource.getMaxStackSize()));
+        int extracted = Math.min(amount, Math.min(current.getCount(), getCapacityAsInt(index, resource)));
         if (extracted > 0) {
             journals.computeIfAbsent(index, SlotJournal::new).updateSnapshots(transaction);
             setStack(index, current.copyWithCount(current.getCount() - extracted));

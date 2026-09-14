@@ -337,6 +337,7 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         double x = mouseX;
         double y = mouseY;
+        if (isStorageUpgradePickerOpen()) return super.mouseClicked(x, y, button);
         if (openingSelection) return true;
         if (hasEditorOverlay()) {
             super.mouseClicked(x, y, button);
@@ -381,6 +382,7 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
         double x = mouseX / uiScale;
         double y = mouseY / uiScale;
+        if (isStorageUpgradePickerOpen()) return super.mouseScrolled(x, y, deltaX, deltaY);
         if (canvas().mouseScrolled(x, y, deltaY)) return true;
         return menu.getNode() != null && super.mouseScrolled(x, y, deltaX, deltaY);
     }
@@ -389,6 +391,7 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         MouseButtonEvent scaled = scaledMouse(event);
         if (openingSelection) return true;
+        if (isStorageUpgradePickerOpen()) return super.mouseClicked(scaled, doubleClick);
         if (!hasEditorOverlay()) return super.mouseClicked(scaled, doubleClick);
         if (!super.mouseClicked(scaled.x(), scaled.y(), scaled.button())) {
             var field = editorTextField();
@@ -520,4 +523,3 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
         }
     }
 }
-
