@@ -1129,11 +1129,6 @@ public class TransferEngine {
                                 if (forcedIn > 0 && bulkHandler != null) {
                                     bulkInsertRejections.clear(bulkHandler);
                                 }
-                                if (!forcedRemainder.isEmpty() && Config.debugMode) {
-                                    LOGGER.debug("ITEM ROLLBACK FAILED: Could not return {} to source or fit into "
-                                            + "target slot mask at {}.",
-                                            forcedRemainder, sourcePos);
-                                }
                             }
                         }
                     }
@@ -1246,10 +1241,6 @@ public class TransferEngine {
                 ItemStack forcedRemainder = insertItemWithAllowedSlots(target, bulkTarget, stillLeft, false,
                         targetSlotMask);
                 accepted += stillLeft.getCount() - forcedRemainder.getCount();
-                if (!forcedRemainder.isEmpty() && Config.debugMode) {
-                    LOGGER.debug("ITEM ROLLBACK FAILED: Could not return {} to source or target after simulation.",
-                            forcedRemainder);
-                }
             }
         }
 
@@ -1477,11 +1468,7 @@ public class TransferEngine {
             if (filled < drained.getAmount()) {
                 int rollbackAmount = drained.getAmount() - filled;
                 FluidStack rollback = drained.copyWithAmount(rollbackAmount);
-                int returned = source.fill(rollback, IFluidHandler.FluidAction.EXECUTE);
-                if (returned < rollbackAmount) {
-                    LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
-                            rollbackAmount - returned, drained.getFluid(), rollbackAmount - returned);
-                }
+                source.fill(rollback, IFluidHandler.FluidAction.EXECUTE);
             }
 
             if (filled > 0) {
@@ -1508,11 +1495,7 @@ public class TransferEngine {
         int received = target.receiveEnergy(actuallyExtracted, false);
         if (received < actuallyExtracted) {
             int rollbackAmount = actuallyExtracted - received;
-            int returned = source.receiveEnergy(rollbackAmount, false);
-            if (returned < rollbackAmount) {
-                LOGGER.error("ENERGY VOIDING: Source rejected rollback of {} RF. {} RF lost.",
-                        rollbackAmount - returned, rollbackAmount - returned);
-            }
+            source.receiveEnergy(rollbackAmount, false);
         }
         return received;
     }
