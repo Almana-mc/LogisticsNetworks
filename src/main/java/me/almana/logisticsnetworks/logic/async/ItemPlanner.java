@@ -42,7 +42,7 @@ public final class ItemPlanner {
         List<TransferPlan.ItemMove> moves = new ArrayList<>();
         IItemHandler sourceHandler = endpoints.get(unit.sourceEndpoint());
 
-        TransferEngine.executeMove(
+        TransferEngine.executeItemOperation(
                 sourceHandler,
                 engineTargets,
                 unit.batchLimit(),
@@ -59,7 +59,8 @@ public final class ItemPlanner {
                         targetIndex,
                         new ItemResource(moved),
                         moved.getCount(),
-                        mask)));
+                        mask)), java.util.Map.of(), List.of(),
+                unit.resourceRoundRobin(), unit.resourceCursor(), null);
 
         var directSource = snapshot.endpoints().get(unit.sourceEndpoint()).direct();
         return new TransferPlan.ChannelMoves(unit.sourceNodeId(), unit.channelIndex(),

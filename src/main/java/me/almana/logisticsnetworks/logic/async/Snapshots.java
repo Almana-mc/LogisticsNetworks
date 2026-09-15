@@ -176,6 +176,7 @@ public final class Snapshots {
                     channel.getFilterMode(),
                     sourceEndpoint,
                     channel.getDistributionMode() == DistributionMode.ROUND_ROBIN,
+                    channel.canRotateResources(), channel.getItemResourceCursor(),
                     targetUnits));
         }
         return itemWakeDelta;

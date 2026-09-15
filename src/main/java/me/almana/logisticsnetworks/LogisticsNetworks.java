@@ -4,6 +4,9 @@ import me.almana.logisticsnetworks.network.GraphPayloadHandler;
 import me.almana.logisticsnetworks.network.RequestOpenGraphPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkGraphPayload;
 import me.almana.logisticsnetworks.network.MoveGraphVertexPayload;
+import me.almana.logisticsnetworks.network.MoveGraphVerticesPayload;
+import me.almana.logisticsnetworks.network.SetNodeLabelsPayload;
+import me.almana.logisticsnetworks.network.SetWrenchModePayload;
 import me.almana.logisticsnetworks.network.ResetGraphLayoutPayload;
 import me.almana.logisticsnetworks.network.ReturnToComputerPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkGraphPayload;
@@ -145,7 +148,7 @@ public class LogisticsNetworks {
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("5");
+                final var registrar = event.registrar(MOD_ID).versioned("6");
 
                 // Client -> Server
                 registrar.playToServer(UpdateChannelPayload.TYPE, UpdateChannelPayload.STREAM_CODEC,
@@ -206,6 +209,12 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSyncModifierKeys);
                 registrar.playToServer(CycleWrenchModePayload.TYPE, CycleWrenchModePayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleCycleWrenchMode);
+                registrar.playToServer(SetWrenchModePayload.TYPE, SetWrenchModePayload.STREAM_CODEC,
+                                SetWrenchModePayload::handle);
+                registrar.playToServer(MoveGraphVerticesPayload.TYPE, MoveGraphVerticesPayload.STREAM_CODEC,
+                                GraphPayloadHandler::handleMoveVertices);
+                registrar.playToServer(SetNodeLabelsPayload.TYPE, SetNodeLabelsPayload.STREAM_CODEC,
+                                GraphPayloadHandler::handleSetLabels);
                 registrar.playToServer(MassSelectConnectedPayload.TYPE, MassSelectConnectedPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleMassSelectConnected);
                 registrar.playToServer(CopyPasteConnectedPayload.TYPE, CopyPasteConnectedPayload.STREAM_CODEC,
@@ -235,7 +244,7 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleToggleNetworkLabelHighlight);
                 registrar.playToServer(RequestOpenNodeSettingsPayload.TYPE,
                                 RequestOpenNodeSettingsPayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleRequestOpenNodeSettings);
+                                GraphPayloadHandler::handleOpenNodeSettings);
                 registrar.playToServer(SubscribeTelemetryPayload.TYPE,
                                 SubscribeTelemetryPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSubscribeTelemetry);

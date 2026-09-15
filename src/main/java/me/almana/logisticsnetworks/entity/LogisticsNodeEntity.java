@@ -517,7 +517,19 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setUpgradeItem(int slot, ItemStack stack) {
         if (slot >= 0 && slot < UPGRADE_SLOT_COUNT) {
+            int previousTier = NodeUpgradeData.getUpgradeTier(this);
             upgradeItems[slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
+            if (!level().isClientSide) {
+                int tier = NodeUpgradeData.getUpgradeTier(this);
+                if (previousTier != tier) {
+                    for (int index = 0; index < channels.length; index++) {
+                        ChannelData channel = channels[index];
+                        NodeUpgradeData.applyTierChange(channel, previousTier, tier);
+                        channel.resetResourceRotation();
+                        me.almana.logisticsnetworks.network.ServerPayloadHandler.sendChannelSyncToViewers(this, index, channel);
+                    }
+                }
+            }
         }
     }
 

@@ -31,7 +31,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public final class GraphCanvas {
@@ -41,30 +40,33 @@ public final class GraphCanvas {
     private static final int MAX_TOOLTIP_MEMBERS = 8;
     private static final int MAX_TOOLTIP_ROUTES = 10;
     private final Consumer<String> selectionChanged;
-    private final BiConsumer<String, GraphPosition> positionMoved;
+    private final Consumer<Map<String, GraphPosition>> positionsMoved;
+    private final GraphSelection selection = new GraphSelection();
     private final GraphCamera camera = new GraphCamera();
     private final EnumMap<ChannelType, ConnectionBatch> connections = new EnumMap<>(ChannelType.class);
     private final Map<String, List<ConnectionRef>> connectionRefs = new HashMap<>();
     private List<GraphNode> sourceNodes = List.of();
     private NetworkGraph graph = NetworkGraph.from(List.of());
     private Map<String, GraphPosition> positions = new LinkedHashMap<>();
-    private String selected;
+    private String focused;
     private UUID selectedMember;
     private String pressedNode;
-    private GraphPosition pressedPosition;
+    private Map<String, GraphPosition> pressedPositions = Map.of();
     private double pressX;
     private double pressY;
     private double lastMouseX;
     private double lastMouseY;
     private boolean draggingNode;
     private boolean panning;
+    private boolean boxSelecting;
+    private boolean controlPressed;
     private boolean interactionMoved;
     private boolean fitPending;
 
     public GraphCanvas(Consumer<String> selectionChanged,
-                       BiConsumer<String, GraphPosition> positionMoved) {
+                       Consumer<Map<String, GraphPosition>> positionsMoved) {
         this.selectionChanged = selectionChanged;
-        this.positionMoved = positionMoved;
+        this.positionsMoved = positionsMoved;
         for (ChannelType type : ChannelType.values()) {
             connections.put(type, new ConnectionBatch(0));
         }
@@ -94,10 +96,10 @@ public final class GraphCanvas {
         if (pressedNode != null && !positions.containsKey(pressedNode)) {
             cancelInteraction();
         }
-        if (selected != null && !positions.containsKey(selected)) {
-            selected = null;
-            selectedMember = null;
-        }
+        selection.retain(nextNodes.stream().map(GraphNode::nodeId).toList());
+        if (selectedMember != null) focused = keyForMember(selectedMember);
+        if (focused != null && !positions.containsKey(focused)) focused = null;
+        if (focused == null) selectedMember = null;
         rebuildConnections();
         if (firstGraph) {
             fitPending = true;
@@ -111,8 +113,10 @@ public final class GraphCanvas {
     }
 
     public void setSelected(String selected, UUID selectedMember) {
-        this.selected = selected != null && positions.containsKey(selected) ? selected : null;
-        this.selectedMember = this.selected == null ? null : selectedMember;
+        focused = selected != null && positions.containsKey(selected) ? selected : null;
+        this.selectedMember = focused == null ? null : selectedMember;
+        NetworkGraph.Vertex vertex = vertex(focused);
+        if (vertex != null) selection.initialize(memberIds(vertex));
     }
 
     public void render(GuiGraphics graphics, Font font, int mouseX, int mouseY, Theme theme, long elapsedMillis) {
@@ -130,7 +134,7 @@ public final class GraphCanvas {
         drawNodes(graphics, font, hovered, theme);
         graphics.flush();
         pose.popPose();
-
+        if (boxSelecting && interactionMoved) drawSelectionBox(graphics, theme);
     }
 
     public void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY, Theme theme) {
@@ -151,6 +155,10 @@ public final class GraphCanvas {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        return mouseClicked(mouseX, mouseY, button, false, false);
+    }
+
+    public boolean mouseClicked(double mouseX, double mouseY, int button, boolean control, boolean shift) {
         if (button != 0 || !camera.contains(mouseX, mouseY)) {
             return false;
         }
@@ -160,15 +168,17 @@ public final class GraphCanvas {
         lastMouseX = mouseX;
         lastMouseY = mouseY;
         pressedNode = findNode(mouseX, mouseY);
-        pressedPosition = pressedNode == null ? null : positions.get(pressedNode);
+        pressedPositions = pressedNode == null ? Map.of() : dragPositions(pressedNode);
         draggingNode = false;
         interactionMoved = false;
-        panning = pressedNode == null;
+        controlPressed = control;
+        boxSelecting = pressedNode == null && shift;
+        panning = pressedNode == null && !shift;
         return true;
     }
 
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (button != 0 || (!panning && pressedNode == null)) {
+        if (button != 0 || (!panning && !boxSelecting && pressedNode == null)) {
             return false;
         }
 
@@ -179,6 +189,12 @@ public final class GraphCanvas {
         }
         interactionMoved = true;
 
+        if (boxSelecting) {
+            lastMouseX = mouseX;
+            lastMouseY = mouseY;
+            return true;
+        }
+
         if (panning) {
             camera.pan(mouseX - lastMouseX, mouseY - lastMouseY);
             lastMouseX = mouseX;
@@ -187,27 +203,39 @@ public final class GraphCanvas {
         }
 
         draggingNode = true;
-        positions.put(pressedNode, new GraphPosition(
-                pressedPosition.x() + (float) deltaX / camera.zoom(),
-                pressedPosition.y() + (float) deltaY / camera.zoom()));
-        updateConnections(pressedNode);
+        if (selection.state(memberIds(vertex(pressedNode))) == GraphSelection.State.NONE) {
+            selection.click(memberIds(vertex(pressedNode)), controlPressed);
+            pressedPositions = dragPositions(pressedNode);
+        }
+        for (Map.Entry<String, GraphPosition> entry : pressedPositions.entrySet()) {
+            positions.put(entry.getKey(), new GraphPosition(
+                    entry.getValue().x() + (float) deltaX / camera.zoom(),
+                    entry.getValue().y() + (float) deltaY / camera.zoom()));
+            updateConnections(entry.getKey());
+        }
         return true;
     }
 
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (button != 0 || (!panning && pressedNode == null)) {
+        if (button != 0 || (!panning && !boxSelecting && pressedNode == null)) {
             return false;
         }
 
         if (!interactionMoved) {
-            setSelection(pressedNode);
+            clickSelection(pressedNode);
+        } else if (boxSelecting) {
+            selection.box(nodesInBox(pressX, pressY, mouseX, mouseY), controlPressed);
         } else if (draggingNode) {
-            positionMoved.accept(pressedNode, positions.get(pressedNode));
+            Map<String, GraphPosition> moved = new LinkedHashMap<>();
+            for (String key : pressedPositions.keySet()) moved.put(key, positions.get(key));
+            positionsMoved.accept(moved);
         }
         pressedNode = null;
-        pressedPosition = null;
+        pressedPositions = Map.of();
         draggingNode = false;
         panning = false;
+        boxSelecting = false;
+        controlPressed = false;
         interactionMoved = false;
         return true;
     }
@@ -234,7 +262,34 @@ public final class GraphCanvas {
     }
 
     public String getSelected() {
-        return selected;
+        return focused;
+    }
+
+    public Set<UUID> getSelectedNodes() {
+        return selection.nodes();
+    }
+
+    public Set<String> getSelectedVertices() {
+        Set<String> keys = new LinkedHashSet<>();
+        for (NetworkGraph.Vertex vertex : graph.vertices()) {
+            if (selection.state(memberIds(vertex)) != GraphSelection.State.NONE) keys.add(vertex.key());
+        }
+        return keys;
+    }
+
+    public void selectSameBlock(UUID source) {
+        GraphNode selected = sourceNodes.stream().filter(node -> node.nodeId().equals(source)).findFirst().orElse(null);
+        if (selected == null) return;
+        selection.replace(sourceNodes.stream().filter(node -> node.blockName().equals(selected.blockName()))
+                .map(GraphNode::nodeId).toList());
+    }
+
+    public Map<String, GraphPosition> distribute(GraphLayout.Axis axis) {
+        Map<String, GraphPosition> moved = GraphLayout.distribute(positions, getSelectedVertices(), axis);
+        positions.putAll(moved);
+        moved.keySet().forEach(this::updateConnections);
+        if (!moved.isEmpty()) positionsMoved.accept(moved);
+        return moved;
     }
 
     public GraphPosition getPosition(String key) {
@@ -409,8 +464,10 @@ public final class GraphCanvas {
             int centerX = Math.round(position.x());
             int centerY = Math.round(position.y());
             int fill = vertex.key().equals(hovered) ? theme.accentSoft() : theme.surface2();
-            drawHexagon(graphics, centerX, centerY, fill,
-                    vertex.key().equals(selected) ? theme.accent() : theme.borderStrong());
+            GraphSelection.State state = selection.state(memberIds(vertex));
+            int border = state == GraphSelection.State.ALL ? theme.accent()
+                    : state == GraphSelection.State.PARTIAL ? theme.warn() : theme.borderStrong();
+            drawHexagon(graphics, centerX, centerY, fill, border);
         }
         for (NetworkGraph.Vertex vertex : graph.vertices()) {
             GraphPosition position = positions.get(vertex.key());
@@ -419,7 +476,7 @@ public final class GraphCanvas {
             }
             int centerX = Math.round(position.x());
             int centerY = Math.round(position.y());
-            boolean focused = vertex.key().equals(selected) || vertex.key().equals(hovered);
+            boolean focused = vertex.key().equals(this.focused) || vertex.key().equals(hovered);
             ItemStack icon = iconFor(vertex, selectedMember);
             if (!icon.isEmpty() && (camera.zoom() >= 0.35f || focused)) {
                 graphics.renderItem(icon, centerX - 8, centerY - 8);
@@ -503,24 +560,79 @@ public final class GraphCanvas {
                 && absoluteX <= NODE_RADIUS - absoluteY * (NODE_RADIUS / 2.0f) / NODE_HALF_HEIGHT;
     }
 
-    private void setSelection(String key) {
-        if (key == null ? selected == null : key.equals(selected)) {
+    private void clickSelection(String key) {
+        if (key == null) {
+            if (!controlPressed) selection.replace(List.of());
+            focused = null;
+            selectedMember = null;
+            if (!controlPressed) selectionChanged.accept(null);
             return;
         }
-        selected = key;
-        selectionChanged.accept(key);
+        NetworkGraph.Vertex vertex = vertex(key);
+        selection.click(memberIds(vertex), controlPressed);
+        focused = key;
+        selectedMember = vertex.members().getFirst().nodeId();
+        if (!controlPressed) selectionChanged.accept(key);
     }
 
     private boolean skipSavedPosition(String key) {
-        return draggingNode && key.equals(pressedNode);
+        return draggingNode && pressedPositions.containsKey(key);
     }
 
     private void cancelInteraction() {
         pressedNode = null;
-        pressedPosition = null;
+        pressedPositions = Map.of();
         draggingNode = false;
         panning = false;
+        boxSelecting = false;
+        controlPressed = false;
         interactionMoved = false;
+    }
+
+    private Map<String, GraphPosition> dragPositions(String key) {
+        Set<String> keys = getSelectedVertices();
+        if (!keys.contains(key)) keys = Set.of(key);
+        Map<String, GraphPosition> dragged = new LinkedHashMap<>();
+        for (String selectedKey : keys) dragged.put(selectedKey, positions.get(selectedKey));
+        return dragged;
+    }
+
+    private List<UUID> nodesInBox(double startX, double startY, double endX, double endY) {
+        double minX = Math.min(startX, endX);
+        double maxX = Math.max(startX, endX);
+        double minY = Math.min(startY, endY);
+        double maxY = Math.max(startY, endY);
+        List<UUID> nodes = new ArrayList<>();
+        for (NetworkGraph.Vertex vertex : graph.vertices()) {
+            GraphPosition position = positions.get(vertex.key());
+            if (position == null) continue;
+            float screenX = camera.screenX(position.x());
+            float screenY = camera.screenY(position.y());
+            if (screenX >= minX && screenX <= maxX && screenY >= minY && screenY <= maxY) {
+                nodes.addAll(memberIds(vertex));
+            }
+        }
+        return nodes;
+    }
+
+    private void drawSelectionBox(GuiGraphics graphics, Theme theme) {
+        int x = (int) Math.min(pressX, lastMouseX);
+        int y = (int) Math.min(pressY, lastMouseY);
+        int width = (int) Math.abs(lastMouseX - pressX);
+        int height = (int) Math.abs(lastMouseY - pressY);
+        graphics.fill(x, y, x + width, y + height, 0x30000000 | (theme.accent() & 0x00FFFFFF));
+        graphics.renderOutline(x, y, width, height, theme.accent());
+    }
+
+    private List<UUID> memberIds(NetworkGraph.Vertex vertex) {
+        return vertex == null ? List.of() : vertex.members().stream().map(GraphNode::nodeId).toList();
+    }
+
+    private String keyForMember(UUID memberId) {
+        for (NetworkGraph.Vertex vertex : graph.vertices()) {
+            if (memberIds(vertex).contains(memberId)) return vertex.key();
+        }
+        return null;
     }
 
     private void renderTooltipDetails(GuiGraphics graphics, Font font, String key, int mouseX, int mouseY,

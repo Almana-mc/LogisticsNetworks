@@ -15,7 +15,6 @@ import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.GraphMenuContext;
-import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
@@ -177,6 +176,7 @@ public class ServerPayloadHandler {
             channel.setFilterMode(FilterMode.values()[payload.filterModeOrdinal()]);
 
         channel.setPriority(payload.priority());
+        channel.setResourceRoundRobin(payload.resourceRoundRobin());
     }
 
     private static <T extends Enum<T>> boolean isValidEnum(int ordinal, T[] values) {
@@ -540,11 +540,6 @@ public class ServerPayloadHandler {
             List<ItemStack> original = LabelUpgradeSync.snapshotUpgrades(node);
             node.setUpgradeItem(payload.upgradeSlot(), payload.upgradeItem());
 
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                ChannelData channel = node.getChannel(i);
-                if (channel != null)
-                    setChannelToUpgradeMax(node, channel);
-            }
             if (context.player() instanceof ServerPlayer player) {
                 StorageLink link = player.containerMenu instanceof NodeMenu menu
                         ? menu.getAccessibleStorageLink(player)
@@ -921,7 +916,7 @@ public class ServerPayloadHandler {
         Player player = context.player();
         GraphMenuContext graph = GraphPayloadHandler.getContext(player.containerMenu);
         if (graph != null) {
-            LogisticsNodeEntity selected = player.containerMenu instanceof NodeGraphMenu menu
+            LogisticsNodeEntity selected = player.containerMenu instanceof NodeMenu menu
                     ? menu.getNode() : ((FilterMenu) player.containerMenu).getNodeSource();
             return graph.canEdit(player, selected) && selected.getId() == entityId ? selected : null;
         }
@@ -931,6 +926,7 @@ public class ServerPayloadHandler {
     }
 
     public static void invalidateNetwork(LogisticsNodeEntity node) {
+        for (ChannelData channel : node.getChannels()) channel.resetResourceRotation();
         if (node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
             NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
             GraphPayloadHandler.broadcast(level.getServer(), node.getNetworkId());
@@ -1041,11 +1037,6 @@ public class ServerPayloadHandler {
         }
 
         return ItemStack.EMPTY;
-    }
-
-    private static void setChannelToUpgradeMax(LogisticsNodeEntity node, ChannelData channel) {
-        channel.setBatchSize(getMaxBatch(node, channel.getType()));
-        channel.setTickDelay(channel.getType() == ChannelType.ENERGY ? 1 : NodeUpgradeData.getMinTickDelay(node));
     }
 
     public static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
@@ -1259,46 +1250,6 @@ public class ServerPayloadHandler {
 
             for (LogisticsNodeEntity node : labeledNodes) {
                 node.setHighlighted(makeVisible);
-            }
-        });
-    }
-
-    public static void handleRequestOpenNodeSettings(RequestOpenNodeSettingsPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player))
-                return;
-            if (!(player.containerMenu instanceof ComputerMenu))
-                return;
-
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
-            LogisticsNetwork network = registry.getNetwork(payload.networkId());
-            if (network == null || !canAccessNetwork(player, network))
-                return;
-
-            if (!network.getNodeUuids().contains(payload.nodeId()))
-                return;
-
-            LogisticsNodeEntity node = findNode(player, payload.nodeId());
-            if (node == null)
-                return;
-
-            player.openMenu(new MenuProvider() {
-                @Override
-                public Component getDisplayName() {
-                    return Component.translatable("gui.logisticsnetworks.node_config");
-                }
-
-                @Override
-                public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
-                    return new NodeMenu(containerId, playerInv, node);
-                }
-            }, buf -> {
-                NodeMenuSync.write(buf, node, player.level().registryAccess(), 0);
-            });
-
-            if (player.containerMenu instanceof NodeMenu menu) {
-                menu.setRemoteAccess(true);
-                menu.sendNetworkListToClient(player);
             }
         });
     }

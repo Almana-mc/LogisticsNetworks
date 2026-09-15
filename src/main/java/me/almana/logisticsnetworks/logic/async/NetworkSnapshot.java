@@ -29,6 +29,8 @@ public record NetworkSnapshot(
             FilterMode exportFilterMode,
             int sourceEndpoint,
             boolean roundRobin,
+            boolean resourceRoundRobin,
+            @Nullable me.almana.logisticsnetworks.logic.ItemResourceOrder.Cursor resourceCursor,
             List<TargetUnit> targets) {
     }
 

@@ -96,6 +96,7 @@ public final class NodeClipboardConfig {
         FilterMode filterMode;
         int priority;
         String name = "";
+        boolean resourceRoundRobin;
     }
 
     private NodeClipboardConfig(ChannelConfig[] channels, ItemStack[][] filterItems, ItemStack[] upgradeItems,
@@ -136,7 +137,7 @@ public final class NodeClipboardConfig {
                     config.distributionMode,
                     config.filterMode,
                     config.priority,
-                    config.name));
+                    config.name, config.resourceRoundRobin));
         }
 
         List<ClipboardSnapshot.FilterSlot> filters = new ArrayList<>();
@@ -187,6 +188,7 @@ public final class NodeClipboardConfig {
             config.filterMode = state.filterMode();
             config.priority = state.priority();
             config.name = state.name();
+            config.resourceRoundRobin = state.resourceRoundRobin();
         }
         for (ClipboardSnapshot.FilterSlot filter : snapshot.filters()) {
             if (filter.channel() >= 0 && filter.channel() < result.filterItems.length
@@ -285,6 +287,14 @@ public final class NodeClipboardConfig {
 
     public void setChannelFilterMode(int channel, FilterMode mode) {
         getChannelConfig(channel).filterMode = mode == null ? FilterMode.MATCH_ANY : mode;
+    }
+
+    public boolean getChannelResourceRoundRobin(int channel) {
+        return getChannelConfig(channel).resourceRoundRobin;
+    }
+
+    public void setChannelResourceRoundRobin(int channel, boolean value) {
+        getChannelConfig(channel).resourceRoundRobin = value;
     }
 
     public int getChannelPriority(int channel) {
@@ -412,6 +422,7 @@ public final class NodeClipboardConfig {
                     || config.redstoneMode != defaults.redstoneMode
                     || config.distributionMode != defaults.distributionMode
                     || config.filterMode != defaults.filterMode
+                    || config.resourceRoundRobin
                     || config.priority != defaults.priority
                     || !config.name.isEmpty()) {
                 return false;
@@ -499,6 +510,7 @@ public final class NodeClipboardConfig {
                 config.redstoneMode = channel.getRedstoneMode();
                 config.distributionMode = channel.getDistributionMode();
                 config.filterMode = channel.getFilterMode();
+                config.resourceRoundRobin = channel.isResourceRoundRobin();
                 config.priority = channel.getPriority();
                 config.name = channel.getName();
 
@@ -568,6 +580,7 @@ public final class NodeClipboardConfig {
             channelTag.putString(KEY_REDSTONE, channel.redstoneMode.name());
             channelTag.putString(KEY_DISTRIBUTION, channel.distributionMode.name());
             channelTag.putString(KEY_FILTER_MODE, channel.filterMode.name());
+            channelTag.putBoolean("resource_round_robin", channel.resourceRoundRobin);
             channelTag.putInt(KEY_PRIORITY, channel.priority);
             if (!channel.name.isEmpty())
                 channelTag.putString(KEY_CH_NAME, channel.name);
@@ -683,6 +696,7 @@ public final class NodeClipboardConfig {
                     RedstoneMode.ALWAYS_ON);
             config.distributionMode = parseEnum(channelTag.getString(KEY_DISTRIBUTION), DistributionMode.values(),
                     DistributionMode.PRIORITY);
+            config.resourceRoundRobin = channelTag.getBoolean("resource_round_robin");
             config.filterMode = parseEnum(channelTag.getString(KEY_FILTER_MODE), FilterMode.values(),
                     FilterMode.MATCH_ANY);
             config.priority = Math.max(-99, Math.min(99, channelTag.getInt(KEY_PRIORITY)));
@@ -1094,6 +1108,17 @@ public final class NodeClipboardConfig {
     }
 
     private void applyToNode(LogisticsNodeEntity node) {
+        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+            ItemStack expected = upgradeItems[slot];
+            ItemStack current = node.getUpgradeItem(slot);
+
+            if (expected.isEmpty()) {
+                node.setUpgradeItem(slot, ItemStack.EMPTY);
+            } else if (!ItemStack.isSameItemSameComponents(expected, current)) {
+                node.setUpgradeItem(slot, expected.copyWithCount(1));
+            }
+        }
+
         for (int channelIndex = 0; channelIndex < LogisticsNodeEntity.CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = node.getChannel(channelIndex);
             ChannelConfig config = channels[channelIndex];
@@ -1110,6 +1135,8 @@ public final class NodeClipboardConfig {
             channel.setRedstoneMode(config.redstoneMode);
             channel.setDistributionMode(config.distributionMode);
             channel.setFilterMode(config.filterMode);
+            channel.setResourceRoundRobin(config.resourceRoundRobin);
+            channel.resetResourceRotation();
             channel.setPriority(config.priority);
             channel.setName(config.name);
 
@@ -1122,17 +1149,6 @@ public final class NodeClipboardConfig {
                 } else if (!ItemStack.isSameItemSameComponents(expected, current)) {
                     channel.setFilterItem(slot, expected.copyWithCount(1));
                 }
-            }
-        }
-
-        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
-            ItemStack expected = upgradeItems[slot];
-            ItemStack current = node.getUpgradeItem(slot);
-
-            if (expected.isEmpty()) {
-                node.setUpgradeItem(slot, ItemStack.EMPTY);
-            } else if (!ItemStack.isSameItemSameComponents(expected, current)) {
-                node.setUpgradeItem(slot, expected.copyWithCount(1));
             }
         }
 

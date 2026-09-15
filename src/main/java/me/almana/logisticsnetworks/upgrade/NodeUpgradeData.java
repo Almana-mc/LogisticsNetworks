@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.upgrade;
 
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -17,6 +18,25 @@ import java.util.UUID;
 public final class NodeUpgradeData {
 
     private NodeUpgradeData() {
+    }
+
+    public static int getOperationCap(ChannelType type, int tier) {
+        return switch (type) {
+            case ITEM -> getItemOperationCap(tier);
+            case FLUID -> getFluidOperationCapMb(tier);
+            case ENERGY -> getEnergyOperationCap(tier);
+            case CHEMICAL -> getChemicalOperationCap(tier);
+            case SOURCE -> getSourceOperationCap(tier);
+        };
+    }
+
+    public static void applyTierChange(ChannelData channel, int previousTier, int tier) {
+        if (tier == previousTier) return;
+        int maximum = getOperationCap(channel.getType(), tier);
+        channel.setBatchSize(tier > previousTier ? maximum : Math.min(channel.getBatchSize(), maximum));
+        if (tier < previousTier && channel.getType() != ChannelType.ENERGY) {
+            channel.setTickDelay(Math.max(channel.getTickDelay(), getMinTickDelay(tier)));
+        }
     }
 
     public static int getItemOperationCap(LogisticsNodeEntity node) {

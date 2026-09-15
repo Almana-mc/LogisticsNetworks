@@ -18,7 +18,8 @@ public record UpdateChannelPayload(
         int redstoneModeOrdinal,
         int distributionModeOrdinal,
         int filterModeOrdinal,
-        int priority) implements CustomPacketPayload {
+        int priority,
+        boolean resourceRoundRobin) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<UpdateChannelPayload> TYPE = new CustomPacketPayload.Type<>(
             ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "update_channel"));
@@ -39,7 +40,8 @@ public record UpdateChannelPayload(
                 buf.readVarInt(),
                 buf.readVarInt(),
                 buf.readVarInt(),
-                buf.readVarInt());
+                buf.readVarInt(),
+                buf.readBoolean());
     }
 
     public static void write(FriendlyByteBuf buf, UpdateChannelPayload payload) {
@@ -55,6 +57,7 @@ public record UpdateChannelPayload(
         buf.writeVarInt(payload.distributionModeOrdinal);
         buf.writeVarInt(payload.filterModeOrdinal);
         buf.writeVarInt(payload.priority);
+        buf.writeBoolean(payload.resourceRoundRobin);
     }
 
     @Override

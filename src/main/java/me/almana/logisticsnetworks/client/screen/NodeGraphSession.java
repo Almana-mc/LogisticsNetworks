@@ -13,11 +13,12 @@ final class NodeGraphSession {
     NodeGraphScreen screen;
     SyncNetworkGraphPayload snapshot;
     boolean editorOpen;
+    UUID labelSource;
 
     private NodeGraphSession(UUID networkId) {
         this.networkId = networkId;
         canvas = new GraphCanvas(key -> screen.selectVertex(key),
-                (key, position) -> screen.moveVertex(key, position));
+                positions -> screen.moveVertices(positions));
     }
 
     static void begin(UUID networkId) {

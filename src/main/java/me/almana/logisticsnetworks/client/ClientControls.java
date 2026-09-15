@@ -39,6 +39,9 @@ public final class ClientControls {
             "key.logisticsnetworks.toggle_wrench_hud", InputConstants.KEY_H, CATEGORY);
     public static final KeyMapping EDIT_WRENCH_COLORS = new KeyMapping(
             "key.logisticsnetworks.wrench_colors", InputConstants.KEY_G, CATEGORY);
+    public static final KeyMapping WRENCH_MODES = new KeyMapping(
+            "key.logisticsnetworks.wrench_modes", KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CATEGORY);
     public static final KeyMapping TOGGLE_SLOT_NUMBERS = new KeyMapping(
             "key.logisticsnetworks.toggle_slot_numbers", KeyConflictContext.UNIVERSAL,
             KeyModifier.ALT, InputConstants.Type.KEYSYM.getOrCreate(InputConstants.KEY_I), CATEGORY);
@@ -46,6 +49,7 @@ public final class ClientControls {
     private static boolean modifier1Down;
     private static boolean modifier2Down;
     private static boolean modifier3Down;
+    private static boolean wrenchModesDown;
 
     private ClientControls() {
     }
@@ -89,6 +93,10 @@ public final class ClientControls {
         return mask;
     }
 
+    public static boolean wrenchModesDown() {
+        return wrenchModesDown;
+    }
+
     public static boolean usesVanillaUseInput(Options options) {
         return SECONDARY_INTERACTION.getKey().equals(options.keyUse.getKey())
                 && SECONDARY_INTERACTION.getKeyModifier() == options.keyUse.getKeyModifier();
@@ -112,6 +120,7 @@ public final class ClientControls {
     }
 
     private static void updateModifierState(InputConstants.Key key, boolean down) {
+        if (WRENCH_MODES.getKey().equals(key)) wrenchModesDown = down;
         if (MODIFIER_1.getKey().equals(key)) modifier1Down = down;
         if (MODIFIER_2.getKey().equals(key)) modifier2Down = down;
         if (MODIFIER_3.getKey().equals(key)) modifier3Down = down;
@@ -123,6 +132,7 @@ public final class ClientControls {
             modifier1Down = false;
             modifier2Down = false;
             modifier3Down = false;
+            wrenchModesDown = false;
         }
     }
 
@@ -138,6 +148,7 @@ public final class ClientControls {
             event.register(SECONDARY_INTERACTION);
             event.register(TOGGLE_WRENCH_HUD);
             event.register(EDIT_WRENCH_COLORS);
+            event.register(WRENCH_MODES);
             event.register(TOGGLE_SLOT_NUMBERS);
         }
     }

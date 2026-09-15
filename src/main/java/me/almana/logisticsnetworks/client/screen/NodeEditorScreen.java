@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.data.RedstoneMode;
 
+import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
@@ -113,6 +114,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private int networkScrollOffset = 0;
 
     private NetworkEditor networkEditor;
+    private NetworkCreationConfirmation networkCreationConfirmation;
 
     // Settings scroll state
     private int settingsScrollOffset = 0;
@@ -192,6 +194,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     protected void rebuildPageLayout() {
         stopNumericEdit(false);
         networkEditor = null;
+        networkCreationConfirmation = null;
         clearWidgets();
         getMenu().setNodeSlotsVisible(currentPage == Page.CHANNEL_CONFIG);
         if (currentPage == Page.NETWORK_SELECT) {
@@ -199,7 +202,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             int y = topPos + 32;
             networkNameField = new EditBox(this.font, cx - 75, y, 150, 16, Component.empty());
             networkNameField.setMaxLength(32);
-            networkNameField.setHint(Component.translatable("gui.logisticsnetworks.node.network_name_hint"));
+            networkNameField.setHint(Component.translatable("gui.logisticsnetworks.node.network_search_hint"));
             networkNameField.setBordered(true);
             addRenderableWidget(networkNameField);
         }
@@ -258,7 +261,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        boolean backgroundInteractive = networkEditor == null && !storageUpgradePicker.isOpen();
+        boolean backgroundInteractive = networkEditor == null && networkCreationConfirmation == null
+                && !storageUpgradePicker.isOpen();
         int backgroundMouseX = backgroundInteractive ? mx : Integer.MIN_VALUE;
         int backgroundMouseY = backgroundInteractive ? my : Integer.MIN_VALUE;
         super.render(g, backgroundMouseX, backgroundMouseY, pt);
@@ -269,10 +273,14 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             renderFilterPicker(g, mx, my);
         }
         if (currentPage == Page.CHANNEL_CONFIG) {
-            storageUpgradePicker.render(g, font, theme(), leftPos, topPos, mx, my);
+            storageUpgradePicker.render(g, font, theme(), width, height, leftPos, topPos, mx, my);
         }
         if (tweaksOpen) {
             renderTweaksPanel(g, mx, my);
+        }
+        if (networkCreationConfirmation != null) {
+            networkCreationConfirmation.render(g, mx, my, theme());
+            return;
         }
         if (networkEditor != null) {
             networkEditor.render(g, mx, my, pt, theme());
@@ -305,7 +313,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             }
             renderFilterPreview(g, mx, my);
         }
-        storageUpgradePicker.renderTooltip(g, font, leftPos, topPos, mx, my);
+        storageUpgradePicker.renderTooltip(g, font, mx, my);
     }
 
     @Override
@@ -1239,6 +1247,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
         int action = ClientControls.resolveMouseAction(btn);
+        if (networkCreationConfirmation != null) {
+            networkCreationConfirmation.mouseClicked(mx, my, action);
+            return true;
+        }
         if (networkEditor != null) {
             if (action != -1) {
                 networkEditor.mouseClicked(mx, my, action);
@@ -1258,6 +1270,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         if (action != 0 && action != 1)
             return false;
 
+        if (networkCreationConfirmation != null) {
+            networkCreationConfirmation.mouseClicked(mx, my, action);
+            return true;
+        }
         if (networkEditor != null) {
             return networkEditor.mouseClicked(mx, my, action);
         }
@@ -1314,7 +1330,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     private void handleStorageUpgradePickerAction(double mx, double my, int action) {
         if (action == 0) {
-            SyncStorageUpgradeCatalogPayload.Entry entry = storageUpgradePicker.entryAt(mx, my, leftPos, topPos);
+            SyncStorageUpgradeCatalogPayload.Entry entry = storageUpgradePicker.entryAt(mx, my);
             if (entry != null) {
                 PacketDistributor.sendToServer(new InstallStorageUpgradePayload(
                         menu.containerId, menu.getNodeId(), storageUpgradePicker.preferredSlot(),
@@ -1323,17 +1339,19 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 return;
             }
         }
-        if (!storageUpgradePicker.contains(mx, my, leftPos, topPos)) {
+        if (!storageUpgradePicker.contains(mx, my)) {
             storageUpgradePicker.close();
         }
     }
 
     private boolean handleNetworkPageClick(double mx, double my) {
         if (isHoveringAbs(leftPos + GUI_WIDTH / 2 - 45, topPos + 54, 90, 16, mx, my)) {
-            String name = networkNameField.getValue().trim();
-            if (name.isEmpty())
-                name = tr("gui.logisticsnetworks.node.network.unnamed");
-            sendNetworkAssign(Optional.empty(), name);
+            String value = networkNameField.getValue().trim();
+            String name = value.isEmpty() ? tr("gui.logisticsnetworks.node.network.unnamed") : value;
+            networkNameField.setFocused(false);
+            networkCreationConfirmation = NetworkCreationConfirmation.open(ClientConfig.confirmNetworkCreation,
+                    font, width, height, name, () -> sendNetworkAssign(Optional.empty(), name),
+                    () -> networkCreationConfirmation = null);
             return true;
         }
 
@@ -1743,7 +1761,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 ch.getRedstoneMode().ordinal(),
                 ch.getDistributionMode().ordinal(),
                 ch.getFilterMode().ordinal(),
-                ch.getPriority()));
+                ch.getPriority(), ch.isResourceRoundRobin()));
     }
 
     private void sendNetworkAssign(Optional<UUID> id, String name) {
@@ -1869,6 +1887,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (networkCreationConfirmation != null) return true;
         if (networkEditor != null) {
             networkEditor.mouseDragged(mx, my, button);
             return true;
@@ -1879,6 +1898,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public boolean mouseReleased(double mx, double my, int button) {
+        if (networkCreationConfirmation != null) return true;
         if (networkEditor != null) {
             networkEditor.mouseReleased(mx, my, button);
             return true;
@@ -1899,12 +1919,20 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         return storageUpgradePicker.isOpen();
     }
 
+    public List<Rect2i> getUpgradePickerAreas() {
+        return storageUpgradePicker.isOpen() ? List.of(storageUpgradePicker.bounds()) : List.of();
+    }
+
     protected boolean handleScreenKey(int key, int scan, int modifiers) {
         return super.keyPressed(key, scan, modifiers);
     }
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
+        if (networkCreationConfirmation != null) {
+            networkCreationConfirmation.keyPressed(key, scan, modifiers);
+            return true;
+        }
         if (networkEditor != null) {
             if (key == 256) {
                 networkEditor = null;
@@ -1980,6 +2008,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public boolean charTyped(char ch, int modifiers) {
+        if (networkCreationConfirmation != null) return true;
         if (networkEditor != null) {
             return networkEditor.charTyped(ch);
         }
@@ -2003,11 +2032,11 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
-        if (networkEditor != null) {
+        if (networkCreationConfirmation != null || networkEditor != null) {
             return true;
         }
         if (storageUpgradePicker.isOpen()) {
-            storageUpgradePicker.scroll(mx, my, sy, leftPos, topPos);
+            storageUpgradePicker.scroll(mx, my, sy);
             return true;
         }
         if (labelPickerOpen && networkLabels.size() > LABEL_PICKER_MAX_VISIBLE) {

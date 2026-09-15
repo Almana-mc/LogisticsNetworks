@@ -78,6 +78,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             LogisticsNetworks.MOD_ID, "textures/gui/filter_paste.png");
     private static final ResourceLocation SCAN_STORAGE_ICON = ResourceLocation.fromNamespaceAndPath(
             LogisticsNetworks.MOD_ID, "textures/gui/filter_scan_storage.png");
+    private static final ResourceLocation RESOURCE_ROTATION_ICON = ResourceLocation.fromNamespaceAndPath(
+            LogisticsNetworks.MOD_ID, "textures/gui/filter_resource_rotation.png");
     private static final int CLIPBOARD_BUTTON_SIZE = 12;
     private static final int CLIPBOARD_BUTTON_GAP = 2;
     private static FilterClipboardSnapshot copiedFilter;
@@ -917,16 +919,23 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void renderClipboardButtons(GuiGraphics g, int mx, int my) {
+        if (menu.canSetResourceRoundRobin()) {
+            drawIconButton(g, resourceRotationButtonX(), clipboardButtonY(), RESOURCE_ROTATION_ICON, mx, my,
+                    true, menu.isResourceRoundRobin());
+        }
         drawIconButton(g, scanStorageButtonX(), clipboardButtonY(), SCAN_STORAGE_ICON, mx, my,
-                menu.canScanAttachedStorage());
-        drawIconButton(g, copyButtonX(), clipboardButtonY(), COPY_ICON, mx, my, true);
-        drawIconButton(g, pasteButtonX(), clipboardButtonY(), PASTE_ICON, mx, my, copiedFilter != null);
+                menu.canScanAttachedStorage(), false);
+        drawIconButton(g, copyButtonX(), clipboardButtonY(), COPY_ICON, mx, my, true, false);
+        drawIconButton(g, pasteButtonX(), clipboardButtonY(), PASTE_ICON, mx, my, copiedFilter != null, false);
     }
 
-    private void drawIconButton(GuiGraphics g, int x, int y, ResourceLocation icon, int mx, int my, boolean active) {
+    private void drawIconButton(GuiGraphics g, int x, int y, ResourceLocation icon, int mx, int my,
+            boolean active, boolean selected) {
         boolean hovered = active && isHovering(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my);
-        g.fill(x, y, x + CLIPBOARD_BUTTON_SIZE, y + CLIPBOARD_BUTTON_SIZE, hovered ? COL_BTN_HOVER : COL_BTN_BG);
-        g.renderOutline(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, hovered ? COL_WHITE : COL_BTN_BORDER);
+        g.fill(x, y, x + CLIPBOARD_BUTTON_SIZE, y + CLIPBOARD_BUTTON_SIZE,
+                selected ? COL_SELECTED : hovered ? COL_BTN_HOVER : COL_BTN_BG);
+        g.renderOutline(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
+                selected ? COL_ACCENT : hovered ? COL_WHITE : COL_BTN_BORDER);
         g.blit(icon, x + 2, y + 2, 0, 0, 8, 8, 8, 8);
     }
 
@@ -936,6 +945,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private int scanStorageButtonX() {
         return copyButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
+    }
+
+    private int resourceRotationButtonX() {
+        return scanStorageButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
     }
 
     private int pasteButtonX() {
@@ -971,6 +984,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private boolean renderClipboardTooltip(GuiGraphics g, int mx, int my) {
+        if (menu.canSetResourceRoundRobin()
+                && isHovering(resourceRotationButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE,
+                        CLIPBOARD_BUTTON_SIZE, mx, my)) {
+            g.renderComponentTooltip(font, List.of(
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint"),
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint.operation"),
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint.blocked"),
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint.settings")), mx, my);
+            return true;
+        }
         if (isHovering(scanStorageButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
                 mx, my)) {
             String key = menu.canScanAttachedStorage()
@@ -996,6 +1019,14 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private boolean handleClipboardButtonClick(double mx, double my, int action) {
         if (action != 0) {
             return false;
+        }
+        if (menu.canSetResourceRoundRobin()
+                && isHovering(resourceRotationButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE,
+                        CLIPBOARD_BUTTON_SIZE, (int) mx, (int) my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 10);
+            }
+            return true;
         }
         if (isHovering(scanStorageButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
                 (int) mx, (int) my)) {
@@ -1330,9 +1361,14 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (menu.getGraphContext() != null) {
             flushOpenEditors();
             var graph = menu.getGraphContext();
-            PacketDistributor.sendToServer(new me.almana.logisticsnetworks.network.RequestOpenGraphPayload(
-                    graph.computerPos(), graph.computerDimension(), graph.networkId(),
-                    java.util.Optional.of(menu.getNodeSource().getUUID()), menu.getNodeChannel()));
+            if (graph.origin() == me.almana.logisticsnetworks.menu.GraphMenuContext.Origin.TABLE) {
+                PacketDistributor.sendToServer(new OpenNodeMenuPayload(
+                        menu.getNodeSource().getId(), menu.getNodeChannel()));
+            } else {
+                PacketDistributor.sendToServer(new me.almana.logisticsnetworks.network.RequestOpenGraphPayload(
+                        graph.computerPos(), graph.computerDimension(), graph.networkId(),
+                        java.util.Optional.of(menu.getNodeSource().getUUID()), menu.getNodeChannel()));
+            }
         } else {
             PacketDistributor.sendToServer(new OpenNodeMenuPayload(
                     menu.getNodeSource().getId(), menu.getNodeChannel()));
@@ -4767,6 +4803,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             lines.add(Component.literal("Slots: " + slotExpr).withStyle(ChatFormatting.LIGHT_PURPLE));
         }
 
+        lines.add(1, Component.translatable("gui.logisticsnetworks.filter.advanced_settings_hint",
+                ClientControls.MODIFIER_2.getTranslatedKeyMessage()).withStyle(ChatFormatting.GREEN));
+        lines.add(2, Component.literal("-----").withStyle(ChatFormatting.DARK_GRAY));
         return lines;
     }
 

@@ -49,10 +49,10 @@ A node that is not assigned to a network does nothing — all 9 channels stay in
 **What it does:** opens the network picker screen. From there you can:
 
 - Pick an existing network you own and move the node onto it.
-- Type a new name (up to 32 characters) to create a fresh network and join it.
+- Search existing networks, or use **Create** to open a separate name form (up to 32 characters) and join a fresh network.
 - Leave the current network so the node becomes unassigned.
 
-**How to change networks:** use Primary Interaction on **Change**, then either select a listed network or type a new name and confirm. The node moves immediately and the main screen returns to the channel configuration view.
+**How to change networks:** use Primary Interaction on **Change**, then select a listed network or open **Create**, enter a new name, and confirm. The node moves immediately and the main screen returns to the channel configuration view.
 
 Use this to split a setup into separate networks, merge several nodes onto one shared network, or rename the network the node is on.
 
@@ -96,7 +96,9 @@ Names are purely cosmetic — they do not affect transfers. Use them to tag chan
 
 Leave the field empty and confirm to clear the label.
 
-**Why it matters:** when two or more nodes on the same network share the same label, any change to one of them is automatically copied to every other node in the group. This covers channel modes, types, filters, batch sizes, delays, filter items, and filter configurations. Upgrades stay per-node, and batch sizes are clamped to what each node's upgrades allow.
+**Why it matters:** nodes on the same network with the same label share channel modes, types, filters, batch sizes, delays, and resource-rotation preferences. Their upgrade layout also synchronizes using physical upgrades from your inventory or linked storage. Batch sizes remain limited by the installed upgrades.
+
+Use the computer table checkboxes or graph multi-selection to apply a label to several nodes. An existing label supplies its current group settings. For a new label, choose the settings source from your selection. Missing upgrade supplies leave the selected nodes' labels and settings unchanged.
 
 Typical use: label all 20 of your furnace nodes `furnace`, configure one, and the other 19 copy the setup automatically. Later tweaks to any of them propagate to all.
 

@@ -4,10 +4,12 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.LabelUpgradeTemplate;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageInventory;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.network.GraphPayloadHandler;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -54,6 +56,133 @@ public final class LabelUpgradeSync {
     public static boolean synchronizeCraftedUpgrade(ServerPlayer player, LogisticsNodeEntity source,
                                                      List<ItemStack> original, StorageLink storageLink) {
         return synchronizeLoaded(player, source, original, storageLink, true);
+    }
+
+    public static boolean synchronizeLabels(ServerPlayer player, LogisticsNetwork network,
+                                            List<LogisticsNodeEntity> targets, UUID sourceId,
+                                            String label, @Nullable StorageLink storageLink) {
+        if (targets.isEmpty() || targets.stream().anyMatch(node -> PENDING_NODES.contains(node.getUUID()))) {
+            return false;
+        }
+        if (label.isEmpty()) {
+            Map<UUID, GraphPosition> splitPositions = bulkUnlabelPositions(network, targets);
+            for (LogisticsNodeEntity target : targets) {
+                target.setNodeLabel("");
+                GraphPosition position = splitPositions.get(target.getUUID());
+                if (position != null) network.setGraphPosition("node:" + target.getUUID(), position);
+            }
+            NetworkRegistry.get(player.serverLevel()).setDirty();
+            NetworkRegistry.get(player.serverLevel()).invalidateNetwork(network.getId());
+            GraphPayloadHandler.broadcast(player.getServer(), network.getId());
+            GraphPayloadHandler.refreshTable(player, network.getId());
+            return true;
+        }
+
+        LabelUpgradeTemplate storedTemplate = network.getLabelTemplate(label);
+        LogisticsNodeEntity authority = findLabelAuthority(player.getServer(), network, label, storedTemplate);
+        if (storedTemplate == null && authority == null) {
+            authority = targets.stream().filter(node -> node.getUUID().equals(sourceId)).findFirst().orElse(null);
+        }
+        if (storedTemplate == null && authority == null) return false;
+
+        LabelUpgradeTemplate template = storedTemplate;
+        if (authority != null && (storedTemplate == null
+                || authority.getLabelRevision() != storedTemplate.revision()
+                || !sameUpgrades(authority, storedTemplate.upgrades())
+                || !sameChannels(authority, storedTemplate.channels()))) {
+            StorageLink templateLink = storedTemplate != null && storedTemplate.storageLink() != null
+                    ? storedTemplate.storageLink() : storageLink;
+            long revision = Math.max(nextRevision(network, label), authority.getLabelRevision() + 1);
+            template = new LabelUpgradeTemplate(revision, player.getUUID(), templateLink,
+                    snapshotUpgrades(authority), snapshotChannels(authority));
+        }
+
+        Map<UUID, BulkNodeState> snapshots = new LinkedHashMap<>();
+        Map<UUID, UpgradeChanges> changes = new LinkedHashMap<>();
+        List<Requirement> required = new ArrayList<>();
+        for (LogisticsNodeEntity target : targets) {
+            snapshots.put(target.getUUID(), new BulkNodeState(target.getNodeLabel(), target.getLabelRevision(),
+                    snapshotUpgrades(target), snapshotChannels(target)));
+            UpgradeChanges targetChanges = getUpgradeChanges(target, template.upgrades());
+            changes.put(target.getUUID(), targetChanges);
+            mergeRequirements(required, targetChanges.required());
+        }
+
+        LabelUpgradeTemplate appliedTemplate = template;
+        LogisticsNodeEntity labelAuthority = authority;
+        BulkNodeState authoritySnapshot = authority == null ? null : new BulkNodeState(authority.getNodeLabel(),
+                authority.getLabelRevision(), snapshotUpgrades(authority), snapshotChannels(authority));
+        boolean refreshesAuthority = authority != null && label.equals(authority.getNodeLabel())
+                && appliedTemplate != storedTemplate;
+        GraphPosition labelPosition = bulkLabelPosition(network, targets, label);
+        StorageLink supplyLink = template.storageLink() != null ? template.storageLink() : storageLink;
+        Set<UUID> pending = new HashSet<>(snapshots.keySet());
+        if (authority != null) pending.add(authority.getUUID());
+        PENDING_NODES.addAll(pending);
+        Runnable release = () -> PENDING_NODES.removeAll(pending);
+        Runnable commit = () -> {
+            for (LogisticsNodeEntity target : targets) {
+                GraphPayloadHandler.preserveLabelPosition(target, label);
+                target.setNodeLabel(label);
+                applyTemplate(target, appliedTemplate);
+                target.setLabelRevision(appliedTemplate.revision());
+                returnItems(player, changes.get(target.getUUID()).returned(), null);
+            }
+            if (refreshesAuthority) labelAuthority.setLabelRevision(appliedTemplate.revision());
+            if (labelPosition != null) network.setGraphPosition("label:" + label, labelPosition);
+            network.setLabelTemplate(label, appliedTemplate);
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            registry.setDirty();
+            registry.invalidateNetwork(network.getId());
+            GraphPayloadHandler.broadcast(player.getServer(), network.getId());
+            GraphPayloadHandler.refreshTable(player, network.getId());
+            player.displayClientMessage(Component.translatable(
+                    "message.logisticsnetworks.label.synced", targets.size()), true);
+            release.run();
+        };
+        java.util.function.BooleanSupplier stillValid = () -> validBulkTargets(
+                player, network, label, storedTemplate, targets, snapshots, pending,
+                labelAuthority, authoritySnapshot);
+        List<LinkedStorage.ItemRequirement> requirements = toRequirements(required);
+        if (requirements.isEmpty()) {
+            if (stillValid.getAsBoolean()) commit.run();
+            else release.run();
+            return true;
+        }
+        if (hasInventory(player.getInventory(), requirements, -1)) {
+            consumeInventory(player.getInventory(), requirements, -1);
+            commit.run();
+            return true;
+        }
+        if (supplyLink == null) {
+            reportFailure(player, label, Component.translatable(
+                    "message.logisticsnetworks.label.missing_upgrades", formatRequirements(requirements)));
+            release.run();
+            return false;
+        }
+
+        UUID requestId = UUID.randomUUID();
+        Component subject = labelSubject(label, targets.size());
+        LinkedStorage.requestSupply(requestId, player, supplyLink, requirements, -1, subject,
+                new LinkedStorage.SupplyOperation() {
+                    @Override
+                    public boolean stillValid() {
+                        return stillValid.getAsBoolean();
+                    }
+
+                    @Override
+                    public boolean commit() {
+                        commit.run();
+                        return true;
+                    }
+
+                    @Override
+                    public void failed(Component detail) {
+                        reportFailure(player, label, detail);
+                        release.run();
+                    }
+                });
+        return true;
     }
 
     public static void synchronizeOnLoad(LogisticsNodeEntity node) {
@@ -293,6 +422,109 @@ public final class LabelUpgradeSync {
     }
 
     @Nullable
+    private static LogisticsNodeEntity findLabelAuthority(MinecraftServer server, LogisticsNetwork network,
+                                                           String label,
+                                                           @Nullable LabelUpgradeTemplate storedTemplate) {
+        LogisticsNodeEntity authority = null;
+        long minimumRevision = storedTemplate == null ? Long.MIN_VALUE : storedTemplate.revision();
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(server, nodeId);
+            if (node == null || !node.isValidNode() || !label.equals(node.getNodeLabel())
+                    || node.getLabelRevision() < minimumRevision) continue;
+            if (authority == null || node.getLabelRevision() > authority.getLabelRevision()
+                    || node.getLabelRevision() == authority.getLabelRevision()
+                    && node.getUUID().compareTo(authority.getUUID()) < 0) authority = node;
+        }
+        return authority;
+    }
+
+    private static boolean validBulkTargets(ServerPlayer player, LogisticsNetwork network,
+                                            String label, @Nullable LabelUpgradeTemplate storedTemplate,
+                                            List<LogisticsNodeEntity> targets,
+                                            Map<UUID, BulkNodeState> snapshots, Set<UUID> pending,
+                                            @Nullable LogisticsNodeEntity authority,
+                                            @Nullable BulkNodeState authoritySnapshot) {
+        LabelUpgradeTemplate currentTemplate = network.getLabelTemplate(label);
+        if (!PENDING_NODES.containsAll(pending) || currentTemplate != storedTemplate
+                || currentTemplate != null && currentTemplate.revision() != storedTemplate.revision()) return false;
+        for (LogisticsNodeEntity target : targets) {
+            BulkNodeState state = snapshots.get(target.getUUID());
+            if (findNode(player.getServer(), target.getUUID()) != target || !target.isOwnedBy(player)
+                    || !network.getId().equals(target.getNetworkId())
+                    || !network.getNodeUuids().contains(target.getUUID())
+                    || !state.label().equals(target.getNodeLabel())
+                    || state.revision() != target.getLabelRevision()
+                    || !sameUpgrades(target, state.upgrades())
+                    || !sameChannels(target, state.channels())) return false;
+        }
+        return authority == null || findNode(player.getServer(), authority.getUUID()) == authority
+                && authority.isValidNode()
+                && network.getId().equals(authority.getNetworkId())
+                && network.getNodeUuids().contains(authority.getUUID())
+                && authoritySnapshot.label().equals(authority.getNodeLabel())
+                && authoritySnapshot.revision() == authority.getLabelRevision()
+                && sameUpgrades(authority, authoritySnapshot.upgrades())
+                && sameChannels(authority, authoritySnapshot.channels());
+    }
+
+    private static boolean sameChannels(LogisticsNodeEntity node, List<ChannelData> expected) {
+        if (!(node.level() instanceof ServerLevel level)) return false;
+        for (int index = 0; index < LogisticsNodeEntity.CHANNEL_COUNT; index++) {
+            ChannelData actual = node.getChannel(index);
+            if (actual == null || index >= expected.size()
+                    || !actual.save(level.registryAccess()).equals(expected.get(index).save(level.registryAccess()))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Nullable
+    private static GraphPosition bulkLabelPosition(LogisticsNetwork network,
+                                                   List<LogisticsNodeEntity> targets, String label) {
+        GraphPosition existing = network.getGraphPositions().get("label:" + label);
+        if (existing != null) return existing;
+        Set<String> keys = new HashSet<>();
+        float x = 0;
+        float y = 0;
+        int count = 0;
+        for (LogisticsNodeEntity target : targets) {
+            String key = target.getNodeLabel().isEmpty()
+                    ? "node:" + target.getUUID() : "label:" + target.getNodeLabel();
+            GraphPosition position = network.getGraphPositions().get(key);
+            if (position != null && keys.add(key)) {
+                x += position.x();
+                y += position.y();
+                count++;
+            }
+        }
+        return count == 0 ? null : new GraphPosition(x / count, y / count);
+    }
+
+    private static Map<UUID, GraphPosition> bulkUnlabelPositions(LogisticsNetwork network,
+                                                                 List<LogisticsNodeEntity> targets) {
+        Map<UUID, GraphPosition> positions = new LinkedHashMap<>();
+        Map<String, Integer> splitIndexes = new LinkedHashMap<>();
+        for (LogisticsNodeEntity target : targets) {
+            String oldKey = target.getNodeLabel().isEmpty()
+                    ? "node:" + target.getUUID() : "label:" + target.getNodeLabel();
+            GraphPosition oldPosition = network.getGraphPositions().get(oldKey);
+            if (oldPosition == null) continue;
+            if (target.getNodeLabel().isEmpty()) {
+                positions.put(target.getUUID(), oldPosition);
+                continue;
+            }
+            int index = splitIndexes.merge(oldKey, 1, Integer::sum) - 1;
+            double angle = index * Math.PI / 3.0;
+            float distance = 46.0f * (1 + index / 6);
+            positions.put(target.getUUID(), new GraphPosition(
+                    oldPosition.x() + (float) Math.cos(angle) * distance,
+                    oldPosition.y() + (float) Math.sin(angle) * distance));
+        }
+        return positions;
+    }
+
+    @Nullable
     private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
         for (ServerLevel level : server.getAllLevels()) {
             Entity entity = level.getEntity(nodeId);
@@ -487,5 +719,9 @@ public final class LabelUpgradeSync {
     }
 
     private record UpgradeChanges(List<Requirement> required, List<ItemStack> returned) {
+    }
+
+    private record BulkNodeState(String label, long revision, List<ItemStack> upgrades,
+                                 List<ChannelData> channels) {
     }
 }

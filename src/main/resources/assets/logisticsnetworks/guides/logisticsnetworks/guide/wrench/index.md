@@ -10,7 +10,9 @@ navigation:
 
 The Wrench is the tool you use for everything related to nodes — opening their configuration, removing them, copying setups between nodes, and bulk-placing lots of nodes at once.
 
-It has three modes, and every mode does something different. Cycle through them with **Modifier Key 1 (default: Shift) + Mouse Wheel** while holding the wrench. The current mode is shown in the HUD overlay at the top of the screen.
+It has three modes. Hold **R** while holding the wrench to open the mode wheel, point at a mode, then release to select it. Release in the centre or press Escape to cancel. Remap the wheel key in Minecraft's Controls menu.
+
+You can also cycle modes with **Modifier Key 1 (default: Shift) + Mouse Wheel**. The HUD beside the hotbar shows the active mode: blue for Wrench, green for Copy / Paste, and gold for Mass Placement.
 
 ## Modes at a Glance
 

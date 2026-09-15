@@ -7,7 +7,7 @@ import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
-import me.almana.logisticsnetworks.network.GraphPayloadHandler;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.network.FriendlyByteBuf;
@@ -46,6 +46,8 @@ public class NodeMenu extends AbstractContainerMenu {
     private final List<ItemStack> openingUpgrades;
     @Nullable
     private final StorageLink preferredStorageLink;
+    @Nullable
+    private GraphMenuContext returnContext;
     private int storageUpgradeAccess;
     private boolean remoteAccess;
     private int selectedChannel = 0;
@@ -93,6 +95,7 @@ public class NodeMenu extends AbstractContainerMenu {
         this.node = state.node();
         this.playerInventory = playerInv;
         this.preferredStorageLink = null;
+        this.returnContext = buf.readableBytes() > 0 && buf.readBoolean() ? GraphMenuContext.read(buf) : null;
 
         this.upgradeContainer = new UpgradeItemsContainer();
         this.openingUpgrades = node == null ? List.of() : LabelUpgradeSync.snapshotUpgrades(node);
@@ -171,6 +174,15 @@ public class NodeMenu extends AbstractContainerMenu {
         return installed;
     }
 
+    @Nullable
+    public GraphMenuContext getReturnContext() {
+        return returnContext;
+    }
+
+    public void setReturnContext(@Nullable GraphMenuContext returnContext) {
+        this.returnContext = returnContext;
+    }
+
     public boolean canEditNode(Player player) {
         return node != null && node.isValidNode() && node.isOwnedBy(player)
                 && stillValid(player) && hasAvailableNode();
@@ -195,6 +207,7 @@ public class NodeMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
+        if (returnContext != null) return returnContext.canEdit(player, node);
         if (node == null || !node.isAlive()) return false;
         return remoteAccess || player.distanceToSqr(node) < 64.0;
     }
@@ -242,10 +255,7 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     private void markDirty() {
-        if (node != null && node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
-            NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
-            GraphPayloadHandler.broadcast(level.getServer(), node.getNetworkId());
-        }
+        if (node != null) ServerPayloadHandler.invalidateNetwork(node);
     }
 
     @Override

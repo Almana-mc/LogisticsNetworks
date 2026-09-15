@@ -15,6 +15,7 @@ import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.PlannedItemValidation;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
+import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -148,6 +149,9 @@ public final class TransferCommitter {
         }
 
         int committed = 0;
+        ItemResourceOrder.Cursor cursor = sourceChannel.canRotateResources() && !channel.moves().isEmpty()
+                ? ItemResourceOrder.after(source, channel.moves().getFirst().resource()) : null;
+        me.almana.logisticsnetworks.integration.storage.ItemResource movedResource = null;
         int tier = network.getTierCache().getOrDefault(sourceNode.getUUID(), 0);
         int currentBatch = Math.max(1, Math.min(sourceChannel.getBatchSize(),
                 TransferEngine.getBatchLimit(ChannelType.ITEM, tier)));
@@ -176,6 +180,7 @@ public final class TransferCommitter {
                     source, target.handler(), target.bulkHandler(), validated, sourceNode);
             committed += moved;
             if (moved > 0) {
+                movedResource = move.resource();
                 committedByItem.merge(move.expectedItem(), moved, Integer::sum);
                 if (roundRobin) batchMoved.merge(move.expectedItem(), moved, Integer::sum);
                 validation.moved(move.expectedItem(), moved, target.handler());
@@ -191,12 +196,18 @@ public final class TransferCommitter {
         int recovered = 0;
         if (revalidated) {
             try (var operation = capCache.storageOperation(true)) {
-                recovered = TransferEngine.recoverItemChannel(
+                var recovery = TransferEngine.recoverItemChannel(
                         network, server, capCache, channel.sourceNodeId(), channel.channelIndex(),
-                        recoveryGoal - committed, committed, committedByItem, committedByTarget);
+                        recoveryGoal - committed, committed, committedByItem, committedByTarget, movedResource);
+                recovered = recovery.moved();
+                if (recovery.resource() != null) movedResource = recovery.resource();
+                if (recovery.cursor() != null) cursor = recovery.cursor();
             }
         }
         int totalMoved = committed + recovered;
+        if (sourceChannel.canRotateResources() && totalMoved > 0 && cursor != null) {
+            sourceChannel.setItemResourceCursor(cursor);
+        }
 
         long wakeDelta = TransferEngine.finishChannelAttempt(
                 sourceNode, sourceChannel, channel.channelIndex(), totalMoved,

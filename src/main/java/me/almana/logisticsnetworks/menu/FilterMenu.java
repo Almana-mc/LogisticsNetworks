@@ -1,6 +1,8 @@
 package me.almana.logisticsnetworks.menu;
 
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.ChannelMode;
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.*;
@@ -39,6 +41,8 @@ public class FilterMenu extends AbstractContainerMenu {
     private static final int ID_CYCLE_DURABILITY = 7;
     private static final int ID_CYCLE_TARGET = 8;
     private static final int ID_CYCLE_NAME_SCOPE = 9;
+    private static final int ID_TOGGLE_RESOURCE_ROUND_ROBIN = 10;
+    private static final int DATA_RESOURCE_ROUND_ROBIN = 4;
 
     private static final int FILTER_COLS = 9;
     private static final int FILTER_X = 8;
@@ -59,7 +63,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
     private final SimpleContainer filterInventory;
     private final SimpleContainer extractorInventory = new SimpleContainer(1);
-    private final ContainerData data = new SimpleContainerData(4);
+    private final ContainerData data = new SimpleContainerData(5);
     private final int lockedSlot;
     private final int inventorySlotIndex;
     private int playerSlotStart = -1;
@@ -256,6 +260,7 @@ public class FilterMenu extends AbstractContainerMenu {
         buf.readBoolean();
         this.isNameMode = buf.readBoolean();
         this.isSpecialMode = isModMode || isNameMode;
+        data.set(DATA_RESOURCE_ROUND_ROBIN, -1);
 
         this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
         this.filterInventory = new SimpleContainer(slotCount);
@@ -290,6 +295,9 @@ public class FilterMenu extends AbstractContainerMenu {
             data.set(1, FilterItemData.getTargetType(stack).ordinal());
             data.set(2, 0);
         }
+        data.set(DATA_RESOURCE_ROUND_ROBIN, nodeSource == null
+                ? -1
+                : resourceRoundRobinState(nodeSource.getChannel(nodeChannel)));
     }
 
     private void layoutSlots(Inventory playerInv) {
@@ -402,6 +410,24 @@ public class FilterMenu extends AbstractContainerMenu {
 
     public boolean canScanAttachedStorage() {
         return nodeSource != null && !isSpecialMode;
+    }
+
+    public boolean canSetResourceRoundRobin() {
+        return data.get(DATA_RESOURCE_ROUND_ROBIN) >= 0;
+    }
+
+    public boolean isResourceRoundRobin() {
+        return data.get(DATA_RESOURCE_ROUND_ROBIN) == 1;
+    }
+
+    static boolean supportsResourceRoundRobin(ChannelData channel) {
+        return channel.getMode() == ChannelMode.EXPORT
+                && (channel.getType() == ChannelType.ITEM || channel.getType() == ChannelType.FLUID);
+    }
+
+    static int resourceRoundRobinState(ChannelData channel) {
+        if (!supportsResourceRoundRobin(channel)) return -1;
+        return channel.isResourceRoundRobin() ? 1 : 0;
     }
 
     @Nullable
@@ -819,6 +845,8 @@ public class FilterMenu extends AbstractContainerMenu {
             return cycleTargetType();
         if (id == ID_CYCLE_NAME_SCOPE && isNameMode)
             return cycleNameMatchScope();
+        if (id == ID_TOGGLE_RESOURCE_ROUND_ROBIN)
+            return toggleResourceRoundRobin();
 
         return false;
     }
@@ -860,6 +888,19 @@ public class FilterMenu extends AbstractContainerMenu {
         NameMatchScope next = NameFilterData.getMatchScope(stack).next();
         NameFilterData.setMatchScope(stack, next);
         data.set(2, next.ordinal());
+        broadcastChanges();
+        return true;
+    }
+
+    private boolean toggleResourceRoundRobin() {
+        if (nodeSource == null) return false;
+        ChannelData channel = nodeSource.getChannel(nodeChannel);
+        if (!supportsResourceRoundRobin(channel)) return false;
+        channel.setResourceRoundRobin(!channel.isResourceRoundRobin());
+        data.set(DATA_RESOURCE_ROUND_ROBIN, resourceRoundRobinState(channel));
+        ServerPayloadHandler.sendChannelSyncToViewers(nodeSource, nodeChannel, channel);
+        ServerPayloadHandler.propagateToLabelGroup(nodeSource, nodeChannel);
+        ServerPayloadHandler.invalidateNetwork(nodeSource);
         broadcastChanges();
         return true;
     }
