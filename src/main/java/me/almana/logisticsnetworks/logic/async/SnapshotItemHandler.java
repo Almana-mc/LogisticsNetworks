@@ -47,7 +47,7 @@ public final class SnapshotItemHandler implements IItemHandlerModifiable {
 
     @Override
     public int getSlotLimit(int slot) {
-        return slotLimits.get(slot);
+        return bulkSlotLimits == null ? slotLimits.get(slot) : bulkSlotLimits[slot];
     }
 
     @Override
@@ -59,6 +59,9 @@ public final class SnapshotItemHandler implements IItemHandlerModifiable {
     public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
         if (stack.isEmpty() || slot < 0 || slot >= totalSlots) {
             return stack;
+        }
+        if (bulkSlotLimits != null) {
+            return insertBulkItem(slot, stack, simulate);
         }
         ItemStack existing = getStackInSlot(slot);
         int limit = Math.min(getSlotLimit(slot), stack.getMaxStackSize());

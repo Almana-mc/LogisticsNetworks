@@ -164,6 +164,9 @@ dependencies {
     compileOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") {
         isTransitive = false
     }
+    compileOnly("maven.modrinth:functional-storage:1.21-1.5.5") {
+        isTransitive = false
+    }
     testRuntimeOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") {
         isTransitive = false
     }

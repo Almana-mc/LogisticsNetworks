@@ -1293,7 +1293,7 @@ public class TransferEngine {
             }
             return ItemHandlerHelper.insertItemStacked(handler, stack, simulate);
         }
-        if (handler instanceof IItemHandlerModifiable modifiable) {
+        if (handler instanceof IItemHandlerModifiable modifiable && !(handler instanceof SnapshotItemHandler)) {
             return insertItemStrictAllowedSlots(modifiable, stack, simulate, allowedSlots);
         }
 
