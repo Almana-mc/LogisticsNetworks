@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.LabelUpgradeTemplate;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.graph.GraphChannel;
@@ -35,6 +36,7 @@ import net.minecraft.world.inventory.MenuConstructor;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -141,6 +143,135 @@ public final class GraphPayloadHandler {
         });
     }
 
+    public static void handlePreviewLabels(PreviewGraphLabelsPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player) {
+                handleGraphLabels(player, payload.requestId(), payload.networkId(), payload.nodeIds(), payload.label(),
+                        payload.settingsSource(), null);
+            }
+        });
+    }
+
+    public static void handleConfirmLabels(ConfirmGraphLabelsPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player) {
+                handleGraphLabels(player, payload.requestId(), payload.networkId(), payload.nodeIds(),
+                        payload.label(), payload.settingsSource(), payload.expectedState());
+            }
+        });
+    }
+
+    private static void handleGraphLabels(ServerPlayer player, UUID requestId, UUID networkId,
+                                          List<UUID> nodeIds, String requestedLabel,
+                                          UUID settingsSource, UUID expectedState) {
+        if (!authorized(player, networkId) || nodeIds.isEmpty()
+                || nodeIds.size() > SetNodeLabelsPayload.MAX_NODES) return;
+        String label = requestedLabel.trim();
+        if (label.length() > 48) label = label.substring(0, 48);
+        LogisticsNetwork network = NetworkRegistry.get(player.serverLevel()).getNetwork(networkId);
+        if (network == null) {
+            sendLabelFailure(player, requestId, networkId, nodeIds, settingsSource, label);
+            return;
+        }
+        List<LogisticsNodeEntity> nodes = resolveLabelNodes(player, nodeIds, settingsSource);
+        if (nodes == null) {
+            sendLabelFailure(player, requestId, networkId, nodeIds, settingsSource, label);
+            return;
+        }
+        LabelState state = labelState(player.getServer(), network, nodes, label, settingsSource);
+        if (!label.isEmpty() && !state.targetExists() && !state.complete()) {
+            player.displayClientMessage(Component.translatable(
+                    "message.logisticsnetworks.label.unloaded_unknown"), true);
+            sendLabelFailure(player, requestId, networkId, nodeIds, settingsSource, label);
+            return;
+        }
+        GraphLabelChange change = GraphLabelChange.evaluate(
+                nodes.stream().map(LogisticsNodeEntity::getNodeLabel).toList(), state.targetExists(), label);
+        if (change.kind() == GraphLabelChange.Kind.NONE) {
+            sendLabelResult(player, requestId, networkId, nodeIds, settingsSource, change, state.token(),
+                    GraphLabelPreviewPayload.Result.NONE);
+            return;
+        }
+        if (change.requiresConfirmation() && !state.token().equals(expectedState)) {
+            sendLabelResult(player, requestId, networkId, nodeIds, settingsSource, change, state.token(),
+                    GraphLabelPreviewPayload.Result.CONFIRM);
+            return;
+        }
+        StorageLink link = LinkedStorage.findAccessibleLink(player, null);
+        String appliedLabel = label;
+        LabelUpgradeSync.synchronizeLabels(player, network, nodes, settingsSource, appliedLabel, link,
+                () -> state.equals(labelState(
+                        player.getServer(), network, nodes, appliedLabel, settingsSource)),
+                applied -> sendLabelResult(player, requestId, networkId, nodeIds, settingsSource,
+                        change, state.token(), applied ? GraphLabelPreviewPayload.Result.APPLIED
+                                : GraphLabelPreviewPayload.Result.FAILED));
+    }
+
+    private static List<LogisticsNodeEntity> resolveLabelNodes(ServerPlayer player, List<UUID> nodeIds,
+                                                                UUID settingsSource) {
+        Set<UUID> ids = new LinkedHashSet<>(nodeIds);
+        if (ids.size() != nodeIds.size() || !ids.contains(settingsSource)) return null;
+        GraphMenuContext context = getContext(player.containerMenu);
+        List<LogisticsNodeEntity> nodes = new ArrayList<>(ids.size());
+        for (UUID nodeId : ids) {
+            LogisticsNodeEntity node = findNode(player.getServer(), nodeId);
+            if (node == null || !context.canEdit(player, node)) return null;
+            nodes.add(node);
+        }
+        return nodes;
+    }
+
+    private static LabelState labelState(MinecraftServer server, LogisticsNetwork network,
+                                         List<LogisticsNodeEntity> selected, String label, UUID settingsSource) {
+        StringBuilder value = new StringBuilder();
+        appendState(value, label);
+        appendState(value, settingsSource.toString());
+        for (LogisticsNodeEntity node : selected) {
+            appendState(value, node.getUUID().toString());
+            appendState(value, node.getNodeLabel());
+            value.append(node.getLabelRevision()).append(';');
+        }
+        LabelUpgradeTemplate template = label.isEmpty() ? null : network.getLabelTemplate(label);
+        value.append(template == null ? "-;" : template.revision() + ";");
+        boolean targetExists = template != null;
+        List<LogisticsNodeEntity> loadedNodes = network.getNodeUuids().stream()
+                .map(id -> findNode(server, id))
+                .filter(node -> node != null && node.isValidNode())
+                .toList();
+        List<LogisticsNodeEntity> authorities = label.isEmpty() ? List.of() : loadedNodes.stream()
+                .filter(node -> label.equals(node.getNodeLabel()))
+                .sorted(Comparator.comparing(LogisticsNodeEntity::getUUID))
+                .toList();
+        for (LogisticsNodeEntity authority : authorities) {
+            targetExists = true;
+            appendState(value, authority.getUUID().toString());
+            value.append(authority.getLabelRevision()).append(';');
+        }
+        UUID token = UUID.nameUUIDFromBytes(value.toString().getBytes(StandardCharsets.UTF_8));
+        return new LabelState(targetExists, loadedNodes.size() == network.getNodeUuids().size(), token);
+    }
+
+    private static void appendState(StringBuilder value, String part) {
+        value.append(part.length()).append(':').append(part).append(';');
+    }
+
+    private static void sendLabelResult(ServerPlayer player, UUID requestId, UUID networkId,
+                                        List<UUID> nodeIds, UUID settingsSource, GraphLabelChange change,
+                                        UUID expectedState, GraphLabelPreviewPayload.Result result) {
+        PacketDistributor.sendToPlayer(player, new GraphLabelPreviewPayload(requestId, networkId, nodeIds,
+                change.label(), settingsSource, change.kind(), change.replacedLabels(), expectedState, result));
+    }
+
+    private static void sendLabelFailure(ServerPlayer player, UUID requestId, UUID networkId,
+                                         List<UUID> nodeIds, UUID settingsSource, String label) {
+        GraphLabelChange change = new GraphLabelChange(label, 0, GraphLabelChange.Kind.DIRECT);
+        sendLabelResult(player, requestId, networkId, nodeIds, settingsSource, change, new UUID(0, 0),
+                GraphLabelPreviewPayload.Result.FAILED);
+    }
+
+    private record LabelState(boolean targetExists, boolean complete, UUID token) {
+    }
+
     public static void handleOpenNodeSettings(RequestOpenNodeSettingsPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)
@@ -188,10 +319,6 @@ public final class GraphPayloadHandler {
     }
 
     private static GraphMenuContext labelContext(ServerPlayer player, UUID networkId) {
-        GraphMenuContext context = getContext(player.containerMenu);
-        if (context != null) {
-            return context.networkId().equals(networkId) && context.stillValid(player) ? context : null;
-        }
         if (!(player.containerMenu instanceof ComputerMenu menu) || !menu.stillValid(player)) return null;
         GraphMenuContext table = new GraphMenuContext(menu.getComputerPos(),
                 player.level().dimension().location(), networkId, GraphMenuContext.Origin.TABLE);

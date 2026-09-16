@@ -20,6 +20,10 @@ public final class GraphSelection {
         return Collections.unmodifiableSet(new LinkedHashSet<>(nodes));
     }
 
+    public UUID primary() {
+        return nodes.isEmpty() ? null : nodes.iterator().next();
+    }
+
     public void click(Collection<UUID> vertexNodes, boolean control) {
         initialized = true;
         if (!control) {

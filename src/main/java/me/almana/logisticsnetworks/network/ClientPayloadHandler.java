@@ -43,6 +43,14 @@ public class ClientPayloadHandler {
         });
     }
 
+    public static void handleGraphLabelPreview(GraphLabelPreviewPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (Minecraft.getInstance().screen instanceof NodeGraphScreen screen) {
+                screen.receiveLabelPreview(payload);
+            }
+        });
+    }
+
     public static void handleSyncNetworkNodes(SyncNetworkNodesPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             var screen = Minecraft.getInstance().screen;

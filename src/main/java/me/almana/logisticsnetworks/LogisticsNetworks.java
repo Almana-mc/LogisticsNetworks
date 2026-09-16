@@ -1,6 +1,9 @@
 package me.almana.logisticsnetworks;
 
 import me.almana.logisticsnetworks.network.GraphPayloadHandler;
+import me.almana.logisticsnetworks.network.ConfirmGraphLabelsPayload;
+import me.almana.logisticsnetworks.network.GraphLabelPreviewPayload;
+import me.almana.logisticsnetworks.network.PreviewGraphLabelsPayload;
 import me.almana.logisticsnetworks.network.RequestOpenGraphPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkGraphPayload;
 import me.almana.logisticsnetworks.network.MoveGraphVertexPayload;
@@ -148,7 +151,7 @@ public class LogisticsNetworks {
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("6");
+                final var registrar = event.registrar(MOD_ID).versioned("7");
 
                 // Client -> Server
                 registrar.playToServer(UpdateChannelPayload.TYPE, UpdateChannelPayload.STREAM_CODEC,
@@ -215,6 +218,10 @@ public class LogisticsNetworks {
                                 GraphPayloadHandler::handleMoveVertices);
                 registrar.playToServer(SetNodeLabelsPayload.TYPE, SetNodeLabelsPayload.STREAM_CODEC,
                                 GraphPayloadHandler::handleSetLabels);
+                registrar.playToServer(PreviewGraphLabelsPayload.TYPE, PreviewGraphLabelsPayload.STREAM_CODEC,
+                                GraphPayloadHandler::handlePreviewLabels);
+                registrar.playToServer(ConfirmGraphLabelsPayload.TYPE, ConfirmGraphLabelsPayload.STREAM_CODEC,
+                                GraphPayloadHandler::handleConfirmLabels);
                 registrar.playToServer(MassSelectConnectedPayload.TYPE, MassSelectConnectedPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleMassSelectConnected);
                 registrar.playToServer(CopyPasteConnectedPayload.TYPE, CopyPasteConnectedPayload.STREAM_CODEC,
@@ -279,6 +286,8 @@ public class LogisticsNetworks {
                                 GraphPayloadHandler::handleReturn);
                 registrar.playToClient(SyncNetworkGraphPayload.TYPE, SyncNetworkGraphPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkGraph);
+                registrar.playToClient(GraphLabelPreviewPayload.TYPE, GraphLabelPreviewPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleGraphLabelPreview);
 
                 // Server -> Client
                 registrar.playToClient(SyncMassPlacementChoicesPayload.TYPE,

@@ -53,7 +53,7 @@ public class Config {
         builder.push("async");
         asyncPlanningSpec = builder
                 .comment("Plan item transfers on worker threads. Disable to force the synchronous path.")
-                .define("asyncPlanning", true);
+                .define("asyncPlanning", false);
         asyncWorkerThreadsSpec = builder
                 .comment("Worker threads for transfer planning. 0 = auto (min(4, cores - 2)).")
                 .defineInRange("asyncWorkerThreads", 0, 0, 16);
@@ -72,7 +72,7 @@ public class Config {
     public static boolean debugMode;
     public static NodeAccessMode nodeAccessMode = NodeAccessMode.TEAMS;
     public static int backoffMaxTicks = 40;
-    public static boolean asyncPlanning = true;
+    public static boolean asyncPlanning = false;
     public static int asyncWorkerThreads = 0;
     public static int asyncCommitBudgetUs = 2000;
     public static int asyncMaxOccupiedSlots = 200000;

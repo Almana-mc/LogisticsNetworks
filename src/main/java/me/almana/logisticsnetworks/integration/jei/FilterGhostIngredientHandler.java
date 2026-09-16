@@ -24,6 +24,10 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
     public <I> List<Target<I>> getTargetsTyped(FilterScreen screen, ITypedIngredient<I> ingredient, boolean doStart) {
         Optional<FluidStack> fluid = ingredient.getIngredient(NeoForgeTypes.FLUID_STACK);
         if (fluid.isPresent()) {
+            if (screen.isDetailPageOpen()) {
+                return castTargets(List.of(new FilterTarget<>(screen.getDetailSlotArea(),
+                        ignored -> screen.setDetailGhostFluid(fluid.get()))));
+            }
             if (screen.acceptsFluidSelectorGhostIngredient()) {
                 return castTargets(buildSelectorFluidTarget(screen, fluid.get()));
             }
@@ -66,6 +70,11 @@ public class FilterGhostIngredientHandler implements IGhostIngredientHandler<Fil
         Object underlying = ingredient.getIngredient();
         if (underlying instanceof ChemicalStack chemStack) {
             if (!chemStack.isEmpty()) {
+                if (screen.isDetailPageOpen()) {
+                    String id = ChemicalTransferHelper.getChemicalId(chemStack);
+                    return castTargets(List.of(new FilterTarget<>(screen.getDetailSlotArea(),
+                            ignored -> screen.setDetailGhostChemical(id))));
+                }
                 if (screen.acceptsItemSelectorGhostIngredient()) {
                     return castTargets(buildSelectorChemicalTarget(screen, chemStack));
                 }

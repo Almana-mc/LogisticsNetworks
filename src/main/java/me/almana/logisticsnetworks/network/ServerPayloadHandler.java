@@ -1106,6 +1106,7 @@ public class ServerPayloadHandler {
 
     public static void handleSetNodeLabel(SetNodeLabelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) return;
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
@@ -1126,31 +1127,27 @@ public class ServerPayloadHandler {
                 if (network != null) {
                     LOGGER.debug("[LabelSync] Searching {} nodes in network for label '{}'",
                             network.getNodeUuids().size(), label);
+                    LogisticsNodeEntity authority = node;
                     for (UUID otherId : network.getNodeUuids()) {
-                        if (otherId.equals(node.getUUID()))
-                            continue;
-                        for (ServerLevel sl : level.getServer().getAllLevels()) {
-                            Entity entity = sl.getEntity(otherId);
-                            if (entity instanceof LogisticsNodeEntity other
-                                    && label.equals(other.getNodeLabel())) {
-                                LOGGER.debug("[LabelSync] Found matching node {}, copying all channels", otherId);
-                                // Copy all channels from the existing labeled node
-                                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                                    ChannelData src = other.getChannel(i);
-                                    ChannelData dst = node.getChannel(i);
-                                    if (src != null && dst != null) {
-                                        dst.copyFrom(src);
-                                        clampChannelToUpgradeLimits(node, dst);
-                                        sendChannelSyncToViewers(node, i, dst);
-                                    }
+                        if (otherId.equals(node.getUUID())) continue;
+                        LogisticsNodeEntity other = findNode(player, otherId);
+                        if (other != null && label.equals(other.getNodeLabel())) {
+                            LOGGER.debug("[LabelSync] Found matching node {}, copying all channels", otherId);
+                            authority = other;
+                            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                                ChannelData src = other.getChannel(i);
+                                ChannelData dst = node.getChannel(i);
+                                if (src != null && dst != null) {
+                                    dst.copyFrom(src);
+                                    clampChannelToUpgradeLimits(node, dst);
+                                    sendChannelSyncToViewers(node, i, dst);
                                 }
-                                invalidateNetwork(node);
-                                LabelUpgradeSync.synchronizeOnLoad(node);
-                                return;
                             }
+                            break;
                         }
                     }
-                    LOGGER.debug("[LabelSync] No matching labeled node found in network");
+                    LabelUpgradeSync.establishLabelTemplate(player, network, authority,
+                            LinkedStorage.findAccessibleLink(player, null));
                 }
             }
             invalidateNetwork(node);
@@ -1264,7 +1261,7 @@ public class ServerPayloadHandler {
             if (network == null || !canAccessNetwork(player, network))
                 return;
 
-            Set<String> labels = new LinkedHashSet<>();
+            Set<String> labels = new LinkedHashSet<>(network.getLabelNames());
             for (UUID nodeId : network.getNodeUuids()) {
                 for (ServerLevel level : player.getServer().getAllLevels()) {
                     Entity entity = level.getEntity(nodeId);

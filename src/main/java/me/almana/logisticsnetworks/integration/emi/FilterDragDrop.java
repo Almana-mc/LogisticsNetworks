@@ -3,9 +3,14 @@ package me.almana.logisticsnetworks.integration.emi;
 import dev.emi.emi.api.EmiDragDropHandler;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
+import mekanism.api.IMekanismAccess;
+import mekanism.api.chemical.ChemicalStack;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
+import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.Rect2i;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -42,10 +47,17 @@ final class FilterDragDrop implements EmiDragDropHandler<FilterScreen> {
         if (stack.getKey() instanceof Fluid fluid) {
             FluidStack value = new FluidStack(fluid, 1000);
             value.applyComponents(stack.getComponentChanges());
+            if (screen.isDetailPageOpen()) {
+                return List.of(new Target(screen.getDetailSlotArea(), () -> screen.setDetailGhostFluid(value)));
+            }
             if (screen.acceptsFluidSelectorGhostIngredient()) {
                 return List.of(new Target(screen.getSelectorGhostArea(), () -> screen.setSelectorGhostFluid(value)));
             }
             return slotTargets(screen, slot -> screen.setGhostFluidFilterEntry(slot, value));
+        }
+        if (MekanismCompat.isLoaded()) {
+            List<Target> chemicalTargets = chemicalTargets(screen, stack);
+            if (!chemicalTargets.isEmpty()) return chemicalTargets;
         }
         if (item.isEmpty()) return List.of();
         if (screen.isDetailPageOpen()) {
@@ -56,6 +68,23 @@ final class FilterDragDrop implements EmiDragDropHandler<FilterScreen> {
             return List.of(new Target(screen.getSelectorGhostArea(), () -> screen.setSelectorGhostItem(item)));
         }
         return slotTargets(screen, slot -> screen.setGhostItemFilterEntry(slot, item));
+    }
+
+    private List<Target> chemicalTargets(FilterScreen screen, EmiStack stack) {
+        ChemicalStack chemical = IMekanismAccess.INSTANCE.emiHelper().asChemicalStack(stack)
+                .orElse(ChemicalStack.EMPTY);
+        if (chemical.isEmpty()) return List.of();
+        String id = ChemicalTransferHelper.getChemicalId(chemical);
+        if (screen.isDetailPageOpen()) {
+            return List.of(new Target(screen.getDetailSlotArea(), () -> screen.setDetailGhostChemical(id)));
+        }
+        if (screen.acceptsItemSelectorGhostIngredient()) {
+            List<String> tags = chemical.getTags().map(tag -> tag.location().toString()).toList();
+            Component name = ChemicalTransferHelper.getChemicalTextComponent(id);
+            return List.of(new Target(screen.getSelectorGhostArea(),
+                    () -> screen.setSelectorGhostChemical(id, tags, name)));
+        }
+        return slotTargets(screen, slot -> screen.setGhostChemicalFilterEntry(slot, id));
     }
 
     private List<Target> slotTargets(FilterScreen screen, java.util.function.IntConsumer accept) {
