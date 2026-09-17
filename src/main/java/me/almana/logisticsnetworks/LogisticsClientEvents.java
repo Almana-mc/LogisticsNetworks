@@ -74,6 +74,7 @@ public final class LogisticsClientEvents {
         WrenchHudOverlay.registerKeys(event);
         SlotNumberOverlay.registerKeys(event);
         event.register(WrenchInputHandler.OPEN_COLOR_EDITOR);
+        event.register(ClientControls.WRENCH_MODES);
         event.register(ClientControls.MODIFIER_1);
         event.register(ClientControls.MODIFIER_2);
         event.register(ClientControls.MODIFIER_3);

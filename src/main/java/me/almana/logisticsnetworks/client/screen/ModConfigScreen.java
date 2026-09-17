@@ -80,6 +80,7 @@ public class ModConfigScreen extends Screen {
     private static final Component TEXT_CONNECTED_NODE_TEXTURES = Component.translatable("gui.logisticsnetworks.config.client.connectedNodeTextures");
     private static final Component TEXT_INVERT_COPY_PASTE = Component.translatable("gui.logisticsnetworks.config.client.invertCopyPasteControls");
     private static final Component TEXT_COMPUTER_CLASSIC = Component.translatable("gui.logisticsnetworks.config.client.computerClassicTheme");
+    private static final Component TEXT_CONFIRM_NETWORK_CREATION = Component.translatable("gui.logisticsnetworks.config.client.confirmNetworkCreation");
 
     private static final Component[] TIER_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.upgrades.tier.none"),
@@ -118,11 +119,12 @@ public class ModConfigScreen extends Screen {
     private int pendingBackoffMaxTicks;
     private EditBox backoffMaxTicksBox;
 
+    private boolean pendingDefaultNodeVisibility;
+    private boolean pendingInvertCopyPasteControls;
+    private boolean pendingConfirmNetworkCreation;
     private int pendingMaxRenderedNodes;
     private int pendingMaxVisibleNodes;
-    private boolean pendingDefaultNodeVisibility;
     private boolean pendingConnectedNodeTextures;
-    private boolean pendingInvertCopyPasteControls;
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
     private String pendingTheme;
@@ -164,6 +166,7 @@ public class ModConfigScreen extends Screen {
         pendingBackoffMaxTicks = Config.backoffMaxTicksSpec.get();
         pendingDefaultNodeVisibility = ClientConfig.defaultNodeVisibilitySpec.get();
         pendingInvertCopyPasteControls = ClientConfig.invertCopyPasteControlsSpec.get();
+        pendingConfirmNetworkCreation = ClientConfig.confirmNetworkCreationSpec.get();
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
         pendingConnectedNodeTextures = ClientConfig.connectedNodeTexturesSpec.get();
@@ -402,7 +405,10 @@ public class ModConfigScreen extends Screen {
         renderUnderline(g, cx + 150, cy + 36 + 14, 80);
 
         renderCheckbox(g, cx, cy + 54, cw, TEXT_CONNECTED_NODE_TEXTURES, pendingConnectedNodeTextures, mx, my, false);
-        renderCheckbox(g, cx, cy + 72, cw, TEXT_INVERT_COPY_PASTE, pendingInvertCopyPasteControls, mx, my, false);
+        int halfWidth = (cw - 8) / 2;
+        renderCheckbox(g, cx, cy + 72, halfWidth, TEXT_INVERT_COPY_PASTE, pendingInvertCopyPasteControls, mx, my, false);
+        renderCheckbox(g, cx + halfWidth + 8, cy + 72, halfWidth, TEXT_CONFIRM_NETWORK_CREATION,
+                pendingConfirmNetworkCreation, mx, my, false);
 
         int themeY = cy + 90;
         g.text(font, Component.translatable("gui.logisticsnetworks.config.client.theme"), cx, themeY, COL_INK, false);
@@ -445,8 +451,13 @@ public class ModConfigScreen extends Screen {
             pendingConnectedNodeTextures = !pendingConnectedNodeTextures;
             return true;
         }
-        if (inBox(mouseX, mouseY, boxX, cy + 74, boxSize)) {
+        int halfWidth = (cw - 8) / 2;
+        if (inBox(mouseX, mouseY, cx + halfWidth - 14, cy + 74, 9)) {
             pendingInvertCopyPasteControls = !pendingInvertCopyPasteControls;
+            return true;
+        }
+        if (inBox(mouseX, mouseY, boxX, cy + 74, 9)) {
+            pendingConfirmNetworkCreation = !pendingConfirmNetworkCreation;
             return true;
         }
 
@@ -728,6 +739,7 @@ public class ModConfigScreen extends Screen {
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
         ClientConfig.connectedNodeTexturesSpec.set(pendingConnectedNodeTextures);
         ClientConfig.invertCopyPasteControlsSpec.set(pendingInvertCopyPasteControls);
+        ClientConfig.confirmNetworkCreationSpec.set(pendingConfirmNetworkCreation);
         ClientConfig.themeSpec.set(pendingTheme);
         ClientConfig.computerClassicThemeSpec.set(pendingComputerClassic);
         flowOptions.save();

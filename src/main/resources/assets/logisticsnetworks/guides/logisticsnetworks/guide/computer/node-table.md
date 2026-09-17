@@ -28,6 +28,8 @@ Each row shows one node on the network. Columns:
 - **Highlight** (the lamp icon) — use **Primary Interaction (default: Left Click)** to toggle a glowing outline on the node in the world, making it easy to find. The outline stays on until you use Primary Interaction on the lamp again or close the Computer screen.
 - **Settings** (the gear / terminal icon) — opens that node's full configuration screen **remotely**, from wherever you are. You do not have to go stand next to the node to edit its channels or filters.
 
+Use **Back to table** after editing to restore the mounted network, scroll position, expanded groups, selection, and pending label text. Opening a filter from these settings retains the same return path.
+
 ## Label Grouping
 
 Nodes with a label are grouped together under that label. The label name shows as a header row; use Primary Interaction on the header to collapse the whole group into one line, then use it again to expand. Nodes without a label render flat at the bottom of the list.
@@ -35,6 +37,12 @@ Nodes with a label are grouped together under that label. The label name shows a
 Collapse state is remembered for the session — expand the groups you are working on and collapse the rest to keep the table readable on big networks.
 
 Labels are set from the [Header → Set Label](../nodes/header.md) field on each node, or copied automatically when you paste with the [Wrench → Copy/Paste](../wrench/copy-paste.md).
+
+## Selection and Bulk Labels
+
+Use row checkboxes to select nodes. A group checkbox selects every member; its partial state means only some members are selected. **Same block** selects nodes attached to the exact same block type as the selected source.
+
+Enter a label and apply it to the selection. An existing label supplies its current group settings. For a new label, choose the settings source from your selection. Shared upgrade layouts require physical upgrades from your inventory or linked storage; missing supplies leave the selected nodes unchanged. Apply an empty label to ungroup them.
 
 ## Bulk Show / Hide
 
@@ -47,7 +55,7 @@ For a refresher on what the Visible toggle does per node, see [Header → Visibl
 
 ## Pagination
 
-Seven rows fit per page. Scroll the mouse wheel to page through larger networks.
+The visible row count adapts to the available height. Locations use a separate line to keep full coordinates readable. Scroll the mouse wheel to page through larger networks.
 
 ## Good to Know
 

@@ -71,6 +71,13 @@ public final class GuiGraphics {
         raw.centeredText(font, text, x, y, color);
     }
 
+    public void drawWordWrap(Font font, Component text, int x, int y, int width, int color) {
+        for (var line : font.split(text, width)) {
+            raw.text(font, line, x, y, color, false);
+            y += font.lineHeight;
+        }
+    }
+
     public void renderItem(ItemStack stack, int x, int y) {
         raw.item(stack, x, y);
     }

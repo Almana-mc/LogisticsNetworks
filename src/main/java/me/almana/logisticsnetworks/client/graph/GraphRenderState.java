@@ -12,7 +12,7 @@ import org.joml.Matrix3x2fc;
 
 import java.util.Arrays;
 
-record GraphRenderState(Matrix3x2fc pose, float[] coordinates, int[] colors,
+public record GraphRenderState(Matrix3x2fc pose, float[] coordinates, int[] colors,
                         ScreenRectangle scissorArea, ScreenRectangle bounds) implements GuiElementRenderState {
     @Override
     public RenderPipeline pipeline() {
@@ -32,7 +32,7 @@ record GraphRenderState(Matrix3x2fc pose, float[] coordinates, int[] colors,
         }
     }
 
-    static final class Builder {
+    public static final class Builder {
         private float[] coordinates = new float[512];
         private int[] colors = new int[256];
         private int size;
@@ -41,7 +41,7 @@ record GraphRenderState(Matrix3x2fc pose, float[] coordinates, int[] colors,
         private float maxX = Float.NEGATIVE_INFINITY;
         private float maxY = Float.NEGATIVE_INFINITY;
 
-        void vertex(float x, float y, int color) {
+        public void vertex(float x, float y, int color) {
             if (size == colors.length) {
                 colors = Arrays.copyOf(colors, size * 2);
                 coordinates = Arrays.copyOf(coordinates, size * 4);
@@ -55,7 +55,7 @@ record GraphRenderState(Matrix3x2fc pose, float[] coordinates, int[] colors,
             maxY = Math.max(maxY, y);
         }
 
-        void submit(GuiGraphicsExtractor graphics) {
+        public void submit(GuiGraphicsExtractor graphics) {
             if (size == 0) return;
             Matrix3x2f pose = new Matrix3x2f(graphics.pose());
             int left = (int) Math.floor(minX);

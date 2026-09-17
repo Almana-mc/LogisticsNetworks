@@ -14,6 +14,7 @@ import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
 import me.almana.logisticsnetworks.network.SetComputerWrenchClipboardPayload;
+import me.almana.logisticsnetworks.network.SetNodeLabelsPayload;
 import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.RequestChannelListPayload;
 import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
@@ -80,8 +81,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     private static final int OPTION_BTN_HEIGHT = 26;
     private static final int OPTION_BTN_GAP = 2;
     private static final int OPTION_BTN_START_Y = 72;
-    private static final int NODE_ENTRY_HEIGHT = 22;
-    private static final int NODES_PER_PAGE = 7;
+    private static final int NODE_ENTRY_HEIGHT = 24;
     private static final int VIS_BTN_W = 54;
     private static final int VIS_BTN_H = 14;
     private static final int VIS_BTN_GAP = 6;
@@ -90,6 +90,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     private static final int SETTINGS_BTN_W = 16;
     private static final int SETTINGS_BTN_H = 12;
     private static final int SETTINGS_BTN_GAP = 4;
+    private static final int SELECT_BOX_SIZE = 10;
     private static final int NODE_ROW_SIDE_PAD = 8;
     private static final int NODE_TEXT_GAP = 8;
     private static final int VIS_BTN_Y = 38;
@@ -131,6 +132,9 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     private List<SyncNetworkNodesPayload.NodeInfo> nodeInfoList = new ArrayList<>();
     private int nodeMapScrollOffset = 0;
     private final Set<String> collapsedGroups = new HashSet<>();
+    private final Set<UUID> selectedNodeIds = new HashSet<>();
+    private UUID labelSettingsSource;
+    private EditBox nodeLabelBox;
 
     private List<SyncChannelListPayload.ChannelEntry> channelList = new ArrayList<>();
     private int channelListScrollOffset;
@@ -157,6 +161,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
     @Override
     protected void init() {
+        String pendingLabel = nodeLabelBox == null ? "" : nodeLabelBox.getValue();
         super.init();
         networkSearchBox = new EditBox(font, 0, 0, SEARCH_INPUT_WIDTH, SEARCH_INPUT_HEIGHT, Component.empty());
         networkSearchBox.setMaxLength(32);
@@ -165,6 +170,13 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         networkSearchBox.setHint(Component.translatable("gui.logisticsnetworks.computer.search_hint"));
         layoutSearchBox();
         addRenderableWidget(networkSearchBox);
+        nodeLabelBox = new EditBox(font, 0, 0, 84, 16,
+                Component.translatable("gui.logisticsnetworks.computer.bulk_label"));
+        nodeLabelBox.setMaxLength(48);
+        nodeLabelBox.setHint(Component.translatable("gui.logisticsnetworks.computer.bulk_label"));
+        nodeLabelBox.setValue(pendingLabel);
+        layoutNodeLabelBox();
+        addRenderableWidget(nodeLabelBox);
     }
 
     @Override
@@ -182,7 +194,10 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         if (currentPage != Page.NETWORK_LIST && networkSearchBox.isFocused()) {
             networkSearchBox.setFocused(false);
         }
+        if (currentPage != Page.NODE_MAP && nodeLabelBox.isFocused()) nodeLabelBox.setFocused(false);
         networkSearchBox.setVisible(currentPage == Page.NETWORK_LIST);
+        layoutNodeLabelBox();
+        nodeLabelBox.setVisible(currentPage == Page.NODE_MAP && !selectedNodeIds.isEmpty());
 
         switch (currentPage) {
             case NETWORK_LIST -> renderNetworkListPage(g, mouseX, mouseY);
@@ -745,7 +760,8 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             int contentW, int contentH, int mouseX, int mouseY) {
         List<RenderEntry> renderEntries = buildNodeRenderEntries();
 
-        int maxScroll = Math.max(0, renderEntries.size() - NODES_PER_PAGE);
+        int rowsPerPage = nodeRowsPerPage();
+        int maxScroll = Math.max(0, renderEntries.size() - rowsPerPage);
         nodeMapScrollOffset = Math.max(0, Math.min(nodeMapScrollOffset, maxScroll));
 
         int headerX = contentX + 8;
@@ -753,13 +769,13 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int headerW = contentW - 16;
         g.fill(headerX, headerY, headerX + headerW, headerY + 14, pal().panelAlt());
         g.renderOutline(headerX, headerY, headerW, 14, pal().border());
-        g.drawString(font, label("gui.logisticsnetworks.computer.device"), headerX + 8, headerY + 3,
+        g.drawString(font, label("gui.logisticsnetworks.computer.device"), headerX + 22, headerY + 3,
                 pal().textSecondary());
         g.drawString(font, label("gui.logisticsnetworks.computer.location"), headerX + headerW - 72, headerY + 3,
                 pal().textSecondary());
 
         int listY = contentY + 40;
-        for (int i = 0; i < NODES_PER_PAGE && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
+        for (int i = 0; i < rowsPerPage && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
             int index = i + nodeMapScrollOffset;
             RenderEntry entry = renderEntries.get(index);
             int entryY = listY + (i * NODE_ENTRY_HEIGHT);
@@ -778,11 +794,12 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                 boolean active = isGroupHighlighted(entry.headerName);
                 int countX = settingsX - NODE_TEXT_GAP - font.width(countText);
                 String headerText = marker + " "
-                        + trimText(entry.headerName, Math.max(0, countX - NODE_TEXT_GAP - (headerX + NODE_ROW_SIDE_PAD)));
+                        + trimText(entry.headerName, Math.max(0, countX - NODE_TEXT_GAP - (headerX + 22)));
 
                 g.fill(headerX, entryY, headerX + headerW, entryY + NODE_ENTRY_HEIGHT - 2, pal().panelAlt());
                 g.renderOutline(headerX, entryY, headerW, NODE_ENTRY_HEIGHT - 2, pal().accentDark());
-                g.drawString(font, headerText, headerX + NODE_ROW_SIDE_PAD, entryY + 7, pal().accent());
+                renderCheckbox(g, headerX + 6, entryY + 6, groupSelectionState(entry.headerName));
+                g.drawString(font, headerText, headerX + 22, entryY + 7, pal().accent());
                 g.drawString(font, countText, countX, entryY + 7, pal().textSecondary());
                 renderSettingsButton(g, settingsX, buttonY, SETTINGS_BTN_W, SETTINGS_BTN_H, settingsHovered);
                 renderToggleButton(g, buttonX, buttonY, HIGHLIGHT_BTN_W, HIGHLIGHT_BTN_H, buttonHovered, active);
@@ -792,7 +809,8 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             boolean hovered = mouseX >= headerX && mouseX < headerX + headerW
                     && mouseY >= entryY && mouseY < entryY + NODE_ENTRY_HEIGHT - 2;
             int bgColor = hovered ? pal().rowHover() : pal().row();
-            int borderColor = hovered ? pal().accentDark() : pal().border();
+            int borderColor = selectedNodeIds.contains(entry.nodeInfo.nodeId())
+                    ? pal().borderBright() : hovered ? pal().accentDark() : pal().border();
             g.fill(headerX, entryY, headerX + headerW, entryY + NODE_ENTRY_HEIGHT - 2, bgColor);
             g.renderOutline(headerX, entryY, headerW, NODE_ENTRY_HEIGHT - 2, borderColor);
 
@@ -801,7 +819,9 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             }
 
             boolean active = entry.nodeInfo.highlighted();
-            int textX = headerX + (entry.isGrouped ? 16 : NODE_ROW_SIDE_PAD);
+            renderCheckbox(g, headerX + 6, entryY + 6,
+                    selectedNodeIds.contains(entry.nodeInfo.nodeId()) ? 2 : 0);
+            int textX = headerX + 22;
 
             int rightAnchor = buttonX;
             boolean settingsHovered = false;
@@ -827,23 +847,48 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                 textX += 20;
             }
 
-            String positionText = trimText(formatPosition(entry.nodeInfo), 72);
-            int positionX = rightAnchor - NODE_TEXT_GAP - font.width(positionText);
+            String positionText = formatPosition(entry.nodeInfo);
             String blockLabel = trimText(resolveBlockLabel(entry.nodeInfo.blockName()),
-                    Math.max(0, positionX - NODE_TEXT_GAP - textX));
+                    Math.max(0, rightAnchor - NODE_TEXT_GAP - textX));
 
-            g.drawString(font, blockLabel, textX, entryY + 7, pal().text());
-            g.drawString(font, positionText, positionX, entryY + 7, pal().textSecondary());
+            g.drawString(font, blockLabel, textX, entryY + 3, pal().text());
+            g.drawString(font, positionText, textX, entryY + 13, pal().textSecondary());
             renderToggleButton(g, buttonX, buttonY, HIGHLIGHT_BTN_W, HIGHLIGHT_BTN_H, buttonHovered, active);
         }
 
-        if (renderEntries.size() > NODES_PER_PAGE) {
+        if (renderEntries.size() > rowsPerPage) {
             String scrollInfo = (nodeMapScrollOffset + 1) + "-"
-                    + Math.min(nodeMapScrollOffset + NODES_PER_PAGE, renderEntries.size())
+                    + Math.min(nodeMapScrollOffset + rowsPerPage, renderEntries.size())
                     + " / " + renderEntries.size();
             g.drawString(font, scrollInfo, contentX + contentW - 12 - font.width(scrollInfo),
-                    contentY + contentH - 14, pal().textMuted());
+                    contentY + contentH - 31, pal().textMuted());
         }
+        renderLabelToolbar(g, contentX, contentY, contentW, contentH, mouseX, mouseY);
+    }
+
+    private void renderCheckbox(GuiGraphics g, int x, int y, int state) {
+        g.fill(x, y, x + SELECT_BOX_SIZE, y + SELECT_BOX_SIZE, pal().badgeBg());
+        g.renderOutline(x, y, SELECT_BOX_SIZE, SELECT_BOX_SIZE,
+                state == 0 ? pal().border() : pal().borderBright());
+        if (state == 2) g.fill(x + 3, y + 3, x + 7, y + 7, pal().accent());
+        else if (state == 1) g.fill(x + 2, y + 4, x + 8, y + 6, pal().warning());
+    }
+
+    private void renderLabelToolbar(GuiGraphics g, int contentX, int contentY, int contentW, int contentH,
+                                    int mouseX, int mouseY) {
+        if (selectedNodeIds.isEmpty()) return;
+        int y = contentY + contentH - 20;
+        int applyX = contentX + 96;
+        int sourceX = applyX + 44;
+        int sameX = sourceX + 82;
+        renderSmallButton(g, applyX, y, 40, 16,
+                line("gui.logisticsnetworks.computer.apply_label"),
+                isHoveringAbs(applyX, y, 40, 16, mouseX, mouseY));
+        renderSmallButton(g, sourceX, y, 78, 16, labelSourceText(),
+                isHoveringAbs(sourceX, y, 78, 16, mouseX, mouseY));
+        renderSmallButton(g, sameX, y, Math.max(40, contentX + contentW - 8 - sameX), 16,
+                line("gui.logisticsnetworks.computer.same_block"),
+                isHoveringAbs(sameX, y, contentX + contentW - 8 - sameX, 16, mouseX, mouseY));
     }
 
     private void renderTerminalPanel(GuiGraphics g, int x, int y, int w, int h, String label) {
@@ -1055,6 +1100,14 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (currentPage == Page.NODE_MAP && nodeLabelBox != null && nodeLabelBox.isFocused()) {
+            if (keyCode == 256) {
+                nodeLabelBox.setFocused(false);
+                return true;
+            }
+            nodeLabelBox.keyPressed(ClientInput.key(keyCode, scanCode, modifiers));
+            return true;
+        }
         if (currentPage == Page.NETWORK_LIST && networkSearchBox != null && networkSearchBox.isFocused()) {
             if (keyCode == 256) {
                 networkSearchBox.setFocused(false);
@@ -1074,6 +1127,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
     @Override
     public boolean charTyped(char ch, int modifiers) {
+        if (nodeLabelBox.isFocused()) return nodeLabelBox.charTyped(ClientInput.character(ch));
         if (currentPage == Page.NETWORK_LIST && networkSearchBox != null && networkSearchBox.isFocused()) {
             return networkSearchBox.charTyped(ClientInput.character(ch));
         }
@@ -1103,9 +1157,10 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             case NODE_MAP -> {
                 if (!nodeInfoList.isEmpty()) {
                     List<RenderEntry> renderEntries = buildNodeRenderEntries();
-                    if (renderEntries.size() > NODES_PER_PAGE) {
+                    int rowsPerPage = nodeRowsPerPage();
+                    if (renderEntries.size() > rowsPerPage) {
                         nodeMapScrollOffset -= (int) scrollY;
-                        int maxScroll = Math.max(0, renderEntries.size() - NODES_PER_PAGE);
+                        int maxScroll = Math.max(0, renderEntries.size() - rowsPerPage);
                         nodeMapScrollOffset = Math.max(0, Math.min(nodeMapScrollOffset, maxScroll));
                         return true;
                     }
@@ -1187,6 +1242,8 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             currentPage = Page.NETWORK_LIST;
             nodeInfoList.clear();
             nodeMapScrollOffset = 0;
+            selectedNodeIds.clear();
+            labelSettingsSource = null;
             return true;
         }
         if (handleVisibilityButtonClick(mouseX, mouseY))
@@ -1209,6 +1266,13 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         networkSearchBox.setX(leftPos + NETWORK_LIST_X + SEARCH_INPUT_X);
         networkSearchBox.setY(getSearchBoxTop() + ((SEARCH_BOX_HEIGHT - SEARCH_INPUT_HEIGHT) / 2));
         networkSearchBox.setWidth(SEARCH_INPUT_WIDTH);
+    }
+
+    private void layoutNodeLabelBox() {
+        if (nodeLabelBox == null) return;
+        nodeLabelBox.setX(leftPos + 18);
+        nodeLabelBox.setY(topPos + imageHeight - 30);
+        nodeLabelBox.setWidth(84);
     }
 
     private boolean handleSearchBoxClick(double mouseX, double mouseY) {
@@ -1427,6 +1491,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         if (selectedNetworkId == null) {
             return false;
         }
+        if (handleLabelToolbarClick(mouseX, mouseY)) return true;
 
         int contentX = leftPos + 10;
         int contentY = topPos + 34;
@@ -1436,7 +1501,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int listY = contentY + 40;
         List<RenderEntry> renderEntries = buildNodeRenderEntries();
 
-        for (int i = 0; i < NODES_PER_PAGE && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
+        for (int i = 0; i < nodeRowsPerPage() && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
             int index = i + nodeMapScrollOffset;
             RenderEntry entry = renderEntries.get(index);
             int entryY = listY + (i * NODE_ENTRY_HEIGHT);
@@ -1446,6 +1511,10 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                     && mouseY >= buttonY && mouseY < buttonY + HIGHLIGHT_BTN_H;
 
             if (entry.isHeader) {
+                if (isHoveringAbs(headerX + 4, entryY + 4, 14, 14, mouseX, mouseY)) {
+                    toggleGroupSelection(entry.headerName);
+                    return true;
+                }
                 int settingsX = buttonX - SETTINGS_BTN_GAP - SETTINGS_BTN_W;
                 boolean settingsClicked = mouseX >= settingsX && mouseX < settingsX + SETTINGS_BTN_W
                         && mouseY >= buttonY && mouseY < buttonY + SETTINGS_BTN_H;
@@ -1470,13 +1539,17 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                 continue;
             }
 
+            if (isHoveringAbs(headerX + 4, entryY + 4, 14, 14, mouseX, mouseY)) {
+                toggleNodeSelection(entry.nodeInfo.nodeId());
+                return true;
+            }
+
             if (!entry.isGrouped) {
                 int settingsX = buttonX - SETTINGS_BTN_GAP - SETTINGS_BTN_W;
                 boolean settingsClicked = mouseX >= settingsX && mouseX < settingsX + SETTINGS_BTN_W
                         && mouseY >= buttonY && mouseY < buttonY + SETTINGS_BTN_H;
                 if (settingsClicked) {
-                    ClientPacketDistributor.sendToServer(
-                            new RequestOpenNodeSettingsPayload(selectedNetworkId, entry.nodeInfo.nodeId()));
+                    openNodeSettings(entry.nodeInfo.nodeId());
                     return true;
                 }
             }
@@ -1495,11 +1568,40 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     private void openFirstNodeInLabel(String labelName) {
         for (SyncNetworkNodesPayload.NodeInfo info : nodeInfoList) {
             if (labelName.equals(info.nodeLabel())) {
-                ClientPacketDistributor.sendToServer(
-                        new RequestOpenNodeSettingsPayload(selectedNetworkId, info.nodeId()));
+                openNodeSettings(info.nodeId());
                 return;
             }
         }
+    }
+
+    private void openNodeSettings(UUID nodeId) {
+        NodeTableSession.begin(selectedNetworkId, selectedNetworkName, nodeMapScrollOffset, collapsedGroups,
+                selectedNodeIds, labelSettingsSource, nodeLabelBox.getValue());
+        ClientPacketDistributor.sendToServer(new RequestOpenNodeSettingsPayload(selectedNetworkId, nodeId));
+    }
+
+    private boolean handleLabelToolbarClick(double mouseX, double mouseY) {
+        if (selectedNodeIds.isEmpty()) return false;
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int contentW = imageWidth - 20;
+        int y = contentY + imageHeight - 44 - 20;
+        int applyX = contentX + 96;
+        int sourceX = applyX + 44;
+        int sameX = sourceX + 82;
+        if (isHoveringAbs(applyX, y, 40, 16, mouseX, mouseY)) {
+            applyBulkLabel();
+            return true;
+        }
+        if (isHoveringAbs(sourceX, y, 78, 16, mouseX, mouseY)) {
+            cycleLabelSource();
+            return true;
+        }
+        if (isHoveringAbs(sameX, y, contentX + contentW - 8 - sameX, 16, mouseX, mouseY)) {
+            selectSameBlock();
+            return true;
+        }
+        return false;
     }
 
     private boolean handleOptionButtonClick(double mouseX, double mouseY) {
@@ -1524,6 +1626,8 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                 && mouseY >= button2Y && mouseY < button2Y + OPTION_BTN_HEIGHT) {
             currentPage = Page.NODE_MAP;
             nodeMapScrollOffset = 0;
+            selectedNodeIds.clear();
+            labelSettingsSource = null;
             ClientPacketDistributor.sendToServer(new RequestNetworkNodesPayload(selectedNetworkId));
             return true;
         }
@@ -1610,6 +1714,80 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         return renderEntries;
     }
 
+    private int nodeRowsPerPage() {
+        int contentHeight = imageHeight - 44;
+        return Math.max(1, (contentHeight - 64) / NODE_ENTRY_HEIGHT);
+    }
+
+    private int groupSelectionState(String label) {
+        int selected = 0;
+        int total = 0;
+        for (SyncNetworkNodesPayload.NodeInfo node : nodeInfoList) {
+            if (!label.equals(node.nodeLabel())) continue;
+            total++;
+            if (selectedNodeIds.contains(node.nodeId())) selected++;
+        }
+        if (selected == 0) return 0;
+        return selected == total ? 2 : 1;
+    }
+
+    private void toggleGroupSelection(String label) {
+        boolean allSelected = groupSelectionState(label) == 2;
+        for (SyncNetworkNodesPayload.NodeInfo node : nodeInfoList) {
+            if (!label.equals(node.nodeLabel())) continue;
+            if (allSelected) selectedNodeIds.remove(node.nodeId());
+            else selectedNodeIds.add(node.nodeId());
+        }
+        normalizeLabelSource();
+    }
+
+    private void toggleNodeSelection(UUID nodeId) {
+        if (!selectedNodeIds.remove(nodeId)) selectedNodeIds.add(nodeId);
+        normalizeLabelSource();
+    }
+
+    private void normalizeLabelSource() {
+        if (labelSettingsSource != null && selectedNodeIds.contains(labelSettingsSource)) return;
+        labelSettingsSource = nodeInfoList.stream().map(SyncNetworkNodesPayload.NodeInfo::nodeId)
+                .filter(selectedNodeIds::contains).findFirst().orElse(null);
+    }
+
+    private String labelSourceText() {
+        normalizeLabelSource();
+        String source = nodeInfoList.stream().filter(node -> node.nodeId().equals(labelSettingsSource))
+                .map(node -> resolveBlockLabel(node.blockName())).findFirst().orElse("-");
+        return line("gui.logisticsnetworks.computer.settings_source", source);
+    }
+
+    private void cycleLabelSource() {
+        List<UUID> selected = nodeInfoList.stream().map(SyncNetworkNodesPayload.NodeInfo::nodeId)
+                .filter(selectedNodeIds::contains).toList();
+        if (selected.isEmpty()) return;
+        int index = selected.indexOf(labelSettingsSource);
+        labelSettingsSource = selected.get(Math.floorMod(index + 1, selected.size()));
+    }
+
+    private void selectSameBlock() {
+        normalizeLabelSource();
+        String block = nodeInfoList.stream().filter(node -> node.nodeId().equals(labelSettingsSource))
+                .map(SyncNetworkNodesPayload.NodeInfo::blockName).findFirst().orElse(null);
+        if (block == null) return;
+        selectedNodeIds.clear();
+        nodeInfoList.stream().filter(node -> block.equals(node.blockName()))
+                .map(SyncNetworkNodesPayload.NodeInfo::nodeId).forEach(selectedNodeIds::add);
+        normalizeLabelSource();
+    }
+
+    private void applyBulkLabel() {
+        normalizeLabelSource();
+        if (selectedNetworkId == null || labelSettingsSource == null) return;
+        List<UUID> selected = nodeInfoList.stream().map(SyncNetworkNodesPayload.NodeInfo::nodeId)
+                .filter(selectedNodeIds::contains).toList();
+        if (selected.size() > SetNodeLabelsPayload.MAX_NODES) return;
+        ClientPacketDistributor.sendToServer(new SetNodeLabelsPayload(
+                selectedNetworkId, selected, nodeLabelBox.getValue(), labelSettingsSource));
+    }
+
     private void renderHighlightTooltip(GuiGraphics g, int mouseX, int mouseY) {
         if (currentPage != Page.NODE_MAP || selectedNetworkId == null) {
             return;
@@ -1636,7 +1814,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int listY = contentY + 40;
         List<RenderEntry> renderEntries = buildNodeRenderEntries();
 
-        for (int i = 0; i < NODES_PER_PAGE && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
+        for (int i = 0; i < nodeRowsPerPage() && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
             int index = i + nodeMapScrollOffset;
             RenderEntry entry = renderEntries.get(index);
             int entryY = listY + (i * NODE_ENTRY_HEIGHT);
@@ -1662,7 +1840,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int listY = contentY + 40;
         List<RenderEntry> renderEntries = buildNodeRenderEntries();
 
-        for (int i = 0; i < NODES_PER_PAGE && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
+        for (int i = 0; i < nodeRowsPerPage() && (i + nodeMapScrollOffset) < renderEntries.size(); i++) {
             int index = i + nodeMapScrollOffset;
             RenderEntry entry = renderEntries.get(index);
             int entryY = listY + (i * NODE_ENTRY_HEIGHT);
@@ -1816,7 +1994,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             case "overworld" -> line("gui.logisticsnetworks.computer.dimension.overworld");
             case "the_nether" -> line("gui.logisticsnetworks.computer.dimension.nether");
             case "the_end" -> line("gui.logisticsnetworks.computer.dimension.end");
-            default -> trimText(dimension.toUpperCase(Locale.ROOT), 10);
+            default -> nodeInfo.dimension().toString();
         };
         return line("gui.logisticsnetworks.computer.position", dimension,
                 nodeInfo.attachedPos().getX(),
@@ -1825,11 +2003,19 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     }
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
-        if (Config.debugMode) LOGGER.debug("Received network list with {} entries", networks.size());
-        if (Config.debugMode) {
-            for (SyncNetworkListPayload.NetworkEntry entry : networks) {
-                LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
-            }
+        NodeTableSession.State table = NodeTableSession.take();
+        if (table != null) {
+            currentPage = Page.NODE_MAP;
+            selectedNetworkId = table.networkId();
+            selectedNetworkName = table.networkName();
+            nodeMapScrollOffset = table.scroll();
+            collapsedGroups.clear();
+            collapsedGroups.addAll(table.collapsedGroups());
+            selectedNodeIds.clear();
+            selectedNodeIds.addAll(table.selectedNodes());
+            labelSettingsSource = table.settingsSource();
+            nodeLabelBox.setValue(table.label());
+            ClientPacketDistributor.sendToServer(new RequestNetworkNodesPayload(table.networkId()));
         }
         UUID returningNetwork = NodeGraphSession.takeReturningNetwork();
         if (returningNetwork != null) {
@@ -1888,7 +2074,10 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     public void receiveNetworkNodes(UUID networkId, List<SyncNetworkNodesPayload.NodeInfo> nodes) {
         if (networkId.equals(selectedNetworkId)) {
             this.nodeInfoList = new ArrayList<>(nodes);
-            this.nodeMapScrollOffset = 0;
+            Set<UUID> available = nodes.stream().map(SyncNetworkNodesPayload.NodeInfo::nodeId)
+                    .collect(java.util.stream.Collectors.toSet());
+            selectedNodeIds.retainAll(available);
+            normalizeLabelSource();
         }
     }
 

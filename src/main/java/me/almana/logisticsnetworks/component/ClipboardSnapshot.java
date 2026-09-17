@@ -54,7 +54,8 @@ public record ClipboardSnapshot(
             DistributionMode distributionMode,
             FilterMode filterMode,
             int priority,
-            String name) {
+            String name,
+            boolean resourceRoundRobin) {
 
         private static final Codec<ChannelMode> MODE_CODEC = enumCodec(ChannelMode.values(), ChannelMode.IMPORT);
         private static final Codec<ChannelType> TYPE_CODEC = enumCodec(ChannelType.values(), ChannelType.ITEM);
@@ -73,7 +74,8 @@ public record ClipboardSnapshot(
                 DISTRIBUTION_CODEC.fieldOf("distribution_mode").forGetter(ChannelState::distributionMode),
                 FILTER_CODEC.fieldOf("filter_mode").forGetter(ChannelState::filterMode),
                 Codec.INT.fieldOf("priority").forGetter(ChannelState::priority),
-                Codec.STRING.optionalFieldOf("name", "").forGetter(ChannelState::name)
+                Codec.STRING.optionalFieldOf("name", "").forGetter(ChannelState::name),
+                Codec.BOOL.optionalFieldOf("resource_round_robin", false).forGetter(ChannelState::resourceRoundRobin)
         ).apply(instance, ChannelState::new));
 
         public ChannelState {

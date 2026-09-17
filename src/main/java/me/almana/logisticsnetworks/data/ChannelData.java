@@ -2,6 +2,8 @@ package me.almana.logisticsnetworks.data;
 
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.logic.ChannelTelemetry;
+import me.almana.logisticsnetworks.logic.ItemResourceOrder;
+import me.almana.logisticsnetworks.logic.FluidResourceOrder;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -44,6 +46,9 @@ public class ChannelData {
     private FilterMode filterMode = FilterMode.MATCH_ANY;
     private int priority = 0;
     private String name = "";
+    private boolean resourceRoundRobin;
+    private transient ItemResourceOrder.Cursor itemResourceCursor;
+    private transient FluidResourceOrder.Cursor fluidResourceCursor;
 
     private final ItemStack[] filterItems = new ItemStack[FILTER_SIZE];
     private final transient ChannelTelemetry telemetry = new ChannelTelemetry();
@@ -72,6 +77,7 @@ public class ChannelData {
         tag.putString(KEY_DISTRIB, distributionMode.name());
         tag.putString(KEY_FILTER_MODE, filterMode.name());
         tag.putInt(KEY_PRIORITY, priority);
+        tag.putBoolean("ResourceRoundRobin", resourceRoundRobin);
 
         if (provider != null) {
             ListTag list = new ListTag();
@@ -91,6 +97,8 @@ public class ChannelData {
     }
 
     public void load(CompoundTag tag, @Nullable HolderLookup.Provider provider) {
+        resourceRoundRobin = tag.getBooleanOr("ResourceRoundRobin", false);
+        resetResourceRotation();
         if (tag.contains(KEY_ENABLED))
             enabled = tag.getBooleanOr(KEY_ENABLED, enabled);
 
@@ -153,6 +161,7 @@ public class ChannelData {
     }
 
     public void save(ValueOutput tag) {
+        tag.putBoolean("ResourceRoundRobin", resourceRoundRobin);
         tag.putBoolean(KEY_ENABLED, enabled);
         tag.putString(KEY_MODE, mode.name());
         tag.putString(KEY_TYPE, type.name());
@@ -178,6 +187,8 @@ public class ChannelData {
     }
 
     public void load(ValueInput tag) {
+        resourceRoundRobin = tag.getBooleanOr("ResourceRoundRobin", false);
+        resetResourceRotation();
         enabled = tag.getBooleanOr(KEY_ENABLED, enabled);
         mode = parseEnum(tag.getStringOr(KEY_MODE, mode.name()), ChannelMode.class, ChannelMode.IMPORT);
         type = parseEnum(tag.getStringOr(KEY_TYPE, type.name()), ChannelType.class, ChannelType.ITEM);
@@ -339,6 +350,44 @@ public class ChannelData {
         return priority;
     }
 
+    public boolean isResourceRoundRobin() {
+        return resourceRoundRobin;
+    }
+
+    public void setResourceRoundRobin(boolean value) {
+        if (resourceRoundRobin != value) resetResourceRotation();
+        resourceRoundRobin = value;
+    }
+
+    public boolean canRotateResources() {
+        return resourceRoundRobin && mode == ChannelMode.EXPORT
+                && (type == ChannelType.ITEM || type == ChannelType.FLUID)
+                && Arrays.stream(filterItems).anyMatch(stack -> !stack.isEmpty());
+    }
+
+    @Nullable
+    public ItemResourceOrder.Cursor getItemResourceCursor() {
+        return itemResourceCursor;
+    }
+
+    public void setItemResourceCursor(ItemResourceOrder.Cursor cursor) {
+        itemResourceCursor = cursor;
+    }
+
+    @Nullable
+    public FluidResourceOrder.Cursor getFluidResourceCursor() {
+        return fluidResourceCursor;
+    }
+
+    public void setFluidResourceCursor(FluidResourceOrder.Cursor cursor) {
+        fluidResourceCursor = cursor;
+    }
+
+    public void resetResourceRotation() {
+        itemResourceCursor = null;
+        fluidResourceCursor = null;
+    }
+
     public void setPriority(int priority) {
         this.priority = Math.max(-99, Math.min(99, priority));
     }
@@ -376,6 +425,8 @@ public class ChannelData {
     }
 
     public void copyFrom(ChannelData source) {
+        resourceRoundRobin = source.resourceRoundRobin;
+        resetResourceRotation();
         this.enabled = source.enabled;
         this.mode = source.mode;
         this.type = source.type;

@@ -47,6 +47,10 @@ Use Primary Interaction on the button above the filter grid to toggle between th
 
 **How to change it:** use Primary Interaction on the button to flip between Any and All. The change takes effect instantly for the current channel.
 
+## Round-robin resources
+
+On an Item or Fluid Sender with a filter, the **RR** button beside the filter grid enables resource rotation. It is off by default. Each operation moves one distinct matching resource type from the attached storage, then the next successful operation starts after that type. Duplicate slots count as one type; different components remain distinct. Blocked types are skipped, and no movement leaves the turn unchanged. Existing batch, delay, stock, slot and receiver-distribution rules still apply.
+
 ## Upgrades
 
 ![Upgrades 2x2 grid](images/filters-upgrades-upgrades.png)
@@ -55,7 +59,7 @@ Use Primary Interaction on the button above the filter grid to toggle between th
 
 **What it does:** performance upgrades increase batch caps and lower the minimum tick delay. The Dimensional Upgrade enables transfers across dimensions.
 
-**Per-node, not per-channel.** This is the opposite of Filters. Upgrades are shared by **all 9 channels** on the node. Insert a Diamond Upgrade and every channel on the node benefits from the higher batch cap and shorter delay. You do not need to (and cannot) install separate upgrades for each channel.
+**Per-node, not per-channel.** Upgrades are shared by **all 9 channels** on the node. Increasing the tier sets each channel's Batch to its new maximum and allows a shorter delay. Non-energy channels keep their configured Delay until you change it.
 
 **What fits in the slots:**
 

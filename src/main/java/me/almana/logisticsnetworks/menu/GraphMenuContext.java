@@ -14,15 +14,31 @@ import net.minecraft.world.entity.player.Player;
 
 import java.util.UUID;
 
-public record GraphMenuContext(BlockPos computerPos, Identifier computerDimension, UUID networkId) {
+public record GraphMenuContext(BlockPos computerPos, Identifier computerDimension, UUID networkId,
+                               Origin origin) {
+    public enum Origin {
+        GRAPH,
+        TABLE
+    }
+
+    public GraphMenuContext(BlockPos computerPos, Identifier computerDimension, UUID networkId) {
+        this(computerPos, computerDimension, networkId, Origin.GRAPH);
+    }
+
     public static GraphMenuContext read(FriendlyByteBuf buf) {
-        return new GraphMenuContext(buf.readBlockPos(), buf.readIdentifier(), buf.readUUID());
+        BlockPos computerPos = buf.readBlockPos();
+        Identifier dimension = buf.readIdentifier();
+        UUID networkId = buf.readUUID();
+        int origin = buf.readVarInt();
+        return new GraphMenuContext(computerPos, dimension, networkId,
+                origin == Origin.TABLE.ordinal() ? Origin.TABLE : Origin.GRAPH);
     }
 
     public void write(FriendlyByteBuf buf) {
         buf.writeBlockPos(computerPos);
         buf.writeIdentifier(computerDimension);
         buf.writeUUID(networkId);
+        buf.writeVarInt(origin.ordinal());
     }
 
     public boolean stillValid(Player player) {

@@ -35,10 +35,11 @@ public final class ItemPlanner {
         List<TransferPlan.MoveIntent> moves = new ArrayList<>();
         ResourceHandler<ItemResource> sourceHandler = endpoints.get(unit.sourceEndpoint());
 
-        TransferEngine.executeMove(sourceHandler, engineTargets, unit.batchLimit(), exportFilters,
+        TransferEngine.executeItemOperation(sourceHandler, engineTargets, unit.batchLimit(), exportFilters,
                 unit.exportFilterMode(), null, snapshot.registries(), unit.roundRobin(), readCache,
                 (sourceSlot, targetIndex, moved, mask) -> moves.add(new TransferPlan.MoveIntent(
-                        sourceSlot, targetIndex, ItemResource.of(moved), moved.getCount(), mask)));
+                        sourceSlot, targetIndex, ItemResource.of(moved), moved.getCount(), mask)),
+                java.util.Map.of(), null, null, unit.resourceRoundRobin(), unit.resourceCursor(), null);
 
         NetworkSnapshot.DirectEndpoint directSource = snapshot.endpoints().get(unit.sourceEndpoint()).direct();
         return new TransferPlan.ChannelMoves(unit.sourceNodeId(), unit.channelIndex(), targetRefs, moves,

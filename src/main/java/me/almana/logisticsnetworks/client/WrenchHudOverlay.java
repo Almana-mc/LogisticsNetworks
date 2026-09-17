@@ -86,12 +86,16 @@ public class WrenchHudOverlay {
             int screenWidth = mc.getWindow().getGuiScaledWidth();
             int screenHeight = mc.getWindow().getGuiScaledHeight();
 
-            int x = screenWidth / 2 + 98;
+            int textWidth = mc.font.width(text);
+            int x = Math.min(screenWidth / 2 + 98, screenWidth - (int) Math.ceil(textWidth * 0.75) - 8);
             int y = screenHeight - 4;
 
             g.pose().pushPose();
             g.pose().translate(x, y, 0);
             g.pose().scale(0.75f, 0.75f, 1f);
+            g.fill(-5, -mc.font.lineHeight - 3, textWidth + 4, 3, 0xCC101010);
+            int color = WrenchItem.getModeDisplayName(mode).getStyle().getColor().getValue();
+            g.fill(-5, -mc.font.lineHeight - 3, -2, 3, 0xFF000000 | color);
             g.drawString(mc.font, text, 0, -mc.font.lineHeight, 0xFFFFFF, true);
             g.pose().popPose();
         }

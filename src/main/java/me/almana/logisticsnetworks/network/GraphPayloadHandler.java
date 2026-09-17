@@ -9,6 +9,10 @@ import me.almana.logisticsnetworks.data.graph.GraphNode;
 import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import me.almana.logisticsnetworks.data.graph.NetworkGraph;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
+import me.almana.logisticsnetworks.logic.TransferEngine;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.GraphMenuContext;
@@ -33,7 +37,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public final class GraphPayloadHandler {
@@ -63,10 +70,15 @@ public final class GraphPayloadHandler {
     public static GraphMenuContext getContext(AbstractContainerMenu menu) {
         if (menu instanceof NodeGraphMenu graph) return graph.getGraphContext();
         if (menu instanceof FilterMenu filter) return filter.getGraphContext();
+        if (menu instanceof me.almana.logisticsnetworks.menu.NodeMenu node) return node.getReturnContext();
         return null;
     }
 
     public static void open(ServerPlayer player, GraphMenuContext context, LogisticsNodeEntity node, int channel) {
+        if (context.origin() == GraphMenuContext.Origin.TABLE) {
+            openNodeSettings(player, context, node, channel);
+            return;
+        }
         int selectedChannel = Math.clamp(channel, 0, LogisticsNodeEntity.CHANNEL_COUNT - 1);
         boolean preserveCursor = getContext(player.containerMenu) != null;
         player.openMenu(new GraphMenuProvider(
@@ -91,15 +103,52 @@ public final class GraphPayloadHandler {
     public static void handleMove(MoveGraphVertexPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player) || !authorized(player, payload.networkId())) return;
-            if (!Float.isFinite(payload.x()) || !Float.isFinite(payload.y())
-                    || Math.abs(payload.x()) > 1_000_000 || Math.abs(payload.y()) > 1_000_000) return;
-            NetworkRegistry registry = NetworkRegistry.get(player.level());
-            LogisticsNetwork network = registry.getNetwork(payload.networkId());
-            List<GraphNode> nodes = loadedNodes(player.level().getServer(), network);
-            if (nodes.stream().noneMatch(node -> NetworkGraph.key(node).equals(payload.key()))) return;
-            network.setGraphPosition(payload.key(), new GraphPosition(payload.x(), payload.y()));
-            registry.setDirty();
-            broadcast(player.level().getServer(), network.getId());
+            moveVertices(player, payload.networkId(), Map.of(
+                    payload.key(), new GraphPosition(payload.x(), payload.y())));
+        });
+    }
+
+    public static void handleMoveVertices(MoveGraphVerticesPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player) || !authorized(player, payload.networkId())) return;
+            if (payload.positions().isEmpty() || payload.positions().size() > MoveGraphVerticesPayload.MAX_VERTICES) return;
+            moveVertices(player, payload.networkId(), payload.positions());
+        });
+    }
+
+    public static void handleSetLabels(SetNodeLabelsPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || payload.nodeIds().isEmpty() || payload.nodeIds().size() > SetNodeLabelsPayload.MAX_NODES) return;
+            GraphMenuContext menuContext = labelContext(player, payload.networkId());
+            if (menuContext == null) return;
+            LogisticsNetwork network = NetworkRegistry.get(player.level()).getNetwork(payload.networkId());
+            if (network == null) return;
+
+            Set<UUID> ids = new LinkedHashSet<>(payload.nodeIds());
+            if (ids.size() != payload.nodeIds().size()) return;
+            List<LogisticsNodeEntity> nodes = new ArrayList<>(ids.size());
+            for (UUID nodeId : ids) {
+                LogisticsNodeEntity node = findNode(player.level().getServer(), nodeId);
+                if (node == null || !menuContext.canEdit(player, node)) return;
+                nodes.add(node);
+            }
+            String label = payload.label().trim();
+            if (label.length() > 48) label = label.substring(0, 48);
+            StorageLink link = LinkedStorage.findAccessibleLink(player, null);
+            LabelUpgradeSync.synchronizeLabels(player, network, nodes, payload.settingsSource(), label, link);
+        });
+    }
+
+    public static void handleOpenNodeSettings(RequestOpenNodeSettingsPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof ComputerMenu menu) || !menu.stillValid(player)) return;
+            GraphMenuContext table = new GraphMenuContext(menu.getComputerPos(),
+                    player.level().dimension().identifier(), payload.networkId(), GraphMenuContext.Origin.TABLE);
+            LogisticsNodeEntity node = findNode(player.level().getServer(), payload.nodeId());
+            if (node == null || !table.canEdit(player, node) || !player.containerMenu.getCarried().isEmpty()) return;
+            openNodeSettings(player, table, node, 0);
         });
     }
 
@@ -115,7 +164,7 @@ public final class GraphPayloadHandler {
 
     public static void handleReturn(ReturnToComputerPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player) || !authorized(player, payload.networkId())) return;
+            if (!(context.player() instanceof ServerPlayer player) || !authorizedReturn(player, payload.networkId())) return;
             if (!player.containerMenu.getCarried().isEmpty()) return;
             GraphMenuContext graph = getContext(player.containerMenu);
             player.openMenu(new SimpleMenuProvider(
@@ -128,7 +177,71 @@ public final class GraphPayloadHandler {
 
     private static boolean authorized(ServerPlayer player, UUID networkId) {
         GraphMenuContext graph = getContext(player.containerMenu);
-        return graph != null && graph.networkId().equals(networkId) && graph.stillValid(player);
+        return graph != null && graph.origin() == GraphMenuContext.Origin.GRAPH
+                && graph.networkId().equals(networkId) && graph.stillValid(player);
+    }
+
+    private static boolean authorizedReturn(ServerPlayer player, UUID networkId) {
+        GraphMenuContext context = getContext(player.containerMenu);
+        return context != null && context.networkId().equals(networkId) && context.stillValid(player);
+    }
+
+    private static GraphMenuContext labelContext(ServerPlayer player, UUID networkId) {
+        GraphMenuContext context = getContext(player.containerMenu);
+        if (context != null) {
+            return context.networkId().equals(networkId) && context.stillValid(player) ? context : null;
+        }
+        if (!(player.containerMenu instanceof ComputerMenu menu) || !menu.stillValid(player)) return null;
+        GraphMenuContext table = new GraphMenuContext(menu.getComputerPos(),
+                player.level().dimension().identifier(), networkId, GraphMenuContext.Origin.TABLE);
+        return table.stillValid(player) ? table : null;
+    }
+
+    private static void openNodeSettings(ServerPlayer player, GraphMenuContext context,
+                                         LogisticsNodeEntity node, int channel) {
+        if (node == null || !context.canEdit(player, node) || !player.containerMenu.getCarried().isEmpty()) return;
+        int selectedChannel = Math.clamp(channel, 0, LogisticsNodeEntity.CHANNEL_COUNT - 1);
+        player.openMenu(new GraphMenuProvider((id, inventory, ignored) -> {
+            me.almana.logisticsnetworks.menu.NodeMenu menu =
+                    new me.almana.logisticsnetworks.menu.NodeMenu(id, inventory, node);
+            menu.setSelectedChannel(selectedChannel);
+            menu.setRemoteAccess(true);
+            menu.setReturnContext(context);
+            return menu;
+        }, Component.translatable("gui.logisticsnetworks.node_config"), true), buf -> {
+            NodeMenuSync.write(buf, node, player.registryAccess(), selectedChannel);
+            buf.writeBoolean(true);
+            context.write(buf);
+        });
+        if (player.containerMenu instanceof me.almana.logisticsnetworks.menu.NodeMenu menu) {
+            menu.sendNetworkListToClient(player);
+        }
+    }
+
+    private static void moveVertices(ServerPlayer player, UUID networkId,
+                                     Map<String, GraphPosition> requestedPositions) {
+        for (Map.Entry<String, GraphPosition> entry : requestedPositions.entrySet()) {
+            GraphPosition position = entry.getValue();
+            if (entry.getKey().length() > 128 || !Float.isFinite(position.x()) || !Float.isFinite(position.y())
+                    || Math.abs(position.x()) > 1_000_000 || Math.abs(position.y()) > 1_000_000) return;
+        }
+        NetworkRegistry registry = NetworkRegistry.get(player.level());
+        LogisticsNetwork network = registry.getNetwork(networkId);
+        if (network == null) return;
+        Map<String, List<LogisticsNodeEntity>> vertices = new LinkedHashMap<>();
+        for (GraphNode graphNode : loadedNodes(player.level().getServer(), network)) {
+            LogisticsNodeEntity node = findNode(player.level().getServer(), graphNode.nodeId());
+            if (node != null) vertices.computeIfAbsent(NetworkGraph.key(graphNode), key -> new ArrayList<>()).add(node);
+        }
+        for (String key : requestedPositions.keySet()) {
+            List<LogisticsNodeEntity> members = vertices.get(key);
+            if (members == null || members.isEmpty()) return;
+            GraphMenuContext context = getContext(player.containerMenu);
+            if (members.stream().anyMatch(node -> !context.canEdit(player, node))) return;
+        }
+        requestedPositions.forEach(network::setGraphPosition);
+        registry.setDirty();
+        broadcast(player.level().getServer(), networkId);
     }
 
     public static void preserveLabelPosition(LogisticsNodeEntity node, String newLabel) {
@@ -156,6 +269,22 @@ public final class GraphPayloadHandler {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (player.containerMenu instanceof NodeGraphMenu && authorized(player, networkId)) sendSnapshot(player);
         }
+    }
+
+    public static void refreshTable(ServerPlayer player, UUID networkId) {
+        if (!(player.containerMenu instanceof ComputerMenu)) return;
+        LogisticsNetwork network = NetworkRegistry.get(player.level()).getNetwork(networkId);
+        if (network == null) return;
+        List<SyncNetworkNodesPayload.NodeInfo> nodes = new ArrayList<>();
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(player.level().getServer(), nodeId);
+            if (node == null || !node.isAlive() || !node.isValidNode() || !node.level().isLoaded(node.getAttachedPos())) continue;
+            var attached = node.level().getBlockState(node.getAttachedPos());
+            nodes.add(new SyncNetworkNodesPayload.NodeInfo(nodeId, node.blockPosition(), node.getAttachedPos(),
+                    BuiltInRegistries.BLOCK.getKey(attached.getBlock()).toString(), node.getNodeLabel(),
+                    node.level().dimension().identifier(), node.isRenderVisible(), node.isHighlighted()));
+        }
+        PacketDistributor.sendToPlayer(player, new SyncNetworkNodesPayload(networkId, nodes));
     }
 
     private static void sendSnapshot(ServerPlayer player) {

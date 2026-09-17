@@ -94,6 +94,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             LogisticsNetworks.MOD_ID, "textures/gui/filter_paste.png");
     private static final Identifier SCAN_STORAGE_ICON = Identifier.fromNamespaceAndPath(
             LogisticsNetworks.MOD_ID, "textures/gui/filter_scan_storage.png");
+    private static final Identifier RESOURCE_ROTATION_ICON = Identifier.fromNamespaceAndPath(
+            LogisticsNetworks.MOD_ID, "textures/gui/filter_resource_rotation.png");
     private static final int CLIPBOARD_BUTTON_SIZE = 12;
     private static final int CLIPBOARD_BUTTON_GAP = 2;
     private static FilterClipboardSnapshot copiedFilter;
@@ -846,16 +848,20 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private void renderClipboardButtons(GuiGraphics g, int mx, int my) {
+        if (menu.canSetResourceRoundRobin()) {
+            drawIconButton(g, resourceRotationButtonX(), clipboardButtonY(), RESOURCE_ROTATION_ICON, mx, my,
+                    true, menu.isResourceRoundRobin());
+        }
         drawIconButton(g, scanStorageButtonX(), clipboardButtonY(), SCAN_STORAGE_ICON, mx, my,
-                menu.canScanAttachedStorage());
-        drawIconButton(g, copyButtonX(), clipboardButtonY(), COPY_ICON, mx, my, true);
-        drawIconButton(g, pasteButtonX(), clipboardButtonY(), PASTE_ICON, mx, my, copiedFilter != null);
+                menu.canScanAttachedStorage(), false);
+        drawIconButton(g, copyButtonX(), clipboardButtonY(), COPY_ICON, mx, my, true, false);
+        drawIconButton(g, pasteButtonX(), clipboardButtonY(), PASTE_ICON, mx, my, copiedFilter != null, false);
     }
 
-    private void drawIconButton(GuiGraphics g, int x, int y, Identifier icon, int mx, int my, boolean active) {
+    private void drawIconButton(GuiGraphics g, int x, int y, Identifier icon, int mx, int my, boolean active, boolean selected) {
         boolean hovered = active && isHovering(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my);
-        g.fill(x, y, x + CLIPBOARD_BUTTON_SIZE, y + CLIPBOARD_BUTTON_SIZE, hovered ? cBtnHover() : cBtnBg());
-        g.renderOutline(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, hovered ? cText() : cBtnBorder());
+        g.fill(x, y, x + CLIPBOARD_BUTTON_SIZE, y + CLIPBOARD_BUTTON_SIZE, selected ? cSelected() : hovered ? cBtnHover() : cBtnBg());
+        g.renderOutline(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, selected ? cAccent() : hovered ? cText() : cBtnBorder());
         g.blit(icon, x + 2, y + 2, 0f, 0f, 8, 8, 8, 8);
     }
 
@@ -865,6 +871,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     private int scanStorageButtonX() {
         return copyButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
+    }
+
+    private int resourceRotationButtonX() {
+        return scanStorageButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
     }
 
     private int pasteButtonX() {
@@ -996,6 +1006,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private boolean handleClipboardButtonClick(double mx, double my, int btn) {
         if (btn != 0) {
             return false;
+        }
+        if (menu.canSetResourceRoundRobin()
+                && isHovering(resourceRotationButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE,
+                        CLIPBOARD_BUTTON_SIZE, (int) mx, (int) my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 10);
+            }
+            return true;
         }
         if (isHovering(scanStorageButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
                 (int) mx, (int) my)) {
@@ -1749,6 +1767,16 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private boolean renderClipboardTooltip(GuiGraphics g, int mx, int my) {
+        if (menu.canSetResourceRoundRobin()
+                && isHovering(resourceRotationButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE,
+                        CLIPBOARD_BUTTON_SIZE, mx, my)) {
+            g.renderTooltip(font, List.of(
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint"),
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint.operation"),
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint.blocked"),
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint.settings")), mx, my);
+            return true;
+        }
         if (isHovering(scanStorageButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
                 mx, my)) {
             String key = menu.canScanAttachedStorage()
@@ -4713,6 +4741,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             lines.add(Component.literal("Slots: " + slotExpr).withStyle(ChatFormatting.LIGHT_PURPLE));
         }
 
+        lines.add(1, Component.translatable("gui.logisticsnetworks.filter.advanced_settings_hint",
+                ClientControls.MODIFIER_2.getTranslatedKeyMessage()).withStyle(ChatFormatting.GREEN));
+        lines.add(2, Component.literal("-----").withStyle(ChatFormatting.DARK_GRAY));
         return lines;
     }
 }

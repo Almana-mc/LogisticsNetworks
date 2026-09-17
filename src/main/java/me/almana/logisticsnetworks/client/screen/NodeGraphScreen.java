@@ -2,19 +2,21 @@ package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.graph.GraphCanvas;
+import me.almana.logisticsnetworks.client.graph.GraphLayout;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.data.graph.GraphNode;
 import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import me.almana.logisticsnetworks.data.graph.NetworkGraph;
 import me.almana.logisticsnetworks.menu.NodeGraphMenu;
-import me.almana.logisticsnetworks.network.MoveGraphVertexPayload;
+import me.almana.logisticsnetworks.network.MoveGraphVerticesPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkGraphPayload;
 import me.almana.logisticsnetworks.network.RequestOpenGraphPayload;
 import me.almana.logisticsnetworks.network.ResetGraphLayoutPayload;
 import me.almana.logisticsnetworks.network.ReturnToComputerPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkGraphPayload;
 import net.minecraft.util.Util;
+import me.almana.logisticsnetworks.network.SetNodeLabelsPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -22,6 +24,7 @@ import net.minecraft.client.input.KeyEvent;
 import me.almana.logisticsnetworks.client.ClientInput;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -29,7 +32,9 @@ import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -47,6 +52,7 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     private final NodeGraphSession session;
     private final NodeGraphMenu graphMenu;
     private double uiScale = 1;
+    private int mouseModifiers;
     private int refreshTicks;
     private SyncNetworkGraphPayload receivedSnapshot;
     private boolean openingSelection;
@@ -54,6 +60,8 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     private long panelAnimationStartedAt = -1;
     private Button previousButton;
     private Button nextButton;
+    private EditBox bulkLabelBox;
+    private Button labelSourceButton;
 
     public NodeGraphScreen(NodeGraphMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -85,6 +93,7 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
 
     @Override
     protected void rebuildPageLayout() {
+        String pendingLabel = bulkLabelBox == null ? "" : bulkLabelBox.getValue();
         previousButton = null;
         nextButton = null;
         if (menu.getNode() != null) super.rebuildPageLayout();
@@ -92,6 +101,17 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
         addButton(width - 224, 8, 48, "back", this::returnToComputer);
         addButton(width - 170, 8, 46, "fit", () -> canvas().fit());
         addButton(width - 118, 8, 110, "reset", this::resetLayout);
+        bulkLabelBox = new EditBox(font, 8, 9, 80, 18, text("label"));
+        bulkLabelBox.setMaxLength(48);
+        bulkLabelBox.setHint(text("label"));
+        bulkLabelBox.setValue(pendingLabel);
+        addRenderableWidget(bulkLabelBox);
+        addButton(92, 8, 42, "apply", this::applyLabel);
+        labelSourceButton = addButton(138, 8, 90, "source", this::cycleLabelSource);
+        addButton(232, 8, 62, "same_block", this::selectSameBlock);
+        addButton(298, 8, 34, "horizontal", () -> canvas().distribute(GraphLayout.Axis.HORIZONTAL));
+        addButton(336, 8, 34, "vertical", () -> canvas().distribute(GraphLayout.Axis.VERTICAL));
+        updateLabelSource();
         if (menu.getNode() != null) {
             previousButton = addIconButton(leftPos + 6, topPos - 16, "previous", PREVIOUS_ICON,
                     () -> selectMember(-1));
@@ -134,6 +154,7 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
         if (!snapshot.networkId().equals(graphMenu.getGraphNetworkId())) return;
         session.snapshot = snapshot;
         canvas().update(snapshot.nodes(), snapshot.positions());
+        updateLabelSource();
         updateSelection();
         if (menu.getNode() != null && selectedNode() == null && !openingSelection) openSelection(null);
     }
@@ -316,9 +337,54 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
                 getSelectedChannel()));
     }
 
-    void moveVertex(String key, GraphPosition position) {
-        ClientPacketDistributor.sendToServer(new MoveGraphVertexPayload(graphMenu.getGraphNetworkId(), key,
-                position.x(), position.y()));
+    void moveVertices(Map<String, GraphPosition> positions) {
+        if (positions.size() > MoveGraphVerticesPayload.MAX_VERTICES) return;
+        ClientPacketDistributor.sendToServer(new MoveGraphVerticesPayload(graphMenu.getGraphNetworkId(), positions));
+    }
+
+    private void selectSameBlock() {
+        updateLabelSource();
+        if (session.labelSource != null) canvas().selectSameBlock(session.labelSource);
+        updateLabelSource();
+    }
+
+    private void cycleLabelSource() {
+        List<GraphNode> selected = selectedNodes();
+        if (selected.isEmpty()) return;
+        int index = selected.stream().map(GraphNode::nodeId).toList().indexOf(session.labelSource);
+        session.labelSource = selected.get(Math.floorMod(index + 1, selected.size())).nodeId();
+        updateLabelSource();
+    }
+
+    private void updateLabelSource() {
+        List<GraphNode> selected = selectedNodes();
+        if (selected.isEmpty()) session.labelSource = null;
+        else if (selected.stream().noneMatch(node -> node.nodeId().equals(session.labelSource))) {
+            session.labelSource = selected.getFirst().nodeId();
+        }
+        if (labelSourceButton != null) {
+            String source = selected.stream().filter(node -> node.nodeId().equals(session.labelSource))
+                    .map(GraphNode::blockName).findFirst().orElse("-");
+            labelSourceButton.setMessage(Component.translatable(
+                    "gui.logisticsnetworks.graph.source_value", source));
+            labelSourceButton.active = !selected.isEmpty();
+        }
+    }
+
+    private List<GraphNode> selectedNodes() {
+        if (session.snapshot == null) return List.of();
+        Set<UUID> selected = canvas().getSelectedNodes();
+        return session.snapshot.nodes().stream().filter(node -> selected.contains(node.nodeId())).toList();
+    }
+
+    private void applyLabel() {
+        updateLabelSource();
+        List<GraphNode> selected = selectedNodes();
+        if (selected.isEmpty() || selected.size() > SetNodeLabelsPayload.MAX_NODES
+                || session.labelSource == null) return;
+        commitPendingEdits();
+        ClientPacketDistributor.sendToServer(new SetNodeLabelsPayload(graphMenu.getGraphNetworkId(),
+                selected.stream().map(GraphNode::nodeId).toList(), bulkLabelBox.getValue(), session.labelSource));
     }
 
     private void resetLayout() {
@@ -350,7 +416,11 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
             }
         }
         if (!menu.getCarried().isEmpty() && (menu.getNode() == null || x >= 270)) return true;
-        if (canvas().mouseClicked(x, y, button)) return true;
+        if (bulkLabelBox != null && bulkLabelBox.mouseClicked(ClientInput.mouse(x, y, button, mouseModifiers), false)) {
+            setFocused(bulkLabelBox);
+            return true;
+        }
+        if (canvas().mouseClicked(x, y, button, (mouseModifiers & 2) != 0, (mouseModifiers & 1) != 0)) return true;
         return menu.getNode() != null && super.mouseClicked(x, y, button);
     }
 
@@ -382,13 +452,14 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
         double x = mouseX / uiScale;
         double y = mouseY / uiScale;
-        if (isStorageUpgradePickerOpen()) return super.mouseScrolled(x, y, deltaX, deltaY);
+        if (hasEditorOverlay()) return super.mouseScrolled(x, y, deltaX, deltaY);
         if (canvas().mouseScrolled(x, y, deltaY)) return true;
         return menu.getNode() != null && super.mouseScrolled(x, y, deltaX, deltaY);
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        mouseModifiers = event.modifiers();
         MouseButtonEvent scaled = scaledMouse(event);
         if (openingSelection) return true;
         if (isStorageUpgradePickerOpen()) return super.mouseClicked(scaled, doubleClick);
@@ -438,7 +509,20 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (openingSelection) return true;
+        if (!hasEditorOverlay() && bulkLabelBox != null && bulkLabelBox.isFocused()) {
+            if (event.key() == 256) bulkLabelBox.setFocused(false);
+            else bulkLabelBox.keyPressed(event);
+            return true;
+        }
         return super.keyPressed(event);
+    }
+
+    @Override
+    public boolean charTyped(char ch, int modifiers) {
+        if (!hasEditorOverlay() && bulkLabelBox != null && bulkLabelBox.isFocused()) {
+            return bulkLabelBox.charTyped(ClientInput.character(ch));
+        }
+        return super.charTyped(ch, modifiers);
     }
 
     @Override

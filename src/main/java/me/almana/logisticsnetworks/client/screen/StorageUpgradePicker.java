@@ -7,19 +7,23 @@ import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.network.SyncStorageUpgradeCatalogPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
+import java.text.NumberFormat;
 import java.util.List;
+import java.util.Locale;
 
 final class StorageUpgradePicker {
-
-    private static final int WIDTH = 58;
-    private static final int MESSAGE_WIDTH = 136;
-    private static final int TITLE_HEIGHT = 18;
     private static final int ROW_HEIGHT = 22;
     private static final int MAX_VISIBLE = 5;
+    private static final NumberFormat COUNT_FORMAT = NumberFormat.getCompactNumberInstance(
+            Locale.ROOT, NumberFormat.Style.SHORT);
+
+    static {
+        COUNT_FORMAT.setMaximumFractionDigits(1);
+    }
 
     private boolean open;
     private boolean loading;
@@ -27,6 +31,9 @@ final class StorageUpgradePicker {
     private StorageBackend backend;
     private int preferredSlot = -1;
     private int scroll;
+    private int titleHeight = 18;
+    private int visibleRows = MAX_VISIBLE;
+    private Rect2i bounds = new Rect2i(0, 0, 0, 0);
     private List<SyncStorageUpgradeCatalogPayload.Entry> entries = List.of();
 
     void open(int slot) {
@@ -45,7 +52,7 @@ final class StorageUpgradePicker {
         loading = false;
         backend = receivedBackend;
         available = networkAvailable;
-        entries = new ArrayList<>(received);
+        entries = List.copyOf(received);
         scroll = 0;
     }
 
@@ -64,100 +71,115 @@ final class StorageUpgradePicker {
         return preferredSlot;
     }
 
-    int x(int left) {
-        return left + 114;
+    Rect2i bounds() {
+        return bounds;
     }
 
-    int y(int top) {
-        return top + 103;
-    }
-
-    int height() {
-        int rows = loading || !available || entries.isEmpty() ? 1 : Math.min(entries.size(), MAX_VISIBLE);
-        return TITLE_HEIGHT + rows * ROW_HEIGHT + 4;
-    }
-
-    private int width() {
-        return loading || !available || entries.isEmpty() ? MESSAGE_WIDTH : WIDTH;
-    }
-
-    boolean contains(double mouseX, double mouseY, int left, int top) {
-        int x = x(left);
-        int y = y(top);
-        return mouseX >= x && mouseX < x + width() && mouseY >= y && mouseY < y + height();
+    boolean contains(double mouseX, double mouseY) {
+        return bounds.contains((int) mouseX, (int) mouseY);
     }
 
     @Nullable
-    SyncStorageUpgradeCatalogPayload.Entry entryAt(double mouseX, double mouseY, int left, int top) {
-        if (loading || !available || entries.isEmpty()) return null;
-        int listY = y(top) + TITLE_HEIGHT;
-        int visible = Math.min(entries.size(), MAX_VISIBLE);
-        if (mouseY < listY || mouseY >= listY + visible * ROW_HEIGHT
-                || mouseX < x(left) || mouseX >= x(left) + width()) return null;
-        int row = ((int) mouseY - listY) / ROW_HEIGHT;
-        return entries.get(row + scroll);
+    SyncStorageUpgradeCatalogPayload.Entry entryAt(double mouseX, double mouseY) {
+        if (loading || !available || entries.isEmpty() || !contains(mouseX, mouseY)) return null;
+        double offset = mouseY - bounds.getY() - titleHeight;
+        if (offset < 0 || offset >= visibleRows * ROW_HEIGHT) return null;
+        return entries.get((int) offset / ROW_HEIGHT + scroll);
     }
 
-    boolean scroll(double mouseX, double mouseY, double amount, int left, int top) {
-        if (!open || entries.size() <= MAX_VISIBLE || !contains(mouseX, mouseY, left, top)) return false;
-        int max = entries.size() - MAX_VISIBLE;
-        if (amount > 0 && scroll > 0) scroll--;
-        if (amount < 0 && scroll < max) scroll++;
+    boolean scroll(double mouseX, double mouseY, double amount) {
+        if (!open || entries.size() <= visibleRows || !contains(mouseX, mouseY)) return false;
+        scroll = Math.clamp(scroll - (int) Math.signum(amount), 0, entries.size() - visibleRows);
         return true;
     }
 
-    void render(GuiGraphics graphics, Font font, Theme theme, int left, int top, int mouseX, int mouseY) {
+    private Component title() {
+        return Component.translatable("gui.logisticsnetworks.node.upgrades");
+    }
+
+    private Component message() {
+        String state = loading ? "loading" : !available ? "unavailable" : "empty";
+        return Component.translatable("gui.logisticsnetworks.node.storage_upgrades." + state);
+    }
+
+    private void layout(Font font, int screenWidth, int screenHeight, int left, int top) {
+        int width = font.width(title()) + 12;
+        if (loading || !available || entries.isEmpty()) width = Math.max(width, font.width(message()) + 12);
+        for (var entry : entries) {
+            width = Math.max(width, font.width(entry.item().getHoverName()) + font.width(availability(entry)) + 48);
+        }
+        width = Math.min(width, Math.min(248, screenWidth - 8));
+        titleHeight = font.split(title(), width - 12).size() * font.lineHeight + 10;
+        visibleRows = Math.min(Math.min(entries.size(), MAX_VISIBLE),
+                Math.max(1, (screenHeight - titleHeight - 12) / ROW_HEIGHT));
+        scroll = Math.clamp(scroll, 0, Math.max(0, entries.size() - visibleRows));
+        int bodyHeight = loading || !available || entries.isEmpty()
+                ? font.split(message(), width - 12).size() * font.lineHeight + 12 : visibleRows * ROW_HEIGHT;
+        int height = titleHeight + bodyHeight + 4;
+        bounds = new Rect2i(Math.clamp(left + 114, 4, screenWidth - width - 4),
+                Math.clamp(top + 103, 4, screenHeight - height - 4), width, height);
+    }
+
+    void render(GuiGraphics graphics, Font font, Theme theme, int screenWidth, int screenHeight,
+                int left, int top, int mouseX, int mouseY) {
         if (!open) return;
-        int x = x(left);
-        int y = y(top);
-        int width = width();
-        int height = height();
+        layout(font, screenWidth, screenHeight, left, top);
+        int x = bounds.getX();
+        int y = bounds.getY();
+        int width = bounds.getWidth();
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 450);
-        ThemePaint.panel(graphics, x, y, width, height, theme);
-        Component title = Component.translatable("gui.logisticsnetworks.node.upgrades");
-        graphics.drawString(font, title, x + 6, y + 5, theme.text(), false);
-
+        ThemePaint.panel(graphics, x, y, width, bounds.getHeight(), theme);
+        graphics.drawWordWrap(font, title(), x + 6, y + 5, width - 12, theme.text());
         if (loading || !available || entries.isEmpty()) {
-            Component message = loading
-                    ? Component.translatable("gui.logisticsnetworks.node.storage_upgrades.loading")
-                    : !available
-                    ? Component.translatable("gui.logisticsnetworks.node.storage_upgrades.unavailable")
-                    : Component.translatable("gui.logisticsnetworks.node.storage_upgrades.empty");
-            ThemePaint.drawCentered(graphics, font, message, x + width / 2,
-                    y + TITLE_HEIGHT + 7, theme.textMuted());
-            graphics.pose().popPose();
-            return;
-        }
-
-        int visible = Math.min(entries.size(), MAX_VISIBLE);
-        for (int row = 0; row < visible; row++) {
-            SyncStorageUpgradeCatalogPayload.Entry entry = entries.get(row + scroll);
-            int rowY = y + TITLE_HEIGHT + row * ROW_HEIGHT;
-            boolean hovered = mouseX >= x + 2 && mouseX < x + width - 2
-                    && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT;
-            if (hovered) graphics.fill(x + 2, rowY, x + width - 2, rowY + ROW_HEIGHT, 0x22FFFFFF);
-            graphics.renderItem(entry.item(), x + 5, rowY + 3);
-            if (entry.stored() > 0) {
-                graphics.drawString(font, "x " + entry.stored(), x + 27, rowY + 7, theme.accent(), false);
-            }
-        }
-        if (scroll > 0) graphics.drawString(font, "▲", x + width - 12, y + TITLE_HEIGHT,
-                theme.textMuted(), false);
-        if (scroll + visible < entries.size()) {
-            graphics.drawString(font, "▼", x + width - 12, y + height - 11, theme.textMuted(), false);
+            graphics.drawWordWrap(font, message(), x + 6, y + titleHeight + 5, width - 12, theme.textMuted());
+        } else {
+            renderEntries(graphics, font, theme, mouseX, mouseY);
         }
         graphics.pose().popPose();
     }
 
-    void renderTooltip(GuiGraphics graphics, Font font, int left, int top, int mouseX, int mouseY) {
-        SyncStorageUpgradeCatalogPayload.Entry entry = entryAt(mouseX, mouseY, left, top);
+    private void renderEntries(GuiGraphics graphics, Font font, Theme theme, int mouseX, int mouseY) {
+        int x = bounds.getX();
+        int width = bounds.getWidth();
+        for (int row = 0; row < visibleRows; row++) {
+            var entry = entries.get(row + scroll);
+            int rowY = bounds.getY() + titleHeight + row * ROW_HEIGHT;
+            if (mouseX >= x + 2 && mouseX < x + width - 2 && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT) {
+                graphics.fill(x + 2, rowY, x + width - 2, rowY + ROW_HEIGHT, 0x22FFFFFF);
+            }
+            graphics.renderItem(entry.item(), x + 5, rowY + 3);
+            String count = availability(entry);
+            int countX = x + width - 14 - font.width(count);
+            String name = entry.item().getHoverName().getString();
+            int nameWidth = Math.max(0, countX - x - 32);
+            if (font.width(name) > nameWidth) name = font.plainSubstrByWidth(name, Math.max(0, nameWidth - 9)) + "...";
+            graphics.drawString(font, name, x + 27, rowY + 7, theme.text(), false);
+            graphics.drawString(font, count, countX, rowY + 7, theme.accent(), false);
+        }
+        if (scroll > 0) graphics.drawString(font, "▲", x + width - 10,
+                bounds.getY() + titleHeight, theme.textMuted(), false);
+        if (scroll + visibleRows < entries.size()) graphics.drawString(font, "▼", x + width - 10,
+                bounds.getY() + bounds.getHeight() - 11, theme.textMuted(), false);
+    }
+
+    private String availability(SyncStorageUpgradeCatalogPayload.Entry entry) {
+        return entry.stored() > 0 ? "× " + compactCount(entry.stored())
+                : Component.translatable("gui.logisticsnetworks.node.storage_upgrades.craft").getString();
+    }
+
+    private static String compactCount(long count) {
+        COUNT_FORMAT.setMaximumFractionDigits((Long.toString(count).length() - 1) % 3 == 0 ? 1 : 0);
+        return COUNT_FORMAT.format(count).toLowerCase(Locale.ROOT);
+    }
+
+    void renderTooltip(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        if (!open) return;
+        var entry = entryAt(mouseX, mouseY);
         if (entry == null) return;
         Component availability = entry.stored() > 0
-                ? Component.translatable("gui.logisticsnetworks.node.storage_upgrades.stored", entry.stored())
-                .withStyle(ChatFormatting.GRAY)
-                : Component.translatable("gui.logisticsnetworks.node.storage_upgrades.craftable")
-                .withStyle(ChatFormatting.AQUA);
+                ? Component.translatable("gui.logisticsnetworks.node.storage_upgrades.stored", entry.stored()).withStyle(ChatFormatting.GRAY)
+                : Component.translatable("gui.logisticsnetworks.node.storage_upgrades.craftable").withStyle(ChatFormatting.AQUA);
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 500);
         graphics.renderTooltip(font, List.of(entry.item().getHoverName(), availability), mouseX, mouseY);

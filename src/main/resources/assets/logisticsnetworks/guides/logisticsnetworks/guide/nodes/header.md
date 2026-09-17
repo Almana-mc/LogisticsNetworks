@@ -49,10 +49,10 @@ A node that is not assigned to a network does nothing — all 9 channels stay in
 **What it does:** opens the network picker screen. From there you can:
 
 - Pick an existing network you own and move the node onto it.
-- Type a new name (up to 32 characters) to create a fresh network and join it.
+- Search existing networks, or use **Create** to open a separate name form (up to 32 characters) and join a fresh network.
 - Leave the current network so the node becomes unassigned.
 
-**How to change networks:** use Primary Interaction on **Change**, then either select a listed network or type a new name and confirm. The node moves immediately and the main screen returns to the channel configuration view.
+**How to change networks:** use Primary Interaction on **Change**, then select a listed network or open **Create**, enter a new name, and confirm. The node moves immediately and the main screen returns to the channel configuration view.
 
 Use this to split a setup into separate networks, merge several nodes onto one shared network, or rename the network the node is on.
 
@@ -96,11 +96,9 @@ Names are purely cosmetic — they do not affect transfers. Use them to tag chan
 
 Leave the field empty and confirm to clear the label.
 
-**Why it matters:** when two or more nodes on the same network share the same label, any channel change to one of them is automatically copied to every other node in the group. This covers channel modes, types, filters, batch sizes, delays, filter items, and filter configurations.
+**Why it matters:** nodes on the same network with the same label share channel modes, types, filters, batch sizes, delays, and resource-rotation preferences. Their upgrade layout also synchronizes using physical upgrades from your inventory or linked storage. Batch sizes remain limited by the installed upgrades.
 
-Joining an existing label also matches that group's upgrade layout. Required upgrades are pulled from your inventory first, then from the AE2 network linked to the wrench that opened the node screen. Nodes opened through the Computer use your inventory only. Replaced upgrades return to your inventory or drop beside you when the inventory is full. If the full upgrade set is unavailable, no upgrades move: the label and channel settings still apply, values are clamped to the installed upgrades, and a message lists every missing upgrade.
-
-Upgrades remain per-node after joining. Whenever you close a labeled node screen, matching upgrades are pulled for the other labeled nodes as one operation and its settings are reapplied. If any upgrades are missing, none move and chat lists the total shortage. Adding or removing an upgrade later reapplies the label group's channel settings and clamps them to the new limits.
+Use the computer table checkboxes or graph multi-selection to apply a label to several nodes. An existing label supplies its current group settings. For a new label, the first selected node supplies the settings. Missing upgrade supplies leave the selected nodes' labels and settings unchanged.
 
 Typical use: label all 20 of your furnace nodes `furnace`, configure one, and the other 19 copy the setup automatically. Later tweaks to any of them propagate to all.
 

@@ -29,9 +29,14 @@ public final class ClientControls {
     public static final KeyMapping SECONDARY_INTERACTION = key(
             "key.logisticsnetworks.secondary_interaction", InputConstants.Type.MOUSE, GLFW.GLFW_MOUSE_BUTTON_RIGHT);
 
+    public static final KeyMapping WRENCH_MODES = new KeyMapping(
+            "key.logisticsnetworks.wrench_modes", KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, WrenchHudOverlay.LOGISTICS_CATEGORY);
+
     private static boolean modifier1Down;
     private static boolean modifier2Down;
     private static boolean modifier3Down;
+    private static boolean wrenchModesDown;
 
     private ClientControls() {
     }
@@ -82,6 +87,10 @@ public final class ClientControls {
         return mask;
     }
 
+    public static boolean wrenchModesDown() {
+        return wrenchModesDown;
+    }
+
     public static boolean usesVanillaUseInput(Options options) {
         return SECONDARY_INTERACTION.getKey().equals(options.keyUse.getKey())
                 && SECONDARY_INTERACTION.getKeyModifier() == options.keyUse.getKeyModifier();
@@ -105,6 +114,7 @@ public final class ClientControls {
     }
 
     private static void updateModifierState(InputConstants.Key key, boolean down) {
+        if (WRENCH_MODES.getKey().equals(key)) wrenchModesDown = down;
         if (MODIFIER_1.getKey().equals(key)) modifier1Down = down;
         if (MODIFIER_2.getKey().equals(key)) modifier2Down = down;
         if (MODIFIER_3.getKey().equals(key)) modifier3Down = down;
@@ -116,6 +126,7 @@ public final class ClientControls {
             modifier1Down = false;
             modifier2Down = false;
             modifier3Down = false;
+            wrenchModesDown = false;
         }
     }
 

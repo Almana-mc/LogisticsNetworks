@@ -139,6 +139,7 @@ public final class Snapshots {
         return new NetworkSnapshot.ChannelUnit(node.getUUID(), index, batchLimit,
                 channel.getFilterItems(), channel.getFilterMode(), sourceEndpoint,
                 channel.getDistributionMode() == DistributionMode.ROUND_ROBIN,
+                channel.canRotateResources(), channel.getItemResourceCursor(),
                 captureTargets(resolved, endpoints, occupiedSlots, sourceEndpoint, readCache),
                 binding(node, channel), channel.getDistributionMode());
     }

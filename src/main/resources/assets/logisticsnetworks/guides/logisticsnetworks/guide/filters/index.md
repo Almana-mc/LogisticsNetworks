@@ -44,12 +44,13 @@ For a full walkthrough, see [Filters & Upgrades](../nodes/filters-upgrades.md#fi
 
 ## Filter Types
 
-### Small, Medium, and Big
+### Normal Filter
 
-Small, Medium, and Big filters all use the same exact-match behavior and the same **45-slot** entry grid.
+Choose **Normal Filter** from the channel's filter picker to open its **45-entry** grid.
 
 - Match exact item ids and fluid ids.
 - Put any item or fluid bucket into an entry slot to add it to the list.
+- Drag an item or fluid from JEI onto an entry to add a ghost rule.
 - Remove the entry to take it off the list.
 - Empty entry slots are ignored.
 
@@ -99,7 +100,7 @@ Slot filters restrict which slot indices on the attached block the channel can r
 
 ## Entry Details
 
-Every slot in a Small, Medium, or Big filter's main grid is more than a single-item check. Open the Detail page for a filled entry to configure these per-entry rules:
+Every slot in a Normal Filter's main grid is more than a single-item check. Open the Detail page for a filled entry to configure these per-entry rules:
 
 - **Item or #tag**: match an exact id like `minecraft:iron_ingot`, or a tag like `#c:ores`.
 - **Batch**: override how many of this entry move per transfer on the Sender side.
@@ -117,7 +118,7 @@ This clipboard lives only in your current game session. It is **not** saved to t
 
 What gets copied depends on the filter type:
 
-- **Small / Medium / Big**: every entry plus its per-entry rules — item, fluid, or `#tag`, batch and stock amounts, slot mapping, NBT (strict flag, raw SNBT, rules, and Match Any/All mode), durability, and enchanted state — along with the filter's Whitelist/Blacklist mode and Type.
+- **Normal Filter**: every entry plus its per-entry rules — item, fluid, or `#tag`, batch and stock amounts, slot mapping, NBT (strict flag, raw SNBT, rules, and Match Any/All mode), durability, and enchanted state — along with the filter's Whitelist/Blacklist mode and Type.
 - **Mod**: Whitelist/Blacklist mode, Type, and the selected mod id.
 - **Regex**: Whitelist/Blacklist mode, Type, the regex pattern, and the match scope.
 

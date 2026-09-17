@@ -97,6 +97,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
             changed |= copyString(channel, entry, "redstone", "ALWAYS_ON");
             changed |= copyString(channel, entry, "distribution", "PRIORITY");
             changed |= copyString(channel, entry, "filter_mode", "MATCH_ANY");
+            changed |= copyBoolean(channel, entry, "resource_round_robin", false);
             changed |= copyInt(channel, entry, "priority", 0);
             if (channel.contains("name") && !channel.getStringOr("name", "").isEmpty()) {
                 entry.putString("name", channel.getStringOr("name", ""));
