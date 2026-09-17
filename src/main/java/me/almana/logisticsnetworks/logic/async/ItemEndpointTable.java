@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -42,6 +43,8 @@ final class ItemEndpointTable {
     int capture(LogisticsNodeEntity node, @Nullable Direction direction, ResourceHandler<ItemResource> handler,
             Snapshots.OccupiedSlotBudget budget, boolean bulk) {
         ThreadGuard.requireServerThread();
+        bulk |= BuiltInRegistries.BLOCK.getKey(node.level().getBlockState(node.getAttachedPos()).getBlock())
+                .getNamespace().equals("functionalstorage");
         EndpointKey key = EndpointKey.of(node, direction, handler);
         Integer existing = indexes.get(key);
         if (existing == null) existing = handlerIndexes.get(handler);
