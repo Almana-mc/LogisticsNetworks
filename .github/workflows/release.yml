@@ -18,11 +18,6 @@ on:
         required: true
         type: boolean
         default: true
-      publish_modrinth:
-        description: "Publish to Modrinth"
-        required: true
-        type: boolean
-        default: true
       changelog_type:
         description: "CurseForge changelog format"
         required: true
@@ -54,7 +49,6 @@ jobs:
       publish_discord: ${{ steps.branch_check.outputs.publish_discord }}
       publish_github: ${{ steps.branch_check.outputs.publish_github }}
       publish_curseforge: ${{ steps.branch_check.outputs.publish_curseforge }}
-      publish_modrinth: ${{ steps.branch_check.outputs.publish_modrinth }}
       changelog_type: ${{ steps.branch_check.outputs.changelog_type }}
     steps:
       - name: Resolve trigger inputs
@@ -65,7 +59,6 @@ jobs:
           INPUT_PUBLISH_DISCORD: ${{ inputs.publish_discord }}
           INPUT_PUBLISH_GITHUB: ${{ inputs.publish_github }}
           INPUT_PUBLISH_CURSEFORGE: ${{ inputs.publish_curseforge }}
-          INPUT_PUBLISH_MODRINTH: ${{ inputs.publish_modrinth }}
           INPUT_CHANGELOG_TYPE: ${{ inputs.changelog_type }}
           INPUT_CONFIRM: ${{ inputs.confirm }}
         run: |
@@ -73,7 +66,6 @@ jobs:
           publish_discord="$INPUT_PUBLISH_DISCORD"
           publish_github="$INPUT_PUBLISH_GITHUB"
           publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
-          publish_modrinth="$INPUT_PUBLISH_MODRINTH"
           changelog_type="$INPUT_CHANGELOG_TYPE"
 
           if [[ "$INPUT_CONFIRM" != "RELEASE" ]]; then
@@ -94,7 +86,6 @@ jobs:
           echo "publish_discord=$publish_discord" >> "$GITHUB_OUTPUT"
           echo "publish_github=$publish_github" >> "$GITHUB_OUTPUT"
           echo "publish_curseforge=$publish_curseforge" >> "$GITHUB_OUTPUT"
-          echo "publish_modrinth=$publish_modrinth" >> "$GITHUB_OUTPUT"
           echo "changelog_type=$changelog_type" >> "$GITHUB_OUTPUT"
 
   build:
@@ -109,7 +100,6 @@ jobs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       changelog: ${{ steps.meta.outputs.changelog }}
       curseforge_dependencies: ${{ steps.meta.outputs.curseforge_dependencies }}
-      modrinth_dependencies: ${{ steps.meta.outputs.modrinth_dependencies }}
       java_version: ${{ steps.meta.outputs.java_version }}
       loader: ${{ steps.meta.outputs.loader }}
 
@@ -129,7 +119,7 @@ jobs:
           mod_name="$(awk -F= '/^mod_name=/{print $2}' gradle.properties | tr -d '\r')"
           release_tag="${minecraft_version}-${mod_version}"
           changelog_file="CHANGELOGS/${release_tag}.md"
-          java_version="$(grep -oE 'JavaLanguageVersion\\.of\\([0-9]+\\)' build.gradle.kts | head -n1 | grep -oE '[0-9]+' || true)"
+          java_version="$(grep -oE 'JavaLanguageVersion\.of\([0-9]+\)' build.gradle.kts | head -n1 | grep -oE '[0-9]+' || true)"
 
           if [[ -z "$java_version" ]]; then
             java_version="21"
@@ -162,26 +152,11 @@ jobs:
               "mekanism": {"slug": "mekanism", "projectID": 268560},
               "refinedstorage": {"slug": "refined-storage", "projectID": 243076},
           }
-          modrinth_projects = {
-              "ae2": "ae2",
-              "ars_nouveau": "ars-nouveau",
-              "guideme": "guideme",
-              "jade": "jade",
-              "jei": "jei",
-              "mekanism": "mekanism",
-              "refinedstorage": "refined-storage",
-          }
           curseforge_types = {
               "required": "requiredDependency",
               "optional": "optionalDependency",
               "incompatible": "incompatible",
               "discouraged": "optionalDependency",
-          }
-          modrinth_types = {
-              "required": "required",
-              "optional": "optional",
-              "incompatible": "incompatible",
-              "discouraged": "recommended",
           }
 
           dependencies = []
@@ -215,7 +190,6 @@ jobs:
               dependencies.append(current_dependency)
 
           curseforge_dependencies = []
-          modrinth_dependencies = []
           missing_curseforge = []
 
           for dependency in dependencies:
@@ -233,25 +207,17 @@ jobs:
               else:
                   missing_curseforge.append(mod_id)
 
-              modrinth_project = modrinth_projects.get(mod_id)
-              if modrinth_project:
-                  modrinth_dependencies.append(
-                      f"{modrinth_project}({modrinth_types.get(dependency_type, 'optional')})"
-                  )
-
           if missing_curseforge:
               missing = ", ".join(sorted(missing_curseforge))
               raise SystemExit(f"Missing CurseForge dependency mappings: {missing}")
 
           print(json.dumps({
               "curseforge": curseforge_dependencies,
-              "modrinth": modrinth_dependencies,
           }))
           PY
           )"
 
           curseforge_dependencies="$(jq -c '.curseforge' <<<"$dependency_data")"
-          modrinth_dependencies="$(jq -r '.modrinth[]' <<<"$dependency_data")"
 
           echo "minecraft_version=$minecraft_version" >> "$GITHUB_OUTPUT"
           echo "mod_version=$mod_version" >> "$GITHUB_OUTPUT"
@@ -260,11 +226,6 @@ jobs:
           echo "java_version=$java_version" >> "$GITHUB_OUTPUT"
           echo "loader=$loader" >> "$GITHUB_OUTPUT"
           echo "curseforge_dependencies=$curseforge_dependencies" >> "$GITHUB_OUTPUT"
-          {
-            echo "modrinth_dependencies<<EOF"
-            printf '%s\n' "$modrinth_dependencies"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
           {
             echo "changelog<<EOF"
             cat "$changelog_file"
@@ -287,7 +248,7 @@ jobs:
         shell: bash
         run: |
           exclude_args=()
-          if ./gradlew tasks --all --console=plain | grep -qE '^copyJar\\s'; then
+          if ./gradlew tasks --all --console=plain | grep -qE '^copyJar[[:space:]]'; then
             exclude_args=(-x copyJar)
           fi
 
@@ -425,55 +386,9 @@ jobs:
           file_id="$(jq -r '.id' <"$body_file")"
           echo "curseforge-url=https://www.curseforge.com/projects/${PROJECT_ID}/files/${file_id}" >> "$GITHUB_OUTPUT"
 
-  publish-modrinth:
-    name: Publish to Modrinth
-    needs: [validate-release, build]
-    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_modrinth == 'true' && vars.MODRINTH_PROJECT_ID != ''
-    runs-on: ubuntu-latest
-    env:
-      MODRINTH_TOKEN: ${{ secrets.TOKEN_MODRINTH }}
-    outputs:
-      release_url: ${{ steps.modrinth_publish.outputs.modrinth-url }}
-
-    steps:
-      - name: Validate Modrinth config
-        id: modrinth_config
-        shell: bash
-        run: |
-          if [[ -z "$MODRINTH_TOKEN" ]]; then
-            echo "Modrinth token is not configured. Skipping publish."
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Download artifacts
-        if: steps.modrinth_config.outputs.enabled == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: release-build
-          path: build/libs
-
-      - name: Publish to Modrinth
-        if: steps.modrinth_config.outputs.enabled == 'true'
-        id: modrinth_publish
-        uses: Kira-NT/mc-publish@v3.3.0
-        with:
-          name: ${{ needs.build.outputs.mod_name }} - ${{ needs.build.outputs.release_tag }}
-          version: ${{ needs.build.outputs.release_tag }}
-          version-type: release
-          files: build/libs/*.jar
-          changelog: ${{ needs.build.outputs.changelog }}
-          dependencies: ${{ needs.build.outputs.modrinth_dependencies }}
-          loaders: ${{ needs.build.outputs.loader }}
-          game-versions: ${{ needs.build.outputs.minecraft_version }}
-          java: ${{ needs.build.outputs.java_version }}
-          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
-          modrinth-token: ${{ env.MODRINTH_TOKEN }}
-
   notify-discord:
     name: Notify Discord
-    needs: [validate-release, build, publish-github, publish-curseforge, publish-modrinth]
+    needs: [validate-release, build, publish-github, publish-curseforge]
     if: always() && needs.validate-release.outputs.is_version_branch == 'true' && needs.validate-release.outputs.publish_discord == 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     env:
@@ -490,8 +405,6 @@ jobs:
       GITHUB_URL: ${{ needs.publish-github.outputs.release_url }}
       CURSEFORGE_RESULT: ${{ needs.publish-curseforge.result }}
       CURSEFORGE_URL: ${{ needs.publish-curseforge.outputs.release_url }}
-      MODRINTH_RESULT: ${{ needs.publish-modrinth.result }}
-      MODRINTH_URL: ${{ needs.publish-modrinth.outputs.release_url }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ACTOR: ${{ github.actor }}
       REPOSITORY: ${{ github.repository }}
@@ -550,7 +463,6 @@ jobs:
           lines.extend([
               "",
               link_line("Curseforge", os.environ.get("CURSEFORGE_URL", "").strip(), os.environ.get("CURSEFORGE_RESULT", "").strip()),
-              link_line("Modrinth", os.environ.get("MODRINTH_URL", "").strip(), os.environ.get("MODRINTH_RESULT", "").strip()),
               link_line("Github", os.environ.get("GITHUB_URL", "").strip(), os.environ.get("GITHUB_RESULT", "").strip()),
               "",
               "Thank you all for downloading,",
@@ -569,7 +481,6 @@ jobs:
               footer_lines = [
                   "",
                   link_line("Curseforge", os.environ.get("CURSEFORGE_URL", "").strip(), os.environ.get("CURSEFORGE_RESULT", "").strip()),
-                  link_line("Modrinth", os.environ.get("MODRINTH_URL", "").strip(), os.environ.get("MODRINTH_RESULT", "").strip()),
                   link_line("Github", os.environ.get("GITHUB_URL", "").strip(), os.environ.get("GITHUB_RESULT", "").strip()),
                   "",
                   "Thank you all for downloading,",
