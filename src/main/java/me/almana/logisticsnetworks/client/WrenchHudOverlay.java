@@ -96,7 +96,7 @@ public class WrenchHudOverlay {
             g.fill(-5, -mc.font.lineHeight - 3, textWidth + 4, 3, 0xCC101010);
             int color = WrenchItem.getModeDisplayName(mode).getStyle().getColor().getValue();
             g.fill(-5, -mc.font.lineHeight - 3, -2, 3, 0xFF000000 | color);
-            g.drawString(mc.font, text, 0, -mc.font.lineHeight, 0xFFFFFF, true);
+            g.drawString(mc.font, text, 0, -mc.font.lineHeight, 0xFFFFFFFF, true);
             g.pose().popPose();
         }
     }
