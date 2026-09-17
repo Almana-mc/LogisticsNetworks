@@ -1236,11 +1236,7 @@ public class TransferEngine {
                 int filled = fillFluid(target, drained, tx);
                 if (filled < drained.getAmount()) {
                     int rollbackAmount = drained.getAmount() - filled;
-                    int returned = fillFluid(source, drained.copyWithAmount(rollbackAmount), tx);
-                    if (returned < rollbackAmount) {
-                        if (Config.debugMode) LOGGER.error("FLUID VOIDING: Source rejected rollback of {} mB ({}). {} mB lost.",
-                                rollbackAmount - returned, drained.getFluid(), rollbackAmount - returned);
-                    }
+                    fillFluid(source, drained.copyWithAmount(rollbackAmount), tx);
                 }
 
                 if (filled > 0) {
