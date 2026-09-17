@@ -305,6 +305,10 @@ public class LogisticsNetwork {
         return labelTemplates.get(label);
     }
 
+    public Set<String> getLabelNames() {
+        return Collections.unmodifiableSet(labelTemplates.keySet());
+    }
+
     public void setLabelTemplate(String label, LabelUpgradeTemplate template) {
         if (!label.isBlank()) labelTemplates.put(label, template);
     }

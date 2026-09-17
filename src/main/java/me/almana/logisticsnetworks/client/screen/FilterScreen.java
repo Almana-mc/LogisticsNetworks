@@ -131,6 +131,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private int detailTagScrollOffset = 0;
     private boolean detailNbtRawMode = false;
     private boolean detailNbtPageOpen = false;
+    private FilterTagPicker detailTagPicker;
     private int detailNbtScrollOffset = 0;
     private int detailNbtSelectedIdx = -1;
     private String detailNbtOp = "=";
@@ -228,6 +229,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         this.leftPos = (this.width - GUI_WIDTH) / 2;
         this.topPos = (this.height - imageHeight) / 2;
 
+        if (detailTagPicker != null) {
+            addRenderableWidget(manualInputBox);
+            if (savedImageWidth > 0) savedLeftPos = (width - savedImageWidth) / 2;
+            if (savedImageHeight > 0) savedTopPos = (height - savedImageHeight) / 2;
+            return;
+        }
         setupInputBox();
         refreshFilterData();
     }
@@ -401,6 +408,16 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     @Override
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mx, int my, float pt) {
+        if (detailTagPicker != null) {
+            graphics.fill(0, 0, width, height, 0xC0101010);
+            detailTagPicker.render(guiGraphics(graphics), mx, my, pt, width, height);
+            return;
+        }
+        super.extractRenderState(graphics, mx, my, pt);
+    }
+
+    @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         if (detailEditSlot >= 0) {
             return;
@@ -457,6 +474,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     @Override
     protected void renderBg(GuiGraphics g, float pt, int mx, int my) {
+        if (detailTagPicker != null) return;
         renderPanel(g, leftPos, topPos, imageWidth, imageHeight);
 
         if (detailEditSlot >= 0) {
@@ -926,7 +944,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         }
     }
 
-    private void renderFluidStack(GuiGraphics g, FluidStack stack, int x, int y) {
+    static void renderFluidStack(GuiGraphics g, FluidStack stack, int x, int y) {
         ItemStack bucket = new ItemStack(stack.getFluid().getBucket());
         if (!bucket.isEmpty()) {
             g.renderItem(bucket, x, y);
@@ -950,7 +968,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         }
     }
 
-    private void renderChemicalStack(GuiGraphics g, String chemId, int x, int y) {
+    static void renderChemicalStack(GuiGraphics g, String chemId, int x, int y) {
         Identifier iconPath = MekanismCompat.getChemicalIcon(chemId);
         if (iconPath == null)
             return;
@@ -962,7 +980,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         renderTintOverlay(g, x, y, color);
     }
 
-    private void renderTintOverlay(GuiGraphics g, int x, int y, int color) {
+    private static void renderTintOverlay(GuiGraphics g, int x, int y, int color) {
         int alpha = (color >>> 24) & 0xFF;
         if (alpha == 0) {
             alpha = 96;
@@ -1088,9 +1106,32 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
         int action = ClientControls.resolveMouseAction(mx, my, btn);
+        if (detailTagPicker != null) {
+            detailTagPicker.mouseClicked(mx, my, action < 0 ? btn : action,
+                    InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LCONTROL));
+            return true;
+        }
         if (action != -1 && handleInteraction(mx, my, action))
             return true;
         return super.mouseClicked(mx, my, btn);
+    }
+
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (detailTagPicker != null) {
+            detailTagPicker.mouseDragged(my);
+            return true;
+        }
+        return super.mouseDragged(mx, my, button, dx, dy);
+    }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
+        if (detailTagPicker != null) {
+            detailTagPicker.mouseReleased();
+            return true;
+        }
+        return super.mouseReleased(mx, my, button);
     }
 
     private boolean handleInteraction(double mx, double my, int action) {
@@ -1547,6 +1588,16 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
+        if (detailTagPicker != null) {
+            int action = ClientControls.resolveKeyAction(key, scan, modifiers);
+            if (key != InputConstants.KEY_ESCAPE && action == 0 && !detailTagPicker.isSearchFocused()) {
+                detailTagPicker.mouseClicked(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action,
+                        InputConstants.isKeyDown(minecraft.getWindow(), InputConstants.KEY_LCONTROL));
+            } else {
+                detailTagPicker.keyPressed(key, scan, modifiers);
+            }
+            return true;
+        }
         if (minecraft.options.keyInventory.matches(new net.minecraft.client.input.KeyEvent(key, scan, modifiers))) {
             return true;
         }
@@ -1630,6 +1681,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     @Override
     public boolean charTyped(char c, int modifiers) {
+        if (detailTagPicker != null) {
+            detailTagPicker.charTyped(c, modifiers);
+            return true;
+        }
         if (detailEditSlot >= 0) {
             if (detailIdInputBox != null && detailIdInputBox.isFocused())
                 return detailIdInputBox.charTyped(ClientInput.character(c));
@@ -1662,6 +1717,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
+        if (detailTagPicker != null) {
+            detailTagPicker.mouseScrolled(mx, my, sy);
+            return true;
+        }
         if (detailEditSlot >= 0) {
             return handleDetailPageScroll(mx, my, sy);
         }
@@ -2131,7 +2190,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     public boolean isDetailPageOpen() {
-        return detailEditSlot >= 0 && !detailNbtPageOpen;
+        return detailEditSlot >= 0 && !detailNbtPageOpen && detailTagPicker == null;
     }
 
     public Rect2i getDetailSlotArea() {
@@ -2143,7 +2202,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     public void setDetailGhostItem(ItemStack stack) {
-        if (detailEditSlot < 0 || stack.isEmpty()) return;
+        if (!isDetailPageOpen() || stack.isEmpty()) return;
         Identifier itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
         menu.clearEntryTag(detailEditSlot);
         ClientPacketDistributor.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, stack));
@@ -2151,26 +2210,18 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailIdInputBox.setValue(itemId.toString());
     }
 
-    public List<Rect2i> getExtraGuiAreas() {
-        List<Rect2i> areas = new ArrayList<>();
-        if (detailEditSlot >= 0) {
-            areas.add(new Rect2i(leftPos, topPos, imageWidth, imageHeight));
-        }
-        if (nbtEditSlot >= 0) {
-            int panelW = getNbtPanelW();
-            int panelX = getNbtPanelX();
-            int panelY = topPos + 20;
-            int panelH = menu.getPlayerInventoryY() - 24;
-            areas.add(new Rect2i(panelX, panelY, panelW, panelH));
-        }
-        if (tagEditSlot >= 0) {
-            int panelX = leftPos + 4;
-            int panelY = topPos + 20;
-            int panelW = imageWidth - 8;
-            int panelH = menu.getPlayerInventoryY() - 24;
-            areas.add(new Rect2i(panelX, panelY, panelW, panelH));
-        }
-        return areas;
+    public void setDetailGhostFluid(FluidStack stack) {
+        if (!isDetailPageOpen() || stack.isEmpty()) return;
+        menu.clearEntryTag(detailEditSlot);
+        setGhostFluidFilterEntry(detailEditSlot, stack);
+        detailIdInputBox.setValue(BuiltInRegistries.FLUID.getKey(stack.getFluid()).toString());
+    }
+
+    public void setDetailGhostChemical(String chemicalId) {
+        if (!isDetailPageOpen() || chemicalId == null || chemicalId.isBlank()) return;
+        menu.clearEntryTag(detailEditSlot);
+        setGhostChemicalFilterEntry(detailEditSlot, chemicalId);
+        detailIdInputBox.setValue(chemicalId);
     }
 
     public void setSelectorGhostFluid(FluidStack stack) {
@@ -2946,6 +2997,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     public List<Rect2i> getExtraAreas() {
+        if (detailTagPicker != null) {
+            return List.of(new Rect2i(0, 0, width, height));
+        }
         List<Rect2i> areas = new ArrayList<>();
         if (detailEditSlot >= 0) {
             areas.add(new Rect2i(leftPos, topPos, imageWidth, imageHeight));
@@ -3227,6 +3281,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailEditSlot = -1;
         menu.setSlotsHidden(false);
         detailNbtPageOpen = false;
+        detailTagPicker = null;
         nbtSavedImageWidth = -1;
 
         if (savedImageHeight > 0) {
@@ -3493,11 +3548,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         }
 
         int idFieldX = slotX + 22;
-        int idFieldW = contentW - 22;
+        int idFieldW = contentW - 40;
         detailIdInputBox.setX(idFieldX);
         detailIdInputBox.setY(slotY + 2);
         detailIdInputBox.setWidth(idFieldW);
         detailIdInputBox.extractRenderState(g.raw(), mx, my, 0);
+        Rect2i tagButton = detailTagButtonArea();
+        drawButton(g, tagButton.getX(), tagButton.getY(), tagButton.getWidth(), tagButton.getHeight(),
+                "T", mx, my, true);
 
         y = slotY + 22;
 
@@ -3624,6 +3682,33 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             detailSlotMappingInputBox.setHint(Component.empty());
             detailSlotMappingInputBox.extractRenderState(g.raw(), mx, my, 0);
         }
+        if (tagButton.contains(mx, my)) {
+            g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.tag_picker.open"), mx, my);
+        }
+    }
+
+    private Rect2i detailTagButtonArea() {
+        return new Rect2i(leftPos + imageWidth - 22, topPos + 42, 14, 14);
+    }
+
+    private void openDetailTagPicker() {
+        flushDetailPageInputs();
+        detailIdInputBox.setFocused(false);
+        detailBatchInputBox.setFocused(false);
+        detailStockInputBox.setFocused(false);
+        detailSlotMappingInputBox.setFocused(false);
+        String value = detailIdInputBox.getValue().trim();
+        Identifier current = value.isEmpty() || value.startsWith("#") ? null : Identifier.tryParse(value);
+        detailTagPicker = new FilterTagPicker(font, menu.getTargetType(), current, menu.getEntryTag(detailEditSlot),
+                this::applyDetailTag, () -> detailTagPicker = null, width, height);
+    }
+
+    private void applyDetailTag(String tag) {
+        ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, tag));
+        menu.setEntryTag(minecraft.player, detailEditSlot, tag);
+        detailIdInputBox.setValue("#" + tag);
+        rebuildIdFilteredList();
+        detailTagPicker = null;
     }
 
     private void renderNbtSubPage(GuiGraphics g, int mx, int my) {
@@ -3927,6 +4012,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (detailNbtPageOpen) {
             return handleNbtSubPageClick(mx, my, btn);
         }
+        if (btn == 0 && detailTagButtonArea().contains((int) mx, (int) my)) {
+            openDetailTagPicker();
+            return true;
+        }
 
         FilterTargetType targetType = menu.getTargetType();
         boolean isFluidOrChemical = targetType != FilterTargetType.ITEMS;
@@ -3958,7 +4047,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int slotX = contentX;
         int itemSlotY = panelY + 20;
         int idFieldX = slotX + 22;
-        int idFieldW = contentW - 22;
+        int idFieldW = contentW - 40;
 
         if (isHovering(slotX, itemSlotY, 18, 18, (int) mx, (int) my)) {
             String currentId = detailIdInputBox.getValue().trim();

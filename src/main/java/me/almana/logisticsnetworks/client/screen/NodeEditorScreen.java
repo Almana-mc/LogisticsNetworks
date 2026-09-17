@@ -1471,7 +1471,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         }
     }
 
-    private void closeLabelPicker() {
+    protected void closeLabelPicker() {
         labelPickerOpen = false;
         if (labelEditBox != null) {
             removeWidget(labelEditBox);
@@ -1480,7 +1480,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         networkLabels.clear();
     }
 
-    private void commitLabelChange(String label) {
+    protected void commitLabelChange(String label) {
         LogisticsNodeEntity node = getMenu().getNode();
         if (node != null) {
             node.setNodeLabel(label);

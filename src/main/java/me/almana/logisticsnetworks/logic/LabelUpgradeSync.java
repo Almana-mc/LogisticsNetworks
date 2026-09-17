@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public final class LabelUpgradeSync {
 
@@ -61,7 +63,21 @@ public final class LabelUpgradeSync {
     public static boolean synchronizeLabels(ServerPlayer player, LogisticsNetwork network,
                                             List<LogisticsNodeEntity> targets, UUID sourceId,
                                             String label, @Nullable StorageLink storageLink) {
+        return synchronizeLabels(player, network, targets, sourceId, label, storageLink,
+                () -> true, ignored -> {});
+    }
+
+    public static boolean synchronizeLabels(ServerPlayer player, LogisticsNetwork network,
+                                            List<LogisticsNodeEntity> targets, UUID sourceId,
+                                            String label, @Nullable StorageLink storageLink,
+                                            java.util.function.BooleanSupplier expectationValid,
+                                            Consumer<Boolean> completion) {
+        AtomicBoolean completed = new AtomicBoolean();
+        Consumer<Boolean> finish = success -> {
+            if (completed.compareAndSet(false, true)) completion.accept(success);
+        };
         if (targets.isEmpty() || targets.stream().anyMatch(node -> PENDING_NODES.contains(node.getUUID()))) {
+            finish.accept(false);
             return false;
         }
         if (label.isEmpty()) {
@@ -75,6 +91,7 @@ public final class LabelUpgradeSync {
             NetworkRegistry.get(player.level()).invalidateNetwork(network.getId());
             GraphPayloadHandler.broadcast(player.level().getServer(), network.getId());
             GraphPayloadHandler.refreshTable(player, network.getId());
+            finish.accept(true);
             return true;
         }
 
@@ -83,7 +100,10 @@ public final class LabelUpgradeSync {
         if (storedTemplate == null && authority == null) {
             authority = targets.stream().filter(node -> node.getUUID().equals(sourceId)).findFirst().orElse(null);
         }
-        if (storedTemplate == null && authority == null) return false;
+        if (storedTemplate == null && authority == null) {
+            finish.accept(false);
+            return false;
+        }
 
         LabelUpgradeTemplate template = storedTemplate;
         if (authority != null && (storedTemplate == null
@@ -139,14 +159,18 @@ public final class LabelUpgradeSync {
             player.sendSystemMessage(Component.translatable(
                     "message.logisticsnetworks.label.synced", targets.size()), true);
             release.run();
+            finish.accept(true);
         };
-        java.util.function.BooleanSupplier stillValid = () -> validBulkTargets(
-                player, network, label, storedTemplate, targets, snapshots, pending,
+        java.util.function.BooleanSupplier stillValid = () -> expectationValid.getAsBoolean()
+                && validBulkTargets(player, network, label, storedTemplate, targets, snapshots, pending,
                 labelAuthority, authoritySnapshot);
         List<LinkedStorage.ItemRequirement> requirements = toRequirements(required);
         if (requirements.isEmpty()) {
             if (stillValid.getAsBoolean()) commit.run();
-            else release.run();
+            else {
+                release.run();
+                finish.accept(false);
+            }
             return true;
         }
         if (hasInventory(player.getInventory(), requirements, -1)) {
@@ -158,6 +182,7 @@ public final class LabelUpgradeSync {
             reportFailure(player, label, Component.translatable(
                     "message.logisticsnetworks.label.missing_upgrades", formatRequirements(requirements)));
             release.run();
+            finish.accept(false);
             return false;
         }
 
@@ -180,8 +205,10 @@ public final class LabelUpgradeSync {
                     public void failed(Component detail) {
                         reportFailure(player, label, detail);
                         release.run();
+                        finish.accept(false);
                     }
                 });
+        if (!LinkedStorage.isSupplyPending(requestId)) finish.accept(false);
         return true;
     }
 

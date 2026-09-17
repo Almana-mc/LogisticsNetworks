@@ -1187,6 +1187,7 @@ public class ServerPayloadHandler {
 
     public static void handleSetNodeLabel(SetNodeLabelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) return;
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
@@ -1197,6 +1198,15 @@ public class ServerPayloadHandler {
 
             if (Config.debugMode) LOGGER.debug("[LabelSync] Setting label '{}' on node {} (networkId={})",
                     label, node.getUUID(), node.getNetworkId());
+            LogisticsNetwork network = node.getNetworkId() == null ? null
+                    : NetworkRegistry.get(player.level()).getNetwork(node.getNetworkId());
+            if (network != null) {
+                GraphMenuContext graph = GraphPayloadHandler.getContext(player.containerMenu);
+                LabelUpgradeSync.synchronizeLabels(player, network, List.of(node), node.getUUID(), label,
+                        LinkedStorage.findAccessibleLink(player, null),
+                        () -> graph == null || graph.stillValid(player), ignored -> {});
+                return;
+            }
             GraphPayloadHandler.preserveLabelPosition(node, label);
             node.setNodeLabel(label);
             markNetworkDirty(node);
@@ -1310,7 +1320,7 @@ public class ServerPayloadHandler {
             if (network == null || !canAccessNetwork(player, network))
                 return;
 
-            Set<String> labels = new LinkedHashSet<>();
+            Set<String> labels = new LinkedHashSet<>(network.getLabelNames());
             for (UUID nodeId : network.getNodeUuids()) {
                 for (ServerLevel level : player.level().getServer().getAllLevels()) {
                     Entity entity = level.getEntity(nodeId);
