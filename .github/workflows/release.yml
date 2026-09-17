@@ -373,7 +373,7 @@ jobs:
           body_file="$(mktemp)"
           http_code="$(curl -sS -o "$body_file" -w '%{http_code}' \
             -H "X-Api-Token: $CURSEFORGE_TOKEN" \
-            -F "metadata=$metadata" \
+            --form-string "metadata=$metadata" \
             -F "file=@${jar}" \
             "https://minecraft.curseforge.com/api/projects/${PROJECT_ID}/upload-file")"
 
