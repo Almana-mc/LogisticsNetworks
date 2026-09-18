@@ -4,7 +4,6 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
-import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -287,8 +286,6 @@ public final class TransferCommitter {
     }
 
     private static boolean isActive(LogisticsNodeEntity node, ChannelData channel) {
-        if (channel.getRedstoneMode() == RedstoneMode.ALWAYS_ON) return true;
-        if (channel.getRedstoneMode() == RedstoneMode.ALWAYS_OFF) return false;
         int signal = node.isMountedOnCreate() ? 0 : node.level().getBestNeighborSignal(node.getAttachedPos());
         return TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal);
     }

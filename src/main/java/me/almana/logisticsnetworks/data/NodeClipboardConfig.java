@@ -270,7 +270,7 @@ public final class NodeClipboardConfig {
     }
 
     public void setChannelRedstoneMode(int channel, RedstoneMode mode) {
-        getChannelConfig(channel).redstoneMode = mode == null ? RedstoneMode.ALWAYS_ON : mode;
+        getChannelConfig(channel).redstoneMode = mode == null ? RedstoneMode.LOW : mode;
     }
 
     public DistributionMode getChannelDistributionMode(int channel) {
@@ -525,7 +525,7 @@ public final class NodeClipboardConfig {
                 config.batchSize = 8;
                 config.tickDelay = 20;
                 config.ioDirection = Direction.UP;
-                config.redstoneMode = RedstoneMode.ALWAYS_ON;
+                config.redstoneMode = RedstoneMode.LOW;
                 config.distributionMode = DistributionMode.PRIORITY;
                 config.filterMode = FilterMode.MATCH_ANY;
                 config.priority = 0;
@@ -692,8 +692,10 @@ public final class NodeClipboardConfig {
                 Direction direction = Direction.byName(dirStr);
                 config.ioDirection = direction == null ? Direction.UP : direction;
             }
-            config.redstoneMode = parseEnum(channelTag.getString(KEY_REDSTONE), RedstoneMode.values(),
-                    RedstoneMode.ALWAYS_ON);
+            String savedRedstoneMode = channelTag.getString(KEY_REDSTONE);
+            if (RedstoneMode.disablesChannel(savedRedstoneMode))
+                config.enabled = false;
+            config.redstoneMode = RedstoneMode.fromSerialized(savedRedstoneMode);
             config.distributionMode = parseEnum(channelTag.getString(KEY_DISTRIBUTION), DistributionMode.values(),
                     DistributionMode.PRIORITY);
             config.resourceRoundRobin = channelTag.getBoolean("resource_round_robin");
@@ -1164,7 +1166,7 @@ public final class NodeClipboardConfig {
         config.batchSize = 8;
         config.tickDelay = 20;
         config.ioDirection = Direction.UP;
-        config.redstoneMode = RedstoneMode.ALWAYS_ON;
+        config.redstoneMode = RedstoneMode.LOW;
         config.distributionMode = DistributionMode.PRIORITY;
         config.filterMode = FilterMode.MATCH_ANY;
         config.priority = 0;
