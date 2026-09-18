@@ -133,7 +133,8 @@ final class ItemEndpointTable {
             List<StorageEndpoint.StoredItem> exports = new ArrayList<>();
             for (var stored : DirectStorageHandlers.exports(handler)) {
                 if (budget != null) budget.retain();
-                exports.add(new StorageEndpoint.StoredItem(stored.stack().copyWithCount(1), stored.amount()));
+                exports.add(new StorageEndpoint.StoredItem(
+                        stored.stack().copyWithCount(1), stored.amount(), stored.bufferedAmount()));
             }
             return directEndpoint(new NetworkSnapshot.DirectEndpoint(0, 0,
                     DirectStorageHandlers.snapshotView(handler) == 1, List.copyOf(exports), Map.of()));

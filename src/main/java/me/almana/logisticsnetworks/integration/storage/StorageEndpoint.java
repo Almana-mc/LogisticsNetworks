@@ -10,7 +10,10 @@ import java.util.Set;
 
 public interface StorageEndpoint {
 
-    record StoredItem(ItemStack stack, long amount) {
+    record StoredItem(ItemStack stack, long amount, long bufferedAmount) {
+        public StoredItem(ItemStack stack, long amount) {
+            this(stack, amount, 0);
+        }
     }
 
     record StoredFluid(FluidStack stack, long amount) {

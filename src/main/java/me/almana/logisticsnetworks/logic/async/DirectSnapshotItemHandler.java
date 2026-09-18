@@ -33,7 +33,7 @@ final class DirectSnapshotItemHandler implements DirectItemAccess {
     public ItemStack getStackInSlot(int slot) {
         if (slot < 0 || slot >= exports.size()) return ItemStack.EMPTY;
         ItemResource key = exports.get(slot);
-        return key.toStack(DirectStorageReads.clamp(stock.amount(key)));
+        return key.toStack(DirectStorageReads.clamp(stock.amount(endpoint.binding(), key)));
     }
 
     @Override
@@ -60,8 +60,7 @@ final class DirectSnapshotItemHandler implements DirectItemAccess {
 
     private ItemStack extract(ItemResource key, int amount, boolean simulate) {
         if (!endpoint.exporting() || amount <= 0 || !exportKeys.contains(key)) return ItemStack.EMPTY;
-        int moved = Math.min(amount, DirectStorageReads.clamp(stock.amount(key)));
-        if (!simulate && moved > 0) stock.move(key, -moved);
+        int moved = stock.extract(endpoint.binding(), key, amount, simulate);
         return moved == 0 ? ItemStack.EMPTY : key.toStack(moved);
     }
 
@@ -74,7 +73,7 @@ final class DirectSnapshotItemHandler implements DirectItemAccess {
         }
         for (ItemResource key : exports) {
             if (candidates.contains(key.item())) {
-                result.merge(key.item(), DirectStorageReads.clamp(stock.amount(key)),
+                result.merge(key.item(), DirectStorageReads.clamp(stock.amount(endpoint.binding(), key)),
                         (a, b) -> DirectStorageReads.clamp((long) a + b));
             }
         }

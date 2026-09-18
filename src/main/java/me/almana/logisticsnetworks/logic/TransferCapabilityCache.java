@@ -57,12 +57,13 @@ public final class TransferCapabilityCache {
             storageOperation = this;
         }
 
-        private IItemHandler itemHandler(StorageEndpoint endpoint, boolean exporting) {
+        private IItemHandler itemHandler(StorageEndpoint endpoint, @Nullable IItemHandler buffer,
+                boolean exporting) {
             IItemHandler[] views = handlers.computeIfAbsent(endpoint.endpointIdentity(), ignored -> new IItemHandler[2]);
             int index = exporting ? 0 : 1;
             IItemHandler existing = views[index];
             if (existing == null || DirectStorageHandlers.networkIdentity(existing) != endpoint.networkIdentity()) {
-                views[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, reads)
+                views[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, buffer, reads)
                         : DirectStorageHandlers.importItems(endpoint, reads);
             }
             return views[index];
@@ -118,14 +119,35 @@ public final class TransferCapabilityCache {
                 (ServerLevel) node.level(), node.getAttachedPos(), direction);
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE) {
             if (directInterfaces) {
-                if (storageOperation != null) return storageOperation.itemHandler(resolution.endpoint(), exporting);
+                IItemHandler buffer = exporting
+                        ? findInterfaceBuffer((ServerLevel) node.level(), node.getAttachedPos(),
+                                direction, resolution.endpoint())
+                        : null;
+                if (storageOperation != null) {
+                    return storageOperation.itemHandler(resolution.endpoint(), buffer, exporting);
+                }
                 return exporting
-                        ? DirectStorageHandlers.exportItems(resolution.endpoint())
+                        ? DirectStorageHandlers.exportItems(
+                                resolution.endpoint(), buffer, new DirectStorageReads(true))
                         : DirectStorageHandlers.importItems(resolution.endpoint());
             }
         }
         if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
         return findItemHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
+    }
+
+    @Nullable
+    private IItemHandler findInterfaceBuffer(ServerLevel level, BlockPos pos,
+            @Nullable Direction direction, StorageEndpoint endpoint) {
+        if (direction != null) return getItemHandler(level, pos, direction);
+        for (Direction side : DIRECTIONS) {
+            InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(level, pos, side);
+            if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE
+                    && resolution.endpoint().endpointIdentity() == endpoint.endpointIdentity()) {
+                return getItemHandler(level, pos, side);
+            }
+        }
+        return null;
     }
 
     @Nullable
