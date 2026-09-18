@@ -73,14 +73,23 @@ public final class NodeClipboardConfig {
         SUCCESS,
         CLIPBOARD_INVALID,
         INCOMPATIBLE_TARGET,
-        MISSING_ITEMS,
-        INVENTORY_FULL
+        MISSING_ITEMS
     }
 
     private record Requirement(ItemStack stack, int count) {
     }
 
     public record RequiredItem(ItemStack stack, int count) {
+    }
+
+    public record PasteOutcome(PasteResult result, List<RequiredItem> missingItems) {
+        public PasteOutcome(PasteResult result) {
+            this(result, List.of());
+        }
+
+        public PasteOutcome {
+            missingItems = List.copyOf(missingItems);
+        }
     }
 
     private static final class ChannelConfig {
@@ -752,22 +761,22 @@ public final class NodeClipboardConfig {
         return config.isStructurallyValid() ? config : null;
     }
 
-    public PasteResult applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack) {
+    public PasteOutcome applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack) {
         return applyToNode(player, node, protectedStack, (StorageLink) null);
     }
 
-    public PasteResult applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack,
+    public PasteOutcome applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack,
                                    @Nullable StorageLink storageLink) {
         if (player == null || node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT) {
-            return PasteResult.CLIPBOARD_INVALID;
+            return new PasteOutcome(PasteResult.CLIPBOARD_INVALID);
         }
 
         if (!isStructurallyValid()) {
-            return PasteResult.CLIPBOARD_INVALID;
+            return new PasteOutcome(PasteResult.CLIPBOARD_INVALID);
         }
 
         if (!hasCompatibleStructure(node)) {
-            return PasteResult.INCOMPATIBLE_TARGET;
+            return new PasteOutcome(PasteResult.INCOMPATIBLE_TARGET);
         }
 
         Inventory inventory = player.getInventory();
@@ -777,15 +786,17 @@ public final class NodeClipboardConfig {
 
         StorageAccess access = storageLink == null ? null : LinkedStorage.resolve(player.serverLevel(), storageLink);
         if (access != null && !access.allows(player, StorageAction.EXTRACT)) access = null;
+        List<RequiredItem> missingItems = new ArrayList<>();
         for (Requirement requirement : requirements) {
             int available = StorageInventory.count(inventory, requirement.stack(), protectedSlot);
             long stored = access == null ? 0 : access.count(requirement.stack());
-            if ((long) available + stored < requirement.count()) {
-                return PasteResult.MISSING_ITEMS;
+            long missing = requirement.count() - (long) available - stored;
+            if (missing > 0) {
+                missingItems.add(new RequiredItem(requirement.stack().copyWithCount(1), (int) missing));
             }
         }
-        if (!canFitReturnedItemsAfterConsumption(inventory, requirements, returnedItems, protectedSlot)) {
-            return PasteResult.INVENTORY_FULL;
+        if (!missingItems.isEmpty()) {
+            return new PasteOutcome(PasteResult.MISSING_ITEMS, missingItems);
         }
 
         List<ItemStack> inventoryReserved = new ArrayList<>();
@@ -798,11 +809,13 @@ public final class NodeClipboardConfig {
             List<ItemStack> fromStorage = access == null ? List.of()
                     : access.extract(requirement.stack(), remaining, player);
             storageReserved.addAll(fromStorage);
-            if (StorageInventory.count(fromStorage) != remaining) {
+            int extracted = StorageInventory.count(fromStorage);
+            if (extracted != remaining) {
                 StorageInventory.returnToPlayer(player, inventoryReserved);
                 if (access == null) StorageInventory.returnToPlayer(player, storageReserved);
                 else StorageInventory.returnToStorageOrPlayer(access, player, storageReserved);
-                return PasteResult.MISSING_ITEMS;
+                return new PasteOutcome(PasteResult.MISSING_ITEMS, List.of(new RequiredItem(
+                        requirement.stack().copyWithCount(1), Math.max(1, remaining - extracted))));
             }
         }
         applyToNode(node);
@@ -813,7 +826,7 @@ public final class NodeClipboardConfig {
         }
         inventory.setChanged();
 
-        return PasteResult.SUCCESS;
+        return new PasteOutcome(PasteResult.SUCCESS);
     }
 
     public PasteResult applyToNodeWithoutInventory(LogisticsNodeEntity node) {
@@ -970,96 +983,6 @@ public final class NodeClipboardConfig {
         }
         return -1;
     }
-
-
-
-    private static boolean canFitReturnedItemsAfterConsumption(Inventory inventory, List<Requirement> requirements,
-            List<ItemStack> returnedItems, int protectedSlot) {
-        ItemStack[] snapshot = copyInventorySlots(inventory);
-        if (!consumeRequirementsFromSnapshot(snapshot, requirements, protectedSlot)) {
-            return false;
-        }
-        return insertStacksIntoSnapshot(snapshot, returnedItems, protectedSlot);
-    }
-
-    private static ItemStack[] copyInventorySlots(Inventory inventory) {
-        ItemStack[] snapshot = new ItemStack[inventory.getContainerSize()];
-        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            snapshot[slot] = inventory.getItem(slot).copy();
-        }
-        return snapshot;
-    }
-
-    private static boolean consumeRequirementsFromSnapshot(ItemStack[] slots, List<Requirement> requirements,
-            int protectedSlot) {
-        for (Requirement requirement : requirements) {
-            int remaining = requirement.count();
-            for (int slot = 0; slot < slots.length && remaining > 0; slot++) {
-                if (slot == protectedSlot) {
-                    continue;
-                }
-                ItemStack stack = slots[slot];
-                if (stack.isEmpty() || !ItemStack.isSameItem(stack, requirement.stack())) {
-                    continue;
-                }
-                int consumed = Math.min(remaining, stack.getCount());
-                stack.shrink(consumed);
-                remaining -= consumed;
-            }
-            if (remaining > 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean insertStacksIntoSnapshot(ItemStack[] slots, List<ItemStack> stacks, int protectedSlot) {
-        for (ItemStack stack : stacks) {
-            if (stack.isEmpty()) {
-                continue;
-            }
-            ItemStack remaining = stack.copy();
-            if (!tryInsertIntoSnapshot(slots, remaining, protectedSlot)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean tryInsertIntoSnapshot(ItemStack[] slots, ItemStack remaining, int protectedSlot) {
-        for (int slot = 0; slot < slots.length && !remaining.isEmpty(); slot++) {
-            if (slot == protectedSlot) {
-                continue;
-            }
-            ItemStack current = slots[slot];
-            if (current.isEmpty() || !ItemStack.isSameItemSameComponents(current, remaining)) {
-                continue;
-            }
-            int max = Math.min(current.getMaxStackSize(), remaining.getMaxStackSize());
-            int room = max - current.getCount();
-            if (room <= 0) {
-                continue;
-            }
-            int move = Math.min(room, remaining.getCount());
-            current.grow(move);
-            remaining.shrink(move);
-        }
-
-        for (int slot = 0; slot < slots.length && !remaining.isEmpty(); slot++) {
-            if (slot == protectedSlot) {
-                continue;
-            }
-            if (!slots[slot].isEmpty()) {
-                continue;
-            }
-            int move = Math.min(remaining.getCount(), remaining.getMaxStackSize());
-            slots[slot] = remaining.copyWithCount(move);
-            remaining.shrink(move);
-        }
-
-        return remaining.isEmpty();
-    }
-
     private static List<ItemStack> returnItemsToInventory(Inventory inventory, List<ItemStack> returnedItems,
             int protectedSlot) {
         List<ItemStack> leftovers = new ArrayList<>();
