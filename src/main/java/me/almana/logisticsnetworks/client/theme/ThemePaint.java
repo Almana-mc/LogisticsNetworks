@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.theme;
 
+import me.almana.logisticsnetworks.data.ChannelType;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -108,11 +109,26 @@ public final class ThemePaint {
         return font.width(text) + 6 + 8 + 2;
     }
 
-    public static void tab(GuiGraphics g, Font font, int x, int y, int w, int h,
-                            String label, boolean active, boolean hasDot, boolean hovered, Theme t) {
-        int bg = active ? t.tabActiveBg() : t.surface2();
-        int fg = active ? t.tabActiveFg() : (hovered ? t.text() : t.textMuted());
-        int border = active ? t.tabActiveBg() : t.border();
+    public static void channelTab(GuiGraphics g, Font font, int x, int y, int w, int h,
+                                  String label, ChannelType type, boolean active, boolean hasDot,
+                                  boolean hovered, Theme t) {
+        int bg;
+        int fg;
+        int border;
+        if (type == null) {
+            bg = active ? t.tabActiveBg() : t.surface2();
+            fg = active ? t.tabActiveFg() : (hovered ? t.text() : t.textMuted());
+            border = active ? t.tabActiveBg() : t.border();
+        } else if (active) {
+            bg = ChannelTint.selectedBg(type, t);
+            fg = ChannelTint.selectedFg(type, t);
+            border = bg;
+        } else {
+            bg = ChannelTint.tabBg(type, t);
+            if (hovered) bg = brighten(bg, 0x10);
+            fg = ChannelTint.digit(type, t);
+            border = ChannelTint.border(type, t);
+        }
         if (t.hardShadow() && active) {
             g.fill(x + 2, y + 2, x + w + 2, y + h + 2, 0xFF000000);
         }
