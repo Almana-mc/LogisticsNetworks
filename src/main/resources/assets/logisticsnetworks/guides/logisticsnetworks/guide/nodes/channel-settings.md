@@ -7,8 +7,6 @@ navigation:
 
 # Channel Settings
 
-![Full channel settings panel — Status, Mode, Type, Side, Redstone, Distribution, Priority, Batch, Delay](images/channel-settings-full.png)
-
 This panel controls the channel you have currently selected in the [Header](header.md). Every node has 9 channels and each one has its own independent copy of all the settings below — changing a setting here only affects the one channel you are looking at.
 
 Hold **Modifier Key 3 (default: Alt)** and use **Primary Interaction (default: Left Click)** to set a setting to its maximum value, or **Secondary Interaction (default: Right Click)** to set it to its minimum value.
@@ -96,10 +94,6 @@ Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but r
 
 ## Redstone
 
-![Redstone: Always On](images/channel-redstone-always-on.png)
-
-![Redstone: Always Off](images/channel-redstone-always-off.png)
-
 ![Redstone: High Signal](images/channel-redstone-high-signal.png)
 
 ![Redstone: Low Signal](images/channel-redstone-low-signal.png)
@@ -108,14 +102,12 @@ Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but r
 
 **What it does:** the engine checks the redstone signal **at the block this node is attached to** (from any neighbor — lever, redstone torch, dust, comparator, whatever). Based on that signal, the channel either runs or is blocked:
 
-- **Always On** — run regardless of signal.
-- **Always Off** — never run. Same effect as Status = Disabled, but you keep the channel armed.
 - **High Signal** — run only when a redstone signal is present (strength > 0).
 - **Low Signal** — run only when there is no redstone signal (strength = 0).
 
 **How to change it:** use Primary Interaction to cycle to the next mode.
 
-**Disabled on Receivers:** this row is greyed out when Mode is Receiver. Redstone gating only applies on the Sender side (since Senders drive the transfer).
+Redstone gating applies to both Senders and Receivers.
 
 ## Distribution
 
