@@ -223,40 +223,13 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 rebuildPageLayout();
             }
         }
-
-        if (currentPage == Page.CHANNEL_CONFIG) {
-            validateChannelConfigs(node);
-        }
     }
 
-    private void validateChannelConfigs(LogisticsNodeEntity node) {
-        for (int i = 0; i < 9; i++) {
-            ChannelData ch = node.getChannel(i);
-            if (ch == null)
-                continue;
-
-            int batchCap = switch (ch.getType()) {
-                case FLUID -> NodeUpgradeData.getFluidOperationCapMb(node);
-                case ENERGY -> NodeUpgradeData.getEnergyOperationCap(node);
-                case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(node);
-                case SOURCE -> NodeUpgradeData.getSourceOperationCap(node);
-                default -> NodeUpgradeData.getItemOperationCap(node);
-            };
-
-            if (ch.getBatchSize() > batchCap)
-                ch.setBatchSize(batchCap);
-            if (ch.getBatchSize() < 1)
-                ch.setBatchSize(1);
-
-            if (ch.getType() == ChannelType.ENERGY) {
-                if (ch.getTickDelay() != 1)
-                    ch.setTickDelay(1);
-            } else {
-                int minDelay = NodeUpgradeData.getMinTickDelay(node);
-                if (ch.getTickDelay() < minDelay)
-                    ch.setTickDelay(minDelay);
-            }
-        }
+    private void validateChannelConfig(LogisticsNodeEntity node, ChannelData channel) {
+        int tier = NodeUpgradeData.getUpgradeTier(node);
+        int maximum = NodeUpgradeData.getOperationCap(channel.getType(), tier);
+        channel.setBatchSize(Math.max(1, Math.min(channel.getBatchSize(), maximum)));
+        channel.setTickDelay(Math.max(channel.getTickDelay(), NodeUpgradeData.getMinTickDelay(tier)));
     }
 
     @Override
@@ -1633,11 +1606,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         switch (row) {
             case 0 -> ch.setEnabled(!ch.isEnabled());
             case 1 -> ch.setMode(cycleModeForNode(ch.getMode(), dir));
-            case 2 -> {
-                ChannelType oldT = ch.getType();
-                ch.setType(cycleChannelType(ch.getType(), dir));
-                resetDefaultsForTypeChange(ch, oldT, ch.getType());
-            }
+            case 2 -> NodeUpgradeData.applyTypeChange(ch, cycleChannelType(ch.getType(), dir),
+                    NodeUpgradeData.getUpgradeTier(getMenu().getNode()));
             case 3 -> ch.setIoDirection(cycleSide(ch.getIoDirection(), dir));
             case 4 -> ch.setRedstoneMode(cycleEnum(ch.getRedstoneMode(), dir));
             case 5 -> ch.setDistributionMode(cycleEnum(ch.getDistributionMode(), dir));
@@ -1691,20 +1661,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         return pos < 6 ? Direction.values()[pos] : null;
     }
 
-    private void resetDefaultsForTypeChange(ChannelData ch, ChannelType oldT, ChannelType newT) {
-        if (oldT == newT)
-            return;
-        if (newT == ChannelType.FLUID || newT == ChannelType.CHEMICAL || newT == ChannelType.SOURCE) {
-            ch.setBatchSize(100);
-        } else if (newT == ChannelType.ENERGY) {
-            ch.setBatchSize(2000);
-            ch.setTickDelay(1);
-        } else if (oldT == ChannelType.ENERGY) {
-            ch.setBatchSize(8);
-            ch.setTickDelay(20);
-        }
-    }
-
     private void startNumericEdit(ChannelData ch, int row, int x, int y) {
         stopNumericEdit(false);
         editingRow = row;
@@ -1753,7 +1709,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     }
 
     private void commitChannelUpdate(LogisticsNodeEntity node, ChannelData ch) {
-        validateChannelConfigs(node);
+        validateChannelConfig(node, ch);
         PacketDistributor.sendToServer(new UpdateChannelPayload(
                 node.getId(), selectedChannel, ch.isEnabled(),
                 ch.getMode().ordinal(), ch.getType().ordinal(),

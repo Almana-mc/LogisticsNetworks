@@ -30,6 +30,12 @@ public final class NodeUpgradeData {
         };
     }
 
+    public static void applyTypeChange(ChannelData channel, ChannelType type, int tier) {
+        if (channel.getType() == type) return;
+        channel.setType(type);
+        channel.setBatchSize(getOperationCap(type, tier));
+    }
+
     public static void applyTierChange(ChannelData channel, int previousTier, int tier) {
         if (tier == previousTier) return;
         int maximum = getOperationCap(channel.getType(), tier);
