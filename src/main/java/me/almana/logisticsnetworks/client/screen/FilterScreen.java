@@ -436,7 +436,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         if (detailTagPicker != null) {
-            renderBackground(g, mx, my, pt);
+            renderTransparentBackground(g);
             detailTagPicker.render(g, mx, my, pt, width, height);
             return;
         }
