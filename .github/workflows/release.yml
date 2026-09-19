@@ -145,12 +145,15 @@ jobs:
           curseforge_projects = {
               "ae2": {"slug": "applied-energistics-2", "projectID": 223794},
               "ars_nouveau": {"slug": "ars-nouveau", "projectID": 401955},
+              "create": {"slug": "create", "projectID": 328085},
               "ftbteams": {"slug": "ftb-teams-forge", "projectID": 404468},
               "guideme": {"slug": "guideme", "projectID": 1173950},
+              "iris": {"slug": "irisshaders", "projectID": 455508},
               "jade": {"slug": "jade", "projectID": 324717},
               "jei": {"slug": "jei", "projectID": 238222},
               "mekanism": {"slug": "mekanism", "projectID": 268560},
               "refinedstorage": {"slug": "refined-storage", "projectID": 243076},
+              "sophisticatedcore": {"slug": "sophisticated-core", "projectID": 618298},
           }
           curseforge_types = {
               "required": "requiredDependency",
