@@ -664,5 +664,13 @@
   "message.logisticsnetworks.label.unloaded_unknown": "Load all network nodes before creating this label.",
   "message.logisticsnetworks.label.loaded_synced": "Synchronized loaded node with label %s",
   "message.logisticsnetworks.label.sync_failed": "Could not synchronize label %s",
-  "message.logisticsnetworks.label.rollback_incomplete": "The original upgrade was no longer available, so the source node was only partially restored"
+  "message.logisticsnetworks.label.rollback_incomplete": "The original upgrade was no longer available, so the source node was only partially restored",
+  "gui.logisticsnetworks.computer.delete_tooltip": "Delete network",
+  "gui.logisticsnetworks.computer.delete_title": "Delete network?",
+  "gui.logisticsnetworks.computer.delete_warning": "Delete \"%s\" and its %s registered nodes? Node items and installed upgrades will be placed in your inventory. Anything that does not fit will be dropped at your feet. This cannot be undone.",
+  "gui.logisticsnetworks.computer.delete_confirm": "Delete",
+  "message.logisticsnetworks.network_delete.success": "Deleted network and returned %s nodes",
+  "message.logisticsnetworks.network_delete.denied": "You do not have permission to delete this network",
+  "message.logisticsnetworks.network_delete.missing": "That network no longer exists",
+  "message.logisticsnetworks.network_delete.unavailable": "Cannot delete network: %s registered nodes are unavailable"
 }
