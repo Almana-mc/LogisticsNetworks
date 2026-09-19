@@ -437,10 +437,11 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int x = leftPos + DETAIL_PANEL_X + DETAIL_PANEL_WIDTH - DELETE_BUTTON_SIZE - 8;
         int y = topPos + DETAIL_PANEL_Y + 20;
         boolean hovered = isHoveringAbs(x, y, DELETE_BUTTON_SIZE, DELETE_BUTTON_SIZE, mouseX, mouseY);
-        g.fill(x, y, x + DELETE_BUTTON_SIZE, y + DELETE_BUTTON_SIZE,
-                hovered ? COLOR_DANGER_HOVER : COLOR_DANGER);
+        if (hovered) {
+            g.fill(x, y, x + DELETE_BUTTON_SIZE, y + DELETE_BUTTON_SIZE, COLOR_ROW_HOVER);
+        }
         g.renderOutline(x, y, DELETE_BUTTON_SIZE, DELETE_BUTTON_SIZE,
-                hovered ? COLOR_DANGER_BORDER : COLOR_BORDER);
+                hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER);
         RenderSystem.enableBlend();
         g.blit(DELETE_ICON, x + 1, y + 1, 16, 16, 0, 0, 512, 512, 512, 512);
         RenderSystem.disableBlend();
@@ -1177,8 +1178,10 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         }
         int x = (width - DELETE_MODAL_WIDTH) / 2;
         int y = (height - DELETE_MODAL_HEIGHT) / 2;
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 500);
         g.fill(0, 0, width, height, 0xB0000000);
-        g.fill(x, y, x + DELETE_MODAL_WIDTH, y + DELETE_MODAL_HEIGHT, COLOR_PANEL);
+        g.fill(x, y, x + DELETE_MODAL_WIDTH, y + DELETE_MODAL_HEIGHT, COLOR_PANEL_ALT);
         g.renderOutline(x, y, DELETE_MODAL_WIDTH, DELETE_MODAL_HEIGHT, COLOR_DANGER_BORDER);
         g.fill(x + 1, y + 1, x + DELETE_MODAL_WIDTH - 1, y + 18, COLOR_PANEL_HEADER);
         g.drawString(font, label("gui.logisticsnetworks.computer.delete_title"), x + 10, y + 6,
@@ -1191,6 +1194,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 line("gui.logisticsnetworks.config.cancel"), false, mouseX, mouseY);
         renderConfirmationButton(g, deleteX, buttonY, 72,
                 line("gui.logisticsnetworks.computer.delete_confirm"), true, mouseX, mouseY);
+        g.pose().popPose();
     }
 
     private void renderDeleteWarning(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, int x, int y) {
