@@ -327,13 +327,15 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         for (WrenchItem.MassSelectionTarget target : targets) {
             LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, target.pos(), player.getUUID());
             if (node == null || clipboard != null
-                    && clipboard.applyToNodeWithoutInventory(node) != NodeClipboardConfig.PasteResult.SUCCESS) {
+                    && clipboard.applyToNodeWithoutInventory((ServerPlayer) player, node)
+                    != NodeClipboardConfig.PasteResult.SUCCESS) {
                 if (node != null) node.discard();
                 placed.forEach(LogisticsNodeEntity::discard);
                 return false;
             }
             placed.add(node);
         }
+        if (clipboard != null) WrenchItem.setClipboard(wrenchStack, clipboard, player.registryAccess());
         WrenchItem.clearMassSelections(wrenchStack);
         player.getInventory().setChanged();
         player.displayClientMessage(

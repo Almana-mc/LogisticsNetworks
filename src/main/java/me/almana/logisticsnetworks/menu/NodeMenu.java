@@ -214,6 +214,10 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     public void sendNetworkListToClient(ServerPlayer player) {
+        sendAvailableNetworkListToClient(player);
+    }
+
+    public static void sendAvailableNetworkListToClient(ServerPlayer player) {
         if (!(player.level() instanceof ServerLevel level))
             return;
 

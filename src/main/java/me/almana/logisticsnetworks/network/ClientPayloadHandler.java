@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
+import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeEditorScreen;
@@ -29,6 +30,8 @@ public class ClientPayloadHandler {
             } else if (screen instanceof ComputerScreen computerScreen) {
                 LOGGER.debug("Passing to ComputerScreen");
                 computerScreen.receiveNetworkList(payload.networks());
+            } else if (screen instanceof ClipboardScreen clipboardScreen) {
+                clipboardScreen.receiveNetworkList(payload.networks());
             } else {
                 LOGGER.debug("Screen is not NodeScreen or ComputerScreen, ignoring");
             }
@@ -65,6 +68,8 @@ public class ClientPayloadHandler {
             var screen = Minecraft.getInstance().screen;
             if (screen instanceof NodeEditorScreen<?> nodeScreen) {
                 nodeScreen.receiveNetworkLabels(payload.labels());
+            } else if (screen instanceof ClipboardScreen clipboardScreen) {
+                clipboardScreen.receiveNetworkLabels(payload.labels());
             }
         });
     }
@@ -83,6 +88,8 @@ public class ClientPayloadHandler {
             var screen = Minecraft.getInstance().screen;
             if (screen instanceof ComputerScreen computerScreen) {
                 computerScreen.receiveChannelList(payload.networkId(), payload.channels());
+            } else if (screen instanceof ClipboardScreen clipboardScreen) {
+                clipboardScreen.receiveChannelList(payload.networkId(), payload.channelNames());
             }
         });
     }

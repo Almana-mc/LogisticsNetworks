@@ -374,6 +374,7 @@ public class WrenchItem extends Item {
         }
 
         if (pasted > 0) {
+            setClipboard(wrenchStack, clipboard, player.registryAccess());
             if (missingOutcome != null) {
                 player.displayClientMessage(
                         Component.translatable("message.logisticsnetworks.clipboard.paste.connected.partial",
@@ -648,10 +649,7 @@ public class WrenchItem extends Item {
         if (isSecondaryUse(player)) {
             sendClipboardPreview(serverPlayer, stack);
         } else {
-            serverPlayer.openMenu(new SimpleMenuProvider(
-                    (id, inventory, p) -> new ClipboardMenu(id, inventory, hand),
-                    Component.translatable("gui.logisticsnetworks.clipboard")),
-                    buf -> buf.writeVarInt(hand.ordinal()));
+            ClipboardMenu.open(serverPlayer, hand, 0);
         }
 
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
@@ -868,6 +866,7 @@ public class WrenchItem extends Item {
         NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(serverPlayer, node, wrenchStack, storageLink);
         switch (outcome.result()) {
             case SUCCESS -> {
+                setClipboard(wrenchStack, clipboard, serverPlayer.registryAccess());
                 invalidateNodeNetwork(node);
                 player.displayClientMessage(Component.translatable("message.logisticsnetworks.clipboard.paste.success"),
                         true);

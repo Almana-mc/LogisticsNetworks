@@ -9,7 +9,9 @@ import me.almana.logisticsnetworks.integration.storage.StorageAccess;
 import me.almana.logisticsnetworks.integration.storage.StorageAction;
 import me.almana.logisticsnetworks.integration.storage.StorageInventory;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.registration.ModTags;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -239,7 +241,48 @@ public final class NodeClipboardConfig {
         Arrays.fill(upgradeItems, ItemStack.EMPTY);
         networkId = null;
         networkName = null;
+        renderVisible = true;
         nodeLabel = "";
+    }
+
+    @Nullable
+    public UUID getNetworkId() {
+        return networkId;
+    }
+
+    @Nullable
+    public String getNetworkName() {
+        return networkName;
+    }
+
+    public void setNetworkTarget(@Nullable UUID id, @Nullable String name) {
+        networkId = id;
+        networkName = trim(name, 32);
+        if (networkName.isEmpty()) networkName = null;
+    }
+
+    public boolean isRenderVisible() {
+        return renderVisible;
+    }
+
+    public void setRenderVisible(boolean visible) {
+        renderVisible = visible;
+    }
+
+    public String getNodeLabel() {
+        return nodeLabel;
+    }
+
+    public void setNodeLabel(String label) {
+        nodeLabel = trim(label, 48);
+    }
+
+    public String getChannelName(int channel) {
+        return getChannelConfig(channel).name;
+    }
+
+    public void setChannelName(int channel, String name) {
+        getChannelConfig(channel).name = trim(name, 24);
     }
 
     public boolean isChannelEnabled(int channel) {
@@ -263,15 +306,21 @@ public final class NodeClipboardConfig {
     }
 
     public void setChannelType(int channel, ChannelType type) {
-        getChannelConfig(channel).type = type == null ? ChannelType.ITEM : type;
+        ChannelConfig config = getChannelConfig(channel);
+        ChannelType next = type == null ? ChannelType.ITEM : type;
+        if (config.type != next) {
+            config.type = next;
+            config.batchSize = NodeUpgradeData.getOperationCap(next, getUpgradeTier());
+        }
     }
 
+    @Nullable
     public Direction getChannelDirection(int channel) {
         return getChannelConfig(channel).ioDirection;
     }
 
-    public void setChannelDirection(int channel, Direction direction) {
-        getChannelConfig(channel).ioDirection = direction == null ? Direction.UP : direction;
+    public void setChannelDirection(int channel, @Nullable Direction direction) {
+        getChannelConfig(channel).ioDirection = direction;
     }
 
     public RedstoneMode getChannelRedstoneMode(int channel) {
@@ -319,7 +368,10 @@ public final class NodeClipboardConfig {
     }
 
     public void setChannelBatchSize(int channel, int batchSize) {
-        getChannelConfig(channel).batchSize = Math.max(1, batchSize);
+        ChannelConfig config = getChannelConfig(channel);
+        int maximum = NodeUpgradeData.getOperationCap(config.type, getUpgradeTier());
+        config.batchSize = config.type == ChannelType.ENERGY
+                ? maximum : Math.max(1, Math.min(batchSize, maximum));
     }
 
     public int getChannelTickDelay(int channel) {
@@ -327,7 +379,8 @@ public final class NodeClipboardConfig {
     }
 
     public void setChannelTickDelay(int channel, int delay) {
-        getChannelConfig(channel).tickDelay = Math.max(1, delay);
+        getChannelConfig(channel).tickDelay = Math.max(NodeUpgradeData.getMinTickDelay(getUpgradeTier()),
+                Math.min(10_000, delay));
     }
 
     public ItemStack getFilterItem(int channel, int slot) {
@@ -355,7 +408,32 @@ public final class NodeClipboardConfig {
         if (slot < 0 || slot >= upgradeItems.length) {
             return;
         }
-        upgradeItems[slot] = stack == null || stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
+        ItemStack next = stack == null || stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
+        if (!next.isEmpty()) {
+            for (int i = 0; i < upgradeItems.length; i++) {
+                if (i != slot && ItemStack.isSameItem(upgradeItems[i], next)) return;
+            }
+        }
+        int previousTier = getUpgradeTier();
+        upgradeItems[slot] = next;
+        int tier = getUpgradeTier();
+        if (tier != previousTier) {
+            for (ChannelConfig config : channels) {
+                int maximum = NodeUpgradeData.getOperationCap(config.type, tier);
+                config.batchSize = tier > previousTier ? maximum : Math.min(config.batchSize, maximum);
+                if (tier < previousTier && config.type != ChannelType.ENERGY) {
+                    config.tickDelay = Math.max(config.tickDelay, NodeUpgradeData.getMinTickDelay(tier));
+                }
+            }
+        }
+    }
+
+    public int getUpgradeTier() {
+        int tier = 0;
+        for (ItemStack stack : upgradeItems) {
+            tier = Math.max(tier, NodeUpgradeData.getUpgradeTier(stack));
+        }
+        return tier;
     }
 
     public int getEnabledChannelCount() {
@@ -412,6 +490,9 @@ public final class NodeClipboardConfig {
     }
 
     public boolean isEffectivelyEmpty() {
+        if (!renderVisible) {
+            return false;
+        }
         if (networkId != null || (networkName != null && !networkName.isBlank())) {
             return false;
         }
@@ -479,6 +560,13 @@ public final class NodeClipboardConfig {
         for (ItemStack stack : upgradeItems) {
             if (stack != null && !stack.isEmpty() && !stack.is(ModTags.UPGRADES)) {
                 return false;
+            }
+        }
+
+        for (int first = 0; first < upgradeItems.length; first++) {
+            if (upgradeItems[first] == null || upgradeItems[first].isEmpty()) continue;
+            for (int second = first + 1; second < upgradeItems.length; second++) {
+                if (ItemStack.isSameItem(upgradeItems[first], upgradeItems[second])) return false;
             }
         }
 
@@ -778,6 +866,9 @@ public final class NodeClipboardConfig {
         if (!hasCompatibleStructure(node)) {
             return new PasteOutcome(PasteResult.INCOMPATIBLE_TARGET);
         }
+        if (!canAccessTargetNetwork(player, node)) {
+            return new PasteOutcome(PasteResult.INCOMPATIBLE_TARGET);
+        }
 
         Inventory inventory = player.getInventory();
         int protectedSlot = findProtectedSlot(inventory, protectedStack);
@@ -819,7 +910,7 @@ public final class NodeClipboardConfig {
             }
         }
         applyToNode(node);
-        applyNetworkToNode(node);
+        applyNetworkToNode(node, player);
         List<ItemStack> leftovers = returnItemsToInventory(inventory, returnedItems, protectedSlot);
         for (ItemStack leftover : leftovers) {
             player.drop(leftover, false);
@@ -829,7 +920,7 @@ public final class NodeClipboardConfig {
         return new PasteOutcome(PasteResult.SUCCESS);
     }
 
-    public PasteResult applyToNodeWithoutInventory(LogisticsNodeEntity node) {
+    public PasteResult applyToNodeWithoutInventory(ServerPlayer player, LogisticsNodeEntity node) {
         if (node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT) {
             return PasteResult.CLIPBOARD_INVALID;
         }
@@ -841,9 +932,12 @@ public final class NodeClipboardConfig {
         if (!hasCompatibleStructure(node)) {
             return PasteResult.INCOMPATIBLE_TARGET;
         }
+        if (!canAccessTargetNetwork(player, node)) {
+            return PasteResult.INCOMPATIBLE_TARGET;
+        }
 
         applyToNode(node);
-        applyNetworkToNode(node);
+        applyNetworkToNode(node, player);
         return PasteResult.SUCCESS;
     }
 
@@ -881,7 +975,14 @@ public final class NodeClipboardConfig {
         return !ItemStack.isSameItem(expected, current);
     }
 
-    private void applyNetworkToNode(LogisticsNodeEntity node) {
+    private boolean canAccessTargetNetwork(ServerPlayer player, LogisticsNodeEntity node) {
+        if (networkId == null || !(node.level() instanceof ServerLevel serverLevel)) return true;
+        LogisticsNetwork network = NetworkRegistry.get(serverLevel).getNetwork(networkId);
+        return network == null || NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
+                || player.hasPermissions(2);
+    }
+
+    private void applyNetworkToNode(LogisticsNodeEntity node, ServerPlayer player) {
         if (!(node.level() instanceof ServerLevel serverLevel)) {
             return;
         }
@@ -898,7 +999,7 @@ public final class NodeClipboardConfig {
             return;
         }
 
-        LogisticsNetwork targetNetwork = resolveTargetNetwork(registry, node.getOwnerUUID());
+        LogisticsNetwork targetNetwork = resolveTargetNetwork(registry, node.getOwnerUUID(), player);
         if (targetNetwork == null) {
             return;
         }
@@ -922,28 +1023,45 @@ public final class NodeClipboardConfig {
     }
 
     @Nullable
-    private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry, UUID ownerUuid) {
+    private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry, UUID ownerUuid, ServerPlayer player) {
         if (networkId != null) {
             LogisticsNetwork byId = registry.getNetwork(networkId);
-            if (byId != null) {
+            if (byId != null && (NodeAccessPolicy.canAccess(byId.getOwnerUuid(), player.getUUID())
+                    || player.hasPermissions(2))) {
                 return byId;
             }
+            if (byId != null) return null;
         }
 
         if (networkName != null && !networkName.isBlank()) {
-            for (LogisticsNetwork candidate : registry.getAllNetworks().values()) {
-                if (networkName.equals(candidate.getName())) {
-                    return candidate;
-                }
-            }
-            return registry.createNetwork(networkName, ownerUuid);
+            LogisticsNetwork created = registry.createNetwork(networkName, ownerUuid);
+            networkId = created.getId();
+            networkName = created.getName();
+            seedChannelNames(created);
+            return created;
         }
 
         if (networkId != null) {
-            return registry.createNetwork("Network-" + networkId.toString().substring(0, 6), ownerUuid);
+            LogisticsNetwork created = registry.createNetwork("Network-" + networkId.toString().substring(0, 6), ownerUuid);
+            networkId = created.getId();
+            networkName = created.getName();
+            seedChannelNames(created);
+            return created;
         }
 
         return null;
+    }
+
+    private void seedChannelNames(LogisticsNetwork network) {
+        for (int channel = 0; channel < channels.length; channel++) {
+            network.setChannelName(channel, channels[channel].name);
+        }
+    }
+
+    private static String trim(@Nullable String value, int maxLength) {
+        if (value == null) return "";
+        String trimmed = value.trim();
+        return trimmed.length() <= maxLength ? trimmed : trimmed.substring(0, maxLength);
     }
 
     private List<Requirement> buildUpgradeRequirements(LogisticsNodeEntity node) {

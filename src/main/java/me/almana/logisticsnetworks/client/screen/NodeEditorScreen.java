@@ -62,7 +62,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.*;
 
-public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScreen<T> {
+public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScreen<T> implements VirtualFilterTarget {
 
     private enum Page {
         NETWORK_SELECT, CHANNEL_CONFIG

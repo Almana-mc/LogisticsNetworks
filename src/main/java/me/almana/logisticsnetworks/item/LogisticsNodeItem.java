@@ -87,6 +87,7 @@ public class LogisticsNodeItem extends Item {
                 serverPlayer, node, offhand, WrenchItem.getStorageLink(offhand));
         switch (outcome.result()) {
             case SUCCESS -> {
+                WrenchItem.setClipboard(offhand, clipboard, serverPlayer.registryAccess());
             }
             case MISSING_ITEMS -> WrenchItem.reportPasteMissing(serverPlayer, outcome);
             case INCOMPATIBLE_TARGET -> serverPlayer.displayClientMessage(
