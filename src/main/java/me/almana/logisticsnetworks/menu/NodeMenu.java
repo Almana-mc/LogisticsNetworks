@@ -277,9 +277,12 @@ public class NodeMenu extends AbstractContainerMenu {
         int nodeSlotCount = UPGRADE_SLOTS;
 
         if (index < nodeSlotCount) {
-            if (!moveItemStackTo(fromStack, nodeSlotCount, slots.size(), true)) {
+            ItemStack remainder = fromStack.copy();
+            if (!moveItemStackTo(remainder, nodeSlotCount, slots.size(), true)) {
                 return ItemStack.EMPTY;
             }
+            fromSlot.set(remainder);
+            return copy;
         } else {
             if (!fromStack.is(ModTags.UPGRADES)) {
                 return ItemStack.EMPTY;
@@ -297,14 +300,6 @@ public class NodeMenu extends AbstractContainerMenu {
             }
             return ItemStack.EMPTY;
         }
-
-        if (fromStack.isEmpty()) {
-            fromSlot.set(ItemStack.EMPTY);
-        } else {
-            fromSlot.setChanged();
-        }
-
-        return copy;
     }
 
     private class UpgradeItemsContainer extends AbstractProxyContainer {
