@@ -118,7 +118,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private int listScrollOffset = 0;
     private boolean amountInfoOpen = false;
     private int amountInfoPage = 0;
-    private boolean flushedTextOnClose = false;
+    private boolean flushedEditorsOnExit = false;
     private boolean wasManualInputFocused = false;
 
     private int tagEditSlot = -1;
@@ -1244,8 +1244,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         int copied = Math.min(menu.getFilterSlots(), copiedFilter.entries().size());
         for (int slot = 0; slot < menu.getFilterSlots(); slot++) {
-            menu.clearFilterEntry(slot);
-            PacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, ItemStack.EMPTY));
+            clearFilterEntry(slot);
             PacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, ""));
             PacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(slot));
             PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
@@ -1369,9 +1368,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (!menu.isNodeFilter()) {
             return false;
         }
-        flushManualInputToServer();
+        flushEditorsBeforeExit();
         if (menu.getGraphContext() != null) {
-            flushOpenEditors();
             var graph = menu.getGraphContext();
             if (graph.origin() == me.almana.logisticsnetworks.menu.GraphMenuContext.Origin.TABLE) {
                 PacketDistributor.sendToServer(new OpenNodeMenuPayload(
@@ -1772,12 +1770,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return false;
     }
 
-    private void flushManualInputToServer() {
-        if (flushedTextOnClose || manualInputBox == null || !manualInputBox.isVisible()) {
+    private void flushEditorsBeforeExit() {
+        if (flushedEditorsOnExit) {
             return;
         }
-        flushedTextOnClose = true;
-        commitManualInput();
+        flushedEditorsOnExit = true;
+        flushOpenEditors();
     }
 
     private boolean saveManualInputAndClearFocus() {
@@ -1830,13 +1828,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     public void onClose() {
-        flushManualInputToServer();
+        flushEditorsBeforeExit();
         super.onClose();
     }
 
     @Override
     public void removed() {
-        flushManualInputToServer();
+        flushEditorsBeforeExit();
         super.removed();
     }
 
@@ -2043,9 +2041,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (slot < menu.slots.size() && !menu.slots.get(slot).getItem().isEmpty())
             return true;
         ItemStack openedStack = menu.getOpenedStack();
-        return FilterItemData.hasEntryNbt(openedStack, slot)
-                || FilterItemData.hasEntryDurability(openedStack, slot)
-                || FilterItemData.hasEntryEnchanted(openedStack, slot)
+        return FilterItemData.isNbtOnlySlot(openedStack, slot)
                 || FilterItemData.hasEntrySlotMapping(openedStack, slot);
     }
 
@@ -2130,8 +2126,18 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     public void setItemFilterEntry(Player player, int slot, ItemStack stack) {
         if (stack.isEmpty())
             return;
-        PacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, stack));
+        PacketDistributor.sendToServer(SetFilterItemEntryPayload.set(slot, stack));
         menu.setItemFilterEntry(player, slot, stack);
+    }
+
+    private void clearItemFilterEntry(int slot) {
+        menu.clearFilterEntryItem(minecraft.player, slot);
+        PacketDistributor.sendToServer(SetFilterItemEntryPayload.clearItem(slot));
+    }
+
+    private void clearFilterEntry(int slot) {
+        menu.clearFilterEntry(slot);
+        PacketDistributor.sendToServer(SetFilterItemEntryPayload.clearEntry(slot));
     }
 
     public boolean acceptsFluidSelectorGhostIngredient() {
@@ -2197,7 +2203,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (!isDetailPageOpen() || stack.isEmpty()) return;
         ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
         menu.clearEntryTag(detailEditSlot);
-        PacketDistributor.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, stack));
+        PacketDistributor.sendToServer(SetFilterItemEntryPayload.set(detailEditSlot, stack));
         menu.setItemFilterEntry(minecraft.player, detailEditSlot, stack);
         detailIdInputBox.setValue(itemId.toString());
     }
@@ -3384,7 +3390,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                             if (menu.getEntryTag(slot) != null) {
                                 menu.clearEntryTag(slot);
                             }
-                            PacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, stack));
+                            PacketDistributor.sendToServer(SetFilterItemEntryPayload.set(slot, stack));
                             menu.setItemFilterEntry(minecraft.player, slot, stack);
                         }
                     }
@@ -3392,17 +3398,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
         } else if (hasEntryInSlot(slot)) {
             if (isFluidOrChemical) {
-                menu.clearFilterEntry(slot);
+                clearFilterEntry(slot);
             } else {
                 ItemStack opened = menu.getOpenedStack();
                 boolean hasConfig = FilterItemData.hasEntryNbt(opened, slot)
                         || FilterItemData.hasEntryDurability(opened, slot)
                         || FilterItemData.hasEntryEnchanted(opened, slot);
                 if (hasConfig) {
-                    menu.clearFilterEntryItem(minecraft.player, slot);
-                    PacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, ItemStack.EMPTY));
+                    clearItemFilterEntry(slot);
                 } else {
-                    menu.clearFilterEntry(slot);
+                    clearFilterEntry(slot);
                 }
             }
         }
@@ -4092,17 +4097,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             String currentId = detailIdInputBox.getValue().trim();
             if (!currentId.isEmpty() && !currentId.startsWith("#")) {
                 if (isFluidOrChemical) {
-                    menu.clearFilterEntry(detailEditSlot);
+                    clearFilterEntry(detailEditSlot);
                 } else {
                     ItemStack openedStack = menu.getOpenedStack();
                     boolean hasConfig = FilterItemData.hasEntryNbt(openedStack, detailEditSlot)
                             || FilterItemData.hasEntryDurability(openedStack, detailEditSlot)
                             || FilterItemData.hasEntryEnchanted(openedStack, detailEditSlot);
                     if (hasConfig) {
-                        menu.clearFilterEntryItem(minecraft.player, detailEditSlot);
-                        PacketDistributor.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, ItemStack.EMPTY));
+                        clearItemFilterEntry(detailEditSlot);
                     } else {
-                        menu.clearFilterEntry(detailEditSlot);
+                        clearFilterEntry(detailEditSlot);
                     }
                 }
                 detailIdInputBox.setValue("");
@@ -4153,7 +4157,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                                 if (item != Items.AIR) {
                                     ItemStack stack = new ItemStack(item);
                                     menu.clearEntryTag(detailEditSlot);
-                                    PacketDistributor.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, stack));
+                                    PacketDistributor.sendToServer(SetFilterItemEntryPayload.set(detailEditSlot, stack));
                                     menu.setItemFilterEntry(minecraft.player, detailEditSlot, stack);
                                     detailIdInputBox.setValue(selected);
                                 }
@@ -4573,7 +4577,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 if (item != Items.AIR) {
                     ItemStack stack = new ItemStack(item);
                     menu.clearEntryTag(detailEditSlot);
-                    PacketDistributor.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, stack));
+                    PacketDistributor.sendToServer(SetFilterItemEntryPayload.set(detailEditSlot, stack));
                     menu.setItemFilterEntry(minecraft.player, detailEditSlot, stack);
                     detailIdInputBox.setValue(itemId.toString());
                 }
@@ -4808,10 +4812,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 || FilterItemData.hasEntryEnchanted(openedStack, slot);
 
         if (hasNbtConfig) {
-            menu.clearFilterEntryItem(minecraft.player, slot);
-            PacketDistributor.sendToServer(new SetFilterItemEntryPayload(slot, ItemStack.EMPTY));
+            clearItemFilterEntry(slot);
         } else {
-            menu.clearFilterEntry(slot);
+            clearFilterEntry(slot);
         }
 
         detailIdInputBox.setValue("");

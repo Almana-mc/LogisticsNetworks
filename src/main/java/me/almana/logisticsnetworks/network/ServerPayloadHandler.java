@@ -986,8 +986,15 @@ public class ServerPayloadHandler {
     public static void handleSetFilterItemEntry(SetFilterItemEntryPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && menu.stillValid(context.player()) && !isSpecialMode(menu)) {
-                if (!payload.itemStack().isEmpty()) {
-                    menu.setItemFilterEntry((Player) context.player(), payload.slot(), payload.itemStack());
+                switch (payload.action()) {
+                    case SetFilterItemEntryPayload.ACTION_SET -> {
+                        if (!payload.itemStack().isEmpty()) {
+                            menu.setItemFilterEntry((Player) context.player(), payload.slot(), payload.itemStack());
+                        }
+                    }
+                    case SetFilterItemEntryPayload.ACTION_CLEAR_ITEM ->
+                        menu.clearFilterEntryItem((Player) context.player(), payload.slot());
+                    case SetFilterItemEntryPayload.ACTION_CLEAR_ENTRY -> menu.clearFilterEntry(payload.slot());
                 }
             }
         });
