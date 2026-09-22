@@ -8,7 +8,6 @@ import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.NbtFilterConfig;
 import me.almana.logisticsnetworks.item.NbtFilterItem;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
@@ -16,7 +15,6 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import org.jetbrains.annotations.Nullable;
@@ -426,13 +424,10 @@ public final class NbtFilterData {
                 components.putInt("minecraft:damage", stack.getDamageValue());
             if (!components.contains("minecraft:max_damage"))
                 components.putInt("minecraft:max_damage", stack.getMaxDamage());
-            components.putInt("minecraft:durability", stack.getMaxDamage() - stack.getDamageValue());
         }
-
-        if (stack.isEnchantable() || stack.isEnchanted()) {
-            ItemEnchantments enchants = stack.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY);
-            components.put("minecraft:enchanted", ByteTag.valueOf(!enchants.isEmpty()));
-        }
+        int durability = stack.isDamageableItem() ? Math.max(0, stack.getMaxDamage() - stack.getDamageValue()) : 0;
+        components.putInt("minecraft:durability", durability);
+        components.put("minecraft:enchanted", ByteTag.valueOf(stack.isEnchanted()));
 
         return components.isEmpty() ? null : components;
     }
