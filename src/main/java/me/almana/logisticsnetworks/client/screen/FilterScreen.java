@@ -172,7 +172,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private static final int NBT_COL_VAL = 140;
     private static final int NBT_COL_OP_GAP = 24;
     private static final int NBT_ROW_H = 14;
-    private static final int NBT_MIN_GROUP_PREFIX = 10;
     private static final int NBT_HEADING_COLOR = 0xFF88AACC;
     private static final int DETAIL_SECTION_H = 22;
     private static final int DETAIL_TAG_COLOR = 0xFF44BB44;
@@ -3764,62 +3763,76 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private void buildNbtRows() {
         nbtRows.clear();
-        int n = detailCachedNbtEntries.size();
-        if (n == 0) return;
+        Map<String, List<Integer>> groupedEntries = new HashMap<>();
+        for (int i = 0; i < detailCachedNbtEntries.size(); i++) {
+            String category = nbtCategory(detailCachedNbtEntries.get(i).path());
+            groupedEntries.computeIfAbsent(category, ignored -> new ArrayList<>()).add(i);
+        }
 
-        Integer[] order = new Integer[n];
-        for (int i = 0; i < n; i++) order[i] = i;
-        Arrays.sort(order, Comparator.comparing(idx -> detailCachedNbtEntries.get(idx).path()));
-
-        int i = 0;
-        while (i < n) {
-            String pi = detailCachedNbtEntries.get(order[i]).path();
-            String groupPrefix = "";
-
-            if (i + 1 < n) {
-                String pj = detailCachedNbtEntries.get(order[i + 1]).path();
-                String lcp = nbtCommonPrefix(pi, pj);
-                int sep = -1;
-                for (int k = lcp.length() - 1; k >= 0; k--) {
-                    char c = lcp.charAt(k);
-                    if (c == '.' || c == ':' || c == '/') { sep = k; break; }
-                }
-                if (sep >= NBT_MIN_GROUP_PREFIX) {
-                    groupPrefix = lcp.substring(0, sep);
-                    int j = i + 1;
-                    while (j < n) {
-                        String pk = detailCachedNbtEntries.get(order[j]).path();
-                        if (pk.startsWith(groupPrefix) && pk.length() > groupPrefix.length()) {
-                            j++;
-                        } else break;
-                    }
-                    if (j - i >= 2) {
-                        nbtRows.add(new NbtRow(true, groupPrefix, -1, groupPrefix));
-                        for (int k = i; k < j; k++) {
-                            String full = detailCachedNbtEntries.get(order[k]).path();
-                            String suffix = full.substring(groupPrefix.length());
-                            if (!suffix.isEmpty()) {
-                                char fc = suffix.charAt(0);
-                                if (fc == '.' || fc == ':' || fc == '/') suffix = suffix.substring(1);
-                            }
-                            nbtRows.add(new NbtRow(false, suffix, order[k], groupPrefix));
-                        }
-                        i = j;
-                        continue;
-                    }
-                }
+        List<String> categories = new ArrayList<>(groupedEntries.keySet());
+        categories.sort(FilterScreen::compareNbtCategories);
+        for (String category : categories) {
+            List<Integer> entries = groupedEntries.get(category);
+            entries.sort(Comparator.comparing(index -> detailCachedNbtEntries.get(index).path()));
+            nbtRows.add(new NbtRow(true, category, -1, category));
+            for (int entryIdx : entries) {
+                String path = detailCachedNbtEntries.get(entryIdx).path();
+                nbtRows.add(new NbtRow(false, nbtDisplayPath(path, category), entryIdx, category));
             }
-
-            nbtRows.add(new NbtRow(false, pi, order[i], ""));
-            i++;
         }
     }
 
-    private String nbtCommonPrefix(String a, String b) {
-        int len = Math.min(a.length(), b.length());
-        int i = 0;
-        while (i < len && a.charAt(i) == b.charAt(i)) i++;
-        return a.substring(0, i);
+    private static String nbtCategory(String path) {
+        String componentPath = nbtComponentPath(path);
+        if (componentPath.equals("minecraft:enchanted")
+                || componentPath.equals("minecraft:enchantments")
+                || componentPath.startsWith("minecraft:enchantments.")
+                || componentPath.equals("minecraft:stored_enchantments")
+                || componentPath.startsWith("minecraft:stored_enchantments.")) {
+            return "Enchantments";
+        }
+
+        int separator = componentPath.indexOf(':');
+        if (separator < 1) return "Other";
+        String namespace = componentPath.substring(0, separator);
+        return namespace.equals("minecraft") ? "Minecraft" : namespace;
+    }
+
+    private static int compareNbtCategories(String left, String right) {
+        if (left.equals(right)) return 0;
+        if (left.equals("Enchantments")) return -1;
+        if (right.equals("Enchantments")) return 1;
+        if (left.equals("Minecraft")) return -1;
+        if (right.equals("Minecraft")) return 1;
+        if (left.equals("Other")) return 1;
+        if (right.equals("Other")) return -1;
+        return left.compareTo(right);
+    }
+
+    private static String nbtDisplayPath(String path, String category) {
+        String componentPath = nbtComponentPath(path);
+        if (category.equals("Enchantments")) {
+            if (componentPath.equals("minecraft:enchanted")) return "enchanted";
+            if (componentPath.equals("minecraft:enchantments")) return "enchantments";
+            if (componentPath.equals("minecraft:stored_enchantments")) return "stored";
+            if (componentPath.startsWith("minecraft:enchantments.")) {
+                String suffix = componentPath.substring("minecraft:enchantments.".length());
+                return suffix.startsWith("levels.") ? suffix.substring("levels.".length()) : suffix;
+            }
+            if (componentPath.startsWith("minecraft:stored_enchantments.")) {
+                String suffix = componentPath.substring("minecraft:stored_enchantments.".length());
+                if (suffix.startsWith("levels.")) suffix = suffix.substring("levels.".length());
+                return "stored > " + suffix;
+            }
+        }
+
+        int separator = componentPath.indexOf(':');
+        return separator >= 0 ? componentPath.substring(separator + 1) : componentPath;
+    }
+
+    private static String nbtComponentPath(String path) {
+        String prefix = "fluid.components.";
+        return path.startsWith(prefix) ? path.substring(prefix.length()) : path;
     }
 
     private List<NbtRow> getVisibleNbtRows() {
