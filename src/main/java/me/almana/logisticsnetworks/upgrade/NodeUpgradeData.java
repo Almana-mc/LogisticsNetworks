@@ -13,6 +13,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 public final class NodeUpgradeData {
@@ -32,6 +33,7 @@ public final class NodeUpgradeData {
 
     public static void applyTypeChange(ChannelData channel, ChannelType type, int tier) {
         if (channel.getType() == type) return;
+        Arrays.fill(channel.getFilterItems(), ItemStack.EMPTY);
         channel.setType(type);
         channel.setBatchSize(getOperationCap(type, tier));
     }
