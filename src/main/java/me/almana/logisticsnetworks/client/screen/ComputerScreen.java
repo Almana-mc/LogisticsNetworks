@@ -2193,9 +2193,11 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 selectedNetworkName = network.name();
             });
         }
-        LOGGER.debug("Received network list with {} entries", networks.size());
-        for (SyncNetworkListPayload.NetworkEntry entry : networks) {
-            LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
+        if (Config.debugMode) {
+            LOGGER.debug("Received network list with {} entries", networks.size());
+            for (SyncNetworkListPayload.NetworkEntry entry : networks) {
+                LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
+            }
         }
         this.networkList = new ArrayList<>(networks);
         SyncNetworkListPayload.NetworkEntry selected = getSelectedNetworkEntry();
@@ -2211,7 +2213,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         }
         this.networkScrollOffset = Math.min(this.networkScrollOffset,
                 Math.max(0, networkList.size() - NETWORKS_PER_PAGE));
-        LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());
+        if (Config.debugMode) LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());
     }
 
     public void receiveNetworkExport(SyncNetworkExportPayload payload) {

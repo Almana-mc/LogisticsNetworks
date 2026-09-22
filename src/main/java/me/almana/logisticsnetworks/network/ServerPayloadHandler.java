@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -1197,8 +1198,10 @@ public class ServerPayloadHandler {
             if (label.length() > 48)
                 label = label.substring(0, 48);
 
-            LOGGER.debug("[LabelSync] Setting label '{}' on node {} (networkId={})",
-                    label, node.getUUID(), node.getNetworkId());
+            if (Config.debugMode) {
+                LOGGER.debug("[LabelSync] Setting label '{}' on node {} (networkId={})",
+                        label, node.getUUID(), node.getNetworkId());
+            }
             GraphPayloadHandler.preserveLabelPosition(node, label);
             node.setNodeLabel(label);
 
@@ -1207,14 +1210,18 @@ public class ServerPayloadHandler {
                 NetworkRegistry registry = NetworkRegistry.get(level);
                 LogisticsNetwork network = registry.getNetwork(node.getNetworkId());
                 if (network != null) {
-                    LOGGER.debug("[LabelSync] Searching {} nodes in network for label '{}'",
-                            network.getNodeUuids().size(), label);
+                    if (Config.debugMode) {
+                        LOGGER.debug("[LabelSync] Searching {} nodes in network for label '{}'",
+                                network.getNodeUuids().size(), label);
+                    }
                     LogisticsNodeEntity authority = node;
                     for (UUID otherId : network.getNodeUuids()) {
                         if (otherId.equals(node.getUUID())) continue;
                         LogisticsNodeEntity other = findNode(player, otherId);
                         if (other != null && label.equals(other.getNodeLabel())) {
-                            LOGGER.debug("[LabelSync] Found matching node {}, copying all channels", otherId);
+                            if (Config.debugMode) {
+                                LOGGER.debug("[LabelSync] Found matching node {}, copying all channels", otherId);
+                            }
                             authority = other;
                             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                                 ChannelData src = other.getChannel(i);
@@ -1365,8 +1372,10 @@ public class ServerPayloadHandler {
     public static void propagateToLabelGroup(LogisticsNodeEntity sourceNode, int channelIndex) {
         String label = sourceNode.getNodeLabel();
         if (label.isEmpty() || sourceNode.getNetworkId() == null) {
-            LOGGER.debug("[LabelSync] Skipping propagation: label='{}', networkId={}", label,
-                    sourceNode.getNetworkId());
+            if (Config.debugMode) {
+                LOGGER.debug("[LabelSync] Skipping propagation: label='{}', networkId={}", label,
+                        sourceNode.getNetworkId());
+            }
             return;
         }
         if (!(sourceNode.level() instanceof ServerLevel level))
@@ -1379,12 +1388,14 @@ public class ServerPayloadHandler {
         NetworkRegistry registry = NetworkRegistry.get(level);
         LogisticsNetwork network = registry.getNetwork(sourceNode.getNetworkId());
         if (network == null) {
-            LOGGER.debug("[LabelSync] Network not found for id={}", sourceNode.getNetworkId());
+            if (Config.debugMode) LOGGER.debug("[LabelSync] Network not found for id={}", sourceNode.getNetworkId());
             return;
         }
 
-        LOGGER.debug("[LabelSync] Propagating channel {} from node {} (label='{}') to {} network nodes",
-                channelIndex, sourceNode.getUUID(), label, network.getNodeUuids().size());
+        if (Config.debugMode) {
+            LOGGER.debug("[LabelSync] Propagating channel {} from node {} (label='{}') to {} network nodes",
+                    channelIndex, sourceNode.getUUID(), label, network.getNodeUuids().size());
+        }
 
         int updated = 0;
         for (UUID otherId : network.getNodeUuids()) {
@@ -1399,7 +1410,9 @@ public class ServerPayloadHandler {
                         dst.copyFrom(sourceChannel);
                         clampChannelToUpgradeLimits(other, dst);
                         updated++;
-                        LOGGER.debug("[LabelSync] Updated node {} (label='{}')", otherId, other.getNodeLabel());
+                        if (Config.debugMode) {
+                            LOGGER.debug("[LabelSync] Updated node {} (label='{}')", otherId, other.getNodeLabel());
+                        }
                         // Notify any player who has this node's menu open
                         sendChannelSyncToViewers(other, channelIndex, dst);
                     }
@@ -1407,7 +1420,7 @@ public class ServerPayloadHandler {
                 }
             }
         }
-        LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated);
+        if (Config.debugMode) LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated);
     }
 
     public static void handleSubscribeTelemetry(SubscribeTelemetryPayload payload, IPayloadContext context) {

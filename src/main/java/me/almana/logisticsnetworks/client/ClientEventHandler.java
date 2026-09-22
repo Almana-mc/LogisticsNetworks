@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.client;
 
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.model.NodeModel;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
@@ -69,7 +70,9 @@ public class ClientEventHandler {
             api.getMethod("addSidebarScreenBlacklist", String[].class).invoke(api.getMethod("get").invoke(null),
                     (Object) new String[]{NodeGraphScreen.class.getName()});
         } catch (ReflectiveOperationException exception) {
-            LogUtils.getLogger().debug("Unable to reserve graph canvas from FTB sidebar", exception);
+            if (Config.debugMode) {
+                LogUtils.getLogger().debug("Unable to reserve graph canvas from FTB sidebar", exception);
+            }
         }
     }
 
