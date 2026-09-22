@@ -222,12 +222,7 @@ public class NodeMenu extends AbstractContainerMenu {
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        Collection<LogisticsNetwork> networks;
-        if (player.hasPermissions(2)) {
-            networks = registry.getAllNetworks().values();
-        } else {
-            networks = registry.getNetworksForPlayer(player.getUUID());
-        }
+        Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {
@@ -236,7 +231,7 @@ public class NodeMenu extends AbstractContainerMenu {
                     net.getName(),
                     net.getNodeUuids().size(),
                     false,
-                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player.getUUID(), player.hasPermissions(2)),
+                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
                     net.getColor()));
         }
 

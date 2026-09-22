@@ -980,8 +980,7 @@ public final class NodeClipboardConfig {
     private boolean canAccessTargetNetwork(ServerPlayer player, LogisticsNodeEntity node) {
         if (networkId == null || !(node.level() instanceof ServerLevel serverLevel)) return true;
         LogisticsNetwork network = NetworkRegistry.get(serverLevel).getNetwork(networkId);
-        return network == null || NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                || player.hasPermissions(2);
+        return network == null || NodeAccessPolicy.canAccess(network.getOwnerUuid(), player);
     }
 
     private void applyNetworkToNode(LogisticsNodeEntity node, ServerPlayer player) {
@@ -1028,8 +1027,7 @@ public final class NodeClipboardConfig {
     private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry, UUID ownerUuid, ServerPlayer player) {
         if (networkId != null) {
             LogisticsNetwork byId = registry.getNetwork(networkId);
-            if (byId != null && (NodeAccessPolicy.canAccess(byId.getOwnerUuid(), player.getUUID())
-                    || player.hasPermissions(2))) {
+            if (byId != null && NodeAccessPolicy.canAccess(byId.getOwnerUuid(), player)) {
                 return byId;
             }
             if (byId != null) return null;

@@ -472,9 +472,7 @@ public class LogisticsNodeEntity extends Entity {
 
     public boolean isOwnedBy(Player player) {
         UUID owner = getOwnerUUID();
-        if (NodeAccessPolicy.canAccess(owner, player.getUUID())) return true;
-        if (player instanceof ServerPlayer sp && sp.hasPermissions(2)) return true;
-        return false;
+        return NodeAccessPolicy.canAccess(owner, player);
     }
 
     public String getNodeLabel() {

@@ -265,8 +265,7 @@ public class ServerPayloadHandler {
             LogisticsNetwork network = registry.getNetwork(payload.networkId().get());
             if (network == null)
                 return null;
-            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    && !player.hasPermissions(2)) {
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
                 return null;
             }
             return network;
@@ -290,8 +289,7 @@ public class ServerPayloadHandler {
             if (network == null)
                 return;
 
-            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    && !player.hasPermissions(2)) {
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
                 return;
             }
 
@@ -331,7 +329,7 @@ public class ServerPayloadHandler {
         if (network == null) {
             return Component.translatable("message.logisticsnetworks.network_delete.missing");
         }
-        if (!NodeAccessPolicy.canDelete(network.getOwnerUuid(), player.getUUID(), player.hasPermissions(2))) {
+        if (!NodeAccessPolicy.canDelete(network.getOwnerUuid(), player)) {
             return Component.translatable("message.logisticsnetworks.network_delete.denied");
         }
 
@@ -1567,8 +1565,7 @@ public class ServerPayloadHandler {
     }
 
     private static boolean canAccessNetwork(ServerPlayer player, LogisticsNetwork network) {
-        return NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                || player.hasPermissions(2);
+        return NodeAccessPolicy.canAccess(network.getOwnerUuid(), player);
     }
 
     private static LogisticsNodeEntity findNode(ServerPlayer player, UUID nodeId) {

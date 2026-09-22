@@ -672,5 +672,10 @@
   "message.logisticsnetworks.network_delete.success": "Deleted network and returned %s nodes",
   "message.logisticsnetworks.network_delete.denied": "You do not have permission to delete this network",
   "message.logisticsnetworks.network_delete.missing": "That network no longer exists",
-  "message.logisticsnetworks.network_delete.unavailable": "Cannot delete network: %s registered nodes are unavailable"
+  "message.logisticsnetworks.network_delete.unavailable": "Cannot delete network: %s registered nodes are unavailable",
+  "message.logisticsnetworks.admin.enabled": "Admin mode enabled",
+  "message.logisticsnetworks.admin.disabled": "Admin mode disabled",
+  "message.logisticsnetworks.admin.enabled_other": "Enabled admin mode for %s",
+  "message.logisticsnetworks.admin.disabled_other": "Disabled admin mode for %s",
+  "message.logisticsnetworks.admin.enable_denied": "Only operators can enable admin mode"
 }

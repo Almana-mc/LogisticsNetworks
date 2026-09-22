@@ -46,8 +46,7 @@ public record GraphMenuContext(BlockPos computerPos, ResourceLocation computerDi
         if (player.level().isClientSide) return true;
         if (!(player.level().getBlockEntity(computerPos) instanceof ComputerBlockEntity)) return false;
         LogisticsNetwork network = NetworkRegistry.get((ServerLevel) player.level()).getNetwork(networkId);
-        return network != null && (NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                || player.hasPermissions(2));
+        return network != null && NodeAccessPolicy.canAccess(network.getOwnerUuid(), player);
     }
 
     public boolean canEdit(Player player, LogisticsNodeEntity node) {

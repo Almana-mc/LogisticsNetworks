@@ -96,6 +96,14 @@ public class EventHandler {
     }
 
     @SubscribeEvent
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        if (!event.getEntity().level().isClientSide()) {
+            event.getEntity().setData(Registration.ADMIN_MODE,
+                    event.getOriginal().getData(Registration.ADMIN_MODE));
+        }
+    }
+
+    @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         Player player = event.getEntity();
         ItemStack stack = player.getItemInHand(event.getHand());
