@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.client.theme;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.Config;
 import net.neoforged.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 
@@ -48,7 +49,7 @@ public final class ThemeState {
 
     private static void notifyListeners() {
         for (Runnable r : new ArrayList<>(listeners)) {
-            try { r.run(); } catch (Exception e) { LOGGER.debug("theme listener failed", e); }
+            try { r.run(); } catch (Exception e) { if (Config.debugMode) LOGGER.debug("theme listener failed", e); }
         }
     }
 

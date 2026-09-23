@@ -57,7 +57,7 @@ public final class FilterItemData {
     private static final String KEY_RULE_P = "p";
     private static final String KEY_RULE_O = "o";
     private static final String KEY_RULE_V = "v";
-    private static final int MAX_NBT_RULES_PER_SLOT = 6;
+    private static final int MAX_NBT_RULES_PER_SLOT = 8;
     private static final String NBT_OP_EQUALS = "=";
 
     public static final class ReadCache {

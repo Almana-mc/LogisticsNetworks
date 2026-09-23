@@ -150,20 +150,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private String detailNbtOp = "=";
     private Map<String, String> detailNbtActiveOps = new HashMap<>();
     private int nbtTableEditingRow = -1;
-    private boolean detailItemEnchanted = false;
-    private boolean detailEnchantedEnabled = false;
     private List<ItemStack> nbtOnlyCycleItems;
-    private int detailItemDurability = -1;
-    private int detailItemMaxDurability = -1;
-    private int detailItemStackSize = 1;
     private EditBox detailNbtValueBox;
     private EditBox detailIdInputBox;
     private EditBox detailBatchInputBox;
     private EditBox detailStockInputBox;
     private EditBox detailSlotMappingInputBox;
-    private EditBox detailDurabilityValueBox;
     private MultiLineEditBox detailNbtInputBox;
-    private String detailDurabilityOp = null;
     private int savedImageHeight = -1;
     private int savedTopPos = -1;
     private int savedImageWidth = -1;
@@ -179,11 +172,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private static final int NBT_COL_VAL = 140;
     private static final int NBT_COL_OP_GAP = 24;
     private static final int NBT_ROW_H = 14;
-    private static final int NBT_BUILTIN_ROWS = 3;
-    private static final int NBT_EDIT_DURABILITY = -10;
-    private static final int NBT_EDIT_ENCHANTED = -11;
-    private static final int NBT_EDIT_STACK_SIZE = -12;
-    private static final int NBT_MIN_GROUP_PREFIX = 10;
     private static final int NBT_HEADING_COLOR = 0xFF88AACC;
     private static final int DETAIL_SECTION_H = 22;
     private static final int DETAIL_TAG_COLOR = 0xFF44BB44;
@@ -275,12 +263,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailSlotMappingInputBox.setVisible(false);
         detailSlotMappingInputBox.setBordered(true);
         detailSlotMappingInputBox.setTextColor(COL_WHITE);
-
-        detailDurabilityValueBox = new EditBox(font, leftPos + 12, topPos + 50, 40, 14, Component.empty());
-        detailDurabilityValueBox.setMaxLength(5);
-        detailDurabilityValueBox.setVisible(false);
-        detailDurabilityValueBox.setBordered(true);
-        detailDurabilityValueBox.setTextColor(COL_WHITE);
 
         detailNbtValueBox = new EditBox(font, leftPos + 12, topPos + 50, 80, 14, Component.empty());
         detailNbtValueBox.setMaxLength(256);
@@ -1097,7 +1079,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 || detailBatchInputBox != null && detailBatchInputBox.isFocused()
                 || detailStockInputBox != null && detailStockInputBox.isFocused()
                 || detailSlotMappingInputBox != null && detailSlotMappingInputBox.isFocused()
-                || detailDurabilityValueBox != null && detailDurabilityValueBox.isFocused()
                 || detailNbtValueBox != null && detailNbtValueBox.isFocused()
                 || detailNbtInputBox != null && detailNbtInputBox.isFocused();
     }
@@ -3205,8 +3186,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (isFluidOrChemical) {
             detailSlotMappingInputBox.setValue("");
             detailSlotMappingInputBox.setVisible(false);
-            detailDurabilityOp = null;
-            detailDurabilityValueBox.setVisible(false);
             detailNbtInputBox.setValue("");
             detailNbtInputBox.active = false;
             detailNbtInputBox.setFocused(false);
@@ -3217,11 +3196,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailNbtValueBox.setValue("");
             detailNbtValueBox.setVisible(false);
             nbtTableEditingRow = -1;
-            detailItemEnchanted = false;
-            detailEnchantedEnabled = false;
-            detailItemDurability = -1;
-            detailItemMaxDurability = 0;
-            detailItemStackSize = 1;
         } else {
             String slotMapping = menu.getEntrySlotMappingExpression(slot);
             detailSlotMappingInputBox.setValue(slotMapping);
@@ -3229,11 +3203,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailSlotMappingInputBox.setFocused(false);
 
             ItemStack openedStack = menu.getOpenedStack();
-            String durOp = FilterItemData.getEntryDurabilityOp(openedStack, slot);
-            detailDurabilityOp = durOp;
-            detailDurabilityValueBox.setVisible(false);
-            detailDurabilityValueBox.setFocused(false);
-
             ItemStack slotItem = getSlotItemForSubMode(slot);
             String existingNbtRaw = FilterItemData.getEntryNbtRaw(openedStack, slot);
             if (existingNbtRaw != null) {
@@ -3260,6 +3229,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     String display = r.value() != null ? r.value().getAsString() : "?";
                     detailCachedNbtEntries.add(new NbtFilterData.NbtEntry(r.path(), display));
                 }
+                for (NbtFilterData.NbtEntry entry : NbtFilterData.getDefaultEntries()) {
+                    if (detailCachedNbtEntries.stream().noneMatch(existing -> existing.path().equals(entry.path()))) {
+                        detailCachedNbtEntries.add(entry);
+                    }
+                }
             }
             nbtCollapsedGroups.clear();
             buildNbtRows();
@@ -3275,22 +3249,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailNbtValueBox.setVisible(false);
             detailNbtValueBox.setFocused(false);
             nbtTableEditingRow = -1;
-
-            Boolean savedEnchanted = FilterItemData.getEntryEnchanted(openedStack, slot);
-            if (!slotItem.isEmpty()) {
-                detailItemEnchanted = savedEnchanted != null ? savedEnchanted : slotItem.isEnchanted();
-                detailEnchantedEnabled = savedEnchanted != null;
-                detailItemMaxDurability = slotItem.getMaxDamage();
-                detailItemDurability = detailItemMaxDurability > 0
-                        ? detailItemMaxDurability - slotItem.getDamageValue() : -1;
-                detailItemStackSize = slotItem.getCount();
-            } else {
-                detailItemEnchanted = savedEnchanted != null ? savedEnchanted : false;
-                detailEnchantedEnabled = savedEnchanted != null;
-                detailItemDurability = 0;
-                detailItemMaxDurability = 0;
-                detailItemStackSize = 1;
-            }
         }
     }
 
@@ -3349,8 +3307,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailStockInputBox.setFocused(false);
         detailSlotMappingInputBox.setVisible(false);
         detailSlotMappingInputBox.setFocused(false);
-        detailDurabilityValueBox.setVisible(false);
-        detailDurabilityValueBox.setFocused(false);
         detailNbtInputBox.active = false;
         detailNbtInputBox.setFocused(false);
     }
@@ -3447,18 +3403,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (!slotMapStr.equals(currentSlotMap)) {
                 PacketDistributor.sendToServer(new SetFilterEntrySlotMappingPayload(slot, slotMapStr));
                 menu.setEntrySlotMapping(minecraft.player, slot, slotMapStr);
-            }
-
-            if (detailDurabilityOp != null && detailItemDurability >= 0) {
-                menu.setEntryDurability(minecraft.player, slot, detailDurabilityOp, detailItemDurability);
-                PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(
-                        slot, detailDurabilityOp, detailItemDurability));
-            } else {
-                String existingOp = FilterItemData.getEntryDurabilityOp(menu.getOpenedStack(), slot);
-                if (existingOp != null) {
-                    menu.clearEntryDurability(minecraft.player, slot);
-                    PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
-                }
             }
 
             if (detailNbtPageOpen) {
@@ -3682,16 +3626,17 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             boolean strictNbt = menu.isEntryNbtStrict(detailEditSlot);
             int strictToggleX = contentX + labelW;
             String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
+            int strictToggleW = 14 + font.width(strictLabel);
             drawToggle(g, strictToggleX, y + 2, strictNbt);
             g.drawString(font, strictLabel, strictToggleX + 14, y + 3,
                     strictNbt ? COL_ACCENT : COL_GRAY, false);
 
-            int nbtBtnX = strictToggleX + 14 + font.width(strictLabel) + 8;
+            int nbtBtnX = strictToggleX + strictToggleW + 8;
             String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
             int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
             drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, !strictNbt);
 
-            if (isHovering(strictToggleX, y, 54, 14, mx, my)) {
+            if (isHovering(strictToggleX, y, strictToggleW, 14, mx, my)) {
                 g.renderTooltip(font, Component.translatable(strictNbt
                         ? "gui.logisticsnetworks.filter.detail.nbt.strict.on"
                         : "gui.logisticsnetworks.filter.detail.nbt.strict.off"), mx, my);
@@ -3818,62 +3763,76 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private void buildNbtRows() {
         nbtRows.clear();
-        int n = detailCachedNbtEntries.size();
-        if (n == 0) return;
+        Map<String, List<Integer>> groupedEntries = new HashMap<>();
+        for (int i = 0; i < detailCachedNbtEntries.size(); i++) {
+            String category = nbtCategory(detailCachedNbtEntries.get(i).path());
+            groupedEntries.computeIfAbsent(category, ignored -> new ArrayList<>()).add(i);
+        }
 
-        Integer[] order = new Integer[n];
-        for (int i = 0; i < n; i++) order[i] = i;
-        Arrays.sort(order, Comparator.comparing(idx -> detailCachedNbtEntries.get(idx).path()));
-
-        int i = 0;
-        while (i < n) {
-            String pi = detailCachedNbtEntries.get(order[i]).path();
-            String groupPrefix = "";
-
-            if (i + 1 < n) {
-                String pj = detailCachedNbtEntries.get(order[i + 1]).path();
-                String lcp = nbtCommonPrefix(pi, pj);
-                int sep = -1;
-                for (int k = lcp.length() - 1; k >= 0; k--) {
-                    char c = lcp.charAt(k);
-                    if (c == '.' || c == ':' || c == '/') { sep = k; break; }
-                }
-                if (sep >= NBT_MIN_GROUP_PREFIX) {
-                    groupPrefix = lcp.substring(0, sep);
-                    int j = i + 1;
-                    while (j < n) {
-                        String pk = detailCachedNbtEntries.get(order[j]).path();
-                        if (pk.startsWith(groupPrefix) && pk.length() > groupPrefix.length()) {
-                            j++;
-                        } else break;
-                    }
-                    if (j - i >= 2) {
-                        nbtRows.add(new NbtRow(true, groupPrefix, -1, groupPrefix));
-                        for (int k = i; k < j; k++) {
-                            String full = detailCachedNbtEntries.get(order[k]).path();
-                            String suffix = full.substring(groupPrefix.length());
-                            if (!suffix.isEmpty()) {
-                                char fc = suffix.charAt(0);
-                                if (fc == '.' || fc == ':' || fc == '/') suffix = suffix.substring(1);
-                            }
-                            nbtRows.add(new NbtRow(false, suffix, order[k], groupPrefix));
-                        }
-                        i = j;
-                        continue;
-                    }
-                }
+        List<String> categories = new ArrayList<>(groupedEntries.keySet());
+        categories.sort(FilterScreen::compareNbtCategories);
+        for (String category : categories) {
+            List<Integer> entries = groupedEntries.get(category);
+            entries.sort(Comparator.comparing(index -> detailCachedNbtEntries.get(index).path()));
+            nbtRows.add(new NbtRow(true, category, -1, category));
+            for (int entryIdx : entries) {
+                String path = detailCachedNbtEntries.get(entryIdx).path();
+                nbtRows.add(new NbtRow(false, nbtDisplayPath(path, category), entryIdx, category));
             }
-
-            nbtRows.add(new NbtRow(false, pi, order[i], ""));
-            i++;
         }
     }
 
-    private String nbtCommonPrefix(String a, String b) {
-        int len = Math.min(a.length(), b.length());
-        int i = 0;
-        while (i < len && a.charAt(i) == b.charAt(i)) i++;
-        return a.substring(0, i);
+    private static String nbtCategory(String path) {
+        String componentPath = nbtComponentPath(path);
+        if (componentPath.equals("minecraft:enchanted")
+                || componentPath.equals("minecraft:enchantments")
+                || componentPath.startsWith("minecraft:enchantments.")
+                || componentPath.equals("minecraft:stored_enchantments")
+                || componentPath.startsWith("minecraft:stored_enchantments.")) {
+            return "Enchantments";
+        }
+
+        int separator = componentPath.indexOf(':');
+        if (separator < 1) return "Other";
+        String namespace = componentPath.substring(0, separator);
+        return namespace.equals("minecraft") ? "Minecraft" : namespace;
+    }
+
+    private static int compareNbtCategories(String left, String right) {
+        if (left.equals(right)) return 0;
+        if (left.equals("Enchantments")) return -1;
+        if (right.equals("Enchantments")) return 1;
+        if (left.equals("Minecraft")) return -1;
+        if (right.equals("Minecraft")) return 1;
+        if (left.equals("Other")) return 1;
+        if (right.equals("Other")) return -1;
+        return left.compareTo(right);
+    }
+
+    private static String nbtDisplayPath(String path, String category) {
+        String componentPath = nbtComponentPath(path);
+        if (category.equals("Enchantments")) {
+            if (componentPath.equals("minecraft:enchanted")) return "enchanted";
+            if (componentPath.equals("minecraft:enchantments")) return "enchantments";
+            if (componentPath.equals("minecraft:stored_enchantments")) return "stored";
+            if (componentPath.startsWith("minecraft:enchantments.")) {
+                String suffix = componentPath.substring("minecraft:enchantments.".length());
+                return suffix.startsWith("levels.") ? suffix.substring("levels.".length()) : suffix;
+            }
+            if (componentPath.startsWith("minecraft:stored_enchantments.")) {
+                String suffix = componentPath.substring("minecraft:stored_enchantments.".length());
+                if (suffix.startsWith("levels.")) suffix = suffix.substring("levels.".length());
+                return "stored > " + suffix;
+            }
+        }
+
+        int separator = componentPath.indexOf(':');
+        return separator >= 0 ? componentPath.substring(separator + 1) : componentPath;
+    }
+
+    private static String nbtComponentPath(String path) {
+        String prefix = "fluid.components.";
+        return path.startsWith(prefix) ? path.substring(prefix.length()) : path;
     }
 
     private List<NbtRow> getVisibleNbtRows() {
@@ -3888,22 +3847,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return visible;
     }
 
-    private void renderBuiltinEditBox(GuiGraphics g, int mx, int my, int colValX, int rowY) {
-        detailNbtValueBox.setX(colValX);
-        detailNbtValueBox.setY(rowY);
-        detailNbtValueBox.setWidth(NBT_COL_VAL);
-        detailNbtValueBox.setHeight(NBT_ROW_H);
-        detailNbtValueBox.setVisible(true);
-        detailNbtValueBox.render(g, mx, my, 0);
-    }
-
     private void renderNbtTable(GuiGraphics g, int mx, int my, int tableX, int tableY, int tableW, int tableH) {
         Set<String> activePaths = detailNbtActiveOps.keySet();
-        boolean durEnabled = detailDurabilityOp != null;
         if (nbtTableEditingRow < 0) detailNbtValueBox.setVisible(false);
 
         List<NbtRow> visible = getVisibleNbtRows();
-        int totalRows = NBT_BUILTIN_ROWS + visible.size();
+        int totalRows = visible.size();
         boolean scrollable = totalRows * NBT_ROW_H > tableH;
         int scrollW = scrollable ? SUBMODE_SCROLLBAR_W + SUBMODE_SCROLLBAR_GAP : 0;
         int rowW = tableW - scrollW;
@@ -3930,106 +3879,64 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             boolean hovered = mx >= tableX && mx < tableX + rowW
                     && my >= rowY && my < rowY + NBT_ROW_H;
 
-            if (vi < NBT_BUILTIN_ROWS) {
-                if (hovered)
-                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
-                g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
+            NbtRow row = visible.get(vi);
 
-                switch (vi) {
-                    case 0 -> {
-                        drawToggle(g, colToggleX, rowY + 1, durEnabled);
-                        g.drawString(font, "Durability", colPathX, rowY + 3, DETAIL_DUR_COLOR, false);
-                        String opStr = detailDurabilityOp != null ? detailDurabilityOp : "=";
-                        g.drawString(font, opStr, colOpX + 4, rowY + 3, COL_WHITE, false);
-                        if (nbtTableEditingRow == NBT_EDIT_DURABILITY) {
-                            renderBuiltinEditBox(g, mx, my, colValX, rowY);
-                        } else {
-                            String durVal = detailItemMaxDurability > 0
-                                    ? detailItemDurability + "/" + detailItemMaxDurability
-                                    : String.valueOf(detailItemDurability);
-                            String truncVal = font.plainSubstrByWidth(durVal, NBT_COL_VAL - 4);
-                            g.drawString(font, truncVal, colValX + 2, rowY + 3,
-                                    durEnabled ? COL_WHITE : COL_GRAY, false);
-                        }
-                    }
-                    case 1 -> {
-                        drawToggle(g, colToggleX, rowY + 1, detailEnchantedEnabled);
-                        g.drawString(font, "Enchanted", colPathX, rowY + 3, 0xFFDD88FF, false);
-                        int enchColor = detailItemEnchanted ? COL_ACCENT : 0xFFFF5555;
-                        String enchStr = detailItemEnchanted ? "true" : "false";
-                        g.drawString(font, enchStr, colValX + 2, rowY + 3,
-                                detailEnchantedEnabled ? enchColor : COL_GRAY, false);
-                    }
-                    case 2 -> {
-                        drawToggle(g, colToggleX, rowY + 1, false);
-                        g.drawString(font, "Stack Size", colPathX, rowY + 3, 0xFFFFCC44, false);
-                        if (nbtTableEditingRow == NBT_EDIT_STACK_SIZE) {
-                            renderBuiltinEditBox(g, mx, my, colValX, rowY);
-                        } else {
-                            g.drawString(font, String.valueOf(detailItemStackSize), colValX + 2, rowY + 3, COL_GRAY, false);
-                        }
-                    }
+            if (row.heading()) {
+                boolean collapsed = nbtCollapsedGroups.contains(row.group());
+                g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x18FFFFFF);
+                g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
+                if (hovered)
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x10FFFFFF);
+
+                String arrow = collapsed ? ">" : "v";
+                g.drawString(font, arrow, colToggleX + 2, rowY + 3, NBT_HEADING_COLOR, false);
+                String headText = font.plainSubstrByWidth(row.display(), rowW - 20);
+                g.drawString(font, headText, colToggleX + 12, rowY + 3, NBT_HEADING_COLOR, false);
+                if (hovered && headText.length() < row.display().length()) {
+                    hoveredFullText = row.display();
                 }
             } else {
-                NbtRow row = visible.get(vi - NBT_BUILTIN_ROWS);
+                int entryIdx = row.entryIdx();
+                NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
+                boolean active = activePaths.contains(entry.path());
+                boolean indented = !row.group().isEmpty();
 
-                if (row.heading()) {
-                    boolean collapsed = nbtCollapsedGroups.contains(row.group());
-                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x18FFFFFF);
-                    g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
-                    if (hovered)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x10FFFFFF);
+                if (active)
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, COL_SELECTED);
+                else if (hovered)
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, COL_HOVER);
 
-                    String arrow = collapsed ? ">" : "v";
-                    g.drawString(font, arrow, colToggleX + 2, rowY + 3, NBT_HEADING_COLOR, false);
-                    String headText = font.plainSubstrByWidth(row.display(), rowW - 20);
-                    g.drawString(font, headText, colToggleX + 12, rowY + 3, NBT_HEADING_COLOR, false);
-                    if (hovered && headText.length() < row.display().length()) {
-                        hoveredFullText = row.display();
-                    }
+                drawToggle(g, colToggleX, rowY + 1, active);
+
+                int entryPathX = indented ? colPathX + 6 : colPathX;
+                int entryPathW = indented ? pathW - 6 : pathW;
+                String pathDisplay = row.display();
+                String truncPath = font.plainSubstrByWidth(pathDisplay, entryPathW - 4);
+                g.drawString(font, truncPath, entryPathX, rowY + 3,
+                        active ? COL_ACCENT : COL_WHITE, false);
+
+                if (hovered && truncPath.length() < pathDisplay.length()) {
+                    hoveredFullText = entry.path() + " = " + entry.valueDisplay();
+                }
+
+                String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path(), "=") : "=";
+                int opColor = active ? COL_WHITE : COL_GRAY;
+                g.drawString(font, opStr, colOpX + 4, rowY + 3, opColor, false);
+
+                if (nbtTableEditingRow == entryIdx) {
+                    detailNbtValueBox.setX(colValX);
+                    detailNbtValueBox.setY(rowY);
+                    detailNbtValueBox.setWidth(NBT_COL_VAL);
+                    detailNbtValueBox.setHeight(NBT_ROW_H);
+                    detailNbtValueBox.setVisible(true);
+                    detailNbtValueBox.render(g, mx, my, 0);
                 } else {
-                    int entryIdx = row.entryIdx();
-                    NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
-                    boolean active = activePaths.contains(entry.path());
-                    boolean indented = !row.group().isEmpty();
-
-                    if (active)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, COL_SELECTED);
-                    else if (hovered)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, COL_HOVER);
-
-                    drawToggle(g, colToggleX, rowY + 1, active);
-
-                    int entryPathX = indented ? colPathX + 6 : colPathX;
-                    int entryPathW = indented ? pathW - 6 : pathW;
-                    String pathDisplay = row.display();
-                    String truncPath = font.plainSubstrByWidth(pathDisplay, entryPathW - 4);
-                    g.drawString(font, truncPath, entryPathX, rowY + 3,
-                            active ? COL_ACCENT : COL_WHITE, false);
-
-                    if (hovered && truncPath.length() < pathDisplay.length()) {
+                    String valDisplay = entry.valueDisplay();
+                    String truncVal = font.plainSubstrByWidth(valDisplay, NBT_COL_VAL - 4);
+                    g.drawString(font, truncVal, colValX + 2, rowY + 3,
+                            active ? COL_ACCENT : COL_GRAY, false);
+                    if (hovered && truncVal.length() < valDisplay.length() && hoveredFullText == null) {
                         hoveredFullText = entry.path() + " = " + entry.valueDisplay();
-                    }
-
-                    String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path(), "=") : "=";
-                    int opColor = active ? COL_WHITE : COL_GRAY;
-                    g.drawString(font, opStr, colOpX + 4, rowY + 3, opColor, false);
-
-                    if (nbtTableEditingRow == entryIdx) {
-                        detailNbtValueBox.setX(colValX);
-                        detailNbtValueBox.setY(rowY);
-                        detailNbtValueBox.setWidth(NBT_COL_VAL);
-                        detailNbtValueBox.setHeight(NBT_ROW_H);
-                        detailNbtValueBox.setVisible(true);
-                        detailNbtValueBox.render(g, mx, my, 0);
-                    } else {
-                        String valDisplay = entry.valueDisplay();
-                        String truncVal = font.plainSubstrByWidth(valDisplay, NBT_COL_VAL - 4);
-                        g.drawString(font, truncVal, colValX + 2, rowY + 3,
-                                active ? COL_ACCENT : COL_GRAY, false);
-                        if (hovered && truncVal.length() < valDisplay.length() && hoveredFullText == null) {
-                            hoveredFullText = entry.path() + " = " + valDisplay;
-                        }
                     }
                 }
             }
@@ -4191,16 +4098,17 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int nbtY = stockY + DETAIL_SECTION_H;
 
             int strictToggleX = contentX + labelW;
+            String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
+            int strictToggleW = 14 + font.width(strictLabel);
             boolean strictNbt = menu.isEntryNbtStrict(detailEditSlot);
-            if (isHovering(strictToggleX, nbtY, 54, 14, (int) mx, (int) my)) {
+            if (isHovering(strictToggleX, nbtY, strictToggleW, 14, (int) mx, (int) my)) {
                 boolean next = !strictNbt;
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, next));
                 menu.setEntryNbtStrict(detailEditSlot, next);
                 return true;
             }
 
-            String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
-            int nbtBtnX = strictToggleX + 14 + font.width(strictLabel) + 8;
+            int nbtBtnX = strictToggleX + strictToggleW + 8;
             String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
             int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
             if (!strictNbt && isHovering(nbtBtnX, nbtY, nbtBtnW, 14, (int) mx, (int) my)) {
@@ -4333,7 +4241,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                                          int tableX, int tableY, int tableW, int tableH) {
         Set<String> activePaths = detailNbtActiveOps.keySet();
         List<NbtRow> visible = getVisibleNbtRows();
-        int totalRows = NBT_BUILTIN_ROWS + visible.size();
+        int totalRows = visible.size();
         boolean scrollable = totalRows * NBT_ROW_H > tableH;
         int scrollW = scrollable ? SUBMODE_SCROLLBAR_W + SUBMODE_SCROLLBAR_GAP : 0;
         int rowW = tableW - scrollW;
@@ -4352,48 +4260,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (mx < tableX || mx >= tableX + rowW || my < rowY || my >= rowY + NBT_ROW_H)
                 continue;
 
-            if (vi < NBT_BUILTIN_ROWS) {
-                int builtinEditId = vi == 0 ? NBT_EDIT_DURABILITY
-                        : vi == 1 ? NBT_EDIT_ENCHANTED : NBT_EDIT_STACK_SIZE;
-
-                if (vi == 1) {
-                    if (mx < colToggleX + NBT_COL_TOGGLE + 4) {
-                        detailEnchantedEnabled = !detailEnchantedEnabled;
-                    } else {
-                        detailItemEnchanted = !detailItemEnchanted;
-                        if (!detailEnchantedEnabled) detailEnchantedEnabled = true;
-                    }
-                    PacketDistributor.sendToServer(new SetFilterEntryEnchantedPayload(
-                            detailEditSlot, detailEnchantedEnabled, detailItemEnchanted));
-                    menu.setEntryEnchanted(minecraft.player, detailEditSlot,
-                            detailEnchantedEnabled ? detailItemEnchanted : null);
-                    return true;
-                }
-
-                if (mx < colToggleX + NBT_COL_TOGGLE + 4) {
-                    if (vi == 0) {
-                        detailDurabilityOp = detailDurabilityOp != null ? null : ">=";
-                        sendDetailDurabilityPacket();
-                    }
-                } else if (mx >= colOpX && mx < colOpX + NBT_COL_OP) {
-                    if (vi == 0) {
-                        cycleDurabilityOp();
-                        sendDetailDurabilityPacket();
-                    }
-                } else if (mx >= colValX) {
-                    if (nbtTableEditingRow != builtinEditId) {
-                        commitDetailBuiltinEdit();
-                        nbtTableEditingRow = builtinEditId;
-                        detailNbtValueBox.setValue(getBuiltinDefault(builtinEditId));
-                    }
-                    detailNbtValueBox.setFocused(true);
-                    detailNbtValueBox.mouseClicked(mx, my, action);
-                    return true;
-                }
-                return true;
-            }
-
-            NbtRow row = visible.get(vi - NBT_BUILTIN_ROWS);
+            NbtRow row = visible.get(vi);
 
             if (row.heading()) {
                 if (nbtCollapsedGroups.contains(row.group())) {
@@ -4460,8 +4327,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (nbtTableEditingRow >= 0) {
             commitDetailNbtValueEdit();
-        } else if (nbtTableEditingRow <= NBT_EDIT_DURABILITY) {
-            commitDetailBuiltinEdit();
         }
         return true;
     }
@@ -4517,45 +4382,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             buildNbtRows();
         }
         detailNbtActiveOps.put(entry.path(), opSymbol);
-    }
-
-    private String getBuiltinDefault(int builtinId) {
-        return switch (builtinId) {
-            case NBT_EDIT_DURABILITY -> String.valueOf(detailItemDurability);
-            case NBT_EDIT_ENCHANTED -> detailItemEnchanted ? "true" : "false";
-            case NBT_EDIT_STACK_SIZE -> String.valueOf(detailItemStackSize);
-            default -> "";
-        };
-    }
-
-    private void commitDetailBuiltinEdit() {
-        if (nbtTableEditingRow >= 0 || nbtTableEditingRow == -1) return;
-        String val = detailNbtValueBox.getValue().trim();
-        if (val.isEmpty()) val = getBuiltinDefault(nbtTableEditingRow);
-
-        switch (nbtTableEditingRow) {
-            case NBT_EDIT_DURABILITY -> {
-                try {
-                    int durVal = Integer.parseInt(val);
-                    detailItemDurability = durVal;
-                    if (detailDurabilityOp == null) detailDurabilityOp = ">=";
-                    menu.setEntryDurability(minecraft.player, detailEditSlot, detailDurabilityOp, durVal);
-                    PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(
-                            detailEditSlot, detailDurabilityOp, durVal));
-                } catch (NumberFormatException ignored) {}
-            }
-            case NBT_EDIT_ENCHANTED -> {
-                detailItemEnchanted = "true".equalsIgnoreCase(val);
-            }
-            case NBT_EDIT_STACK_SIZE -> {
-                try {
-                    detailItemStackSize = Integer.parseInt(val);
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-        nbtTableEditingRow = -1;
-        detailNbtValueBox.setVisible(false);
-        detailNbtValueBox.setFocused(false);
     }
 
     private void commitDetailNbtValueEdit() {
@@ -4658,11 +4484,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
             if (detailNbtValueBox.isFocused()) {
                 if (key == 257 || key == 256) {
-                    if (nbtTableEditingRow <= NBT_EDIT_DURABILITY) {
-                        commitDetailBuiltinEdit();
-                    } else {
-                        commitDetailNbtValueEdit();
-                    }
+                    commitDetailNbtValueEdit();
                     return true;
                 }
                 detailNbtValueBox.keyPressed(key, scan, modifiers);
@@ -4723,7 +4545,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int panelH = imageHeight - 24;
             int y = panelY + 36;
             int listH = panelY + panelH - y - 4;
-            int totalRows = NBT_BUILTIN_ROWS + getVisibleNbtRows().size();
+            int totalRows = getVisibleNbtRows().size();
             int visibleRows = Math.max(1, listH / NBT_ROW_H);
             int maxScroll = Math.max(0, totalRows - visibleRows);
             detailNbtScrollOffset = Mth.clamp(detailNbtScrollOffset - (int) delta, 0, maxScroll);
@@ -4773,30 +4595,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return menu.getEntryBatch(slot) > 0 || menu.getEntryStock(slot) > 0;
     }
 
-    private void cycleDurabilityOp() {
-        if (detailDurabilityOp == null) {
-            detailDurabilityOp = "=";
-        } else if (detailDurabilityOp.equals("=")) {
-            detailDurabilityOp = ">=";
-        } else if (detailDurabilityOp.equals(">=")) {
-            detailDurabilityOp = "<=";
-        } else {
-            detailDurabilityOp = "=";
-        }
-    }
-
-    private void sendDetailDurabilityPacket() {
-        if (detailDurabilityOp != null) {
-            menu.setEntryDurability(minecraft.player, detailEditSlot, detailDurabilityOp, detailItemDurability);
-            PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(
-                    detailEditSlot, detailDurabilityOp, detailItemDurability));
-        } else {
-            menu.setEntryDurability(minecraft.player, detailEditSlot, null, 0);
-            PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(
-                    detailEditSlot, "", 0));
-        }
-    }
-
     private static String abbreviateNbtPath(String path) {
         StringBuilder result = new StringBuilder();
         String[] segments = path.split("\\.");
@@ -4833,8 +4631,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailStockInputBox.setValue("");
         detailSlotMappingInputBox.setValue("");
         if (!hasNbtConfig) {
-            detailDurabilityValueBox.setValue("");
-            detailDurabilityOp = null;
             detailNbtInputBox.setValue("");
             detailNbtValueBox.setValue("");
             detailNbtSelectedIdx = -1;

@@ -99,7 +99,7 @@ public class ChannelData {
             enabled = tag.getBoolean(KEY_ENABLED);
 
         mode = getEnum(tag, KEY_MODE, ChannelMode.class, ChannelMode.IMPORT);
-        type = getEnum(tag, KEY_TYPE, ChannelType.class, ChannelType.ITEM);
+        setType(getEnum(tag, KEY_TYPE, ChannelType.class, ChannelType.ITEM));
         String savedRedstoneMode = tag.getString(KEY_REDSTONE);
         if (RedstoneMode.disablesChannel(savedRedstoneMode))
             enabled = false;
@@ -110,7 +110,7 @@ public class ChannelData {
         if (tag.contains(KEY_BATCH))
             batchSize = Math.max(1, tag.getInt(KEY_BATCH));
         if (tag.contains(KEY_DELAY))
-            tickDelay = Math.max(1, tag.getInt(KEY_DELAY));
+            setTickDelay(tag.getInt(KEY_DELAY));
 
         if (tag.contains(KEY_IO)) {
             String dirStr = tag.getString(KEY_IO);
@@ -209,8 +209,11 @@ public class ChannelData {
     }
 
     public void setType(ChannelType type) {
-        if (type != null)
+        if (type != null) {
             this.type = type;
+            if (type == ChannelType.ENERGY)
+                tickDelay = 1;
+        }
     }
 
     public int getBatchSize() {
@@ -226,7 +229,7 @@ public class ChannelData {
     }
 
     public void setTickDelay(int tickDelay) {
-        this.tickDelay = Math.max(1, tickDelay);
+        this.tickDelay = type == ChannelType.ENERGY ? 1 : Math.max(1, tickDelay);
     }
 
     @Nullable
@@ -344,9 +347,9 @@ public class ChannelData {
         resetResourceRotation();
         this.enabled = source.enabled;
         this.mode = source.mode;
-        this.type = source.type;
+        setType(source.type);
         this.batchSize = source.batchSize;
-        this.tickDelay = source.tickDelay;
+        setTickDelay(source.tickDelay);
         this.ioDirection = source.ioDirection;
         this.redstoneMode = source.redstoneMode;
         this.distributionMode = source.distributionMode;

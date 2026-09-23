@@ -12,6 +12,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.storage.DimensionDataStorage;
 
@@ -92,6 +93,12 @@ public class NetworkRegistry extends SavedData {
         return result;
     }
 
+    public Collection<LogisticsNetwork> getVisibleNetworks(ServerPlayer player) {
+        return NodeAccessPolicy.isAdminMode(player)
+                ? getAllNetworks().values()
+                : getNetworksForPlayer(player.getUUID());
+    }
+
     public void deleteNetwork(UUID id) {
         boolean removed = networks.remove(id) != null;
         dispatcher.delete(id);
@@ -138,7 +145,7 @@ public class NetworkRegistry extends SavedData {
         LogisticsNetwork network = networks.get(networkId);
         if (network != null) {
             network.addNode(nodeId);
-            if (network.getNodeUuids().size() > WARNING_NODE_COUNT) {
+            if (Config.debugMode && network.getNodeUuids().size() > WARNING_NODE_COUNT) {
                 LOGGER.warn("Network {} has exceeded {} nodes (Count: {}). Performance may degrade.",
                         networkId, WARNING_NODE_COUNT, network.getNodeUuids().size());
             }
@@ -154,7 +161,7 @@ public class NetworkRegistry extends SavedData {
             dispatcher.markDirty(networkId);
 
             if (network.getNodeUuids().isEmpty()) {
-                LOGGER.info("Network {} is empty, deleting.", networkId);
+                if (Config.debugMode) LOGGER.info("Network {} is empty, deleting.", networkId);
                 deleteNetwork(networkId);
             }
             setDirty();
@@ -192,7 +199,7 @@ public class NetworkRegistry extends SavedData {
         }
         if (!registry.networks.isEmpty()) {
             registry.networks.keySet().forEach(registry.dispatcher::markDirty);
-            LOGGER.info("Loaded {} networks.", registry.networks.size());
+            if (Config.debugMode) LOGGER.info("Loaded {} networks.", registry.networks.size());
         }
         if (assignedDefaultColor) {
             registry.setDirty();

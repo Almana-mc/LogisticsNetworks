@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
@@ -20,20 +21,24 @@ public class ClientPayloadHandler {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public static void handleSyncNetworkList(SyncNetworkListPayload payload, IPayloadContext context) {
-        LOGGER.debug("Received SyncNetworkListPayload with {} networks", payload.networks().size());
+        if (Config.debugMode) {
+            LOGGER.debug("Received SyncNetworkListPayload with {} networks", payload.networks().size());
+        }
         context.enqueueWork(() -> {
             var screen = Minecraft.getInstance().screen;
-            LOGGER.debug("Current screen: {}", screen != null ? screen.getClass().getSimpleName() : "null");
+            if (Config.debugMode) {
+                LOGGER.debug("Current screen: {}", screen != null ? screen.getClass().getSimpleName() : "null");
+            }
             if (screen instanceof NodeEditorScreen<?> nodeScreen) {
-                LOGGER.debug("Passing to NodeScreen");
+                if (Config.debugMode) LOGGER.debug("Passing to NodeScreen");
                 nodeScreen.receiveNetworkList(payload.networks());
             } else if (screen instanceof ComputerScreen computerScreen) {
-                LOGGER.debug("Passing to ComputerScreen");
+                if (Config.debugMode) LOGGER.debug("Passing to ComputerScreen");
                 computerScreen.receiveNetworkList(payload.networks());
             } else if (screen instanceof ClipboardScreen clipboardScreen) {
                 clipboardScreen.receiveNetworkList(payload.networks());
             } else {
-                LOGGER.debug("Screen is not NodeScreen or ComputerScreen, ignoring");
+                if (Config.debugMode) LOGGER.debug("Screen is not NodeScreen or ComputerScreen, ignoring");
             }
         });
     }

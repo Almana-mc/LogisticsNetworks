@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -24,6 +25,7 @@ import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -101,27 +103,29 @@ public class ComputerMenu extends AbstractContainerMenu {
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        List<LogisticsNetwork> networks = registry.getNetworksForPlayer(player.getUUID());
+        Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
         ComputerBlockEntity computer = getComputer(level);
         Set<UUID> starredNetworks = computer != null ? computer.getStarredNetworks() : Set.of();
 
-        LOGGER.debug("Player {} UUID: {}", player.getName().getString(), player.getUUID());
-        LOGGER.debug("Found {} networks for player", networks.size());
+        if (Config.debugMode) LOGGER.debug("Player {} UUID: {}", player.getName().getString(), player.getUUID());
+        if (Config.debugMode) LOGGER.debug("Found {} networks for player", networks.size());
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>();
         for (LogisticsNetwork net : networks) {
-            LOGGER.debug("  Network: {} (ID: {}, Nodes: {}, Owner: {})",
-                    net.getName(), net.getId(), net.getNodeUuids().size(), net.getOwnerUuid());
+            if (Config.debugMode) {
+                LOGGER.debug("  Network: {} (ID: {}, Nodes: {}, Owner: {})",
+                        net.getName(), net.getId(), net.getNodeUuids().size(), net.getOwnerUuid());
+            }
             entries.add(new SyncNetworkListPayload.NetworkEntry(
                     net.getId(),
                     net.getName(),
                     net.getNodeUuids().size(),
                     starredNetworks.contains(net.getId()),
-                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player.getUUID(), player.hasPermissions(2)),
+                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
                     net.getColor()));
         }
 
-        LOGGER.debug("Sending {} network entries to client", entries.size());
+        if (Config.debugMode) LOGGER.debug("Sending {} network entries to client", entries.size());
         PacketDistributor.sendToPlayer(player, new SyncNetworkListPayload(entries));
     }
 

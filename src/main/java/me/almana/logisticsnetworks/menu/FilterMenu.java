@@ -1336,8 +1336,7 @@ public class FilterMenu extends AbstractContainerMenu {
                     || !nodeSource.isOwnedBy(player)) return;
             var network = NetworkRegistry.get(level).getNetwork(graphContext.networkId());
             if (network == null || !network.getNodeUuids().contains(nodeSource.getUUID())
-                    || !(NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    || player.hasPermissions(2))) return;
+                    || !NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) return;
         }
         if (!player.level().isClientSide && !isSpecialMode && !returningToClipboard) {
             saveFilterItems(getOpenedStack(), player.level().registryAccess());

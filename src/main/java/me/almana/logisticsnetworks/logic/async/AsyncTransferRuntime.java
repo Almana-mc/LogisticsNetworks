@@ -56,7 +56,7 @@ public final class AsyncTransferRuntime {
                 ? configured
                 : Math.min(4, Math.max(1, Runtime.getRuntime().availableProcessors() - 2));
         instance = new AsyncTransferRuntime(RUNTIME_IDS.incrementAndGet(), workers);
-        LOGGER.info("Async transfer runtime started with {} worker threads", workers);
+        if (Config.debugMode) LOGGER.info("Async transfer runtime started with {} worker threads", workers);
     }
 
     public static synchronized void stop() {
@@ -66,7 +66,7 @@ public final class AsyncTransferRuntime {
             current.executor.shutdownNow();
             current.completed.clear();
             current.bindings.clear();
-            LOGGER.info("Async transfer runtime stopped");
+            if (Config.debugMode) LOGGER.info("Async transfer runtime stopped");
         }
     }
 

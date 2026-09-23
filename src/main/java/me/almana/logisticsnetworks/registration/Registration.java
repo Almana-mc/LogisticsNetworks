@@ -42,9 +42,11 @@ import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 import java.util.function.Supplier;
 
@@ -64,6 +66,11 @@ public class Registration {
                         .create(Registries.BLOCK_ENTITY_TYPE, LogisticsNetworks.MOD_ID);
         public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS = DeferredRegister
                         .create(Registries.RECIPE_SERIALIZER, LogisticsNetworks.MOD_ID);
+        public static final DeferredRegister<AttachmentType<?>> ATTACHMENT_TYPES = DeferredRegister
+                        .create(NeoForgeRegistries.Keys.ATTACHMENT_TYPES, LogisticsNetworks.MOD_ID);
+
+        public static final DeferredHolder<AttachmentType<?>, AttachmentType<Boolean>> ADMIN_MODE = ATTACHMENT_TYPES
+                        .register("admin_mode", () -> AttachmentType.builder(() -> false).build());
 
         // Some ugly shit I have done here....
         public static final DeferredHolder<EntityType<?>, EntityType<LogisticsNodeEntity>> LOGISTICS_NODE = ENTITIES
@@ -200,5 +207,6 @@ public class Registration {
                 BLOCK_ENTITY_TYPES.register(modEventBus);
                 RECIPE_SERIALIZERS.register(modEventBus);
                 CREATIVE_TABS.register(modEventBus);
+                ATTACHMENT_TYPES.register(modEventBus);
         }
 }

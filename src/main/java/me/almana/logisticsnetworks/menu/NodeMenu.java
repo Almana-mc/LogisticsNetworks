@@ -222,12 +222,7 @@ public class NodeMenu extends AbstractContainerMenu {
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        Collection<LogisticsNetwork> networks;
-        if (player.hasPermissions(2)) {
-            networks = registry.getAllNetworks().values();
-        } else {
-            networks = registry.getNetworksForPlayer(player.getUUID());
-        }
+        Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {
@@ -236,7 +231,7 @@ public class NodeMenu extends AbstractContainerMenu {
                     net.getName(),
                     net.getNodeUuids().size(),
                     false,
-                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player.getUUID(), player.hasPermissions(2)),
+                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
                     net.getColor()));
         }
 
@@ -277,9 +272,12 @@ public class NodeMenu extends AbstractContainerMenu {
         int nodeSlotCount = UPGRADE_SLOTS;
 
         if (index < nodeSlotCount) {
-            if (!moveItemStackTo(fromStack, nodeSlotCount, slots.size(), true)) {
+            ItemStack remainder = fromStack.copy();
+            if (!moveItemStackTo(remainder, nodeSlotCount, slots.size(), true)) {
                 return ItemStack.EMPTY;
             }
+            fromSlot.set(remainder);
+            return copy;
         } else {
             if (!fromStack.is(ModTags.UPGRADES)) {
                 return ItemStack.EMPTY;
@@ -297,14 +295,6 @@ public class NodeMenu extends AbstractContainerMenu {
             }
             return ItemStack.EMPTY;
         }
-
-        if (fromStack.isEmpty()) {
-            fromSlot.set(ItemStack.EMPTY);
-        } else {
-            fromSlot.setChanged();
-        }
-
-        return copy;
     }
 
     private class UpgradeItemsContainer extends AbstractProxyContainer {

@@ -185,8 +185,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
         UUID networkId = next.getNetworkId();
         if (networkId != null) {
             LogisticsNetwork network = NetworkRegistry.get(player.serverLevel()).getNetwork(networkId);
-            if (network == null || !(NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    || player.hasPermissions(2))) return false;
+            if (network == null || !NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) return false;
             next.setNetworkTarget(networkId, network.getName());
             for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
                 next.setChannelName(channel, network.getChannelName(channel));

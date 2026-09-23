@@ -986,11 +986,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                         contentW - BACK_BTN_W - 40),
                 contentX + BACK_BTN_W + 18, contentY + 4, COLOR_ACCENT);
 
-        int saveX = contentX + 8;
-        int refreshX = saveX + 66;
+        int refreshX = contentX + 8;
         int buttonY = contentY + LNET_TOOLBAR_Y;
-        renderSmallButton(g, saveX, buttonY, 58, 14, line("gui.logisticsnetworks.computer.lnet_save"),
-                isHoveringAbs(saveX, buttonY, 58, 14, mouseX, mouseY));
         renderSmallButton(g, refreshX, buttonY, 58, 14, line("gui.logisticsnetworks.computer.lnet_refresh"),
                 isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY));
 
@@ -1445,14 +1442,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private boolean handleLnetFilesClick(double mouseX, double mouseY) {
         int contentX = leftPos + 10;
         int contentY = topPos + 34;
-        int saveX = contentX + 8;
-        int refreshX = saveX + 66;
+        int refreshX = contentX + 8;
         int buttonY = contentY + LNET_TOOLBAR_Y;
 
-        if (isHoveringAbs(saveX, buttonY, 58, 14, mouseX, mouseY)) {
-            requestNetworkSave();
-            return true;
-        }
         if (isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY)) {
             refreshLnetFiles();
             return true;
@@ -1496,10 +1488,6 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     private void requestNetworkSave() {
-        if (selectedNetworkId == null) {
-            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_no_network"), COLOR_WARNING);
-            return;
-        }
         setLnetStatus(line("gui.logisticsnetworks.computer.lnet_saving"), COLOR_TEXT_SECONDARY);
         PacketDistributor.sendToServer(new RequestNetworkExportPayload(selectedNetworkId));
     }
@@ -2205,9 +2193,11 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 selectedNetworkName = network.name();
             });
         }
-        LOGGER.debug("Received network list with {} entries", networks.size());
-        for (SyncNetworkListPayload.NetworkEntry entry : networks) {
-            LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
+        if (Config.debugMode) {
+            LOGGER.debug("Received network list with {} entries", networks.size());
+            for (SyncNetworkListPayload.NetworkEntry entry : networks) {
+                LOGGER.debug("  - {} ({} nodes)", entry.name(), entry.nodeCount());
+            }
         }
         this.networkList = new ArrayList<>(networks);
         SyncNetworkListPayload.NetworkEntry selected = getSelectedNetworkEntry();
@@ -2223,7 +2213,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         }
         this.networkScrollOffset = Math.min(this.networkScrollOffset,
                 Math.max(0, networkList.size() - NETWORKS_PER_PAGE));
-        LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());
+        if (Config.debugMode) LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());
     }
 
     public void receiveNetworkExport(SyncNetworkExportPayload payload) {
