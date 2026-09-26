@@ -102,6 +102,7 @@ Chemical (Mekanism) and Source (Ars Nouveau) integration is retained for future 
 
 **What it does:** the engine checks the redstone signal **at the block this node is attached to** (from any neighbor — lever, redstone torch, dust, comparator, whatever). Based on that signal, the channel either runs or is blocked:
 
+- **Ignored** (default) — run regardless of redstone. The signal is not checked at all.
 - **High Signal** — run only when a redstone signal is present (strength > 0).
 - **Low Signal** — run only when there is no redstone signal (strength = 0).
 

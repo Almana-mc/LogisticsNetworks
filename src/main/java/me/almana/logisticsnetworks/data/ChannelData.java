@@ -41,7 +41,7 @@ public class ChannelData {
     private int tickDelay = 20;
     @Nullable
     private Direction ioDirection = Direction.UP;
-    private RedstoneMode redstoneMode = RedstoneMode.LOW;
+    private RedstoneMode redstoneMode = RedstoneMode.IGNORED;
     private DistributionMode distributionMode = DistributionMode.PRIORITY;
     private FilterMode filterMode = FilterMode.MATCH_ANY;
     private int priority = 0;

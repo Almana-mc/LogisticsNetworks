@@ -367,8 +367,11 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> implem
                         ? Theme.Variant.WARN : Theme.Variant.ACCENT,
                 typeVariant(config().getChannelType(selectedChannel)),
                 Theme.Variant.NEUTRAL,
-                config().getChannelRedstoneMode(selectedChannel) == RedstoneMode.HIGH
-                        ? Theme.Variant.ACCENT : Theme.Variant.WARN,
+                switch (config().getChannelRedstoneMode(selectedChannel)) {
+                    case IGNORED -> Theme.Variant.NEUTRAL;
+                    case HIGH -> Theme.Variant.ACCENT;
+                    case LOW -> Theme.Variant.WARN;
+                },
                 distributionVariant(config().getChannelDistributionMode(selectedChannel)),
                 Theme.Variant.NEUTRAL, Theme.Variant.NEUTRAL, Theme.Variant.NEUTRAL
         };

@@ -100,7 +100,7 @@ public static boolean canRunChannel(boolean mounted, ChannelType type, RedstoneM
     if (!mounted) {
         return true;
     }
-    return redstoneMode == RedstoneMode.LOW
+    return redstoneMode == RedstoneMode.IGNORED
             && (type == ChannelType.ITEM || type == ChannelType.FLUID);
 }
 
