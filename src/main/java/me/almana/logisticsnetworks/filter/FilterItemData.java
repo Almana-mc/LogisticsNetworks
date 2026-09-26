@@ -1045,11 +1045,13 @@ public final class FilterItemData {
     }
 
     public static boolean isNbtOnlySlot(ItemStack stack, int slot) {
-        if (!hasEntryNbt(stack, slot) && !hasEntryDurability(stack, slot) && !hasEntryEnchanted(stack, slot))
+        if (!hasEntryNbt(stack, slot) && !hasEntryDurability(stack, slot) && !hasEntryEnchanted(stack, slot)
+                && getEntryBatch(stack, slot) <= 0 && getEntryStock(stack, slot) <= 0)
             return false;
         return getEntryTag(stack, slot) == null
                 && !hasEntryItem(stack, slot)
-                && getFluidEntry(stack, slot).isEmpty();
+                && getFluidEntry(stack, slot).isEmpty()
+                && getChemicalEntry(stack, slot) == null;
     }
 
     public static boolean isEntryNbtStrict(ItemStack stack, int slot) {
@@ -2050,8 +2052,8 @@ public final class FilterItemData {
                 : entry.slotMapping().slots().stream().mapToInt(Integer::intValue).toArray();
         boolean hasNbt = !rules.isEmpty() || !entry.nbt().raw().isEmpty();
         boolean hasDur = entry.durability() != null;
-        boolean nbtOnly = (hasNbt || hasDur || entry.enchanted() != null) && tag == null && item == null
-                && fluidId == null && chemicalId == null;
+        boolean nbtOnly = (hasNbt || hasDur || entry.enchanted() != null || entry.counts().batch() > 0 || stock > 0)
+                && tag == null && item == null && fluidId == null && chemicalId == null;
         boolean strict = item != null && entry.nbt().strict().orElse(
                 !hasNbt && !hasDur && entry.enchanted() == null);
         boolean slotOnly = mapping != null && tag == null && item == null && fluidId == null
@@ -2068,7 +2070,7 @@ public final class FilterItemData {
         for (ItemFilterSlot entry : entriesBySlot) {
             if (entry == null)
                 continue;
-            item |= entry.item() != null;
+            item |= entry.item() != null || entry.nbtOnly();
             fluid |= entry.fluidEntry() != null;
             chemical |= entry.chemicalId() != null;
             tag |= entry.tag() != null;
@@ -2189,7 +2191,8 @@ public final class FilterItemData {
             boolean hasNbt = !nbtRules.isEmpty() || nbtPath != null || raw != null;
             boolean hasDur = durOp != null;
             Boolean enchanted = entry.contains(KEY_ENCHANTED) ? entry.getBooleanOr(KEY_ENCHANTED, false) : null;
-            boolean nbtOnly = (hasNbt || hasDur || enchanted != null) && tag == null && item == null && !hasFluid && !hasChemical;
+            boolean nbtOnly = (hasNbt || hasDur || enchanted != null || batch > 0 || stock > 0)
+                    && tag == null && item == null && !hasFluid && !hasChemical;
             boolean nbtStrict = isEntryNbtStrict(entry);
 
             int[] slotMapping = null;
@@ -2205,7 +2208,7 @@ public final class FilterItemData {
                     nbtValue, nbtOp, rawNbt, invalidRawNbt, durOp, durVal, hasNbt, nbtOnly, nbtStrict, nbtRules,
                     nbtMatchAny, slotMapping, slotOnly, enchanted, itemTag, fluidTag);
 
-            hasItemEntries |= item != null;
+            hasItemEntries |= item != null || nbtOnly;
             hasFluidEntries |= hasFluid;
             hasChemicalEntries |= hasChemical;
             hasTagEntries |= tag != null;

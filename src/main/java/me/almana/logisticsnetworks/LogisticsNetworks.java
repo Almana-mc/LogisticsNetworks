@@ -153,7 +153,7 @@ public class LogisticsNetworks {
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("8");
+                final var registrar = event.registrar(MOD_ID).versioned("9");
 
                 // Client -> Server
                 registrar.playToServer(RequestOpenGraphPayload.TYPE, RequestOpenGraphPayload.STREAM_CODEC,
