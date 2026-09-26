@@ -957,11 +957,8 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                         contentW - BACK_BTN_W - 40),
                 contentX + BACK_BTN_W + 18, contentY + 4, pal().accent());
 
-        int saveX = contentX + 8;
-        int refreshX = saveX + 66;
+        int refreshX = contentX + 8;
         int buttonY = contentY + LNET_TOOLBAR_Y;
-        renderSmallButton(g, saveX, buttonY, 58, 14, line("gui.logisticsnetworks.computer.lnet_save"),
-                isHoveringAbs(saveX, buttonY, 58, 14, mouseX, mouseY));
         renderSmallButton(g, refreshX, buttonY, 58, 14, line("gui.logisticsnetworks.computer.lnet_refresh"),
                 isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY));
 
@@ -1418,14 +1415,9 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     private boolean handleLnetFilesClick(double mouseX, double mouseY) {
         int contentX = leftPos + 10;
         int contentY = topPos + 34;
-        int saveX = contentX + 8;
-        int refreshX = saveX + 66;
+        int refreshX = contentX + 8;
         int buttonY = contentY + LNET_TOOLBAR_Y;
 
-        if (isHoveringAbs(saveX, buttonY, 58, 14, mouseX, mouseY)) {
-            requestNetworkSave();
-            return true;
-        }
         if (isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY)) {
             refreshLnetFiles();
             return true;
@@ -1469,10 +1461,6 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     }
 
     private void requestNetworkSave() {
-        if (selectedNetworkId == null) {
-            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_no_network"), pal().warning());
-            return;
-        }
         setLnetStatus(line("gui.logisticsnetworks.computer.lnet_saving"), pal().textSecondary());
         ClientPacketDistributor.sendToServer(new RequestNetworkExportPayload(selectedNetworkId));
     }
