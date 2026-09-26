@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
@@ -13,6 +14,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -117,6 +119,8 @@ public class ComputerMenu extends AbstractContainerMenu {
                     net.getName(),
                     net.getNodeUuids().size(),
                     starredNetworks.contains(net.getId()),
+                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player.getUUID(),
+                            player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)),
                     net.getCreatedAt(),
                     net.getColor()));
         }

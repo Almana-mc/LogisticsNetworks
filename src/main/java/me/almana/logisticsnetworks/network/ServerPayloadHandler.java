@@ -19,6 +19,7 @@ import me.almana.logisticsnetworks.menu.GraphMenuContext;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
+import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -27,6 +28,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
@@ -37,6 +39,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.Containers;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -310,6 +313,90 @@ public class ServerPayloadHandler {
             }
             GraphPayloadHandler.broadcast(player.level().getServer(), network.getId());
         });
+    }
+
+    public static void handleDeleteNetwork(DeleteNetworkPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof ComputerMenu)) {
+                return;
+            }
+            player.sendSystemMessage(deleteNetwork(player, payload.networkId()), true);
+        });
+    }
+
+    private static Component deleteNetwork(ServerPlayer player, UUID networkId) {
+        NetworkRegistry registry = NetworkRegistry.get(player.level());
+        LogisticsNetwork network = registry.getNetwork(networkId);
+        if (network == null) {
+            return Component.translatable("message.logisticsnetworks.network_delete.missing");
+        }
+        if (!NodeAccessPolicy.canDelete(network.getOwnerUuid(), player.getUUID(),
+                player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))) {
+            return Component.translatable("message.logisticsnetworks.network_delete.denied");
+        }
+
+        List<LogisticsNodeEntity> nodes = findNetworkNodes(player, network);
+        int unavailable = network.getNodeUuids().size() - nodes.size();
+        if (unavailable > 0) {
+            return Component.translatable("message.logisticsnetworks.network_delete.unavailable", unavailable);
+        }
+
+        List<ItemStack> returnedItems = collectNetworkItems(nodes);
+        removeNetworkNodes(nodes);
+        registry.deleteNetwork(networkId);
+        returnNetworkItems(player, returnedItems);
+        refreshAllOpenComputerMenus(player.level().getServer());
+        return Component.translatable("message.logisticsnetworks.network_delete.success", nodes.size());
+    }
+
+    private static List<LogisticsNodeEntity> findNetworkNodes(ServerPlayer player, LogisticsNetwork network) {
+        List<LogisticsNodeEntity> nodes = new ArrayList<>(network.getNodeUuids().size());
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(player, nodeId);
+            if (node != null && !node.isRemoved() && network.getId().equals(node.getNetworkId())) {
+                nodes.add(node);
+            }
+        }
+        return nodes;
+    }
+
+    private static List<ItemStack> collectNetworkItems(List<LogisticsNodeEntity> nodes) {
+        List<ItemStack> items = new ArrayList<>(nodes.size() * (LogisticsNodeEntity.UPGRADE_SLOT_COUNT + 1));
+        for (LogisticsNodeEntity node : nodes) {
+            items.add(Registration.LOGISTICS_NODE_ITEM.get().getDefaultInstance());
+            for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+                ItemStack upgrade = node.getUpgradeItem(slot);
+                if (!upgrade.isEmpty()) {
+                    items.add(upgrade.copy());
+                }
+            }
+        }
+        return items;
+    }
+
+    private static void removeNetworkNodes(List<LogisticsNodeEntity> nodes) {
+        for (LogisticsNodeEntity node : nodes) {
+            node.setNetworkId(null);
+            node.discard();
+        }
+    }
+
+    private static void returnNetworkItems(ServerPlayer player, List<ItemStack> items) {
+        for (ItemStack stack : items) {
+            player.getInventory().add(stack);
+            if (!stack.isEmpty()) {
+                Containers.dropItemStack(player.level(), player.getX(), player.getY(), player.getZ(), stack);
+            }
+        }
+    }
+
+    private static void refreshAllOpenComputerMenus(MinecraftServer server) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.containerMenu instanceof ComputerMenu menu) {
+                menu.requestNetworkList(player);
+            }
+        }
     }
 
     public static void handleSetNetworkColor(SetNetworkColorPayload payload, IPayloadContext context) {

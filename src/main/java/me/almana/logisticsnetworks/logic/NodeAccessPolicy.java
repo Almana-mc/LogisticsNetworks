@@ -37,4 +37,8 @@ public final class NodeAccessPolicy {
                 && FTBTeamsCompat.arePlayersAllied(ownerUuid, playerUuid);
         return mode.allows(sameTeam, allies);
     }
+
+    public static boolean canDelete(UUID ownerUuid, UUID playerUuid, boolean operator) {
+        return operator || ownerUuid != null && ownerUuid.equals(playerUuid);
+    }
 }
