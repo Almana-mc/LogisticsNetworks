@@ -9,7 +9,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.UUID;
@@ -47,8 +46,7 @@ public record GraphMenuContext(BlockPos computerPos, Identifier computerDimensio
         if (player.level().isClientSide()) return true;
         if (!(player.level().getBlockEntity(computerPos) instanceof ComputerBlockEntity)) return false;
         LogisticsNetwork network = NetworkRegistry.get((ServerLevel) player.level()).getNetwork(networkId);
-        return network != null && (NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER));
+        return network != null && NodeAccessPolicy.canAccess(network.getOwnerUuid(), player);
     }
 
     public boolean canEdit(Player player, LogisticsNodeEntity node) {

@@ -92,6 +92,14 @@ public class EventHandler {
     }
 
     @SubscribeEvent
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        if (!event.getEntity().level().isClientSide()) {
+            event.getEntity().setData(Registration.ADMIN_MODE,
+                    event.getOriginal().getData(Registration.ADMIN_MODE));
+        }
+    }
+
+    @SubscribeEvent
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player))
             return;

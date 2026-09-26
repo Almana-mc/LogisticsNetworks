@@ -15,7 +15,6 @@ import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -227,12 +226,7 @@ public class NodeMenu extends AbstractContainerMenu {
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        Collection<LogisticsNetwork> networks;
-        if (player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
-            networks = registry.getAllNetworks().values();
-        } else {
-            networks = registry.getNetworksForPlayer(player.getUUID());
-        }
+        Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {
@@ -241,8 +235,7 @@ public class NodeMenu extends AbstractContainerMenu {
                     net.getName(),
                     net.getNodeUuids().size(),
                     false,
-                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player.getUUID(),
-                            player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)),
+                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
                     net.getCreatedAt(),
                     net.getColor()));
         }

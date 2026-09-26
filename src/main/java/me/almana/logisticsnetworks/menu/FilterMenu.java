@@ -8,7 +8,6 @@ import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
@@ -1359,8 +1358,7 @@ public class FilterMenu extends AbstractContainerMenu {
                     || !nodeSource.isOwnedBy(player)) return;
             var network = NetworkRegistry.get(level).getNetwork(graphContext.networkId());
             if (network == null || !network.getNodeUuids().contains(nodeSource.getUUID())
-                    || !(NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))) return;
+                    || !NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) return;
         }
         if (!player.level().isClientSide() && !isSpecialMode && !returningToClipboard) {
             saveFilterItems(getOpenedStack(), player.level().registryAccess());

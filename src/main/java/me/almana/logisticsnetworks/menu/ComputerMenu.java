@@ -14,7 +14,6 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -26,6 +25,7 @@ import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -103,7 +103,7 @@ public class ComputerMenu extends AbstractContainerMenu {
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        List<LogisticsNetwork> networks = registry.getNetworksForPlayer(player.getUUID());
+        Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
         ComputerBlockEntity computer = getComputer(level);
         Set<UUID> starredNetworks = computer != null ? computer.getStarredNetworks() : Set.of();
 
@@ -119,8 +119,7 @@ public class ComputerMenu extends AbstractContainerMenu {
                     net.getName(),
                     net.getNodeUuids().size(),
                     starredNetworks.contains(net.getId()),
-                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player.getUUID(),
-                            player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)),
+                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
                     net.getCreatedAt(),
                     net.getColor()));
         }

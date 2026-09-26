@@ -20,7 +20,6 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
@@ -1004,8 +1003,7 @@ public final class NodeClipboardConfig {
     private boolean canAccessTargetNetwork(ServerPlayer player, LogisticsNodeEntity node) {
         if (networkId == null || !(node.level() instanceof ServerLevel serverLevel)) return true;
         LogisticsNetwork network = NetworkRegistry.get(serverLevel).getNetwork(networkId);
-        return network == null || NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+        return network == null || NodeAccessPolicy.canAccess(network.getOwnerUuid(), player);
     }
 
     private void applyNetworkToNode(LogisticsNodeEntity node, ServerPlayer player) {
@@ -1052,8 +1050,7 @@ public final class NodeClipboardConfig {
     private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry, UUID ownerUuid, ServerPlayer player) {
         if (networkId != null) {
             LogisticsNetwork byId = registry.getNetwork(networkId);
-            if (byId != null && (NodeAccessPolicy.canAccess(byId.getOwnerUuid(), player.getUUID())
-                    || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))) {
+            if (byId != null && NodeAccessPolicy.canAccess(byId.getOwnerUuid(), player)) {
                 return byId;
             }
             if (byId != null) return null;

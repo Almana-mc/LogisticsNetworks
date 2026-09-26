@@ -15,7 +15,6 @@ import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.SimpleMenuProvider;
@@ -186,8 +185,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
         UUID networkId = next.getNetworkId();
         if (networkId != null) {
             LogisticsNetwork network = NetworkRegistry.get(player.level()).getNetwork(networkId);
-            if (network == null || !(NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))) return false;
+            if (network == null || !NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) return false;
             next.setNetworkTarget(networkId, network.getName());
             for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
                 next.setChannelName(channel, network.getChannelName(channel));

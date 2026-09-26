@@ -32,7 +32,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.Entity;
@@ -266,8 +265,7 @@ public class ServerPayloadHandler {
             LogisticsNetwork network = registry.getNetwork(payload.networkId().get());
             if (network == null)
                 return null;
-            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    && !player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
                 return null;
             }
             return network;
@@ -291,8 +289,7 @@ public class ServerPayloadHandler {
             if (network == null)
                 return;
 
-            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    && !player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
                 return;
             }
 
@@ -332,8 +329,7 @@ public class ServerPayloadHandler {
         if (network == null) {
             return Component.translatable("message.logisticsnetworks.network_delete.missing");
         }
-        if (!NodeAccessPolicy.canDelete(network.getOwnerUuid(), player.getUUID(),
-                player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))) {
+        if (!NodeAccessPolicy.canDelete(network.getOwnerUuid(), player)) {
             return Component.translatable("message.logisticsnetworks.network_delete.denied");
         }
 
@@ -410,8 +406,7 @@ public class ServerPayloadHandler {
             if (network == null)
                 return;
 
-            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    && !player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
                 return;
             }
 
@@ -1572,8 +1567,7 @@ public class ServerPayloadHandler {
     }
 
     private static boolean canAccessNetwork(ServerPlayer player, LogisticsNetwork network) {
-        return NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+        return NodeAccessPolicy.canAccess(network.getOwnerUuid(), player);
     }
 
     private static LogisticsNodeEntity findNode(ServerPlayer player, UUID nodeId) {
