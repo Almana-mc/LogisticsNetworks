@@ -61,7 +61,9 @@ public final class LogisticsClientEvents {
             api.getMethod("addSidebarScreenBlacklist", String[].class).invoke(api.getMethod("get").invoke(null),
                     (Object) new String[]{NodeGraphScreen.class.getName()});
         } catch (ReflectiveOperationException exception) {
-            LogUtils.getLogger().debug("Unable to reserve graph canvas from FTB sidebar", exception);
+            if (Config.debugMode) {
+                LogUtils.getLogger().debug("Unable to reserve graph canvas from FTB sidebar", exception);
+            }
         }
     }
 
