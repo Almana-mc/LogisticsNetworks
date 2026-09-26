@@ -313,6 +313,7 @@ public final class NodeClipboardConfig {
         ChannelConfig config = getChannelConfig(channel);
         ChannelType next = type == null ? ChannelType.ITEM : type;
         if (config.type != next) {
+            Arrays.fill(filterItems[channel], ItemStack.EMPTY);
             config.type = next;
             config.batchSize = NodeUpgradeData.getOperationCap(next, getUpgradeTier());
             if (next == ChannelType.ENERGY) config.tickDelay = 1;
