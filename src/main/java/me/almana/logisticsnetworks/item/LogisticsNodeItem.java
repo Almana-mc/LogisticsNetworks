@@ -83,14 +83,13 @@ public class LogisticsNodeItem extends Item {
             return;
         }
 
-        NodeClipboardConfig.PasteResult result = clipboard.applyToNode(serverPlayer, node, offhand);
-        switch (result) {
+        NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(
+                serverPlayer, node, offhand, WrenchItem.getStorageLink(offhand));
+        switch (outcome.result()) {
             case SUCCESS -> {
+                WrenchItem.setClipboard(offhand, clipboard, serverPlayer.registryAccess());
             }
-            case MISSING_ITEMS -> WrenchItem.sendPlayerMessage(serverPlayer,
-                    Component.translatable("message.logisticsnetworks.clipboard.paste.missing_items"), true);
-            case INVENTORY_FULL -> WrenchItem.sendPlayerMessage(serverPlayer,
-                    Component.translatable("message.logisticsnetworks.clipboard.paste.no_space"), true);
+            case MISSING_ITEMS -> WrenchItem.reportPasteMissing(serverPlayer, outcome);
             case INCOMPATIBLE_TARGET -> WrenchItem.sendPlayerMessage(serverPlayer,
                     Component.translatable("message.logisticsnetworks.clipboard.paste.incompatible"), true);
             case CLIPBOARD_INVALID -> WrenchItem.sendPlayerMessage(serverPlayer,

@@ -13,12 +13,14 @@ import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
+import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.GraphMenuContext;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
+import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -27,9 +29,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.Entity;
@@ -37,6 +39,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.Containers;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -140,24 +143,25 @@ public class ServerPayloadHandler {
             if (channel == null)
                 return;
 
-            updateChannelData(channel, payload);
+            updateChannelData(channel, payload, NodeUpgradeData.getUpgradeTier(node));
             clampChannelToUpgradeLimits(node, channel);
+            sendChannelSyncToViewers(node, payload.channelIndex(), channel);
             propagateToLabelGroup(node, payload.channelIndex());
             markNetworkDirty(node);
         });
     }
 
-    private static void updateChannelData(ChannelData channel, UpdateChannelPayload payload) {
+    private static void updateChannelData(ChannelData channel, UpdateChannelPayload payload, int tier) {
         channel.setEnabled(payload.enabled());
 
         if (isValidEnum(payload.modeOrdinal(), ChannelMode.values()))
             channel.setMode(ChannelMode.values()[payload.modeOrdinal()]);
 
-        if (isValidEnum(payload.typeOrdinal(), ChannelType.values()))
-            channel.setType(ChannelType.values()[payload.typeOrdinal()]);
-
         channel.setBatchSize(payload.batchSize());
         channel.setTickDelay(payload.tickDelay());
+
+        if (isValidEnum(payload.typeOrdinal(), ChannelType.values()))
+            NodeUpgradeData.applyTypeChange(channel, ChannelType.values()[payload.typeOrdinal()], tier);
 
         if (payload.directionOrdinal() == 6) {
             channel.setIoDirection(null);
@@ -261,8 +265,7 @@ public class ServerPayloadHandler {
             LogisticsNetwork network = registry.getNetwork(payload.networkId().get());
             if (network == null)
                 return null;
-            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    && !player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
                 return null;
             }
             return network;
@@ -286,8 +289,7 @@ public class ServerPayloadHandler {
             if (network == null)
                 return;
 
-            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    && !player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
                 return;
             }
 
@@ -311,6 +313,89 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleDeleteNetwork(DeleteNetworkPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof ComputerMenu)) {
+                return;
+            }
+            player.sendSystemMessage(deleteNetwork(player, payload.networkId()), true);
+        });
+    }
+
+    private static Component deleteNetwork(ServerPlayer player, UUID networkId) {
+        NetworkRegistry registry = NetworkRegistry.get(player.level());
+        LogisticsNetwork network = registry.getNetwork(networkId);
+        if (network == null) {
+            return Component.translatable("message.logisticsnetworks.network_delete.missing");
+        }
+        if (!NodeAccessPolicy.canDelete(network.getOwnerUuid(), player)) {
+            return Component.translatable("message.logisticsnetworks.network_delete.denied");
+        }
+
+        List<LogisticsNodeEntity> nodes = findNetworkNodes(player, network);
+        int unavailable = network.getNodeUuids().size() - nodes.size();
+        if (unavailable > 0) {
+            return Component.translatable("message.logisticsnetworks.network_delete.unavailable", unavailable);
+        }
+
+        List<ItemStack> returnedItems = collectNetworkItems(nodes);
+        removeNetworkNodes(nodes);
+        registry.deleteNetwork(networkId);
+        returnNetworkItems(player, returnedItems);
+        refreshAllOpenComputerMenus(player.level().getServer());
+        return Component.translatable("message.logisticsnetworks.network_delete.success", nodes.size());
+    }
+
+    private static List<LogisticsNodeEntity> findNetworkNodes(ServerPlayer player, LogisticsNetwork network) {
+        List<LogisticsNodeEntity> nodes = new ArrayList<>(network.getNodeUuids().size());
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(player, nodeId);
+            if (node != null && !node.isRemoved() && network.getId().equals(node.getNetworkId())) {
+                nodes.add(node);
+            }
+        }
+        return nodes;
+    }
+
+    private static List<ItemStack> collectNetworkItems(List<LogisticsNodeEntity> nodes) {
+        List<ItemStack> items = new ArrayList<>(nodes.size() * (LogisticsNodeEntity.UPGRADE_SLOT_COUNT + 1));
+        for (LogisticsNodeEntity node : nodes) {
+            items.add(Registration.LOGISTICS_NODE_ITEM.get().getDefaultInstance());
+            for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+                ItemStack upgrade = node.getUpgradeItem(slot);
+                if (!upgrade.isEmpty()) {
+                    items.add(upgrade.copy());
+                }
+            }
+        }
+        return items;
+    }
+
+    private static void removeNetworkNodes(List<LogisticsNodeEntity> nodes) {
+        for (LogisticsNodeEntity node : nodes) {
+            node.setNetworkId(null);
+            node.discard();
+        }
+    }
+
+    private static void returnNetworkItems(ServerPlayer player, List<ItemStack> items) {
+        for (ItemStack stack : items) {
+            player.getInventory().add(stack);
+            if (!stack.isEmpty()) {
+                Containers.dropItemStack(player.level(), player.getX(), player.getY(), player.getZ(), stack);
+            }
+        }
+    }
+
+    private static void refreshAllOpenComputerMenus(MinecraftServer server) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.containerMenu instanceof ComputerMenu menu) {
+                menu.requestNetworkList(player);
+            }
+        }
+    }
+
     public static void handleSetNetworkColor(SetNetworkColorPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player))
@@ -321,8 +406,7 @@ public class ServerPayloadHandler {
             if (network == null)
                 return;
 
-            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                    && !player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
                 return;
             }
 
@@ -903,8 +987,15 @@ public class ServerPayloadHandler {
     public static void handleSetFilterItemEntry(SetFilterItemEntryPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof FilterMenu menu && menu.stillValid(context.player()) && !isSpecialMode(menu)) {
-                if (!payload.itemStack().isEmpty()) {
-                    menu.setItemFilterEntry((Player) context.player(), payload.slot(), payload.itemStack());
+                switch (payload.action()) {
+                    case SetFilterItemEntryPayload.ACTION_SET -> {
+                        if (!payload.itemStack().isEmpty()) {
+                            menu.setItemFilterEntry((Player) context.player(), payload.slot(), payload.itemStack());
+                        }
+                    }
+                    case SetFilterItemEntryPayload.ACTION_CLEAR_ITEM ->
+                        menu.clearFilterEntryItem((Player) context.player(), payload.slot());
+                    case SetFilterItemEntryPayload.ACTION_CLEAR_ENTRY -> menu.clearFilterEntry(payload.slot());
                 }
             }
         });
@@ -1052,29 +1143,19 @@ public class ServerPayloadHandler {
     }
 
     public static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
-        int maxBatch = getMaxBatch(node, channel.getType());
+        int tier = NodeUpgradeData.getUpgradeTier(node);
+        int maxBatch = NodeUpgradeData.getOperationCap(channel.getType(), tier);
 
         if (channel.getType() == ChannelType.ENERGY) {
             channel.setBatchSize(maxBatch);
-            channel.setTickDelay(1);
         } else {
             channel.setBatchSize(Math.max(1, Math.min(channel.getBatchSize(), maxBatch)));
         }
 
-        int minDelay = NodeUpgradeData.getMinTickDelay(node);
+        int minDelay = NodeUpgradeData.getMinTickDelay(tier);
         if (channel.getTickDelay() < minDelay) {
             channel.setTickDelay(minDelay);
         }
-    }
-
-    private static int getMaxBatch(LogisticsNodeEntity node, ChannelType type) {
-        return switch (type) {
-            case FLUID -> NodeUpgradeData.getFluidOperationCapMb(node);
-            case ENERGY -> NodeUpgradeData.getEnergyOperationCap(node);
-            case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(node);
-            case SOURCE -> NodeUpgradeData.getSourceOperationCap(node);
-            default -> NodeUpgradeData.getItemOperationCap(node);
-        };
     }
 
     public static void handleNodeUpgradeChanged(LogisticsNodeEntity node) {
@@ -1415,16 +1496,20 @@ public class ServerPayloadHandler {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player))
                 return;
-            if (!(player.containerMenu instanceof ComputerMenu menu))
-                return;
-
             NodeClipboardConfig config = NodeClipboardConfig.load(payload.clipboardTag(), player.registryAccess());
             if (config == null || !config.isStructurallyValid()) {
                 player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.invalid_clipboard"), true);
                 return;
             }
 
-            if (!menu.setWrenchClipboard(config, player.registryAccess())) {
+            if (player.containerMenu instanceof ClipboardMenu clipboardMenu) {
+                if (!clipboardMenu.replaceClipboard(config, player)) {
+                    player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.invalid_clipboard"), true);
+                }
+                return;
+            }
+            if (!(player.containerMenu instanceof ComputerMenu menu)
+                    || !menu.setWrenchClipboard(config, player.registryAccess())) {
                 player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.no_wrench"), true);
                 return;
             }
@@ -1437,7 +1522,8 @@ public class ServerPayloadHandler {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player))
                 return;
-            if (!(player.containerMenu instanceof ComputerMenu))
+            if (!(player.containerMenu instanceof ComputerMenu)
+                    && !(player.containerMenu instanceof ClipboardMenu))
                 return;
 
             NetworkRegistry registry = NetworkRegistry.get(player.level());
@@ -1467,20 +1553,21 @@ public class ServerPayloadHandler {
             }
 
             List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
+            List<String> channelNames = new ArrayList<>(LogisticsNodeEntity.CHANNEL_COUNT);
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                channelNames.add(network.getChannelName(i));
                 if (nodeCounts[i] > 0) {
                     entries.add(new SyncChannelListPayload.ChannelEntry(i, typeOrdinals[i], nodeCounts[i]));
                 }
             }
 
             PacketDistributor.sendToPlayer(player,
-                    new SyncChannelListPayload(payload.networkId(), entries));
+                    new SyncChannelListPayload(payload.networkId(), entries, channelNames));
         });
     }
 
     private static boolean canAccessNetwork(ServerPlayer player, LogisticsNetwork network) {
-        return NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
-                || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+        return NodeAccessPolicy.canAccess(network.getOwnerUuid(), player);
     }
 
     private static LogisticsNodeEntity findNode(ServerPlayer player, UUID nodeId) {

@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
+import me.almana.logisticsnetworks.network.DeleteNetworkPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
 import me.almana.logisticsnetworks.network.SetComputerWrenchClipboardPayload;
@@ -27,10 +28,13 @@ import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
@@ -109,8 +113,16 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     private static final int LNET_FILE_W = 104;
     private static final int LNET_LABEL_W = 80;
     private static final int LNET_COLUMN_GAP = 8;
+    private static final int DELETE_BUTTON_SIZE = 18;
+    private static final int DELETE_MODAL_WIDTH = 276;
+    private static final int DELETE_MODAL_HEIGHT = 126;
+    private static final Identifier DELETE_ICON = Identifier.fromNamespaceAndPath(
+            "logisticsnetworks", "textures/gui/trash_can.png");
 
     private static final int COLOR_STAR = 0xFFFFD700;
+    private static final int COLOR_DANGER = 0xFFB33A3A;
+    private static final int COLOR_DANGER_HOVER = 0xFFD9534F;
+    private static final int COLOR_DANGER_BORDER = 0xFFFFA3A3;
     private static final int STAR_BTN_W = 10;
     private static final int SEARCH_BOX_HEIGHT = 16;
     private static final int SEARCH_INPUT_HEIGHT = SEARCH_BOX_HEIGHT - 4;
@@ -126,6 +138,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     private int networkScrollOffset = 0;
     private UUID selectedNetworkId = null;
     private String selectedNetworkName = "";
+    private boolean deleteConfirmationOpen;
     private EditBox networkSearchBox;
     private String lastSearchFilter = "";
 
@@ -380,11 +393,28 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         renderStatusBadge(g, textX, panelY + 56, 58, 10, nodeCount);
         renderStatusBadge(g, textX + 66, panelY + 56, 54, 10, line("gui.logisticsnetworks.computer.status.synced"));
         renderOptionButtons(g, mouseX, mouseY);
+        renderDeleteButton(g, selectedEntry, mouseX, mouseY);
 
         if (!lnetStatus.isEmpty()) {
             g.drawString(font, trimText(lnetStatus, DETAIL_PANEL_WIDTH - 24), textX,
                     panelY + DETAIL_PANEL_HEIGHT - 12, lnetStatusColor);
         }
+    }
+
+    private void renderDeleteButton(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry,
+            int mouseX, int mouseY) {
+        if (entry == null || !entry.canDelete()) {
+            return;
+        }
+        int x = leftPos + DETAIL_PANEL_X + DETAIL_PANEL_WIDTH - DELETE_BUTTON_SIZE - 8;
+        int y = topPos + DETAIL_PANEL_Y + 20;
+        boolean hovered = isHoveringAbs(x, y, DELETE_BUTTON_SIZE, DELETE_BUTTON_SIZE, mouseX, mouseY);
+        if (hovered) {
+            g.fill(x, y, x + DELETE_BUTTON_SIZE, y + DELETE_BUTTON_SIZE, pal().rowHover());
+        }
+        g.renderOutline(x, y, DELETE_BUTTON_SIZE, DELETE_BUTTON_SIZE,
+                hovered ? pal().borderBright() : pal().border());
+        g.raw().blit(RenderPipelines.GUI_TEXTURED, DELETE_ICON, x + 1, y + 1, 0, 0, 16, 16, 512, 512, 512, 512);
     }
 
     private void renderOptionButtons(GuiGraphics g, int mouseX, int mouseY) {
@@ -927,11 +957,8 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                         contentW - BACK_BTN_W - 40),
                 contentX + BACK_BTN_W + 18, contentY + 4, pal().accent());
 
-        int saveX = contentX + 8;
-        int refreshX = saveX + 66;
+        int refreshX = contentX + 8;
         int buttonY = contentY + LNET_TOOLBAR_Y;
-        renderSmallButton(g, saveX, buttonY, 58, 14, line("gui.logisticsnetworks.computer.lnet_save"),
-                isHoveringAbs(saveX, buttonY, 58, 14, mouseX, mouseY));
         renderSmallButton(g, refreshX, buttonY, 58, 14, line("gui.logisticsnetworks.computer.lnet_refresh"),
                 isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY));
 
@@ -1090,8 +1117,82 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
+        if (deleteConfirmationOpen) {
+            renderDeleteConfirmation(g, mouseX, mouseY);
+            return;
+        }
+        renderDeleteTooltip(g, mouseX, mouseY);
         renderHighlightTooltip(g, mouseX, mouseY);
         renderTooltip(g, mouseX, mouseY);
+    }
+
+    @Override
+    protected void extractTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+        if (deleteConfirmationOpen) {
+            return;
+        }
+        super.extractTooltip(graphics, mouseX, mouseY);
+    }
+
+    private void renderDeleteTooltip(GuiGraphics g, int mouseX, int mouseY) {
+        SyncNetworkListPayload.NetworkEntry entry = getSelectedNetworkEntry();
+        if (currentPage != Page.NETWORK_LIST || entry == null || !entry.canDelete()) {
+            return;
+        }
+        int x = leftPos + DETAIL_PANEL_X + DETAIL_PANEL_WIDTH - DELETE_BUTTON_SIZE - 8;
+        int y = topPos + DETAIL_PANEL_Y + 20;
+        if (isHoveringAbs(x, y, DELETE_BUTTON_SIZE, DELETE_BUTTON_SIZE, mouseX, mouseY)) {
+            g.renderTooltip(font, label("gui.logisticsnetworks.computer.delete_tooltip"), mouseX, mouseY);
+        }
+    }
+
+    private void renderDeleteConfirmation(GuiGraphics g, int mouseX, int mouseY) {
+        SyncNetworkListPayload.NetworkEntry entry = getSelectedNetworkEntry();
+        if (entry == null) {
+            deleteConfirmationOpen = false;
+            return;
+        }
+        int x = (width - DELETE_MODAL_WIDTH) / 2;
+        int y = (height - DELETE_MODAL_HEIGHT) / 2;
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 500);
+        g.fill(0, 0, width, height, 0xB0000000);
+        g.fill(x, y, x + DELETE_MODAL_WIDTH, y + DELETE_MODAL_HEIGHT, pal().panelAlt());
+        g.renderOutline(x, y, DELETE_MODAL_WIDTH, DELETE_MODAL_HEIGHT, COLOR_DANGER_BORDER);
+        g.fill(x + 1, y + 1, x + DELETE_MODAL_WIDTH - 1, y + 18, pal().panelHeader());
+        g.drawString(font, label("gui.logisticsnetworks.computer.delete_title"), x + 10, y + 6,
+                COLOR_DANGER_BORDER);
+        renderDeleteWarning(g, entry, x, y);
+        int deleteX = x + DELETE_MODAL_WIDTH - 82;
+        int cancelX = deleteX - 80;
+        int buttonY = y + DELETE_MODAL_HEIGHT - 26;
+        renderConfirmationButton(g, cancelX, buttonY, 72,
+                line("gui.logisticsnetworks.config.cancel"), false, mouseX, mouseY);
+        renderConfirmationButton(g, deleteX, buttonY, 72,
+                line("gui.logisticsnetworks.computer.delete_confirm"), true, mouseX, mouseY);
+        g.pose().popPose();
+    }
+
+    private void renderDeleteWarning(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, int x, int y) {
+        Component warning = label("gui.logisticsnetworks.computer.delete_warning",
+                entry.name(), entry.nodeCount());
+        List<FormattedCharSequence> lines = font.split(warning, DELETE_MODAL_WIDTH - 20);
+        int textY = y + 26;
+        for (FormattedCharSequence line : lines) {
+            g.drawString(font, line, x + 10, textY, pal().text(), true);
+            textY += 10;
+        }
+    }
+
+    private void renderConfirmationButton(GuiGraphics g, int x, int y, int width, String text,
+            boolean danger, int mouseX, int mouseY) {
+        boolean hovered = isHoveringAbs(x, y, width, 18, mouseX, mouseY);
+        int background = danger ? (hovered ? COLOR_DANGER_HOVER : COLOR_DANGER)
+                : (hovered ? pal().rowSelected() : pal().badgeBg());
+        int border = hovered ? (danger ? COLOR_DANGER_BORDER : pal().borderBright()) : pal().border();
+        g.fill(x, y, x + width, y + 18, background);
+        g.renderOutline(x, y, width, 18, border);
+        g.drawCenteredString(font, text, x + width / 2, y + 5, danger ? 0xFFFFFFFF : pal().text());
     }
 
     @Override
@@ -1100,6 +1201,12 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (deleteConfirmationOpen) {
+            if (keyCode == 256) {
+                deleteConfirmationOpen = false;
+            }
+            return true;
+        }
         if (currentPage == Page.NODE_MAP && nodeLabelBox != null && nodeLabelBox.isFocused()) {
             if (keyCode == 256) {
                 nodeLabelBox.setFocused(false);
@@ -1127,6 +1234,9 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
     @Override
     public boolean charTyped(char ch, int modifiers) {
+        if (deleteConfirmationOpen) {
+            return true;
+        }
         if (nodeLabelBox.isFocused()) return nodeLabelBox.charTyped(ClientInput.character(ch));
         if (currentPage == Page.NETWORK_LIST && networkSearchBox != null && networkSearchBox.isFocused()) {
             return networkSearchBox.charTyped(ClientInput.character(ch));
@@ -1136,6 +1246,9 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (deleteConfirmationOpen) {
+            return true;
+        }
         switch (currentPage) {
             case NETWORK_LIST -> {
                 List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
@@ -1190,6 +1303,10 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int action = ClientControls.resolveMouseAction(mouseX, mouseY, button);
+        if (deleteConfirmationOpen) {
+            handleDeleteConfirmationClick(mouseX, mouseY, action);
+            return true;
+        }
         if (action != -1 && handleInteraction(mouseX, mouseY, action))
             return true;
         return super.mouseClicked(mouseX, mouseY, button);
@@ -1298,14 +1415,9 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     private boolean handleLnetFilesClick(double mouseX, double mouseY) {
         int contentX = leftPos + 10;
         int contentY = topPos + 34;
-        int saveX = contentX + 8;
-        int refreshX = saveX + 66;
+        int refreshX = contentX + 8;
         int buttonY = contentY + LNET_TOOLBAR_Y;
 
-        if (isHoveringAbs(saveX, buttonY, 58, 14, mouseX, mouseY)) {
-            requestNetworkSave();
-            return true;
-        }
         if (isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY)) {
             refreshLnetFiles();
             return true;
@@ -1349,10 +1461,6 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     }
 
     private void requestNetworkSave() {
-        if (selectedNetworkId == null) {
-            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_no_network"), pal().warning());
-            return;
-        }
         setLnetStatus(line("gui.logisticsnetworks.computer.lnet_saving"), pal().textSecondary());
         ClientPacketDistributor.sendToServer(new RequestNetworkExportPayload(selectedNetworkId));
     }
@@ -1614,6 +1722,16 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int button3Y = button2Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
         int button4Y = button3Y + OPTION_BTN_HEIGHT + OPTION_BTN_GAP;
 
+        SyncNetworkListPayload.NetworkEntry entry = getSelectedNetworkEntry();
+        int deleteX = panelX + DETAIL_PANEL_WIDTH - DELETE_BUTTON_SIZE - 8;
+        int deleteY = panelY + 20;
+        if (entry != null && entry.canDelete()
+                && isHoveringAbs(deleteX, deleteY, DELETE_BUTTON_SIZE, DELETE_BUTTON_SIZE, mouseX, mouseY)) {
+            deleteConfirmationOpen = true;
+            networkSearchBox.setFocused(false);
+            return true;
+        }
+
         if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button1Y && mouseY < button1Y + OPTION_BTN_HEIGHT) {
             currentPage = Page.IO_CHANNEL_LIST;
@@ -1647,6 +1765,28 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             return true;
         }
         return false;
+    }
+
+    private void handleDeleteConfirmationClick(double mouseX, double mouseY, int action) {
+        if (action != 0) {
+            return;
+        }
+        int x = (width - DELETE_MODAL_WIDTH) / 2;
+        int y = (height - DELETE_MODAL_HEIGHT) / 2;
+        int deleteX = x + DELETE_MODAL_WIDTH - 82;
+        int cancelX = deleteX - 80;
+        int buttonY = y + DELETE_MODAL_HEIGHT - 26;
+        if (isHoveringAbs(cancelX, buttonY, 72, 18, mouseX, mouseY)) {
+            deleteConfirmationOpen = false;
+            return;
+        }
+        if (isHoveringAbs(deleteX, buttonY, 72, 18, mouseX, mouseY)) {
+            UUID networkId = selectedNetworkId;
+            deleteConfirmationOpen = false;
+            if (networkId != null) {
+                ClientPacketDistributor.sendToServer(new DeleteNetworkPayload(networkId));
+            }
+        }
     }
 
     private boolean handleLoadButtonClick(double mouseX, double mouseY) {
@@ -2025,6 +2165,17 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             });
         }
         this.networkList = new ArrayList<>(networks);
+        SyncNetworkListPayload.NetworkEntry selected = getSelectedNetworkEntry();
+        if (selectedNetworkId != null && selected == null) {
+            selectedNetworkId = null;
+            selectedNetworkName = "";
+            deleteConfirmationOpen = false;
+        } else if (selected != null) {
+            selectedNetworkName = selected.name();
+            if (!selected.canDelete()) {
+                deleteConfirmationOpen = false;
+            }
+        }
         this.networkScrollOffset = Math.min(this.networkScrollOffset,
                 Math.max(0, networkList.size() - NETWORKS_PER_PAGE));
         if (Config.debugMode) LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());

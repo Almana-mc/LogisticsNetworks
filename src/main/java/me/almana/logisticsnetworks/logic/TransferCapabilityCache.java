@@ -56,13 +56,14 @@ public final class TransferCapabilityCache {
         }
 
         @SuppressWarnings("unchecked")
-        private ResourceHandler<ItemResource> itemHandler(StorageEndpoint endpoint, boolean exporting) {
+        private ResourceHandler<ItemResource> itemHandler(StorageEndpoint endpoint,
+                @Nullable ResourceHandler<ItemResource> buffer, boolean exporting) {
             ResourceHandler<ItemResource>[] views = handlers.computeIfAbsent(
                     endpoint.endpointIdentity(), ignored -> new ResourceHandler[2]);
             int index = exporting ? 0 : 1;
             ResourceHandler<ItemResource> existing = views[index];
             if (existing == null || DirectStorageHandlers.networkIdentity(existing) != endpoint.networkIdentity()) {
-                views[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, reads)
+                views[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, buffer, reads)
                         : DirectStorageHandlers.importItems(endpoint, reads);
             }
             return views[index];
@@ -106,14 +107,31 @@ public final class TransferCapabilityCache {
         InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(
                 level, node.getAttachedPos(), direction);
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE && directInterfaces) {
+            ResourceHandler<ItemResource> buffer = exporting
+                    ? findInterfaceBuffer(level, direction, resolution.endpoint())
+                    : null;
             StorageOperation operation = STORAGE_OPERATION.get();
-            if (operation != null) return operation.itemHandler(resolution.endpoint(), exporting);
+            if (operation != null) return operation.itemHandler(resolution.endpoint(), buffer, exporting);
             return exporting
-                    ? DirectStorageHandlers.exportItems(resolution.endpoint())
+                    ? DirectStorageHandlers.exportItems(resolution.endpoint(), buffer, new DirectStorageReads(true))
                     : DirectStorageHandlers.importItems(resolution.endpoint());
         }
         if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
         return findItemCapability(level, direction);
+    }
+
+    @Nullable
+    private ResourceHandler<ItemResource> findInterfaceBuffer(ServerLevel level, @Nullable Direction direction,
+            StorageEndpoint endpoint) {
+        if (direction != null) return itemSide(level, direction);
+        for (Direction side : Direction.values()) {
+            InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(level, node.getAttachedPos(), side);
+            if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE
+                    && resolution.endpoint().endpointIdentity() == endpoint.endpointIdentity()) {
+                return itemSide(level, side);
+            }
+        }
+        return null;
     }
 
     @Nullable

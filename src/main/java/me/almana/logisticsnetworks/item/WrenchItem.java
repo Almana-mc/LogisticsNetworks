@@ -356,25 +356,19 @@ public class WrenchItem extends Item {
         }
 
         int pasted = 0;
-        boolean missingItems = false;
-        boolean inventoryFull = false;
+        NodeClipboardConfig.PasteOutcome missingOutcome = null;
         boolean incompatibleOnly = false;
         StorageLink storageLink = getStorageLink(wrenchStack);
 
         for (LogisticsNodeEntity node : targets) {
-            NodeClipboardConfig.PasteResult result = clipboard.applyToNode(player, node, wrenchStack, storageLink);
-            switch (result) {
+            NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(player, node, wrenchStack, storageLink);
+            switch (outcome.result()) {
                 case SUCCESS -> {
                     pasted++;
                     markNodeNetworkDirty(node);
                 }
                 case MISSING_ITEMS -> {
-                    missingItems = true;
-                    break;
-                }
-                case INVENTORY_FULL -> {
-                    inventoryFull = true;
-                    break;
+                    if (missingOutcome == null) missingOutcome = outcome;
                 }
                 case INCOMPATIBLE_TARGET -> incompatibleOnly = true;
                 case CLIPBOARD_INVALID -> {
@@ -386,16 +380,13 @@ public class WrenchItem extends Item {
         }
 
         if (pasted > 0) {
-            if (missingItems) {
+            setClipboard(wrenchStack, clipboard, player.registryAccess());
+            if (missingOutcome != null) {
                 sendPlayerMessage(player,
-                        Component.translatable("message.logisticsnetworks.clipboard.paste.connected.partial_missing",
-                                pasted),
+                        Component.translatable("message.logisticsnetworks.clipboard.paste.connected.partial",
+                                pasted, targets.size()),
                         true);
-            } else if (inventoryFull) {
-                sendPlayerMessage(player,
-                        Component.translatable("message.logisticsnetworks.clipboard.paste.connected.partial_no_space",
-                                pasted),
-                        true);
+                sendPasteMissingDetail(player, missingOutcome);
             } else {
                 sendPlayerMessage(player,
                         Component.translatable("message.logisticsnetworks.clipboard.paste.connected.success", pasted),
@@ -404,14 +395,8 @@ public class WrenchItem extends Item {
             return true;
         }
 
-        if (missingItems) {
-            sendPlayerMessage(player,
-                    Component.translatable("message.logisticsnetworks.clipboard.paste.missing_items"), true);
-            return true;
-        }
-        if (inventoryFull) {
-            sendPlayerMessage(player,
-                    Component.translatable("message.logisticsnetworks.clipboard.paste.no_space"), true);
+        if (missingOutcome != null) {
+            reportPasteMissing(player, missingOutcome);
             return true;
         }
         if (incompatibleOnly) {
@@ -674,10 +659,7 @@ public class WrenchItem extends Item {
         if (isSecondaryUse(player)) {
             sendClipboardPreview(serverPlayer, stack);
         } else {
-            serverPlayer.openMenu(new SimpleMenuProvider(
-                    (id, inventory, p) -> new ClipboardMenu(id, inventory, hand),
-                    Component.translatable("gui.logisticsnetworks.clipboard")),
-                    buf -> buf.writeVarInt(hand.ordinal()));
+            ClipboardMenu.open(serverPlayer, hand, 0);
         }
 
         return level.isClientSide() ? InteractionResult.SUCCESS : InteractionResult.SUCCESS_SERVER;
@@ -869,17 +851,15 @@ public class WrenchItem extends Item {
         }
 
         StorageLink storageLink = getStorageLink(wrenchStack);
-        NodeClipboardConfig.PasteResult result = clipboard.applyToNode(serverPlayer, node, wrenchStack, storageLink);
-        switch (result) {
+        NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(serverPlayer, node, wrenchStack, storageLink);
+        switch (outcome.result()) {
             case SUCCESS -> {
+                setClipboard(wrenchStack, clipboard, serverPlayer.registryAccess());
                 markNodeNetworkDirty(node);
                 sendPlayerMessage(player, Component.translatable("message.logisticsnetworks.clipboard.paste.success"),
                         true);
             }
-            case MISSING_ITEMS -> sendPlayerMessage(player,
-                    Component.translatable("message.logisticsnetworks.clipboard.paste.missing_items"), true);
-            case INVENTORY_FULL -> sendPlayerMessage(player,
-                    Component.translatable("message.logisticsnetworks.clipboard.paste.no_space"), true);
+            case MISSING_ITEMS -> reportPasteMissing(serverPlayer, outcome);
             case INCOMPATIBLE_TARGET -> sendPlayerMessage(player,
                     Component.translatable("message.logisticsnetworks.clipboard.paste.incompatible"), true);
             case CLIPBOARD_INVALID -> sendPlayerMessage(player,
@@ -887,6 +867,24 @@ public class WrenchItem extends Item {
         }
 
         return InteractionResult.CONSUME;
+    }
+
+    static void reportPasteMissing(ServerPlayer player, NodeClipboardConfig.PasteOutcome outcome) {
+        sendPlayerMessage(player,
+                Component.translatable("message.logisticsnetworks.clipboard.paste.missing_items"), true);
+        sendPasteMissingDetail(player, outcome);
+    }
+
+    private static void sendPasteMissingDetail(ServerPlayer player, NodeClipboardConfig.PasteOutcome outcome) {
+        Component missing = Component.empty();
+        for (int index = 0; index < outcome.missingItems().size(); index++) {
+            NodeClipboardConfig.RequiredItem item = outcome.missingItems().get(index);
+            if (index > 0) missing = missing.copy().append(", ");
+            missing = missing.copy().append(Component.literal(item.count() + "x "))
+                    .append(item.stack().getHoverName());
+        }
+        player.sendSystemMessage(Component.translatable(
+                "message.logisticsnetworks.clipboard.paste.missing_detail", missing));
     }
 
     private static void markNodeNetworkDirty(LogisticsNodeEntity node) {

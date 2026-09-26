@@ -59,7 +59,6 @@ public record ClipboardSnapshot(
 
         private static final Codec<ChannelMode> MODE_CODEC = enumCodec(ChannelMode.values(), ChannelMode.IMPORT);
         private static final Codec<ChannelType> TYPE_CODEC = enumCodec(ChannelType.values(), ChannelType.ITEM);
-        private static final Codec<RedstoneMode> REDSTONE_CODEC = enumCodec(RedstoneMode.values(), RedstoneMode.ALWAYS_ON);
         private static final Codec<DistributionMode> DISTRIBUTION_CODEC = enumCodec(
                 DistributionMode.values(), DistributionMode.PRIORITY);
         private static final Codec<FilterMode> FILTER_CODEC = enumCodec(FilterMode.values(), FilterMode.MATCH_ANY);
@@ -70,13 +69,14 @@ public record ClipboardSnapshot(
                 Codec.INT.fieldOf("batch_size").forGetter(ChannelState::batchSize),
                 Codec.INT.fieldOf("tick_delay").forGetter(ChannelState::tickDelay),
                 Direction.CODEC.optionalFieldOf("direction").forGetter(ChannelState::direction),
-                REDSTONE_CODEC.fieldOf("redstone_mode").forGetter(ChannelState::redstoneMode),
+                Codec.STRING.optionalFieldOf("redstone_mode")
+                        .forGetter(state -> Optional.of(state.redstoneMode.name().toLowerCase(Locale.ROOT))),
                 DISTRIBUTION_CODEC.fieldOf("distribution_mode").forGetter(ChannelState::distributionMode),
                 FILTER_CODEC.fieldOf("filter_mode").forGetter(ChannelState::filterMode),
                 Codec.INT.fieldOf("priority").forGetter(ChannelState::priority),
                 Codec.STRING.optionalFieldOf("name", "").forGetter(ChannelState::name),
                 Codec.BOOL.optionalFieldOf("resource_round_robin", false).forGetter(ChannelState::resourceRoundRobin)
-        ).apply(instance, ChannelState::new));
+        ).apply(instance, ChannelState::fromSerialized));
 
         public ChannelState {
             mode = mode == null ? ChannelMode.IMPORT : mode;
@@ -84,11 +84,31 @@ public record ClipboardSnapshot(
             batchSize = Math.max(1, batchSize);
             tickDelay = Math.max(1, tickDelay);
             direction = direction == null ? Optional.empty() : direction;
-            redstoneMode = redstoneMode == null ? RedstoneMode.ALWAYS_ON : redstoneMode;
+            redstoneMode = redstoneMode == null ? RedstoneMode.IGNORED : redstoneMode;
             distributionMode = distributionMode == null ? DistributionMode.PRIORITY : distributionMode;
             filterMode = filterMode == null ? FilterMode.MATCH_ANY : filterMode;
             priority = Math.max(-99, Math.min(99, priority));
             name = name == null ? "" : name;
+        }
+
+        private static ChannelState fromSerialized(boolean enabled, ChannelMode mode, ChannelType type,
+                int batchSize, int tickDelay, Optional<Direction> direction, Optional<String> redstoneMode,
+                DistributionMode distributionMode, FilterMode filterMode, int priority, String name,
+                boolean resourceRoundRobin) {
+            String savedRedstoneMode = redstoneMode.orElse("ignored");
+            return new ChannelState(
+                    enabled && !RedstoneMode.disablesChannel(savedRedstoneMode),
+                    mode,
+                    type,
+                    batchSize,
+                    tickDelay,
+                    direction,
+                    RedstoneMode.fromSerialized(savedRedstoneMode),
+                    distributionMode,
+                    filterMode,
+                    priority,
+                    name,
+                    resourceRoundRobin);
         }
     }
 

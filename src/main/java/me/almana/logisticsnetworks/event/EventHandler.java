@@ -93,6 +93,14 @@ public class EventHandler {
     }
 
     @SubscribeEvent
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        if (!event.getEntity().level().isClientSide()) {
+            event.getEntity().setData(Registration.ADMIN_MODE,
+                    event.getOriginal().getData(Registration.ADMIN_MODE));
+        }
+    }
+
+    @SubscribeEvent
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player))
             return;
@@ -191,11 +199,8 @@ public class EventHandler {
     private static boolean hasRedstoneSensitiveChannel(LogisticsNodeEntity node) {
         ChannelData[] channels = node.getChannels();
         for (ChannelData ch : channels) {
-            if (ch.isEnabled()) {
-                RedstoneMode mode = ch.getRedstoneMode();
-                if (mode == RedstoneMode.HIGH || mode == RedstoneMode.LOW) {
-                    return true;
-                }
+            if (ch.isEnabled() && ch.getRedstoneMode() != RedstoneMode.IGNORED) {
+                return true;
             }
         }
         return false;

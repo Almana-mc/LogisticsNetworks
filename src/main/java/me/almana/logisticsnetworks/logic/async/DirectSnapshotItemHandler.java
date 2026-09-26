@@ -36,7 +36,7 @@ final class DirectSnapshotItemHandler implements DirectItemAccess {
 
     @Override
     public long getAmountAsLong(int index) {
-        return index >= 0 && index < exports.size() ? stock.amount(exports.get(index)) : 0;
+        return index >= 0 && index < exports.size() ? stock.amount(endpoint.binding(), exports.get(index)) : 0;
     }
 
     @Override
@@ -70,9 +70,7 @@ final class DirectSnapshotItemHandler implements DirectItemAccess {
     @Override
     public int extract(ItemResource resource, int amount, TransactionContext transaction) {
         if (!endpoint.exporting() || amount <= 0 || !exportKeys.contains(resource)) return 0;
-        int moved = Math.min(amount, DirectStorageReads.clamp(stock.amount(resource)));
-        if (moved > 0) stock.move(resource, -moved, transaction);
-        return moved;
+        return stock.extract(endpoint.binding(), resource, amount, transaction);
     }
 
     @Override
@@ -84,7 +82,7 @@ final class DirectSnapshotItemHandler implements DirectItemAccess {
         }
         for (ItemResource resource : exports) {
             if (candidates.contains(resource.getItem())) {
-                result.merge(resource.getItem(), DirectStorageReads.clamp(stock.amount(resource)),
+                result.merge(resource.getItem(), DirectStorageReads.clamp(stock.amount(endpoint.binding(), resource)),
                         (a, b) -> DirectStorageReads.clamp((long) a + b));
             }
         }

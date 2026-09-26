@@ -6,15 +6,20 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.menu.ClipboardMenu;
+import me.almana.logisticsnetworks.menu.ComputerMenu;
+import me.almana.logisticsnetworks.menu.NodeMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -44,14 +49,9 @@ public class LogisticsCommand {
         ServerLevel level = source.getLevel();
         NetworkRegistry registry = NetworkRegistry.get(level);
 
-        Collection<LogisticsNetwork> networks;
-        if (source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
-            networks = registry.getAllNetworks().values();
-        } else if (source.getEntity() instanceof ServerPlayer player) {
-            networks = registry.getNetworksForPlayer(player.getUUID());
-        } else {
-            networks = List.of();
-        }
+        Collection<LogisticsNetwork> networks = source.getEntity() instanceof ServerPlayer player
+                ? registry.getVisibleNetworks(player)
+                : registry.getAllNetworks().values();
 
         List<String> names = new ArrayList<>();
         for (LogisticsNetwork net : networks) {
@@ -95,7 +95,56 @@ public class LogisticsCommand {
                         .executes(context -> networkTicking(context.getSource(), null))
                         .then(Commands.argument("enabled", BoolArgumentType.bool())
                                 .executes(context -> networkTicking(context.getSource(),
-                                        BoolArgumentType.getBool(context, "enabled")))));
+                                        BoolArgumentType.getBool(context, "enabled")))))
+                .then(adminCommand());
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> adminCommand() {
+        return Commands.literal("admin")
+                .executes(context -> toggleOwnAdminMode(context.getSource()))
+                .then(Commands.literal("mode")
+                        .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> toggleAdminMode(
+                                        context.getSource(), EntityArgument.getPlayer(context, "player")))));
+    }
+
+    private static int toggleOwnAdminMode(CommandSourceStack source) throws CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        boolean enabled = NodeAccessPolicy.isAdminMode(player);
+        if (!source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER) && !enabled) {
+            source.sendFailure(Component.translatable("message.logisticsnetworks.admin.enable_denied"));
+            return 0;
+        }
+        return toggleAdminMode(source, player);
+    }
+
+    private static int toggleAdminMode(CommandSourceStack source, ServerPlayer player) {
+        boolean enabled = !NodeAccessPolicy.isAdminMode(player);
+        NodeAccessPolicy.setAdminMode(player, enabled);
+        refreshNetworkList(player);
+
+        String stateKey = enabled
+                ? "message.logisticsnetworks.admin.enabled"
+                : "message.logisticsnetworks.admin.disabled";
+        if (source.getEntity() == player) {
+            source.sendSuccess(() -> Component.translatable(stateKey), false);
+        } else {
+            player.sendSystemMessage(Component.translatable(stateKey));
+            String targetKey = enabled
+                    ? "message.logisticsnetworks.admin.enabled_other"
+                    : "message.logisticsnetworks.admin.disabled_other";
+            source.sendSuccess(() -> Component.translatable(targetKey, player.getDisplayName()), true);
+        }
+        return 1;
+    }
+
+    private static void refreshNetworkList(ServerPlayer player) {
+        if (player.containerMenu instanceof ComputerMenu menu) {
+            menu.requestNetworkList(player);
+        } else if (player.containerMenu instanceof NodeMenu || player.containerMenu instanceof ClipboardMenu) {
+            NodeMenu.sendAvailableNetworkListToClient(player);
+        }
     }
 
     private static int networkTicking(CommandSourceStack source, Boolean enabled) {
@@ -158,10 +207,9 @@ public class LogisticsCommand {
             return 0;
         }
 
-        // Check ownership: must own the network, be a teammate, or be op
-        if (!source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)
-                && source.getEntity() instanceof ServerPlayer player) {
-            if (!NodeAccessPolicy.canAccess(target.getOwnerUuid(), player.getUUID())) {
+        // Owner, teammate, or admin mode
+        if (source.getEntity() instanceof ServerPlayer player) {
+            if (!NodeAccessPolicy.canAccess(target.getOwnerUuid(), player)) {
                 source.sendFailure(Component.literal("You do not own this network."));
                 return 0;
             }

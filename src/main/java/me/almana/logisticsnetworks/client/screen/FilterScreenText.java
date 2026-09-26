@@ -57,15 +57,6 @@ final class FilterScreenText {
         return raw;
     }
 
-    static String commonPrefix(String a, String b) {
-        int len = Math.min(a.length(), b.length());
-        int i = 0;
-        while (i < len && a.charAt(i) == b.charAt(i)) {
-            i++;
-        }
-        return a.substring(0, i);
-    }
-
     static String abbreviateNbtPath(String path) {
         StringBuilder result = new StringBuilder();
         String[] segments = path.split("\\.");
