@@ -284,14 +284,18 @@ public class NodeMenu extends AbstractContainerMenu {
         int nodeSlotCount = UPGRADE_SLOTS;
 
         if (index < nodeSlotCount) {
+            ItemStack remainder = fromStack.copy();
             movingUpgrade = true;
             try {
-                if (!moveItemStackTo(fromStack, nodeSlotCount, slots.size(), true)) {
+                if (!moveItemStackTo(remainder, nodeSlotCount, slots.size(), true)) {
                     return ItemStack.EMPTY;
                 }
+                fromSlot.set(remainder);
             } finally {
                 movingUpgrade = false;
             }
+            refreshUpgradeChannels();
+            return copy;
         } else {
             if (!fromStack.is(ModTags.UPGRADES)) {
                 return ItemStack.EMPTY;
@@ -315,15 +319,6 @@ public class NodeMenu extends AbstractContainerMenu {
             refreshUpgradeChannels();
             return ItemStack.EMPTY;
         }
-
-        if (fromStack.isEmpty()) {
-            fromSlot.set(ItemStack.EMPTY);
-        } else {
-            fromSlot.setChanged();
-        }
-
-        refreshUpgradeChannels();
-        return copy;
     }
 
     private void refreshUpgradeChannels() {

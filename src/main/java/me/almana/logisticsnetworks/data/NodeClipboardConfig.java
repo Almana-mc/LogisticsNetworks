@@ -197,7 +197,7 @@ public final class NodeClipboardConfig {
             config.mode = state.mode();
             config.type = state.type();
             config.batchSize = state.batchSize();
-            config.tickDelay = state.tickDelay();
+            config.tickDelay = config.type == ChannelType.ENERGY ? 1 : state.tickDelay();
             config.ioDirection = state.direction().orElse(null);
             config.redstoneMode = state.redstoneMode();
             config.distributionMode = state.distributionMode();
@@ -316,6 +316,7 @@ public final class NodeClipboardConfig {
         if (config.type != next) {
             config.type = next;
             config.batchSize = NodeUpgradeData.getOperationCap(next, getUpgradeTier());
+            if (next == ChannelType.ENERGY) config.tickDelay = 1;
         }
     }
 
@@ -384,8 +385,9 @@ public final class NodeClipboardConfig {
     }
 
     public void setChannelTickDelay(int channel, int delay) {
-        getChannelConfig(channel).tickDelay = Math.max(NodeUpgradeData.getMinTickDelay(getUpgradeTier()),
-                Math.min(10_000, delay));
+        ChannelConfig config = getChannelConfig(channel);
+        config.tickDelay = config.type == ChannelType.ENERGY ? 1
+                : Math.max(NodeUpgradeData.getMinTickDelay(getUpgradeTier()), Math.min(10_000, delay));
     }
 
     public ItemStack getFilterItem(int channel, int slot) {
@@ -805,7 +807,7 @@ public final class NodeClipboardConfig {
             config.mode = parseEnum(channelTag.getStringOr(KEY_MODE, ChannelMode.IMPORT.name()), ChannelMode.values(), ChannelMode.IMPORT);
             config.type = parseEnum(channelTag.getStringOr(KEY_TYPE, ChannelType.ITEM.name()), ChannelType.values(), ChannelType.ITEM);
             config.batchSize = Math.max(1, channelTag.getIntOr(KEY_BATCH, 8));
-            config.tickDelay = Math.max(1, channelTag.getIntOr(KEY_DELAY, 20));
+            config.tickDelay = config.type == ChannelType.ENERGY ? 1 : Math.max(1, channelTag.getIntOr(KEY_DELAY, 20));
 
             String dirStr = channelTag.getStringOr(KEY_IO, Direction.UP.getName());
             if ("all".equals(dirStr)) {
