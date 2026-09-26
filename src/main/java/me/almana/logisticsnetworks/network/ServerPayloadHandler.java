@@ -140,24 +140,25 @@ public class ServerPayloadHandler {
             if (channel == null)
                 return;
 
-            updateChannelData(channel, payload);
+            updateChannelData(channel, payload, NodeUpgradeData.getUpgradeTier(node));
             clampChannelToUpgradeLimits(node, channel);
+            sendChannelSyncToViewers(node, payload.channelIndex(), channel);
             propagateToLabelGroup(node, payload.channelIndex());
             markNetworkDirty(node);
         });
     }
 
-    private static void updateChannelData(ChannelData channel, UpdateChannelPayload payload) {
+    private static void updateChannelData(ChannelData channel, UpdateChannelPayload payload, int tier) {
         channel.setEnabled(payload.enabled());
 
         if (isValidEnum(payload.modeOrdinal(), ChannelMode.values()))
             channel.setMode(ChannelMode.values()[payload.modeOrdinal()]);
 
-        if (isValidEnum(payload.typeOrdinal(), ChannelType.values()))
-            channel.setType(ChannelType.values()[payload.typeOrdinal()]);
-
         channel.setBatchSize(payload.batchSize());
         channel.setTickDelay(payload.tickDelay());
+
+        if (isValidEnum(payload.typeOrdinal(), ChannelType.values()))
+            NodeUpgradeData.applyTypeChange(channel, ChannelType.values()[payload.typeOrdinal()], tier);
 
         if (payload.directionOrdinal() == 6) {
             channel.setIoDirection(null);
@@ -1052,29 +1053,19 @@ public class ServerPayloadHandler {
     }
 
     public static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
-        int maxBatch = getMaxBatch(node, channel.getType());
+        int tier = NodeUpgradeData.getUpgradeTier(node);
+        int maxBatch = NodeUpgradeData.getOperationCap(channel.getType(), tier);
 
         if (channel.getType() == ChannelType.ENERGY) {
             channel.setBatchSize(maxBatch);
-            channel.setTickDelay(1);
         } else {
             channel.setBatchSize(Math.max(1, Math.min(channel.getBatchSize(), maxBatch)));
         }
 
-        int minDelay = NodeUpgradeData.getMinTickDelay(node);
+        int minDelay = NodeUpgradeData.getMinTickDelay(tier);
         if (channel.getTickDelay() < minDelay) {
             channel.setTickDelay(minDelay);
         }
-    }
-
-    private static int getMaxBatch(LogisticsNodeEntity node, ChannelType type) {
-        return switch (type) {
-            case FLUID -> NodeUpgradeData.getFluidOperationCapMb(node);
-            case ENERGY -> NodeUpgradeData.getEnergyOperationCap(node);
-            case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(node);
-            case SOURCE -> NodeUpgradeData.getSourceOperationCap(node);
-            default -> NodeUpgradeData.getItemOperationCap(node);
-        };
     }
 
     public static void handleNodeUpgradeChanged(LogisticsNodeEntity node) {
