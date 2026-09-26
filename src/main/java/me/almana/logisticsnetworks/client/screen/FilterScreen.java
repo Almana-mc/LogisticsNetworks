@@ -137,20 +137,13 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private String detailNbtOp = "=";
     private Map<String, String> detailNbtActiveOps = new HashMap<>();
     private int nbtTableEditingRow = -1;
-    private boolean detailItemEnchanted = false;
-    private boolean detailEnchantedEnabled = false;
     private List<ItemStack> nbtOnlyCycleItems;
-    private int detailItemDurability = -1;
-    private int detailItemMaxDurability = -1;
-    private int detailItemStackSize = 1;
     private EditBox detailNbtValueBox;
     private EditBox detailIdInputBox;
     private EditBox detailBatchInputBox;
     private EditBox detailStockInputBox;
     private EditBox detailSlotMappingInputBox;
-    private EditBox detailDurabilityValueBox;
     private MultiLineEditBox detailNbtInputBox;
-    private String detailDurabilityOp = null;
     private int savedImageHeight = -1;
     private int savedTopPos = -1;
     private int savedImageWidth = -1;
@@ -166,10 +159,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private static final int NBT_COL_VAL = 140;
     private static final int NBT_COL_OP_GAP = 24;
     private static final int NBT_ROW_H = 14;
-    private static final int NBT_BUILTIN_ROWS = 3;
-    private static final int NBT_EDIT_DURABILITY = -10;
-    private static final int NBT_EDIT_ENCHANTED = -11;
-    private static final int NBT_EDIT_STACK_SIZE = -12;
     private static final int NBT_MIN_GROUP_PREFIX = 10;
     private static final int DETAIL_SECTION_H = 22;
 
@@ -285,12 +274,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailSlotMappingInputBox.setVisible(false);
         detailSlotMappingInputBox.setBordered(true);
         detailSlotMappingInputBox.setTextColor(cText());
-
-        detailDurabilityValueBox = new EditBox(font, leftPos + 12, topPos + 50, 40, 14, Component.empty());
-        detailDurabilityValueBox.setMaxLength(5);
-        detailDurabilityValueBox.setVisible(false);
-        detailDurabilityValueBox.setBordered(true);
-        detailDurabilityValueBox.setTextColor(cText());
 
         detailNbtValueBox = new EditBox(font, leftPos + 12, topPos + 50, 80, 14, Component.empty());
         detailNbtValueBox.setMaxLength(256);
@@ -1104,7 +1087,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 || detailBatchInputBox != null && detailBatchInputBox.isFocused()
                 || detailStockInputBox != null && detailStockInputBox.isFocused()
                 || detailSlotMappingInputBox != null && detailSlotMappingInputBox.isFocused()
-                || detailDurabilityValueBox != null && detailDurabilityValueBox.isFocused()
                 || detailNbtValueBox != null && detailNbtValueBox.isFocused()
                 || detailNbtInputBox != null && detailNbtInputBox.isFocused();
     }
@@ -3177,8 +3159,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (isFluidOrChemical) {
             detailSlotMappingInputBox.setValue("");
             detailSlotMappingInputBox.setVisible(false);
-            detailDurabilityOp = null;
-            detailDurabilityValueBox.setVisible(false);
             detailNbtInputBox.setValue("");
             detailNbtInputBox.active = false;
             detailNbtInputBox.setFocused(false);
@@ -3189,11 +3169,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             detailNbtValueBox.setValue("");
             detailNbtValueBox.setVisible(false);
             nbtTableEditingRow = -1;
-            detailItemEnchanted = false;
-            detailEnchantedEnabled = false;
-            detailItemDurability = -1;
-            detailItemMaxDurability = 0;
-            detailItemStackSize = 1;
         } else {
             ItemStack slotItem = getSlotItemForSubMode(slot);
             String slotMapping = menu.getEntrySlotMappingExpression(slot);
@@ -3202,11 +3177,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             detailSlotMappingInputBox.setFocused(false);
 
             ItemStack openedStack = menu.getOpenedStack();
-            String durOp = FilterItemData.getEntryDurabilityOp(openedStack, slot);
-            detailDurabilityOp = durOp;
-            detailDurabilityValueBox.setVisible(false);
-            detailDurabilityValueBox.setFocused(false);
-
             String existingNbtRaw = FilterItemData.getEntryNbtRaw(openedStack, slot);
             if (existingNbtRaw != null) {
                 detailNbtInputBox.setValue(existingNbtRaw);
@@ -3232,6 +3202,11 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     String display = r.value() != null ? r.value().toString() : "?";
                     detailCachedNbtEntries.add(new NbtFilterData.NbtEntry(r.path(), display));
                 }
+                for (NbtFilterData.NbtEntry entry : NbtFilterData.getDefaultEntries()) {
+                    if (detailCachedNbtEntries.stream().noneMatch(existing -> existing.path().equals(entry.path()))) {
+                        detailCachedNbtEntries.add(entry);
+                    }
+                }
             }
             nbtCollapsedGroups.clear();
             buildNbtRows();
@@ -3247,22 +3222,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             detailNbtValueBox.setVisible(false);
             detailNbtValueBox.setFocused(false);
             nbtTableEditingRow = -1;
-
-            Boolean savedEnchanted = FilterItemData.getEntryEnchanted(openedStack, slot);
-            if (!slotItem.isEmpty()) {
-                detailItemEnchanted = savedEnchanted != null ? savedEnchanted : slotItem.isEnchanted();
-                detailEnchantedEnabled = savedEnchanted != null;
-                detailItemMaxDurability = slotItem.getMaxDamage();
-                detailItemDurability = detailItemMaxDurability > 0
-                        ? detailItemMaxDurability - slotItem.getDamageValue() : -1;
-                detailItemStackSize = slotItem.getCount();
-            } else {
-                detailItemEnchanted = savedEnchanted != null ? savedEnchanted : false;
-                detailEnchantedEnabled = savedEnchanted != null;
-                detailItemDurability = 0;
-                detailItemMaxDurability = 0;
-                detailItemStackSize = 1;
-            }
         }
     }
 
@@ -3322,8 +3281,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailStockInputBox.setFocused(false);
         detailSlotMappingInputBox.setVisible(false);
         detailSlotMappingInputBox.setFocused(false);
-        detailDurabilityValueBox.setVisible(false);
-        detailDurabilityValueBox.setFocused(false);
         detailNbtInputBox.active = false;
         detailNbtInputBox.setFocused(false);
     }
@@ -3420,18 +3377,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             if (!slotMapStr.equals(currentSlotMap)) {
                 ClientPacketDistributor.sendToServer(new SetFilterEntrySlotMappingPayload(slot, slotMapStr));
                 menu.setEntrySlotMapping(minecraft.player, slot, slotMapStr);
-            }
-
-            if (detailDurabilityOp != null && detailItemDurability >= 0) {
-                menu.setEntryDurability(minecraft.player, slot, detailDurabilityOp, detailItemDurability);
-                ClientPacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(
-                        slot, detailDurabilityOp, detailItemDurability));
-            } else {
-                String existingOp = FilterItemData.getEntryDurabilityOp(menu.getOpenedStack(), slot);
-                if (existingOp != null) {
-                    menu.clearEntryDurability(minecraft.player, slot);
-                    ClientPacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
-                }
             }
 
             if (detailNbtPageOpen) {
@@ -3655,16 +3600,17 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             boolean strictNbt = menu.isEntryNbtStrict(detailEditSlot);
             int strictToggleX = contentX + labelW;
             String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
+            int strictToggleW = 14 + font.width(strictLabel);
             drawToggle(g, strictToggleX, y + 2, strictNbt);
             g.drawString(font, strictLabel, strictToggleX + 14, y + 3,
                     strictNbt ? cAccent() : cMuted(), false);
 
-            int nbtBtnX = strictToggleX + 14 + font.width(strictLabel) + 8;
+            int nbtBtnX = strictToggleX + strictToggleW + 8;
             String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
             int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
             drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, !strictNbt);
 
-            if (isHovering(strictToggleX, y, 54, 14, mx, my)) {
+            if (isHovering(strictToggleX, y, strictToggleW, 14, mx, my)) {
                 g.renderTooltip(font, Component.translatable(strictNbt
                         ? "gui.logisticsnetworks.filter.detail.nbt.strict.on"
                         : "gui.logisticsnetworks.filter.detail.nbt.strict.off"), mx, my);
@@ -3851,22 +3797,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return visible;
     }
 
-    private void renderBuiltinEditBox(GuiGraphics g, int mx, int my, int colValX, int rowY) {
-        detailNbtValueBox.setX(colValX);
-        detailNbtValueBox.setY(rowY);
-        detailNbtValueBox.setWidth(NBT_COL_VAL);
-        detailNbtValueBox.setHeight(NBT_ROW_H);
-        detailNbtValueBox.setVisible(true);
-        detailNbtValueBox.extractRenderState(g.raw(), mx, my, 0);
-    }
-
     private void renderNbtTable(GuiGraphics g, int mx, int my, int tableX, int tableY, int tableW, int tableH) {
         Set<String> activePaths = detailNbtActiveOps.keySet();
-        boolean durEnabled = detailDurabilityOp != null;
         if (nbtTableEditingRow < 0) detailNbtValueBox.setVisible(false);
 
         List<NbtRow> visible = getVisibleNbtRows();
-        int totalRows = NBT_BUILTIN_ROWS + visible.size();
+        int totalRows = visible.size();
         boolean scrollable = totalRows * NBT_ROW_H > tableH;
         int scrollW = scrollable ? SUBMODE_SCROLLBAR_W + SUBMODE_SCROLLBAR_GAP : 0;
         int rowW = tableW - scrollW;
@@ -3893,106 +3829,64 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             boolean hovered = mx >= tableX && mx < tableX + rowW
                     && my >= rowY && my < rowY + NBT_ROW_H;
 
-            if (vi < NBT_BUILTIN_ROWS) {
-                if (hovered)
-                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x20));
-                g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x20));
+            NbtRow row = visible.get(vi);
 
-                switch (vi) {
-                    case 0 -> {
-                        drawToggle(g, colToggleX, rowY + 1, durEnabled);
-                        g.drawString(font, "Durability", colPathX, rowY + 3, cInfo(), false);
-                        String opStr = detailDurabilityOp != null ? detailDurabilityOp : "=";
-                        g.drawString(font, opStr, colOpX + 4, rowY + 3, cText(), false);
-                        if (nbtTableEditingRow == NBT_EDIT_DURABILITY) {
-                            renderBuiltinEditBox(g, mx, my, colValX, rowY);
-                        } else {
-                            String durVal = detailItemMaxDurability > 0
-                                    ? detailItemDurability + "/" + detailItemMaxDurability
-                                    : String.valueOf(detailItemDurability);
-                            String truncVal = font.plainSubstrByWidth(durVal, NBT_COL_VAL - 4);
-                            g.drawString(font, truncVal, colValX + 2, rowY + 3,
-                                    durEnabled ? cText() : cMuted(), false);
-                        }
-                    }
-                    case 1 -> {
-                        drawToggle(g, colToggleX, rowY + 1, detailEnchantedEnabled);
-                        g.drawString(font, "Enchanted", colPathX, rowY + 3, 0xFFDD88FF, false);
-                        int enchColor = detailItemEnchanted ? cAccent() : cDanger();
-                        String enchStr = detailItemEnchanted ? "true" : "false";
-                        g.drawString(font, enchStr, colValX + 2, rowY + 3,
-                                detailEnchantedEnabled ? enchColor : cMuted(), false);
-                    }
-                    case 2 -> {
-                        drawToggle(g, colToggleX, rowY + 1, false);
-                        g.drawString(font, "Stack Size", colPathX, rowY + 3, cWarn(), false);
-                        if (nbtTableEditingRow == NBT_EDIT_STACK_SIZE) {
-                            renderBuiltinEditBox(g, mx, my, colValX, rowY);
-                        } else {
-                            g.drawString(font, String.valueOf(detailItemStackSize), colValX + 2, rowY + 3, cMuted(), false);
-                        }
-                    }
+            if (row.heading()) {
+                boolean collapsed = nbtCollapsedGroups.contains(row.group());
+                g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x18));
+                g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x20));
+                if (hovered)
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x10));
+
+                String arrow = collapsed ? ">" : "v";
+                g.drawString(font, arrow, colToggleX + 2, rowY + 3, cInfo(), false);
+                String headText = font.plainSubstrByWidth(row.display(), rowW - 20);
+                g.drawString(font, headText, colToggleX + 12, rowY + 3, cInfo(), false);
+                if (hovered && headText.length() < row.display().length()) {
+                    hoveredFullText = row.display();
                 }
             } else {
-                NbtRow row = visible.get(vi - NBT_BUILTIN_ROWS);
+                int entryIdx = row.entryIdx();
+                NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
+                boolean active = activePaths.contains(entry.path());
+                boolean indented = !row.group().isEmpty();
 
-                if (row.heading()) {
-                    boolean collapsed = nbtCollapsedGroups.contains(row.group());
-                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x18));
-                    g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x20));
-                    if (hovered)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cTextVeil(0x10));
+                if (active)
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cSelected());
+                else if (hovered)
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cHover());
 
-                    String arrow = collapsed ? ">" : "v";
-                    g.drawString(font, arrow, colToggleX + 2, rowY + 3, cInfo(), false);
-                    String headText = font.plainSubstrByWidth(row.display(), rowW - 20);
-                    g.drawString(font, headText, colToggleX + 12, rowY + 3, cInfo(), false);
-                    if (hovered && headText.length() < row.display().length()) {
-                        hoveredFullText = row.display();
-                    }
+                drawToggle(g, colToggleX, rowY + 1, active);
+
+                int entryPathX = indented ? colPathX + 6 : colPathX;
+                int entryPathW = indented ? pathW - 6 : pathW;
+                String pathDisplay = row.display();
+                String truncPath = font.plainSubstrByWidth(pathDisplay, entryPathW - 4);
+                g.drawString(font, truncPath, entryPathX, rowY + 3,
+                        active ? cAccent() : cText(), false);
+
+                if (hovered && truncPath.length() < pathDisplay.length()) {
+                    hoveredFullText = entry.path() + " = " + entry.valueDisplay();
+                }
+
+                String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path(), "=") : "=";
+                int opColor = active ? cText() : cMuted();
+                g.drawString(font, opStr, colOpX + 4, rowY + 3, opColor, false);
+
+                if (nbtTableEditingRow == entryIdx) {
+                    detailNbtValueBox.setX(colValX);
+                    detailNbtValueBox.setY(rowY);
+                    detailNbtValueBox.setWidth(NBT_COL_VAL);
+                    detailNbtValueBox.setHeight(NBT_ROW_H);
+                    detailNbtValueBox.setVisible(true);
+                    detailNbtValueBox.extractRenderState(g.raw(), mx, my, 0);
                 } else {
-                    int entryIdx = row.entryIdx();
-                    NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
-                    boolean active = activePaths.contains(entry.path());
-                    boolean indented = !row.group().isEmpty();
-
-                    if (active)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cSelected());
-                    else if (hovered)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, cHover());
-
-                    drawToggle(g, colToggleX, rowY + 1, active);
-
-                    int entryPathX = indented ? colPathX + 6 : colPathX;
-                    int entryPathW = indented ? pathW - 6 : pathW;
-                    String pathDisplay = row.display();
-                    String truncPath = font.plainSubstrByWidth(pathDisplay, entryPathW - 4);
-                    g.drawString(font, truncPath, entryPathX, rowY + 3,
-                            active ? cAccent() : cText(), false);
-
-                    if (hovered && truncPath.length() < pathDisplay.length()) {
-                        hoveredFullText = entry.path() + " = " + entry.valueDisplay();
-                    }
-
-                    String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path(), "=") : "=";
-                    int opColor = active ? cText() : cMuted();
-                    g.drawString(font, opStr, colOpX + 4, rowY + 3, opColor, false);
-
-                    if (nbtTableEditingRow == entryIdx) {
-                        detailNbtValueBox.setX(colValX);
-                        detailNbtValueBox.setY(rowY);
-                        detailNbtValueBox.setWidth(NBT_COL_VAL);
-                        detailNbtValueBox.setHeight(NBT_ROW_H);
-                        detailNbtValueBox.setVisible(true);
-                        detailNbtValueBox.extractRenderState(g.raw(), mx, my, 0);
-                    } else {
-                        String valDisplay = entry.valueDisplay();
-                        String truncVal = font.plainSubstrByWidth(valDisplay, NBT_COL_VAL - 4);
-                        g.drawString(font, truncVal, colValX + 2, rowY + 3,
-                                active ? cAccent() : cMuted(), false);
-                        if (hovered && truncVal.length() < valDisplay.length() && hoveredFullText == null) {
-                            hoveredFullText = entry.path() + " = " + valDisplay;
-                        }
+                    String valDisplay = entry.valueDisplay();
+                    String truncVal = font.plainSubstrByWidth(valDisplay, NBT_COL_VAL - 4);
+                    g.drawString(font, truncVal, colValX + 2, rowY + 3,
+                            active ? cAccent() : cMuted(), false);
+                    if (hovered && truncVal.length() < valDisplay.length() && hoveredFullText == null) {
+                        hoveredFullText = entry.path() + " = " + valDisplay;
                     }
                 }
             }
@@ -4154,16 +4048,17 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             int nbtY = stockY + DETAIL_SECTION_H;
 
             int strictToggleX = contentX + labelW;
+            String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
+            int strictToggleW = 14 + font.width(strictLabel);
             boolean strictNbt = menu.isEntryNbtStrict(detailEditSlot);
-            if (isHovering(strictToggleX, nbtY, 54, 14, (int) mx, (int) my)) {
+            if (isHovering(strictToggleX, nbtY, strictToggleW, 14, (int) mx, (int) my)) {
                 boolean next = !strictNbt;
                 ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, next));
                 menu.setEntryNbtStrict(detailEditSlot, next);
                 return true;
             }
 
-            String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
-            int nbtBtnX = strictToggleX + 14 + font.width(strictLabel) + 8;
+            int nbtBtnX = strictToggleX + strictToggleW + 8;
             String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
             int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
             if (!strictNbt && isHovering(nbtBtnX, nbtY, nbtBtnW, 14, (int) mx, (int) my)) {
@@ -4294,7 +4189,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                                          int tableX, int tableY, int tableW, int tableH) {
         Set<String> activePaths = detailNbtActiveOps.keySet();
         List<NbtRow> visible = getVisibleNbtRows();
-        int totalRows = NBT_BUILTIN_ROWS + visible.size();
+        int totalRows = visible.size();
         boolean scrollable = totalRows * NBT_ROW_H > tableH;
         int scrollW = scrollable ? SUBMODE_SCROLLBAR_W + SUBMODE_SCROLLBAR_GAP : 0;
         int rowW = tableW - scrollW;
@@ -4313,48 +4208,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             if (mx < tableX || mx >= tableX + rowW || my < rowY || my >= rowY + NBT_ROW_H)
                 continue;
 
-            if (vi < NBT_BUILTIN_ROWS) {
-                int builtinEditId = vi == 0 ? NBT_EDIT_DURABILITY
-                        : vi == 1 ? NBT_EDIT_ENCHANTED : NBT_EDIT_STACK_SIZE;
-
-                if (vi == 1) {
-                    if (mx < colToggleX + NBT_COL_TOGGLE + 4) {
-                        detailEnchantedEnabled = !detailEnchantedEnabled;
-                    } else {
-                        detailItemEnchanted = !detailItemEnchanted;
-                        if (!detailEnchantedEnabled) detailEnchantedEnabled = true;
-                    }
-                    ClientPacketDistributor.sendToServer(new SetFilterEntryEnchantedPayload(
-                            detailEditSlot, detailEnchantedEnabled, detailItemEnchanted));
-                    menu.setEntryEnchanted(minecraft.player, detailEditSlot,
-                            detailEnchantedEnabled ? detailItemEnchanted : null);
-                    return true;
-                }
-
-                if (mx < colToggleX + NBT_COL_TOGGLE + 4) {
-                    if (vi == 0) {
-                        detailDurabilityOp = detailDurabilityOp != null ? null : ">=";
-                        sendDetailDurabilityPacket();
-                    }
-                } else if (mx >= colOpX && mx < colOpX + NBT_COL_OP) {
-                    if (vi == 0) {
-                        cycleDurabilityOp();
-                        sendDetailDurabilityPacket();
-                    }
-                } else if (mx >= colValX) {
-                    if (nbtTableEditingRow != builtinEditId) {
-                        commitDetailBuiltinEdit();
-                        nbtTableEditingRow = builtinEditId;
-                        detailNbtValueBox.setValue(getBuiltinDefault(builtinEditId));
-                    }
-                    detailNbtValueBox.setFocused(true);
-                    detailNbtValueBox.mouseClicked(ClientInput.mouse(mx, my, btn), false);
-                    return true;
-                }
-                return true;
-            }
-
-            NbtRow row = visible.get(vi - NBT_BUILTIN_ROWS);
+            NbtRow row = visible.get(vi);
 
             if (row.heading()) {
                 if (nbtCollapsedGroups.contains(row.group())) {
@@ -4421,8 +4275,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (nbtTableEditingRow >= 0) {
             commitDetailNbtValueEdit();
-        } else if (nbtTableEditingRow <= NBT_EDIT_DURABILITY) {
-            commitDetailBuiltinEdit();
         }
         return true;
     }
@@ -4478,45 +4330,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             buildNbtRows();
         }
         detailNbtActiveOps.put(entry.path(), opSymbol);
-    }
-
-    private String getBuiltinDefault(int builtinId) {
-        return switch (builtinId) {
-            case NBT_EDIT_DURABILITY -> String.valueOf(detailItemDurability);
-            case NBT_EDIT_ENCHANTED -> detailItemEnchanted ? "true" : "false";
-            case NBT_EDIT_STACK_SIZE -> String.valueOf(detailItemStackSize);
-            default -> "";
-        };
-    }
-
-    private void commitDetailBuiltinEdit() {
-        if (nbtTableEditingRow >= 0 || nbtTableEditingRow == -1) return;
-        String val = detailNbtValueBox.getValue().trim();
-        if (val.isEmpty()) val = getBuiltinDefault(nbtTableEditingRow);
-
-        switch (nbtTableEditingRow) {
-            case NBT_EDIT_DURABILITY -> {
-                try {
-                    int durVal = Integer.parseInt(val);
-                    detailItemDurability = durVal;
-                    if (detailDurabilityOp == null) detailDurabilityOp = ">=";
-                    menu.setEntryDurability(minecraft.player, detailEditSlot, detailDurabilityOp, durVal);
-                    ClientPacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(
-                            detailEditSlot, detailDurabilityOp, durVal));
-                } catch (NumberFormatException ignored) {}
-            }
-            case NBT_EDIT_ENCHANTED -> {
-                detailItemEnchanted = "true".equalsIgnoreCase(val);
-            }
-            case NBT_EDIT_STACK_SIZE -> {
-                try {
-                    detailItemStackSize = Integer.parseInt(val);
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-        nbtTableEditingRow = -1;
-        detailNbtValueBox.setVisible(false);
-        detailNbtValueBox.setFocused(false);
     }
 
     private void commitDetailNbtValueEdit() {
@@ -4619,11 +4432,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             }
             if (detailNbtValueBox.isFocused()) {
                 if (key == 257 || key == 256) {
-                    if (nbtTableEditingRow <= NBT_EDIT_DURABILITY) {
-                        commitDetailBuiltinEdit();
-                    } else {
-                        commitDetailNbtValueEdit();
-                    }
+                    commitDetailNbtValueEdit();
                     return true;
                 }
                 detailNbtValueBox.keyPressed(ClientInput.key(key, scan, modifiers));
@@ -4684,7 +4493,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             int panelH = imageHeight - 24;
             int y = panelY + 36;
             int listH = panelY + panelH - y - 4;
-            int totalRows = NBT_BUILTIN_ROWS + getVisibleNbtRows().size();
+            int totalRows = getVisibleNbtRows().size();
             int visibleRows = Math.max(1, listH / NBT_ROW_H);
             int maxScroll = Math.max(0, totalRows - visibleRows);
             detailNbtScrollOffset = Mth.clamp(detailNbtScrollOffset - (int) delta, 0, maxScroll);
@@ -4735,30 +4544,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 || FilterItemData.hasEntrySlotMapping(menu.getOpenedStack(), slot);
     }
 
-    private void cycleDurabilityOp() {
-        if (detailDurabilityOp == null) {
-            detailDurabilityOp = "=";
-        } else if (detailDurabilityOp.equals("=")) {
-            detailDurabilityOp = ">=";
-        } else if (detailDurabilityOp.equals(">=")) {
-            detailDurabilityOp = "<=";
-        } else {
-            detailDurabilityOp = "=";
-        }
-    }
-
-    private void sendDetailDurabilityPacket() {
-        if (detailDurabilityOp != null) {
-            menu.setEntryDurability(minecraft.player, detailEditSlot, detailDurabilityOp, detailItemDurability);
-            ClientPacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(
-                    detailEditSlot, detailDurabilityOp, detailItemDurability));
-        } else {
-            menu.setEntryDurability(minecraft.player, detailEditSlot, null, 0);
-            ClientPacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(
-                    detailEditSlot, "", 0));
-        }
-    }
-
     private void clearDetailEntry() {
         if (detailEditSlot < 0) return;
         int slot = detailEditSlot;
@@ -4779,8 +4564,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailStockInputBox.setValue("");
         detailSlotMappingInputBox.setValue("");
         if (!hasNbtConfig) {
-            detailDurabilityValueBox.setValue("");
-            detailDurabilityOp = null;
             detailNbtInputBox.setValue("");
             detailNbtValueBox.setValue("");
             detailNbtSelectedIdx = -1;
