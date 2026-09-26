@@ -174,10 +174,7 @@ public class TransferEngine {
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 ChannelData ch = node.getChannel(i);
                 if (ch != null && ch.isEnabled()) {
-                    RedstoneMode rm = ch.getRedstoneMode();
-                    if (rm == RedstoneMode.HIGH || rm == RedstoneMode.LOW) {
-                        needsSignal = true;
-                    }
+                    needsSignal = true;
                     if (ch.getMode() == ChannelMode.EXPORT) {
                         hasExport = true;
                     }
@@ -1278,8 +1275,6 @@ public class TransferEngine {
 
     public static boolean isRedstoneActive(RedstoneMode mode, int signalStrength) {
         return switch (mode) {
-            case ALWAYS_ON -> true;
-            case ALWAYS_OFF -> false;
             case HIGH -> signalStrength > 0;
             case LOW -> signalStrength == 0;
         };

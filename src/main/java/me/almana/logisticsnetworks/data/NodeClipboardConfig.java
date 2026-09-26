@@ -275,7 +275,7 @@ public final class NodeClipboardConfig {
     }
 
     public void setChannelRedstoneMode(int channel, RedstoneMode mode) {
-        getChannelConfig(channel).redstoneMode = mode == null ? RedstoneMode.ALWAYS_ON : mode;
+        getChannelConfig(channel).redstoneMode = mode == null ? RedstoneMode.LOW : mode;
     }
 
     public DistributionMode getChannelDistributionMode(int channel) {
@@ -530,7 +530,7 @@ public final class NodeClipboardConfig {
                 config.batchSize = 8;
                 config.tickDelay = 20;
                 config.ioDirection = Direction.UP;
-                config.redstoneMode = RedstoneMode.ALWAYS_ON;
+                config.redstoneMode = RedstoneMode.LOW;
                 config.distributionMode = DistributionMode.PRIORITY;
                 config.filterMode = FilterMode.MATCH_ANY;
                 config.priority = 0;
@@ -717,8 +717,10 @@ public final class NodeClipboardConfig {
                 Direction direction = Direction.byName(dirStr);
                 config.ioDirection = direction == null ? Direction.UP : direction;
             }
-            config.redstoneMode = parseEnum(channelTag.getStringOr(KEY_REDSTONE, RedstoneMode.ALWAYS_ON.name()), RedstoneMode.values(),
-                    RedstoneMode.ALWAYS_ON);
+            String savedRedstoneMode = channelTag.getStringOr(KEY_REDSTONE, "");
+            if (RedstoneMode.disablesChannel(savedRedstoneMode))
+                config.enabled = false;
+            config.redstoneMode = RedstoneMode.fromSerialized(savedRedstoneMode);
             config.distributionMode = parseEnum(channelTag.getStringOr(KEY_DISTRIBUTION, DistributionMode.PRIORITY.name()), DistributionMode.values(),
                     DistributionMode.PRIORITY);
             config.resourceRoundRobin = channelTag.getBooleanOr("resource_round_robin", false);
@@ -1186,7 +1188,7 @@ public final class NodeClipboardConfig {
         config.batchSize = 8;
         config.tickDelay = 20;
         config.ioDirection = Direction.UP;
-        config.redstoneMode = RedstoneMode.ALWAYS_ON;
+        config.redstoneMode = RedstoneMode.LOW;
         config.distributionMode = DistributionMode.PRIORITY;
         config.filterMode = FilterMode.MATCH_ANY;
         config.priority = 0;

@@ -5,7 +5,6 @@ import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
@@ -192,10 +191,7 @@ public class EventHandler {
         ChannelData[] channels = node.getChannels();
         for (ChannelData ch : channels) {
             if (ch.isEnabled()) {
-                RedstoneMode mode = ch.getRedstoneMode();
-                if (mode == RedstoneMode.HIGH || mode == RedstoneMode.LOW) {
-                    return true;
-                }
+                return true;
             }
         }
         return false;

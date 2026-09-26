@@ -41,7 +41,7 @@ public class ChannelData {
     private int tickDelay = 20;
     @Nullable
     private Direction ioDirection = Direction.UP;
-    private RedstoneMode redstoneMode = RedstoneMode.ALWAYS_ON;
+    private RedstoneMode redstoneMode = RedstoneMode.LOW;
     private DistributionMode distributionMode = DistributionMode.PRIORITY;
     private FilterMode filterMode = FilterMode.MATCH_ANY;
     private int priority = 0;
@@ -104,7 +104,10 @@ public class ChannelData {
 
         mode = getEnum(tag, KEY_MODE, ChannelMode.class, ChannelMode.IMPORT);
         type = getEnum(tag, KEY_TYPE, ChannelType.class, ChannelType.ITEM);
-        redstoneMode = getEnum(tag, KEY_REDSTONE, RedstoneMode.class, RedstoneMode.ALWAYS_ON);
+        String savedRedstoneMode = tag.getStringOr(KEY_REDSTONE, "");
+        if (RedstoneMode.disablesChannel(savedRedstoneMode))
+            enabled = false;
+        redstoneMode = RedstoneMode.fromSerialized(savedRedstoneMode);
         distributionMode = getEnum(tag, KEY_DISTRIB, DistributionMode.class, DistributionMode.PRIORITY);
         filterMode = getEnum(tag, KEY_FILTER_MODE, FilterMode.class, FilterMode.MATCH_ANY);
 
@@ -192,7 +195,10 @@ public class ChannelData {
         enabled = tag.getBooleanOr(KEY_ENABLED, enabled);
         mode = parseEnum(tag.getStringOr(KEY_MODE, mode.name()), ChannelMode.class, ChannelMode.IMPORT);
         type = parseEnum(tag.getStringOr(KEY_TYPE, type.name()), ChannelType.class, ChannelType.ITEM);
-        redstoneMode = parseEnum(tag.getStringOr(KEY_REDSTONE, redstoneMode.name()), RedstoneMode.class, RedstoneMode.ALWAYS_ON);
+        String savedRedstoneMode = tag.getStringOr(KEY_REDSTONE, redstoneMode.name());
+        if (RedstoneMode.disablesChannel(savedRedstoneMode))
+            enabled = false;
+        redstoneMode = RedstoneMode.fromSerialized(savedRedstoneMode);
         distributionMode = parseEnum(tag.getStringOr(KEY_DISTRIB, distributionMode.name()), DistributionMode.class,
                 DistributionMode.PRIORITY);
         filterMode = parseEnum(tag.getStringOr(KEY_FILTER_MODE, filterMode.name()), FilterMode.class, FilterMode.MATCH_ANY);

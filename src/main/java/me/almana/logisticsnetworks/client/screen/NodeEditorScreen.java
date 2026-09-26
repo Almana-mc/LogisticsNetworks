@@ -932,8 +932,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     private Theme.Variant getRedstoneVariant(RedstoneMode mode) {
         return switch (mode) {
-            case ALWAYS_ON -> Theme.Variant.DANGER;
-            case ALWAYS_OFF -> Theme.Variant.NEUTRAL;
             case HIGH -> Theme.Variant.ACCENT;
             case LOW -> Theme.Variant.WARN;
         };
