@@ -483,7 +483,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         }
 
         int titleX = leftPos + 8;
-        if (menu.isNodeFilter()) {
+        if (menu.isBoundFilter()) {
             drawButton(g, backButtonX(), backButtonY(), BACK_BUTTON_W, BACK_BUTTON_H, "<", mx, my, true);
             titleX += BACK_BUTTON_W + 4;
         }
@@ -585,7 +585,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             renderChemicalGhostItems(g);
         }
 
-        renderModeControls(g, mx, my, !menu.isNodeFilter());
+        renderModeControls(g, mx, my, !menu.isBoundFilter());
     }
 
     private void renderEntryIndicatorOverlays(GuiGraphics g) {
@@ -915,7 +915,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
         int left = rightEdge - modeBtnW;
 
-        if (!menu.isNodeFilter()) {
+        if (!menu.isBoundFilter()) {
             String typeLabel = menu.getTargetType() == FilterTargetType.CHEMICALS
                     ? tr("gui.logisticsnetworks.filter.target.chemicals")
                     : menu.getTargetType() == FilterTargetType.FLUIDS
@@ -1017,7 +1017,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private boolean isHoveringBackButton(double mx, double my) {
-        return menu.isNodeFilter()
+        return menu.isBoundFilter()
                 && isHovering(backButtonX(), backButtonY(), BACK_BUTTON_W, BACK_BUTTON_H, (int) mx, (int) my);
     }
 
@@ -1068,10 +1068,16 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private boolean returnToNodeScreen() {
-        if (!menu.isNodeFilter()) {
+        if (!menu.isBoundFilter()) {
             return false;
         }
         flushEditorsBeforeExit();
+        if (menu.isClipboardFilter()) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, FilterMenu.ID_RETURN_TO_CLIPBOARD);
+            }
+            return true;
+        }
         ClientPacketDistributor.sendToServer(new OpenNodeMenuPayload(
                 menu.getNodeSource().getId(), menu.getNodeChannel()));
         return true;
@@ -1181,7 +1187,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return true;
         }
 
-        return finishInteraction(handleModeControlClick(mx, my, !menu.isNodeFilter()), mx, my);
+        return finishInteraction(handleModeControlClick(mx, my, !menu.isBoundFilter()), mx, my);
     }
 
     private boolean handleDetailPageInteraction(double mx, double my, int action) {
@@ -1399,7 +1405,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private void renderNameButtons(GuiGraphics g, int mx, int my, int btnY) {
         int btnH = 12;
         int leftEdge = leftPos + 8;
-        boolean node = menu.isNodeFilter();
+        boolean node = menu.isBoundFilter();
 
         int modeBtnX = leftEdge;
         if (!node) {
@@ -1448,7 +1454,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int btnH = 12;
         int btnY = topPos + 20;
         int leftEdge = leftPos + 8;
-        boolean node = menu.isNodeFilter();
+        boolean node = menu.isBoundFilter();
 
         int modeBtnX = leftEdge;
         if (!node) {
@@ -2037,6 +2043,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             showFilterMessage("message.logisticsnetworks.filter.paste.empty");
             return true;
         }
+        if (menu.isBoundFilter() && copiedFilter.targetType() != menu.getTargetType()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
 
         if (menu.isModMode()) {
             return pasteModFilter();
@@ -2181,6 +2191,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (menu.isBlacklistMode() != blacklist) {
             minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
         }
+        if (menu.isBoundFilter()) return;
         FilterTargetType[] types = FilterTargetType.values();
         int presses = ((targetType.ordinal() - menu.getTargetType().ordinal()) % types.length + types.length)
                 % types.length;

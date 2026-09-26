@@ -4,8 +4,10 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.*;
@@ -23,6 +25,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.*;
@@ -44,6 +47,7 @@ public class FilterMenu extends AbstractContainerMenu {
     private static final int ID_CYCLE_TARGET = 8;
     private static final int ID_CYCLE_NAME_SCOPE = 9;
     private static final int ID_TOGGLE_RESOURCE_ROUND_ROBIN = 10;
+    public static final int ID_RETURN_TO_CLIPBOARD = 11;
     private static final int DATA_RESOURCE_ROUND_ROBIN = 4;
 
     private static final int FILTER_COLS = 9;
@@ -77,9 +81,12 @@ public class FilterMenu extends AbstractContainerMenu {
     private final boolean[] isChemicalSlot;
     private final boolean[] isTagSlot;
     private boolean ignoreUpdates = false;
+    private boolean returningToClipboard;
 
     @Nullable
     private final LogisticsNodeEntity nodeSource;
+    @Nullable
+    private final NodeClipboardConfig clipboardSource;
     private final int nodeChannel;
     private final int nodeFilterSlot;
     @Nullable
@@ -121,6 +128,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.lockedSlot = inventorySlotIndex;
         this.nodeAE2Link = null;
         this.nodeSource = null;
+        this.clipboardSource = null;
         this.nodeChannel = -1;
         this.nodeFilterSlot = -1;
 
@@ -153,6 +161,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.lockedSlot = (hand == InteractionHand.MAIN_HAND) ? playerInv.getSelectedSlot() : -1;
         this.nodeAE2Link = null;
         this.nodeSource = null;
+        this.clipboardSource = null;
         this.nodeChannel = -1;
         this.nodeFilterSlot = -1;
 
@@ -190,6 +199,7 @@ public class FilterMenu extends AbstractContainerMenu {
         this.lockedSlot = -1;
         this.nodeAE2Link = nodeAE2Link;
         this.nodeSource = node;
+        this.clipboardSource = null;
         this.nodeChannel = channel;
         this.nodeFilterSlot = filterSlot;
 
@@ -215,6 +225,88 @@ public class FilterMenu extends AbstractContainerMenu {
         addDataSlots(data);
     }
 
+    private FilterMenu(int containerId, Inventory playerInv, NodeClipboardConfig clipboard,
+            InteractionHand hand, int channel, int filterSlot) {
+        super(Registration.FILTER_MENU.get(), containerId);
+        this.hand = hand;
+        this.player = playerInv.player;
+        this.inventorySlotIndex = -1;
+        this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInv.getSelectedSlot() : -1;
+        this.nodeAE2Link = null;
+        this.nodeSource = null;
+        this.clipboardSource = clipboard;
+        this.nodeChannel = channel;
+        this.nodeFilterSlot = filterSlot;
+
+        ItemStack stack = getOpenedStack();
+        this.isTagMode = false;
+        this.isAmountMode = false;
+        this.isNbtMode = false;
+        this.isDurabilityMode = false;
+        this.isModMode = stack.getItem() instanceof ModFilterItem;
+        this.isNameMode = stack.getItem() instanceof NameFilterItem;
+        this.isSpecialMode = isModMode || isNameMode;
+
+        this.slotCount = isSpecialMode ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
+        this.rows = isSpecialMode ? 0 : (int) Math.ceil(slotCount / 9.0);
+        this.filterInventory = new SimpleContainer(slotCount);
+        this.isFluidSlot = new boolean[slotCount];
+        this.isChemicalSlot = new boolean[slotCount];
+        this.isTagSlot = new boolean[slotCount];
+
+        initSyncedData(stack);
+        layoutSlots(playerInv);
+        addDataSlots(data);
+    }
+
+    public static boolean openClipboard(ServerPlayer player, NodeClipboardConfig clipboard, InteractionHand hand,
+            int channelIndex, int filterSlot, VirtualFilterType requestedType) {
+        if (channelIndex < 0 || channelIndex >= clipboard.getChannelCount()
+                || filterSlot < 0 || filterSlot >= clipboard.getFilterSlotCount()) return false;
+        FilterTargetType target = FilterTargetType.forChannel(clipboard.getChannelType(channelIndex));
+        if (target == null) return false;
+
+        ItemStack stack = clipboard.getFilterItem(channelIndex, filterSlot);
+        boolean fresh = requestedType != VirtualFilterType.EXISTING || stack.isEmpty()
+                || !stack.is(ModTags.FILTERS) || currentTarget(stack) != target;
+        if (fresh) {
+            VirtualFilterType type = requestedType != VirtualFilterType.EXISTING
+                    ? requestedType : VirtualFilterType.SMALL;
+            stack = type.createStack();
+            applyTarget(stack, target);
+            clipboard.setFilterItem(channelIndex, filterSlot, stack);
+        }
+
+        VirtualFilterType type = VirtualFilterType.fromStack(stack);
+        boolean isMod = type == VirtualFilterType.MOD;
+        boolean isName = type == VirtualFilterType.NAME;
+        int slots = type.isSpecial() ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
+        player.openMenu(new SimpleMenuProvider(
+                (id, inventory, ignored) -> new FilterMenu(id, inventory, clipboard, hand, channelIndex, filterSlot),
+                stack.getHoverName()), buf -> {
+                    buf.writeVarInt(-3);
+                    buf.writeVarInt(hand.ordinal());
+                    buf.writeVarInt(channelIndex);
+                    buf.writeVarInt(filterSlot);
+                    buf.writeNbt(clipboard.save(player.registryAccess()));
+                    writeModeData(buf, slots, isMod, false, isName);
+                });
+        return true;
+    }
+
+    private static FilterTargetType currentTarget(ItemStack stack) {
+        if (FilterItemData.isFilterItem(stack)) return FilterItemData.getTargetType(stack);
+        if (NameFilterData.isNameFilter(stack)) return NameFilterData.getTargetType(stack);
+        if (ModFilterData.isModFilter(stack)) return ModFilterData.getTargetType(stack);
+        return null;
+    }
+
+    private static void applyTarget(ItemStack stack, FilterTargetType target) {
+        if (FilterItemData.isFilterItem(stack)) FilterItemData.setTargetType(stack, target);
+        else if (NameFilterData.isNameFilter(stack)) NameFilterData.setTargetType(stack, target);
+        else if (ModFilterData.isModFilter(stack)) ModFilterData.setTargetType(stack, target);
+    }
+
     public FilterMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
         super(Registration.FILTER_MENU.get(), containerId);
         int handOrdinal = buf.readVarInt();
@@ -230,6 +322,7 @@ public class FilterMenu extends AbstractContainerMenu {
             this.lockedSlot = -1;
             this.nodeAE2Link = null;
             this.nodeSource = NodeMenuSync.findOrCreateClientNode(playerInv.player, entityId, nodeId, dimension);
+            this.clipboardSource = null;
             CompoundTag stackTag = buf.readNbt();
             ItemStack openedStack = stackTag != null
                     ? stackTag.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY)
@@ -240,12 +333,25 @@ public class FilterMenu extends AbstractContainerMenu {
                     channel.setFilterItem(this.nodeFilterSlot, openedStack);
                 }
             }
+        } else if (handOrdinal == -3) {
+            int clipboardHand = buf.readVarInt();
+            this.hand = clipboardHand == InteractionHand.OFF_HAND.ordinal()
+                    ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
+            this.lockedSlot = hand == InteractionHand.MAIN_HAND ? playerInv.getSelectedSlot() : -1;
+            this.inventorySlotIndex = -1;
+            this.nodeAE2Link = null;
+            this.nodeSource = null;
+            this.nodeChannel = buf.readVarInt();
+            this.nodeFilterSlot = buf.readVarInt();
+            NodeClipboardConfig loaded = NodeClipboardConfig.load(buf.readNbt(), playerInv.player.registryAccess());
+            this.clipboardSource = loaded == null ? NodeClipboardConfig.createEmpty() : loaded;
         } else if (handOrdinal == -1) {
             this.inventorySlotIndex = buf.readVarInt();
             this.hand = InteractionHand.MAIN_HAND;
             this.lockedSlot = inventorySlotIndex;
             this.nodeAE2Link = null;
             this.nodeSource = null;
+            this.clipboardSource = null;
             this.nodeChannel = -1;
             this.nodeFilterSlot = -1;
         } else {
@@ -256,6 +362,7 @@ public class FilterMenu extends AbstractContainerMenu {
             this.lockedSlot = (hand == InteractionHand.MAIN_HAND) ? playerInv.getSelectedSlot() : -1;
             this.nodeAE2Link = null;
             this.nodeSource = null;
+            this.clipboardSource = null;
             this.nodeChannel = -1;
             this.nodeFilterSlot = -1;
         }
@@ -308,9 +415,13 @@ public class FilterMenu extends AbstractContainerMenu {
             data.set(1, FilterItemData.getTargetType(stack).ordinal());
             data.set(2, 0);
         }
-        data.set(DATA_RESOURCE_ROUND_ROBIN, nodeSource == null
-                ? -1
-                : resourceRoundRobinState(nodeSource.getChannel(nodeChannel)));
+        if (nodeSource != null) {
+            data.set(DATA_RESOURCE_ROUND_ROBIN, resourceRoundRobinState(nodeSource.getChannel(nodeChannel)));
+        } else if (clipboardSource != null) {
+            data.set(DATA_RESOURCE_ROUND_ROBIN, clipboardResourceRoundRobinState());
+        } else {
+            data.set(DATA_RESOURCE_ROUND_ROBIN, -1);
+        }
     }
 
     private void layoutSlots(Inventory playerInv) {
@@ -419,6 +530,14 @@ public class FilterMenu extends AbstractContainerMenu {
 
     public boolean isNodeFilter() {
         return nodeSource != null;
+    }
+
+    public boolean isClipboardFilter() {
+        return clipboardSource != null;
+    }
+
+    public boolean isBoundFilter() {
+        return nodeSource != null || clipboardSource != null;
     }
 
     public boolean canScanAttachedStorage() {
@@ -844,6 +963,9 @@ public class FilterMenu extends AbstractContainerMenu {
             ChannelData ch = nodeSource.getChannel(nodeChannel);
             return ch != null ? ch.getFilterItem(nodeFilterSlot) : ItemStack.EMPTY;
         }
+        if (clipboardSource != null) {
+            return clipboardSource.getFilterItem(nodeChannel, nodeFilterSlot);
+        }
         if (inventorySlotIndex >= 0)
             return player.getInventory().getItem(inventorySlotIndex);
         if (hand == InteractionHand.OFF_HAND)
@@ -857,9 +979,15 @@ public class FilterMenu extends AbstractContainerMenu {
         if (player.level().isClientSide())
             return false;
 
+        if (id == ID_RETURN_TO_CLIPBOARD && player instanceof ServerPlayer serverPlayer
+                && clipboardSource != null) {
+            returnToClipboard(serverPlayer);
+            return true;
+        }
+
         if (id == ID_TOGGLE_MODE)
             return toggleBlacklist();
-        if (id == ID_CYCLE_TARGET)
+        if (id == ID_CYCLE_TARGET && !isBoundFilter())
             return cycleTargetType();
         if (id == ID_CYCLE_NAME_SCOPE && isNameMode)
             return cycleNameMatchScope();
@@ -911,16 +1039,32 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     private boolean toggleResourceRoundRobin() {
-        if (nodeSource == null) return false;
-        ChannelData channel = nodeSource.getChannel(nodeChannel);
-        if (!supportsResourceRoundRobin(channel)) return false;
-        channel.setResourceRoundRobin(!channel.isResourceRoundRobin());
-        data.set(DATA_RESOURCE_ROUND_ROBIN, resourceRoundRobinState(channel));
-        ServerPayloadHandler.sendChannelSyncToViewers(nodeSource, nodeChannel, channel);
-        ServerPayloadHandler.propagateToLabelGroup(nodeSource, nodeChannel);
-        ServerPayloadHandler.invalidateNetwork(nodeSource);
+        if (clipboardSource != null) {
+            if (clipboardResourceRoundRobinState() < 0) return false;
+            clipboardSource.setChannelResourceRoundRobin(nodeChannel,
+                    !clipboardSource.getChannelResourceRoundRobin(nodeChannel));
+            data.set(DATA_RESOURCE_ROUND_ROBIN, clipboardResourceRoundRobinState());
+            saveClipboard();
+        } else {
+            if (nodeSource == null) return false;
+            ChannelData channel = nodeSource.getChannel(nodeChannel);
+            if (!supportsResourceRoundRobin(channel)) return false;
+            channel.setResourceRoundRobin(!channel.isResourceRoundRobin());
+            data.set(DATA_RESOURCE_ROUND_ROBIN, resourceRoundRobinState(channel));
+            ServerPayloadHandler.sendChannelSyncToViewers(nodeSource, nodeChannel, channel);
+            ServerPayloadHandler.propagateToLabelGroup(nodeSource, nodeChannel);
+            ServerPayloadHandler.invalidateNetwork(nodeSource);
+        }
         broadcastChanges();
         return true;
+    }
+
+    private int clipboardResourceRoundRobinState() {
+        boolean supported = clipboardSource.getChannelMode(nodeChannel) == ChannelMode.EXPORT
+                && (clipboardSource.getChannelType(nodeChannel) == ChannelType.ITEM
+                || clipboardSource.getChannelType(nodeChannel) == ChannelType.FLUID);
+        if (!supported) return -1;
+        return clipboardSource.getChannelResourceRoundRobin(nodeChannel) ? 1 : 0;
     }
 
     private int getDelta(int id) {
@@ -1191,6 +1335,12 @@ public class FilterMenu extends AbstractContainerMenu {
         if (graphContext != null) return graphContext.canEdit(player, nodeSource);
         if (nodeSource != null)
             return nodeSource.isAlive();
+        if (clipboardSource != null) {
+            ItemStack wrench = hand == InteractionHand.OFF_HAND
+                    ? player.getOffhandItem()
+                    : lockedSlot >= 0 ? player.getInventory().getItem(lockedSlot) : player.getMainHandItem();
+            return wrench.getItem() instanceof WrenchItem;
+        }
         ItemStack stack = getOpenedStack();
         return !stack.isEmpty() && (stack.getItem() instanceof BaseFilterItem ||
                 stack.getItem() instanceof ModFilterItem ||
@@ -1212,7 +1362,7 @@ public class FilterMenu extends AbstractContainerMenu {
                     || !(NodeAccessPolicy.canAccess(network.getOwnerUuid(), player.getUUID())
                     || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))) return;
         }
-        if (!player.level().isClientSide() && !isSpecialMode) {
+        if (!player.level().isClientSide() && !isSpecialMode && !returningToClipboard) {
             saveFilterItems(getOpenedStack(), player.level().registryAccess());
         }
         if (!player.level().isClientSide() && nodeSource != null) {
@@ -1226,6 +1376,29 @@ public class FilterMenu extends AbstractContainerMenu {
             }
             ServerPayloadHandler.markNetworkDirty(nodeSource);
         }
+        if (!player.level().isClientSide() && clipboardSource != null && !returningToClipboard) {
+            if (!hasConfiguredRules()) {
+                clipboardSource.setFilterItem(nodeChannel, nodeFilterSlot, ItemStack.EMPTY);
+            }
+            saveClipboard();
+        }
+    }
+
+    public void returnToClipboard(ServerPlayer player) {
+        if (clipboardSource == null) return;
+        returningToClipboard = true;
+        if (!isSpecialMode) saveFilterItems(getOpenedStack(), player.registryAccess());
+        if (!hasConfiguredRules()) clipboardSource.setFilterItem(nodeChannel, nodeFilterSlot, ItemStack.EMPTY);
+        saveClipboard();
+        ClipboardMenu.open(player, hand, nodeChannel);
+    }
+
+    private void saveClipboard() {
+        if (clipboardSource == null || player.level().isClientSide()) return;
+        ItemStack wrench = hand == InteractionHand.OFF_HAND
+                ? player.getOffhandItem()
+                : lockedSlot >= 0 ? player.getInventory().getItem(lockedSlot) : player.getMainHandItem();
+        WrenchItem.setClipboard(wrench, clipboardSource, player.registryAccess());
     }
 
     @Nullable
