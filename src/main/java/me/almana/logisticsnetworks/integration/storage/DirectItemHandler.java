@@ -2,9 +2,12 @@ package me.almana.logisticsnetworks.integration.storage;
 
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.transaction.SnapshotJournal;
 import net.neoforged.neoforge.transfer.transaction.TransactionContext;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -14,15 +17,19 @@ import java.util.Set;
 
 final class DirectItemHandler implements DirectItemAccess {
     private final StorageEndpoint endpoint;
+    @Nullable
+    private final ResourceHandler<ItemResource> buffer;
     private final DirectStorageReads reads;
     private final boolean exporting;
     private final ChangeJournal journal = new ChangeJournal();
     private List<StorageEndpoint.StoredItem> exports;
     private Map<ItemResource, Long> changes = new LinkedHashMap<>();
 
-    DirectItemHandler(StorageEndpoint endpoint, DirectStorageReads reads, boolean exporting) {
+    DirectItemHandler(StorageEndpoint endpoint, @Nullable ResourceHandler<ItemResource> buffer,
+            DirectStorageReads reads, boolean exporting) {
         ThreadGuard.requireServerThread();
         this.endpoint = endpoint;
+        this.buffer = buffer;
         this.reads = reads;
         this.exporting = exporting;
     }
@@ -37,7 +44,7 @@ final class DirectItemHandler implements DirectItemAccess {
 
     List<StorageEndpoint.StoredItem> exports() {
         ThreadGuard.requireServerThread();
-        if (exports == null) exports = exporting ? endpoint.exportableItems(reads.fresh()) : List.of();
+        if (exports == null) exports = exporting ? readExports() : List.of();
         return exports;
     }
 
@@ -56,7 +63,8 @@ final class DirectItemHandler implements DirectItemAccess {
     public long getAmountAsLong(int index) {
         if (index < 0 || index >= exports().size()) return 0;
         StorageEndpoint.StoredItem stored = exports().get(index);
-        return add(stored.amount(), changes.getOrDefault(ItemResource.of(stored.stack()), 0L));
+        ItemResource resource = ItemResource.of(stored.stack());
+        return add(add(stored.amount(), changes.getOrDefault(resource, 0L)), bufferedAmount(resource));
     }
 
     @Override
@@ -98,7 +106,8 @@ final class DirectItemHandler implements DirectItemAccess {
         long current = changes.getOrDefault(resource, 0L);
         int accepted = acceptedExtract(resource, amount, current);
         if (accepted > 0) move(resource, -accepted, transaction);
-        return accepted;
+        if (buffer == null || accepted == amount) return accepted;
+        return accepted + buffer.extract(resource, amount - accepted, transaction);
     }
 
     @Override
@@ -114,9 +123,49 @@ final class DirectItemHandler implements DirectItemAccess {
             Item item = change.getKey().getItem();
             if (items.contains(item)) totals.merge(item, change.getValue(), DirectItemHandler::add);
         }
+        if (buffer != null) {
+            for (int slot = 0; slot < buffer.size(); slot++) {
+                ItemResource resource = buffer.getResource(slot);
+                if (resource.isEmpty() || !items.contains(resource.getItem())
+                        || !endpoint.canExportItem(resource.toStack(1))) continue;
+                totals.merge(resource.getItem(), buffer.getAmountAsLong(slot), DirectItemHandler::saturatingAdd);
+            }
+        }
         Map<Item, Integer> result = new HashMap<>();
         for (Item item : items) result.put(item, DirectStorageReads.clamp(totals.getOrDefault(item, 0L)));
         return result;
+    }
+
+    private List<StorageEndpoint.StoredItem> readExports() {
+        Map<ItemResource, StorageEndpoint.StoredItem> items = new LinkedHashMap<>();
+        for (StorageEndpoint.StoredItem stored : endpoint.exportableItems(reads.fresh())) {
+            ItemStack stack = stored.stack().copyWithCount(1);
+            ItemResource key = ItemResource.of(stack);
+            StorageEndpoint.StoredItem current = items.get(key);
+            long amount = add(current == null ? 0 : current.amount(), stored.amount());
+            long buffered = current == null ? 0 : current.bufferedAmount();
+            items.put(key, new StorageEndpoint.StoredItem(stack, amount, buffered));
+        }
+        if (buffer == null) return List.copyOf(items.values());
+        for (int slot = 0; slot < buffer.size(); slot++) {
+            ItemResource key = buffer.getResource(slot);
+            long count = buffer.getAmountAsLong(slot);
+            if (key.isEmpty() || count <= 0 || !endpoint.canExportItem(key.toStack(1))) continue;
+            StorageEndpoint.StoredItem current = items.get(key);
+            long amount = current == null ? 0 : current.amount();
+            long buffered = add(current == null ? 0 : current.bufferedAmount(), count);
+            items.put(key, new StorageEndpoint.StoredItem(key.toStack(1), amount, buffered));
+        }
+        return List.copyOf(items.values());
+    }
+
+    private long bufferedAmount(ItemResource resource) {
+        if (buffer == null) return 0;
+        long total = 0;
+        for (int slot = 0; slot < buffer.size(); slot++) {
+            if (resource.equals(buffer.getResource(slot))) total = add(total, buffer.getAmountAsLong(slot));
+        }
+        return total;
     }
 
     private void move(ItemResource resource, int delta, TransactionContext transaction) {

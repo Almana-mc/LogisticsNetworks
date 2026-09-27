@@ -14,6 +14,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.world.level.storage.SavedDataStorage;
@@ -110,6 +111,12 @@ public class NetworkRegistry extends SavedData {
             }
         }
         return result;
+    }
+
+    public Collection<LogisticsNetwork> getVisibleNetworks(ServerPlayer player) {
+        return NodeAccessPolicy.isAdminMode(player)
+                ? getAllNetworks().values()
+                : getNetworksForPlayer(player.getUUID());
     }
 
     public void deleteNetwork(UUID id) {

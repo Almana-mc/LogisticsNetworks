@@ -58,12 +58,12 @@ public final class PlannedItemValidation {
                 registries, components, filters, -1)) {
             return move.withAmount(0, null);
         }
-        int allowed = allowed(candidate, target, imports, components, batchMoved);
+        int allowed = allowed(candidate, sourceSlot, target, mask, imports, components, batchMoved);
         return move.withAmount(Math.min(candidate.getCount(), allowed), mask);
     }
 
-    private int allowed(ItemStack candidate, ResourceHandler<ItemResource> target, ItemStack[] imports,
-            CompoundTag components, Map<Item, Integer> batchMoved) {
+    private int allowed(ItemStack candidate, int sourceSlot, ResourceHandler<ItemResource> target,
+            boolean[] mask, ItemStack[] imports, CompoundTag components, Map<Item, Integer> batchMoved) {
         TransferAmountRules.Constraints constraints = TransferAmountRules.collect(
                 channel.getFilterItems(), imports, filters);
         if (!constraints.hasPerEntryAmounts() && !constraints.hasImportThreshold()
@@ -80,7 +80,7 @@ public final class PlannedItemValidation {
         }
         int allowed = TransferAmountRules.allowedItems(candidate, constraints, sourceCounts, counts);
         int perEntry = TransferAmountRules.perEntryItemAmount(candidate, channel.getFilterItems(), imports,
-                sourceCounts, counts, registries, components, filters);
+                source, sourceSlot, target, mask, sourceCounts, counts, registries, components, filters);
         if (perEntry >= 0) allowed = Math.min(allowed, perEntry);
         int batch = TransferAmountRules.perEntryItemBatch(
                 candidate, channel.getFilterItems(), registries, components, filters);

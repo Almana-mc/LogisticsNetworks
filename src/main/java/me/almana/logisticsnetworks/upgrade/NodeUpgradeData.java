@@ -13,6 +13,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 public final class NodeUpgradeData {
@@ -28,6 +29,13 @@ public final class NodeUpgradeData {
             case CHEMICAL -> getChemicalOperationCap(tier);
             case SOURCE -> getSourceOperationCap(tier);
         };
+    }
+
+    public static void applyTypeChange(ChannelData channel, ChannelType type, int tier) {
+        if (channel.getType() == type) return;
+        Arrays.fill(channel.getFilterItems(), ItemStack.EMPTY);
+        channel.setType(type);
+        channel.setBatchSize(getOperationCap(type, tier));
     }
 
     public static void applyTierChange(ChannelData channel, int previousTier, int tier) {
@@ -185,14 +193,14 @@ public final class NodeUpgradeData {
     public static int getUpgradeTier(LogisticsNodeEntity node) {
         int maxTier = 0;
         for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-            maxTier = Math.max(maxTier, getTier(node.getUpgradeItem(i)));
+            maxTier = Math.max(maxTier, getUpgradeTier(node.getUpgradeItem(i)));
             if (maxTier == 4)
                 break;
         }
         return maxTier;
     }
 
-    private static int getTier(ItemStack stack) {
+    public static int getUpgradeTier(ItemStack stack) {
         if (stack.isEmpty())
             return 0;
         if (stack.is(Registration.NETHERITE_UPGRADE.get()))
