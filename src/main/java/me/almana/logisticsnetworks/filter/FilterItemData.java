@@ -126,6 +126,9 @@ public final class FilterItemData {
         }
     }
 
+    public record ItemStock(int amount, @Nullable int[] slots) {
+    }
+
     private FilterItemData() {
     }
 
@@ -1436,16 +1439,8 @@ public final class FilterItemData {
         ItemFilterView view = getItemFilterView(filter, readCache);
         LazyComponents components = new LazyComponents(candidateComponents);
         for (ItemFilterSlot entry : view.entriesBySlot()) {
-            if (entry == null)
+            if (entry == null || !coversSlot(entry, inventorySlot))
                 continue;
-
-            if (inventorySlot >= 0 && entry.slotMapping() != null) {
-                boolean inSet = false;
-                for (int s : entry.slotMapping()) {
-                    if (s == inventorySlot) { inSet = true; break; }
-                }
-                if (!inSet) continue;
-            }
 
             if (entry.slotOnly()) return true;
 
@@ -1543,45 +1538,39 @@ public final class FilterItemData {
 
     // ── Full amount threshold methods (tag-aware + constraint-aware) ──
 
-    public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider) {
-        return getItemAmountThresholdFull(filter, candidate, provider, null);
-    }
-
-    public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents) {
-        return getItemAmountThresholdFull(filter, candidate, provider, candidateComponents, null);
-    }
-
-    public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents, @Nullable ReadCache readCache) {
+    public static List<ItemStock> getItemStocksFull(ItemStack filter, ItemStack candidate,
+            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents, @Nullable ReadCache readCache,
+            int inventorySlot) {
         if (!isFilterItem(filter) || candidate.isEmpty())
-            return 0;
+            return List.of();
         ItemFilterView view = getItemFilterView(filter, readCache);
         LazyComponents components = new LazyComponents(candidateComponents);
+        List<ItemStock> stocks = new ArrayList<>();
         for (ItemFilterSlot entry : view.entriesBySlot()) {
-            if (entry == null)
-                continue;
-
-            String tag = entry.tag();
-            if (tag != null) {
-                if (entry.itemTag() != null && candidate.is(entry.itemTag())
-                        && entryConstraintsMatch(entry, candidate, provider, components))
-                    return entry.stock();
-                continue;
-            }
-
-            if (entry.nbtOnly()) {
-                if (entryConstraintsMatch(entry, candidate, provider, components))
-                    return entry.stock();
-                continue;
-            }
-
-            Item itemEntry = entry.item();
-            if (itemEntry != null && itemEntry == candidate.getItem()
-                    && itemEntryConstraintsMatch(filter, entry, candidate, provider, components)) return entry.stock();
+            if (entry != null && coversSlot(entry, inventorySlot)
+                    && itemEntryMatches(filter, entry, candidate, provider, components))
+                stocks.add(new ItemStock(entry.stock(), entry.slotMapping()));
         }
-        return 0;
+        return stocks;
+    }
+
+    private static boolean itemEntryMatches(ItemStack filter, ItemFilterSlot entry, ItemStack candidate,
+            HolderLookup.Provider provider, LazyComponents components) {
+        if (entry.tag() != null)
+            return entry.itemTag() != null && candidate.is(entry.itemTag())
+                    && entryConstraintsMatch(entry, candidate, provider, components);
+        if (entry.nbtOnly())
+            return entryConstraintsMatch(entry, candidate, provider, components);
+        return entry.item() == candidate.getItem()
+                && itemEntryConstraintsMatch(filter, entry, candidate, provider, components);
+    }
+
+    private static boolean coversSlot(ItemFilterSlot entry, int inventorySlot) {
+        if (inventorySlot < 0 || entry.slotMapping() == null) return true;
+        for (int s : entry.slotMapping()) {
+            if (s == inventorySlot) return true;
+        }
+        return false;
     }
 
     public static int getItemBatchLimitFull(ItemStack filter, ItemStack candidate,

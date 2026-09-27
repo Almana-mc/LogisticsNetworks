@@ -904,7 +904,8 @@ public class TransferEngine {
                                     sourceItemCounts, targetItemCounts.get(targetIndex));
                             if (target.constraints().hasPerEntryAmounts() && provider != null) {
                                 int perEntry = TransferAmountRules.perEntryItemAmount(extracted, exportFilters,
-                                        target.importFilters(), sourceItemCounts,
+                                        target.importFilters(), source, slot, target.handler(), importAllowedSlots,
+                                        sourceItemCounts,
                                         targetItemCounts.get(targetIndex), provider, candidateComponents,
                                         filterReadCache);
                                 if (perEntry >= 0) {
