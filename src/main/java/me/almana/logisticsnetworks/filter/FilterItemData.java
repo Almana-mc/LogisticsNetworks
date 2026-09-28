@@ -370,8 +370,6 @@ public final class FilterItemData {
     public static boolean hasAnyFluidEntries(ItemStack stack, @Nullable ReadCache readCache) {
         if (!isFilterItem(stack))
             return false;
-        if (readCache == null)
-            return hasEntryType(stack, KEY_FLUID_ID);
         return getItemFilterView(stack, readCache).hasFluidEntries();
     }
 
@@ -565,8 +563,6 @@ public final class FilterItemData {
     public static boolean hasAnyChemicalEntries(ItemStack stack, @Nullable ReadCache readCache) {
         if (!isFilterItem(stack))
             return false;
-        if (readCache == null)
-            return hasEntryType(stack, KEY_CHEMICAL_ID);
         return getItemFilterView(stack, readCache).hasChemicalEntries();
     }
 
@@ -1502,8 +1498,8 @@ public final class FilterItemData {
             if (slot == null)
                 continue;
             String tag = slot.tag();
-            if (tag != null) {
-                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
+            if (tag != null || slot.nbtOnly()) {
+                if (tag == null || candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
                     if (slot.hasNbt()) {
                         if (!candidateComponentsResolved) {
                             candidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
@@ -1550,6 +1546,8 @@ public final class FilterItemData {
                     return true;
                 continue;
             }
+            if (slot.nbtOnly())
+                return true;
             String entryId = slot.chemicalId();
             if (entryId != null && entryId.equals(chemicalId))
                 return true;
@@ -1652,6 +1650,8 @@ public final class FilterItemData {
                     return slot.stock();
                 continue;
             }
+            if (slot.nbtOnly())
+                return slot.stock();
             FluidStack entry = slot.fluidEntry();
             if (entry != null && !entry.isEmpty() && FluidStack.isSameFluidSameComponents(entry, candidate))
                 return slot.stock();
@@ -1677,6 +1677,8 @@ public final class FilterItemData {
                     return slot.stock();
                 continue;
             }
+            if (slot.nbtOnly())
+                return slot.stock();
             String entryId = slot.chemicalId();
             if (entryId != null && entryId.equals(chemicalId))
                 return slot.stock();
@@ -1702,6 +1704,8 @@ public final class FilterItemData {
                     return slot.batch();
                 continue;
             }
+            if (slot.nbtOnly())
+                return slot.batch();
             FluidStack entry = slot.fluidEntry();
             if (entry != null && !entry.isEmpty() && FluidStack.isSameFluidSameComponents(entry, candidate))
                 return slot.batch();
@@ -1727,6 +1731,8 @@ public final class FilterItemData {
                     return slot.batch();
                 continue;
             }
+            if (slot.nbtOnly())
+                return slot.batch();
             String entryId = slot.chemicalId();
             if (entryId != null && entryId.equals(chemicalId))
                 return slot.batch();
@@ -2091,8 +2097,8 @@ public final class FilterItemData {
             if (entry == null)
                 continue;
             item |= entry.item() != null || entry.nbtOnly();
-            fluid |= entry.fluidEntry() != null;
-            chemical |= entry.chemicalId() != null;
+            fluid |= entry.fluidEntry() != null || entry.nbtOnly();
+            chemical |= entry.chemicalId() != null || entry.nbtOnly();
             tag |= entry.tag() != null;
             nbt |= entry.hasNbt();
             amount |= entry.batch() > 0 || entry.stock() > 0 || entry.enchanted() != null;
@@ -2216,8 +2222,8 @@ public final class FilterItemData {
                     nbtMatchAny, slotMapping, slotOnly, enchanted);
 
             hasItemEntries |= item != null || nbtOnly;
-            hasFluidEntries |= hasFluid;
-            hasChemicalEntries |= hasChemical;
+            hasFluidEntries |= hasFluid || nbtOnly;
+            hasChemicalEntries |= hasChemical || nbtOnly;
             hasTagEntries |= tag != null;
             hasNbtEntries |= hasNbt;
             hasAmountEntries |= batch > 0 || stock > 0 || enchanted != null;
