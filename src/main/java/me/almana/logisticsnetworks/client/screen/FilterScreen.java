@@ -40,6 +40,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -151,6 +152,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private Map<String, String> detailNbtActiveOps = new HashMap<>();
     private int nbtTableEditingRow = -1;
     private List<ItemStack> nbtOnlyCycleItems;
+    private List<Fluid> anyCycleFluids;
+    private List<String> anyCycleChemicals;
     private EditBox detailNbtValueBox;
     private EditBox detailIdInputBox;
     private EditBox detailBatchInputBox;
@@ -450,9 +453,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (menu.isModMode())
             renderModTooltip(g, mx, my);
-        else if (menu.getTargetType() == FilterTargetType.FLUIDS || menu.getTargetType() == FilterTargetType.CHEMICALS) {
-            renderFluidTooltip(g, mx, my);
-        }
 
         if (!menu.isTagMode() && !menu.isModMode()
                 && tagEditSlot < 0 && nbtEditSlot < 0 && detailEditSlot < 0
@@ -558,17 +558,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     || isAnyItemSlot(i)) {
                 drawSlot(g, sx, sy);
                 g.renderOutline(sx, sy, 18, 18, 0xFF44BB44);
-                if (nbtOnlyCycleItems == null) {
-                    nbtOnlyCycleItems = BuiltInRegistries.ITEM.stream()
-                            .map(ItemStack::new)
-                            .filter(s -> !s.isEmpty())
-                            .toList();
-                }
-                if (!nbtOnlyCycleItems.isEmpty()) {
-                    long tick = (System.currentTimeMillis() / 1000);
-                    int idx = (int) (tick % nbtOnlyCycleItems.size());
-                    g.renderItem(nbtOnlyCycleItems.get(idx), sx + 1, sy + 1);
-                }
+                renderAnyResource(g, sx + 1, sy + 1);
             } else {
                 drawSlot(g, sx, sy);
             }
@@ -882,6 +872,43 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 int x = leftPos + slot.x;
                 int y = topPos + slot.y;
                 FilterResourceRenderer.renderFluid(g, fs, x, y);
+            }
+        }
+    }
+
+    private void renderAnyResource(GuiGraphics g, int x, int y) {
+        long tick = System.currentTimeMillis() / 1000;
+        switch (menu.getTargetType()) {
+            case FLUIDS -> {
+                if (anyCycleFluids == null) {
+                    anyCycleFluids = BuiltInRegistries.FLUID.stream()
+                            .filter(f -> f != Fluids.EMPTY && f.isSource(f.defaultFluidState()))
+                            .toList();
+                }
+                if (!anyCycleFluids.isEmpty()) {
+                    Fluid fluid = anyCycleFluids.get((int) (tick % anyCycleFluids.size()));
+                    FilterResourceRenderer.renderFluid(g, new FluidStack(fluid, 1000), x, y);
+                }
+            }
+            case CHEMICALS -> {
+                if (anyCycleChemicals == null) {
+                    anyCycleChemicals = MekanismCompat.getAllChemicalIds();
+                }
+                if (!anyCycleChemicals.isEmpty()) {
+                    String id = anyCycleChemicals.get((int) (tick % anyCycleChemicals.size()));
+                    FilterResourceRenderer.renderChemical(g, id, x, y);
+                }
+            }
+            default -> {
+                if (nbtOnlyCycleItems == null) {
+                    nbtOnlyCycleItems = BuiltInRegistries.ITEM.stream()
+                            .map(ItemStack::new)
+                            .filter(s -> !s.isEmpty())
+                            .toList();
+                }
+                if (!nbtOnlyCycleItems.isEmpty()) {
+                    g.renderItem(nbtOnlyCycleItems.get((int) (tick % nbtOnlyCycleItems.size())), x, y);
+                }
             }
         }
     }
@@ -2022,7 +2049,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private boolean hasEntryInSlot(int slot) {
-        if (menu.isTagSlot(slot))
+        ItemStack openedStack = menu.getOpenedStack();
+        if (menu.isTagSlot(slot) || FilterItemData.isNbtOnlySlot(openedStack, slot))
             return true;
         if (menu.getTargetType() == FilterTargetType.FLUIDS) {
             return !menu.getFluidFilter(slot).isEmpty();
@@ -2032,9 +2060,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
         if (slot < menu.slots.size() && !menu.slots.get(slot).getItem().isEmpty())
             return true;
-        ItemStack openedStack = menu.getOpenedStack();
-        return FilterItemData.isNbtOnlySlot(openedStack, slot)
-                || FilterItemData.hasEntrySlotMapping(openedStack, slot);
+        return FilterItemData.hasEntrySlotMapping(openedStack, slot);
     }
 
     private int computeScrollDelta(double scrollDirection, FilterTargetType targetType) {
@@ -2070,32 +2096,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (extractor != null && menu.getExtractorItem().isEmpty()
                 && isHovering(extractor[0], extractor[1], 18, 18, mx, my)) {
             g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.selector_hint"), mx, my);
-        }
-    }
-
-    private void renderFluidTooltip(GuiGraphics g, int mx, int my) {
-        for (int i = 0; i < menu.getFilterSlots(); i++) {
-            var slot = menu.slots.get(i);
-            int x = leftPos + slot.x;
-            int y = topPos + slot.y;
-            if (isHovering(x, y, 18, 18, mx, my)) {
-                FluidStack fs = menu.getFluidFilter(i);
-                if (!fs.isEmpty()) {
-                    g.renderTooltip(font, fs.getHoverName(), mx, my);
-                    break;
-                }
-                String chemId = menu.getChemicalFilter(i);
-                if (chemId != null) {
-                    Component name = MekanismCompat.getChemicalTextComponent(chemId);
-                    if (name != null) {
-                        g.renderTooltip(font, name, mx, my);
-                    } else {
-                        g.renderTooltip(font, Component.literal(chemId), mx, my);
-                    }
-                    break;
-                }
-                break;
-            }
         }
     }
 
@@ -3523,7 +3523,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     }
                 }
             }
-        } else if (!isFluidOrChemical && FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
+        } else if (isFluidOrChemical && FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
+            g.renderOutline(slotX, slotY, 18, 18, 0xFF44BB44);
+            renderAnyResource(g, slotX + 1, slotY + 1);
+        } else if (FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
             boolean hasNbt = FilterItemData.hasEntryNbt(openedStack, detailEditSlot);
             int ic = hasNbt ? DETAIL_NBT_COLOR : DETAIL_DUR_COLOR;
             String il = hasNbt ? "N" : "D";
@@ -4645,6 +4648,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         String tag = menu.getEntryTag(slot);
         ItemStack slotItem = slot < menu.slots.size() ? menu.slots.get(slot).getItem() : ItemStack.EMPTY;
+        FluidStack fluid = menu.getFluidFilter(slot);
+        String chemId = menu.getChemicalFilter(slot);
         boolean isNbtOnly = FilterItemData.isNbtOnlySlot(filterStack, slot);
 
         int batch = menu.getEntryBatch(slot);
@@ -4655,9 +4660,18 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         } else if (!slotItem.isEmpty()) {
             ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(slotItem.getItem());
             lines.add(Component.literal(itemId.toString()).withStyle(ChatFormatting.WHITE));
-        } else if (isNbtOnly || batch > 0 || stock > 0
-                || FilterItemData.hasEntrySlotMapping(filterStack, slot)) {
-            lines.add(Component.literal("Any Item").withStyle(ChatFormatting.AQUA));
+        } else if (!fluid.isEmpty()) {
+            lines.add(fluid.getHoverName().copy().withStyle(ChatFormatting.WHITE));
+        } else if (chemId != null) {
+            Component name = MekanismCompat.getChemicalTextComponent(chemId);
+            lines.add((name != null ? name.copy() : Component.literal(chemId)).withStyle(ChatFormatting.WHITE));
+        } else if (isNbtOnly || FilterItemData.hasEntrySlotMapping(filterStack, slot)) {
+            String any = switch (menu.getTargetType()) {
+                case FLUIDS -> "Any Fluid";
+                case CHEMICALS -> "Any Chemical";
+                default -> "Any Item";
+            };
+            lines.add(Component.literal(any).withStyle(ChatFormatting.AQUA));
         } else {
             return lines;
         }
