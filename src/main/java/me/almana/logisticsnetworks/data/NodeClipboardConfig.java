@@ -330,7 +330,7 @@ public final class NodeClipboardConfig {
     }
 
     public void setChannelRedstoneMode(int channel, RedstoneMode mode) {
-        getChannelConfig(channel).redstoneMode = mode == null ? RedstoneMode.LOW : mode;
+        getChannelConfig(channel).redstoneMode = mode == null ? RedstoneMode.IGNORED : mode;
     }
 
     public DistributionMode getChannelDistributionMode(int channel) {
@@ -625,7 +625,7 @@ public final class NodeClipboardConfig {
                 config.batchSize = 8;
                 config.tickDelay = 20;
                 config.ioDirection = Direction.UP;
-                config.redstoneMode = RedstoneMode.LOW;
+                config.redstoneMode = RedstoneMode.IGNORED;
                 config.distributionMode = DistributionMode.PRIORITY;
                 config.filterMode = FilterMode.MATCH_ANY;
                 config.priority = 0;
@@ -1208,7 +1208,7 @@ public final class NodeClipboardConfig {
         config.batchSize = 8;
         config.tickDelay = 20;
         config.ioDirection = Direction.UP;
-        config.redstoneMode = RedstoneMode.LOW;
+        config.redstoneMode = RedstoneMode.IGNORED;
         config.distributionMode = DistributionMode.PRIORITY;
         config.filterMode = FilterMode.MATCH_ANY;
         config.priority = 0;

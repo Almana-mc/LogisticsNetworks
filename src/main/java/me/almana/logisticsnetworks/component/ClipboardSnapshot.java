@@ -84,7 +84,7 @@ public record ClipboardSnapshot(
             batchSize = Math.max(1, batchSize);
             tickDelay = Math.max(1, tickDelay);
             direction = direction == null ? Optional.empty() : direction;
-            redstoneMode = redstoneMode == null ? RedstoneMode.LOW : redstoneMode;
+            redstoneMode = redstoneMode == null ? RedstoneMode.IGNORED : redstoneMode;
             distributionMode = distributionMode == null ? DistributionMode.PRIORITY : distributionMode;
             filterMode = filterMode == null ? FilterMode.MATCH_ANY : filterMode;
             priority = Math.max(-99, Math.min(99, priority));
@@ -95,7 +95,7 @@ public record ClipboardSnapshot(
                 int batchSize, int tickDelay, Optional<Direction> direction, Optional<String> redstoneMode,
                 DistributionMode distributionMode, FilterMode filterMode, int priority, String name,
                 boolean resourceRoundRobin) {
-            String savedRedstoneMode = redstoneMode.orElse("low");
+            String savedRedstoneMode = redstoneMode.orElse("ignored");
             return new ChannelState(
                     enabled && !RedstoneMode.disablesChannel(savedRedstoneMode),
                     mode,
