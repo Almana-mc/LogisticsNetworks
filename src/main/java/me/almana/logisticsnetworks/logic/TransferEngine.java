@@ -1083,7 +1083,8 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack simulatedInsert = extracted.copyWithCount(allowed);
+                    ItemStack simulatedInsert = allowed == extracted.getCount() ? extracted
+                            : extracted.copyWithCount(allowed);
                     StackedInsertion insertion = prepareStackedInsertion(
                             target.handler(), bulkHandler, importAllowedSlots);
                     ItemStack simRemainder;
