@@ -52,6 +52,8 @@ public class TransferEngine {
     private static final float BACKOFF_MULTIPLIER = 1.3f;
     private static final float BACKOFF_DECAY_DIVISOR = 3f;
     private static final float BACKOFF_MAX_TICKS_ENERGY = 5f;
+    private static final byte SLOT_REJECTED = 1;
+    private static final byte SLOT_PASSED = 2;
 
     public record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
     }
@@ -981,6 +983,7 @@ public class TransferEngine {
         // Serialize each source slot once across the target loop
         CompoundTag[] slotComponents = hasNbtFilter ? new CompoundTag[source.getSlots()] : null;
         boolean[] slotComponentsCached = hasNbtFilter ? new boolean[source.getSlots()] : null;
+        byte[] slotVerdicts = new byte[sourceSlots == null ? source.getSlots() : sourceSlots.length];
 
         while (remaining > 0 && openTargetCount > 0) {
             movedAny = false;
@@ -1005,11 +1008,17 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack extracted = source.extractItem(slot, Math.min(remaining, targetRemaining), true);
-                    if (extracted.isEmpty() || extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
+                    if (slotVerdicts[entry] == SLOT_REJECTED) {
                         continue;
                     }
-                    if (resource != null && !resource.equals(new ItemResource(extracted))) continue;
+
+                    ItemStack extracted = source.extractItem(slot, Math.min(remaining, targetRemaining), true);
+                    boolean sourcePassed = slotVerdicts[entry] == SLOT_PASSED;
+                    if (extracted.isEmpty() || !sourcePassed && (extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
+                            || resource != null && !resource.equals(new ItemResource(extracted)))) {
+                        slotVerdicts[entry] = SLOT_REJECTED;
+                        continue;
+                    }
 
                     CompoundTag candidateComponents = null;
                     if (provider != null && hasNbtFilter) {
@@ -1020,12 +1029,14 @@ public class TransferEngine {
                         candidateComponents = slotComponents[slot];
                     }
 
-                    if (provider != null) {
+                    if (provider != null && !sourcePassed) {
                         if (!FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode, extracted, provider,
                                 candidateComponents, filterReadCache, slot)) {
+                            slotVerdicts[entry] = SLOT_REJECTED;
                             continue;
                         }
                     }
+                    slotVerdicts[entry] = SLOT_PASSED;
 
                     boolean[] importAllowedSlots = target.allowedSlots();
                     if (provider != null) {
@@ -1140,6 +1151,8 @@ public class TransferEngine {
                             }
                         }
                     }
+                    // Source changed, recheck slots
+                    slotVerdicts = new byte[Math.max(slotVerdicts.length, source.getSlots())];
 
                     if (targetAccepted > 0) {
                         insertRejections = null;
