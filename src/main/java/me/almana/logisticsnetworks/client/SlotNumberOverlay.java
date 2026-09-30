@@ -79,7 +79,7 @@ public class SlotNumberOverlay {
             g.pose().pushPose();
             g.pose().translate(0, 0, 1);
             for (Slot slot : screen.getMenu().slots) {
-                String label = String.valueOf(slot.index);
+                String label = String.valueOf(slot.getSlotIndex());
                 int textWidth = font.width(label);
                 float scale = Math.min(16f / font.lineHeight, 16f / textWidth) * 0.8f;
                 g.pose().pushPose();

@@ -62,7 +62,7 @@ public final class FilterItemData {
     private static final String KEY_RULE_P = "p";
     private static final String KEY_RULE_O = "o";
     private static final String KEY_RULE_V = "v";
-    private static final int MAX_NBT_RULES_PER_SLOT = 6;
+    private static final int MAX_NBT_RULES_PER_SLOT = 8;
     private static final String NBT_OP_EQUALS = "=";
 
     public static final class ReadCache {
@@ -124,6 +124,9 @@ public final class FilterItemData {
             String val = value != null ? value.toString() : "";
             return path + " " + operator + " " + val;
         }
+    }
+
+    public record ItemStock(int amount, @Nullable int[] slots) {
     }
 
     private FilterItemData() {
@@ -1045,11 +1048,13 @@ public final class FilterItemData {
     }
 
     public static boolean isNbtOnlySlot(ItemStack stack, int slot) {
-        if (!hasEntryNbt(stack, slot) && !hasEntryDurability(stack, slot) && !hasEntryEnchanted(stack, slot))
+        if (!hasEntryNbt(stack, slot) && !hasEntryDurability(stack, slot) && !hasEntryEnchanted(stack, slot)
+                && getEntryBatch(stack, slot) <= 0 && getEntryStock(stack, slot) <= 0)
             return false;
         return getEntryTag(stack, slot) == null
                 && !hasEntryItem(stack, slot)
-                && getFluidEntry(stack, slot).isEmpty();
+                && getFluidEntry(stack, slot).isEmpty()
+                && getChemicalEntry(stack, slot) == null;
     }
 
     public static boolean isEntryNbtStrict(ItemStack stack, int slot) {
@@ -1434,16 +1439,8 @@ public final class FilterItemData {
         ItemFilterView view = getItemFilterView(filter, readCache);
         LazyComponents components = new LazyComponents(candidateComponents);
         for (ItemFilterSlot entry : view.entriesBySlot()) {
-            if (entry == null)
+            if (entry == null || !coversSlot(entry, inventorySlot))
                 continue;
-
-            if (inventorySlot >= 0 && entry.slotMapping() != null) {
-                boolean inSet = false;
-                for (int s : entry.slotMapping()) {
-                    if (s == inventorySlot) { inSet = true; break; }
-                }
-                if (!inSet) continue;
-            }
 
             if (entry.slotOnly()) return true;
 
@@ -1541,45 +1538,39 @@ public final class FilterItemData {
 
     // ── Full amount threshold methods (tag-aware + constraint-aware) ──
 
-    public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider) {
-        return getItemAmountThresholdFull(filter, candidate, provider, null);
-    }
-
-    public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents) {
-        return getItemAmountThresholdFull(filter, candidate, provider, candidateComponents, null);
-    }
-
-    public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents, @Nullable ReadCache readCache) {
+    public static List<ItemStock> getItemStocksFull(ItemStack filter, ItemStack candidate,
+            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents, @Nullable ReadCache readCache,
+            int inventorySlot) {
         if (!isFilterItem(filter) || candidate.isEmpty())
-            return 0;
+            return List.of();
         ItemFilterView view = getItemFilterView(filter, readCache);
         LazyComponents components = new LazyComponents(candidateComponents);
+        List<ItemStock> stocks = new ArrayList<>();
         for (ItemFilterSlot entry : view.entriesBySlot()) {
-            if (entry == null)
-                continue;
-
-            String tag = entry.tag();
-            if (tag != null) {
-                if (entry.itemTag() != null && candidate.is(entry.itemTag())
-                        && entryConstraintsMatch(entry, candidate, provider, components))
-                    return entry.stock();
-                continue;
-            }
-
-            if (entry.nbtOnly()) {
-                if (entryConstraintsMatch(entry, candidate, provider, components))
-                    return entry.stock();
-                continue;
-            }
-
-            Item itemEntry = entry.item();
-            if (itemEntry != null && itemEntry == candidate.getItem()
-                    && itemEntryConstraintsMatch(filter, entry, candidate, provider, components)) return entry.stock();
+            if (entry != null && coversSlot(entry, inventorySlot)
+                    && itemEntryMatches(filter, entry, candidate, provider, components))
+                stocks.add(new ItemStock(entry.stock(), entry.slotMapping()));
         }
-        return 0;
+        return stocks;
+    }
+
+    private static boolean itemEntryMatches(ItemStack filter, ItemFilterSlot entry, ItemStack candidate,
+            HolderLookup.Provider provider, LazyComponents components) {
+        if (entry.tag() != null)
+            return entry.itemTag() != null && candidate.is(entry.itemTag())
+                    && entryConstraintsMatch(entry, candidate, provider, components);
+        if (entry.nbtOnly())
+            return entryConstraintsMatch(entry, candidate, provider, components);
+        return entry.item() == candidate.getItem()
+                && itemEntryConstraintsMatch(filter, entry, candidate, provider, components);
+    }
+
+    private static boolean coversSlot(ItemFilterSlot entry, int inventorySlot) {
+        if (inventorySlot < 0 || entry.slotMapping() == null) return true;
+        for (int s : entry.slotMapping()) {
+            if (s == inventorySlot) return true;
+        }
+        return false;
     }
 
     public static int getItemBatchLimitFull(ItemStack filter, ItemStack candidate,
@@ -2050,8 +2041,8 @@ public final class FilterItemData {
                 : entry.slotMapping().slots().stream().mapToInt(Integer::intValue).toArray();
         boolean hasNbt = !rules.isEmpty() || !entry.nbt().raw().isEmpty();
         boolean hasDur = entry.durability() != null;
-        boolean nbtOnly = (hasNbt || hasDur || entry.enchanted() != null) && tag == null && item == null
-                && fluidId == null && chemicalId == null;
+        boolean nbtOnly = (hasNbt || hasDur || entry.enchanted() != null || entry.counts().batch() > 0 || stock > 0)
+                && tag == null && item == null && fluidId == null && chemicalId == null;
         boolean strict = item != null && entry.nbt().strict().orElse(
                 !hasNbt && !hasDur && entry.enchanted() == null);
         boolean slotOnly = mapping != null && tag == null && item == null && fluidId == null
@@ -2068,7 +2059,7 @@ public final class FilterItemData {
         for (ItemFilterSlot entry : entriesBySlot) {
             if (entry == null)
                 continue;
-            item |= entry.item() != null;
+            item |= entry.item() != null || entry.nbtOnly();
             fluid |= entry.fluidEntry() != null;
             chemical |= entry.chemicalId() != null;
             tag |= entry.tag() != null;
@@ -2189,7 +2180,8 @@ public final class FilterItemData {
             boolean hasNbt = !nbtRules.isEmpty() || nbtPath != null || raw != null;
             boolean hasDur = durOp != null;
             Boolean enchanted = entry.contains(KEY_ENCHANTED) ? entry.getBooleanOr(KEY_ENCHANTED, false) : null;
-            boolean nbtOnly = (hasNbt || hasDur || enchanted != null) && tag == null && item == null && !hasFluid && !hasChemical;
+            boolean nbtOnly = (hasNbt || hasDur || enchanted != null || batch > 0 || stock > 0)
+                    && tag == null && item == null && !hasFluid && !hasChemical;
             boolean nbtStrict = isEntryNbtStrict(entry);
 
             int[] slotMapping = null;
@@ -2205,7 +2197,7 @@ public final class FilterItemData {
                     nbtValue, nbtOp, rawNbt, invalidRawNbt, durOp, durVal, hasNbt, nbtOnly, nbtStrict, nbtRules,
                     nbtMatchAny, slotMapping, slotOnly, enchanted, itemTag, fluidTag);
 
-            hasItemEntries |= item != null;
+            hasItemEntries |= item != null || nbtOnly;
             hasFluidEntries |= hasFluid;
             hasChemicalEntries |= hasChemical;
             hasTagEntries |= tag != null;

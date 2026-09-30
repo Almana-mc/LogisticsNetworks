@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.GraphPayloadHandler;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
@@ -14,7 +15,6 @@ import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -218,16 +218,15 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     public void sendNetworkListToClient(ServerPlayer player) {
+        sendAvailableNetworkListToClient(player);
+    }
+
+    public static void sendAvailableNetworkListToClient(ServerPlayer player) {
         if (!(player.level() instanceof ServerLevel level))
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        Collection<LogisticsNetwork> networks;
-        if (player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
-            networks = registry.getAllNetworks().values();
-        } else {
-            networks = registry.getNetworksForPlayer(player.getUUID());
-        }
+        Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {
@@ -236,6 +235,7 @@ public class NodeMenu extends AbstractContainerMenu {
                     net.getName(),
                     net.getNodeUuids().size(),
                     false,
+                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
                     net.getCreatedAt(),
                     net.getColor()));
         }
@@ -277,14 +277,18 @@ public class NodeMenu extends AbstractContainerMenu {
         int nodeSlotCount = UPGRADE_SLOTS;
 
         if (index < nodeSlotCount) {
+            ItemStack remainder = fromStack.copy();
             movingUpgrade = true;
             try {
-                if (!moveItemStackTo(fromStack, nodeSlotCount, slots.size(), true)) {
+                if (!moveItemStackTo(remainder, nodeSlotCount, slots.size(), true)) {
                     return ItemStack.EMPTY;
                 }
+                fromSlot.set(remainder);
             } finally {
                 movingUpgrade = false;
             }
+            refreshUpgradeChannels();
+            return copy;
         } else {
             if (!fromStack.is(ModTags.UPGRADES)) {
                 return ItemStack.EMPTY;
@@ -308,15 +312,6 @@ public class NodeMenu extends AbstractContainerMenu {
             refreshUpgradeChannels();
             return ItemStack.EMPTY;
         }
-
-        if (fromStack.isEmpty()) {
-            fromSlot.set(ItemStack.EMPTY);
-        } else {
-            fromSlot.setChanged();
-        }
-
-        refreshUpgradeChannels();
-        return copy;
     }
 
     private void refreshUpgradeChannels() {

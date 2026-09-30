@@ -3,8 +3,11 @@ package me.almana.logisticsnetworks.component;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
+import net.minecraft.nbt.ByteTag;
+import net.minecraft.nbt.IntTag;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,6 +43,19 @@ public record GeneralFilterEntry(
         counts = counts == null ? EntryCounts.EMPTY : counts;
         slotMapping = slotMapping == null ? SlotMapping.EMPTY : slotMapping;
         nbt = nbt == null ? NbtConstraints.EMPTY : nbt;
+        if (enchanted != null || durability != null) {
+            List<NbtCriterion> rules = new ArrayList<>(nbt.rules());
+            if (enchanted != null && rules.stream().noneMatch(rule -> rule.path().equals("minecraft:enchanted"))) {
+                rules.add(new NbtCriterion("minecraft:enchanted", "=", ByteTag.valueOf(enchanted)));
+            }
+            if (durability != null && rules.stream().noneMatch(rule -> rule.path().equals("minecraft:durability"))) {
+                rules.add(new NbtCriterion("minecraft:durability", durability.operator().symbol(),
+                        IntTag.valueOf(durability.value())));
+            }
+            nbt = new NbtConstraints(rules, nbt.matchAny(), nbt.strict(), nbt.raw());
+            enchanted = null;
+            durability = null;
+        }
     }
 
     public static GeneralFilterEntry empty(int slot) {

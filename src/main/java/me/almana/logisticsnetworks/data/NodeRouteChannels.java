@@ -33,7 +33,7 @@ public final class NodeRouteChannels {
             return false;
         }
         ChannelType type = channel.getType();
-        if (mounted && (channel.getRedstoneMode() != RedstoneMode.ALWAYS_ON
+        if (mounted && (channel.getRedstoneMode() != RedstoneMode.IGNORED
                 || type != ChannelType.ITEM && type != ChannelType.FLUID)) {
             return false;
         }

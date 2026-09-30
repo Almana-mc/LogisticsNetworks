@@ -6,6 +6,7 @@ import mezz.jei.api.gui.handlers.IGuiContainerHandler;
 import mezz.jei.api.registration.IGuiHandlerRegistration;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
+import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
 import net.minecraft.client.Minecraft;
@@ -32,6 +33,7 @@ public class LogisticsJeiPlugin implements IModPlugin {
         registration.addGhostIngredientHandler(FilterScreen.class, FILTER_GHOST_HANDLER);
         registration.addGhostIngredientHandler(NodeScreen.class, NODE_GHOST_HANDLER);
         registration.addGhostIngredientHandler(NodeGraphScreen.class, new NodeGhostIngredientHandler<>());
+        registration.addGhostIngredientHandler(ClipboardScreen.class, new NodeGhostIngredientHandler<>());
         registration.addGuiContainerHandler(NodeGraphScreen.class, new IGuiContainerHandler<>() {
             @Override
             public List<Rect2i> getGuiExtraAreas(NodeGraphScreen screen) {

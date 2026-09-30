@@ -94,7 +94,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
             changed |= copyInt(channel, entry, "batch", 8);
             changed |= copyInt(channel, entry, "delay", 20);
             changed |= copyString(channel, entry, "io", "up");
-            changed |= copyString(channel, entry, "redstone", "ALWAYS_ON");
+            changed |= copyString(channel, entry, "redstone", "IGNORED");
             changed |= copyString(channel, entry, "distribution", "PRIORITY");
             changed |= copyString(channel, entry, "filter_mode", "MATCH_ANY");
             changed |= copyBoolean(channel, entry, "resource_round_robin", false);

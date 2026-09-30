@@ -15,6 +15,7 @@ import net.neoforged.neoforge.transfer.item.ItemUtil;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -130,42 +131,78 @@ public final class TransferAmountRules {
     }
 
     static int perEntryItemAmount(ItemStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts,
+            ItemStack[] importFilters, ResourceHandler<ItemResource> source, int sourceSlot,
+            ResourceHandler<ItemResource> target, @Nullable boolean[] importMask,
+            Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts,
             HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         int allowed = Integer.MAX_VALUE;
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                int threshold = FilterItemData.getItemAmountThresholdFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache);
-                if (threshold > 0) {
-                    int sourceCount = sourceCounts != null ? sourceCounts.getOrDefault(candidate.getItem(), 0) : 0;
-                    int exportCap = sourceCount - threshold;
-                    if (exportCap <= 0) {
-                        return 0;
-                    }
-                    allowed = Math.min(allowed, exportCap);
+                List<FilterItemData.ItemStock> stocks = FilterItemData.getItemStocksFull(filter, candidate, provider,
+                        candidateComponents, filterReadCache, sourceSlot);
+                if (stocks.isEmpty() || stocks.getFirst().amount() <= 0) continue;
+                FilterItemData.ItemStock stock = stocks.getFirst();
+                int sourceCount = stockedCount(source, stock.slots(), sourceCounts, candidate.getItem());
+                int exportCap = sourceCount - stock.amount();
+                if (exportCap <= 0) {
+                    return 0;
                 }
+                allowed = Math.min(allowed, exportCap);
             }
         }
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                int threshold = FilterItemData.getItemAmountThresholdFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache);
-                if (threshold > 0) {
-                    int targetCount = targetCounts != null ? targetCounts.getOrDefault(candidate.getItem(), 0) : 0;
-                    int importCap = threshold - targetCount;
-                    if (importCap <= 0) {
-                        return 0;
-                    }
-                    allowed = Math.min(allowed, importCap);
+                int importCap = importCap(FilterItemData.getItemStocksFull(filter, candidate, provider,
+                        candidateComponents, filterReadCache, -1), target, importMask, targetCounts,
+                        candidate.getItem());
+                if (importCap <= 0) {
+                    return 0;
                 }
+                allowed = Math.min(allowed, importCap);
             }
         }
 
         return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
+    }
+
+    private static int importCap(List<FilterItemData.ItemStock> stocks, ResourceHandler<ItemResource> target,
+            @Nullable boolean[] importMask, @Nullable Map<Item, Integer> targetCounts, Item item) {
+        int cap = Integer.MAX_VALUE;
+        boolean wholeSeen = false;
+        for (FilterItemData.ItemStock stock : stocks) {
+            if (stock.slots() == null) {
+                if (wholeSeen) continue;
+                wholeSeen = true;
+            }
+            if (stock.amount() <= 0) continue;
+            int room = stock.amount() - stockedCount(target, stock.slots(), targetCounts, item);
+            if (room > 0) {
+                cap = Math.min(cap, room);
+            } else if (stock.slots() == null) {
+                return 0;
+            } else if (importMask != null) {
+                // full bucket, block its slots
+                for (int slot : stock.slots()) {
+                    if (slot < importMask.length) importMask[slot] = false;
+                }
+            }
+        }
+        return cap;
+    }
+
+    private static int stockedCount(ResourceHandler<ItemResource> handler, @Nullable int[] slots,
+            @Nullable Map<Item, Integer> counts, Item item) {
+        if (slots == null) return counts != null ? counts.getOrDefault(item, 0) : 0;
+        int count = 0;
+        for (int slot : slots) {
+            if (slot < handler.size() && handler.getResource(slot).getItem() == item) {
+                count = saturatingAdd(count, handler.getAmountAsInt(slot));
+            }
+        }
+        return count;
     }
 
     static int perEntryItemBatch(ItemStack candidate, ItemStack[] exportFilters,

@@ -156,9 +156,11 @@ final class NetworkDispatcher {
         if (disposition == CaptureDisposition.DISABLE_ASYNC) {
             dispatchStats.record(AsyncDispatchReason.OCCUPIED_SLOT_LIMIT, id);
             if (state.disableForOccupiedSlots(id)) {
-                LOGGER.warn("Network {} exceeded the async occupied-slot limit of {}; "
-                        + "disabling async planning and scheduling degraded recovery.",
-                        id, Config.asyncMaxOccupiedSlots);
+                if (Config.debugMode) {
+                    LOGGER.warn("Network {} exceeded the async occupied-slot limit of {}; "
+                            + "disabling async planning and scheduling degraded recovery.",
+                            id, Config.asyncMaxOccupiedSlots);
+                }
             }
         } else if (disposition == CaptureDisposition.DEFER) {
             if (capture.status() == Snapshots.CaptureStatus.UNAVAILABLE) {

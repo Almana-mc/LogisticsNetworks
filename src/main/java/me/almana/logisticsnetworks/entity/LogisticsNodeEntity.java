@@ -16,8 +16,6 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerEntity;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
@@ -366,9 +364,7 @@ public class LogisticsNodeEntity extends Entity {
 
     public boolean isOwnedBy(Player player) {
         UUID owner = getOwnerUUID();
-        if (NodeAccessPolicy.canAccess(owner, player.getUUID())) return true;
-        if (player instanceof ServerPlayer sp && sp.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) return true;
-        return false;
+        return NodeAccessPolicy.canAccess(owner, player);
     }
 
     public String getNodeLabel() {

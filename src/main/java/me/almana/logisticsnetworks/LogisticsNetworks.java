@@ -12,6 +12,7 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import me.almana.logisticsnetworks.network.ClientPayloadHandler;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
+import me.almana.logisticsnetworks.network.DeleteNetworkPayload;
 import me.almana.logisticsnetworks.network.ModifyFilterModPayload;
 import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
@@ -152,7 +153,7 @@ public class LogisticsNetworks {
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("7");
+                final var registrar = event.registrar(MOD_ID).versioned("9");
 
                 // Client -> Server
                 registrar.playToServer(RequestOpenGraphPayload.TYPE, RequestOpenGraphPayload.STREAM_CODEC,
@@ -240,6 +241,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleCopyPasteConnected);
                 registrar.playToServer(RenameNetworkPayload.TYPE, RenameNetworkPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleRenameNetwork);
+                registrar.playToServer(DeleteNetworkPayload.TYPE, DeleteNetworkPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleDeleteNetwork);
                 registrar.playToServer(SetNetworkColorPayload.TYPE, SetNetworkColorPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetNetworkColor);
                 registrar.playToServer(ApplyPatternPayload.TYPE, ApplyPatternPayload.STREAM_CODEC,

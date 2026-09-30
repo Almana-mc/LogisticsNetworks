@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
@@ -24,6 +25,7 @@ import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -101,7 +103,7 @@ public class ComputerMenu extends AbstractContainerMenu {
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        List<LogisticsNetwork> networks = registry.getNetworksForPlayer(player.getUUID());
+        Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
         ComputerBlockEntity computer = getComputer(level);
         Set<UUID> starredNetworks = computer != null ? computer.getStarredNetworks() : Set.of();
 
@@ -117,6 +119,7 @@ public class ComputerMenu extends AbstractContainerMenu {
                     net.getName(),
                     net.getNodeUuids().size(),
                     starredNetworks.contains(net.getId()),
+                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
                     net.getCreatedAt(),
                     net.getColor()));
         }
