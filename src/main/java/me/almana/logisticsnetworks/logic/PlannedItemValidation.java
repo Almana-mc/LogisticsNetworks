@@ -54,12 +54,12 @@ public final class PlannedItemValidation {
             if (mask == null) return move.withAmount(0, null);
         } else if (!FilterLogic.matchesItemInSlot(imports, targetChannel.getFilterMode(), candidate,
                 registries, components, filters, -1)) return move.withAmount(0, null);
-        int allowed = allowed(candidate, target, imports, components, batchMoved);
+        int allowed = allowed(candidate, sourceSlot, target, mask, imports, components, batchMoved);
         return move.withAmount(Math.min(candidate.getCount(), allowed), mask);
     }
 
-    private int allowed(ItemStack candidate, IItemHandler target, ItemStack[] imports,
-            CompoundTag components, Map<Item, Integer> batchMoved) {
+    private int allowed(ItemStack candidate, int sourceSlot, IItemHandler target,
+            boolean[] mask, ItemStack[] imports, CompoundTag components, Map<Item, Integer> batchMoved) {
         var constraints = TransferAmountRules.collect(channel.getFilterItems(), imports, filters);
         if (!constraints.hasPerEntryAmounts() && !constraints.hasImportThreshold()
                 && !constraints.hasExportThreshold()) return candidate.getCount();
@@ -74,7 +74,7 @@ public final class PlannedItemValidation {
         }
         int allowed = TransferAmountRules.allowedItems(candidate, constraints, sourceCounts, counts);
         int perEntry = TransferAmountRules.perEntryItemAmount(candidate, channel.getFilterItems(), imports,
-                sourceCounts, counts, registries, components, filters);
+                source, sourceSlot, target, mask, sourceCounts, counts, registries, components, filters);
         if (perEntry >= 0) allowed = Math.min(allowed, perEntry);
         int batch = TransferAmountRules.perEntryItemBatch(candidate, channel.getFilterItems(), registries, components, filters);
         if (batch > 0) allowed = Math.min(allowed, Math.max(0, batch - batchMoved.getOrDefault(candidate.getItem(), 0)));
