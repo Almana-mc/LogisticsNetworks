@@ -976,6 +976,7 @@ public class TransferEngine {
         Arrays.fill(openTargets, true);
         int openTargetCount = targets.size();
         BulkInsertRejectionCache bulkInsertRejections = null;
+        BulkInsertRejectionCache insertRejections = null;
 
         // Serialize each source slot once across the target loop
         CompoundTag[] slotComponents = hasNbtFilter ? new CompoundTag[source.getSlots()] : null;
@@ -1094,6 +1095,12 @@ public class TransferEngine {
                         simRemainder = bulkInsertRejections.simulate(bulkHandler, simulatedInsert);
                     } else if (insertion != null) {
                         simRemainder = insertion.simulate(simulatedInsert);
+                    } else if (importAllowedSlots == null) {
+                        if (insertRejections == null) {
+                            insertRejections = new BulkInsertRejectionCache(
+                                    (handler, stack) -> insertItemWithAllowedSlots(handler, null, stack, true, null));
+                        }
+                        simRemainder = insertRejections.simulate(target.handler(), simulatedInsert);
                     } else {
                         simRemainder = insertItemWithAllowedSlots(target.handler(), null,
                                 simulatedInsert, true, importAllowedSlots);
@@ -1134,6 +1141,7 @@ public class TransferEngine {
                     }
 
                     if (targetAccepted > 0) {
+                        insertRejections = null;
                         if (recorder != null) {
                             recorder.record(slot, targetIndex, toMove.copyWithCount(targetAccepted), importAllowedSlots);
                         }

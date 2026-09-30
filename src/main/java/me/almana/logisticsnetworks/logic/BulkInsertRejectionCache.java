@@ -8,6 +8,8 @@ import java.util.IdentityHashMap;
 import java.util.List;
 
 final class BulkInsertRejectionCache {
+    private static final int MAX_REJECTIONS = 64;
+
     @FunctionalInterface
     interface Inserter {
         ItemStack insert(IItemHandler handler, ItemStack stack);
@@ -34,7 +36,10 @@ final class BulkInsertRejectionCache {
         ItemStack remainder = inserter.insert(handler, candidate);
         if (remainder.getCount() == candidate.getCount()
                 && ItemStack.isSameItemSameComponents(remainder, candidate)) {
-            rejected.computeIfAbsent(handler, key -> new ArrayList<>()).add(candidate.copy());
+            List<ItemStack> handlerRejections = rejected.computeIfAbsent(handler, key -> new ArrayList<>());
+            if (handlerRejections.size() < MAX_REJECTIONS) {
+                handlerRejections.add(candidate.copy());
+            }
         }
         return remainder;
     }
