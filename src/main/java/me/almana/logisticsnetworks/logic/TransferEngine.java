@@ -1282,7 +1282,10 @@ public class TransferEngine {
             if (bulkHandler != null) {
                 return insertBulkItem(bulkHandler, stack, simulate);
             }
-            return ItemHandlerHelper.insertItemStacked(handler, stack, simulate);
+            // Belt segments show passing items
+            return stack.isStackable() || handler.getSlots() < 2
+                    ? ItemHandlerHelper.insertItemStacked(handler, stack, simulate)
+                    : insertUnstackableItem(handler, stack, simulate);
         }
         if (handler instanceof IItemHandlerModifiable modifiable && !(handler instanceof SnapshotItemHandler)) {
             return insertItemStrictAllowedSlots(modifiable, stack, simulate, allowedSlots);
@@ -1315,6 +1318,23 @@ public class TransferEngine {
             remaining = handler.insertItem(slot, remaining, simulate);
         }
 
+        return remaining;
+    }
+
+    private static ItemStack insertUnstackableItem(IItemHandler handler, ItemStack stack, boolean simulate) {
+        ItemStack remaining = stack;
+        for (int slot = 0; slot < handler.getSlots() && !remaining.isEmpty(); slot++) {
+            ItemStack slotStack = handler.getStackInSlot(slot);
+            if (!slotStack.isEmpty()) {
+                int limit = handler.getSlotLimit(slot);
+                // Plain slot already full
+                if (slotStack.getCount() >= limit && limit <= slotStack.getMaxStackSize()
+                        && ItemStack.isSameItemSameComponents(slotStack, remaining)) {
+                    continue;
+                }
+            }
+            remaining = handler.insertItem(slot, remaining, simulate);
+        }
         return remaining;
     }
 
