@@ -133,6 +133,8 @@ public final class Snapshots {
             IItemHandler sourceHandler = capCache.findItemExportHandler(
                     node, channel.getIoDirection(), directSource);
             if (sourceHandler == null) {
+                itemWakeDelta = itemWakeDelta(itemWakeDelta, targets,
+                        TransferEngine.finishChannelAttempt(node, channel, i, 0, gameTime, tier, false));
                 continue;
             }
 
