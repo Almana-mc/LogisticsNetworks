@@ -108,6 +108,10 @@ public final class BuildingGadgetsCompat {
     }
 
     private static void spawnMoved(ServerLevel level, BlockPos pos, CompoundTag payload) {
+        if (NodePlacementHelper.validatePlacement(level, pos, true) != NodePlacementHelper.ValidationResult.OK) {
+            dropMoved(level, pos, payload);
+            return;
+        }
         LogisticsNodeEntity node = Registration.LOGISTICS_NODE.get().create(level);
         if (node == null) return;
         node.loadNodeState(payload.getCompound("state"));
@@ -115,8 +119,7 @@ public final class BuildingGadgetsCompat {
         node.setAttachedPos(pos);
 
         UUID original = payload.getUUID("uuid");
-        boolean reused = level.getEntity(original) == null;
-        if (reused) node.setUUID(original);
+        if (level.getEntity(original) == null) node.setUUID(original);
         NetworkRegistry registry = NetworkRegistry.get(level);
         UUID networkId = node.getNetworkId();
         if (networkId != null && registry.getNetwork(networkId) == null) {
@@ -124,16 +127,24 @@ public final class BuildingGadgetsCompat {
             node.setNetworkName("");
             networkId = null;
         }
-
-        boolean valid = NodePlacementHelper.validatePlacement(level, pos, true)
-                == NodePlacementHelper.ValidationResult.OK;
-        if (!valid || !level.addFreshEntity(node)) {
-            if (networkId != null && reused) registry.removeNodeFromNetwork(networkId, original);
-            if (Config.dropNodeItem) node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
-            node.dropUpgrades();
+        if (!level.addFreshEntity(node)) {
+            dropMoved(level, pos, payload);
             return;
         }
         if (networkId != null) registry.addNodeToNetwork(networkId, node.getUUID());
+    }
+
+    public static void dropMoved(ServerLevel level, BlockPos pos, CompoundTag payload) {
+        LogisticsNodeEntity node = Registration.LOGISTICS_NODE.get().create(level);
+        if (node == null) return;
+        node.loadNodeState(payload.getCompound("state"));
+        node.setPos(Vec3.atBottomCenterOf(pos));
+        UUID original = payload.getUUID("uuid");
+        if (node.getNetworkId() != null && level.getEntity(original) == null) {
+            NetworkRegistry.get(level).removeNodeFromNetwork(node.getNetworkId(), original);
+        }
+        if (Config.dropNodeItem) node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
+        node.dropUpgrades();
     }
 
     private static void spawnCopied(ServerLevel level, BlockPos pos, CompoundTag payload) {

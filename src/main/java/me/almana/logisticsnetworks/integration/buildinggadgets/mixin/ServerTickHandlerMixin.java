@@ -9,6 +9,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -33,5 +34,18 @@ abstract class ServerTickHandlerMixin {
             list.teData.add(holder);
         }
         holder.tag.put(NodeTransit.KEY_NODE, payload);
+    }
+
+    @Inject(method = "removeEmptyLists", at = @At(value = "INVOKE",
+            target = "Lcom/direwolf20/buildinggadgets2/common/worlddata/BG2Data;getTEMap(Ljava/util/UUID;)Ljava/util/ArrayList;"))
+    private static void logisticsnetworks$dropUnpastedNodes(ServerTickEvent.Pre event, CallbackInfo ci,
+            @Local ServerBuildList list) {
+        if (!(list.level instanceof ServerLevel level)) return;
+        for (TagPos tagPos : list.teData) {
+            if (tagPos.tag.contains(NodeTransit.KEY_NODE)) {
+                BuildingGadgetsCompat.dropMoved(level, tagPos.pos.offset(list.lookingAt),
+                        tagPos.tag.getCompound(NodeTransit.KEY_NODE));
+            }
+        }
     }
 }
