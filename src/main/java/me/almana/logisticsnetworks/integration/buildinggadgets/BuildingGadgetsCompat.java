@@ -147,6 +147,22 @@ public final class BuildingGadgetsCompat {
         node.dropUpgrades();
     }
 
+    public static void release(ServerLevel level, BlockPos pos, CompoundTag payload) {
+        if (NodeTransit.KIND_MOVE.equals(payload.getString("kind"))) {
+            dropMoved(level, pos, payload);
+        } else {
+            refundCopy(level, pos, payload);
+        }
+    }
+
+    private static void refundCopy(ServerLevel level, BlockPos pos, CompoundTag payload) {
+        NodeClipboardConfig config = NodeClipboardConfig.load(payload.getCompound("config"), level.registryAccess());
+        if (config == null || !payload.getBoolean("paid")) return;
+        for (ItemStack stack : cost(config)) {
+            Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
+        }
+    }
+
     private static void spawnCopied(ServerLevel level, BlockPos pos, CompoundTag payload) {
         NodeClipboardConfig config = NodeClipboardConfig.load(payload.getCompound("config"), level.registryAccess());
         if (config == null) return;
@@ -155,9 +171,7 @@ public final class BuildingGadgetsCompat {
                 ? NodePlacementHelper.placeNode(level, pos, payload.getUUID("owner"))
                 : null;
         if (node == null) {
-            if (payload.getBoolean("paid")) {
-                for (ItemStack stack : cost(config)) Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
-            }
+            refundCopy(level, pos, payload);
             return;
         }
         config.applyToNode(node);

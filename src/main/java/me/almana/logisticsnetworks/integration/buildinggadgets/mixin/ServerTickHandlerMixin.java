@@ -14,6 +14,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -49,6 +50,25 @@ abstract class ServerTickHandlerMixin {
             if (tagPos.tag.contains(NodeTransit.KEY_NODE)) {
                 BuildingGadgetsCompat.dropMoved(level, player.blockPosition(), tagPos.tag.getCompound(NodeTransit.KEY_NODE));
             }
+        }
+    }
+
+    @Inject(method = "remove", at = @At(value = "FIELD",
+            target = "Lcom/direwolf20/buildinggadgets2/common/blockentities/RenderBlockBE;renderBlock:Lnet/minecraft/world/level/block/state/BlockState;",
+            opcode = Opcodes.GETFIELD))
+    private static void logisticsnetworks$releaseNode(ServerBuildList list, Player player, CallbackInfo ci,
+            @Local RenderBlockBE renderBlockBE) {
+        if (!(list.level instanceof ServerLevel level)) return;
+        BlockPos pos = renderBlockBE.getBlockPos();
+        NodePayloadHolder holder = (NodePayloadHolder) renderBlockBE;
+        CompoundTag held = holder.logisticsnetworks$getNode();
+        if (held != null) {
+            holder.logisticsnetworks$setNode(null);
+            BuildingGadgetsCompat.release(level, pos, held);
+        }
+        CompoundTag data = renderBlockBE.blockEntityData;
+        if (data != null && data.contains(NodeTransit.KEY_NODE)) {
+            BuildingGadgetsCompat.release(level, pos, data.getCompound(NodeTransit.KEY_NODE));
         }
     }
 

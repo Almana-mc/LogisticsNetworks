@@ -40,6 +40,10 @@ abstract class RenderBlockBEMixin implements NodePayloadHolder {
     @Inject(method = "setRealBlock", at = @At("HEAD"))
     private void logisticsnetworks$takeMovedNode(BlockState realBlock, CallbackInfo ci) {
         if (blockEntityData == null || !blockEntityData.contains(NodeTransit.KEY_NODE)) return;
+        BlockEntity self = (BlockEntity) (Object) this;
+        if (logisticsnetworks$node != null && self.getLevel() instanceof ServerLevel level) {
+            BuildingGadgetsCompat.release(level, self.getBlockPos(), logisticsnetworks$node);
+        }
         CompoundTag data = blockEntityData.copy();
         logisticsnetworks$node = data.getCompound(NodeTransit.KEY_NODE);
         data.remove(NodeTransit.KEY_NODE);
