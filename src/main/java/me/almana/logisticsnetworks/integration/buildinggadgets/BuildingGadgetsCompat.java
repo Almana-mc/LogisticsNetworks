@@ -115,7 +115,8 @@ public final class BuildingGadgetsCompat {
         node.setAttachedPos(pos);
 
         UUID original = payload.getUUID("uuid");
-        if (level.getEntity(original) == null) node.setUUID(original);
+        boolean reused = level.getEntity(original) == null;
+        if (reused) node.setUUID(original);
         NetworkRegistry registry = NetworkRegistry.get(level);
         UUID networkId = node.getNetworkId();
         if (networkId != null && registry.getNetwork(networkId) == null) {
@@ -127,15 +128,12 @@ public final class BuildingGadgetsCompat {
         boolean valid = NodePlacementHelper.validatePlacement(level, pos, true)
                 == NodePlacementHelper.ValidationResult.OK;
         if (!valid || !level.addFreshEntity(node)) {
-            if (networkId != null) registry.removeNodeFromNetwork(networkId, original);
+            if (networkId != null && reused) registry.removeNodeFromNetwork(networkId, original);
             if (Config.dropNodeItem) node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
             node.dropUpgrades();
             return;
         }
-        if (networkId != null) {
-            registry.addNodeToNetwork(networkId, node.getUUID());
-            if (!node.getUUID().equals(original)) registry.removeNodeFromNetwork(networkId, original);
-        }
+        if (networkId != null) registry.addNodeToNetwork(networkId, node.getUUID());
     }
 
     private static void spawnCopied(ServerLevel level, BlockPos pos, CompoundTag payload) {
