@@ -814,7 +814,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                 : row == 7 ? config().getChannelBatchSize(selectedChannel)
                 : config().getChannelTickDelay(selectedChannel);
         numericEditBox = new EditBox(font, x, y, 70, 11, Component.empty());
-        numericEditBox.setMaxLength(10);
+        numericEditBox.setMaxLength(32);
         numericEditBox.setValue(String.valueOf(value));
         numericEditBox.setTextColor(cText());
         numericEditBox.setFocused(true);
@@ -826,7 +826,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         if (numericEditBox == null) return;
         if (save) {
             try {
-                int value = Integer.parseInt(numericEditBox.getValue().trim());
+                int value = ArithmeticExpression.evaluate(numericEditBox.getValue().trim());
                 if (editingRow == 6) config().setChannelPriority(selectedChannel, value);
                 else if (editingRow == 7) config().setChannelBatchSize(selectedChannel, value);
                 else if (editingRow == 8) config().setChannelTickDelay(selectedChannel, value);
@@ -1084,7 +1084,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     public boolean charTyped(char codePoint, int modifiers) {
         if (channelNameEditBox != null) return channelNameEditBox.charTyped(codePoint, modifiers);
         if (numericEditBox != null) {
-            return (Character.isDigit(codePoint) || codePoint == '-')
+            return ArithmeticExpression.accepts(codePoint)
                     && numericEditBox.charTyped(codePoint, modifiers);
         }
         if (labelEditBox != null) return labelEditBox.charTyped(codePoint, modifiers);
