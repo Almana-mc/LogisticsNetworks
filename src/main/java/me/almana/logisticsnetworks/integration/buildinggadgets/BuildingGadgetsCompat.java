@@ -62,6 +62,7 @@ public final class BuildingGadgetsCompat {
 
     public static Map<BlockPos, CompoundTag> captureCopy(ServerPlayer player, BlockPos start, BlockPos end) {
         AABB area = AABB.encapsulatingFullBlocks(start, end);
+        if (area.getXsize() > 500 || area.getYsize() > 500 || area.getZsize() > 500) return Map.of();
         Map<BlockPos, CompoundTag> configs = new HashMap<>();
         for (LogisticsNodeEntity node : player.serverLevel().getEntitiesOfClass(LogisticsNodeEntity.class, area,
                 node -> node.isActive() && !node.isMountedOnCreate() && node.isOwnedBy(player))) {
