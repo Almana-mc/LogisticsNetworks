@@ -41,12 +41,13 @@ abstract class StatePosMixin implements NodePayloadHolder {
     private static void logisticsnetworks$liftMoves(ArrayList<StatePos> list, ArrayList<TagPos> tags,
             CallbackInfoReturnable<ArrayList<StatePos>> cir, @Share("moved") LocalRef<Map<BlockPos, CompoundTag>> moved) {
         if (list == null || list.isEmpty()) return;
-        moved.set(new HashMap<>());
+        Map<BlockPos, CompoundTag> lifted = new HashMap<>();
+        moved.set(lifted);
         if (tags == null) return;
         for (ListIterator<TagPos> it = tags.listIterator(); it.hasNext(); ) {
             TagPos entry = it.next();
             if (!entry.tag.contains(NodeTransit.KEY_NODE)) continue;
-            moved.get().put(entry.pos, entry.tag.getCompound(NodeTransit.KEY_NODE));
+            lifted.put(entry.pos, entry.tag.getCompound(NodeTransit.KEY_NODE));
             CompoundTag rest = entry.tag.copy();
             rest.remove(NodeTransit.KEY_NODE);
             if (rest.isEmpty()) it.remove();
@@ -57,23 +58,29 @@ abstract class StatePosMixin implements NodePayloadHolder {
     @Inject(method = "rotate90Degrees", at = @At("RETURN"))
     private static void logisticsnetworks$rotateNodes(ArrayList<StatePos> list, ArrayList<TagPos> tags,
             CallbackInfoReturnable<ArrayList<StatePos>> cir, @Share("moved") LocalRef<Map<BlockPos, CompoundTag>> moved) {
-        if (moved.get() == null) return;
+        Map<BlockPos, CompoundTag> lifted = moved.get();
+        if (lifted == null) return;
         ArrayList<StatePos> rotated = cir.getReturnValue();
         for (int i = 0; i < list.size(); i++) {
             CompoundTag config = ((NodePayloadHolder) list.get(i)).logisticsnetworks$getNode();
             if (config != null) ((NodePayloadHolder) rotated.get(i)).logisticsnetworks$setNode(NodeTransit.rotateCopy(config));
         }
-        moved.get().forEach((pos, payload) -> {
-            BlockPos target = new BlockPos(-pos.getZ(), pos.getY(), pos.getX());
+        if (lifted.isEmpty()) return;
+        Map<BlockPos, CompoundTag> placed = new HashMap<>();
+        lifted.forEach((pos, payload) -> placed.put(new BlockPos(-pos.getZ(), pos.getY(), pos.getX()),
+                NodeTransit.rotateMove(payload)));
+        for (ListIterator<TagPos> it = tags.listIterator(); it.hasNext(); ) {
+            TagPos entry = it.next();
+            CompoundTag payload = placed.remove(entry.pos);
+            if (payload == null) continue;
+            CompoundTag tag = entry.tag.copy();
+            tag.put(NodeTransit.KEY_NODE, payload);
+            it.set(new TagPos(tag, entry.pos));
+        }
+        placed.forEach((pos, payload) -> {
             CompoundTag tag = new CompoundTag();
-            for (int i = 0; i < tags.size(); i++) {
-                if (tags.get(i).pos.equals(target)) {
-                    tag = tags.remove(i).tag.copy();
-                    break;
-                }
-            }
-            tag.put(NodeTransit.KEY_NODE, NodeTransit.rotateMove(payload));
-            tags.add(new TagPos(tag, target));
+            tag.put(NodeTransit.KEY_NODE, payload);
+            tags.add(new TagPos(tag, pos));
         });
     }
 }
