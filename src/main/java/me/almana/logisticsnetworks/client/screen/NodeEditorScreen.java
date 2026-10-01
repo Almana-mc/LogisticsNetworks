@@ -1672,7 +1672,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         };
 
         numericEditBox = new EditBox(font, x, y, 70, 11, Component.empty());
-        numericEditBox.setMaxLength(10);
+        numericEditBox.setMaxLength(32);
         numericEditBox.setValue(val);
         numericEditBox.setBordered(true);
         numericEditBox.setTextColor(cText());
@@ -1687,7 +1687,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
         if (commit) {
             try {
-                int val = Integer.parseInt(numericEditBox.getValue().trim());
+                int val = ArithmeticExpression.evaluate(numericEditBox.getValue().trim());
                 LogisticsNodeEntity node = getMenu().getNode();
                 ChannelData ch = node.getChannel(selectedChannel);
                 if (ch != null) {
@@ -1976,7 +1976,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             return labelEditBox.charTyped(ch, modifiers);
         }
         if (editingRow != -1 && numericEditBox != null) {
-            if (Character.isDigit(ch) || ch == '-')
+            if (ArithmeticExpression.accepts(ch))
                 return numericEditBox.charTyped(ch, modifiers);
             return true;
         }
