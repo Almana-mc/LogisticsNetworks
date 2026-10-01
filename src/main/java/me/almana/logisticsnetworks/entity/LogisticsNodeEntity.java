@@ -254,6 +254,16 @@ public class LogisticsNodeEntity extends Entity {
         }
     }
 
+    public CompoundTag saveNodeState() {
+        CompoundTag tag = new CompoundTag();
+        addAdditionalSaveData(tag);
+        return tag;
+    }
+
+    public void loadNodeState(CompoundTag tag) {
+        readAdditionalSaveData(tag);
+    }
+
     @Override
     public void tick() {
         if (!this.level().isClientSide() && (this.tickCount <= 1 || this.tickCount % 5 == 0)) {
