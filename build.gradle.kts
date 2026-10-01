@@ -32,9 +32,11 @@ val guideme_version: String by project
 val sophisticated_core_version: String by project
 val create_version: String by project
 val ponder_version: String by project
+val building_gadgets_file_id: String by project
 val create_runtime = providers.gradleProperty("create_runtime").orElse("true").map { it.toBoolean() }
 val ae2Runtime = providers.gradleProperty("ae2_runtime").orElse("true").map { it.toBoolean() }
 val refinedStorageRuntime = providers.gradleProperty("refined_storage_runtime").orElse("true").map { it.toBoolean() }
+val buildingGadgetsRuntime = providers.gradleProperty("building_gadgets_runtime").orElse("true").map { it.toBoolean() }
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -49,6 +51,9 @@ repositories {
     maven("https://maven.terraformersmc.com/releases")
     maven("https://maven.createmod.net")
     maven("https://maven.creeperhost.net")
+    maven("https://cursemaven.com") {
+        content { includeGroup("curse.maven") }
+    }
 }
 
 base {
@@ -123,6 +128,11 @@ dependencies {
         runtimeOnly("com.simibubi.create:create-${minecraft_version}:${create_version}") {
             isTransitive = false
         }
+    }
+
+    compileOnly("curse.maven:building-gadgets-298187:${building_gadgets_file_id}")
+    if (buildingGadgetsRuntime.get()) {
+        runtimeOnly("curse.maven:building-gadgets-298187:${building_gadgets_file_id}")
     }
 
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
