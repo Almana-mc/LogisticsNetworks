@@ -759,7 +759,7 @@ public final class NodeClipboardConfig {
         }
         Arrays.fill(upgrades, ItemStack.EMPTY);
         UUID networkId = root.hasUUID(KEY_NETWORK_ID) ? root.getUUID(KEY_NETWORK_ID) : null;
-        String networkName = root.contains(KEY_NETWORK_NAME, Tag.TAG_STRING) ? root.getString(KEY_NETWORK_NAME) : null;
+        String networkName = root.contains(KEY_NETWORK_NAME, Tag.TAG_STRING) ? trim(root.getString(KEY_NETWORK_NAME), 32) : null;
         if (networkName != null && networkName.isBlank()) {
             networkName = null;
         }
@@ -803,7 +803,7 @@ public final class NodeClipboardConfig {
                     FilterMode.MATCH_ANY);
             config.priority = Math.max(-99, Math.min(99, channelTag.getInt(KEY_PRIORITY)));
             if (channelTag.contains(KEY_CH_NAME, Tag.TAG_STRING))
-                config.name = channelTag.getString(KEY_CH_NAME);
+                config.name = trim(channelTag.getString(KEY_CH_NAME), 24);
             channels[index] = config;
         }
 
@@ -847,7 +847,7 @@ public final class NodeClipboardConfig {
             config.renderVisible = root.getBoolean(KEY_VISIBLE);
         }
         if (root.contains(KEY_NODE_LABEL, Tag.TAG_STRING)) {
-            config.nodeLabel = root.getString(KEY_NODE_LABEL);
+            config.nodeLabel = trim(root.getString(KEY_NODE_LABEL), 48);
         }
         return config.isStructurallyValid() ? config : null;
     }
