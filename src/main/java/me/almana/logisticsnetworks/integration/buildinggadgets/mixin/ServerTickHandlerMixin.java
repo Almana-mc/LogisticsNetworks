@@ -39,12 +39,11 @@ abstract class ServerTickHandlerMixin {
     @Inject(method = "removeEmptyLists", at = @At(value = "INVOKE",
             target = "Lcom/direwolf20/buildinggadgets2/common/worlddata/BG2Data;getTEMap(Ljava/util/UUID;)Ljava/util/ArrayList;"))
     private static void logisticsnetworks$dropUnpastedNodes(ServerTickEvent.Pre event, CallbackInfo ci,
-            @Local ServerBuildList list) {
-        if (!(list.level instanceof ServerLevel level)) return;
+            @Local ServerBuildList list, @Local Player player) {
+        if (!(player.level() instanceof ServerLevel level)) return;
         for (TagPos tagPos : list.teData) {
             if (tagPos.tag.contains(NodeTransit.KEY_NODE)) {
-                BuildingGadgetsCompat.dropMoved(level, tagPos.pos.offset(list.lookingAt),
-                        tagPos.tag.getCompound(NodeTransit.KEY_NODE));
+                BuildingGadgetsCompat.dropMoved(level, player.blockPosition(), tagPos.tag.getCompound(NodeTransit.KEY_NODE));
             }
         }
     }
