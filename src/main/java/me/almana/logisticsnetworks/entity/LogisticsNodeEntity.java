@@ -23,6 +23,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -303,6 +304,15 @@ public class LogisticsNodeEntity extends Entity {
     @Override
     public boolean shouldRenderAtSqrDistance(double distanceSq) {
         return distanceSq < 48.0 * 48.0;
+    }
+
+    @Override
+    public AABB getBoundingBoxForCulling() {
+        if (isMountedOnCreate()) {
+            // Fits any contraption rotation
+            return AABB.ofSize(position(), 2.5, 2.5, 2.5);
+        }
+        return new AABB(getX() - 0.5, getY(), getZ() - 0.5, getX() + 0.5, getY() + 1.0, getZ() + 0.5);
     }
 
     @Override
