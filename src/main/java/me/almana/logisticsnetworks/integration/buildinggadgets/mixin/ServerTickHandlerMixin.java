@@ -72,7 +72,7 @@ abstract class ServerTickHandlerMixin {
         }
     }
 
-    @Inject(method = {"build", "exchange"}, at = @At(value = "INVOKE",
+    @Inject(method = {"build", "exchange"}, require = 3, at = @At(value = "INVOKE",
             target = "Lcom/direwolf20/buildinggadgets2/common/blockentities/RenderBlockBE;setRenderData(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/block/state/BlockState;B)V",
             shift = At.Shift.AFTER))
     private static void logisticsnetworks$chargeNode(ServerBuildList list, Player player, CallbackInfo ci,
