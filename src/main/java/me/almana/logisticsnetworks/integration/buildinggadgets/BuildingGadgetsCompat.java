@@ -81,6 +81,11 @@ public final class BuildingGadgetsCompat {
         NodeClipboardConfig clipboard = NodeClipboardConfig.load(config, player.registryAccess());
         if (clipboard == null || !clipboard.isStructurallyValid()) return null;
 
+        // Strip untrusted upgrade components
+        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+            clipboard.setUpgradeItem(slot, new ItemStack(clipboard.getUpgradeItem(slot).getItem()));
+        }
+
         boolean paid = !player.isCreative();
         if (paid && !take(player, cost(clipboard))) return null;
 
@@ -88,7 +93,7 @@ public final class BuildingGadgetsCompat {
         payload.putString("kind", NodeTransit.KIND_COPY);
         payload.putUUID("owner", player.getUUID());
         payload.putBoolean("paid", paid);
-        payload.put("config", config);
+        payload.put("config", clipboard.save(player.registryAccess()));
         UUID network = resolveNetwork(player, clipboard, paste);
         if (network != null) payload.putUUID("network", network);
         return payload;
