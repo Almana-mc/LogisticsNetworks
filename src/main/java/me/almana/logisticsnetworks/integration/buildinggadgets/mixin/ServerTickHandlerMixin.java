@@ -1,13 +1,17 @@
 package me.almana.logisticsnetworks.integration.buildinggadgets.mixin;
 
+import com.direwolf20.buildinggadgets2.common.blockentities.RenderBlockBE;
 import com.direwolf20.buildinggadgets2.common.events.ServerBuildList;
+import com.direwolf20.buildinggadgets2.util.datatypes.StatePos;
 import com.direwolf20.buildinggadgets2.util.datatypes.TagPos;
 import com.llamalad7.mixinextras.sugar.Local;
 import me.almana.logisticsnetworks.integration.buildinggadgets.BuildingGadgetsCompat;
+import me.almana.logisticsnetworks.integration.buildinggadgets.NodePayloadHolder;
 import me.almana.logisticsnetworks.integration.buildinggadgets.NodeTransit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.spongepowered.asm.mixin.Mixin;
@@ -46,5 +50,17 @@ abstract class ServerTickHandlerMixin {
                 BuildingGadgetsCompat.dropMoved(level, player.blockPosition(), tagPos.tag.getCompound(NodeTransit.KEY_NODE));
             }
         }
+    }
+
+    @Inject(method = {"build", "exchange"}, at = @At(value = "INVOKE",
+            target = "Lcom/direwolf20/buildinggadgets2/common/blockentities/RenderBlockBE;setRenderData(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/block/state/BlockState;B)V",
+            shift = At.Shift.AFTER))
+    private static void logisticsnetworks$chargeNode(ServerBuildList list, Player player, CallbackInfo ci,
+            @Local StatePos statePos, @Local RenderBlockBE be) {
+        CompoundTag config = ((NodePayloadHolder) statePos).logisticsnetworks$getNode();
+        NodePayloadHolder holder = (NodePayloadHolder) be;
+        if (config == null || holder.logisticsnetworks$getNode() != null
+                || !(player instanceof ServerPlayer serverPlayer)) return;
+        holder.logisticsnetworks$setNode(BuildingGadgetsCompat.chargeCopy(serverPlayer, config, list));
     }
 }

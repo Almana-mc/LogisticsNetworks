@@ -5,9 +5,13 @@
   "plugin": "me.almana.logisticsnetworks.integration.create.mixin.CreateMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "BG2DataMixin",
+    "BuildingUtilsMixin",
+    "GadgetCopyPasteMixin",
     "GadgetCutPasteMixin",
     "RenderBlockBEMixin",
-    "ServerTickHandlerMixin"
+    "ServerTickHandlerMixin",
+    "StatePosMixin"
   ],
   "injectors": {
     "defaultRequire": 1
