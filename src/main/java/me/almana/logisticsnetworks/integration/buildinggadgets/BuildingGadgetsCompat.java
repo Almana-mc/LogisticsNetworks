@@ -20,9 +20,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Containers;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -147,7 +147,7 @@ public final class BuildingGadgetsCompat {
                 : null;
         if (node == null) {
             if (payload.getBoolean("paid")) {
-                for (ItemStack stack : cost(config)) Block.popResource(level, pos, stack);
+                for (ItemStack stack : cost(config)) Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
             }
             return;
         }
