@@ -80,6 +80,7 @@ abstract class ServerTickHandlerMixin {
         CompoundTag config = ((NodePayloadHolder) statePos).logisticsnetworks$getNode();
         NodePayloadHolder holder = (NodePayloadHolder) be;
         if (config == null || holder.logisticsnetworks$getNode() != null
+                || be.blockEntityData != null && be.blockEntityData.contains(NodeTransit.KEY_NODE)
                 || !(player instanceof ServerPlayer serverPlayer)) return;
         holder.logisticsnetworks$setNode(BuildingGadgetsCompat.chargeCopy(serverPlayer, config, list));
     }
