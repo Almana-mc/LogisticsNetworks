@@ -4,7 +4,11 @@
   "package": "me.almana.logisticsnetworks.integration.buildinggadgets.mixin",
   "plugin": "me.almana.logisticsnetworks.integration.create.mixin.CreateMixinPlugin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [],
+  "mixins": [
+    "GadgetCutPasteMixin",
+    "RenderBlockBEMixin",
+    "ServerTickHandlerMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
