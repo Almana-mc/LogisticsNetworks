@@ -451,7 +451,7 @@ public class TransferEngine {
         IItemHandler sourceHandler = capCache.findItemExportHandler(
                 sourceNode, exportChannel.getIoDirection(), directSource);
         if (sourceHandler == null)
-            return new ItemResourceOrder.Result(null, -1);
+            return ItemResourceOrder.EMPTY;
 
         boolean[] sourceAllowedSlots = null;
 
@@ -614,7 +614,7 @@ public class TransferEngine {
         IFluidHandler sourceHandler = capCache.findFluidExportHandler(
                 sourceNode, exportChannel.getIoDirection(), true);
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
         targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
@@ -673,7 +673,7 @@ public class TransferEngine {
             return -1;
         IEnergyStorage sourceHandler = capCache.findEnergyHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null || !sourceHandler.canExtract())
-            return -1;
+            return 0;
 
         targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
@@ -733,7 +733,7 @@ public class TransferEngine {
         IChemicalHandler sourceHandler = capCache.findChemicalHandler(sourceLevel, sourcePos,
                 exportChannel.getIoDirection());
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
         targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
@@ -751,6 +751,7 @@ public class TransferEngine {
             if (!canReach(sourceNode, target.node(), sourceDimensional, dimensionalCache))
                 continue;
 
+            anyReachable = true;
             ServerLevel targetLevel = (ServerLevel) target.node().level();
             BlockPos targetPos = target.node().getAttachedPos();
             if (!targetLevel.isLoaded(targetPos))
@@ -761,7 +762,6 @@ public class TransferEngine {
             if (targetHandler == null)
                 continue;
 
-            anyReachable = true;
             long moved = ChemicalTransferHelper.transferBetween(
                     sourceHandler, targetHandler, remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
