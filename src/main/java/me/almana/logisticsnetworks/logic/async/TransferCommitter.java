@@ -132,7 +132,10 @@ public final class TransferCommitter {
         IItemHandler source = capCache.findItemExportHandler(
                 sourceNode, sourceChannel.getIoDirection(), directSource);
         if (source == null) {
-            return ChannelCommitResult.skipped(planned);
+            long wakeDelta = TransferEngine.finishChannelAttempt(sourceNode, sourceChannel, channel.channelIndex(), 0,
+                    sourceNode.level().getGameTime(), network.getTierCache().getOrDefault(sourceNode.getUUID(), 0),
+                    telemetryActive);
+            return new ChannelCommitResult(planned, 0, 0, wakeDelta, false);
         }
         if (!matchesBinding(channel.sourceBinding(), source, bindings)) {
             return new ChannelCommitResult(planned, 0, 0, 1, true);
