@@ -2097,7 +2097,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         String filter = networkNameField != null ? networkNameField.getValue().trim().toLowerCase() : "";
         List<SyncNetworkListPayload.NetworkEntry> filtered = new ArrayList<>();
         for (SyncNetworkListPayload.NetworkEntry entry : networkList) {
-            if (entry.name().toLowerCase().contains(filter))
+            if (filter.isEmpty() || entry.name().toLowerCase().contains(filter))
                 filtered.add(entry);
         }
         filtered.sort(sortMode.comparator());
