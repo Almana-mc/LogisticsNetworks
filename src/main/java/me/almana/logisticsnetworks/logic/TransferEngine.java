@@ -1469,17 +1469,24 @@ public class TransferEngine {
             List<FluidTransferTarget> targets, int limit, ItemStack[] filters, FilterMode mode,
             HolderLookup.Provider provider, FilterItemData.ReadCache cache, boolean rotate,
             @Nullable FluidResourceOrder.Cursor cursor, @Nullable IntConsumer served) {
+        if (served != null) {
+            // Receiver-outer avoids resource lockstep
+            for (int i = 0; i < targets.size(); i++) {
+                FluidResourceOrder.Result result = executeFluidOperation(source, List.of(targets.get(i)), limit,
+                        filters, mode, provider, cache, rotate, cursor, null);
+                if (result.moved() > 0) {
+                    served.accept(i);
+                    return result;
+                }
+            }
+            return new FluidResourceOrder.Result(FluidStack.EMPTY, 0);
+        }
         java.util.function.ToIntFunction<FluidStack> transfer = resource -> {
             int remaining = limit;
-            for (int i = 0; i < targets.size() && remaining > 0; i++) {
-                FluidTransferTarget target = targets.get(i);
-                int moved = executeFluidMove(source, target.handler(), remaining, filters, mode,
+            for (FluidTransferTarget target : targets) {
+                if (remaining <= 0) break;
+                remaining -= executeFluidMove(source, target.handler(), remaining, filters, mode,
                         target.filters(), target.mode(), provider, cache, resource);
-                remaining -= moved;
-                if (served != null && moved > 0) {
-                    served.accept(i);
-                    break;
-                }
             }
             return limit - remaining;
         };
