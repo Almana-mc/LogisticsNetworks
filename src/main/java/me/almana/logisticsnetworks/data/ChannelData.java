@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.data;
 import me.almana.logisticsnetworks.logic.ChannelTelemetry;
 import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import me.almana.logisticsnetworks.logic.FluidResourceOrder;
+import me.almana.logisticsnetworks.logic.PriorityRobin;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -46,6 +47,7 @@ public class ChannelData {
     private boolean resourceRoundRobin;
     private transient ItemResourceOrder.Cursor itemResourceCursor;
     private transient FluidResourceOrder.Cursor fluidResourceCursor;
+    private transient PriorityRobin.Cursor robinCursor;
 
     private final ItemStack[] filterItems = new ItemStack[FILTER_SIZE];
     private final transient ChannelTelemetry telemetry = new ChannelTelemetry();
@@ -310,6 +312,15 @@ public class ChannelData {
         fluidResourceCursor = null;
     }
 
+    @Nullable
+    public PriorityRobin.Cursor getRobinCursor() {
+        return robinCursor;
+    }
+
+    public void setRobinCursor(PriorityRobin.Cursor cursor) {
+        robinCursor = cursor;
+    }
+
     public void setPriority(int priority) {
         this.priority = Math.max(-99, Math.min(99, priority));
     }
@@ -345,6 +356,7 @@ public class ChannelData {
     public void copyFrom(ChannelData source) {
         resourceRoundRobin = source.resourceRoundRobin;
         resetResourceRotation();
+        robinCursor = null;
         this.enabled = source.enabled;
         this.mode = source.mode;
         setType(source.type);
