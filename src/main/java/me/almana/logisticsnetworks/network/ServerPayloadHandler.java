@@ -1437,8 +1437,7 @@ public class ServerPayloadHandler {
                 LogisticsNetwork network = registry.getNetwork(payload.networkId());
                 if (network == null || !canAccessNetwork(player, network))
                     return;
-                telemetry.subscribe(payload.networkId(), payload.channelIndex(),
-                        player, registry, player.getServer());
+                telemetry.subscribe(payload.networkId(), player, registry, player.getServer());
             } else {
                 telemetry.unsubscribe(player);
             }

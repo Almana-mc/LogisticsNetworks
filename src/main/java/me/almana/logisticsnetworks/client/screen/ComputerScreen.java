@@ -6,7 +6,6 @@ import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.lnet.LnetNetworkFile;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
-import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
 import me.almana.logisticsnetworks.network.DeleteNetworkPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
@@ -97,6 +96,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private static final int PANEL_HEADER_HEIGHT = 14;
     private static final int CHANNEL_ENTRY_HEIGHT = 18;
     private static final int CHANNELS_PER_PAGE = 7;
+    private static final int TELEMETRY_HISTORY = 120;
     private static final int LNET_ENTRY_HEIGHT = 18;
     private static final int LNET_FILES_PER_PAGE = 6;
     private static final int LNET_LABELS_PER_PAGE = 6;
@@ -177,7 +177,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private int channelListScrollOffset;
     private int watchedChannelIndex;
     private int watchedTypeOrdinal;
-    private long[] telemetryHistory = new long[TelemetryManager.HISTORY_SIZE];
+    private long[] telemetryHistory = new long[TELEMETRY_HISTORY];
     private int telemetryIndex;
     private boolean telemetrySubscribed;
 
@@ -640,12 +640,12 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
         int barW = 4;
         int barStep = barW + 1;
-        int maxBars = Math.min(barAreaW / barStep, TelemetryManager.HISTORY_SIZE);
+        int maxBars = Math.min(barAreaW / barStep, TELEMETRY_HISTORY);
 
         long maxVal = 1;
         for (int i = 0; i < maxBars; i++) {
-            int idx = ((writeIndex - 1 - i) % TelemetryManager.HISTORY_SIZE
-                    + TelemetryManager.HISTORY_SIZE) % TelemetryManager.HISTORY_SIZE;
+            int idx = ((writeIndex - 1 - i) % TELEMETRY_HISTORY
+                    + TELEMETRY_HISTORY) % TELEMETRY_HISTORY;
             maxVal = Math.max(maxVal, history[idx]);
         }
 
@@ -653,13 +653,13 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             g.fill(barAreaX, gy, barAreaX + barAreaW, gy + 1, COLOR_GRAPH_GRID);
         }
 
-        int newestIdx = ((writeIndex - 1) % TelemetryManager.HISTORY_SIZE
-                + TelemetryManager.HISTORY_SIZE) % TelemetryManager.HISTORY_SIZE;
+        int newestIdx = ((writeIndex - 1) % TELEMETRY_HISTORY
+                + TELEMETRY_HISTORY) % TELEMETRY_HISTORY;
         long newestVal = history[newestIdx];
 
         for (int i = 0; i < maxBars; i++) {
-            int idx = ((writeIndex - 1 - i) % TelemetryManager.HISTORY_SIZE
-                    + TelemetryManager.HISTORY_SIZE) % TelemetryManager.HISTORY_SIZE;
+            int idx = ((writeIndex - 1 - i) % TELEMETRY_HISTORY
+                    + TELEMETRY_HISTORY) % TELEMETRY_HISTORY;
             long val = history[idx];
             if (val <= 0) continue;
 
@@ -2275,27 +2275,24 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     public void receiveTelemetry(SyncTelemetryPayload payload) {
-        if (payload.networkId().equals(selectedNetworkId)
-                && payload.channelIndex() == watchedChannelIndex) {
-            this.telemetryHistory = payload.history();
-            this.telemetryIndex = payload.historyIndex();
+        if (payload.networkId().equals(selectedNetworkId)) {
+            telemetryHistory[telemetryIndex] = payload.channels().get(watchedChannelIndex).total();
+            telemetryIndex = (telemetryIndex + 1) % TELEMETRY_HISTORY;
         }
     }
 
     private void subscribeTelemetry() {
         if (!telemetrySubscribed && selectedNetworkId != null) {
-            telemetryHistory = new long[TelemetryManager.HISTORY_SIZE];
+            telemetryHistory = new long[TELEMETRY_HISTORY];
             telemetryIndex = 0;
-            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(
-                    selectedNetworkId, true, watchedChannelIndex));
+            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(selectedNetworkId, true));
             telemetrySubscribed = true;
         }
     }
 
     private void unsubscribeTelemetry() {
         if (telemetrySubscribed && selectedNetworkId != null) {
-            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(
-                    selectedNetworkId, false, watchedChannelIndex));
+            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(selectedNetworkId, false));
             telemetrySubscribed = false;
         }
     }
