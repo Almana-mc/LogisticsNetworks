@@ -118,7 +118,7 @@ Redstone gating applies to both Senders and Receivers.
 
 ![Distribution: Farthest First](images/channel-distribution-farthest-first.png)
 
-![Distribution: Round Robin](images/channel-distribution-round-robin.png)
+![Distribution: Equal Distribution](images/channel-distribution-round-robin.png)
 
 **What it is:** how a Sender picks between multiple matching Receivers on the same channel number.
 
@@ -127,11 +127,12 @@ Redstone gating applies to both Senders and Receivers.
 - **Priority** — sort by each Receiver's **Priority** value. Higher numbers are served first. Ties are broken in no particular order.
 - **Nearest First** — serve the Receivers closest to the Sender first (by straight-line distance).
 - **Farthest First** — opposite of Nearest First: serve the furthest Receiver first.
-- **Round Robin** — distribute each operation's item batch as evenly as possible across matching Receivers.
+- **Equal Distribution** — split each operation's item batch as evenly as possible across matching Receivers.
+- **Priority Robin** — each operation goes to one Receiver, then the next. Receivers are visited from highest to lowest **Priority**, then the cycle repeats. A full Receiver is skipped.
 
 **How to change it:** use Primary Interaction to cycle to the next mode.
 
-**Gotcha:** Round Robin does not keep a rotation pointer. Available items are divided during the same operation, and unused shares flow to Receivers with storage space.
+**Gotcha:** Equal Distribution does not keep a rotation pointer, and unused shares flow to Receivers with space. Priority Robin does keep one, but it resets to the highest-priority Receiver on world reload. If the chosen Receiver accepts only part of a batch, the rest waits for the next operation. Equal Distribution only affects item channels; Priority Robin works on every channel type.
 
 **Disabled on Receivers:** this row is greyed out when Mode is Receiver. Distribution only makes sense on the Sender side.
 
@@ -141,11 +142,11 @@ Redstone gating applies to both Senders and Receivers.
 
 **What it is:** a small integer attached to this channel. Range: **–99 to +99**.
 
-**What it does:** used by a Sender that has Distribution set to **Priority**. The Sender sorts its target Receivers by this number, highest first, and serves them in that order. Receivers with higher priority get resources before lower-priority ones.
+**What it does:** used by a Sender that has Distribution set to **Priority** or **Priority Robin**. The Sender sorts its target Receivers by this number, highest first, and serves them in that order. Receivers with higher priority get resources before lower-priority ones.
 
 **How to change it:** use Primary Interaction on the number field to open a text box, type a number between –99 and 99, and press Enter.
 
-**Gotcha:** Priority is only consulted when Distribution = Priority. Under Nearest/Farthest/Round Robin it is ignored — the sorter never reads it. Set Priority on the **Receivers** you want served first, not on the Sender.
+**Gotcha:** Priority is only consulted when Distribution = Priority or Priority Robin. Under Nearest/Farthest/Equal Distribution it is ignored — the sorter never reads it. Set Priority on the **Receivers** you want served first, not on the Sender.
 
 ## Batch
 
