@@ -102,12 +102,12 @@ public final class BuildingGadgetsCompat {
         return payload;
     }
 
-    @Nullable
     public static List<ItemStack> pasteCost(CompoundTag config, HolderLookup.Provider registries) {
         NodeClipboardConfig clipboard = loadSanitized(config, registries);
         return clipboard == null ? List.of() : cost(clipboard);
     }
 
+    @Nullable
     private static NodeClipboardConfig loadSanitized(CompoundTag config, HolderLookup.Provider registries) {
         NodeClipboardConfig clipboard = NodeClipboardConfig.load(config, registries);
         if (clipboard == null || !clipboard.isStructurallyValid()) return null;
