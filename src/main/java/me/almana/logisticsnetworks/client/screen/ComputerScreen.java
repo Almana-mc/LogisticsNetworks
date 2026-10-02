@@ -163,7 +163,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private UUID labelSettingsSource;
     private EditBox nodeLabelBox;
 
-    private boolean telemetrySubscribed;
+    private UUID telemetryNetworkId;
     private FlowMonitorPage flowMonitor;
 
     private List<Path> lnetFiles = new ArrayList<>();
@@ -1952,6 +1952,9 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         this.networkList = new ArrayList<>(networks);
         SyncNetworkListPayload.NetworkEntry selected = getSelectedNetworkEntry();
         if (selectedNetworkId != null && selected == null) {
+            if (currentPage == Page.IO_MONITOR) {
+                closeFlowMonitor();
+            }
             selectedNetworkId = null;
             selectedNetworkName = "";
             deleteConfirmationOpen = false;
@@ -2041,16 +2044,16 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     private void subscribeTelemetry() {
-        if (!telemetrySubscribed && selectedNetworkId != null) {
-            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(selectedNetworkId, true));
-            telemetrySubscribed = true;
+        if (telemetryNetworkId == null && selectedNetworkId != null) {
+            telemetryNetworkId = selectedNetworkId;
+            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(telemetryNetworkId, true));
         }
     }
 
     private void unsubscribeTelemetry() {
-        if (telemetrySubscribed && selectedNetworkId != null) {
-            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(selectedNetworkId, false));
-            telemetrySubscribed = false;
+        if (telemetryNetworkId != null) {
+            PacketDistributor.sendToServer(new SubscribeTelemetryPayload(telemetryNetworkId, false));
+            telemetryNetworkId = null;
         }
     }
 
