@@ -87,7 +87,7 @@ final class FlowResourceList {
         return true;
     }
 
-    static void renderIcon(GuiGraphics g, FlowResource resource, int x, int y) {
+    private static void renderIcon(GuiGraphics g, FlowResource resource, int x, int y) {
         switch (resource) {
             case FlowResource.Item item -> g.renderItem(item.stack(), x, y);
             case FlowResource.Fluid fluid -> FilterResourceRenderer.renderFluid(g, fluid.stack(), x, y);

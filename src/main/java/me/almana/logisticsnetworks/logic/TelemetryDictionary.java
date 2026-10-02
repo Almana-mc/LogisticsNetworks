@@ -12,7 +12,7 @@ import java.util.UUID;
 
 final class TelemetryDictionary {
 
-    static final int MAX_ENTRIES = 4096;
+    private static final int MAX_ENTRIES = 4096;
     private static final int RESET_AT = MAX_ENTRIES
             - LogisticsNodeEntity.CHANNEL_COUNT * TelemetryManager.TOP_RESOURCES;
 

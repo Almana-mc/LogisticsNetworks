@@ -14,7 +14,7 @@ import java.util.Map;
 
 final class FlowHistory {
 
-    static final int SIZE = 120;
+    private static final int SIZE = 120;
     private static final float GROW_MS = 300f;
     private static final Sample EMPTY = new Sample(0, Map.of());
 

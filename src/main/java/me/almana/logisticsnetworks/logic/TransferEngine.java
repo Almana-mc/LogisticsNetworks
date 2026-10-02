@@ -497,7 +497,7 @@ public class TransferEngine {
         return result;
     }
 
-    static MoveRecorder withTelemetry(@Nullable MoveRecorder next, ChannelTelemetry telemetry) {
+    private static MoveRecorder withTelemetry(@Nullable MoveRecorder next, ChannelTelemetry telemetry) {
         return (slot, index, moved, mask) -> {
             telemetry.recordResource(new FlowResource.Item(moved), moved.getCount());
             if (next != null) {
