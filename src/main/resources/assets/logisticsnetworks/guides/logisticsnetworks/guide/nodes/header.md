@@ -50,7 +50,7 @@ A node that is not assigned to a network does nothing — all 9 channels stay in
 
 - Pick an existing network you own and move the node onto it.
 - Search existing networks, or use **Create** to open a separate name form (up to 32 characters) and join a fresh network.
-- Sort the list with the button to the right of **Existing Networks**. Each click cycles **A-Z**, **Z-A**, **Old→New** and **New→Old**. A network made before sorting existed gets its creation time the first time one of its nodes is opened, and until then it counts as the oldest.
+- Sort the list with the button at the right end of the **Existing Networks** row. Use Primary Interaction on it to cycle **A-Z**, **Z-A**, **Old→New** and **New→Old**. A network made before sorting existed gets its creation time the first time one of its nodes is opened, and until then it counts as the oldest.
 - Leave the current network so the node becomes unassigned.
 
 **How to change networks:** use Primary Interaction on **Change**, then select a listed network or open **Create**, enter a new name, and confirm. The node moves immediately and the main screen returns to the channel configuration view.
