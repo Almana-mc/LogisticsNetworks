@@ -337,7 +337,8 @@ public class TransferEngine {
                 case SOURCE ->
                     transferSource(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache);
                 default ->
-                    transferItems(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
+                    transferItems(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache,
+                            capCache, telemetryActive);
             };
 
             if (result < 0)
@@ -440,16 +441,17 @@ public class TransferEngine {
 
     private static int transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
-            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache, boolean telemetryActive) {
         return transferItems(sourceNode, sourceLevel, exportChannel, channelIndex, targets,
-                batchLimit, dimensionalCache, capCache, Collections.emptyMap(), Collections.emptyMap(), null).moved();
+                batchLimit, dimensionalCache, capCache, Collections.emptyMap(), Collections.emptyMap(), null,
+                telemetryActive).moved();
     }
 
     private static ItemResourceOrder.Result transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
             Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache,
             Map<Item, Integer> priorBatchMoved, Map<UUID, Map<Item, Integer>> priorTargetBatches,
-            @Nullable ItemResource requiredResource) {
+            @Nullable ItemResource requiredResource, boolean telemetryActive) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos))
@@ -478,16 +480,26 @@ public class TransferEngine {
         MoveRecorder served = distribution == DistributionMode.PRIORITY_ROBIN
                 ? (slot, index, moved, mask) -> markServed(exportChannel, resolved.refs().get(index))
                 : null;
+        MoveRecorder recorder = telemetryActive ? withTelemetry(served, exportChannel.getTelemetry()) : served;
         ItemResourceOrder.Result result = executeItemOperation(sourceHandler, resolved.targets(), batchLimit,
                 exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
                 sourceLevel, sourcePos, filterReadCache,
-                distribution, served, priorBatchMoved, resolved.refs().stream()
+                distribution, recorder, priorBatchMoved, resolved.refs().stream()
                         .map(ref -> priorTargetBatches.getOrDefault(ref.node().getUUID(), Map.of())).toList(),
                 exportChannel.canRotateResources(), exportChannel.getItemResourceCursor(), requiredResource);
         if (result.cursor() != null) exportChannel.setItemResourceCursor(result.cursor());
         return result;
+    }
+
+    static MoveRecorder withTelemetry(@Nullable MoveRecorder next, ChannelTelemetry telemetry) {
+        return (slot, index, moved, mask) -> {
+            telemetry.recordResource(new FlowResource.Item(moved), moved.getCount());
+            if (next != null) {
+                next.record(slot, index, moved, mask);
+            }
+        };
     }
 
     public static ItemResourceOrder.Result recoverItemChannel(LogisticsNetwork network, MinecraftServer server,
@@ -542,10 +554,12 @@ public class TransferEngine {
             return ItemResourceOrder.EMPTY;
         }
 
+        boolean telemetryActive = NetworkRegistry.get((ServerLevel) server.overworld())
+                .getTelemetryManager().isActive(network.getId());
         ItemResourceOrder.Result recovered = transferItems(
                 sourceNode, (ServerLevel) sourceNode.level(), channel, channelIndex,
                 targets, recoveryLimit, context.dimensionalCache(), capCache, committedByItem, committedByTarget,
-                requiredResource);
+                requiredResource, telemetryActive);
         return recovered.moved() < 0 ? ItemResourceOrder.EMPTY : recovered;
     }
 

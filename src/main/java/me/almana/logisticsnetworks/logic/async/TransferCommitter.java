@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
+import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -184,6 +185,10 @@ public final class TransferCommitter {
                     source, target.handler(), target.bulkHandler(), validated, sourceNode);
             committed += moved;
             if (moved > 0) {
+                if (telemetryActive) {
+                    sourceChannel.getTelemetry().recordResource(
+                            new FlowResource.Item(move.resource().toStack(1)), moved);
+                }
                 servedTarget = move.targetIndex();
                 movedResource = move.resource();
                 committedByItem.merge(move.expectedItem(), moved, Integer::sum);
