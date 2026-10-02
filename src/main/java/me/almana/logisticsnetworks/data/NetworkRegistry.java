@@ -111,6 +111,13 @@ public class NetworkRegistry extends SavedData {
         return networks.get(id);
     }
 
+    public void stampCreatedAt(UUID networkId) {
+        LogisticsNetwork network = networks.get(networkId);
+        if (network != null && network.stampCreatedAtIfMissing()) {
+            setDirty();
+        }
+    }
+
     public Map<UUID, LogisticsNetwork> getAllNetworks() {
         return Collections.unmodifiableMap(networks);
     }

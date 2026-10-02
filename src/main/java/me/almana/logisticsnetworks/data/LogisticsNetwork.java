@@ -34,6 +34,7 @@ public class LogisticsNetwork {
     private static final String KEY_OWNER_UUID = "OwnerUUID";
     private static final String KEY_CHANNEL_NAMES = "ChannelNames";
     private static final String KEY_COLOR = "Color";
+    private static final String KEY_CREATED = "CreatedAt";
     private static final String KEY_GRAPH_POSITIONS = "GraphPositions";
     private static final String KEY_GRAPH_X = "X";
     private static final String KEY_GRAPH_Y = "Y";
@@ -46,6 +47,7 @@ public class LogisticsNetwork {
     private String name;
     private UUID ownerUuid;
     private int color = NetworkColors.randomColor();
+    private long createdAt = System.currentTimeMillis();
     private final Set<UUID> nodeUuids = new HashSet<>();
     private final Map<String, GraphPosition> graphPositions = new HashMap<>();
     private final Map<String, LabelUpgradeTemplate> labelTemplates = new HashMap<>();
@@ -109,6 +111,7 @@ public class LogisticsNetwork {
         tag.putString(KEY_NAME, name);
         tag.putBoolean(KEY_SLEEPING, sleeping);
         tag.putInt(KEY_COLOR, color);
+        tag.putLong(KEY_CREATED, createdAt);
         if (ownerUuid != null) {
             tag.putUUID(KEY_OWNER_UUID, ownerUuid);
         }
@@ -170,6 +173,8 @@ public class LogisticsNetwork {
         if (tag.contains(KEY_COLOR)) {
             network.color = NetworkColors.mask(tag.getInt(KEY_COLOR));
         }
+        // 0 means legacy, unstamped
+        network.createdAt = tag.getLong(KEY_CREATED);
 
         if (tag.contains(KEY_NODES)) {
             ListTag nodesTag = tag.getList(KEY_NODES, Tag.TAG_COMPOUND);
@@ -270,6 +275,16 @@ public class LogisticsNetwork {
 
     public void setColor(int color) {
         this.color = NetworkColors.mask(color);
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public boolean stampCreatedAtIfMissing() {
+        if (createdAt != 0L) return false;
+        createdAt = System.currentTimeMillis();
+        return true;
     }
 
     public String getChannelName(int index) {
