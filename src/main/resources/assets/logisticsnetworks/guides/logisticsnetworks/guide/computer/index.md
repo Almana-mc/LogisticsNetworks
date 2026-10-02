@@ -23,7 +23,7 @@ The drive bay slot is only interactable on the Network Directory page. If you sw
 Once you pick a network from the directory, you can jump into either of the two subsystems. Covered in their own chapters:
 
 - [Network Directory](network-directory.md) — the list of networks on the left; search, pinning, mounting a network.
-- [I/O Monitor](io-monitor.md) — aggregated channel throughput with live graphs (120 data points per channel).
+- [I/O Monitor](io-monitor.md) — live throughput for all nine channels, plus exactly which items, fluids and chemicals are moving.
 - [Node Table](node-table.md) — every node on the mounted network, grouped by label, with per-row actions.
 
 See [Saving & Loading Networks](save-load.md) to back up node configurations or load them onto the Computer's wrench.
