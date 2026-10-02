@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.integration.buildinggadgets.mixin;
 
 import com.direwolf20.buildinggadgets2.common.blockentities.RenderBlockBE;
 import com.direwolf20.buildinggadgets2.common.events.ServerBuildList;
+import com.direwolf20.buildinggadgets2.util.BuildingUtils;
 import com.direwolf20.buildinggadgets2.util.datatypes.StatePos;
 import com.direwolf20.buildinggadgets2.util.datatypes.TagPos;
 import com.llamalad7.mixinextras.sugar.Local;
@@ -82,6 +83,9 @@ abstract class ServerTickHandlerMixin {
         if (config == null || holder.logisticsnetworks$getNode() != null
                 || be.blockEntityData != null && be.blockEntityData.contains(NodeTransit.KEY_NODE)
                 || !(player instanceof ServerPlayer serverPlayer)) return;
-        holder.logisticsnetworks$setNode(BuildingGadgetsCompat.chargeCopy(serverPlayer, config, list));
+        holder.logisticsnetworks$setNode(BuildingGadgetsCompat.chargeCopy(serverPlayer, config, list,
+                cost -> BuildingUtils.removeStacksFromInventory(player, cost, true, list.boundPos, list.getDirection())
+                        && BuildingUtils.removeStacksFromInventory(player, cost, false, list.boundPos,
+                                list.getDirection())));
     }
 }

@@ -7,21 +7,22 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.function.Predicate;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.integration.storage.StorageInventory;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Containers;
-import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -78,17 +79,18 @@ public final class BuildingGadgetsCompat {
     }
 
     @Nullable
-    public static CompoundTag chargeCopy(ServerPlayer player, CompoundTag config, Object paste) {
-        NodeClipboardConfig clipboard = NodeClipboardConfig.load(config, player.registryAccess());
-        if (clipboard == null || !clipboard.isStructurallyValid()) return null;
-
-        // Strip untrusted upgrade components
-        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
-            clipboard.setUpgradeItem(slot, new ItemStack(clipboard.getUpgradeItem(slot).getItem()));
-        }
+    public static CompoundTag chargeCopy(ServerPlayer player, CompoundTag config, Object paste,
+            Predicate<List<ItemStack>> pay) {
+        NodeClipboardConfig clipboard = loadSanitized(config, player.registryAccess());
+        if (clipboard == null) return null;
 
         boolean paid = !player.isCreative();
-        if (paid && !take(player, cost(clipboard))) return null;
+        List<ItemStack> cost = cost(clipboard);
+        if (paid && !pay.test(cost)) {
+            player.displayClientMessage(Component.translatable(
+                    "message.logisticsnetworks.buildinggadgets.missing_items", describe(cost)), true);
+            return null;
+        }
 
         CompoundTag payload = new CompoundTag();
         payload.putString("kind", NodeTransit.KIND_COPY);
@@ -98,6 +100,26 @@ public final class BuildingGadgetsCompat {
         UUID network = resolveNetwork(player, clipboard, paste);
         if (network != null) payload.putUUID("network", network);
         return payload;
+    }
+
+    @Nullable
+    private static NodeClipboardConfig loadSanitized(CompoundTag config, HolderLookup.Provider registries) {
+        NodeClipboardConfig clipboard = NodeClipboardConfig.load(config, registries);
+        if (clipboard == null || !clipboard.isStructurallyValid()) return null;
+        // Strip untrusted upgrade components
+        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+            clipboard.setUpgradeItem(slot, new ItemStack(clipboard.getUpgradeItem(slot).getItem()));
+        }
+        return clipboard;
+    }
+
+    private static Component describe(List<ItemStack> cost) {
+        MutableComponent text = Component.empty();
+        for (int i = 0; i < cost.size(); i++) {
+            if (i > 0) text.append(", ");
+            text.append(cost.get(i).getCount() + "x ").append(cost.get(i).getHoverName());
+        }
+        return text;
     }
 
     public static void spawn(ServerLevel level, BlockPos pos, CompoundTag payload) {
@@ -189,21 +211,6 @@ public final class BuildingGadgetsCompat {
             cost.add(required.stack().copyWithCount(required.count()));
         }
         return cost;
-    }
-
-    private static boolean take(ServerPlayer player, List<ItemStack> cost) {
-        Inventory inventory = player.getInventory();
-        for (ItemStack stack : cost) {
-            if (StorageInventory.count(inventory, stack, -1) < stack.getCount()) {
-                player.displayClientMessage(Component.translatable(
-                        "message.logisticsnetworks.buildinggadgets.missing_items", stack.getHoverName()), true);
-                return false;
-            }
-        }
-        for (ItemStack stack : cost) {
-            StorageInventory.reserve(inventory, stack, stack.getCount(), -1);
-        }
-        return true;
     }
 
     @Nullable

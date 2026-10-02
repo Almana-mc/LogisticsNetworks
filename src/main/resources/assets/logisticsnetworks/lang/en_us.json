@@ -350,7 +350,7 @@
   "message.logisticsnetworks.clipboard.invalid": "Clipboard data is invalid",
   "message.logisticsnetworks.clipboard.cleared": "Clipboard cleared",
   "message.logisticsnetworks.buildinggadgets.copy_too_large": "Too many node settings to copy; nodes were left out",
-  "message.logisticsnetworks.buildinggadgets.missing_items": "Node not pasted: missing %s",
+  "message.logisticsnetworks.buildinggadgets.missing_items": "Node not pasted, needs: %s",
   "message.logisticsnetworks.clipboard.paste.success": "Clipboard pasted successfully",
   "message.logisticsnetworks.clipboard.paste.connected.success": "Clipboard pasted to %s connected nodes",
   "message.logisticsnetworks.clipboard.paste.connected.partial": "Pasted to %s of %s connected nodes; some were skipped",
