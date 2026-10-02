@@ -112,6 +112,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private List<SyncNetworkListPayload.NetworkEntry> networkList = new ArrayList<>();
     private String lastNetworkFilter = "";
     private int networkScrollOffset = 0;
+    private NetworkSortMode sortMode = NetworkSortMode.NAME_ASC;
 
     private NetworkEditor networkEditor;
     private NetworkCreationConfirmation networkCreationConfirmation;
@@ -495,6 +496,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         g.fill(leftPos + 12, topPos + 76, leftPos + GUI_WIDTH - 12, topPos + 77, cBorder());
         g.drawString(font, Component.translatable("gui.logisticsnetworks.node.existing_networks"), leftPos + 14,
                 topPos + 82, cSubtle(), false);
+        drawSortButton(g, mx, my);
 
         String currentFilter = networkNameField != null ? networkNameField.getValue().trim() : "";
         if (!currentFilter.equals(lastNetworkFilter)) {
@@ -527,6 +529,41 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private void drawButton(GuiGraphics g, int x, int y, int w, int h, String label, int mx, int my) {
         boolean hovered = !labelPickerOpen && mx >= x && mx <= x + w && my >= y && my <= y + h;
         ThemePaint.button(g, font, x, y, w, h, label, hovered, theme());
+    }
+
+    private static final int SORT_ICON_W = 5;
+    private static final int SORT_ICON_GAP = 4;
+
+    private int[] sortButtonBounds() {
+        String label = tr(sortMode.labelKey());
+        int w = font.width(label) + 12 + SORT_ICON_W + SORT_ICON_GAP;
+        int h = 13;
+        int x = leftPos + GUI_WIDTH - 14 - w;
+        int y = topPos + 79;
+        return new int[] { x, y, w, h };
+    }
+
+    private void drawSortButton(GuiGraphics g, int mx, int my) {
+        String label = tr(sortMode.labelKey());
+        int[] b = sortButtonBounds();
+        boolean hovered = mx >= b[0] && mx <= b[0] + b[2] && my >= b[1] && my <= b[1] + b[3];
+        int fg = hovered ? ((cBorderStrong() == cText()) ? theme().bg() : cText()) : cMuted();
+        g.fill(b[0], b[1], b[0] + b[2], b[1] + b[3], hovered ? cBorderStrong() : cPanel());
+        g.renderOutline(b[0], b[1], b[2], b[3], hovered ? cAccent() : cBorder());
+
+        int iconX = b[0] + 5;
+        int iconY = b[1] + 3;
+        drawSortIcon(g, iconX, iconY, fg);
+        g.drawString(font, label, iconX + SORT_ICON_W + SORT_ICON_GAP, b[1] + 3, fg, false);
+    }
+
+    private void drawSortIcon(GuiGraphics g, int x, int y, int color) {
+        g.fill(x + 2, y, x + 3, y + 1, color);
+        g.fill(x + 1, y + 1, x + 4, y + 2, color);
+        g.fill(x, y + 2, x + 5, y + 3, color);
+        g.fill(x, y + 4, x + 5, y + 5, color);
+        g.fill(x + 1, y + 5, x + 4, y + 6, color);
+        g.fill(x + 2, y + 6, x + 3, y + 7, color);
     }
 
     private void drawNetworkListEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, int x, int y, int w,
@@ -1318,6 +1355,13 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     }
 
     private boolean handleNetworkPageClick(double mx, double my) {
+        int[] sb = sortButtonBounds();
+        if (isHoveringAbs(sb[0], sb[1], sb[2], sb[3], mx, my)) {
+            sortMode = sortMode.next();
+            networkScrollOffset = 0;
+            return true;
+        }
+
         if (isHoveringAbs(leftPos + GUI_WIDTH / 2 - 45, topPos + 54, 90, 16, mx, my)) {
             String value = networkNameField.getValue().trim();
             String name = value.isEmpty() ? tr("gui.logisticsnetworks.node.network.unnamed") : value;
@@ -2050,14 +2094,13 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     }
 
     private List<SyncNetworkListPayload.NetworkEntry> getFilteredNetworks() {
-        if (networkNameField == null) return networkList;
-        String filter = networkNameField.getValue().trim().toLowerCase();
-        if (filter.isEmpty()) return networkList;
+        String filter = networkNameField != null ? networkNameField.getValue().trim().toLowerCase() : "";
         List<SyncNetworkListPayload.NetworkEntry> filtered = new ArrayList<>();
         for (SyncNetworkListPayload.NetworkEntry entry : networkList) {
             if (entry.name().toLowerCase().contains(filter))
                 filtered.add(entry);
         }
+        filtered.sort(sortMode.comparator());
         return filtered;
     }
 
