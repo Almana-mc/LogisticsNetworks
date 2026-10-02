@@ -122,7 +122,8 @@ public class ComputerMenu extends AbstractContainerMenu {
                     net.getNodeUuids().size(),
                     starredNetworks.contains(net.getId()),
                     NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
-                    net.getColor()));
+                    net.getColor(),
+                    net.getCreatedAt()));
         }
 
         if (Config.debugMode) LOGGER.debug("Sending {} network entries to client", entries.size());

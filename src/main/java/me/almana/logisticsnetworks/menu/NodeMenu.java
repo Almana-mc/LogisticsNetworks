@@ -232,7 +232,8 @@ public class NodeMenu extends AbstractContainerMenu {
                     net.getNodeUuids().size(),
                     false,
                     NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
-                    net.getColor()));
+                    net.getColor(),
+                    net.getCreatedAt()));
         }
 
         PacketDistributor.sendToPlayer(player, new SyncNetworkListPayload(entries));
