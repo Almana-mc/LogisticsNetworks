@@ -112,7 +112,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private List<SyncNetworkListPayload.NetworkEntry> networkList = new ArrayList<>();
     private String lastNetworkFilter = "";
     private int networkScrollOffset = 0;
-    private NetworkSortMode sortMode = NetworkSortMode.NAME_ASC;
+    private NetworkSortMode sortMode = NetworkSortMode.NEW_OLD;
 
     private NetworkEditor networkEditor;
     private NetworkCreationConfirmation networkCreationConfirmation;
