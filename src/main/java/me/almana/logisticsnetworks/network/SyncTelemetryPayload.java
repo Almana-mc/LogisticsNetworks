@@ -78,8 +78,8 @@ public record SyncTelemetryPayload(
 
     private static FlowResource readResource(RegistryFriendlyByteBuf buf) {
         return switch (buf.readByte()) {
-            case 0 -> new FlowResource.Item(ItemStack.STREAM_CODEC.decode(buf));
-            case 1 -> new FlowResource.Fluid(FluidStack.STREAM_CODEC.decode(buf));
+            case 0 -> new FlowResource.Item(ItemStack.OPTIONAL_STREAM_CODEC.decode(buf));
+            case 1 -> new FlowResource.Fluid(FluidStack.OPTIONAL_STREAM_CODEC.decode(buf));
             default -> new FlowResource.Chemical(buf.readUtf());
         };
     }
@@ -88,11 +88,11 @@ public record SyncTelemetryPayload(
         switch (resource) {
             case FlowResource.Item item -> {
                 buf.writeByte(0);
-                ItemStack.STREAM_CODEC.encode(buf, item.stack());
+                ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, item.stack());
             }
             case FlowResource.Fluid fluid -> {
                 buf.writeByte(1);
-                FluidStack.STREAM_CODEC.encode(buf, fluid.stack());
+                FluidStack.OPTIONAL_STREAM_CODEC.encode(buf, fluid.stack());
             }
             case FlowResource.Chemical chemical -> {
                 buf.writeByte(2);
