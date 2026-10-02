@@ -73,11 +73,13 @@ final class FlowMonitorPage {
             nodeCounts[entry.channelIndex()] = entry.nodeCount();
         }
         selectFirstActive();
+        refreshSelectedType();
     }
 
     void acceptTelemetry(SyncTelemetryPayload payload) {
         history.accept(payload);
         selectFirstActive();
+        refreshSelectedType();
     }
 
     void render(GuiGraphics g, int left, int top, int mouseX, int mouseY) {
@@ -94,8 +96,6 @@ final class FlowMonitorPage {
             ThemePaint.drawCentered(g, font, tr("enable_channels_hint"), x + MAIN_W / 2, y + 92, t.textSubtle());
             return;
         }
-        int ordinal = typeOrdinal(selected);
-        if (ordinal >= 0) selectedType = ChannelType.values()[ordinal];
         int color = ChannelTint.digit(selectedType, t);
         renderHeader(g, t, x, y, color);
         renderToolbar(g, t, x, y + 24);
@@ -127,7 +127,9 @@ final class FlowMonitorPage {
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
             if (typeOrdinal(i) >= 0
                     && inside(mouseX, mouseY, left + RAIL_X, top + BODY_Y + i * (ROW_H + 2), RAIL_W, ROW_H)) {
-                select(i);
+                if (i != selected) {
+                    select(i);
+                }
                 return true;
             }
         }
@@ -171,8 +173,8 @@ final class FlowMonitorPage {
     private void renderRailRow(GuiGraphics g, Theme t, int channel, int x, int y, int mouseX, int mouseY) {
         int ordinal = typeOrdinal(channel);
         boolean active = ordinal >= 0;
-        ChannelType type = active ? ChannelType.values()[ordinal] : ChannelType.ITEM;
-        boolean on = active && channel == selected;
+        ChannelType type = active ? ChannelType.values()[ordinal] : selectedType;
+        boolean on = channel == selected;
         boolean hovered = active && inside(mouseX, mouseY, x, y, RAIL_W, ROW_H);
         int border = on ? ChannelTint.border(type, t) : hovered ? t.borderStrong() : t.border();
         int tint = active ? ChannelTint.digit(type, t) : t.borderStrong();
@@ -192,7 +194,7 @@ final class FlowMonitorPage {
         g.drawString(font, font.plainSubstrByWidth(channelName(selected), 140), x, y, t.text(), false);
         String prefix = tr("flow.channel_short", selected) + " · ";
         String typeName = tr("telemetry." + typeKey());
-        String nodes = " · " + tr("channel_nodes", nodeCounts[selected]);
+        String nodes = " · " + tr("channel_nodes", typeOrdinal(selected) < 0 ? 0 : nodeCounts[selected]);
         g.drawString(font, prefix, x, y + 11, t.textMuted(), false);
         g.drawString(font, typeName, x + font.width(prefix), y + 11, color, false);
         g.drawString(font, nodes, x + font.width(prefix) + font.width(typeName), y + 11, t.textMuted(), false);
@@ -263,6 +265,14 @@ final class FlowMonitorPage {
     private void selectFirstActive() {
         for (int i = 0; selected < 0 && i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
             if (typeOrdinal(i) >= 0) select(i);
+        }
+    }
+
+    private void refreshSelectedType() {
+        int ordinal = selected < 0 ? -1 : typeOrdinal(selected);
+        if (ordinal >= 0 && ChannelType.values()[ordinal] != selectedType) {
+            selectedType = ChannelType.values()[ordinal];
+            filter = null;
         }
     }
 
