@@ -46,6 +46,8 @@ import org.slf4j.Logger;
 
 import java.util.*;
 import java.util.function.IntConsumer;
+import java.util.function.ObjIntConsumer;
+import java.util.function.ObjLongConsumer;
 
 public class TransferEngine {
 
@@ -329,11 +331,13 @@ public class TransferEngine {
 
             int result = switch (channel.getType()) {
                 case FLUID ->
-                    transferFluids(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
+                    transferFluids(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache,
+                            telemetryActive);
                 case ENERGY ->
                     transferEnergy(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
                 case CHEMICAL ->
-                    transferChemicals(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
+                    transferChemicals(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache,
+                            capCache, telemetryActive);
                 case SOURCE ->
                     transferSource(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache);
                 default ->
@@ -637,7 +641,7 @@ public class TransferEngine {
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimitMb,
-            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache, boolean telemetryActive) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos))
@@ -692,9 +696,13 @@ public class TransferEngine {
             return -1;
         IntConsumer served = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
                 ? index -> markServed(exportChannel, refs.get(index)) : null;
+        ObjIntConsumer<FluidStack> onMoved = telemetryActive
+                ? (stack, amount) -> exportChannel.getTelemetry().recordResource(new FlowResource.Fluid(stack), amount)
+                : null;
         FluidResourceOrder.Result result = executeFluidOperation(sourceHandler, resolved, batchLimitMb,
                 exportChannel.getFilterItems(), exportChannel.getFilterMode(), sourceLevel.registryAccess(),
-                filterReadCache, exportChannel.canRotateResources(), exportChannel.getFluidResourceCursor(), served);
+                filterReadCache, exportChannel.canRotateResources(), exportChannel.getFluidResourceCursor(), served,
+                onMoved);
         if (result.cursor() != null) exportChannel.setFluidResourceCursor(result.cursor());
         return result.moved();
     }
@@ -753,7 +761,7 @@ public class TransferEngine {
 
     private static int transferChemicals(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
-            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache) {
+            Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache, boolean telemetryActive) {
 
         if (!MekanismCompat.isLoaded()) {
             if (Config.debugMode)
@@ -782,6 +790,9 @@ public class TransferEngine {
         int remaining = batchLimit;
         boolean anyReachable = false;
         FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
+        ObjLongConsumer<String> onMoved = telemetryActive
+                ? (id, amount) -> exportChannel.getTelemetry().recordResource(new FlowResource.Chemical(id), amount)
+                : null;
 
         for (ImportTarget target : targets) {
             if (remaining <= 0)
@@ -808,7 +819,7 @@ public class TransferEngine {
                     sourceHandler, targetHandler, remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel().getFilterItems(), target.channel().getFilterMode(),
-                    filterReadCache);
+                    filterReadCache, onMoved);
             if (Config.debugMode)
                 LOGGER.debug("[Chemical] Transfer {} -> {}: moved={}, batch={}",
                         sourcePos, targetPos, moved, remaining);
@@ -1504,12 +1515,13 @@ public class TransferEngine {
     public static FluidResourceOrder.Result executeFluidOperation(IFluidHandler source,
             List<FluidTransferTarget> targets, int limit, ItemStack[] filters, FilterMode mode,
             HolderLookup.Provider provider, FilterItemData.ReadCache cache, boolean rotate,
-            @Nullable FluidResourceOrder.Cursor cursor, @Nullable IntConsumer served) {
+            @Nullable FluidResourceOrder.Cursor cursor, @Nullable IntConsumer served,
+            @Nullable ObjIntConsumer<FluidStack> onMoved) {
         if (served != null) {
             // Receiver-outer avoids resource lockstep
             for (int i = 0; i < targets.size(); i++) {
                 FluidResourceOrder.Result result = executeFluidOperation(source, List.of(targets.get(i)), limit,
-                        filters, mode, provider, cache, rotate, cursor, null);
+                        filters, mode, provider, cache, rotate, cursor, null, onMoved);
                 if (result.moved() > 0) {
                     served.accept(i);
                     return result;
@@ -1522,7 +1534,7 @@ public class TransferEngine {
             for (FluidTransferTarget target : targets) {
                 if (remaining <= 0) break;
                 remaining -= executeFluidMove(source, target.handler(), remaining, filters, mode,
-                        target.filters(), target.mode(), provider, cache, resource);
+                        target.filters(), target.mode(), provider, cache, resource, onMoved);
             }
             return limit - remaining;
         };
@@ -1533,7 +1545,8 @@ public class TransferEngine {
     private static int executeFluidMove(IFluidHandler source, IFluidHandler target, int limitMb,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache, FluidStack required) {
+            HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache, FluidStack required,
+            @Nullable ObjIntConsumer<FluidStack> onMoved) {
 
         int remaining = limitMb;
         TransferAmountRules.Constraints amountConstraints = TransferAmountRules.collect(exportFilters, importFilters,
@@ -1595,6 +1608,9 @@ public class TransferEngine {
 
             if (filled > 0) {
                 remaining -= filled;
+                if (onMoved != null) {
+                    onMoved.accept(drained, filled);
+                }
             }
         }
         return limitMb - remaining;

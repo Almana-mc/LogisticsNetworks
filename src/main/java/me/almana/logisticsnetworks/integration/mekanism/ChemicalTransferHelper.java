@@ -26,6 +26,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.ObjLongConsumer;
 
 public final class ChemicalTransferHelper {
 
@@ -244,13 +245,13 @@ public final class ChemicalTransferHelper {
             LOGGER.debug("[Chemical] Transferring {} -> {}, limit={}, srcTanks={}, tgtTanks={}",
                     sourcePos, targetPos, limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
-                importFilters, importFilterMode, filterReadCache);
+                importFilters, importFilterMode, filterReadCache, null);
     }
 
     public static long transferBetween(IChemicalHandler source, IChemicalHandler target, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
+            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable ObjLongConsumer<String> onMoved) {
         if (source == null || target == null) {
             return 0;
         }
@@ -258,13 +259,13 @@ public final class ChemicalTransferHelper {
             LOGGER.debug("[Chemical] Transferring limit={}, srcTanks={}, tgtTanks={}",
                     limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
-                importFilters, importFilterMode, filterReadCache);
+                importFilters, importFilterMode, filterReadCache, onMoved);
     }
 
     private static long executeChemicalMove(IChemicalHandler source, IChemicalHandler target, long limitAmount,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
+            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable ObjLongConsumer<String> onMoved) {
         long remaining = limitAmount;
 
         for (int tank = 0; tank < source.getChemicalTanks(); tank++) {
@@ -336,6 +337,9 @@ public final class ChemicalTransferHelper {
 
             if (moved > 0) {
                 remaining -= moved;
+                if (onMoved != null && chemId != null) {
+                    onMoved.accept(chemId, moved);
+                }
                 if (Config.debugMode)
                     LOGGER.debug("[Chemical] Moved {} from tank {}", moved, tank);
             }
