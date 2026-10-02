@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic.async;
 
+import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import net.minecraft.core.HolderLookup;
@@ -28,7 +29,7 @@ public record NetworkSnapshot(
             ItemStack[] exportFilters,
             FilterMode exportFilterMode,
             int sourceEndpoint,
-            boolean roundRobin,
+            DistributionMode distribution,
             boolean resourceRoundRobin,
             @Nullable me.almana.logisticsnetworks.logic.ItemResourceOrder.Cursor resourceCursor,
             List<TargetUnit> targets) {

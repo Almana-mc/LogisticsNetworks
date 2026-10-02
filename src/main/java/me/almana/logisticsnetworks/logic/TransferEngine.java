@@ -474,13 +474,16 @@ public class TransferEngine {
             return ItemResourceOrder.EMPTY;
         }
 
+        DistributionMode distribution = exportChannel.getDistributionMode();
+        MoveRecorder served = distribution == DistributionMode.PRIORITY_ROBIN
+                ? (slot, index, moved, mask) -> markServed(exportChannel, resolved.refs().get(index))
+                : null;
         ItemResourceOrder.Result result = executeItemOperation(sourceHandler, resolved.targets(), batchLimit,
                 exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
                 sourceLevel, sourcePos, filterReadCache,
-                exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN,
-                null, priorBatchMoved, resolved.refs().stream()
+                distribution, served, priorBatchMoved, resolved.refs().stream()
                         .map(ref -> priorTargetBatches.getOrDefault(ref.node().getUUID(), Map.of())).toList(),
                 exportChannel.canRotateResources(), exportChannel.getItemResourceCursor(), requiredResource);
         if (result.cursor() != null) exportChannel.setItemResourceCursor(result.cursor());
@@ -490,7 +493,8 @@ public class TransferEngine {
     public static ItemResourceOrder.Result recoverItemChannel(LogisticsNetwork network, MinecraftServer server,
             TransferCapabilityCache capCache, UUID sourceNodeId, int channelIndex,
             int plannedShortfall, int committed, Map<Item, Integer> committedByItem,
-            Map<UUID, Map<Item, Integer>> committedByTarget, @Nullable ItemResource requiredResource) {
+            Map<UUID, Map<Item, Integer>> committedByTarget, @Nullable ItemResource requiredResource,
+            @Nullable UUID onlyTarget) {
         ThreadGuard.requireServerThread();
         if (plannedShortfall <= 0 || channelIndex < 0 || channelIndex >= LogisticsNodeEntity.CHANNEL_COUNT) {
             return ItemResourceOrder.EMPTY;
@@ -524,6 +528,10 @@ public class TransferEngine {
         List<ImportTarget> targets = context.itemImports()[channelIndex];
         if (targets == null || targets.isEmpty()) {
             return ItemResourceOrder.EMPTY;
+        }
+        if (onlyTarget != null) {
+            // Robin recovery stays on receiver
+            targets = targets.stream().filter(t -> t.node().getUUID().equals(onlyTarget)).toList();
         }
 
         int tier = context.tierCache().getOrDefault(sourceNodeId, 0);
@@ -924,10 +932,24 @@ public class TransferEngine {
     public static ItemResourceOrder.Result executeItemOperation(IItemHandler source,
             List<ItemTransferTarget> targets, int limit, ItemStack[] exportFilters, FilterMode exportFilterMode,
             boolean[] sourceAllowedSlots, HolderLookup.Provider provider, @Nullable ServerLevel sourceLevel,
-            @Nullable BlockPos sourcePos, FilterItemData.ReadCache filterReadCache, boolean roundRobin,
+            @Nullable BlockPos sourcePos, FilterItemData.ReadCache filterReadCache, DistributionMode distribution,
             @Nullable MoveRecorder recorder, Map<Item, Integer> priorBatchMoved,
             List<Map<Item, Integer>> priorTargetBatches, boolean rotate,
             @Nullable ItemResourceOrder.Cursor cursor, @Nullable ItemResource required) {
+        if (distribution == DistributionMode.PRIORITY_ROBIN) {
+            // Receiver-outer avoids resource lockstep
+            for (int i = 0; i < targets.size(); i++) {
+                int index = i;
+                MoveRecorder single = (slot, ignored, moved, mask) -> recorder.record(slot, index, moved, mask);
+                ItemResourceOrder.Result result = executeItemOperation(source, List.of(targets.get(i)), limit,
+                        exportFilters, exportFilterMode, sourceAllowedSlots, provider, sourceLevel, sourcePos,
+                        filterReadCache, DistributionMode.PRIORITY, single, priorBatchMoved, List.of(),
+                        rotate, cursor, required);
+                if (result.moved() > 0) return result;
+            }
+            return ItemResourceOrder.EMPTY;
+        }
+        boolean roundRobin = distribution == DistributionMode.ROUND_ROBIN;
         if (!rotate) {
             return new ItemResourceOrder.Result(null, executeMove(source, targets, limit, exportFilters,
                     exportFilterMode, sourceAllowedSlots, provider, sourceLevel, sourcePos, filterReadCache,

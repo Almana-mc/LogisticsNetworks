@@ -53,7 +53,7 @@ public final class ItemPlanner {
                 null,
                 null,
                 readCache,
-                unit.roundRobin(),
+                unit.distribution(),
                 (sourceSlot, targetIndex, moved, mask) -> moves.add(new TransferPlan.ItemMove(
                         sourceSlot,
                         targetIndex,
