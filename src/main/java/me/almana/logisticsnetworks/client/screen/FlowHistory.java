@@ -140,8 +140,13 @@ final class FlowHistory {
 
     static String format(long value) {
         if (value < 1000) return String.valueOf(value);
-        if (value < 1_000_000) return String.format(Locale.ROOT, "%.1fK", value / 1000.0);
-        return String.format(Locale.ROOT, "%.1fM", value / 1_000_000.0);
+        if (value < 1_000_000) return compact(value / 1000.0) + "K";
+        return compact(value / 1_000_000.0) + "M";
+    }
+
+    private static String compact(double value) {
+        String text = String.format(Locale.ROOT, "%.1f", value);
+        return text.endsWith(".0") ? text.substring(0, text.length() - 2) : text;
     }
 
     private Sample sample(int channel, int ago) {

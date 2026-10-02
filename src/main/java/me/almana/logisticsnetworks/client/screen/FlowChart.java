@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 
 final class FlowChart {
 
-    private static final int AXIS_W = 26;
+    private static final int AXIS_W = 30;
     private static final String NOW = "gui.logisticsnetworks.computer.flow.now";
     private static final String AGO = "gui.logisticsnetworks.computer.flow.ago";
 
