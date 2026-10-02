@@ -1031,15 +1031,8 @@ public final class NodeClipboardConfig {
     @Nullable
     public UUID resolveNetworkId(ServerPlayer player) {
         if (networkId == null && (networkName == null || networkName.isBlank())) return null;
-        NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
-        LogisticsNetwork existing = networkId == null ? null : registry.getNetwork(networkId);
-        if (existing != null && !NodeAccessPolicy.canAccess(existing.getOwnerUuid(), player)) {
-            LogisticsNetwork created = registry.createNetwork(networkName != null ? networkName
-                    : "Network-" + networkId.toString().substring(0, 6), player.getUUID());
-            seedChannelNames(created);
-            return created.getId();
-        }
-        LogisticsNetwork network = resolveTargetNetwork(registry, player.getUUID(), player);
+        LogisticsNetwork network = resolveTargetNetwork(NetworkRegistry.get(player.serverLevel()), player.getUUID(),
+                player);
         return network == null ? null : network.getId();
     }
 
@@ -1050,7 +1043,6 @@ public final class NodeClipboardConfig {
             if (byId != null && NodeAccessPolicy.canAccess(byId.getOwnerUuid(), player)) {
                 return byId;
             }
-            if (byId != null) return null;
         }
 
         if (networkName != null && !networkName.isBlank()) {
