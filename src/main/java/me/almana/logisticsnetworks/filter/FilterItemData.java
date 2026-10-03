@@ -17,7 +17,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NumericTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
@@ -34,36 +33,10 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 public final class FilterItemData {
 
-    private static final String KEY_IS_BLACKLIST = "blacklist";
-    private static final String KEY_ITEMS = "items";
-    private static final String KEY_SLOT = "slot";
-    private static final String KEY_ITEM_TAG = "item";
-    private static final String KEY_FLUID_ID = "fluid";
-    private static final String KEY_CHEMICAL_ID = "chemical";
-    private static final String KEY_AMOUNT = "amount";
-    private static final String KEY_BATCH = "batch";
-    private static final String KEY_STOCK = "stock";
-    private static final String KEY_TAG = "tag";
-    private static final String KEY_NBT_PATH = "nbt_path";
-    private static final String KEY_NBT_VALUE = "nbt_val";
-    private static final String KEY_NBT_OP = "nbt_op";
-    private static final String KEY_DUR_OP = "dur_op";
-    private static final String KEY_DUR_VAL = "dur_val";
-    private static final String KEY_NBT_RAW = "nbt_raw";
-    private static final String KEY_SLOT_MAPPING = "slot_map";
-    private static final String KEY_SLOT_MAPPING_EXPR = "slot_map_expr";
-    private static final String KEY_ENCHANTED = "enchanted";
-    private static final String KEY_NBT_RULES = "nbt_rules";
-    private static final String KEY_NBT_MATCH_ANY = "nbt_match_any";
-    private static final String KEY_NBT_STRICT = "nbt_strict";
-    private static final String KEY_RULE_P = "p";
-    private static final String KEY_RULE_O = "o";
-    private static final String KEY_RULE_V = "v";
     private static final int MAX_NBT_RULES_PER_SLOT = 8;
     private static final String NBT_OP_EQUALS = "=";
 
@@ -576,34 +549,6 @@ public final class FilterItemData {
         return -1;
     }
 
-    private static List<NbtCriterion> readSlotNbtRules(CompoundTag entry) {
-        if (entry.contains(KEY_NBT_RULES, Tag.TAG_LIST)) {
-            ListTag rules = entry.getList(KEY_NBT_RULES, Tag.TAG_COMPOUND);
-            List<NbtCriterion> result = new ArrayList<>(rules.size());
-            for (Tag t : rules) {
-                if (t instanceof CompoundTag r) {
-                    NbtPath p = NbtPath.parseLenient(r.getString(KEY_RULE_P));
-                    String o = r.contains(KEY_RULE_O) ? r.getString(KEY_RULE_O) : NBT_OP_EQUALS;
-                    Tag v = r.get(KEY_RULE_V);
-                    if (!p.isEmpty() && v != null) {
-                        result.add(new NbtCriterion(p, normalizeNbtOperator(o), v.copy()));
-                    }
-                }
-            }
-            return result;
-        }
-
-        String rawPath = getEntryNbtPath(entry);
-        NbtPath path = rawPath == null ? null : NbtPath.parseLenient(rawPath);
-        Tag value = getEntryNbtValue(entry);
-        if (path != null && value != null) {
-            String op = getEntryNbtOperator(entry);
-            return List.of(new NbtCriterion(path, normalizeNbtOperator(op), value.copy()));
-        }
-
-        return List.of();
-    }
-
     // ── Durability per-slot methods ──
 
     @Nullable
@@ -1110,13 +1055,11 @@ public final class FilterItemData {
             }
         }
 
-        boolean migrated = LegacyComponentMigration.migrateGeneralFilter(stack, null);
+        LegacyComponentMigration.migrateGeneralFilter(stack, null);
         settings = stack.get(LogisticsDataComponents.FILTER_SETTINGS);
         config = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
         customData = stack.get(DataComponents.CUSTOM_DATA);
-        ItemFilterView built = migrated
-                ? buildItemFilterView(stack, settings, config)
-                : buildLegacyItemFilterView(stack);
+        ItemFilterView built = buildItemFilterView(stack, settings, config);
         if (readCache != null) {
             readCache.itemViews.put(stack, new CachedItemView(settings, config, customData, built));
         }
@@ -1283,186 +1226,6 @@ public final class FilterItemData {
     private record ParsedRawNbt(@Nullable CompoundTag value, boolean invalid) {
     }
 
-    private static ItemFilterView buildLegacyItemFilterView(ItemStack stack) {
-        int cap = getCapacity(stack);
-        ItemFilterSlot[] entriesBySlot = new ItemFilterSlot[Math.max(cap, 0)];
-        if (!isFilterItem(stack) || cap <= 0) {
-            return new ItemFilterView(false, false, false, false, false, false, false, false, entriesBySlot);
-        }
-
-        CompoundTag root = getRoot(stack);
-        boolean blacklist = root.getBoolean(KEY_IS_BLACKLIST);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-
-        boolean hasItemEntries = false;
-        boolean hasFluidEntries = false;
-        boolean hasChemicalEntries = false;
-        boolean hasTagEntries = false;
-        boolean hasNbtEntries = false;
-        boolean hasAmountEntries = false;
-        boolean hasSlotOnlyEntries = false;
-
-        for (Tag t : list) {
-            if (!(t instanceof CompoundTag entry))
-                continue;
-
-            int slot = entry.getInt(KEY_SLOT);
-            if (slot < 0 || slot >= cap || entriesBySlot[slot] != null)
-                continue;
-
-            String tag = getEntryTag(entry);
-            Item item = resolveEntryItem(entry);
-            boolean hasFluid = entry.contains(KEY_FLUID_ID, Tag.TAG_STRING);
-            boolean hasChemical = entry.contains(KEY_CHEMICAL_ID, Tag.TAG_STRING);
-            String chemicalId = hasChemical ? entry.getString(KEY_CHEMICAL_ID) : null;
-            FluidStack fluidEntry = null;
-            if (hasFluid) {
-                ResourceLocation fluidId = ResourceLocation.tryParse(entry.getString(KEY_FLUID_ID));
-                if (fluidId != null) {
-                    fluidEntry = BuiltInRegistries.FLUID.getOptional(fluidId)
-                            .map(f -> new FluidStack(f, 1000))
-                            .orElse(null);
-                }
-            }
-            List<NbtCriterion> nbtRules = readSlotNbtRules(entry);
-            boolean nbtMatchAny = entry.getBoolean(KEY_NBT_MATCH_ANY);
-
-            String rawNbtPath = getEntryNbtPath(entry);
-            NbtPath nbtPath = rawNbtPath == null ? null : NbtPath.parseLenient(rawNbtPath);
-            Tag nbtValue = getEntryNbtValue(entry);
-            String nbtOp = getEntryNbtOperator(entry);
-            String raw = getEntryNbtRaw(entry);
-            CompoundTag rawNbt = null;
-            boolean invalidRawNbt = false;
-            if (raw != null) {
-                try {
-                    rawNbt = TagParser.parseTag(raw);
-                } catch (Exception e) {
-                    invalidRawNbt = true;
-                }
-            }
-
-            String durOp = getEntryDurabilityOp(entry);
-            int durVal = getEntryDurabilityValue(entry);
-            int batch = getEntryBatch(entry);
-            int stock = getEntryStock(entry);
-            boolean hasNbt = !nbtRules.isEmpty() || nbtPath != null || raw != null;
-            boolean hasDur = durOp != null;
-            Boolean enchanted = entry.contains(KEY_ENCHANTED, Tag.TAG_BYTE) ? entry.getBoolean(KEY_ENCHANTED) : null;
-            boolean nbtOnly = (hasNbt || hasDur || enchanted != null || batch > 0 || stock > 0)
-                    && tag == null && item == null && !hasFluid && !hasChemical;
-
-            boolean nbtStrict = isEntryNbtStrict(entry);
-
-            int[] slotMapping = null;
-            if (entry.contains(KEY_SLOT_MAPPING, Tag.TAG_INT_ARRAY)) {
-                int[] arr = entry.getIntArray(KEY_SLOT_MAPPING);
-                if (arr.length > 0) slotMapping = arr;
-            }
-            boolean slotOnly = slotMapping != null && tag == null && item == null && !hasFluid
-                    && !hasChemical && !hasNbt && !hasDur && enchanted == null;
-
-            entriesBySlot[slot] = new ItemFilterSlot(slot, tag, item, null, chemicalId, fluidEntry, batch, stock, nbtPath,
-                    nbtValue, nbtOp, rawNbt, invalidRawNbt, durOp, durVal, hasNbt, nbtOnly, nbtStrict, nbtRules,
-                    nbtMatchAny, slotMapping, slotOnly, enchanted);
-
-            hasItemEntries |= item != null || nbtOnly;
-            hasFluidEntries |= hasFluid || nbtOnly;
-            hasChemicalEntries |= hasChemical || nbtOnly;
-            hasTagEntries |= tag != null;
-            hasNbtEntries |= hasNbt;
-            hasAmountEntries |= batch > 0 || stock > 0 || enchanted != null;
-            hasSlotOnlyEntries |= slotOnly;
-        }
-
-        return new ItemFilterView(blacklist, hasItemEntries, hasFluidEntries, hasChemicalEntries,
-                hasTagEntries, hasNbtEntries, hasAmountEntries, hasSlotOnlyEntries, entriesBySlot);
-    }
-
-    @Nullable
-    private static String getEntryTag(CompoundTag entry) {
-        return entry.contains(KEY_TAG, Tag.TAG_STRING)
-                ? FilterTagUtil.normalizeTag(entry.getString(KEY_TAG))
-                : null;
-    }
-
-    @Nullable
-    private static Item resolveEntryItem(CompoundTag entry) {
-        if (!entry.contains(KEY_ITEM_TAG, Tag.TAG_COMPOUND))
-            return null;
-
-        CompoundTag itemTag = entry.getCompound(KEY_ITEM_TAG);
-        if (!itemTag.contains("id", Tag.TAG_STRING))
-            return null;
-
-        ResourceLocation id = ResourceLocation.tryParse(itemTag.getString("id"));
-        if (id == null)
-            return null;
-
-        return BuiltInRegistries.ITEM.getOptional(id).orElse(null);
-    }
-
-    @Nullable
-    private static String getEntryNbtPath(CompoundTag entry) {
-        return entry.contains(KEY_NBT_PATH, Tag.TAG_STRING) ? entry.getString(KEY_NBT_PATH) : null;
-    }
-
-    @Nullable
-    private static String getEntryNbtOperator(CompoundTag entry) {
-        if (!entry.contains(KEY_NBT_OP, Tag.TAG_STRING))
-            return NBT_OP_EQUALS;
-        return normalizeNbtOperator(entry.getString(KEY_NBT_OP));
-    }
-
-    @Nullable
-    private static Tag getEntryNbtValue(CompoundTag entry) {
-        return entry.contains(KEY_NBT_VALUE) ? entry.get(KEY_NBT_VALUE) : null;
-    }
-
-    @Nullable
-    private static String getEntryNbtRaw(CompoundTag entry) {
-        if (!entry.contains(KEY_NBT_RAW, Tag.TAG_STRING))
-            return null;
-        String raw = entry.getString(KEY_NBT_RAW);
-        return raw.isEmpty() ? null : raw;
-    }
-
-    @Nullable
-    private static String getEntryDurabilityOp(CompoundTag entry) {
-        return entry.contains(KEY_DUR_OP, Tag.TAG_STRING) ? entry.getString(KEY_DUR_OP) : null;
-    }
-
-    private static int getEntryDurabilityValue(CompoundTag entry) {
-        return entry.contains(KEY_DUR_VAL, Tag.TAG_INT) ? entry.getInt(KEY_DUR_VAL) : 0;
-    }
-
-    private static int getEntryAmount(CompoundTag entry) {
-        return entry.contains(KEY_AMOUNT, Tag.TAG_INT) ? entry.getInt(KEY_AMOUNT) : 0;
-    }
-
-    private static int getEntryBatch(CompoundTag entry) {
-        return entry.contains(KEY_BATCH, Tag.TAG_INT) ? entry.getInt(KEY_BATCH) : 0;
-    }
-
-    private static int getEntryStock(CompoundTag entry) {
-        if (entry.contains(KEY_STOCK, Tag.TAG_INT)) return entry.getInt(KEY_STOCK);
-        return getEntryAmount(entry);
-    }
-
-    private static boolean hasEntryNbt(CompoundTag entry) {
-        return entry.contains(KEY_NBT_RULES, Tag.TAG_LIST)
-                || getEntryNbtPath(entry) != null
-                || getEntryNbtRaw(entry) != null;
-    }
-
-    private static boolean isEntryNbtStrict(CompoundTag entry) {
-        if (!entry.contains(KEY_ITEM_TAG))
-            return false;
-        if (entry.contains(KEY_NBT_STRICT))
-            return entry.getBoolean(KEY_NBT_STRICT);
-        return !hasEntryNbt(entry) && !hasEntryDurability(entry) && !entry.contains(KEY_ENCHANTED);
-    }
-
     private static String normalizeNbtOperator(@Nullable String operator) {
         return NbtRuleMatcher.normalizeOperator(operator);
     }
@@ -1473,26 +1236,5 @@ public final class FilterItemData {
 
     private static boolean matchesNbtValue(@Nullable String operator, Tag expected, @Nullable Tag actual) {
         return NbtRuleMatcher.matchesValue(operator, expected, actual);
-    }
-
-    private static boolean hasEntryDurability(CompoundTag entry) {
-        return getEntryDurabilityOp(entry) != null;
-    }
-
-    private static CompoundTag getRoot(ItemStack stack) {
-        return getRoot(stack, null);
-    }
-
-    private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
-        updateRoot(stack, null, modifier);
-    }
-
-    private static CompoundTag getRoot(ItemStack stack, @Nullable HolderLookup.Provider provider) {
-        return LegacyComponentMigration.getGeneralFilterRoot(stack, provider);
-    }
-
-    private static void updateRoot(ItemStack stack, @Nullable HolderLookup.Provider provider,
-            Consumer<CompoundTag> modifier) {
-        LegacyComponentMigration.updateGeneralFilterRoot(stack, provider, modifier);
     }
 }
