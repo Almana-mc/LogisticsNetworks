@@ -12,6 +12,9 @@ import me.almana.logisticsnetworks.logic.PriorityRobin;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -58,6 +61,8 @@ public class ChannelData {
     public static final Codec<ChannelData> CODEC = Codec.withAlternative(CURRENT_CODEC, LEGACY_CODEC);
     public static final Codec<List<ChannelData>> LIST_CODEC =
             ComponentCodecs.lenient(CODEC, ChannelData::new).listOf();
+    public static final StreamCodec<RegistryFriendlyByteBuf, ChannelData> STREAM_CODEC =
+            ByteBufCodecs.fromCodecWithRegistries(CODEC);
 
     private boolean enabled;
     private ChannelMode mode = ChannelMode.IMPORT;
