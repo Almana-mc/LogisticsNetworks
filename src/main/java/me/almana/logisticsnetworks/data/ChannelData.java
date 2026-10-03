@@ -10,8 +10,6 @@ import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import me.almana.logisticsnetworks.logic.FluidResourceOrder;
 import me.almana.logisticsnetworks.logic.PriorityRobin;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -91,14 +89,6 @@ public class ChannelData {
     public ChannelData(boolean enabled) {
         this.enabled = enabled;
         Arrays.fill(filterItems, ItemStack.EMPTY);
-    }
-
-    public CompoundTag save(HolderLookup.Provider provider) {
-        return (CompoundTag) ComponentCodecs.encode(CODEC, provider, this);
-    }
-
-    public void load(CompoundTag tag, HolderLookup.Provider provider) {
-        ComponentCodecs.parse(CODEC, provider, tag).ifPresent(this::copyFrom);
     }
 
     private static ChannelData of(ChannelState settings, List<SlotStack> filters) {
