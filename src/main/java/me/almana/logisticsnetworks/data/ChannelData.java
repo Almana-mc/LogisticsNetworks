@@ -343,4 +343,16 @@ public class ChannelData {
             this.filterItems[i] = source.filterItems[i].isEmpty() ? ItemStack.EMPTY : source.filterItems[i].copy();
         }
     }
+
+    public boolean sameSettings(ChannelData other) {
+        if (!settings().equals(other.settings())) {
+            return false;
+        }
+        for (int slot = 0; slot < FILTER_SIZE; slot++) {
+            if (!ItemStack.matches(filterItems[slot], other.filterItems[slot])) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
