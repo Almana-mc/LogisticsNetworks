@@ -115,6 +115,10 @@ neoForge {
 
 sourceSets.main.get().resources.srcDir("src/generated/resources")
 
+val localRuntime: Configuration by configurations.creating
+configurations.runtimeClasspath { extendsFrom(localRuntime) }
+configurations.testRuntimeClasspath { extendsFrom(localRuntime) }
+
 dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
 
@@ -125,19 +129,19 @@ dependencies {
         isTransitive = false
     }
     if (create_runtime.get()) {
-        runtimeOnly("com.simibubi.create:create-${minecraft_version}:${create_version}") {
+        localRuntime("com.simibubi.create:create-${minecraft_version}:${create_version}") {
             isTransitive = false
         }
     }
 
     compileOnly("curse.maven:building-gadgets-298187:${building_gadgets_file_id}")
     if (buildingGadgetsRuntime.get()) {
-        runtimeOnly("curse.maven:building-gadgets-298187:${building_gadgets_file_id}")
+        localRuntime("curse.maven:building-gadgets-298187:${building_gadgets_file_id}")
     }
 
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
-    runtimeOnly("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
+    localRuntime("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
 
     compileOnly("mekanism:Mekanism:${mekanism_version}")
 
@@ -145,16 +149,16 @@ dependencies {
 
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
     if (ae2Runtime.get()) {
-        runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+        localRuntime("org.appliedenergistics:appliedenergistics2:${ae2_version}")
     }
 
     compileOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
     if (refinedStorageRuntime.get()) {
-        runtimeOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+        localRuntime("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
     }
 
     compileOnly("org.appliedenergistics:guideme:${guideme_version}:api")
-    runtimeOnly("org.appliedenergistics:guideme:${guideme_version}")
+    localRuntime("org.appliedenergistics:guideme:${guideme_version}")
 
     compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftb_teams_version}") {
         isTransitive = false
@@ -165,7 +169,7 @@ dependencies {
     }
 
     compileOnly("maven.modrinth:jade:${jade_version}")
-    runtimeOnly("maven.modrinth:jade:${jade_version}")
+    localRuntime("maven.modrinth:jade:${jade_version}")
 
     compileOnly("maven.modrinth:iris:${iris_version}") {
         isTransitive = false
