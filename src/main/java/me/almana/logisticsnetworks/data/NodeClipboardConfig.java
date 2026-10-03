@@ -73,10 +73,8 @@ public final class NodeClipboardConfig {
     private static final Codec<Pair<Integer, SlotStack>> LEGACY_FILTER =
             Codec.mapPair(Codec.INT.lenientOptionalFieldOf("channel", 0), SlotStack.MAP_CODEC).codec();
 
-    static final Codec<ClipboardSnapshot> CURRENT_CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.INT.validate(NodeClipboardConfig::checkVersion).fieldOf(KEY_VERSION).forGetter(snapshot -> VERSION),
-            ClipboardSnapshot.MAP_CODEC.forGetter(snapshot -> snapshot)
-    ).apply(instance, (version, snapshot) -> snapshot));
+    static final Codec<ClipboardSnapshot> CURRENT_CODEC = Codec.INT.validate(NodeClipboardConfig::checkVersion)
+            .dispatch(KEY_VERSION, snapshot -> VERSION, version -> ClipboardSnapshot.MAP_CODEC);
     static final Codec<ClipboardSnapshot> LEGACY_CODEC = RecordCodecBuilder.create(instance -> instance.group(
             ComponentCodecs.lenientList(LEGACY_CHANNEL).fieldOf("channels").forGetter(snapshot -> IntStream
                     .range(0, snapshot.channels().size())
