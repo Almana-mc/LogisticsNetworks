@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
@@ -771,7 +772,7 @@ public class FilterMenu extends AbstractContainerMenu {
         return FilterItemData.getEntryNbtOperator(getOpenedStack(), slot);
     }
 
-    public List<FilterItemData.SlotNbtRule> getSlotNbtRules(int slot) {
+    public List<NbtCriterion> getSlotNbtRules(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return List.of();
         return FilterItemData.getSlotNbtRules(getOpenedStack(), slot);

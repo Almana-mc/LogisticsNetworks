@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.component.GeneralFilterConfig;
 import me.almana.logisticsnetworks.component.GeneralFilterEntry;
 import me.almana.logisticsnetworks.component.LegacyComponentMigration;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
+import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
@@ -96,7 +97,7 @@ public final class FilterItemData {
             boolean hasNbt,
             boolean nbtOnly,
             boolean nbtStrict,
-            List<SlotNbtRule> nbtRules,
+            List<NbtCriterion> nbtRules,
             boolean nbtMatchAny,
             @Nullable int[] slotMapping,
             boolean slotOnly,
@@ -113,13 +114,6 @@ public final class FilterItemData {
             boolean hasAmountEntries,
             boolean hasSlotOnlyEntries,
             ItemFilterSlot[] entriesBySlot) {
-    }
-
-    public record SlotNbtRule(NbtPath path, String operator, Tag value) {
-        public String displayText() {
-            String val = value != null ? value.toString() : "";
-            return path + " " + operator + " " + val;
-        }
     }
 
     public record ItemStock(int amount, @Nullable int[] slots) {
@@ -699,7 +693,7 @@ public final class FilterItemData {
 
     // ── Multi-rule NBT per-slot methods ──
 
-    public static List<SlotNbtRule> getSlotNbtRules(ItemStack stack, int slot) {
+    public static List<NbtCriterion> getSlotNbtRules(ItemStack stack, int slot) {
         if (!isFilterItem(stack))
             return List.of();
         CompoundTag root = getRoot(stack);
@@ -876,17 +870,17 @@ public final class FilterItemData {
         return result[0];
     }
 
-    private static List<SlotNbtRule> readSlotNbtRules(CompoundTag entry) {
+    private static List<NbtCriterion> readSlotNbtRules(CompoundTag entry) {
         if (entry.contains(KEY_NBT_RULES, Tag.TAG_LIST)) {
             ListTag rules = entry.getList(KEY_NBT_RULES, Tag.TAG_COMPOUND);
-            List<SlotNbtRule> result = new ArrayList<>(rules.size());
+            List<NbtCriterion> result = new ArrayList<>(rules.size());
             for (Tag t : rules) {
                 if (t instanceof CompoundTag r) {
                     NbtPath p = NbtPath.parseLenient(r.getString(KEY_RULE_P));
                     String o = r.contains(KEY_RULE_O) ? r.getString(KEY_RULE_O) : NBT_OP_EQUALS;
                     Tag v = r.get(KEY_RULE_V);
                     if (!p.isEmpty() && v != null) {
-                        result.add(new SlotNbtRule(p, normalizeNbtOperator(o), v.copy()));
+                        result.add(new NbtCriterion(p, normalizeNbtOperator(o), v.copy()));
                     }
                 }
             }
@@ -898,7 +892,7 @@ public final class FilterItemData {
         Tag value = getEntryNbtValue(entry);
         if (path != null && value != null) {
             String op = getEntryNbtOperator(entry);
-            return List.of(new SlotNbtRule(path, normalizeNbtOperator(op), value.copy()));
+            return List.of(new NbtCriterion(path, normalizeNbtOperator(op), value.copy()));
         }
 
         return List.of();
@@ -1334,10 +1328,10 @@ public final class FilterItemData {
         if (components == null)
             return false;
 
-        List<SlotNbtRule> rules = entry.nbtRules();
+        List<NbtCriterion> rules = entry.nbtRules();
         if (!rules.isEmpty()) {
             boolean matchAny = entry.nbtMatchAny();
-            for (SlotNbtRule rule : rules) {
+            for (NbtCriterion rule : rules) {
                 Tag actual = NbtFilterData.resolvePathValue(components, rule.path());
                 boolean matches = matchesNbtValue(rule.operator(), rule.value(), actual);
                 if (matchAny && matches) return true;
@@ -1468,9 +1462,9 @@ public final class FilterItemData {
         String fluidId = nonEmpty(entry.fluidId());
         String chemicalId = nonEmpty(entry.chemicalId());
         FluidStack fluid = resolveFluidEntry(fluidId);
-        List<SlotNbtRule> rules = entry.nbt().rules().stream()
+        List<NbtCriterion> rules = entry.nbt().rules().stream()
                 .filter(rule -> !rule.path().isEmpty())
-                .map(rule -> new SlotNbtRule(rule.path(), normalizeNbtOperator(rule.operator()), rule.value()))
+                .map(rule -> new NbtCriterion(rule.path(), normalizeNbtOperator(rule.operator()), rule.value()))
                 .toList();
         ParsedRawNbt raw = parseRawNbt(entry.nbt().raw());
         String durOp = entry.durability() == null ? null : entry.durability().operator().id();
@@ -1643,7 +1637,7 @@ public final class FilterItemData {
                             .orElse(null);
                 }
             }
-            List<SlotNbtRule> nbtRules = readSlotNbtRules(entry);
+            List<NbtCriterion> nbtRules = readSlotNbtRules(entry);
             boolean nbtMatchAny = entry.getBoolean(KEY_NBT_MATCH_ANY);
 
             String rawNbtPath = getEntryNbtPath(entry);
