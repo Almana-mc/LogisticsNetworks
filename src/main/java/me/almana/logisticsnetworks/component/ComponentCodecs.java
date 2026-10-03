@@ -48,9 +48,15 @@ public final class ComponentCodecs {
         return Codec.of(codec, new Decoder<>() {
             @Override
             public <T> DataResult<Pair<A, T>> decode(DynamicOps<T> ops, T input) {
-                A value = codec.parse(ops, input)
-                        .resultOrPartial(error -> LOGGER.error("Malformed entry: {}", error))
-                        .orElseGet(fallback);
+                A value;
+                try {
+                    value = codec.parse(ops, input)
+                            .resultOrPartial(error -> LOGGER.error("Malformed entry: {}", error))
+                            .orElseGet(fallback);
+                } catch (RuntimeException e) {
+                    LOGGER.error("Malformed entry", e);
+                    value = fallback.get();
+                }
                 return DataResult.success(Pair.of(value, input));
             }
         });
