@@ -7,6 +7,7 @@ import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.data.SlotStack;
+import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
 
@@ -39,7 +40,7 @@ public record NodeState(BlockPos attachedPos, boolean valid, Optional<UUID> netw
             Codec.INT.lenientOptionalFieldOf("network_color", NetworkColors.DEFAULT)
                     .forGetter(NodeState::networkColor),
             Codec.BOOL.lenientOptionalFieldOf("render_visible", true).forGetter(NodeState::renderVisible),
-            UUIDUtil.CODEC.lenientOptionalFieldOf("owner").forGetter(NodeState::owner),
+            owner("owner").forGetter(NodeState::owner),
             Codec.STRING.lenientOptionalFieldOf("node_label", "").forGetter(NodeState::nodeLabel),
             Codec.LONG.lenientOptionalFieldOf("label_revision", 0L).forGetter(NodeState::labelRevision),
             Codec.BOOL.lenientOptionalFieldOf("highlighted", false).forGetter(NodeState::highlighted),
@@ -58,7 +59,7 @@ public record NodeState(BlockPos attachedPos, boolean valid, Optional<UUID> netw
             Codec.INT.lenientOptionalFieldOf("NetworkColor", NetworkColors.DEFAULT)
                     .forGetter(NodeState::networkColor),
             Codec.BOOL.lenientOptionalFieldOf("RenderVisible", true).forGetter(NodeState::renderVisible),
-            UUIDUtil.CODEC.lenientOptionalFieldOf("OwnerUUID").forGetter(NodeState::owner),
+            owner("OwnerUUID").forGetter(NodeState::owner),
             Codec.STRING.lenientOptionalFieldOf("NodeLabel", "").forGetter(NodeState::nodeLabel),
             Codec.LONG.lenientOptionalFieldOf("LabelRevision", 0L).forGetter(NodeState::labelRevision),
             Codec.BOOL.lenientOptionalFieldOf("Highlighted", false).forGetter(NodeState::highlighted),
@@ -75,5 +76,11 @@ public record NodeState(BlockPos attachedPos, boolean valid, Optional<UUID> netw
     public NodeState {
         labelRevision = Math.max(0, labelRevision);
         createLocalPos = createContraptionId.isPresent() ? createLocalPos : BlockPos.ZERO;
+    }
+
+    // Malformed owner locks to nobody
+    private static MapCodec<Optional<UUID>> owner(String key) {
+        return ComponentCodecs.lenient(UUIDUtil.CODEC.xmap(Optional::of, Optional::get),
+                () -> Optional.of(Util.NIL_UUID)).optionalFieldOf(key, Optional.empty());
     }
 }
