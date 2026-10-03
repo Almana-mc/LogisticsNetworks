@@ -16,7 +16,7 @@ import java.util.List;
 
 public record NbtPath(Component[] components) {
     public static final Codec<NbtPath> CODEC = Codec.STRING.xmap(NbtPath::parseLenient, NbtPath::toString);
-    public static final StreamCodec<ByteBuf, NbtPath> STREAM_CODEC = ByteBufCodecs.stringUtf8(1024).map(NbtPath::parseLenient, NbtPath::toString);
+    public static final StreamCodec<ByteBuf, NbtPath> STREAM_CODEC = ByteBufCodecs.STRING_UTF8.map(NbtPath::parseLenient, NbtPath::toString);
 
     public static final NbtPath EMPTY = NbtPath.of();
 
