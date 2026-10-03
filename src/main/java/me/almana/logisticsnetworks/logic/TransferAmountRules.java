@@ -26,10 +26,6 @@ public final class TransferAmountRules {
     private TransferAmountRules() {
     }
 
-    static Constraints collect(ItemStack[] exportFilters, ItemStack[] importFilters) {
-        return collect(exportFilters, importFilters, null);
-    }
-
     public static Constraints collect(ItemStack[] exportFilters, ItemStack[] importFilters,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         int exportThreshold = 0;

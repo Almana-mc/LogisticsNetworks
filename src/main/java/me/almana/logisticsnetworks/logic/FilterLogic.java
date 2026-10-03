@@ -13,11 +13,6 @@ public final class FilterLogic {
     private FilterLogic() {
     }
 
-    public static boolean matchesItem(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt) {
-        return matchesItem(filters, filterMode, candidate, provider, candidateNbt, null);
-    }
-
     public static boolean matchesItemInSlot(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
             HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt,
             @Nullable FilterItemData.ReadCache filterReadCache, int inventorySlot) {
@@ -154,11 +149,6 @@ public final class FilterLogic {
     }
 
     public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
-            HolderLookup.Provider provider) {
-        return matchesFluid(filters, filterMode, candidate, provider, null);
-    }
-
-    public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
             HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache) {
         if (filters == null || filters.length == 0)
             return true;
@@ -222,10 +212,6 @@ public final class FilterLogic {
             return true;
 
         return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
-    }
-
-    public static boolean matchesChemical(ItemStack[] filters, FilterMode filterMode, String chemicalId) {
-        return matchesChemical(filters, filterMode, chemicalId, null);
     }
 
     public static boolean matchesChemical(ItemStack[] filters, FilterMode filterMode, String chemicalId,
@@ -292,10 +278,6 @@ public final class FilterLogic {
             return true;
 
         return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
-    }
-
-    public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters) {
-        return hasConfiguredItemNbtFilter(filters, null);
     }
 
     public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters,
