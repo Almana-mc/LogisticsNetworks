@@ -796,12 +796,12 @@ public class FilterMenu extends AbstractContainerMenu {
         broadcastChanges();
     }
 
-    public void addSlotNbtRule(Player player, int slot, String path, String operator) {
+    public void addSlotNbtRule(Player player, int slot, @Nullable NbtPath path, String operator) {
         addSlotNbtRule(player, slot, path, operator, "");
     }
 
-    public void addSlotNbtRule(Player player, int slot, String path, String operator, String fallbackValue) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount)
+    public void addSlotNbtRule(Player player, int slot, @Nullable NbtPath path, String operator, String fallbackValue) {
+        if (path == null || isSpecialMode || slot < 0 || slot >= slotCount)
             return;
         ItemStack filterStack = getOpenedStack();
         Tag value = null;
@@ -821,12 +821,12 @@ public class FilterMenu extends AbstractContainerMenu {
         }
 
         if (value == null)
-            value = NbtFilterData.getDefaultValue(path);
+            value = NbtFilterData.getDefaultValue(path.toString());
         if (value == null && !fallbackValue.isEmpty())
             value = NbtFilterData.parseValueString(fallbackValue);
         if (value == null)
             return;
-        FilterItemData.addSlotNbtRule(filterStack, slot, path, operator, value);
+        FilterItemData.addSlotNbtRule(filterStack, slot, path.toString(), operator, value);
         broadcastChanges();
     }
 
@@ -883,7 +883,7 @@ public class FilterMenu extends AbstractContainerMenu {
         return FilterItemData.getEntryDurabilityValue(getOpenedStack(), slot);
     }
 
-    public void setEntryNbt(Player player, int slot, String path, String operator) {
+    public void setEntryNbt(Player player, int slot, NbtPath path, String operator) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
         ItemStack filterStack = getOpenedStack();
@@ -897,7 +897,7 @@ public class FilterMenu extends AbstractContainerMenu {
         broadcastChanges();
     }
 
-    public void setEntryNbtRaw(Player player, int slot, String path, String rawValue) {
+    public void setEntryNbtRaw(Player player, int slot, NbtPath path, String rawValue) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
         FilterItemData.setEntryNbtRaw(getOpenedStack(), slot, rawValue);

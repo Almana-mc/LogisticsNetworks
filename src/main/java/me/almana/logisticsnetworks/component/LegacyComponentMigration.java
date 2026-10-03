@@ -1,9 +1,10 @@
 package me.almana.logisticsnetworks.component;
 
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
-import me.almana.logisticsnetworks.data.NodeClipboardConfig;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -21,13 +22,13 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
-import org.jetbrains.annotations.Nullable;
 
 public final class LegacyComponentMigration {
 
@@ -270,7 +271,10 @@ public final class LegacyComponentMigration {
     public static void migrateNbtFilter(ItemStack stack) {
         migrate(stack, NBT_ROOT, root -> {
             List<NbtFilterConfig.Rule> rules = readNbtRules(root);
-            String inferredPath = rules.isEmpty() ? root.getString("path") : rules.getFirst().path();
+            NbtPath inferredPath = rules.isEmpty() ? NbtPath.parse(root.getString("path")) : rules.getFirst().path();
+            if (inferredPath == null) {
+                inferredPath = NbtPath.EMPTY;
+            }
             FilterTargetType inferred = NbtFilterData.isFluidPath(inferredPath)
                     ? FilterTargetType.FLUIDS
                     : FilterTargetType.ITEMS;
@@ -308,9 +312,9 @@ public final class LegacyComponentMigration {
             if (!(tag instanceof CompoundTag rule)) {
                 continue;
             }
-            String path = rule.getString("path").trim();
+            NbtPath path = NbtPath.parse(rule.getString("path").trim());
             Tag value = rule.get("value");
-            if (path.isEmpty() || value == null) {
+            if (path == null || path.isEmpty() || value == null) {
                 continue;
             }
             NbtFilterData.Operator operator = rule.contains("operator", Tag.TAG_INT)
@@ -322,9 +326,9 @@ public final class LegacyComponentMigration {
         if (!rules.isEmpty()) {
             return rules;
         }
-        String path = root.getString("path").trim();
+        NbtPath path = NbtPath.parse(root.getString("path").trim());
         Tag value = root.get("value");
-        return path.isEmpty() || value == null
+        return path == null || path.isEmpty() || value == null
                 ? List.of()
                 : List.of(new NbtFilterConfig.Rule(path, NbtFilterData.Operator.EQUALS, value, true));
     }

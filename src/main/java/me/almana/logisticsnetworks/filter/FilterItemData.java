@@ -15,19 +15,20 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
-import java.util.List;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import net.minecraft.nbt.TagParser;
-import org.jetbrains.annotations.Nullable;
 
 public final class FilterItemData {
 
@@ -83,7 +84,7 @@ public final class FilterItemData {
             @Nullable FluidStack fluidEntry,
             int batch,
             int stock,
-            @Nullable String nbtPath,
+            @Nullable NbtPath nbtPath,
             @Nullable Tag nbtValue,
             @Nullable String nbtOp,
             @Nullable CompoundTag rawNbt,
@@ -112,7 +113,7 @@ public final class FilterItemData {
             ItemFilterSlot[] entriesBySlot) {
     }
 
-    public record SlotNbtRule(String path, String operator, Tag value) {
+    public record SlotNbtRule(NbtPath path, String operator, Tag value) {
         public String displayText() {
             String val = value != null ? value.toString() : "";
             return path + " " + operator + " " + val;
@@ -936,11 +937,11 @@ public final class FilterItemData {
         return null;
     }
 
-    public static void setEntryNbt(ItemStack stack, int slot, @Nullable String path, @Nullable Tag value) {
+    public static void setEntryNbt(ItemStack stack, int slot, @Nullable NbtPath path, @Nullable Tag value) {
         setEntryNbt(stack, slot, path, value, NBT_OP_EQUALS);
     }
 
-    public static void setEntryNbt(ItemStack stack, int slot, @Nullable String path, @Nullable Tag value,
+    public static void setEntryNbt(ItemStack stack, int slot, @Nullable NbtPath path, @Nullable Tag value,
             @Nullable String operator) {
         if (!isFilterItem(stack))
             return;
@@ -955,7 +956,7 @@ public final class FilterItemData {
                 if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
                     if (path != null && !path.isEmpty() && value != null) {
                         entry.remove(KEY_NBT_RAW);
-                        entry.putString(KEY_NBT_PATH, path);
+                        entry.putString(KEY_NBT_PATH, path.toString());
                         entry.put(KEY_NBT_VALUE, value.copy());
                         entry.putString(KEY_NBT_OP, normalizedOperator);
                     } else {
@@ -1289,10 +1290,10 @@ public final class FilterItemData {
             List<SlotNbtRule> result = new ArrayList<>(rules.size());
             for (Tag t : rules) {
                 if (t instanceof CompoundTag r) {
-                    String p = r.getString(KEY_RULE_P);
+                    NbtPath p = NbtPath.parse(r.getString(KEY_RULE_P));
                     String o = r.contains(KEY_RULE_O) ? r.getString(KEY_RULE_O) : NBT_OP_EQUALS;
                     Tag v = r.get(KEY_RULE_V);
-                    if (!p.isEmpty() && v != null) {
+                    if (p != null && !p.isEmpty() && v != null) {
                         result.add(new SlotNbtRule(p, normalizeNbtOperator(o), v.copy()));
                     }
                 }
@@ -1300,7 +1301,7 @@ public final class FilterItemData {
             return result;
         }
 
-        String path = getEntryNbtPath(entry);
+        NbtPath path = NbtPath.parse(getEntryNbtPath(entry));
         Tag value = getEntryNbtValue(entry);
         if (path != null && value != null) {
             String op = getEntryNbtOperator(entry);
@@ -1799,7 +1800,7 @@ public final class FilterItemData {
             return false;
         }
 
-        String nbtPath = entry.nbtPath();
+        NbtPath nbtPath = entry.nbtPath();
         Tag nbtExpected = entry.nbtValue();
         if (nbtPath == null || nbtExpected == null)
             return true;
@@ -1835,7 +1836,7 @@ public final class FilterItemData {
             }
         }
 
-        String nbtPath = getEntryNbtPath(entry);
+        NbtPath nbtPath = NbtPath.parse(getEntryNbtPath(entry));
         Tag nbtExpected = getEntryNbtValue(entry);
         if (nbtPath == null || nbtExpected == null)
             return true;
@@ -2172,7 +2173,7 @@ public final class FilterItemData {
             List<SlotNbtRule> nbtRules = readSlotNbtRules(entry);
             boolean nbtMatchAny = entry.getBoolean(KEY_NBT_MATCH_ANY);
 
-            String nbtPath = getEntryNbtPath(entry);
+            NbtPath nbtPath = NbtPath.parse(getEntryNbtPath(entry));
             Tag nbtValue = getEntryNbtValue(entry);
             String nbtOp = getEntryNbtOperator(entry);
             String raw = getEntryNbtRaw(entry);

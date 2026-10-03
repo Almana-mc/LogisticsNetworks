@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.component;
 
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import me.almana.logisticsnetworks.filter.NbtRuleMatcher;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -155,9 +156,9 @@ public final class GeneralFilterBridge {
             if (!(tag instanceof CompoundTag rule)) {
                 continue;
             }
-            String path = rule.getString("p");
+            NbtPath path = NbtPath.parse(rule.getString("p"));
             Tag value = rule.get("v");
-            if (!path.isEmpty() && value != null) {
+            if (path != null && !path.isEmpty() && value != null) {
                 result.add(new NbtCriterion(path,
                         NbtRuleMatcher.normalizeOperator(rule.getString("o")), value));
             }
@@ -165,9 +166,9 @@ public final class GeneralFilterBridge {
         if (!result.isEmpty()) {
             return result;
         }
-        String path = entry.getString("nbt_path");
+        NbtPath path = NbtPath.parse(entry.getString("nbt_path"));
         Tag value = entry.get("nbt_val");
-        return path.isEmpty() || value == null
+        return path == null || path.isEmpty() || value == null
                 ? List.of()
                 : List.of(new NbtCriterion(path,
                         NbtRuleMatcher.normalizeOperator(entry.getString("nbt_op")), value));
@@ -178,7 +179,7 @@ public final class GeneralFilterBridge {
             ListTag rules = new ListTag();
             for (NbtCriterion criterion : nbt.rules()) {
                 CompoundTag rule = new CompoundTag();
-                rule.putString("p", criterion.path());
+                rule.putString("p", criterion.path().toString());
                 rule.putString("o", criterion.operator());
                 rule.put("v", criterion.value());
                 rules.add(rule);

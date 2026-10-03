@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.component;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.IntTag;
 import org.jetbrains.annotations.Nullable;
@@ -45,11 +46,11 @@ public record GeneralFilterEntry(
         nbt = nbt == null ? NbtConstraints.EMPTY : nbt;
         if (enchanted != null || durability != null) {
             List<NbtCriterion> rules = new ArrayList<>(nbt.rules());
-            if (enchanted != null && rules.stream().noneMatch(rule -> rule.path().equals("minecraft:enchanted"))) {
-                rules.add(new NbtCriterion("minecraft:enchanted", "=", ByteTag.valueOf(enchanted)));
+            if (enchanted != null && rules.stream().noneMatch(rule -> rule.path().equals(NbtPath.of(NbtPath.Component.of("minecraft:enchanted"))))) {
+                rules.add(new NbtCriterion(NbtPath.of(NbtPath.Component.of("minecraft:enchanted")), "=", ByteTag.valueOf(enchanted)));
             }
-            if (durability != null && rules.stream().noneMatch(rule -> rule.path().equals("minecraft:durability"))) {
-                rules.add(new NbtCriterion("minecraft:durability", durability.operator().symbol(),
+            if (durability != null && rules.stream().noneMatch(rule -> rule.path().equals(NbtPath.of(NbtPath.Component.of("minecraft:durability"))))) {
+                rules.add(new NbtCriterion(NbtPath.of(NbtPath.Component.of("minecraft:durability")), durability.operator().symbol(),
                         IntTag.valueOf(durability.value())));
             }
             nbt = new NbtConstraints(rules, nbt.matchAny(), nbt.strict(), nbt.raw());

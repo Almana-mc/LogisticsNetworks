@@ -1,43 +1,51 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.FilterClickHandler;
 import me.almana.logisticsnetworks.client.FilterResourceRenderer;
-import me.almana.logisticsnetworks.filter.DurabilityFilterData;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NameFilterData;
+import me.almana.logisticsnetworks.filter.NameMatchScope;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
-import net.minecraft.core.registries.Registries;
+import me.almana.logisticsnetworks.filter.NbtPath;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.menu.FilterMenu;
+import me.almana.logisticsnetworks.network.ModifyFilterModPayload;
+import me.almana.logisticsnetworks.network.OpenNodeMenuPayload;
+import me.almana.logisticsnetworks.network.ScanAttachedStoragePayload;
+import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryAmountPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryDurabilityPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryEnchantedPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryNbtPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntrySlotMappingPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryTagPayload;
+import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
+import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
+import me.almana.logisticsnetworks.network.SetNameFilterPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.components.MultiLineEditBox;
-import net.minecraft.util.Mth;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.tags.TagKey;
-
-import me.almana.logisticsnetworks.menu.FilterMenu;
-import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
-import me.almana.logisticsnetworks.network.*;
-
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.network.chat.Component;
-import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
-import me.almana.logisticsnetworks.LogisticsNetworks;
-import me.almana.logisticsnetworks.filter.NameMatchScope;
-import me.almana.logisticsnetworks.network.OpenNodeMenuPayload;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
@@ -45,7 +53,16 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
@@ -1320,7 +1337,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
 
         if (entry.rawNbt() != null && !entry.rawNbt().isBlank()) {
-            menu.setEntryNbtRaw(minecraft.player, slot, "", entry.rawNbt());
+            menu.setEntryNbtRaw(minecraft.player, slot, NbtPath.EMPTY, entry.rawNbt());
             PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setRaw(slot, entry.rawNbt()));
         }
 
@@ -2654,7 +2671,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         for (int i = nbtListScrollOffset; i < endIdx; i++) {
             int rowY = listY + (i - nbtListScrollOffset) * LIST_ROW_H;
             NbtFilterData.NbtEntry entry = cachedSlotNbtEntries.get(i);
-            int ruleIdx = findActiveRuleIndex(activeRules, entry.path());
+            int ruleIdx = findActiveRuleIndex(activeRules, entry.path().toString());
             boolean active = ruleIdx >= 0;
             boolean hovered = mx >= listX && mx < listX + rowW && my >= rowY && my < rowY + LIST_ROW_H;
             boolean editing = active && nbtEditingRuleIndex == ruleIdx;
@@ -2679,7 +2696,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int opX = pathX + colW + 1;
             int valX = opX + NBT_OP_BTN_W + 1;
 
-            String displayPath = formatNbtPath(entry.path());
+            String displayPath = formatNbtPath(entry.path().toString());
             g.fill(pathX, rowY, pathX + colW, rowY + LIST_ROW_H, 0xFF080808);
             g.renderOutline(pathX, rowY, colW, LIST_ROW_H, active ? COL_BTN_BORDER : 0xFF222222);
             g.drawString(font, font.plainSubstrByWidth(displayPath, colW - 4),
@@ -2723,7 +2740,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (nbtEditingRuleIndex >= 0) {
             boolean visible = false;
             for (int i = nbtListScrollOffset; i < endIdx; i++) {
-                int rIdx = findActiveRuleIndex(activeRules, cachedSlotNbtEntries.get(i).path());
+                int rIdx = findActiveRuleIndex(activeRules, cachedSlotNbtEntries.get(i).path().toString());
                 if (rIdx == nbtEditingRuleIndex) { visible = true; break; }
             }
             if (!visible) {
@@ -2826,7 +2843,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 continue;
 
             NbtFilterData.NbtEntry entry = cachedSlotNbtEntries.get(i);
-            String path = entry.path();
+            String path = entry.path().toString();
             int ruleIdx = findActiveRuleIndex(activeRules, path);
             boolean active = ruleIdx >= 0;
 
@@ -2842,9 +2859,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 String newOp = FilterItemData.nextNbtOperator(currentOp);
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(nbtEditSlot, ruleIdx));
                 menu.removeSlotNbtRule(nbtEditSlot, ruleIdx);
-                PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, path, newOp, ""));
+                PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, entry.path(), newOp, ""));
                 if (minecraft != null && minecraft.player != null) {
-                    menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, newOp);
+                    menu.addSlotNbtRule(minecraft.player, nbtEditSlot, entry.path(), newOp);
                 }
                 List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
                 int newIdx = findActiveRuleIndex(updatedRules, path);
@@ -2890,9 +2907,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(nbtEditSlot, ruleIdx));
                     menu.removeSlotNbtRule(nbtEditSlot, ruleIdx);
                 } else {
-                    PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, path, "=", ""));
+                    PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, entry.path(), "=", ""));
                     if (minecraft != null && minecraft.player != null) {
-                        menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, "=");
+                        menu.addSlotNbtRule(minecraft.player, nbtEditSlot, entry.path(), "=");
                     }
                 }
                 return true;
@@ -2906,9 +2923,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 String newOp = FilterItemData.nextNbtOperator(currentOp);
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(nbtEditSlot, ruleIdx));
                 menu.removeSlotNbtRule(nbtEditSlot, ruleIdx);
-                PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, path, newOp, ""));
+                PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, entry.path(), newOp, ""));
                 if (minecraft != null && minecraft.player != null) {
-                    menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, newOp);
+                    menu.addSlotNbtRule(minecraft.player, nbtEditSlot, entry.path(), newOp);
                 }
                 List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
                 int newIdx = findActiveRuleIndex(updatedRules, path);
@@ -2929,7 +2946,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private FilterItemData.SlotNbtRule findActiveRule(List<FilterItemData.SlotNbtRule> rules, String path) {
         for (FilterItemData.SlotNbtRule rule : rules) {
-            if (rule.path().equals(path))
+            if (rule.path().toString().equals(path))
                 return rule;
         }
         return null;
@@ -2937,7 +2954,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private int findActiveRuleIndex(List<FilterItemData.SlotNbtRule> rules, String path) {
         for (int i = 0; i < rules.size(); i++) {
-            if (rules.get(i).path().equals(path))
+            if (rules.get(i).path().toString().equals(path))
                 return i;
         }
         return -1;
@@ -3241,7 +3258,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailNbtActiveOps.clear();
             List<FilterItemData.SlotNbtRule> existingRules = menu.getSlotNbtRules(slot);
             for (FilterItemData.SlotNbtRule r : existingRules) {
-                detailNbtActiveOps.put(r.path(), r.operator());
+                detailNbtActiveOps.put(r.path().toString(), r.operator());
             }
             detailNbtOp = "=";
             detailNbtSelectedIdx = -1;
@@ -3655,7 +3672,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 if (!hoverRules.isEmpty()) {
                     List<Component> tipLines = new ArrayList<>();
                     for (FilterItemData.SlotNbtRule r : hoverRules) {
-                        tipLines.add(Component.literal(abbreviateNbtPath(r.path()) + " " + r.operator() + " " + r.value()));
+                        tipLines.add(Component.literal(abbreviateNbtPath(r.path().toString()) + " " + r.operator() + " " + r.value()));
                     }
                     g.renderTooltip(font, tipLines, Optional.empty(), mx, my);
                 } else {
@@ -3770,7 +3787,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         nbtRows.clear();
         Map<String, List<Integer>> groupedEntries = new HashMap<>();
         for (int i = 0; i < detailCachedNbtEntries.size(); i++) {
-            String category = nbtCategory(detailCachedNbtEntries.get(i).path());
+            String category = nbtCategory(detailCachedNbtEntries.get(i).path().toString());
             groupedEntries.computeIfAbsent(category, ignored -> new ArrayList<>()).add(i);
         }
 
@@ -3778,10 +3795,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         categories.sort(FilterScreen::compareNbtCategories);
         for (String category : categories) {
             List<Integer> entries = groupedEntries.get(category);
-            entries.sort(Comparator.comparing(index -> detailCachedNbtEntries.get(index).path()));
+            entries.sort(Comparator.comparing(index -> detailCachedNbtEntries.get(index).path().toString()));
             nbtRows.add(new NbtRow(true, category, -1, category));
             for (int entryIdx : entries) {
-                String path = detailCachedNbtEntries.get(entryIdx).path();
+                String path = detailCachedNbtEntries.get(entryIdx).path().toString();
                 nbtRows.add(new NbtRow(false, nbtDisplayPath(path, category), entryIdx, category));
             }
         }
@@ -3903,7 +3920,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             } else {
                 int entryIdx = row.entryIdx();
                 NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
-                boolean active = activePaths.contains(entry.path());
+                boolean active = activePaths.contains(entry.path().toString());
                 boolean indented = !row.group().isEmpty();
 
                 if (active)
@@ -3924,7 +3941,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     hoveredFullText = entry.path() + " = " + entry.valueDisplay();
                 }
 
-                String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path(), "=") : "=";
+                String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path().toString(), "=") : "=";
                 int opColor = active ? COL_WHITE : COL_GRAY;
                 g.drawString(font, opStr, colOpX + 4, rowY + 3, opColor, false);
 
@@ -4278,16 +4295,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
             int entryIdx = row.entryIdx();
             NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
-            boolean active = activePaths.contains(entry.path());
+            boolean active = activePaths.contains(entry.path().toString());
 
             if (mx < colToggleX + NBT_COL_TOGGLE + 4) {
                 if (active) {
-                    int ruleIdx = findActiveRuleIndex(menu.getSlotNbtRules(detailEditSlot), entry.path());
+                    int ruleIdx = findActiveRuleIndex(menu.getSlotNbtRules(detailEditSlot), entry.path().toString());
                     if (ruleIdx >= 0) {
                         PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(detailEditSlot, ruleIdx));
                         menu.removeSlotNbtRule(detailEditSlot, ruleIdx);
                     }
-                    detailNbtActiveOps.remove(entry.path());
+                    detailNbtActiveOps.remove(entry.path().toString());
                     if (detailNbtSelectedIdx == entryIdx) {
                         detailNbtSelectedIdx = -1;
                         nbtTableEditingRow = -1;
@@ -4336,13 +4353,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return true;
     }
 
-    private void cycleDetailNbtOp(String path) {
+    private void cycleDetailNbtOp(NbtPath path) {
         String currentOp = detailNbtActiveOps.getOrDefault(path, "=");
         String nextOp = FilterItemData.nextNbtOperator(currentOp);
-        detailNbtActiveOps.put(path, nextOp);
+        detailNbtActiveOps.put(path.toString(), nextOp);
         detailNbtOp = nextOp;
 
-        int ruleIdx = findActiveRuleIndex(menu.getSlotNbtRules(detailEditSlot), path);
+        int ruleIdx = findActiveRuleIndex(menu.getSlotNbtRules(detailEditSlot), path.toString());
         if (ruleIdx >= 0) {
             String savedVal = formatNbtValue(menu.getSlotNbtRules(detailEditSlot).get(ruleIdx).value().toString());
             PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(detailEditSlot, ruleIdx));
@@ -4350,7 +4367,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(detailEditSlot, path, nextOp, savedVal));
             menu.addSlotNbtRule(minecraft.player, detailEditSlot, path, nextOp, savedVal);
             List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(detailEditSlot);
-            int newIdx = findActiveRuleIndex(updatedRules, path);
+            int newIdx = findActiveRuleIndex(updatedRules, path.toString());
             if (newIdx >= 0) {
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setValue(detailEditSlot, newIdx, savedVal));
                 menu.setSlotNbtRuleValue(detailEditSlot, newIdx, savedVal);
@@ -4364,7 +4381,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return;
 
         NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(detailNbtSelectedIdx);
-        String opSymbol = detailNbtActiveOps.getOrDefault(entry.path(), detailNbtOp);
+        String opSymbol = detailNbtActiveOps.getOrDefault(entry.path().toString(), detailNbtOp);
 
         String valueOverride = detailNbtValueBox.getValue().trim();
         String fallbackValue = valueOverride.isEmpty() ? entry.valueDisplay() : valueOverride;
@@ -4377,7 +4394,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (!valueOverride.isEmpty() && !valueOverride.equals(entry.valueDisplay())) {
             List<FilterItemData.SlotNbtRule> rules = menu.getSlotNbtRules(detailEditSlot);
-            int ruleIdx = findActiveRuleIndex(rules, entry.path());
+            int ruleIdx = findActiveRuleIndex(rules, entry.path().toString());
             if (ruleIdx >= 0) {
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setValue(detailEditSlot, ruleIdx, valueOverride));
                 menu.setSlotNbtRuleValue(detailEditSlot, ruleIdx, valueOverride);
@@ -4386,7 +4403,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     new NbtFilterData.NbtEntry(entry.path(), valueOverride));
             buildNbtRows();
         }
-        detailNbtActiveOps.put(entry.path(), opSymbol);
+        detailNbtActiveOps.put(entry.path().toString(), opSymbol);
     }
 
     private void commitDetailNbtValueEdit() {
@@ -4437,7 +4454,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, false));
                     menu.setEntryNbtStrict(detailEditSlot, false);
                 }
-                menu.setEntryNbtRaw(minecraft.player, detailEditSlot, "", nbtVal);
+                menu.setEntryNbtRaw(minecraft.player, detailEditSlot, NbtPath.EMPTY, nbtVal);
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setRaw(detailEditSlot, nbtVal));
             } else if (nbtVal.isEmpty() && existingRaw != null) {
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(detailEditSlot));
