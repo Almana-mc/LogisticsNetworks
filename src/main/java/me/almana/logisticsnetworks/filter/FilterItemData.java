@@ -55,7 +55,6 @@ public final class FilterItemData {
     }
 
     private record ItemFilterSlot(
-            int slotIndex,
             @Nullable String tag,
             @Nullable Item item,
             @Nullable DataComponentMap expectedComponents,
@@ -63,21 +62,15 @@ public final class FilterItemData {
             @Nullable FluidStack fluidEntry,
             int batch,
             int stock,
-            @Nullable NbtPath nbtPath,
-            @Nullable Tag nbtValue,
-            @Nullable String nbtOp,
             @Nullable CompoundTag rawNbt,
             boolean invalidRawNbt,
-            @Nullable String durOp,
-            int durVal,
             boolean hasNbt,
             boolean nbtOnly,
             boolean nbtStrict,
             List<NbtCriterion> nbtRules,
             boolean nbtMatchAny,
             @Nullable int[] slotMapping,
-            boolean slotOnly,
-            @Nullable Boolean enchanted) {
+            boolean slotOnly) {
     }
 
     private record ItemFilterView(
@@ -640,7 +633,7 @@ public final class FilterItemData {
 
             Item itemEntry = entry.item();
             if (itemEntry != null && itemEntry == candidate.getItem()
-                    && itemEntryConstraintsMatch(filter, entry, candidate, provider, components))
+                    && itemEntryConstraintsMatch(entry, candidate, provider, components))
                 return true;
         }
         return false;
@@ -676,7 +669,7 @@ public final class FilterItemData {
 
             Item itemEntry = entry.item();
             if (itemEntry != null && itemEntry == candidate.getItem()
-                    && itemEntryConstraintsMatch(filter, entry, candidate, provider, components))
+                    && itemEntryConstraintsMatch(entry, candidate, provider, components))
                 return true;
         }
         return false;
@@ -759,13 +752,13 @@ public final class FilterItemData {
         List<ItemStock> stocks = new ArrayList<>();
         for (ItemFilterSlot entry : view.entriesBySlot()) {
             if (entry != null && coversSlot(entry, inventorySlot)
-                    && itemEntryMatches(filter, entry, candidate, provider, components))
+                    && itemEntryMatches(entry, candidate, provider, components))
                 stocks.add(new ItemStock(entry.stock(), entry.slotMapping()));
         }
         return stocks;
     }
 
-    private static boolean itemEntryMatches(ItemStack filter, ItemFilterSlot entry, ItemStack candidate,
+    private static boolean itemEntryMatches(ItemFilterSlot entry, ItemStack candidate,
             HolderLookup.Provider provider, LazyComponents components) {
         String tag = entry.tag();
         if (tag != null)
@@ -774,7 +767,7 @@ public final class FilterItemData {
         if (entry.nbtOnly())
             return entryConstraintsMatch(entry, candidate, provider, components);
         return entry.item() == candidate.getItem()
-                && itemEntryConstraintsMatch(filter, entry, candidate, provider, components);
+                && itemEntryConstraintsMatch(entry, candidate, provider, components);
     }
 
     private static boolean coversSlot(ItemFilterSlot entry, int inventorySlot) {
@@ -811,7 +804,7 @@ public final class FilterItemData {
 
             Item itemEntry = entry.item();
             if (itemEntry != null && itemEntry == candidate.getItem()
-                    && itemEntryConstraintsMatch(filter, entry, candidate, provider, components))
+                    && itemEntryConstraintsMatch(entry, candidate, provider, components))
                 return entry.batch();
         }
         return 0;
@@ -932,20 +925,14 @@ public final class FilterItemData {
 
     private static boolean entryConstraintsMatch(ItemFilterSlot entry, ItemStack candidate,
             HolderLookup.Provider provider, LazyComponents components) {
-        if (entry.hasNbt() && !checkNbtConstraint(entry, components.of(candidate, provider),
-                candidate.isDamageableItem()))
-            return false;
-        return checkDurabilityConstraint(entry, candidate) && checkEnchantedConstraint(entry, candidate);
+        return !entry.hasNbt()
+                || checkNbtConstraint(entry, components.of(candidate, provider), candidate.isDamageableItem());
     }
 
-    private static boolean itemEntryConstraintsMatch(ItemStack filter, ItemFilterSlot entry, ItemStack candidate,
+    private static boolean itemEntryConstraintsMatch(ItemFilterSlot entry, ItemStack candidate,
             HolderLookup.Provider provider, LazyComponents components) {
-        if (entry.nbtStrict()) {
-            if (entry.expectedComponents() != null)
-                return entry.expectedComponents().equals(candidate.getComponents());
-            ItemStack expected = getEntry(filter, entry.slotIndex(), provider);
-            return !expected.isEmpty() && ItemStack.isSameItemSameComponents(expected, candidate);
-        }
+        if (entry.nbtStrict())
+            return entry.expectedComponents().equals(candidate.getComponents());
         return entryConstraintsMatch(entry, candidate, provider, components);
     }
 
@@ -977,36 +964,7 @@ public final class FilterItemData {
         if (rawNbt != null) {
             return NbtRuleMatcher.compoundContains(components, rawNbt);
         }
-        if (entry.invalidRawNbt()) {
-            return false;
-        }
-
-        NbtPath nbtPath = entry.nbtPath();
-        Tag nbtExpected = entry.nbtValue();
-        if (nbtPath == null || nbtExpected == null)
-            return true;
-        Tag actual = NbtFilterData.resolvePathValue(components, nbtPath);
-        return matchesNbtValue(entry.nbtOp(), nbtExpected, actual);
-    }
-
-    private static boolean checkDurabilityConstraint(ItemFilterSlot entry, ItemStack candidate) {
-        String durOp = entry.durOp();
-        if (durOp == null || !candidate.isDamageableItem())
-            return true;
-        int durVal = entry.durVal();
-        int remaining = candidate.getMaxDamage() - candidate.getDamageValue();
-        DurabilityFilterData.Operator op = DurabilityFilterData.Operator.fromId(durOp);
-        return switch (op) {
-            case LESS_OR_EQUAL -> remaining <= durVal;
-            case EQUAL -> remaining == durVal;
-            case GREATER_OR_EQUAL -> remaining >= durVal;
-        };
-    }
-
-    private static boolean checkEnchantedConstraint(ItemFilterSlot entry, ItemStack candidate) {
-        Boolean enchanted = entry.enchanted();
-        if (enchanted == null) return true;
-        return candidate.isEnchanted() == enchanted;
+        return !entry.invalidRawNbt();
     }
 
     public static int getEntryAmount(ItemStack stack, int slot) {
@@ -1092,29 +1050,23 @@ public final class FilterItemData {
         String tag = FilterTagUtil.normalizeTag(entry.tag());
         String fluidId = nonEmpty(entry.fluidId());
         String chemicalId = nonEmpty(entry.chemicalId());
-        FluidStack fluid = resolveFluidEntry(fluidId);
         List<NbtCriterion> rules = entry.nbt().rules().stream()
                 .filter(rule -> !rule.path().isEmpty())
                 .toList();
         ParsedRawNbt raw = parseRawNbt(entry.nbt().raw());
-        String durOp = entry.durability() == null ? null : entry.durability().operator().id();
-        int durVal = entry.durability() == null ? 0 : entry.durability().value();
         int stock = stockOf(entry);
         int[] mapping = entry.slotMapping().slots().isEmpty()
                 ? null
                 : entry.slotMapping().slots().stream().mapToInt(Integer::intValue).toArray();
         boolean hasNbt = !rules.isEmpty() || !entry.nbt().raw().isEmpty();
-        boolean hasDur = entry.durability() != null;
-        boolean nbtOnly = (hasNbt || hasDur || entry.enchanted() != null || entry.counts().batch() > 0 || stock > 0)
+        boolean nbtOnly = (hasNbt || entry.counts().batch() > 0 || stock > 0)
                 && tag == null && item == null && fluidId == null && chemicalId == null;
-        boolean strict = item != null && entry.nbt().strict().orElse(
-                !hasNbt && !hasDur && entry.enchanted() == null);
         boolean slotOnly = mapping != null && tag == null && item == null && fluidId == null
-                && chemicalId == null && !hasNbt && !hasDur && entry.enchanted() == null;
-        return new ItemFilterSlot(entry.slot(), tag, item, expectedComponents, chemicalId, fluid,
-                entry.counts().batch(), stock, null, null, NBT_OP_EQUALS, raw.value(), raw.invalid(), durOp,
-                durVal, hasNbt, nbtOnly, strict, rules, entry.nbt().matchAny(), mapping, slotOnly,
-                entry.enchanted());
+                && chemicalId == null && !hasNbt;
+        return new ItemFilterSlot(tag, item, expectedComponents, chemicalId, resolveFluidEntry(fluidId),
+                entry.counts().batch(), stock, raw.value(), raw.invalid(), hasNbt, nbtOnly,
+                item != null && entry.nbt().strict().orElse(!hasNbt), rules, entry.nbt().matchAny(), mapping,
+                slotOnly);
     }
 
     private static ItemFilterView summarizeItemFilterView(boolean blacklist, ItemFilterSlot[] entriesBySlot) {
@@ -1128,7 +1080,7 @@ public final class FilterItemData {
             chemical |= entry.chemicalId() != null || entry.nbtOnly();
             tag |= entry.tag() != null;
             nbt |= entry.hasNbt();
-            amount |= entry.batch() > 0 || entry.stock() > 0 || entry.enchanted() != null;
+            amount |= entry.batch() > 0 || entry.stock() > 0;
             slotOnly |= entry.slotOnly();
         }
         return new ItemFilterView(blacklist, item, fluid, chemical, tag, nbt, amount, slotOnly, entriesBySlot);
@@ -1232,9 +1184,5 @@ public final class FilterItemData {
 
     public static String nextNbtOperator(String current) {
         return NbtRuleMatcher.nextOperator(current);
-    }
-
-    private static boolean matchesNbtValue(@Nullable String operator, Tag expected, @Nullable Tag actual) {
-        return NbtRuleMatcher.matchesValue(operator, expected, actual);
     }
 }
