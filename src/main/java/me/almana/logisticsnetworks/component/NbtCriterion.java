@@ -19,7 +19,7 @@ public record NbtCriterion(NbtPath path, String operator, Tag value) {
 
     public NbtCriterion {
         Objects.requireNonNull(path);
-        operator = Objects.requireNonNull(operator);
+        operator = NbtRuleMatcher.normalizeOperator(Objects.requireNonNull(operator));
         value = Objects.requireNonNull(value).copy();
     }
 

@@ -1145,7 +1145,6 @@ public final class FilterItemData {
         FluidStack fluid = resolveFluidEntry(fluidId);
         List<NbtCriterion> rules = entry.nbt().rules().stream()
                 .filter(rule -> !rule.path().isEmpty())
-                .map(rule -> new NbtCriterion(rule.path(), normalizeNbtOperator(rule.operator()), rule.value()))
                 .toList();
         ParsedRawNbt raw = parseRawNbt(entry.nbt().raw());
         String durOp = entry.durability() == null ? null : entry.durability().operator().id();
