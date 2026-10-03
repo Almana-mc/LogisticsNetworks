@@ -63,39 +63,36 @@ public final class LegacyComponentMigration {
     }
 
     public static boolean migrateGeneralFilter(ItemStack stack, @Nullable HolderLookup.Provider provider) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (!(custom.get(GENERAL_ROOT) instanceof CompoundTag root)) {
+        CompoundTag root = legacyRoot(stack, GENERAL_ROOT);
+        if (root == null) {
             return true;
         }
-        GeneralFilterConfig current = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
-        if (current != null) {
-            migrateSettings(stack, root, null);
-            removeRoot(stack, custom, GENERAL_ROOT);
-            return true;
-        }
-        GeneralFilterBridge.ReadResult result = GeneralFilterBridge.read(root, provider, current);
-        if (!result.complete()) {
-            return false;
+        if (!stack.has(LogisticsDataComponents.FILTER_ENTRIES)) {
+            GeneralFilterBridge.ReadResult result = GeneralFilterBridge.read(root, provider, null);
+            if (!result.complete()) {
+                return false;
+            }
+            if (!result.config().entries().isEmpty()) {
+                stack.set(LogisticsDataComponents.FILTER_ENTRIES, result.config());
+            }
         }
         migrateSettings(stack, root, null);
-        if (current == null && !result.config().entries().isEmpty()) {
-            stack.set(LogisticsDataComponents.FILTER_ENTRIES, result.config());
-        }
-        removeRoot(stack, custom, GENERAL_ROOT);
+        removeRoot(stack, GENERAL_ROOT);
         return true;
     }
 
     public static boolean migrateWrench(ItemStack stack, @Nullable HolderLookup.Provider provider) {
-        StorageLink currentLink = stack.get(LogisticsDataComponents.WRENCH_STORAGE_LINK);
         GlobalPos componentLink = stack.get(LogisticsDataComponents.WRENCH_AE2_LINK);
-        if (currentLink == null && componentLink != null) {
-            stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK,
-                    new StorageLink(StorageBackend.AE2, componentLink));
+        if (componentLink != null) {
+            if (!stack.has(LogisticsDataComponents.WRENCH_STORAGE_LINK)) {
+                stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK,
+                        new StorageLink(StorageBackend.AE2, componentLink));
+            }
+            stack.remove(LogisticsDataComponents.WRENCH_AE2_LINK);
         }
-        stack.remove(LogisticsDataComponents.WRENCH_AE2_LINK);
 
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (!(custom.get(WRENCH_ROOT) instanceof CompoundTag root)) {
+        CompoundTag root = legacyRoot(stack, WRENCH_ROOT);
+        if (root == null) {
             return true;
         }
 
@@ -134,14 +131,13 @@ public final class LegacyComponentMigration {
         }
 
         if (clipboardComplete || stack.has(LogisticsDataComponents.WRENCH_CLIPBOARD)) {
-            removeRoot(stack, custom, WRENCH_ROOT);
+            removeRoot(stack, WRENCH_ROOT);
             return true;
         }
 
         CompoundTag pending = new CompoundTag();
         pending.put("clipboard", root.getCompound("clipboard").copy());
-        custom.put(WRENCH_ROOT, pending);
-        writeCustomData(stack, custom);
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, custom -> custom.put(WRENCH_ROOT, pending));
         return false;
     }
 
@@ -149,7 +145,8 @@ public final class LegacyComponentMigration {
         if (stack.has(LogisticsDataComponents.WRENCH_CLIPBOARD)) {
             return true;
         }
-        return getLegacyRoot(stack, WRENCH_ROOT).contains("clipboard");
+        CompoundTag root = legacyRoot(stack, WRENCH_ROOT);
+        return root != null && root.contains("clipboard");
     }
 
     public static void clearWrenchClipboard(ItemStack stack) {
@@ -420,18 +417,26 @@ public final class LegacyComponentMigration {
         }
     }
 
-    private static void migrate(ItemStack stack, String rootKey, Consumer<CompoundTag> migration) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (!(custom.get(rootKey) instanceof CompoundTag root)) {
-            return;
+    @Nullable
+    private static CompoundTag legacyRoot(ItemStack stack, String rootKey) {
+        CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
+        if (custom == null || !custom.contains(rootKey)) {
+            return null;
         }
-        migration.accept(root.copy());
-        removeRoot(stack, custom, rootKey);
+        return custom.copyTag().get(rootKey) instanceof CompoundTag root ? root : null;
     }
 
-    private static void removeRoot(ItemStack stack, CompoundTag custom, String rootKey) {
-        custom.remove(rootKey);
-        writeCustomData(stack, custom);
+    private static void migrate(ItemStack stack, String rootKey, Consumer<CompoundTag> migration) {
+        CompoundTag root = legacyRoot(stack, rootKey);
+        if (root == null) {
+            return;
+        }
+        migration.accept(root);
+        removeRoot(stack, rootKey);
+    }
+
+    private static void removeRoot(ItemStack stack, String rootKey) {
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, custom -> custom.remove(rootKey));
     }
 
     private static void writeCustomData(ItemStack stack, CompoundTag custom) {
