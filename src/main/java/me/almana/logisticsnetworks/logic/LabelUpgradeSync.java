@@ -157,6 +157,7 @@ public final class LabelUpgradeSync {
                 GraphPayloadHandler.preserveLabelPosition(target, label);
                 target.setNodeLabel(label);
                 applyTemplate(target, appliedTemplate);
+                if (labelAuthority != null) target.setRenderVisible(labelAuthority.isRenderVisible());
                 target.setLabelRevision(appliedTemplate.revision());
                 returnItems(player, changes.get(target.getUUID()).returned(), null);
             }

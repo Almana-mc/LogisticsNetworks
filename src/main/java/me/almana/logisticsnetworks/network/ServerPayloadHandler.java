@@ -476,9 +476,29 @@ public class ServerPayloadHandler {
     public static void handleToggleVisibility(ToggleNodeVisibilityPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            if (node != null)
-                node.setRenderVisible(!node.isRenderVisible());
+            if (node == null)
+                return;
+            node.setRenderVisible(!node.isRenderVisible());
+            propagateVisibilityToLabelGroup(node);
         });
+    }
+
+    private static void propagateVisibilityToLabelGroup(LogisticsNodeEntity sourceNode) {
+        String label = sourceNode.getNodeLabel();
+        if (label.isEmpty() || sourceNode.getNetworkId() == null
+                || !(sourceNode.level() instanceof ServerLevel level))
+            return;
+        LogisticsNetwork network = NetworkRegistry.get(level).getNetwork(sourceNode.getNetworkId());
+        if (network == null)
+            return;
+        for (UUID otherId : network.getNodeUuids()) {
+            for (ServerLevel sl : level.getServer().getAllLevels()) {
+                if (sl.getEntity(otherId) instanceof LogisticsNodeEntity other) {
+                    if (label.equals(other.getNodeLabel())) other.setRenderVisible(sourceNode.isRenderVisible());
+                    break;
+                }
+            }
+        }
     }
 
     public static void handleSetDefaultNodeVisibility(SetDefaultNodeVisibilityPayload payload,
@@ -1185,6 +1205,7 @@ public class ServerPayloadHandler {
                                 LOGGER.debug("[LabelSync] Found matching node {}, copying all channels", otherId);
                             }
                             authority = other;
+                            node.setRenderVisible(other.isRenderVisible());
                             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                                 ChannelData src = other.getChannel(i);
                                 ChannelData dst = node.getChannel(i);
