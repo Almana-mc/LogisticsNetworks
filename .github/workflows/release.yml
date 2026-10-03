@@ -18,6 +18,11 @@ on:
         required: true
         type: boolean
         default: true
+      publish_maven:
+        description: "Publish to Almana Maven"
+        required: true
+        type: boolean
+        default: true
       changelog_type:
         description: "CurseForge changelog format"
         required: true
@@ -49,6 +54,7 @@ jobs:
       publish_discord: ${{ steps.branch_check.outputs.publish_discord }}
       publish_github: ${{ steps.branch_check.outputs.publish_github }}
       publish_curseforge: ${{ steps.branch_check.outputs.publish_curseforge }}
+      publish_maven: ${{ steps.branch_check.outputs.publish_maven }}
       changelog_type: ${{ steps.branch_check.outputs.changelog_type }}
     steps:
       - name: Resolve trigger inputs
@@ -59,6 +65,7 @@ jobs:
           INPUT_PUBLISH_DISCORD: ${{ inputs.publish_discord }}
           INPUT_PUBLISH_GITHUB: ${{ inputs.publish_github }}
           INPUT_PUBLISH_CURSEFORGE: ${{ inputs.publish_curseforge }}
+          INPUT_PUBLISH_MAVEN: ${{ inputs.publish_maven }}
           INPUT_CHANGELOG_TYPE: ${{ inputs.changelog_type }}
           INPUT_CONFIRM: ${{ inputs.confirm }}
         run: |
@@ -66,6 +73,7 @@ jobs:
           publish_discord="$INPUT_PUBLISH_DISCORD"
           publish_github="$INPUT_PUBLISH_GITHUB"
           publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
+          publish_maven="$INPUT_PUBLISH_MAVEN"
           changelog_type="$INPUT_CHANGELOG_TYPE"
 
           if [[ "$INPUT_CONFIRM" != "RELEASE" ]]; then
@@ -86,6 +94,7 @@ jobs:
           echo "publish_discord=$publish_discord" >> "$GITHUB_OUTPUT"
           echo "publish_github=$publish_github" >> "$GITHUB_OUTPUT"
           echo "publish_curseforge=$publish_curseforge" >> "$GITHUB_OUTPUT"
+          echo "publish_maven=$publish_maven" >> "$GITHUB_OUTPUT"
           echo "changelog_type=$changelog_type" >> "$GITHUB_OUTPUT"
 
   build:
@@ -388,6 +397,36 @@ jobs:
 
           file_id="$(jq -r '.id' <"$body_file")"
           echo "curseforge-url=https://www.curseforge.com/projects/${PROJECT_ID}/files/${file_id}" >> "$GITHUB_OUTPUT"
+
+  publish-maven:
+    name: Publish to Almana Maven
+    needs: [validate-release, build]
+    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_maven == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ needs.build.outputs.java_version }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Publish
+        shell: bash
+        env:
+          ORG_GRADLE_PROJECT_almanaUsername: ${{ secrets.MAVEN_USERNAME }}
+          ORG_GRADLE_PROJECT_almanaPassword: ${{ secrets.MAVEN_TOKEN }}
+        run: |
+          chmod +x ./gradlew
+          ./gradlew publish --console=plain
 
   notify-discord:
     name: Notify Discord
