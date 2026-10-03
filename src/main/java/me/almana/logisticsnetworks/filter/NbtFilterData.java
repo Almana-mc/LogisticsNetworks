@@ -1,7 +1,6 @@
 package me.almana.logisticsnetworks.filter;
 
 import com.mojang.serialization.Codec;
-import me.almana.logisticsnetworks.component.FilterSettings;
 import me.almana.logisticsnetworks.component.FilterSettingsData;
 import me.almana.logisticsnetworks.component.LegacyComponentMigration;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
@@ -85,10 +84,6 @@ public final class NbtFilterData {
             return symbol;
         }
 
-        public Operator next() {
-            return values()[(ordinal() + 1) % values().length];
-        }
-
         public static Operator fromOrdinal(int ordinal) {
             Operator[] values = values();
             if (ordinal < 0 || ordinal >= values.length)
@@ -118,25 +113,7 @@ public final class NbtFilterData {
         }
     }
 
-    public record View(List<NbtRule> rules, FilterTargetType target, boolean blacklist, boolean anyEnabled) {
-    }
-
     private NbtFilterData() {
-    }
-
-    private static View buildView(ItemStack stack) {
-        List<NbtRule> rules = getRules(stack);
-
-        boolean anyEnabled = false;
-        for (NbtRule rule : rules) {
-            if (rule.enabled()) {
-                anyEnabled = true;
-                break;
-            }
-        }
-
-        FilterSettings settings = FilterSettingsData.get(stack);
-        return new View(rules, settings.target(), settings.blacklist(), anyEnabled);
     }
 
     public static boolean isNbtFilter(ItemStack stack) {
@@ -148,44 +125,6 @@ public final class NbtFilterData {
             return false;
         LegacyComponentMigration.migrateNbtFilter(stack);
         return FilterSettingsData.get(stack).blacklist();
-    }
-
-    public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
-        if (!isNbtFilter(stack))
-            return;
-
-        LegacyComponentMigration.migrateNbtFilter(stack);
-        FilterSettingsData.setBlacklist(stack, isBlacklist);
-    }
-
-    public static FilterTargetType getTargetType(ItemStack stack) {
-        if (!isNbtFilter(stack))
-            return FilterTargetType.ITEMS;
-
-        LegacyComponentMigration.migrateNbtFilter(stack);
-        return FilterSettingsData.get(stack).target();
-    }
-
-    public static void setTargetType(ItemStack stack, FilterTargetType type) {
-        if (!isNbtFilter(stack))
-            return;
-
-        LegacyComponentMigration.migrateNbtFilter(stack);
-        FilterSettingsData.setTarget(stack, type);
-    }
-
-    public static boolean hasSelection(ItemStack stack) {
-        return hasAnyRules(stack);
-    }
-
-    public static @Nullable NbtPath getSelectedPath(ItemStack stack) {
-        List<NbtRule> rules = getRules(stack);
-        return rules.isEmpty() ? null : rules.get(0).path();
-    }
-
-    public static String getSelectedValueDisplay(ItemStack stack) {
-        List<NbtRule> rules = getRules(stack);
-        return rules.isEmpty() ? "" : rules.get(0).valueDisplay();
     }
 
     public static List<NbtRule> getRules(ItemStack stack) {
@@ -200,154 +139,6 @@ public final class NbtFilterData {
         return config.rules().stream()
                 .map(rule -> new NbtRule(rule.path(), rule.operator(), rule.value(), rule.enabled()))
                 .toList();
-    }
-
-    public static boolean hasAnyRules(ItemStack stack) {
-        return !getRules(stack).isEmpty();
-    }
-
-    public static boolean hasEnabledRules(ItemStack stack) {
-        for (NbtRule rule : getRules(stack)) {
-            if (rule.enabled())
-                return true;
-        }
-        return false;
-    }
-
-    public static boolean addRule(ItemStack stack, String rawPath, Operator operator, Tag value) {
-        if (!isNbtFilter(stack) || value == null)
-            return false;
-
-        String pathString = normalizePath(rawPath);
-        if (pathString == null)
-            return false;
-
-        var path = NbtPath.parse(pathString);
-        if (path == null) {
-            return false;
-        }
-
-        Operator resolvedOperator = operator == null ? Operator.EQUALS : operator;
-        List<NbtRule> rules = new ArrayList<>(getRules(stack));
-        NbtRule updated = new NbtRule(path, resolvedOperator, value, true);
-        int index = findRuleIndex(rules, path, resolvedOperator);
-        if (index >= 0) {
-            if (sameRule(rules.get(index), updated)) {
-                return false;
-            }
-            rules.set(index, updated);
-        } else {
-            rules.add(updated);
-        }
-        FilterSettingsData.setTarget(stack, isFluidPath(path) ? FilterTargetType.FLUIDS : FilterTargetType.ITEMS);
-        setRules(stack, rules);
-        return true;
-    }
-
-    public static boolean removeRule(ItemStack stack, int index) {
-        if (!isNbtFilter(stack))
-            return false;
-
-        List<NbtRule> rules = new ArrayList<>(getRules(stack));
-        if (index < 0 || index >= rules.size()) {
-            return false;
-        }
-        rules.remove(index);
-        setRules(stack, rules);
-        return true;
-    }
-
-    public static boolean toggleRuleEnabled(ItemStack stack, int index) {
-        if (!isNbtFilter(stack))
-            return false;
-
-        List<NbtRule> rules = new ArrayList<>(getRules(stack));
-        if (index < 0 || index >= rules.size()) {
-            return false;
-        }
-        NbtRule current = rules.get(index);
-        rules.set(index, new NbtRule(current.path(), current.operator(), current.value(), !current.enabled()));
-        setRules(stack, rules);
-        return true;
-    }
-
-    public static boolean cycleRuleOperator(ItemStack stack, int index) {
-        if (!isNbtFilter(stack))
-            return false;
-
-        List<NbtRule> rules = new ArrayList<>(getRules(stack));
-        if (index < 0 || index >= rules.size()) {
-            return false;
-        }
-        NbtRule current = rules.get(index);
-        rules.set(index, new NbtRule(current.path(), current.operator().next(), current.value(), current.enabled()));
-        setRules(stack, rules);
-        return true;
-    }
-
-    public static boolean setSelection(ItemStack stack, String rawPath, Tag value) {
-        return addRule(stack, rawPath, Operator.EQUALS, value);
-    }
-
-    public static boolean clearSelection(ItemStack stack) {
-        if (!isNbtFilter(stack))
-            return false;
-
-        LegacyComponentMigration.migrateNbtFilter(stack);
-        return stack.remove(LogisticsDataComponents.NBT_FILTER) != null;
-    }
-
-    public static boolean matchesSelection(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider) {
-        if (candidate.isEmpty() || provider == null)
-            return false;
-        if (getTargetType(filter) != FilterTargetType.ITEMS)
-            return false;
-
-        CompoundTag components = getSerializedComponents(candidate, provider);
-        return matches(filter, components);
-    }
-
-    public static boolean matchesSelection(ItemStack filter, FluidStack candidate, HolderLookup.Provider provider) {
-        if (candidate == null || candidate.isEmpty() || provider == null)
-            return false;
-        if (getTargetType(filter) != FilterTargetType.FLUIDS)
-            return false;
-
-        CompoundTag components = getSerializedComponents(candidate, provider);
-        return matches(filter, components);
-    }
-
-    public static boolean matches(ItemStack filter, @Nullable CompoundTag components) {
-        if (!isNbtFilter(filter))
-            return false;
-
-        return matches(getRules(filter), components);
-    }
-
-    public static boolean matches(List<NbtRule> rules, @Nullable CompoundTag components) {
-        if (components == null)
-            return false;
-
-        boolean hasEnabledRule = false;
-        for (NbtRule rule : rules) {
-            if (!rule.enabled())
-                continue;
-
-            hasEnabledRule = true;
-            Tag actual = resolvePathValue(components, rule.path());
-            if (!matchesRule(rule, actual))
-                return false;
-        }
-        return hasEnabledRule;
-    }
-
-    public static boolean matchesSelection(ItemStack filter, @Nullable NbtPath path, @Nullable CompoundTag components) {
-        if (path == null || !isNbtFilter(filter))
-            return false;
-
-        Tag actual = resolvePathValue(components, path);
-        Tag expected = resolveExpectedValue(filter, path);
-        return expected != null && actual != null && expected.equals(actual);
     }
 
     public static @Nullable Tag resolvePathValue(ItemStack stack, @Nullable NbtPath path, HolderLookup.Provider provider) {
@@ -477,54 +268,5 @@ public final class NbtFilterData {
         if (!currentPath.isEmpty()) {
             out.add(new NbtEntry(currentPath, tag.toString()));
         }
-    }
-
-    private static @Nullable String normalizePath(String path) {
-        if (path == null)
-            return null;
-        String trimmed = path.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private static boolean matchesRule(NbtRule rule, @Nullable Tag actual) {
-        return switch (rule.operator()) {
-            case EQUALS -> actual != null && rule.value().equals(actual);
-            case NOT_EQUALS -> actual == null || !rule.value().equals(actual);
-        };
-    }
-
-    private static @Nullable Tag resolveExpectedValue(ItemStack filter, NbtPath path) {
-        for (NbtRule rule : getRules(filter)) {
-            if (rule.path().equals(path))
-                return rule.value();
-        }
-        return null;
-    }
-
-    private static int findRuleIndex(List<NbtRule> rules, NbtPath path, Operator operator) {
-        for (int i = 0; i < rules.size(); i++) {
-            NbtRule rule = rules.get(i);
-            if (rule.path().equals(path) && rule.operator() == operator)
-                return i;
-        }
-        return -1;
-    }
-
-    private static boolean sameRule(NbtRule left, NbtRule right) {
-        return left.path().equals(right.path())
-                && left.operator() == right.operator()
-                && left.enabled() == right.enabled()
-                && left.value().equals(right.value());
-    }
-
-    private static void setRules(ItemStack stack, List<NbtRule> rules) {
-        if (rules.isEmpty()) {
-            stack.remove(LogisticsDataComponents.NBT_FILTER);
-            return;
-        }
-        List<NbtFilterConfig.Rule> stored = rules.stream()
-                .map(rule -> new NbtFilterConfig.Rule(rule.path(), rule.operator(), rule.value(), rule.enabled()))
-                .toList();
-        stack.set(LogisticsDataComponents.NBT_FILTER, new NbtFilterConfig(stored));
     }
 }
