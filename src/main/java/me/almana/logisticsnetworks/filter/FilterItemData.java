@@ -38,6 +38,11 @@ import java.util.function.UnaryOperator;
 public final class FilterItemData {
 
     private static final int MAX_NBT_RULES_PER_SLOT = 8;
+    private static final int MAX_NBT_PATH_LENGTH = 512;
+    private static final int MAX_NBT_VALUE_LENGTH = 1024;
+    // Keeps 45x8 rules under 2MB
+    private static final int MAX_NBT_VALUE_BYTES = 2048;
+    private static final int MAX_NBT_RAW_LENGTH = 4096;
     private static final String NBT_OP_EQUALS = "=";
 
     public static final class ReadCache {
@@ -447,6 +452,8 @@ public final class FilterItemData {
     }
 
     public static void setEntryNbtRaw(ItemStack stack, int slot, @Nullable String rawSnbt) {
+        if (rawSnbt != null && rawSnbt.length() > MAX_NBT_RAW_LENGTH)
+            return;
         edit(stack, slot, entry -> entry.withNbt(entry.nbt().withRaw(rawSnbt)));
     }
 
@@ -476,7 +483,7 @@ public final class FilterItemData {
     }
 
     public static boolean addSlotNbtRule(ItemStack stack, int slot, NbtPath path, String operator, Tag value) {
-        if (path.isEmpty())
+        if (path.isEmpty() || path.toString().length() > MAX_NBT_PATH_LENGTH || isOversizedNbtValue(value))
             return false;
         NbtCriterion added = new NbtCriterion(path, normalizeNbtOperator(operator), value);
         return edit(stack, slot, entry -> {
@@ -521,6 +528,8 @@ public final class FilterItemData {
     }
 
     public static boolean setSlotNbtRuleValue(ItemStack stack, int slot, int ruleIndex, Tag newValue) {
+        if (isOversizedNbtValue(newValue))
+            return false;
         return edit(stack, slot, entry -> {
             List<NbtCriterion> rules = new ArrayList<>(entry.nbt().rules());
             if (ruleIndex < 0 || ruleIndex >= rules.size())
@@ -529,6 +538,10 @@ public final class FilterItemData {
             rules.set(ruleIndex, new NbtCriterion(rule.path(), rule.operator(), newValue));
             return entry.withNbt(entry.nbt().withRules(rules));
         });
+    }
+
+    private static boolean isOversizedNbtValue(Tag value) {
+        return value.sizeInBytes() > MAX_NBT_VALUE_BYTES || value.toString().length() > MAX_NBT_VALUE_LENGTH;
     }
 
     public static int indexOfRule(List<NbtCriterion> rules, NbtCriterion rule) {
