@@ -23,6 +23,7 @@ import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.nbt.CollectionTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
@@ -697,7 +698,7 @@ public final class NodeClipboardConfig {
 
     @Nullable
     public static NodeClipboardConfig load(@Nullable CompoundTag root, @Nullable HolderLookup.Provider provider) {
-        if (root == null || isUnsupportedVersion(root)) {
+        if (root == null || isUnsupportedVersion(root) || isOversized(root)) {
             return null;
         }
         DynamicOps<Tag> ops = provider == null ? NbtOps.INSTANCE : provider.createSerializationContext(NbtOps.INSTANCE);
@@ -714,6 +715,16 @@ public final class NodeClipboardConfig {
     private static boolean isUnsupportedVersion(CompoundTag root) {
         int version = root.getInt(KEY_VERSION);
         return root.contains(KEY_VERSION, Tag.TAG_INT) && version != LEGACY_VERSION && version != VERSION;
+    }
+
+    private static boolean isOversized(CompoundTag root) {
+        return size(root, "channels") > LogisticsNodeEntity.CHANNEL_COUNT
+                || size(root, "filters") > LogisticsNodeEntity.CHANNEL_COUNT * ChannelData.FILTER_SIZE
+                || size(root, "upgrades") > LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
+    }
+
+    private static int size(CompoundTag root, String key) {
+        return root.get(key) instanceof CollectionTag<?> list ? list.size() : 0;
     }
 
     private static DataResult<Integer> checkVersion(int version) {
