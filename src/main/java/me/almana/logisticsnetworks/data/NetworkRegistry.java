@@ -1,7 +1,6 @@
 package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
-import com.mojang.serialization.Codec;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
@@ -10,6 +9,8 @@ import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -26,15 +27,13 @@ public class NetworkRegistry extends SavedData {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String DATA_NAME = "logistics_networks";
+    private static final String KEY_NETWORKS = "networks";
     private static final String LEGACY_KEY_NETWORKS = "Networks";
-    private static final Codec<List<LogisticsNetwork>> NETWORK_LIST =
-            ComponentCodecs.lenientList(LogisticsNetwork.CODEC);
-    private static final Codec<List<LogisticsNetwork>> NETWORKS_CODEC = Codec.withAlternative(
-            NETWORK_LIST.fieldOf("networks").codec(), NETWORK_LIST.fieldOf(LEGACY_KEY_NETWORKS).codec());
 
     // Limits & Warnings for beta
     private static final int WARNING_NODE_COUNT = 200;
     private final Map<UUID, LogisticsNetwork> networks = new HashMap<>();
+    private final List<Tag> undecodableNetworks = new ArrayList<>();
     private final TelemetryManager telemetryManager = new TelemetryManager();
     private final TransferCapabilityCache capabilityCache = new TransferCapabilityCache();
     private final NetworkDispatcher dispatcher = new NetworkDispatcher();
@@ -181,14 +180,23 @@ public class NetworkRegistry extends SavedData {
 
     @Override
     public CompoundTag save(CompoundTag compoundTag, HolderLookup.Provider provider) {
-        return compoundTag.merge((CompoundTag) ComponentCodecs.encode(NETWORKS_CODEC, provider,
-                List.copyOf(networks.values())));
+        ListTag list = new ListTag();
+        for (LogisticsNetwork network : networks.values()) {
+            list.add(ComponentCodecs.encode(LogisticsNetwork.CODEC, provider, network));
+        }
+        undecodableNetworks.forEach(tag -> list.add(tag.copy()));
+        compoundTag.put(KEY_NETWORKS, list);
+        return compoundTag;
     }
 
     public static NetworkRegistry load(CompoundTag compoundTag, HolderLookup.Provider provider) {
         NetworkRegistry registry = new NetworkRegistry();
-        ComponentCodecs.parse(NETWORKS_CODEC, provider, compoundTag).orElse(List.of())
-                .forEach(network -> registry.networks.put(network.getId(), network));
+        String key = compoundTag.contains(KEY_NETWORKS, Tag.TAG_LIST) ? KEY_NETWORKS : LEGACY_KEY_NETWORKS;
+        for (Tag tag : compoundTag.getList(key, Tag.TAG_COMPOUND)) {
+            ComponentCodecs.parse(LogisticsNetwork.CODEC, provider, tag).ifPresentOrElse(
+                    network -> registry.networks.put(network.getId(), network),
+                    () -> registry.undecodableNetworks.add(tag.copy()));
+        }
         if (!registry.networks.isEmpty()) {
             registry.networks.keySet().forEach(registry.dispatcher::markDirty);
             if (Config.debugMode) LOGGER.info("Loaded {} networks.", registry.networks.size());
