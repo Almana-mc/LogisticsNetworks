@@ -1195,10 +1195,10 @@ public final class FilterItemData {
             List<SlotNbtRule> result = new ArrayList<>(rules.size());
             for (Tag t : rules) {
                 if (t instanceof CompoundTag r) {
-                    NbtPath p = NbtPath.parse(r.getString(KEY_RULE_P));
+                    NbtPath p = NbtPath.parseLenient(r.getString(KEY_RULE_P));
                     String o = r.contains(KEY_RULE_O) ? r.getString(KEY_RULE_O) : NBT_OP_EQUALS;
                     Tag v = r.get(KEY_RULE_V);
-                    if (p != null && !p.isEmpty() && v != null) {
+                    if (!p.isEmpty() && v != null) {
                         result.add(new SlotNbtRule(p, normalizeNbtOperator(o), v.copy()));
                     }
                 }
@@ -1206,7 +1206,8 @@ public final class FilterItemData {
             return result;
         }
 
-        NbtPath path = NbtPath.parse(getEntryNbtPath(entry));
+        String rawPath = getEntryNbtPath(entry);
+        NbtPath path = rawPath == null ? null : NbtPath.parseLenient(rawPath);
         Tag value = getEntryNbtValue(entry);
         if (path != null && value != null) {
             String op = getEntryNbtOperator(entry);
@@ -1930,7 +1931,8 @@ public final class FilterItemData {
             List<SlotNbtRule> nbtRules = readSlotNbtRules(entry);
             boolean nbtMatchAny = entry.getBoolean(KEY_NBT_MATCH_ANY);
 
-            NbtPath nbtPath = NbtPath.parse(getEntryNbtPath(entry));
+            String rawNbtPath = getEntryNbtPath(entry);
+            NbtPath nbtPath = rawNbtPath == null ? null : NbtPath.parseLenient(rawNbtPath);
             Tag nbtValue = getEntryNbtValue(entry);
             String nbtOp = getEntryNbtOperator(entry);
             String raw = getEntryNbtRaw(entry);

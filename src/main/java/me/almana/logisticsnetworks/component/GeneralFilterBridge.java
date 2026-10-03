@@ -156,9 +156,9 @@ public final class GeneralFilterBridge {
             if (!(tag instanceof CompoundTag rule)) {
                 continue;
             }
-            NbtPath path = NbtPath.parse(rule.getString("p"));
+            NbtPath path = NbtPath.parseLenient(rule.getString("p"));
             Tag value = rule.get("v");
-            if (path != null && !path.isEmpty() && value != null) {
+            if (!path.isEmpty() && value != null) {
                 result.add(new NbtCriterion(path,
                         NbtRuleMatcher.normalizeOperator(rule.getString("o")), value));
             }
@@ -166,9 +166,9 @@ public final class GeneralFilterBridge {
         if (!result.isEmpty()) {
             return result;
         }
-        NbtPath path = NbtPath.parse(entry.getString("nbt_path"));
+        NbtPath path = NbtPath.parseLenient(entry.getString("nbt_path"));
         Tag value = entry.get("nbt_val");
-        return path == null || path.isEmpty() || value == null
+        return path.isEmpty() || value == null
                 ? List.of()
                 : List.of(new NbtCriterion(path,
                         NbtRuleMatcher.normalizeOperator(entry.getString("nbt_op")), value));

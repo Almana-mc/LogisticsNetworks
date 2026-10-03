@@ -271,10 +271,9 @@ public final class LegacyComponentMigration {
     public static void migrateNbtFilter(ItemStack stack) {
         migrate(stack, NBT_ROOT, root -> {
             List<NbtFilterConfig.Rule> rules = readNbtRules(root);
-            NbtPath inferredPath = rules.isEmpty() ? NbtPath.parse(root.getString("path")) : rules.getFirst().path();
-            if (inferredPath == null) {
-                inferredPath = NbtPath.EMPTY;
-            }
+            NbtPath inferredPath = rules.isEmpty()
+                    ? NbtPath.parseLenient(root.getString("path"))
+                    : rules.getFirst().path();
             FilterTargetType inferred = NbtFilterData.isFluidPath(inferredPath)
                     ? FilterTargetType.FLUIDS
                     : FilterTargetType.ITEMS;
@@ -312,9 +311,9 @@ public final class LegacyComponentMigration {
             if (!(tag instanceof CompoundTag rule)) {
                 continue;
             }
-            NbtPath path = NbtPath.parse(rule.getString("path").trim());
+            NbtPath path = NbtPath.parseLenient(rule.getString("path"));
             Tag value = rule.get("value");
-            if (path == null || path.isEmpty() || value == null) {
+            if (path.isEmpty() || value == null) {
                 continue;
             }
             NbtFilterData.Operator operator = rule.contains("operator", Tag.TAG_INT)
@@ -326,9 +325,9 @@ public final class LegacyComponentMigration {
         if (!rules.isEmpty()) {
             return rules;
         }
-        NbtPath path = NbtPath.parse(root.getString("path").trim());
+        NbtPath path = NbtPath.parseLenient(root.getString("path"));
         Tag value = root.get("value");
-        return path == null || path.isEmpty() || value == null
+        return path.isEmpty() || value == null
                 ? List.of()
                 : List.of(new NbtFilterConfig.Rule(path, NbtFilterData.Operator.EQUALS, value, true));
     }
