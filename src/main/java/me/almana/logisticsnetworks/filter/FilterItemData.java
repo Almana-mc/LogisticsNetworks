@@ -182,8 +182,8 @@ public final class FilterItemData {
         return entry == null || entry.item() == null ? ItemStack.EMPTY : entry.item().toStack();
     }
 
-    public static void setEntry(ItemStack stack, int slot, ItemStack value, @Nullable HolderLookup.Provider provider) {
-        edit(stack, slot, entry -> value.isEmpty()
+    public static boolean setEntry(ItemStack stack, int slot, ItemStack value, @Nullable HolderLookup.Provider provider) {
+        return edit(stack, slot, entry -> value.isEmpty()
                 ? GeneralFilterEntry.empty(slot)
                 : entry.withItem(StackSnapshot.of(value.copyWithCount(1))));
     }
@@ -199,8 +199,7 @@ public final class FilterItemData {
         }
         for (int i = 0; i < cap; i++) {
             if (isEntrySlotAvailable(filter, i)) {
-                setEntry(filter, i, entry, provider);
-                return true;
+                return setEntry(filter, i, entry, provider);
             }
         }
         return false;
