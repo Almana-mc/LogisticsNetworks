@@ -6,8 +6,8 @@ import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.CandidateComponents;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
@@ -24,7 +24,6 @@ import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -1059,8 +1058,7 @@ public class TransferEngine {
         BulkInsertRejectionCache insertRejections = null;
 
         // Serialize each source slot once across the target loop
-        CompoundTag[] slotComponents = hasNbtFilter ? new CompoundTag[source.getSlots()] : null;
-        boolean[] slotComponentsCached = hasNbtFilter ? new boolean[source.getSlots()] : null;
+        CandidateComponents[] slotComponents = hasNbtFilter ? new CandidateComponents[source.getSlots()] : null;
         byte[] slotVerdicts = new byte[sourceSlots == null ? source.getSlots() : sourceSlots.length];
 
         while (remaining > 0 && openTargetCount > 0) {
@@ -1098,11 +1096,11 @@ public class TransferEngine {
                         continue;
                     }
 
-                    CompoundTag candidateComponents = null;
+                    CandidateComponents candidateComponents = null;
                     if (provider != null && hasNbtFilter) {
-                        if (!slotComponentsCached[slot]) {
-                            slotComponents[slot] = NbtFilterData.getSerializedComponents(extracted, provider);
-                            slotComponentsCached[slot] = true;
+                        if (slotComponents[slot] == null) {
+                            // Copy, extracted reaches target handlers
+                            slotComponents[slot] = new CandidateComponents(extracted.copy(), provider);
                         }
                         candidateComponents = slotComponents[slot];
                     }
@@ -1257,8 +1255,8 @@ public class TransferEngine {
                             movedByItem.merge(movedItem, targetAccepted, Integer::sum);
                         }
 
-                        if (slotComponentsCached != null) {
-                            slotComponentsCached[slot] = false;
+                        if (slotComponents != null) {
+                            slotComponents[slot] = null;
                         }
 
                         if (!roundRobin) {
@@ -1356,7 +1354,7 @@ public class TransferEngine {
 
     static boolean[] computeImportAllowedSlots(IItemHandler handler, ItemStack[] importFilters,
             FilterMode importFilterMode, ItemStack candidate, HolderLookup.Provider provider,
-            @Nullable CompoundTag candidateComponents, @Nullable FilterItemData.ReadCache filterReadCache) {
+            @Nullable CandidateComponents candidateComponents, @Nullable FilterItemData.ReadCache filterReadCache) {
         int size = handler.getSlots();
         boolean[] mask = new boolean[size];
         boolean any = false;

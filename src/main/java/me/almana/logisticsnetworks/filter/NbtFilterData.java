@@ -156,22 +156,6 @@ public final class NbtFilterData {
         return new CandidateComponents(stack, provider).resolve(path);
     }
 
-    public static @Nullable Tag resolvePathValue(@Nullable CompoundTag components, @Nullable NbtPath path) {
-        if (components == null || path == null || path.isEmpty())
-            return null;
-
-        if (path.equals(COMPONENTS_PATH) || path.equals(FLUID_COMPONENTS_PATH))
-            return components.copy();
-
-        if (path.startsWith(FLUID_COMPONENTS_PATH))
-            path = path.drop(2);
-        else if (path.startsWith(COMPONENTS_PATH))
-            path = path.drop(1);
-
-        Tag found = path.getFrom(components);
-        return found == null ? null : found.copy();
-    }
-
     public static List<NbtEntry> extractEntries(ItemStack stack, HolderLookup.Provider provider) {
         return extractEntriesInternal(getSerializedComponents(stack, provider), NbtPath.EMPTY);
     }

@@ -1,13 +1,12 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.filter.CandidateComponents;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -41,9 +40,7 @@ public final class PlannedItemValidation {
         if (candidate.isEmpty()) return move.withAmount(0, null);
         ItemStack[] exports = channel.getFilterItems();
         ItemStack[] imports = targetChannel.getFilterItems();
-        CompoundTag components = FilterLogic.hasConfiguredItemNbtFilter(exports, filters)
-                || FilterLogic.hasConfiguredItemNbtFilter(imports, filters)
-                ? NbtFilterData.getSerializedComponents(candidate, registries) : null;
+        CandidateComponents components = new CandidateComponents(candidate, registries);
         int sourceSlot = source instanceof DirectItemAccess ? -1 : move.sourceSlot();
         if (!FilterLogic.matchesItemInSlot(exports, channel.getFilterMode(), candidate, registries,
                 components, filters, sourceSlot)) return move.withAmount(0, null);
@@ -59,7 +56,7 @@ public final class PlannedItemValidation {
     }
 
     private int allowed(ItemStack candidate, int sourceSlot, IItemHandler target,
-            boolean[] mask, ItemStack[] imports, CompoundTag components, Map<Item, Integer> batchMoved) {
+            boolean[] mask, ItemStack[] imports, CandidateComponents components, Map<Item, Integer> batchMoved) {
         var constraints = TransferAmountRules.collect(channel.getFilterItems(), imports, filters);
         if (!constraints.hasPerEntryAmounts() && !constraints.hasImportThreshold()
                 && !constraints.hasExportThreshold()) return candidate.getCount();
