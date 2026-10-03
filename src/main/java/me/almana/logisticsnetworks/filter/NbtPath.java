@@ -11,13 +11,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public record NbtPath(Component[] components) {
-    public static final Codec<NbtPath> CODEC = Codec.STRING.xmap(NbtPath::parse, NbtPath::toString);
-    public static final StreamCodec<ByteBuf, NbtPath> STREAM_CODEC = ByteBufCodecs.STRING_UTF8.map(NbtPath::parse, NbtPath::toString);
+    public static final Codec<NbtPath> CODEC = Codec.STRING.xmap(NbtPath::parseLenient, NbtPath::toString);
+    public static final StreamCodec<ByteBuf, NbtPath> STREAM_CODEC = ByteBufCodecs.STRING_UTF8.map(NbtPath::parseLenient, NbtPath::toString);
 
     public static final NbtPath EMPTY = NbtPath.of();
-    public static final NbtPath IDENTITY = NbtPath.of(new StringComponent("."));
 
     public static NbtPath of(Component... components) {
         return new NbtPath(components);
@@ -31,10 +31,6 @@ public record NbtPath(Component[] components) {
 
         if (pathStr.isEmpty()) {
             return NbtPath.EMPTY;
-        }
-
-        if (pathStr.equals(".")) {
-            return NbtPath.IDENTITY;
         }
 
         var list = new ArrayList<Component>();
@@ -51,7 +47,7 @@ public record NbtPath(Component[] components) {
                 }
                 list.add(res.result());
                 remaining = remaining.substring(res.usage());
-                if (remaining.charAt(0) != ']') {
+                if (remaining.isEmpty() || remaining.charAt(0) != ']') {
                     return null;
                 }
                 remaining = remaining.substring(1);
@@ -75,6 +71,12 @@ public record NbtPath(Component[] components) {
         }
 
         return new NbtPath(list.toArray(new Component[0]));
+    }
+
+    public static NbtPath parseLenient(String pathStr) {
+        var parsed = parse(pathStr);
+        // unparseable paths never match
+        return parsed != null ? parsed : NbtPath.of(new StringComponent(pathStr));
     }
 
     @Override
@@ -137,6 +139,25 @@ public record NbtPath(Component[] components) {
         return this.components.length;
     }
 
+    public boolean startsWith(NbtPath prefix) {
+        return this.size() >= prefix.size()
+                && Arrays.equals(this.components, 0, prefix.size(), prefix.components, 0, prefix.size());
+    }
+
+    public NbtPath drop(int count) {
+        return new NbtPath(Arrays.copyOfRange(this.components, count, this.components.length));
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof NbtPath other && Arrays.equals(this.components, other.components);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(this.components);
+    }
+
     public interface Component {
         @Nullable
         Tag getFrom(@Nullable Tag parent);
@@ -182,6 +203,9 @@ public record NbtPath(Component[] components) {
             }
 
             String value = string.substring(0, Math.min(periodIdx, bracketIdx));
+            if (value.isEmpty()) {
+                return UsageAndResult.of(0, null);
+            }
             return UsageAndResult.of(value.length(), new StringComponent(value));
         }
     }
@@ -189,7 +213,7 @@ public record NbtPath(Component[] components) {
     record IndexComponent(int value) implements Component {
         @Override
         public @Nullable Tag getFrom(@Nullable Tag parent) {
-            if (!(parent instanceof CollectionTag<?> compound) || compound.isEmpty()) {
+            if (!(parent instanceof CollectionTag<?> compound) || this.value < 0 || this.value >= compound.size()) {
                 return null;
             }
 
