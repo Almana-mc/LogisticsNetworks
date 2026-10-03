@@ -1339,6 +1339,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             String value = rule.value().toString();
             menu.addSlotNbtRule(minecraft.player, slot, rule.path(), rule.operator(), value);
             PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(slot, rule.path(), rule.operator(), value));
+            // Add prefers the ghost value
+            int ruleIdx = FilterItemData.indexOfRule(menu.getSlotNbtRules(slot), rule);
+            if (ruleIdx >= 0) {
+                PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setValue(slot, ruleIdx, value));
+                menu.setSlotNbtRuleValue(slot, ruleIdx, value);
+            }
         }
 
         if (entry.nbtMatchAny() != menu.isSlotNbtMatchAny(slot)) {

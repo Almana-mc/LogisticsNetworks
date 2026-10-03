@@ -568,7 +568,7 @@ public final class FilterItemData {
         });
     }
 
-    private static int indexOfRule(List<NbtCriterion> rules, NbtCriterion rule) {
+    public static int indexOfRule(List<NbtCriterion> rules, NbtCriterion rule) {
         for (int i = 0; i < rules.size(); i++) {
             if (rules.get(i).path().equals(rule.path()) && rules.get(i).operator().equals(rule.operator()))
                 return i;
