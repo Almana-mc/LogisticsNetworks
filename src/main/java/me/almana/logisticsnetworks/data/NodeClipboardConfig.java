@@ -467,6 +467,12 @@ public final class NodeClipboardConfig {
         }
     }
 
+    public void stripUpgradeComponents() {
+        for (int slot = 0; slot < upgradeItems.length; slot++) {
+            setUpgradeItem(slot, new ItemStack(upgradeItems[slot].getItem()));
+        }
+    }
+
     public int getUpgradeTier() {
         int tier = 0;
         for (ItemStack stack : upgradeItems) {
