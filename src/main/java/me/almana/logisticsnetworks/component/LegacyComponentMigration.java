@@ -311,7 +311,7 @@ public final class LegacyComponentMigration {
             if (!(tag instanceof CompoundTag rule)) {
                 continue;
             }
-            NbtPath path = NbtPath.parseLenient(rule.getString("path"));
+            NbtPath path = NbtPath.parseLenient(rule.getString("path").trim());
             Tag value = rule.get("value");
             if (path.isEmpty() || value == null) {
                 continue;
@@ -325,7 +325,7 @@ public final class LegacyComponentMigration {
         if (!rules.isEmpty()) {
             return rules;
         }
-        NbtPath path = NbtPath.parseLenient(root.getString("path"));
+        NbtPath path = NbtPath.parseLenient(root.getString("path").trim());
         Tag value = root.get("value");
         return path.isEmpty() || value == null
                 ? List.of()

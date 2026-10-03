@@ -90,8 +90,8 @@ public record NbtPath(Component[] components) {
     }
 
     public static NbtPath parseLenient(String pathStr) {
-        var parsed = parse(pathStr.trim());
-        // unparseable paths never match
+        var parsed = parse(pathStr);
+        // unparseable paths never resolve
         return parsed != null ? parsed : NbtPath.of(new StringComponent(pathStr));
     }
 
