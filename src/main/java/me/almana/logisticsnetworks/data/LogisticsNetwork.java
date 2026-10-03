@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.data;
 
+import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -148,7 +149,8 @@ public class LogisticsNetwork {
             for (Map.Entry<String, LabelUpgradeTemplate> entry : new TreeMap<>(labelTemplates).entrySet()) {
                 CompoundTag templateTag = new CompoundTag();
                 templateTag.putString(KEY_LABEL, entry.getKey());
-                templateTag.put(KEY_TEMPLATE, entry.getValue().save(provider));
+                templateTag.put(KEY_TEMPLATE, ComponentCodecs.encode(LabelUpgradeTemplate.CODEC, provider,
+                        entry.getValue()));
                 templatesTag.add(templateTag);
             }
             tag.put(KEY_LABEL_TEMPLATES, templatesTag);
@@ -210,8 +212,8 @@ public class LogisticsNetwork {
             for (Tag value : templatesTag) {
                 if (!(value instanceof CompoundTag templateTag)) continue;
                 String label = templateTag.getString(KEY_LABEL);
-                LabelUpgradeTemplate template = LabelUpgradeTemplate.load(
-                        templateTag.getCompound(KEY_TEMPLATE), provider);
+                LabelUpgradeTemplate template = ComponentCodecs.parse(LabelUpgradeTemplate.CODEC, provider,
+                        templateTag.getCompound(KEY_TEMPLATE)).orElse(null);
                 if (!label.isBlank() && template != null) network.labelTemplates.put(label, template);
             }
         }
