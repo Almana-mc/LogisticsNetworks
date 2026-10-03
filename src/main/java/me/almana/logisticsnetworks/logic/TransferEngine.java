@@ -1057,7 +1057,7 @@ public class TransferEngine {
         BulkInsertRejectionCache bulkInsertRejections = null;
         BulkInsertRejectionCache insertRejections = null;
 
-        // Serialize each source slot once across the target loop
+        // Memo components per source slot
         CandidateComponents[] slotComponents = hasNbtFilter ? new CandidateComponents[source.getSlots()] : null;
         byte[] slotVerdicts = new byte[sourceSlots == null ? source.getSlots() : sourceSlots.length];
 
@@ -1229,6 +1229,9 @@ public class TransferEngine {
                     }
                     // Source changed, recheck slots
                     slotVerdicts = new byte[Math.max(slotVerdicts.length, source.getSlots())];
+                    if (slotComponents != null) {
+                        slotComponents = new CandidateComponents[Math.max(slotComponents.length, source.getSlots())];
+                    }
 
                     if (targetAccepted > 0) {
                         insertRejections = null;
@@ -1253,10 +1256,6 @@ public class TransferEngine {
                                     ? targetBatchMoved.get(targetIndex)
                                     : batchMoved;
                             movedByItem.merge(movedItem, targetAccepted, Integer::sum);
-                        }
-
-                        if (slotComponents != null) {
-                            slotComponents[slot] = null;
                         }
 
                         if (!roundRobin) {
