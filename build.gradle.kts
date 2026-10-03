@@ -162,12 +162,18 @@ tasks.named("build") {
 publishing {
     publications {
         register<MavenPublication>("mavenJava") {
-            from(components["java"])
+            artifactId = modId
+            artifact(tasks.named<Jar>("jar")) {
+                builtBy(provider { tasks.getByName("reobfJar") })
+            }
         }
     }
     repositories {
         maven {
-            url = uri("file://${project.projectDir}/repo")
+            name = "almana"
+            val channel = if (version.toString().endsWith("-SNAPSHOT")) "snapshots" else "releases"
+            url = uri("https://maven.almanax21.com/$channel")
+            credentials(PasswordCredentials::class)
         }
     }
 }
