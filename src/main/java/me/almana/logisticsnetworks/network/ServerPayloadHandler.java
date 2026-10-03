@@ -1559,13 +1559,15 @@ public class ServerPayloadHandler {
     public static void sendChannelSyncToViewers(LogisticsNodeEntity node, int channelIndex, ChannelData channel) {
         if (!(node.level() instanceof ServerLevel level))
             return;
-        CompoundTag tag = channel.save(level.registryAccess());
+        // Netty encodes later; snapshot now
+        ChannelData snapshot = new ChannelData();
+        snapshot.copyFrom(channel);
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
             if (player.containerMenu instanceof NodeMenu menu
                     && menu.getNode() != null
                     && menu.getNode().getUUID().equals(node.getUUID())) {
                 PacketDistributor.sendToPlayer(player,
-                        new SyncChannelDataPayload(node.getId(), channelIndex, tag));
+                        new SyncChannelDataPayload(node.getId(), channelIndex, snapshot));
             }
         }
     }

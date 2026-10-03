@@ -426,8 +426,10 @@ public final class GraphPayloadHandler {
                 new LinkedHashMap<>(network.getGraphPositions())));
         if (menu.getNode() != null) {
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                PacketDistributor.sendToPlayer(player, new SyncChannelDataPayload(menu.getNodeId(), i,
-                        menu.getNode().getChannel(i).save(player.registryAccess())));
+                // Netty encodes later; snapshot now
+                ChannelData snapshot = new ChannelData();
+                snapshot.copyFrom(menu.getNode().getChannel(i));
+                PacketDistributor.sendToPlayer(player, new SyncChannelDataPayload(menu.getNodeId(), i, snapshot));
             }
         }
     }

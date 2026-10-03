@@ -147,12 +147,12 @@ public class ClientPayloadHandler {
     public static void handleSyncChannelData(SyncChannelDataPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             var player = Minecraft.getInstance().player;
-            if (player == null || payload.channelData() == null)
+            if (player == null)
                 return;
             if (player.containerMenu instanceof NodeMenu menu && menu.getNodeId() == payload.entityId()) {
                 ChannelData channel = menu.getNode().getChannel(payload.channelIndex());
                 if (channel != null) {
-                    channel.load(payload.channelData(), player.level().registryAccess());
+                    channel.copyFrom(payload.channelData());
                 }
             }
         });
