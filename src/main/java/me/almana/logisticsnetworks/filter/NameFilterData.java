@@ -151,10 +151,6 @@ public final class NameFilterData {
         return getNameFilterView(stack, readCache).blacklist();
     }
 
-    public static boolean isValidRegex(String expression) {
-        return validateRegex(expression).accepted();
-    }
-
     public static ValidationResult validateRegex(String expression) {
         if (expression == null || expression.isEmpty())
             return new ValidationResult(null, ValidationError.EMPTY);
