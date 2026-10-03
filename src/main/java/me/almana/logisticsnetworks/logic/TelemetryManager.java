@@ -22,13 +22,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 public class TelemetryManager {
 
     static final int TOP_RESOURCES = 16;
     private static final int SYNC_INTERVAL = 20;
 
-    record ChannelDrain(int typeOrdinal, long total, List<Map.Entry<FlowResource, Long>> top) {
+    public record ChannelDrain(int typeOrdinal, long total, List<Map.Entry<FlowResource, Long>> top) {
         static ChannelDrain of(int typeOrdinal, long total, Map<FlowResource, Long> resources) {
             return new ChannelDrain(typeOrdinal, total, resources.entrySet().stream()
                     .sorted(Map.Entry.<FlowResource, Long>comparingByValue().reversed())
@@ -40,13 +41,27 @@ public class TelemetryManager {
     private record Viewer(UUID networkId, TelemetryDictionary dictionary) {
     }
 
+    private record Watcher(UUID networkId, Predicate<List<ChannelDrain>> sink) {
+    }
+
     private final Map<ServerPlayer, Viewer> viewers = new HashMap<>();
+    private final Map<Object, Watcher> watchers = new HashMap<>();
     private final Set<UUID> activeNetworks = new HashSet<>();
     private int tickCounter;
 
     public void subscribe(UUID networkId, ServerPlayer player, NetworkRegistry registry, MinecraftServer server) {
-        boolean wasActive = activeNetworks.contains(networkId);
         viewers.put(player, new Viewer(networkId, new TelemetryDictionary()));
+        activate(networkId, registry, server);
+    }
+
+    public void watch(Object key, UUID networkId, Predicate<List<ChannelDrain>> sink,
+            NetworkRegistry registry, MinecraftServer server) {
+        watchers.put(key, new Watcher(networkId, sink));
+        activate(networkId, registry, server);
+    }
+
+    private void activate(UUID networkId, NetworkRegistry registry, MinecraftServer server) {
+        boolean wasActive = activeNetworks.contains(networkId);
         rebuildActiveNetworks();
         LogisticsNetwork network = registry.getNetwork(networkId);
         if (!wasActive && network != null) {
@@ -66,7 +81,7 @@ public class TelemetryManager {
     }
 
     public void tick(NetworkRegistry registry, MinecraftServer server) {
-        if (viewers.isEmpty()) return;
+        if (viewers.isEmpty() && watchers.isEmpty()) return;
         if (viewers.keySet().removeIf(p -> p.isRemoved() || !(p.containerMenu instanceof ComputerMenu))) {
             rebuildActiveNetworks();
         }
@@ -86,6 +101,12 @@ public class TelemetryManager {
                 PacketDistributor.sendToPlayer(player, viewer.dictionary().encode(viewer.networkId(), channels));
             }
         });
+        if (watchers.values().removeIf(watcher -> {
+            List<ChannelDrain> channels = drained.get(watcher.networkId());
+            return channels == null || !watcher.sink().test(channels);
+        })) {
+            rebuildActiveNetworks();
+        }
     }
 
     private static List<ChannelDrain> drainNetwork(LogisticsNetwork network, MinecraftServer server) {
@@ -122,6 +143,9 @@ public class TelemetryManager {
         activeNetworks.clear();
         for (Viewer viewer : viewers.values()) {
             activeNetworks.add(viewer.networkId());
+        }
+        for (Watcher watcher : watchers.values()) {
+            activeNetworks.add(watcher.networkId());
         }
     }
 
