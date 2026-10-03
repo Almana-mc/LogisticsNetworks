@@ -75,6 +75,7 @@ import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
+import me.almana.logisticsnetworks.integration.computercraft.ComputerPeripheral;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
@@ -83,6 +84,7 @@ import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -104,6 +106,9 @@ public class LogisticsNetworks {
                 Registration.init(modBus);
                 modBus.addListener(this::registerPayloads);
                 modBus.addListener(this::commonSetup);
+                if (ModList.get().isLoaded("computercraft")) {
+                        modBus.addListener(ComputerPeripheral::register);
+                }
 
                 ModLoadingContext.get().getActiveContainer()
                                 .registerConfig(ModConfig.Type.COMMON, Config.SPEC, "logistics-network/common.toml");

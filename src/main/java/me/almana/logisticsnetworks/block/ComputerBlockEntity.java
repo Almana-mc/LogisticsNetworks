@@ -10,11 +10,14 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 public class ComputerBlockEntity extends BlockEntity {
 
@@ -22,8 +25,11 @@ public class ComputerBlockEntity extends BlockEntity {
             ComponentCodecs.lenientList(UUIDUtil.CODEC).fieldOf("starred_networks").codec(),
             ComponentCodecs.lenientList(UUIDUtil.STRING_CODEC)
                     .lenientOptionalFieldOf("StarredNetworks", List.of()).codec());
+    private static final Codec<Optional<UUID>> OWNER_CODEC = UUIDUtil.CODEC.lenientOptionalFieldOf("owner").codec();
 
     private final Set<UUID> starredNetworks = new LinkedHashSet<>();
+    @Nullable
+    private UUID owner;
 
     public ComputerBlockEntity(BlockPos pos, BlockState blockState) {
         super(Registration.COMPUTER_BLOCK_ENTITY.get(), pos, blockState);
@@ -42,10 +48,21 @@ public class ComputerBlockEntity extends BlockEntity {
         markUpdated();
     }
 
+    @Nullable
+    public UUID getOwner() {
+        return owner;
+    }
+
+    public void setOwner(@Nullable UUID owner) {
+        this.owner = owner;
+        setChanged();
+    }
+
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.merge((CompoundTag) ComponentCodecs.encode(STARRED_CODEC, registries, List.copyOf(starredNetworks)));
+        tag.merge((CompoundTag) ComponentCodecs.encode(OWNER_CODEC, registries, Optional.ofNullable(owner)));
     }
 
     @Override
@@ -53,6 +70,7 @@ public class ComputerBlockEntity extends BlockEntity {
         super.loadAdditional(tag, registries);
         starredNetworks.clear();
         ComponentCodecs.parse(STARRED_CODEC, registries, tag).ifPresent(starredNetworks::addAll);
+        owner = ComponentCodecs.parse(OWNER_CODEC, registries, tag).flatMap(Function.identity()).orElse(null);
     }
 
     @Override
