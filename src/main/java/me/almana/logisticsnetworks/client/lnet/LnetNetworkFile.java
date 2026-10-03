@@ -1,8 +1,6 @@
 package me.almana.logisticsnetworks.client.lnet;
 
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.neoforged.fml.loading.FMLPaths;
 
@@ -62,80 +60,15 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
             if (!node.visible()) {
                 out.append("visible=false\n");
             }
-            out.append("clipboard=").append(compactClipboard(node.clipboardTag())).append('\n');
+            out.append("clipboard=").append(withoutNetworkId(node.clipboardTag())).append('\n');
         }
         return out.toString();
     }
 
-    private static CompoundTag compactClipboard(CompoundTag source) {
+    private static CompoundTag withoutNetworkId(CompoundTag source) {
         CompoundTag root = source.copy();
-        root.remove("version");
         root.remove("network_id");
-        if (!root.contains("renderVisible") || root.getBoolean("renderVisible")) {
-            root.remove("renderVisible");
-        }
-
-        ListTag compactChannels = new ListTag();
-        for (Tag tag : root.getList("channels", Tag.TAG_COMPOUND)) {
-            if (!(tag instanceof CompoundTag channel)) {
-                continue;
-            }
-
-            CompoundTag entry = new CompoundTag();
-            int index = channel.contains("index") ? channel.getInt("index") : -1;
-            if (index < 0) {
-                continue;
-            }
-            entry.putInt("index", index);
-            boolean changed = false;
-            changed |= copyBoolean(channel, entry, "enabled", false);
-            changed |= copyString(channel, entry, "mode", "IMPORT");
-            changed |= copyString(channel, entry, "type", "ITEM");
-            changed |= copyInt(channel, entry, "batch", 8);
-            changed |= copyInt(channel, entry, "delay", 20);
-            changed |= copyString(channel, entry, "io", "up");
-            changed |= copyString(channel, entry, "redstone", "IGNORED");
-            changed |= copyString(channel, entry, "distribution", "PRIORITY");
-            changed |= copyString(channel, entry, "filter_mode", "MATCH_ANY");
-            changed |= copyBoolean(channel, entry, "resource_round_robin", false);
-            changed |= copyInt(channel, entry, "priority", 0);
-            if (channel.contains("name") && !channel.getString("name").isEmpty()) {
-                entry.putString("name", channel.getString("name"));
-                changed = true;
-            }
-            if (changed) {
-                compactChannels.add(entry);
-            }
-        }
-        root.put("channels", compactChannels);
         return root;
-    }
-
-    private static boolean copyBoolean(CompoundTag source, CompoundTag target, String key, boolean fallback) {
-        boolean value = source.contains(key) ? source.getBoolean(key) : fallback;
-        if (value == fallback) {
-            return false;
-        }
-        target.putBoolean(key, value);
-        return true;
-    }
-
-    private static boolean copyInt(CompoundTag source, CompoundTag target, String key, int fallback) {
-        int value = source.contains(key) ? source.getInt(key) : fallback;
-        if (value == fallback) {
-            return false;
-        }
-        target.putInt(key, value);
-        return true;
-    }
-
-    private static boolean copyString(CompoundTag source, CompoundTag target, String key, String fallback) {
-        String value = source.contains(key) ? source.getString(key) : fallback;
-        if (value.equals(fallback)) {
-            return false;
-        }
-        target.putString(key, value);
-        return true;
     }
 
     public static LnetNetworkFile readString(String text) throws IOException {
