@@ -21,7 +21,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -39,6 +38,10 @@ public final class NbtFilterData {
             new NbtEntry(NbtPath.of(NbtPath.Component.of("minecraft:max_stack_size")), "64"),
             new NbtEntry(NbtPath.of(NbtPath.Component.of("minecraft:rarity")), "\"common\"")
     );
+
+    private static final NbtPath COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("components"));
+    private static final NbtPath FLUID_COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("fluid"),
+            NbtPath.Component.of("components"));
 
     public static List<NbtEntry> getDefaultEntries() {
         return DEFAULT_ENTRIES;
@@ -365,29 +368,19 @@ public final class NbtFilterData {
     }
 
     public static @Nullable Tag resolvePathValue(@Nullable CompoundTag components, @Nullable NbtPath path) {
-        if (components == null || path == null)
+        if (components == null || path == null || path.isEmpty())
             return null;
 
-        if (path.components().length == 1
-                && path.components()[0] instanceof NbtPath.StringComponent(String p)
-                && (p.equals("components") || p.equals("fluid.components"))) {
+        if (path.equals(COMPONENTS_PATH) || path.equals(FLUID_COMPONENTS_PATH))
             return components.copy();
-        }
 
-        if (path.components().length > 2 && path.components()[0] instanceof NbtPath.StringComponent(String first) && "fluid".equals(first) && path.components()[1] instanceof NbtPath.StringComponent(String second) && "components".equals(second)) {
-            var newComponents = Arrays.copyOfRange(path.components(), 2, path.components().length);
-            path = new NbtPath(newComponents);
-        } else if (path.components().length > 1 && path.components()[0] instanceof NbtPath.StringComponent(String first) && "components".equals(first)) {
-            var newComponents = Arrays.copyOfRange(path.components(), 1, path.components().length);
-            path = new NbtPath(newComponents);
-        }
+        if (path.startsWith(FLUID_COMPONENTS_PATH))
+            path = path.drop(2);
+        else if (path.startsWith(COMPONENTS_PATH))
+            path = path.drop(1);
 
         Tag found = path.getFrom(components);
         return found == null ? null : found.copy();
-    }
-
-    private static String stripPrefix(String s, String prefix) {
-        return s.startsWith(prefix) ? s.substring(prefix.length()) : s;
     }
 
     public static List<NbtEntry> extractEntries(ItemStack stack, HolderLookup.Provider provider) {
@@ -395,7 +388,7 @@ public final class NbtFilterData {
     }
 
     public static List<NbtEntry> extractEntries(FluidStack stack, HolderLookup.Provider provider) {
-        return extractEntriesInternal(getSerializedComponents(stack, provider), NbtPath.of(NbtPath.Component.of("fluid"), NbtPath.Component.of("components")));
+        return extractEntriesInternal(getSerializedComponents(stack, provider), FLUID_COMPONENTS_PATH);
     }
 
     private static List<NbtEntry> extractEntriesInternal(@Nullable CompoundTag root, NbtPath rootPath) {
@@ -451,9 +444,7 @@ public final class NbtFilterData {
     }
 
     public static boolean isFluidPath(@Nullable NbtPath path) {
-        return path != null && path.components().length >= 2
-                && path.components()[0] instanceof NbtPath.StringComponent(String first) && "fluid".equals(first)
-                && path.components()[1] instanceof NbtPath.StringComponent(String second) && "components".equals(second);
+        return path != null && path.startsWith(FLUID_COMPONENTS_PATH);
     }
 
     private static void collectLeaves(Tag tag, NbtPath currentPath, List<NbtEntry> out) {
@@ -486,19 +477,6 @@ public final class NbtFilterData {
         if (!currentPath.isEmpty()) {
             out.add(new NbtEntry(currentPath, tag.toString()));
         }
-    }
-
-    private static @Nullable Tag traverseTag(Tag root, String path) {
-        if (root == null || path.isEmpty()) {
-            return null;
-        }
-
-        var parsed = NbtPath.parse(path);
-        if (parsed == null) {
-            return null;
-        }
-
-        return parsed.getFrom(root);
     }
 
     private static @Nullable String normalizePath(String path) {
