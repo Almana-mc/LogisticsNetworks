@@ -62,9 +62,14 @@ public final class ComponentCodecs {
     }
 
     public static <A> Optional<A> parse(Codec<A> codec, HolderLookup.Provider provider, Tag tag) {
-        return codec.parse(provider.createSerializationContext(NbtOps.INSTANCE), tag)
-                .ifError(error -> LOGGER.error("Failed to decode saved data: {}", error.message()))
-                .result();
+        try {
+            return codec.parse(provider.createSerializationContext(NbtOps.INSTANCE), tag)
+                    .ifError(error -> LOGGER.error("Failed to decode saved data: {}", error.message()))
+                    .result();
+        } catch (RuntimeException e) {
+            LOGGER.error("Failed to decode saved data", e);
+            return Optional.empty();
+        }
     }
 
     public static <A> Tag encode(Codec<A> codec, HolderLookup.Provider provider, A value) {
