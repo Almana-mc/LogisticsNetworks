@@ -937,8 +937,6 @@ public final class FilterItemData {
             boolean damageable) {
         if (!entry.hasNbt())
             return true;
-        if (components == null)
-            return false;
 
         List<NbtCriterion> rules = entry.nbtRules();
         if (!rules.isEmpty()) {
@@ -948,6 +946,8 @@ public final class FilterItemData {
                 // Durability ignores undamageable items
                 if (!damageable && rule.path().equals(GeneralFilterEntry.DURABILITY_PATH))
                     continue;
+                if (components == null)
+                    return false;
                 evaluated = true;
                 Tag actual = NbtFilterData.resolvePathValue(components, rule.path());
                 boolean matches = rule.matches(actual);
@@ -956,6 +956,8 @@ public final class FilterItemData {
             }
             return !matchAny || !evaluated;
         }
+        if (components == null)
+            return false;
 
         CompoundTag rawNbt = entry.rawNbt();
         if (rawNbt != null) {
