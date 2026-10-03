@@ -23,6 +23,11 @@ on:
         required: true
         type: boolean
         default: true
+      publish_maven:
+        description: "Publish to Almana Maven"
+        required: true
+        type: boolean
+        default: true
       confirm:
         description: "Type RELEASE to confirm"
         required: true
@@ -46,6 +51,7 @@ jobs:
       publish_github: ${{ steps.branch_check.outputs.publish_github }}
       publish_curseforge: ${{ steps.branch_check.outputs.publish_curseforge }}
       publish_modrinth: ${{ steps.branch_check.outputs.publish_modrinth }}
+      publish_maven: ${{ steps.branch_check.outputs.publish_maven }}
     steps:
       - name: Resolve trigger inputs
         id: branch_check
@@ -56,6 +62,7 @@ jobs:
           INPUT_PUBLISH_GITHUB: ${{ inputs.publish_github }}
           INPUT_PUBLISH_CURSEFORGE: ${{ inputs.publish_curseforge }}
           INPUT_PUBLISH_MODRINTH: ${{ inputs.publish_modrinth }}
+          INPUT_PUBLISH_MAVEN: ${{ inputs.publish_maven }}
           INPUT_CONFIRM: ${{ inputs.confirm }}
         run: |
           target="$TARGET_BRANCH"
@@ -63,6 +70,7 @@ jobs:
           publish_github="$INPUT_PUBLISH_GITHUB"
           publish_curseforge="$INPUT_PUBLISH_CURSEFORGE"
           publish_modrinth="$INPUT_PUBLISH_MODRINTH"
+          publish_maven="$INPUT_PUBLISH_MAVEN"
 
           if [[ "$INPUT_CONFIRM" != "RELEASE" ]]; then
             echo "Manual confirmation failed. Type RELEASE in the confirm input."
@@ -83,6 +91,7 @@ jobs:
           echo "publish_github=$publish_github" >> "$GITHUB_OUTPUT"
           echo "publish_curseforge=$publish_curseforge" >> "$GITHUB_OUTPUT"
           echo "publish_modrinth=$publish_modrinth" >> "$GITHUB_OUTPUT"
+          echo "publish_maven=$publish_maven" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build
@@ -294,6 +303,36 @@ jobs:
           java: ${{ needs.build.outputs.java_version }}
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ env.MODRINTH_TOKEN }}
+
+  publish-maven:
+    name: Publish to Almana Maven
+    needs: [validate-release, build]
+    if: needs.build.result == 'success' && needs.validate-release.outputs.publish_maven == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ needs.build.outputs.java_version }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Publish
+        shell: bash
+        env:
+          ORG_GRADLE_PROJECT_almanaUsername: ${{ secrets.MAVEN_USERNAME }}
+          ORG_GRADLE_PROJECT_almanaPassword: ${{ secrets.MAVEN_TOKEN }}
+        run: |
+          chmod +x ./gradlew
+          ./gradlew publish --no-daemon --console=plain
 
   notify-discord:
     name: Notify Discord
