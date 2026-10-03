@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.component;
 
+import me.almana.logisticsnetworks.client.ClientRegistries;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
@@ -19,9 +20,12 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -68,7 +72,8 @@ public final class LegacyComponentMigration {
             return true;
         }
         if (!stack.has(LogisticsDataComponents.FILTER_ENTRIES)) {
-            GeneralFilterBridge.ReadResult result = GeneralFilterBridge.read(root, provider, null);
+            GeneralFilterBridge.ReadResult result = GeneralFilterBridge.read(root,
+                    provider != null ? provider : currentRegistries(), null);
             if (!result.complete()) {
                 return false;
             }
@@ -79,6 +84,17 @@ public final class LegacyComponentMigration {
         migrateSettings(stack, root, null);
         removeRoot(stack, GENERAL_ROOT);
         return true;
+    }
+
+    @Nullable
+    private static HolderLookup.Provider currentRegistries() {
+        // Client stacks need client holders
+        HolderLookup.Provider client = FMLEnvironment.dist.isClient() ? ClientRegistries.onClientThread() : null;
+        if (client != null) {
+            return client;
+        }
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        return server == null ? null : server.registryAccess();
     }
 
     public static boolean migrateWrench(ItemStack stack, @Nullable HolderLookup.Provider provider) {
