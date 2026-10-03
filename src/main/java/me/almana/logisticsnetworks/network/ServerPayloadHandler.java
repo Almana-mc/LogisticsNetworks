@@ -596,8 +596,7 @@ public class ServerPayloadHandler {
             if (channel == null)
                 return;
 
-            channel.setFilterItem(payload.filterSlot(),
-                    payload.filterItem().is(ModTags.FILTERS) ? payload.filterItem().copyWithCount(1) : ItemStack.EMPTY);
+            channel.setFilterItem(payload.filterSlot(), ItemStack.EMPTY);
             propagateToLabelGroup(node, payload.channelIndex());
             invalidateNetwork(node);
         });
