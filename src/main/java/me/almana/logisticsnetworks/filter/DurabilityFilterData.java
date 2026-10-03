@@ -33,14 +33,6 @@ public final class DurabilityFilterData {
             return symbol;
         }
 
-        public Operator next() {
-            return switch (this) {
-                case LESS_OR_EQUAL -> EQUAL;
-                case EQUAL -> GREATER_OR_EQUAL;
-                case GREATER_OR_EQUAL -> LESS_OR_EQUAL;
-            };
-        }
-
         public static Operator fromId(@Nullable String id) {
             if (id == null)
                 return DEFAULT_OPERATOR;

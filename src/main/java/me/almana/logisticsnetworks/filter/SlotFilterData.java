@@ -11,9 +11,6 @@ import java.util.List;
 
 public final class SlotFilterData {
 
-    public static final int MIN_SLOT = 0;
-    public static final int MAX_SLOT = 53;
-
     private SlotFilterData() {
     }
 
