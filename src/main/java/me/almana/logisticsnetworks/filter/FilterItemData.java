@@ -216,9 +216,9 @@ public final class FilterItemData {
         return fluid == null ? FluidStack.EMPTY : fluid;
     }
 
-    public static void setFluidEntry(ItemStack stack, int slot, FluidStack fluid) {
+    public static boolean setFluidEntry(ItemStack stack, int slot, FluidStack fluid) {
         String id = fluid.isEmpty() ? null : BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString();
-        edit(stack, slot, entry -> resourceEntry(entry, id, null));
+        return edit(stack, slot, entry -> resourceEntry(entry, id, null));
     }
 
     public static boolean addFluid(ItemStack filter, FluidStack fluid) {
@@ -234,8 +234,7 @@ public final class FilterItemData {
         }
         for (int i = 0; i < cap; i++) {
             if (isEntrySlotAvailable(filter, i)) {
-                setFluidEntry(filter, i, fluid);
-                return true;
+                return setFluidEntry(filter, i, fluid);
             }
         }
         return false;
@@ -304,8 +303,8 @@ public final class FilterItemData {
         return entry == null ? null : nonEmpty(entry.chemicalId());
     }
 
-    public static void setChemicalEntry(ItemStack stack, int slot, @Nullable String chemicalId) {
-        edit(stack, slot, entry -> resourceEntry(entry, null, nonEmpty(chemicalId)));
+    public static boolean setChemicalEntry(ItemStack stack, int slot, @Nullable String chemicalId) {
+        return edit(stack, slot, entry -> resourceEntry(entry, null, nonEmpty(chemicalId)));
     }
 
     private static GeneralFilterEntry resourceEntry(GeneralFilterEntry current, @Nullable String fluidId,
@@ -330,8 +329,7 @@ public final class FilterItemData {
         }
         for (int i = 0; i < cap; i++) {
             if (isEntrySlotAvailable(filter, i)) {
-                setChemicalEntry(filter, i, chemicalId);
-                return true;
+                return setChemicalEntry(filter, i, chemicalId);
             }
         }
         return false;
