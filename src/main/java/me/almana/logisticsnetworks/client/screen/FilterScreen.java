@@ -4706,18 +4706,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
         }
 
-        Boolean enchanted = FilterItemData.getEntryEnchanted(filterStack, slot);
-        if (enchanted != null) {
-            String enchStr = enchanted ? "Enchanted: Yes" : "Enchanted: No";
-            lines.add(Component.literal(enchStr).withStyle(ChatFormatting.LIGHT_PURPLE));
-        }
-
-        String durOp = FilterItemData.getEntryDurabilityOp(filterStack, slot);
-        if (durOp != null) {
-            int durVal = FilterItemData.getEntryDurabilityValue(filterStack, slot);
-            lines.add(Component.literal("Durability: " + durOp + " " + durVal).withStyle(ChatFormatting.BLUE));
-        }
-
         String slotExpr = menu.getEntrySlotMappingExpression(slot);
         if (slotExpr != null && !slotExpr.isEmpty()) {
             lines.add(Component.literal("Slots: " + slotExpr).withStyle(ChatFormatting.LIGHT_PURPLE));

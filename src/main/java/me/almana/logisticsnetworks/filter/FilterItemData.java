@@ -14,8 +14,11 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NumericTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
@@ -450,48 +453,21 @@ public final class FilterItemData {
 
     @Nullable
     public static Boolean getEntryEnchanted(ItemStack stack, int slot) {
-        if (!isFilterItem(stack)) return null;
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_ENCHANTED, Tag.TAG_BYTE)) {
-                    return entry.getBoolean(KEY_ENCHANTED);
-                }
-            }
-        }
-        return null;
+        NbtCriterion rule = findRule(stack, slot, GeneralFilterEntry.ENCHANTED_PATH);
+        if (rule == null || !NBT_OP_EQUALS.equals(rule.operator()) || !(rule.value() instanceof NumericTag value))
+            return null;
+        return value.getAsByte() != 0;
     }
 
     public static void setEntryEnchanted(ItemStack stack, int slot, @Nullable Boolean value) {
-        if (!isFilterItem(stack)) return;
-        if (slot < 0 || slot >= getCapacity(stack)) return;
-
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-            for (Tag t : list) {
-                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    if (value != null) {
-                        entry.putBoolean(KEY_ENCHANTED, value);
-                    } else {
-                        entry.remove(KEY_ENCHANTED);
-                    }
-                    root.put(KEY_ITEMS, list);
-                    return;
-                }
-            }
-            if (value != null) {
-                CompoundTag entry = new CompoundTag();
-                entry.putInt(KEY_SLOT, slot);
-                entry.putBoolean(KEY_ENCHANTED, value);
-                list.add(entry);
-                root.put(KEY_ITEMS, list);
-            }
-        });
+        NbtCriterion rule = value == null ? null
+                : new NbtCriterion(GeneralFilterEntry.ENCHANTED_PATH, NBT_OP_EQUALS, ByteTag.valueOf(value));
+        edit(stack, slot, entry -> entry.withNbt(entry.nbt().withRules(
+                replaceRule(entry.nbt().rules(), GeneralFilterEntry.ENCHANTED_PATH, rule))));
     }
 
     public static boolean hasEntryEnchanted(ItemStack stack, int slot) {
-        return getEntryEnchanted(stack, slot) != null;
+        return findRule(stack, slot, GeneralFilterEntry.ENCHANTED_PATH) != null;
     }
 
     // ── NBT per-slot methods ──
@@ -632,61 +608,59 @@ public final class FilterItemData {
 
     @Nullable
     public static String getEntryDurabilityOp(ItemStack stack, int slot) {
-        if (!isFilterItem(stack))
+        NbtCriterion rule = findRule(stack, slot, GeneralFilterEntry.DURABILITY_PATH);
+        if (rule == null)
             return null;
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_DUR_OP, Tag.TAG_STRING)) {
-                    return entry.getString(KEY_DUR_OP);
-                }
-            }
+        for (DurabilityFilterData.Operator operator : DurabilityFilterData.Operator.values()) {
+            if (operator.symbol().equals(rule.operator()))
+                return operator.id();
         }
         return null;
     }
 
     public static int getEntryDurabilityValue(ItemStack stack, int slot) {
-        if (!isFilterItem(stack))
-            return 0;
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_DUR_VAL, Tag.TAG_INT)) {
-                    return entry.getInt(KEY_DUR_VAL);
-                }
-            }
-        }
-        return 0;
+        NbtCriterion rule = findRule(stack, slot, GeneralFilterEntry.DURABILITY_PATH);
+        return rule != null && rule.value() instanceof NumericTag value ? value.getAsInt() : 0;
     }
 
     public static void setEntryDurability(ItemStack stack, int slot, @Nullable String op, int value) {
-        if (!isFilterItem(stack))
-            return;
-        if (slot < 0 || slot >= getCapacity(stack))
-            return;
-
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-            for (Tag t : list) {
-                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    if (op != null && !op.isEmpty()) {
-                        entry.putString(KEY_DUR_OP, op);
-                        entry.putInt(KEY_DUR_VAL, Math.max(0, Math.min(3000, value)));
-                    } else {
-                        entry.remove(KEY_DUR_OP);
-                        entry.remove(KEY_DUR_VAL);
-                    }
-                    root.put(KEY_ITEMS, list);
-                    return;
-                }
-            }
-        });
+        NbtCriterion rule = op == null || op.isEmpty() ? null
+                : new NbtCriterion(GeneralFilterEntry.DURABILITY_PATH,
+                        DurabilityFilterData.Operator.fromId(op).symbol(),
+                        IntTag.valueOf(Math.max(0, Math.min(3000, value))));
+        edit(stack, slot, entry -> entry.isEmpty() ? entry : entry.withNbt(entry.nbt().withRules(
+                replaceRule(entry.nbt().rules(), GeneralFilterEntry.DURABILITY_PATH, rule))));
     }
 
     public static boolean hasEntryDurability(ItemStack stack, int slot) {
-        return getEntryDurabilityOp(stack, slot) != null;
+        return findRule(stack, slot, GeneralFilterEntry.DURABILITY_PATH) != null;
+    }
+
+    @Nullable
+    private static NbtCriterion findRule(ItemStack stack, int slot, NbtPath path) {
+        for (NbtCriterion rule : getSlotNbtRules(stack, slot)) {
+            if (rule.path().equals(path))
+                return rule;
+        }
+        return null;
+    }
+
+    private static List<NbtCriterion> replaceRule(List<NbtCriterion> rules, NbtPath path,
+            @Nullable NbtCriterion replacement) {
+        // Keep position, drop duplicates
+        List<NbtCriterion> result = new ArrayList<>(rules.size() + 1);
+        boolean placed = replacement == null;
+        for (NbtCriterion rule : rules) {
+            if (!rule.path().equals(path)) {
+                result.add(rule);
+            } else if (!placed) {
+                result.add(replacement);
+                placed = true;
+            }
+        }
+        if (!placed)
+            result.add(replacement);
+        return result;
     }
 
     // ── Full matching methods (tag + NBT + durability aware) ──
