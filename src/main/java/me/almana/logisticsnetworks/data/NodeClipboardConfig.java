@@ -1087,8 +1087,8 @@ public final class NodeClipboardConfig {
 
             if (expected.isEmpty()) {
                 node.setUpgradeItem(slot, ItemStack.EMPTY);
-            } else if (!ItemStack.isSameItemSameComponents(expected, current)) {
-                node.setUpgradeItem(slot, expected.copyWithCount(1));
+            } else if (!ItemStack.isSameItem(expected, current)) {
+                node.setUpgradeItem(slot, new ItemStack(expected.getItem()));
             }
         }
 
