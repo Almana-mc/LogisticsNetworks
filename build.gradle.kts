@@ -104,19 +104,22 @@ repositories {
     maven(url = uri("https://maven.ftb.dev/releases"))
 }
 
+val localRuntime: Configuration by configurations.creating
+configurations.runtimeClasspath { extendsFrom(localRuntime) }
+
 dependencies {
     add("minecraft", "net.minecraftforge:forge:${minecraftVersion}-${forgeVersion}")
 
     compileOnly("mezz.jei:jei-${minecraftVersion}-common-api:${jeiVersion}")
     compileOnly("mezz.jei:jei-${minecraftVersion}-forge-api:${jeiVersion}")
-    runtimeOnly("mezz.jei:jei-${minecraftVersion}-forge:${jeiVersion}")
+    localRuntime("mezz.jei:jei-${minecraftVersion}-forge:${jeiVersion}")
 
     compileOnly("mekanism:Mekanism:${mekanismVersion}")
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraftVersion}:${arsNouveauVersion}")
     compileOnly("maven.modrinth:jade:${jadeVersion}")
     compileOnly("appeng:appliedenergistics2-forge:${ae2Version}")
     compileOnly("org.appliedenergistics:guideme:${guidemeVersion}:api")
-    runtimeOnly("org.appliedenergistics:guideme:${guidemeVersion}")
+    localRuntime("org.appliedenergistics:guideme:${guidemeVersion}")
     compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
 }
 
