@@ -211,58 +211,14 @@ public final class FilterItemData {
     }
 
     public static FluidStack getFluidEntry(ItemStack stack, int slot) {
-        if (!isFilterItem(stack))
-            return FluidStack.EMPTY;
-
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_FLUID_ID, Tag.TAG_STRING)) {
-                    ResourceLocation id = ResourceLocation.tryParse(entry.getString(KEY_FLUID_ID));
-                    if (id != null) {
-                        return BuiltInRegistries.FLUID.getOptional(id)
-                                .map(f -> new FluidStack(f, 1000))
-                                .orElse(FluidStack.EMPTY);
-                    }
-                }
-            }
-        }
-        return FluidStack.EMPTY;
+        GeneralFilterEntry entry = entry(stack, slot);
+        FluidStack fluid = entry == null ? null : resolveFluidEntry(nonEmpty(entry.fluidId()));
+        return fluid == null ? FluidStack.EMPTY : fluid;
     }
 
     public static void setFluidEntry(ItemStack stack, int slot, FluidStack fluid) {
-        if (!isFilterItem(stack))
-            return;
-        if (slot < 0 || slot >= getCapacity(stack))
-            return;
-
-        ResourceLocation id = (fluid != null && !fluid.isEmpty())
-                ? BuiltInRegistries.FLUID.getKey(fluid.getFluid())
-                : null;
-        int existingBatch = getEntryBatch(stack, slot);
-        int existingStock = getEntryStock(stack, slot);
-
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-            removeFromList(list, slot);
-
-            if (id != null) {
-                CompoundTag entry = new CompoundTag();
-                entry.putInt(KEY_SLOT, slot);
-                entry.putString(KEY_FLUID_ID, id.toString());
-                if (existingBatch > 0) entry.putInt(KEY_BATCH, existingBatch);
-                if (existingStock > 0) entry.putInt(KEY_STOCK, existingStock);
-                list.add(entry);
-            }
-
-            if (list.isEmpty()) {
-                root.remove(KEY_ITEMS);
-            } else {
-                root.put(KEY_ITEMS, list);
-            }
-        });
+        String id = fluid.isEmpty() ? null : BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString();
+        edit(stack, slot, entry -> resourceEntry(entry, id, null));
     }
 
     public static boolean addFluid(ItemStack filter, FluidStack fluid) {
@@ -344,50 +300,22 @@ public final class FilterItemData {
 
     @Nullable
     public static String getChemicalEntry(ItemStack stack, int slot) {
-        if (!isFilterItem(stack))
-            return null;
-
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_CHEMICAL_ID, Tag.TAG_STRING)) {
-                    return entry.getString(KEY_CHEMICAL_ID);
-                }
-            }
-        }
-        return null;
+        GeneralFilterEntry entry = entry(stack, slot);
+        return entry == null ? null : nonEmpty(entry.chemicalId());
     }
 
-    public static void setChemicalEntry(ItemStack stack, int slot, String chemicalId) {
-        if (!isFilterItem(stack))
-            return;
-        if (slot < 0 || slot >= getCapacity(stack))
-            return;
+    public static void setChemicalEntry(ItemStack stack, int slot, @Nullable String chemicalId) {
+        edit(stack, slot, entry -> resourceEntry(entry, null, nonEmpty(chemicalId)));
+    }
 
-        int existingBatch = getEntryBatch(stack, slot);
-        int existingStock = getEntryStock(stack, slot);
-
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-            removeFromList(list, slot);
-
-            if (chemicalId != null && !chemicalId.isEmpty()) {
-                CompoundTag entry = new CompoundTag();
-                entry.putInt(KEY_SLOT, slot);
-                entry.putString(KEY_CHEMICAL_ID, chemicalId);
-                if (existingBatch > 0) entry.putInt(KEY_BATCH, existingBatch);
-                if (existingStock > 0) entry.putInt(KEY_STOCK, existingStock);
-                list.add(entry);
-            }
-
-            if (list.isEmpty()) {
-                root.remove(KEY_ITEMS);
-            } else {
-                root.put(KEY_ITEMS, list);
-            }
-        });
+    private static GeneralFilterEntry resourceEntry(GeneralFilterEntry current, @Nullable String fluidId,
+            @Nullable String chemicalId) {
+        if (fluidId == null && chemicalId == null)
+            return GeneralFilterEntry.empty(current.slot());
+        GeneralFilterEntry.EntryCounts counts = new GeneralFilterEntry.EntryCounts(0,
+                Math.max(0, current.counts().batch()), Math.max(0, stockOf(current)));
+        return new GeneralFilterEntry(current.slot(), null, fluidId, chemicalId, null, counts,
+                GeneralFilterEntry.SlotMapping.EMPTY, null, GeneralFilterEntry.NbtConstraints.EMPTY, null);
     }
 
     public static boolean addChemical(ItemStack filter, String chemicalId) {
@@ -1682,10 +1610,6 @@ public final class FilterItemData {
             }
         }
         return warnings;
-    }
-
-    private static void removeFromList(ListTag list, int slot) {
-        list.removeIf(t -> t instanceof CompoundTag c && c.getInt(KEY_SLOT) == slot);
     }
 
     private static ItemFilterView getItemFilterView(ItemStack stack, @Nullable ReadCache readCache) {
