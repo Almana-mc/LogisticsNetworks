@@ -143,6 +143,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private int nbtEditSlot = -1;
     private List<String> cachedSlotTags = new ArrayList<>();
     private List<NbtFilterData.NbtEntry> cachedSlotNbtEntries = new ArrayList<>();
+    private List<String> cachedSlotNbtPathLabels = List.of();
     private int subModeScrollOffset = 0;
     private boolean subModeDropdownOpen = false;
     private String nbtPendingOperator = "=";
@@ -166,7 +167,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private int detailNbtScrollOffset = 0;
     private int detailNbtSelectedIdx = -1;
     private String detailNbtOp = "=";
-    private Map<String, String> detailNbtActiveOps = new HashMap<>();
+    private Map<NbtPath, String> detailNbtActiveOps = new HashMap<>();
     private int nbtTableEditingRow = -1;
     private List<ItemStack> nbtOnlyCycleItems;
     private List<Fluid> anyCycleFluids;
@@ -2363,6 +2364,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 }
             }
         }
+        cachedSlotNbtPathLabels = cachedSlotNbtEntries.stream()
+                .map(entry -> formatNbtPath(entry.path().toString()))
+                .toList();
     }
 
     private ItemStack getSlotItemForSubMode(int slot) {
@@ -2668,7 +2672,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         for (int i = nbtListScrollOffset; i < endIdx; i++) {
             int rowY = listY + (i - nbtListScrollOffset) * LIST_ROW_H;
             NbtFilterData.NbtEntry entry = cachedSlotNbtEntries.get(i);
-            int ruleIdx = findActiveRuleIndex(activeRules, entry.path().toString());
+            int ruleIdx = findActiveRuleIndex(activeRules, entry.path());
             boolean active = ruleIdx >= 0;
             boolean hovered = mx >= listX && mx < listX + rowW && my >= rowY && my < rowY + LIST_ROW_H;
             boolean editing = active && nbtEditingRuleIndex == ruleIdx;
@@ -2693,7 +2697,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int opX = pathX + colW + 1;
             int valX = opX + NBT_OP_BTN_W + 1;
 
-            String displayPath = formatNbtPath(entry.path().toString());
+            String displayPath = cachedSlotNbtPathLabels.get(i);
             g.fill(pathX, rowY, pathX + colW, rowY + LIST_ROW_H, 0xFF080808);
             g.renderOutline(pathX, rowY, colW, LIST_ROW_H, active ? COL_BTN_BORDER : 0xFF222222);
             g.drawString(font, font.plainSubstrByWidth(displayPath, colW - 4),
@@ -2737,7 +2741,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (nbtEditingRuleIndex >= 0) {
             boolean visible = false;
             for (int i = nbtListScrollOffset; i < endIdx; i++) {
-                int rIdx = findActiveRuleIndex(activeRules, cachedSlotNbtEntries.get(i).path().toString());
+                int rIdx = findActiveRuleIndex(activeRules, cachedSlotNbtEntries.get(i).path());
                 if (rIdx == nbtEditingRuleIndex) { visible = true; break; }
             }
             if (!visible) {
@@ -2840,7 +2844,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 continue;
 
             NbtFilterData.NbtEntry entry = cachedSlotNbtEntries.get(i);
-            String path = entry.path().toString();
+            NbtPath path = entry.path();
             int ruleIdx = findActiveRuleIndex(activeRules, path);
             boolean active = ruleIdx >= 0;
 
@@ -2941,17 +2945,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return true;
     }
 
-    private NbtCriterion findActiveRule(List<NbtCriterion> rules, String path) {
-        for (NbtCriterion rule : rules) {
-            if (rule.path().toString().equals(path))
-                return rule;
-        }
-        return null;
-    }
-
-    private int findActiveRuleIndex(List<NbtCriterion> rules, String path) {
+    private int findActiveRuleIndex(List<NbtCriterion> rules, NbtPath path) {
         for (int i = 0; i < rules.size(); i++) {
-            if (rules.get(i).path().toString().equals(path))
+            if (rules.get(i).path().equals(path))
                 return i;
         }
         return -1;
@@ -3039,6 +3035,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         nbtEditSlot = -1;
         subModeDropdownOpen = false;
         cachedSlotNbtEntries.clear();
+        cachedSlotNbtPathLabels = List.of();
         nbtPendingOperator = "=";
         nbtListScrollOffset = 0;
     }
@@ -3255,7 +3252,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailNbtActiveOps.clear();
             List<NbtCriterion> existingRules = menu.getSlotNbtRules(slot);
             for (NbtCriterion r : existingRules) {
-                detailNbtActiveOps.put(r.path().toString(), r.operator());
+                detailNbtActiveOps.put(r.path(), r.operator());
             }
             detailNbtOp = "=";
             detailNbtSelectedIdx = -1;
@@ -3782,9 +3779,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private void buildNbtRows() {
         nbtRows.clear();
+        List<String> pathTexts = detailCachedNbtEntries.stream()
+                .map(entry -> entry.path().toString())
+                .toList();
         Map<String, List<Integer>> groupedEntries = new HashMap<>();
-        for (int i = 0; i < detailCachedNbtEntries.size(); i++) {
-            String category = nbtCategory(detailCachedNbtEntries.get(i).path().toString());
+        for (int i = 0; i < pathTexts.size(); i++) {
+            String category = nbtCategory(pathTexts.get(i));
             groupedEntries.computeIfAbsent(category, ignored -> new ArrayList<>()).add(i);
         }
 
@@ -3792,11 +3792,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         categories.sort(FilterScreen::compareNbtCategories);
         for (String category : categories) {
             List<Integer> entries = groupedEntries.get(category);
-            entries.sort(Comparator.comparing(index -> detailCachedNbtEntries.get(index).path().toString()));
+            entries.sort(Comparator.comparing(pathTexts::get));
             nbtRows.add(new NbtRow(true, category, -1, category));
             for (int entryIdx : entries) {
-                String path = detailCachedNbtEntries.get(entryIdx).path().toString();
-                nbtRows.add(new NbtRow(false, nbtDisplayPath(path, category), entryIdx, category));
+                nbtRows.add(new NbtRow(false, nbtDisplayPath(pathTexts.get(entryIdx), category), entryIdx, category));
             }
         }
     }
@@ -3867,7 +3866,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void renderNbtTable(GuiGraphics g, int mx, int my, int tableX, int tableY, int tableW, int tableH) {
-        Set<String> activePaths = detailNbtActiveOps.keySet();
+        Set<NbtPath> activePaths = detailNbtActiveOps.keySet();
         if (nbtTableEditingRow < 0) detailNbtValueBox.setVisible(false);
 
         List<NbtRow> visible = getVisibleNbtRows();
@@ -3917,7 +3916,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             } else {
                 int entryIdx = row.entryIdx();
                 NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
-                boolean active = activePaths.contains(entry.path().toString());
+                boolean active = activePaths.contains(entry.path());
                 boolean indented = !row.group().isEmpty();
 
                 if (active)
@@ -3938,7 +3937,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     hoveredFullText = entry.path() + " = " + entry.valueDisplay();
                 }
 
-                String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path().toString(), "=") : "=";
+                String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path(), "=") : "=";
                 int opColor = active ? COL_WHITE : COL_GRAY;
                 g.drawString(font, opStr, colOpX + 4, rowY + 3, opColor, false);
 
@@ -4258,7 +4257,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private boolean handleNbtTableClick(double mx, double my, int action,
                                          int tableX, int tableY, int tableW, int tableH) {
-        Set<String> activePaths = detailNbtActiveOps.keySet();
+        Set<NbtPath> activePaths = detailNbtActiveOps.keySet();
         List<NbtRow> visible = getVisibleNbtRows();
         int totalRows = visible.size();
         boolean scrollable = totalRows * NBT_ROW_H > tableH;
@@ -4292,16 +4291,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
             int entryIdx = row.entryIdx();
             NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
-            boolean active = activePaths.contains(entry.path().toString());
+            boolean active = activePaths.contains(entry.path());
 
             if (mx < colToggleX + NBT_COL_TOGGLE + 4) {
                 if (active) {
-                    int ruleIdx = findActiveRuleIndex(menu.getSlotNbtRules(detailEditSlot), entry.path().toString());
+                    int ruleIdx = findActiveRuleIndex(menu.getSlotNbtRules(detailEditSlot), entry.path());
                     if (ruleIdx >= 0) {
                         PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(detailEditSlot, ruleIdx));
                         menu.removeSlotNbtRule(detailEditSlot, ruleIdx);
                     }
-                    detailNbtActiveOps.remove(entry.path().toString());
+                    detailNbtActiveOps.remove(entry.path());
                     if (detailNbtSelectedIdx == entryIdx) {
                         detailNbtSelectedIdx = -1;
                         nbtTableEditingRow = -1;
@@ -4351,12 +4350,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void cycleDetailNbtOp(NbtPath path) {
-        String currentOp = detailNbtActiveOps.getOrDefault(path.toString(), "=");
+        String currentOp = detailNbtActiveOps.getOrDefault(path, "=");
         String nextOp = FilterItemData.nextNbtOperator(currentOp);
-        detailNbtActiveOps.put(path.toString(), nextOp);
+        detailNbtActiveOps.put(path, nextOp);
         detailNbtOp = nextOp;
 
-        int ruleIdx = findActiveRuleIndex(menu.getSlotNbtRules(detailEditSlot), path.toString());
+        int ruleIdx = findActiveRuleIndex(menu.getSlotNbtRules(detailEditSlot), path);
         if (ruleIdx >= 0) {
             String savedVal = formatNbtValue(menu.getSlotNbtRules(detailEditSlot).get(ruleIdx).value().toString());
             PacketDistributor.sendToServer(SetFilterEntryNbtPayload.remove(detailEditSlot, ruleIdx));
@@ -4364,7 +4363,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(detailEditSlot, path, nextOp, savedVal));
             menu.addSlotNbtRule(minecraft.player, detailEditSlot, path, nextOp, savedVal);
             List<NbtCriterion> updatedRules = menu.getSlotNbtRules(detailEditSlot);
-            int newIdx = findActiveRuleIndex(updatedRules, path.toString());
+            int newIdx = findActiveRuleIndex(updatedRules, path);
             if (newIdx >= 0) {
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setValue(detailEditSlot, newIdx, savedVal));
                 menu.setSlotNbtRuleValue(detailEditSlot, newIdx, savedVal);
@@ -4378,7 +4377,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return;
 
         NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(detailNbtSelectedIdx);
-        String opSymbol = detailNbtActiveOps.getOrDefault(entry.path().toString(), detailNbtOp);
+        String opSymbol = detailNbtActiveOps.getOrDefault(entry.path(), detailNbtOp);
 
         String valueOverride = detailNbtValueBox.getValue().trim();
         String fallbackValue = valueOverride.isEmpty() ? entry.valueDisplay() : valueOverride;
@@ -4391,7 +4390,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (!valueOverride.isEmpty() && !valueOverride.equals(entry.valueDisplay())) {
             List<NbtCriterion> rules = menu.getSlotNbtRules(detailEditSlot);
-            int ruleIdx = findActiveRuleIndex(rules, entry.path().toString());
+            int ruleIdx = findActiveRuleIndex(rules, entry.path());
             if (ruleIdx >= 0) {
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setValue(detailEditSlot, ruleIdx, valueOverride));
                 menu.setSlotNbtRuleValue(detailEditSlot, ruleIdx, valueOverride);
@@ -4400,7 +4399,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     new NbtFilterData.NbtEntry(entry.path(), valueOverride));
             buildNbtRows();
         }
-        detailNbtActiveOps.put(entry.path().toString(), opSymbol);
+        detailNbtActiveOps.put(entry.path(), opSymbol);
     }
 
     private void commitDetailNbtValueEdit() {
