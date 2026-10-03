@@ -114,11 +114,14 @@ neoForge {
 sourceSets.main.get().resources.srcDir("src/generated/client")
 sourceSets.main.get().resources.srcDir("src/generated/server")
 
+val localRuntime: Configuration by configurations.creating
+configurations.runtimeClasspath { extendsFrom(localRuntime) }
+
 dependencies {
     compileOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") { isTransitive = false }
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
-    runtimeOnly("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
+    localRuntime("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
 
     compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftb_teams_version}") {
         isTransitive = false
@@ -128,19 +131,19 @@ dependencies {
     }
 
     compileOnly("org.appliedenergistics:guideme:${guideme_version}")
-    runtimeOnly("org.appliedenergistics:guideme:${guideme_version}")
+    localRuntime("org.appliedenergistics:guideme:${guideme_version}")
 
     compileOnly("maven.modrinth:jade:${jade_version}")
-    runtimeOnly("maven.modrinth:jade:${jade_version}")
+    localRuntime("maven.modrinth:jade:${jade_version}")
 
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
     if (ae2Runtime.get()) {
-        runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+        localRuntime("org.appliedenergistics:appliedenergistics2:${ae2_version}")
     }
 
     compileOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
     if (refinedStorageRuntime.get()) {
-        runtimeOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+        localRuntime("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
     }
 
     // Iris API — compile-only; shaders are an optional runtime dependency.
