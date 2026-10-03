@@ -2369,10 +2369,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (menu.isTagSlot(slot)) {
             return ItemStack.EMPTY;
         }
-        if (minecraft != null && minecraft.player != null) {
-            return FilterItemData.getEntry(menu.getOpenedStack(), slot, minecraft.player.level().registryAccess());
-        }
-        return ItemStack.EMPTY;
+        return FilterItemData.getEntry(menu.getOpenedStack(), slot);
     }
 
     private int getTagSubModeVisibleRows() {

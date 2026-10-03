@@ -675,7 +675,7 @@ public class ServerPayloadHandler {
                 filter = filter.copy();
             }
 
-            if (!FilterItemData.addItem(filter, item, node.level().registryAccess())) {
+            if (!FilterItemData.addItem(filter, item)) {
                 return;
             }
             channel.setFilterItem(fs, filter);
@@ -1100,8 +1100,7 @@ public class ServerPayloadHandler {
     public static void handleApplyPattern(ApplyPatternPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof PatternSetterMenu menu) {
-                menu.applyPattern(payload.useOutputs(), payload.multiplier(),
-                        context.player().level().registryAccess(), context.player().level());
+                menu.applyPattern(payload.useOutputs(), payload.multiplier(), context.player().level());
             }
         });
     }

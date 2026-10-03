@@ -138,29 +138,29 @@ public final class FilterItemData {
         FilterSettingsData.setTarget(stack, type);
     }
 
-    public static ItemStack getEntry(ItemStack stack, int slot, @Nullable HolderLookup.Provider provider) {
+    public static ItemStack getEntry(ItemStack stack, int slot) {
         GeneralFilterEntry entry = entry(stack, slot);
         return entry == null || entry.item() == null ? ItemStack.EMPTY : entry.item().toStack();
     }
 
-    public static boolean setEntry(ItemStack stack, int slot, ItemStack value, @Nullable HolderLookup.Provider provider) {
+    public static boolean setEntry(ItemStack stack, int slot, ItemStack value) {
         return edit(stack, slot, entry -> value.isEmpty()
                 ? GeneralFilterEntry.empty(slot)
                 : entry.withItem(StackSnapshot.of(value.copyWithCount(1))));
     }
 
-    public static boolean addItem(ItemStack filter, ItemStack item, @Nullable HolderLookup.Provider provider) {
+    public static boolean addItem(ItemStack filter, ItemStack item) {
         if (!isFilterItem(filter) || item.isEmpty())
             return false;
         ItemStack entry = item.copyWithCount(1);
         int cap = getCapacity(filter);
         for (int i = 0; i < cap; i++) {
-            if (ItemStack.isSameItemSameComponents(getEntry(filter, i, provider), entry))
+            if (ItemStack.isSameItemSameComponents(getEntry(filter, i), entry))
                 return false;
         }
         for (int i = 0; i < cap; i++) {
             if (isEntrySlotAvailable(filter, i)) {
-                return setEntry(filter, i, entry, provider);
+                return setEntry(filter, i, entry);
             }
         }
         return false;
@@ -221,10 +221,10 @@ public final class FilterItemData {
         return entries(stack).size();
     }
 
-    public static boolean containsItem(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider) {
+    public static boolean containsItem(ItemStack filter, ItemStack candidate) {
         int cap = getCapacity(filter);
         for (int i = 0; i < cap; i++) {
-            ItemStack entry = getEntry(filter, i, provider);
+            ItemStack entry = getEntry(filter, i);
             if (!entry.isEmpty() && ItemStack.isSameItem(entry, candidate)) {
                 return true;
             }
