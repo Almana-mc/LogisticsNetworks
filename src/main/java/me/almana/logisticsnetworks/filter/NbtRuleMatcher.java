@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.filter;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NumericTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import org.jetbrains.annotations.Nullable;
 
@@ -32,7 +33,7 @@ public final class NbtRuleMatcher {
         return OPS[0];
     }
 
-    static boolean matchesValue(@Nullable String operator, Tag expected, @Nullable Tag actual) {
+    public static boolean matchesValue(@Nullable String operator, Tag expected, @Nullable Tag actual) {
         if (actual == null) {
             return OP_NOT_EQUALS.equals(operator);
         }
@@ -81,6 +82,9 @@ public final class NbtRuleMatcher {
     private static double tagToDouble(Tag tag) {
         if (tag instanceof NumericTag numeric) {
             return numeric.getAsDouble();
+        }
+        if (!(tag instanceof StringTag)) {
+            return Double.NaN;
         }
         try {
             return Double.parseDouble(tag.getAsString());

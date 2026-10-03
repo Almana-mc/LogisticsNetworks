@@ -1,9 +1,12 @@
 package me.almana.logisticsnetworks.component;
 
+import me.almana.logisticsnetworks.client.ClientRegistries;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
+import me.almana.logisticsnetworks.filter.DurabilityFilterData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
-import me.almana.logisticsnetworks.data.NodeClipboardConfig;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -18,16 +21,20 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
-import org.jetbrains.annotations.Nullable;
 
 public final class LegacyComponentMigration {
 
@@ -62,39 +69,133 @@ public final class LegacyComponentMigration {
     }
 
     public static boolean migrateGeneralFilter(ItemStack stack, @Nullable HolderLookup.Provider provider) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (!(custom.get(GENERAL_ROOT) instanceof CompoundTag root)) {
+        CompoundTag root = legacyRoot(stack, GENERAL_ROOT);
+        if (root == null) {
             return true;
         }
-        GeneralFilterConfig current = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
-        if (current != null) {
-            migrateSettings(stack, root, null);
-            removeRoot(stack, custom, GENERAL_ROOT);
-            return true;
-        }
-        GeneralFilterBridge.ReadResult result = GeneralFilterBridge.read(root, provider, current);
-        if (!result.complete()) {
-            return false;
+        if (!stack.has(LogisticsDataComponents.FILTER_ENTRIES)) {
+            GeneralFilterConfig config = readGeneralFilter(root, provider != null ? provider : currentRegistries());
+            if (config == null) {
+                return false;
+            }
+            if (!config.entries().isEmpty()) {
+                stack.set(LogisticsDataComponents.FILTER_ENTRIES, config);
+            }
         }
         migrateSettings(stack, root, null);
-        if (current == null && !result.config().entries().isEmpty()) {
-            stack.set(LogisticsDataComponents.FILTER_ENTRIES, result.config());
-        }
-        removeRoot(stack, custom, GENERAL_ROOT);
+        removeRoot(stack, GENERAL_ROOT);
         return true;
     }
 
-    public static boolean migrateWrench(ItemStack stack, @Nullable HolderLookup.Provider provider) {
-        StorageLink currentLink = stack.get(LogisticsDataComponents.WRENCH_STORAGE_LINK);
-        GlobalPos componentLink = stack.get(LogisticsDataComponents.WRENCH_AE2_LINK);
-        if (currentLink == null && componentLink != null) {
-            stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK,
-                    new StorageLink(StorageBackend.AE2, componentLink));
+    @Nullable
+    private static HolderLookup.Provider currentRegistries() {
+        // Client stacks need client holders
+        HolderLookup.Provider client = FMLEnvironment.dist.isClient() ? ClientRegistries.onClientThread() : null;
+        if (client != null) {
+            return client;
         }
-        stack.remove(LogisticsDataComponents.WRENCH_AE2_LINK);
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        return server == null ? null : server.registryAccess();
+    }
 
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (!(custom.get(WRENCH_ROOT) instanceof CompoundTag root)) {
+    @Nullable
+    private static GeneralFilterConfig readGeneralFilter(CompoundTag root, @Nullable HolderLookup.Provider provider) {
+        List<GeneralFilterEntry> entries = new ArrayList<>();
+        ListTag stored = root.getList("items", Tag.TAG_COMPOUND);
+        for (int i = 0; i < stored.size(); i++) {
+            CompoundTag entry = stored.getCompound(i);
+            StackSnapshot item = null;
+            if (entry.get("item") instanceof CompoundTag itemTag) {
+                item = readItem(itemTag, provider);
+                if (item == null && provider == null) {
+                    // Retry once registries exist
+                    return null;
+                }
+                if (item == null) {
+                    continue;
+                }
+            }
+            GeneralFilterEntry read = readEntry(entry, item);
+            if (!read.isEmpty()) {
+                entries.add(read);
+            }
+        }
+        return new GeneralFilterConfig(entries);
+    }
+
+    @Nullable
+    private static StackSnapshot readItem(CompoundTag tag, @Nullable HolderLookup.Provider provider) {
+        ItemStack stack = provider == null
+                ? ItemStack.CODEC.parse(NbtOps.INSTANCE, tag).result().orElse(ItemStack.EMPTY)
+                : ComponentCodecs.QUIET_STACK.parse(provider.createSerializationContext(NbtOps.INSTANCE), tag)
+                        .result().orElse(ItemStack.EMPTY);
+        if (stack.isEmpty()) {
+            return null;
+        }
+        FilterComponentData.migrate(stack, provider);
+        return StackSnapshot.of(stack.copyWithCount(1));
+    }
+
+    private static GeneralFilterEntry readEntry(CompoundTag entry, @Nullable StackSnapshot item) {
+        GeneralFilterEntry.EntryCounts counts = new GeneralFilterEntry.EntryCounts(
+                entry.getInt("amount"), entry.getInt("batch"), entry.getInt("stock"));
+        GeneralFilterEntry.SlotMapping mapping = new GeneralFilterEntry.SlotMapping(
+                Arrays.stream(entry.getIntArray("slot_map")).boxed().toList(), entry.getString("slot_map_expr"));
+        Boolean enchanted = entry.contains("enchanted", Tag.TAG_BYTE) ? entry.getBoolean("enchanted") : null;
+        GeneralFilterEntry.NbtConstraints nbt = new GeneralFilterEntry.NbtConstraints(readRules(entry),
+                entry.getBoolean("nbt_match_any"),
+                entry.contains("nbt_strict", Tag.TAG_BYTE)
+                        ? Optional.of(entry.getBoolean("nbt_strict"))
+                        : Optional.empty(),
+                entry.getString("nbt_raw"));
+        GeneralFilterEntry.DurabilityConstraint durability = entry.contains("dur_op", Tag.TAG_STRING)
+                ? new GeneralFilterEntry.DurabilityConstraint(
+                        DurabilityFilterData.Operator.fromId(entry.getString("dur_op")), entry.getInt("dur_val"))
+                : null;
+        return new GeneralFilterEntry(entry.getInt("slot"), item, readString(entry, "fluid"),
+                readString(entry, "chemical"), readString(entry, "tag"), counts, mapping, enchanted, nbt, durability);
+    }
+
+    private static List<NbtCriterion> readRules(CompoundTag entry) {
+        List<NbtCriterion> rules = new ArrayList<>();
+        ListTag stored = entry.getList("nbt_rules", Tag.TAG_COMPOUND);
+        for (int i = 0; i < stored.size(); i++) {
+            CompoundTag rule = stored.getCompound(i);
+            NbtCriterion criterion = readRule(rule.getString("p"), rule.getString("o"), rule.get("v"));
+            if (criterion != null) {
+                rules.add(criterion);
+            }
+        }
+        if (!rules.isEmpty()) {
+            return rules;
+        }
+        NbtCriterion single = readRule(entry.getString("nbt_path"), entry.getString("nbt_op"), entry.get("nbt_val"));
+        return single == null ? List.of() : List.of(single);
+    }
+
+    @Nullable
+    private static NbtCriterion readRule(String path, String operator, @Nullable Tag value) {
+        NbtPath parsed = NbtPath.parseLenient(path);
+        return parsed.isEmpty() || value == null ? null : new NbtCriterion(parsed, operator, value);
+    }
+
+    @Nullable
+    private static String readString(CompoundTag tag, String key) {
+        return tag.contains(key, Tag.TAG_STRING) ? tag.getString(key) : null;
+    }
+
+    public static boolean migrateWrench(ItemStack stack, @Nullable HolderLookup.Provider provider) {
+        GlobalPos componentLink = stack.get(LogisticsDataComponents.WRENCH_AE2_LINK);
+        if (componentLink != null) {
+            if (!stack.has(LogisticsDataComponents.WRENCH_STORAGE_LINK)) {
+                stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK,
+                        new StorageLink(StorageBackend.AE2, componentLink));
+            }
+            stack.remove(LogisticsDataComponents.WRENCH_AE2_LINK);
+        }
+
+        CompoundTag root = legacyRoot(stack, WRENCH_ROOT);
+        if (root == null) {
             return true;
         }
 
@@ -133,14 +234,13 @@ public final class LegacyComponentMigration {
         }
 
         if (clipboardComplete || stack.has(LogisticsDataComponents.WRENCH_CLIPBOARD)) {
-            removeRoot(stack, custom, WRENCH_ROOT);
+            removeRoot(stack, WRENCH_ROOT);
             return true;
         }
 
         CompoundTag pending = new CompoundTag();
         pending.put("clipboard", root.getCompound("clipboard").copy());
-        custom.put(WRENCH_ROOT, pending);
-        writeCustomData(stack, custom);
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, custom -> custom.put(WRENCH_ROOT, pending));
         return false;
     }
 
@@ -148,7 +248,8 @@ public final class LegacyComponentMigration {
         if (stack.has(LogisticsDataComponents.WRENCH_CLIPBOARD)) {
             return true;
         }
-        return getLegacyRoot(stack, WRENCH_ROOT).contains("clipboard");
+        CompoundTag root = legacyRoot(stack, WRENCH_ROOT);
+        return root != null && root.contains("clipboard");
     }
 
     public static void clearWrenchClipboard(ItemStack stack) {
@@ -166,38 +267,6 @@ public final class LegacyComponentMigration {
             custom.put(WRENCH_ROOT, root);
         }
         writeCustomData(stack, custom);
-    }
-
-    public static CompoundTag getGeneralFilterRoot(ItemStack stack, @Nullable HolderLookup.Provider provider) {
-        boolean migrated = migrateGeneralFilter(stack, provider);
-        GeneralFilterConfig config = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
-        CompoundTag root = migrated
-                ? GeneralFilterBridge.write(config == null ? new GeneralFilterConfig(List.of()) : config, provider)
-                : getLegacyRoot(stack, GENERAL_ROOT);
-        writeSettings(root, FilterSettingsData.get(stack));
-        return root;
-    }
-
-    public static void updateGeneralFilterRoot(ItemStack stack, @Nullable HolderLookup.Provider provider,
-            Consumer<CompoundTag> modifier) {
-        boolean hasLegacy = hasLegacyRoot(stack, GENERAL_ROOT);
-        boolean migrated = migrateGeneralFilter(stack, provider);
-        if (!hasLegacy || migrated || stack.has(LogisticsDataComponents.FILTER_ENTRIES)) {
-            GeneralFilterConfig current = stack.getOrDefault(LogisticsDataComponents.FILTER_ENTRIES,
-                    new GeneralFilterConfig(List.of()));
-            CompoundTag root = GeneralFilterBridge.write(current, provider);
-            writeSettings(root, FilterSettingsData.get(stack));
-            modifier.accept(root);
-            migrateSettingsFromWorkingRoot(stack, root);
-            GeneralFilterBridge.ReadResult result = GeneralFilterBridge.read(root, provider, current);
-            if (result.config().entries().isEmpty()) {
-                stack.remove(LogisticsDataComponents.FILTER_ENTRIES);
-            } else {
-                stack.set(LogisticsDataComponents.FILTER_ENTRIES, result.config());
-            }
-            return;
-        }
-        updateLegacyRoot(stack, GENERAL_ROOT, modifier);
     }
 
     public static void migrateModFilter(ItemStack stack) {
@@ -260,8 +329,8 @@ public final class LegacyComponentMigration {
             }
             DurabilityFilterConfig config = new DurabilityFilterConfig(
                     root.getInt("value"),
-                    me.almana.logisticsnetworks.filter.DurabilityFilterData.Operator.fromId(root.getString("operator")));
-            if (config.value() != 0 || config.operator() != me.almana.logisticsnetworks.filter.DurabilityFilterData.Operator.GREATER_OR_EQUAL) {
+                    DurabilityFilterData.Operator.fromId(root.getString("operator")));
+            if (config.value() != 0 || config.operator() != DurabilityFilterData.Operator.GREATER_OR_EQUAL) {
                 stack.set(LogisticsDataComponents.DURABILITY_FILTER, config);
             }
         });
@@ -270,7 +339,9 @@ public final class LegacyComponentMigration {
     public static void migrateNbtFilter(ItemStack stack) {
         migrate(stack, NBT_ROOT, root -> {
             List<NbtFilterConfig.Rule> rules = readNbtRules(root);
-            String inferredPath = rules.isEmpty() ? root.getString("path") : rules.getFirst().path();
+            NbtPath inferredPath = rules.isEmpty()
+                    ? NbtPath.parseLenient(root.getString("path"))
+                    : rules.getFirst().path();
             FilterTargetType inferred = NbtFilterData.isFluidPath(inferredPath)
                     ? FilterTargetType.FLUIDS
                     : FilterTargetType.ITEMS;
@@ -308,7 +379,7 @@ public final class LegacyComponentMigration {
             if (!(tag instanceof CompoundTag rule)) {
                 continue;
             }
-            String path = rule.getString("path").trim();
+            NbtPath path = NbtPath.parseLenient(rule.getString("path").trim());
             Tag value = rule.get("value");
             if (path.isEmpty() || value == null) {
                 continue;
@@ -322,7 +393,7 @@ public final class LegacyComponentMigration {
         if (!rules.isEmpty()) {
             return rules;
         }
-        String path = root.getString("path").trim();
+        NbtPath path = NbtPath.parseLenient(root.getString("path").trim());
         Tag value = root.get("value");
         return path.isEmpty() || value == null
                 ? List.of()
@@ -375,60 +446,26 @@ public final class LegacyComponentMigration {
         }
     }
 
-    private static void migrateSettingsFromWorkingRoot(ItemStack stack, CompoundTag root) {
-        FilterSettingsData.set(stack, new FilterSettings(
-                FilterTargetType.fromOrdinal(root.getInt("target")), root.getBoolean("blacklist")));
-    }
-
-    private static void writeSettings(CompoundTag root, FilterSettings settings) {
-        root.remove("target");
-        root.remove("blacklist");
-        if (settings.target() != FilterTargetType.ITEMS) {
-            root.putInt("target", settings.target().ordinal());
+    @Nullable
+    private static CompoundTag legacyRoot(ItemStack stack, String rootKey) {
+        CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
+        if (custom == null || !custom.contains(rootKey)) {
+            return null;
         }
-        if (settings.blacklist()) {
-            root.putBoolean("blacklist", true);
-        }
-    }
-
-    private static boolean hasLegacyRoot(ItemStack stack, String rootKey) {
-        return stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
-                .get(rootKey) instanceof CompoundTag;
-    }
-
-    private static CompoundTag getLegacyRoot(ItemStack stack, String rootKey) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.get(rootKey) instanceof CompoundTag root ? root.copy() : new CompoundTag();
-    }
-
-    private static void updateLegacyRoot(ItemStack stack, String rootKey, Consumer<CompoundTag> modifier) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        CompoundTag root = custom.get(rootKey) instanceof CompoundTag stored ? stored.copy() : new CompoundTag();
-        modifier.accept(root);
-        if (root.isEmpty()) {
-            custom.remove(rootKey);
-        } else {
-            custom.put(rootKey, root);
-        }
-        if (custom.isEmpty()) {
-            stack.remove(DataComponents.CUSTOM_DATA);
-        } else {
-            stack.set(DataComponents.CUSTOM_DATA, CustomData.of(custom));
-        }
+        return custom.copyTag().get(rootKey) instanceof CompoundTag root ? root : null;
     }
 
     private static void migrate(ItemStack stack, String rootKey, Consumer<CompoundTag> migration) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (!(custom.get(rootKey) instanceof CompoundTag root)) {
+        CompoundTag root = legacyRoot(stack, rootKey);
+        if (root == null) {
             return;
         }
-        migration.accept(root.copy());
-        removeRoot(stack, custom, rootKey);
+        migration.accept(root);
+        removeRoot(stack, rootKey);
     }
 
-    private static void removeRoot(ItemStack stack, CompoundTag custom, String rootKey) {
-        custom.remove(rootKey);
-        writeCustomData(stack, custom);
+    private static void removeRoot(ItemStack stack, String rootKey) {
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, custom -> custom.remove(rootKey));
     }
 
     private static void writeCustomData(ItemStack stack, CompoundTag custom) {

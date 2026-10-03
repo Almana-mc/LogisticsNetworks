@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.component;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.IntTag;
 import org.jetbrains.annotations.Nullable;
@@ -22,6 +23,9 @@ public record GeneralFilterEntry(
         @Nullable Boolean enchanted,
         NbtConstraints nbt,
         @Nullable DurabilityConstraint durability) {
+
+    public static final NbtPath ENCHANTED_PATH = NbtPath.of(NbtPath.Component.of("minecraft:enchanted"));
+    public static final NbtPath DURABILITY_PATH = NbtPath.of(NbtPath.Component.of("minecraft:durability"));
 
     public static final Codec<GeneralFilterEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.fieldOf("slot").forGetter(GeneralFilterEntry::slot),
@@ -45,11 +49,11 @@ public record GeneralFilterEntry(
         nbt = nbt == null ? NbtConstraints.EMPTY : nbt;
         if (enchanted != null || durability != null) {
             List<NbtCriterion> rules = new ArrayList<>(nbt.rules());
-            if (enchanted != null && rules.stream().noneMatch(rule -> rule.path().equals("minecraft:enchanted"))) {
-                rules.add(new NbtCriterion("minecraft:enchanted", "=", ByteTag.valueOf(enchanted)));
+            if (enchanted != null && rules.stream().noneMatch(rule -> rule.path().equals(ENCHANTED_PATH))) {
+                rules.add(new NbtCriterion(ENCHANTED_PATH, "=", ByteTag.valueOf(enchanted)));
             }
-            if (durability != null && rules.stream().noneMatch(rule -> rule.path().equals("minecraft:durability"))) {
-                rules.add(new NbtCriterion("minecraft:durability", durability.operator().symbol(),
+            if (durability != null && rules.stream().noneMatch(rule -> rule.path().equals(DURABILITY_PATH))) {
+                rules.add(new NbtCriterion(DURABILITY_PATH, durability.operator().symbol(),
                         IntTag.valueOf(durability.value())));
             }
             nbt = new NbtConstraints(rules, nbt.matchAny(), nbt.strict(), nbt.raw());
@@ -61,6 +65,25 @@ public record GeneralFilterEntry(
     public static GeneralFilterEntry empty(int slot) {
         return new GeneralFilterEntry(slot, null, null, null, null, EntryCounts.EMPTY, SlotMapping.EMPTY,
                 null, NbtConstraints.EMPTY, null);
+    }
+
+    public boolean isEmpty() {
+        return equals(empty(slot));
+    }
+
+    public GeneralFilterEntry withItem(@Nullable StackSnapshot value) {
+        return new GeneralFilterEntry(slot, value, fluidId, chemicalId, tag, counts, slotMapping, enchanted,
+                nbt, durability);
+    }
+
+    public GeneralFilterEntry withTag(@Nullable String value) {
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, value, counts, slotMapping, enchanted,
+                nbt, durability);
+    }
+
+    public GeneralFilterEntry withCounts(EntryCounts value) {
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, value, slotMapping, enchanted,
+                nbt, durability);
     }
 
     public GeneralFilterEntry withNbt(NbtConstraints value) {
@@ -108,6 +131,22 @@ public record GeneralFilterEntry(
             rules = List.copyOf(rules);
             strict = strict == null ? Optional.empty() : strict;
             raw = raw == null ? "" : raw;
+        }
+
+        public NbtConstraints withRules(List<NbtCriterion> value) {
+            return new NbtConstraints(value, matchAny, strict, raw);
+        }
+
+        public NbtConstraints withMatchAny(boolean value) {
+            return new NbtConstraints(rules, value, strict, raw);
+        }
+
+        public NbtConstraints withStrict(boolean value) {
+            return new NbtConstraints(rules, matchAny, Optional.of(value), raw);
+        }
+
+        public NbtConstraints withRaw(@Nullable String value) {
+            return new NbtConstraints(rules, matchAny, strict, value);
         }
     }
 

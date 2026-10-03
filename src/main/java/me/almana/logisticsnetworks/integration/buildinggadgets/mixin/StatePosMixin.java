@@ -11,7 +11,9 @@ import java.util.Map;
 import me.almana.logisticsnetworks.integration.buildinggadgets.NodePayloadHolder;
 import me.almana.logisticsnetworks.integration.buildinggadgets.NodeTransit;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -60,15 +62,17 @@ abstract class StatePosMixin implements NodePayloadHolder {
             CallbackInfoReturnable<ArrayList<StatePos>> cir, @Share("moved") LocalRef<Map<BlockPos, CompoundTag>> moved) {
         Map<BlockPos, CompoundTag> lifted = moved.get();
         if (lifted == null) return;
+        // BG2 rotates only server-side
+        HolderLookup.Provider registries = ServerLifecycleHooks.getCurrentServer().registryAccess();
         ArrayList<StatePos> rotated = cir.getReturnValue();
         for (int i = 0; i < list.size(); i++) {
             CompoundTag config = ((NodePayloadHolder) list.get(i)).logisticsnetworks$getNode();
-            if (config != null) ((NodePayloadHolder) rotated.get(i)).logisticsnetworks$setNode(NodeTransit.rotateCopy(config));
+            if (config != null) ((NodePayloadHolder) rotated.get(i)).logisticsnetworks$setNode(NodeTransit.rotateCopy(config, registries));
         }
         if (lifted.isEmpty()) return;
         Map<BlockPos, CompoundTag> placed = new HashMap<>();
         lifted.forEach((pos, payload) -> placed.put(new BlockPos(-pos.getZ(), pos.getY(), pos.getX()),
-                NodeTransit.rotateMove(payload)));
+                NodeTransit.rotateMove(payload, registries)));
         for (ListIterator<TagPos> it = tags.listIterator(); it.hasNext(); ) {
             TagPos entry = it.next();
             CompoundTag payload = placed.remove(entry.pos);

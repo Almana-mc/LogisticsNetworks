@@ -969,7 +969,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         } else {
             filter = filter.copy();
         }
-        if (!FilterItemData.addItem(filter, item, minecraft.level.registryAccess())) return;
+        if (!FilterItemData.addItem(filter, item)) return;
         config().setFilterItem(selectedChannel, slot, filter);
         commit();
         filterAddedToastUntil = System.currentTimeMillis() + 1500;

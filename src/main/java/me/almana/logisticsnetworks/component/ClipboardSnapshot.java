@@ -1,14 +1,20 @@
 package me.almana.logisticsnetworks.component;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.data.RedstoneMode;
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.core.Direction;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
 
 import java.util.List;
 import java.util.Locale;
@@ -24,15 +30,23 @@ public record ClipboardSnapshot(
         boolean renderVisible,
         String nodeLabel) {
 
-    public static final Codec<ClipboardSnapshot> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            ChannelState.CODEC.listOf().fieldOf("channels").forGetter(ClipboardSnapshot::channels),
-            FilterSlot.CODEC.listOf().optionalFieldOf("filters", List.of()).forGetter(ClipboardSnapshot::filters),
-            ItemSlot.CODEC.listOf().optionalFieldOf("upgrades", List.of()).forGetter(ClipboardSnapshot::upgrades),
-            UUIDUtil.CODEC.optionalFieldOf("network_id").forGetter(ClipboardSnapshot::networkId),
-            Codec.STRING.optionalFieldOf("network_name").forGetter(ClipboardSnapshot::networkName),
-            Codec.BOOL.optionalFieldOf("render_visible", true).forGetter(ClipboardSnapshot::renderVisible),
-            Codec.STRING.optionalFieldOf("node_label", "").forGetter(ClipboardSnapshot::nodeLabel)
+    public static final MapCodec<ClipboardSnapshot> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+            ChannelState.LIST_CODEC.lenientOptionalFieldOf("channels", List.of())
+                    .forGetter(ClipboardSnapshot::channels),
+            ComponentCodecs.quietLenientList(FilterSlot.CODEC, LogisticsNodeEntity.CHANNEL_COUNT * ChannelData.FILTER_SIZE)
+                    .lenientOptionalFieldOf("filters", List.of())
+                    .forGetter(ClipboardSnapshot::filters),
+            ComponentCodecs.quietLenientList(ItemSlot.CODEC, LogisticsNodeEntity.UPGRADE_SLOT_COUNT)
+                    .lenientOptionalFieldOf("upgrades", List.of())
+                    .forGetter(ClipboardSnapshot::upgrades),
+            UUIDUtil.CODEC.lenientOptionalFieldOf("network_id").forGetter(ClipboardSnapshot::networkId),
+            Codec.STRING.lenientOptionalFieldOf("network_name").forGetter(ClipboardSnapshot::networkName),
+            Codec.BOOL.lenientOptionalFieldOf("render_visible", true).forGetter(ClipboardSnapshot::renderVisible),
+            Codec.STRING.lenientOptionalFieldOf("node_label", "").forGetter(ClipboardSnapshot::nodeLabel)
     ).apply(instance, ClipboardSnapshot::new));
+    public static final Codec<ClipboardSnapshot> CODEC = MAP_CODEC.codec();
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClipboardSnapshot> STREAM_CODEC =
+            ByteBufCodecs.fromCodecWithRegistries(CODEC);
 
     public ClipboardSnapshot {
         channels = List.copyOf(channels);
@@ -57,26 +71,32 @@ public record ClipboardSnapshot(
             String name,
             boolean resourceRoundRobin) {
 
-        private static final Codec<ChannelMode> MODE_CODEC = enumCodec(ChannelMode.values(), ChannelMode.IMPORT);
-        private static final Codec<ChannelType> TYPE_CODEC = enumCodec(ChannelType.values(), ChannelType.ITEM);
-        private static final Codec<DistributionMode> DISTRIBUTION_CODEC = enumCodec(
-                DistributionMode.values(), DistributionMode.PRIORITY);
-        private static final Codec<FilterMode> FILTER_CODEC = enumCodec(FilterMode.values(), FilterMode.MATCH_ANY);
-        public static final Codec<ChannelState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-                Codec.BOOL.fieldOf("enabled").forGetter(ChannelState::enabled),
-                MODE_CODEC.fieldOf("mode").forGetter(ChannelState::mode),
-                TYPE_CODEC.fieldOf("type").forGetter(ChannelState::type),
-                Codec.INT.fieldOf("batch_size").forGetter(ChannelState::batchSize),
-                Codec.INT.fieldOf("tick_delay").forGetter(ChannelState::tickDelay),
-                Direction.CODEC.optionalFieldOf("direction").forGetter(ChannelState::direction),
-                Codec.STRING.optionalFieldOf("redstone_mode")
-                        .forGetter(state -> Optional.of(state.redstoneMode.name().toLowerCase(Locale.ROOT))),
-                DISTRIBUTION_CODEC.fieldOf("distribution_mode").forGetter(ChannelState::distributionMode),
-                FILTER_CODEC.fieldOf("filter_mode").forGetter(ChannelState::filterMode),
-                Codec.INT.fieldOf("priority").forGetter(ChannelState::priority),
-                Codec.STRING.optionalFieldOf("name", "").forGetter(ChannelState::name),
-                Codec.BOOL.optionalFieldOf("resource_round_robin", false).forGetter(ChannelState::resourceRoundRobin)
+        public static final ChannelState DEFAULT = new ChannelState(false, ChannelMode.IMPORT, ChannelType.ITEM, 8,
+                20, Optional.of(Direction.UP), RedstoneMode.IGNORED, DistributionMode.PRIORITY, FilterMode.MATCH_ANY,
+                0, "", false);
+        public static final Codec<Optional<Direction>> DIRECTION = Codec.STRING.xmap(ChannelState::parseDirection,
+                direction -> direction.map(Direction::getName).orElse("all"));
+        public static final MapCodec<ChannelState> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.BOOL.lenientOptionalFieldOf("enabled", false).forGetter(ChannelState::enabled),
+                ChannelMode.CODEC.lenientOptionalFieldOf("mode", ChannelMode.IMPORT).forGetter(ChannelState::mode),
+                ChannelType.CODEC.fieldOf("type").forGetter(ChannelState::type),
+                Codec.INT.lenientOptionalFieldOf("batch_size", 8).forGetter(ChannelState::batchSize),
+                Codec.INT.lenientOptionalFieldOf("tick_delay", 20).forGetter(ChannelState::tickDelay),
+                DIRECTION.lenientOptionalFieldOf("direction", Optional.empty()).forGetter(ChannelState::direction),
+                Codec.STRING.lenientOptionalFieldOf("redstone_mode", "ignored")
+                        .forGetter(state -> state.redstoneMode.name().toLowerCase(Locale.ROOT)),
+                DistributionMode.CODEC.lenientOptionalFieldOf("distribution_mode", DistributionMode.PRIORITY)
+                        .forGetter(ChannelState::distributionMode),
+                FilterMode.CODEC.lenientOptionalFieldOf("filter_mode", FilterMode.MATCH_ANY)
+                        .forGetter(ChannelState::filterMode),
+                Codec.INT.lenientOptionalFieldOf("priority", 0).forGetter(ChannelState::priority),
+                Codec.STRING.lenientOptionalFieldOf("name", "").forGetter(ChannelState::name),
+                Codec.BOOL.lenientOptionalFieldOf("resource_round_robin", false)
+                        .forGetter(ChannelState::resourceRoundRobin)
         ).apply(instance, ChannelState::fromSerialized));
+        public static final Codec<ChannelState> CODEC = MAP_CODEC.codec();
+        public static final Codec<List<ChannelState>> LIST_CODEC =
+                ComponentCodecs.quietLenient(CODEC, () -> DEFAULT).listOf(0, LogisticsNodeEntity.CHANNEL_COUNT);
 
         public ChannelState {
             mode = mode == null ? ChannelMode.IMPORT : mode;
@@ -91,24 +111,31 @@ public record ClipboardSnapshot(
             name = name == null ? "" : name;
         }
 
-        private static ChannelState fromSerialized(boolean enabled, ChannelMode mode, ChannelType type,
-                int batchSize, int tickDelay, Optional<Direction> direction, Optional<String> redstoneMode,
+        public static ChannelState fromSerialized(boolean enabled, ChannelMode mode, ChannelType type,
+                int batchSize, int tickDelay, Optional<Direction> direction, String redstoneMode,
                 DistributionMode distributionMode, FilterMode filterMode, int priority, String name,
                 boolean resourceRoundRobin) {
-            String savedRedstoneMode = redstoneMode.orElse("ignored");
             return new ChannelState(
-                    enabled && !RedstoneMode.disablesChannel(savedRedstoneMode),
+                    enabled && !RedstoneMode.disablesChannel(redstoneMode),
                     mode,
                     type,
                     batchSize,
                     tickDelay,
                     direction,
-                    RedstoneMode.fromSerialized(savedRedstoneMode),
+                    RedstoneMode.fromSerialized(redstoneMode),
                     distributionMode,
                     filterMode,
                     priority,
                     name,
                     resourceRoundRobin);
+        }
+
+        private static Optional<Direction> parseDirection(String name) {
+            if ("all".equals(name)) {
+                return Optional.empty();
+            }
+            Direction direction = Direction.byName(name);
+            return Optional.of(direction == null ? Direction.UP : direction);
         }
     }
 
@@ -125,16 +152,5 @@ public record ClipboardSnapshot(
                 Codec.INT.fieldOf("slot").forGetter(ItemSlot::slot),
                 StackSnapshot.CODEC.fieldOf("stack").forGetter(ItemSlot::stack)
         ).apply(instance, ItemSlot::new));
-    }
-
-    private static <E extends Enum<E>> Codec<E> enumCodec(E[] values, E fallback) {
-        return Codec.STRING.xmap(value -> {
-            for (E candidate : values) {
-                if (candidate.name().equalsIgnoreCase(value)) {
-                    return candidate;
-                }
-            }
-            return fallback;
-        }, value -> value.name().toLowerCase(Locale.ROOT));
     }
 }

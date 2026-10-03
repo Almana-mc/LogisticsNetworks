@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
+import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
@@ -26,11 +27,13 @@ public class NetworkRegistry extends SavedData {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String DATA_NAME = "logistics_networks";
-    private static final String KEY_NETWORKS = "Networks";
+    private static final String KEY_NETWORKS = "networks";
+    private static final String LEGACY_KEY_NETWORKS = "Networks";
 
     // Limits & Warnings for beta
     private static final int WARNING_NODE_COUNT = 200;
     private final Map<UUID, LogisticsNetwork> networks = new HashMap<>();
+    private final List<Tag> undecodableNetworks = new ArrayList<>();
     private final TelemetryManager telemetryManager = new TelemetryManager();
     private final TransferCapabilityCache capabilityCache = new TransferCapabilityCache();
     private final NetworkDispatcher dispatcher = new NetworkDispatcher();
@@ -179,39 +182,29 @@ public class NetworkRegistry extends SavedData {
     public CompoundTag save(CompoundTag compoundTag, HolderLookup.Provider provider) {
         ListTag list = new ListTag();
         for (LogisticsNetwork network : networks.values()) {
-            list.add(network.save(provider));
+            list.add(ComponentCodecs.encode(LogisticsNetwork.CODEC, provider, network));
         }
+        undecodableNetworks.forEach(tag -> list.add(tag.copy()));
         compoundTag.put(KEY_NETWORKS, list);
         return compoundTag;
     }
 
     public static NetworkRegistry load(CompoundTag compoundTag, HolderLookup.Provider provider) {
         NetworkRegistry registry = new NetworkRegistry();
-        boolean assignedDefaultColor = false;
-        if (compoundTag.contains(KEY_NETWORKS, Tag.TAG_LIST)) {
-            ListTag list = compoundTag.getList(KEY_NETWORKS, Tag.TAG_COMPOUND);
-            for (Tag t : list) {
-                if (t instanceof CompoundTag ct) {
-                    try {
-                        if (!ct.contains("Color")) {
-                            assignedDefaultColor = true;
-                        }
-                        LogisticsNetwork network = LogisticsNetwork.load(ct, provider);
-                        registry.networks.put(network.getId(), network);
-                    } catch (Exception e) {
-                        LOGGER.error("Skipping malformed network: {}", e.getMessage());
-                    }
-                }
-            }
+        String key = compoundTag.contains(KEY_NETWORKS, Tag.TAG_LIST) ? KEY_NETWORKS : LEGACY_KEY_NETWORKS;
+        for (Tag tag : compoundTag.getList(key, Tag.TAG_COMPOUND)) {
+            ComponentCodecs.parse(LogisticsNetwork.CODEC, provider, tag).ifPresentOrElse(
+                    network -> registry.networks.put(network.getId(), network),
+                    () -> registry.undecodableNetworks.add(tag.copy()));
         }
         if (!registry.networks.isEmpty()) {
             registry.networks.keySet().forEach(registry.dispatcher::markDirty);
             if (Config.debugMode) LOGGER.info("Loaded {} networks.", registry.networks.size());
         }
-        if (assignedDefaultColor) {
+        // Persist legacy-format random colours
+        if (compoundTag.contains(LEGACY_KEY_NETWORKS)) {
             registry.setDirty();
         }
-
         return registry;
     }
 }

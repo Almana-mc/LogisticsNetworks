@@ -1,16 +1,15 @@
 package me.almana.logisticsnetworks.entity;
 
+import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NodeRouteChannels;
+import me.almana.logisticsnetworks.data.SlotStack;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -28,6 +27,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -45,24 +45,6 @@ public class LogisticsNodeEntity extends Entity {
 
     public static final int UPGRADE_SLOT_COUNT = 4;
     public static final int CHANNEL_COUNT = 9;
-
-    private static final String KEY_ATTACHED_POS = "AttachedPos";
-    private static final String KEY_VALID = "Valid";
-    private static final String KEY_NETWORK_ID = "NetworkId";
-    private static final String KEY_NETWORK_NAME = "NetworkName";
-    private static final String KEY_NETWORK_COLOR = "NetworkColor";
-    private static final String KEY_VISIBLE = "RenderVisible";
-    private static final String KEY_CHANNELS = "Channels";
-    private static final String KEY_UPGRADES = "Upgrades";
-    private static final String KEY_LABEL_REVISION = "LabelRevision";
-    private static final String KEY_CHANNEL_PREFIX = "Channel";
-    private static final String KEY_SLOT = "Slot";
-    private static final String KEY_ITEM = "Item";
-    private static final String KEY_OWNER_UUID = "OwnerUUID";
-    private static final String KEY_NODE_LABEL = "NodeLabel";
-    private static final String KEY_HIGHLIGHTED = "Highlighted";
-    private static final String KEY_CREATE_CONTRAPTION_ID = "CreateContraptionId";
-    private static final String KEY_CREATE_LOCAL_POS = "CreateLocalPos";
 
     private static final EntityDataAccessor<BlockPos> ATTACHED_POS = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -133,125 +115,41 @@ public class LogisticsNodeEntity extends Entity {
 
     @Override
     protected void readAdditionalSaveData(CompoundTag compound) {
-        if (compound.contains(KEY_ATTACHED_POS)) {
-            setAttachedPos(BlockPos.of(compound.getLong(KEY_ATTACHED_POS)));
-        }
-        setValid(compound.getBoolean(KEY_VALID));
-
-        if (compound.contains(KEY_NETWORK_ID)) {
-            setNetworkId(compound.getUUID(KEY_NETWORK_ID));
-        }
-        if (compound.contains(KEY_NETWORK_NAME, Tag.TAG_STRING)) {
-            setNetworkName(compound.getString(KEY_NETWORK_NAME));
-        }
-        if (compound.contains(KEY_NETWORK_COLOR)) {
-            setNetworkColor(compound.getInt(KEY_NETWORK_COLOR));
-        }
-        if (compound.contains(KEY_VISIBLE)) {
-            setRenderVisible(compound.getBoolean(KEY_VISIBLE));
-        }
-        if (compound.contains(KEY_OWNER_UUID)) {
-            setOwnerUUID(compound.getUUID(KEY_OWNER_UUID));
-        }
-        if (compound.contains(KEY_NODE_LABEL, Tag.TAG_STRING)) {
-            setNodeLabel(compound.getString(KEY_NODE_LABEL));
-        }
-        if (compound.contains(KEY_LABEL_REVISION, Tag.TAG_ANY_NUMERIC)) {
-            labelRevision = Math.max(0, compound.getLong(KEY_LABEL_REVISION));
-        }
-        if (compound.contains(KEY_HIGHLIGHTED)) {
-            setHighlighted(compound.getBoolean(KEY_HIGHLIGHTED));
-        }
-        if (compound.contains(KEY_CREATE_CONTRAPTION_ID)) {
-            entityData.set(CREATE_CONTRAPTION_ID, Optional.of(compound.getUUID(KEY_CREATE_CONTRAPTION_ID)));
-            entityData.set(CREATE_LOCAL_POS, compound.contains(KEY_CREATE_LOCAL_POS)
-                    ? BlockPos.of(compound.getLong(KEY_CREATE_LOCAL_POS))
-                    : BlockPos.ZERO);
-        } else {
-            entityData.set(CREATE_CONTRAPTION_ID, Optional.empty());
-            entityData.set(CREATE_LOCAL_POS, BlockPos.ZERO);
-        }
-
-        HolderLookup.Provider provider = this.registryAccess();
-
-        if (compound.contains(KEY_CHANNELS)) {
-            CompoundTag channelsTag = compound.getCompound(KEY_CHANNELS);
-            for (int i = 0; i < CHANNEL_COUNT; i++) {
-                String key = KEY_CHANNEL_PREFIX + i;
-                if (channelsTag.contains(key)) {
-                    this.channels[i].load(channelsTag.getCompound(key), provider);
-                }
-            }
-        }
-
-        Arrays.fill(this.upgradeItems, ItemStack.EMPTY);
-        if (compound.contains(KEY_UPGRADES, Tag.TAG_LIST)) {
-            ListTag upgrades = compound.getList(KEY_UPGRADES, Tag.TAG_COMPOUND);
-            for (Tag tag : upgrades) {
-                if (tag instanceof CompoundTag entry) {
-                    int slot = entry.getInt(KEY_SLOT);
-                    if (slot >= 0 && slot < UPGRADE_SLOT_COUNT && entry.contains(KEY_ITEM, Tag.TAG_COMPOUND)) {
-                        this.upgradeItems[slot] = ItemStack.parseOptional(provider, entry.getCompound(KEY_ITEM));
-                    }
-                }
-            }
-        }
-        refreshRouteChannels();
+        ComponentCodecs.parse(NodeState.CODEC, registryAccess(), compound).ifPresent(this::applyState);
     }
 
     @Override
     protected void addAdditionalSaveData(CompoundTag compound) {
-        compound.putLong(KEY_ATTACHED_POS, getAttachedPos().asLong());
-        compound.putBoolean(KEY_VALID, isValid());
+        compound.merge((CompoundTag) ComponentCodecs.encode(NodeState.CODEC, registryAccess(), captureState()));
+    }
 
-        UUID netId = getNetworkId();
-        if (netId != null) {
-            compound.putUUID(KEY_NETWORK_ID, netId);
-        }
-        String networkName = getNetworkName();
-        if (!networkName.isBlank()) {
-            compound.putString(KEY_NETWORK_NAME, networkName);
-        }
-        compound.putInt(KEY_NETWORK_COLOR, getNetworkColor());
-        compound.putBoolean(KEY_VISIBLE, isRenderVisible());
+    NodeState captureState() {
+        return new NodeState(getAttachedPos(), isValid(), Optional.ofNullable(getNetworkId()), getNetworkName(),
+                getNetworkColor(), isRenderVisible(), Optional.ofNullable(getOwnerUUID()), getNodeLabel(),
+                labelRevision, isHighlighted(), Optional.ofNullable(getCreateContraptionId()), getCreateLocalPos(),
+                List.of(channels), SlotStack.nonEmpty(Arrays.asList(upgradeItems)));
+    }
 
-        UUID owner = getOwnerUUID();
-        if (owner != null) {
-            compound.putUUID(KEY_OWNER_UUID, owner);
+    void applyState(NodeState state) {
+        setAttachedPos(state.attachedPos());
+        setValid(state.valid());
+        state.networkId().ifPresent(this::setNetworkId);
+        setNetworkName(state.networkName());
+        setNetworkColor(state.networkColor());
+        setRenderVisible(state.renderVisible());
+        state.owner().ifPresent(this::setOwnerUUID);
+        // Label resets revision; keep order
+        setNodeLabel(state.nodeLabel());
+        setLabelRevision(state.labelRevision());
+        setHighlighted(state.highlighted());
+        entityData.set(CREATE_CONTRAPTION_ID, state.createContraptionId());
+        entityData.set(CREATE_LOCAL_POS, state.createLocalPos());
+        for (int i = 0; i < Math.min(CHANNEL_COUNT, state.channels().size()); i++) {
+            channels[i].copyFrom(state.channels().get(i));
         }
-        String label = getNodeLabel();
-        if (!label.isEmpty()) {
-            compound.putString(KEY_NODE_LABEL, label);
-        }
-        if (labelRevision > 0) compound.putLong(KEY_LABEL_REVISION, labelRevision);
-        compound.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
-
-        UUID createContraptionId = getCreateContraptionId();
-        if (createContraptionId != null) {
-            compound.putUUID(KEY_CREATE_CONTRAPTION_ID, createContraptionId);
-            compound.putLong(KEY_CREATE_LOCAL_POS, getCreateLocalPos().asLong());
-        }
-
-        HolderLookup.Provider provider = registryAccess();
-
-        CompoundTag channelsTag = new CompoundTag();
-        for (int i = 0; i < CHANNEL_COUNT; i++) {
-            channelsTag.put(KEY_CHANNEL_PREFIX + i, this.channels[i].save(provider));
-        }
-        compound.put(KEY_CHANNELS, channelsTag);
-
-        ListTag upgradesTag = new ListTag();
-        for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
-            if (!this.upgradeItems[i].isEmpty()) {
-                CompoundTag entry = new CompoundTag();
-                entry.putInt(KEY_SLOT, i);
-                entry.put(KEY_ITEM, this.upgradeItems[i].save(provider));
-                upgradesTag.add(entry);
-            }
-        }
-        if (!upgradesTag.isEmpty()) {
-            compound.put(KEY_UPGRADES, upgradesTag);
-        }
+        System.arraycopy(SlotStack.toSlots(state.upgrades(), UPGRADE_SLOT_COUNT), 0, upgradeItems, 0,
+                UPGRADE_SLOT_COUNT);
+        refreshRouteChannels();
     }
 
     public CompoundTag saveNodeState() {

@@ -3,7 +3,6 @@ package me.almana.logisticsnetworks.logic;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.filter.*;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
@@ -13,13 +12,8 @@ public final class FilterLogic {
     private FilterLogic() {
     }
 
-    public static boolean matchesItem(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt) {
-        return matchesItem(filters, filterMode, candidate, provider, candidateNbt, null);
-    }
-
     public static boolean matchesItemInSlot(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateNbt,
             @Nullable FilterItemData.ReadCache filterReadCache, int inventorySlot) {
         if (inventorySlot < 0)
             return matchesItem(filters, filterMode, candidate, provider, candidateNbt, filterReadCache);
@@ -88,7 +82,7 @@ public final class FilterLogic {
     }
 
     public static boolean matchesItem(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateNbt,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         if (filters == null || filters.length == 0)
             return true;
@@ -151,11 +145,6 @@ public final class FilterLogic {
             return true;
 
         return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
-    }
-
-    public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
-            HolderLookup.Provider provider) {
-        return matchesFluid(filters, filterMode, candidate, provider, null);
     }
 
     public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
@@ -224,10 +213,6 @@ public final class FilterLogic {
         return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
     }
 
-    public static boolean matchesChemical(ItemStack[] filters, FilterMode filterMode, String chemicalId) {
-        return matchesChemical(filters, filterMode, chemicalId, null);
-    }
-
     public static boolean matchesChemical(ItemStack[] filters, FilterMode filterMode, String chemicalId,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         if (filters == null || filters.length == 0)
@@ -292,10 +277,6 @@ public final class FilterLogic {
             return true;
 
         return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
-    }
-
-    public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters) {
-        return hasConfiguredItemNbtFilter(filters, null);
     }
 
     public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters,
