@@ -127,7 +127,8 @@ public final class LegacyComponentMigration {
     private static StackSnapshot readItem(CompoundTag tag, @Nullable HolderLookup.Provider provider) {
         ItemStack stack = provider == null
                 ? ItemStack.CODEC.parse(NbtOps.INSTANCE, tag).result().orElse(ItemStack.EMPTY)
-                : ItemStack.parseOptional(provider, tag);
+                : ComponentCodecs.QUIET_STACK.parse(provider.createSerializationContext(NbtOps.INSTANCE), tag)
+                        .result().orElse(ItemStack.EMPTY);
         if (stack.isEmpty()) {
             return null;
         }
