@@ -38,7 +38,6 @@ import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
@@ -1337,7 +1336,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
 
         for (NbtCriterion rule : entry.nbtRules()) {
-            String value = rule.value() == null ? "" : rule.value().toString();
+            String value = rule.value().toString();
             menu.addSlotNbtRule(minecraft.player, slot, rule.path(), rule.operator(), value);
             PacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(slot, rule.path(), rule.operator(), value));
         }
@@ -3238,7 +3237,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             } else {
                 List<NbtCriterion> stored = menu.getSlotNbtRules(slot);
                 for (NbtCriterion r : stored) {
-                    String display = r.value() != null ? r.value().getAsString() : "?";
+                    String display = r.value().getAsString();
                     detailCachedNbtEntries.add(new NbtFilterData.NbtEntry(r.path(), display));
                 }
                 for (NbtFilterData.NbtEntry entry : NbtFilterData.getDefaultEntries()) {

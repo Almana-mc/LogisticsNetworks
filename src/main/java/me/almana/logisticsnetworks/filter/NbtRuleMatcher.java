@@ -32,7 +32,7 @@ public final class NbtRuleMatcher {
         return OPS[0];
     }
 
-    static boolean matchesValue(@Nullable String operator, Tag expected, @Nullable Tag actual) {
+    public static boolean matchesValue(@Nullable String operator, Tag expected, @Nullable Tag actual) {
         if (actual == null) {
             return OP_NOT_EQUALS.equals(operator);
         }

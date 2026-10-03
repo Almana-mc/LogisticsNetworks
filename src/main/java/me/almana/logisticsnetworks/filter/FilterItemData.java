@@ -1040,7 +1040,7 @@ public final class FilterItemData {
             boolean matchAny = entry.nbtMatchAny();
             for (NbtCriterion rule : rules) {
                 Tag actual = NbtFilterData.resolvePathValue(components, rule.path());
-                boolean matches = matchesNbtValue(rule.operator(), rule.value(), actual);
+                boolean matches = rule.matches(actual);
                 if (matchAny && matches) return true;
                 if (!matchAny && !matches) return false;
             }
