@@ -58,6 +58,10 @@ public record NbtPath(Component[] components) {
     }
 
     private static int parseKey(String str, int start, List<Component> out) {
+        if (str.charAt(start) == '"') {
+            return parseQuotedKey(str, start + 1, out);
+        }
+
         var end = start;
         while (end < str.length() && str.charAt(end) != '.' && str.charAt(end) != '[') {
             end++;
@@ -68,6 +72,30 @@ public record NbtPath(Component[] components) {
 
         out.add(new StringComponent(str.substring(start, end)));
         return end;
+    }
+
+    private static int parseQuotedKey(String str, int start, List<Component> out) {
+        var key = new StringBuilder();
+        var pos = start;
+        while (pos < str.length()) {
+            var c = str.charAt(pos++);
+            if (c == '"') {
+                out.add(new StringComponent(key.toString()));
+                return pos;
+            }
+            if (c == '\\') {
+                if (pos >= str.length() || (str.charAt(pos) != '"' && str.charAt(pos) != '\\')) {
+                    return -1;
+                }
+                c = str.charAt(pos++);
+            }
+            key.append(c);
+        }
+        return -1;
+    }
+
+    private static boolean needsQuotes(String key) {
+        return key.isEmpty() || key.charAt(0) == '"' || key.indexOf('.') >= 0 || key.indexOf('[') >= 0;
     }
 
     private static int parseIndex(String str, int start, List<Component> out) {
@@ -101,6 +129,12 @@ public record NbtPath(Component[] components) {
             return "";
         }
 
+        // lenient parse restores it
+        if (this.components.length == 1 && this.components[0] instanceof StringComponent(var value)
+                && needsQuotes(value) && parse(value) == null) {
+            return value;
+        }
+
         var builder = new StringBuilder();
         for (var component : this.components) {
             switch (component) {
@@ -108,7 +142,11 @@ public record NbtPath(Component[] components) {
                     if (!builder.isEmpty()) {
                         builder.append('.');
                     }
-                    builder.append(p.value);
+                    if (needsQuotes(p.value)) {
+                        builder.append('"').append(p.value.replace("\\", "\\\\").replace("\"", "\\\"")).append('"');
+                    } else {
+                        builder.append(p.value);
+                    }
                 }
                 case IndexComponent p -> {
                     builder.append('[');
