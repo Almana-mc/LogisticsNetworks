@@ -89,7 +89,7 @@ public final class GraphPayloadHandler {
                 Component.translatable("gui.logisticsnetworks.network_graph"), preserveCursor), buf -> {
                     context.write(buf);
                     buf.writeBoolean(node != null);
-                    if (node != null) NodeMenuSync.write(buf, node, player.registryAccess(), selectedChannel);
+                    if (node != null) NodeMenuSync.write(buf, node, selectedChannel);
                 });
         if (player.containerMenu instanceof NodeGraphMenu menu) menu.sendNetworkListToClient(player);
         sendSnapshot(player);
@@ -337,7 +337,7 @@ public final class GraphPayloadHandler {
             menu.setReturnContext(context);
             return menu;
         }, Component.translatable("gui.logisticsnetworks.node_config"), true), buf -> {
-            NodeMenuSync.write(buf, node, player.registryAccess(), selectedChannel);
+            NodeMenuSync.write(buf, node, selectedChannel);
             buf.writeBoolean(true);
             context.write(buf);
         });

@@ -864,7 +864,7 @@ public class ServerPayloadHandler {
                     return menu;
                 }
             }, buf -> {
-                NodeMenuSync.write(buf, node, player.level().registryAccess(), selectedChannel);
+                NodeMenuSync.write(buf, node, selectedChannel);
             });
 
             if (player.containerMenu instanceof NodeMenu menu) {
