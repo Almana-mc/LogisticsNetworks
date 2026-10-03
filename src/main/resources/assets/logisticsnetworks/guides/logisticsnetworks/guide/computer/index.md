@@ -28,7 +28,7 @@ Once you pick a network from the directory, you can jump into either of the two 
 
 See [Saving & Loading Networks](save-load.md) to back up node configurations or load them onto the Computer's wrench.
 
-With CC: Tweaked installed, see [ComputerCraft](computercraft.md) to read the same data from Lua scripts and monitors.
+With CC: Tweaked installed, see [ComputerCraft](../integrations/computercraft.md) to read the same data from Lua scripts and monitors.
 
 Until a network is mounted, the right-hand pane just says **No Network Mounted**. Pick one from the directory and the subsystem buttons unlock.
 

@@ -1,8 +1,8 @@
 ---
 navigation:
   title: ComputerCraft
-  parent: computer/index.md
-  position: 5
+  parent: integrations/index.md
+  position: 1
 ---
 
 # ComputerCraft
@@ -25,7 +25,7 @@ A Computer placed before this update has no owner. Break it and place it again t
 
 ## Methods
 
-`net` is a network id or its exact name. Channel lists are in screen order and each entry's `index` is the `CH` number shown in the I/O Monitor, which starts at 0 — so CH0 is `channels[1]`. Graph edge `channels` also hold CH numbers.
+`net` is a network id or its exact name. Channel lists are in screen order and each entry's `index` is the `CH` number shown in the [I/O Monitor](../computer/io-monitor.md), which starts at 0 — so CH0 is `channels[1]`. Graph edge `channels` also hold CH numbers.
 
 | Method | Returns |
 |---|---|
