@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.component.ClipboardSnapshot;
 import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
@@ -275,7 +276,7 @@ public class FilterMenu extends AbstractContainerMenu {
                     buf.writeVarInt(hand.ordinal());
                     buf.writeVarInt(channelIndex);
                     buf.writeVarInt(filterSlot);
-                    buf.writeNbt(clipboard.save(player.registryAccess()));
+                    ClipboardSnapshot.STREAM_CODEC.encode(buf, clipboard.toComponentSnapshot(player.registryAccess()));
                     writeModeData(buf, slots, isMod, false, isName);
                 });
         return true;
@@ -325,8 +326,7 @@ public class FilterMenu extends AbstractContainerMenu {
             this.nodeSource = null;
             this.nodeChannel = buf.readVarInt();
             this.nodeFilterSlot = buf.readVarInt();
-            NodeClipboardConfig loaded = NodeClipboardConfig.load(buf.readNbt(), playerInv.player.registryAccess());
-            this.clipboardSource = loaded == null ? NodeClipboardConfig.createEmpty() : loaded;
+            this.clipboardSource = NodeClipboardConfig.fromComponentSnapshot(ClipboardSnapshot.STREAM_CODEC.decode(buf));
         } else if (handOrdinal == -1) {
             this.inventorySlotIndex = buf.readVarInt();
             this.hand = InteractionHand.MAIN_HAND;
