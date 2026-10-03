@@ -12,10 +12,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public record NbtPath(Component[] components) {
     public static final Codec<NbtPath> CODEC = Codec.STRING.xmap(NbtPath::parseLenient, NbtPath::toString);
-    public static final StreamCodec<ByteBuf, NbtPath> STREAM_CODEC = ByteBufCodecs.STRING_UTF8.map(NbtPath::parseLenient, NbtPath::toString);
+    public static final StreamCodec<ByteBuf, NbtPath> STREAM_CODEC = ByteBufCodecs.stringUtf8(1024).map(NbtPath::parseLenient, NbtPath::toString);
 
     public static final NbtPath EMPTY = NbtPath.of();
 
@@ -34,36 +35,19 @@ public record NbtPath(Component[] components) {
         }
 
         var list = new ArrayList<Component>();
-
-        var remaining = pathStr;
-        while (!remaining.isEmpty()) {
-            var start = remaining.charAt(0);
-
-            if (start == '[') {
-                remaining = remaining.substring(1);
-                var res = IndexComponent.parse(remaining);
-                if (res.result() == null) {
-                    return null;
-                }
-                list.add(res.result());
-                remaining = remaining.substring(res.usage());
-                if (remaining.isEmpty() || remaining.charAt(0) != ']') {
-                    return null;
-                }
-                remaining = remaining.substring(1);
-            } else {
-                var res = StringComponent.parse(remaining);
-                if (res.result() == null) {
-                    return null;
-                }
-                list.add(res.result());
-                remaining = remaining.substring(res.usage());
+        var pos = 0;
+        while (pos < pathStr.length()) {
+            pos = pathStr.charAt(pos) == '['
+                    ? parseIndex(pathStr, pos + 1, list)
+                    : parseKey(pathStr, pos, list);
+            if (pos < 0) {
+                return null;
             }
 
-            if (!remaining.isEmpty()) {
-                var next = remaining.charAt(0);
+            if (pos < pathStr.length()) {
+                var next = pathStr.charAt(pos);
                 if (next == '.') {
-                    remaining = remaining.substring(1);
+                    pos++;
                 } else if (next != '[') {
                     return null;
                 }
@@ -71,6 +55,38 @@ public record NbtPath(Component[] components) {
         }
 
         return new NbtPath(list.toArray(new Component[0]));
+    }
+
+    private static int parseKey(String str, int start, List<Component> out) {
+        var end = start;
+        while (end < str.length() && str.charAt(end) != '.' && str.charAt(end) != '[') {
+            end++;
+        }
+        if (end == start) {
+            return -1;
+        }
+
+        out.add(new StringComponent(str.substring(start, end)));
+        return end;
+    }
+
+    private static int parseIndex(String str, int start, List<Component> out) {
+        var end = start;
+        var value = 0;
+        while (end < str.length() && str.charAt(end) >= '0' && str.charAt(end) <= '9') {
+            var digit = str.charAt(end) - '0';
+            if (value > (Integer.MAX_VALUE - digit) / 10) {
+                return -1;
+            }
+            value = value * 10 + digit;
+            end++;
+        }
+        if (end == start || end >= str.length() || str.charAt(end) != ']') {
+            return -1;
+        }
+
+        out.add(new IndexComponent(value));
+        return end + 1;
     }
 
     public static NbtPath parseLenient(String pathStr) {
@@ -171,12 +187,6 @@ public record NbtPath(Component[] components) {
         }
     }
 
-    record UsageAndResult<T>(int usage, T result) {
-        public static <T> UsageAndResult<T> of(int usage, T result) {
-            return new UsageAndResult<>(usage, result);
-        }
-    }
-
     record StringComponent(String value) implements Component {
         @Override
         public @Nullable Tag getFrom(@Nullable Tag parent) {
@@ -185,28 +195,6 @@ public record NbtPath(Component[] components) {
             }
 
             return compound.get(this.value);
-        }
-
-        public static @NotNull UsageAndResult<@Nullable Component> parse(String string) {
-            if (string.isEmpty()) {
-                return UsageAndResult.of(0, null);
-            }
-
-            int periodIdx = string.indexOf('.');
-            if (periodIdx == -1) {
-                periodIdx = string.length();
-            }
-
-            int bracketIdx = string.indexOf('[');
-            if (bracketIdx == -1) {
-                bracketIdx = string.length();
-            }
-
-            String value = string.substring(0, Math.min(periodIdx, bracketIdx));
-            if (value.isEmpty()) {
-                return UsageAndResult.of(0, null);
-            }
-            return UsageAndResult.of(value.length(), new StringComponent(value));
         }
     }
 
@@ -218,36 +206,6 @@ public record NbtPath(Component[] components) {
             }
 
             return compound.get(this.value);
-        }
-
-        public static @NotNull UsageAndResult<@Nullable Component> parse(String string) {
-            if (string.isEmpty()) {
-                return UsageAndResult.of(0, null);
-            }
-
-            char[] chars = string.toCharArray();
-            if (chars[0] < '0' || chars[0] > '9') {
-                return UsageAndResult.of(0, null);
-            }
-
-            int value = 0;
-            int i = 0;
-
-            for (; i < chars.length; i++) {
-                char c = chars[i];
-                if (c < '0' || c > '9') {
-                    break;
-                }
-
-                var oldValue = value;
-                value = value * 10 + c - '0';
-
-                if (oldValue > value) {
-                    return UsageAndResult.of(0, null);
-                }
-            }
-
-            return UsageAndResult.of(i, new IndexComponent(value));
         }
     }
 }
