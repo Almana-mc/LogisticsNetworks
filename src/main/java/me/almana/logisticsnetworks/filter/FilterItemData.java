@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.component.GeneralFilterConfig;
 import me.almana.logisticsnetworks.component.GeneralFilterEntry;
 import me.almana.logisticsnetworks.component.LegacyComponentMigration;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
+import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import net.minecraft.core.HolderLookup;
@@ -29,6 +30,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 public final class FilterItemData {
 
@@ -176,75 +178,24 @@ public final class FilterItemData {
     }
 
     public static ItemStack getEntry(ItemStack stack, int slot, @Nullable HolderLookup.Provider provider) {
-        if (!isFilterItem(stack) || provider == null)
-            return ItemStack.EMPTY;
-
-        CompoundTag root = getRoot(stack, provider);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_ITEM_TAG, Tag.TAG_COMPOUND)) {
-                    return ItemStack.parseOptional(provider, entry.getCompound(KEY_ITEM_TAG));
-                }
-            }
-        }
-        return ItemStack.EMPTY;
+        GeneralFilterEntry entry = entry(stack, slot);
+        return entry == null || entry.item() == null ? ItemStack.EMPTY : entry.item().toStack();
     }
 
     public static void setEntry(ItemStack stack, int slot, ItemStack value, @Nullable HolderLookup.Provider provider) {
-        if (!isFilterItem(stack) || provider == null)
-            return;
-        if (slot < 0 || slot >= getCapacity(stack))
-            return;
-
-        ItemStack item = (value == null || value.isEmpty()) ? ItemStack.EMPTY : value.copyWithCount(1);
-
-        updateRoot(stack, provider, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-
-            CompoundTag existing = null;
-            int existingIdx = -1;
-            for (int i = 0; i < list.size(); i++) {
-                if (list.get(i) instanceof CompoundTag c && c.getInt(KEY_SLOT) == slot) {
-                    existing = c;
-                    existingIdx = i;
-                    break;
-                }
-            }
-
-            if (!item.isEmpty()) {
-                if (existing != null) {
-                    existing.put(KEY_ITEM_TAG, item.save(provider));
-                } else {
-                    CompoundTag entry = new CompoundTag();
-                    entry.putInt(KEY_SLOT, slot);
-                    entry.put(KEY_ITEM_TAG, item.save(provider));
-                    list.add(entry);
-                }
-            } else if (existing != null) {
-                list.remove(existingIdx);
-            }
-
-            if (list.isEmpty()) {
-                root.remove(KEY_ITEMS);
-            } else {
-                root.put(KEY_ITEMS, list);
-            }
-        });
+        edit(stack, slot, entry -> value.isEmpty()
+                ? GeneralFilterEntry.empty(slot)
+                : entry.withItem(StackSnapshot.of(value.copyWithCount(1))));
     }
 
     public static boolean addItem(ItemStack filter, ItemStack item, @Nullable HolderLookup.Provider provider) {
-        if (!isFilterItem(filter) || item == null || item.isEmpty() || provider == null) {
+        if (!isFilterItem(filter) || item.isEmpty())
             return false;
-        }
-        int cap = getCapacity(filter);
         ItemStack entry = item.copyWithCount(1);
+        int cap = getCapacity(filter);
         for (int i = 0; i < cap; i++) {
-            ItemStack existing = getEntry(filter, i, provider);
-            if (!existing.isEmpty() && ItemStack.isSameItemSameComponents(existing, entry)) {
+            if (ItemStack.isSameItemSameComponents(getEntry(filter, i, provider), entry))
                 return false;
-            }
         }
         for (int i = 0; i < cap; i++) {
             if (isEntrySlotAvailable(filter, i)) {
@@ -256,19 +207,7 @@ public final class FilterItemData {
     }
 
     public static void clearEntryItem(ItemStack stack, int slot) {
-        if (!isFilterItem(stack)) return;
-        if (slot < 0 || slot >= getCapacity(stack)) return;
-
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-            for (Tag t : list) {
-                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    entry.remove(KEY_ITEM_TAG);
-                    root.put(KEY_ITEMS, list);
-                    return;
-                }
-            }
-        });
+        edit(stack, slot, entry -> entry.withItem(null));
     }
 
     public static FluidStack getFluidEntry(ItemStack stack, int slot) {
@@ -347,12 +286,7 @@ public final class FilterItemData {
     }
 
     public static boolean hasAnyEntries(ItemStack stack) {
-        if (!isFilterItem(stack))
-            return false;
-
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        return !list.isEmpty();
+        return !entries(stack).isEmpty();
     }
 
     public static boolean hasAnyItemMatchEntries(ItemStack stack, @Nullable ReadCache readCache) {
@@ -380,11 +314,7 @@ public final class FilterItemData {
     }
 
     public static int getEntryCount(ItemStack stack) {
-        if (!isFilterItem(stack))
-            return 0;
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        return list.size();
+        return entries(stack).size();
     }
 
     public static boolean containsItem(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider) {
@@ -494,13 +424,10 @@ public final class FilterItemData {
     }
 
     private static boolean isEntrySlotAvailable(ItemStack filter, int slot) {
-        CompoundTag entry = getEntryData(filter, slot);
-        return (entry == null || !entry.contains(KEY_ITEM_TAG, Tag.TAG_COMPOUND))
-                && getFluidEntry(filter, slot).isEmpty()
-                && getChemicalEntry(filter, slot) == null
-                && getEntryTag(filter, slot) == null
-                && !isNbtOnlySlot(filter, slot)
-                && getEntrySlotMapping(filter, slot) == null;
+        GeneralFilterEntry entry = entry(filter, slot);
+        return entry == null || (entry.item() == null && nonEmpty(entry.fluidId()) == null
+                && nonEmpty(entry.chemicalId()) == null && FilterTagUtil.normalizeTag(entry.tag()) == null
+                && entry.slotMapping().slots().isEmpty() && !isNbtOnly(entry));
     }
 
     public static boolean hasAvailableEntrySlot(ItemStack filter) {
@@ -1820,7 +1747,7 @@ public final class FilterItemData {
         ParsedRawNbt raw = parseRawNbt(entry.nbt().raw());
         String durOp = entry.durability() == null ? null : entry.durability().operator().id();
         int durVal = entry.durability() == null ? 0 : entry.durability().value();
-        int stock = entry.counts().stock() != 0 ? entry.counts().stock() : entry.counts().amount();
+        int stock = stockOf(entry);
         int[] mapping = entry.slotMapping().slots().isEmpty()
                 ? null
                 : entry.slotMapping().slots().stream().mapToInt(Integer::intValue).toArray();
@@ -1872,6 +1799,66 @@ public final class FilterItemData {
     @Nullable
     private static String nonEmpty(@Nullable String value) {
         return value == null || value.isEmpty() ? null : value;
+    }
+
+    private static List<GeneralFilterEntry> entries(ItemStack stack) {
+        if (!isFilterItem(stack))
+            return List.of();
+        LegacyComponentMigration.migrateGeneralFilter(stack, null);
+        GeneralFilterConfig config = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
+        return config == null ? List.of() : config.entries();
+    }
+
+    @Nullable
+    private static GeneralFilterEntry entry(ItemStack stack, int slot) {
+        List<GeneralFilterEntry> entries = entries(stack);
+        int index = indexOfSlot(entries, slot);
+        return index < 0 ? null : entries.get(index);
+    }
+
+    private static int indexOfSlot(List<GeneralFilterEntry> entries, int slot) {
+        for (int i = 0; i < entries.size(); i++) {
+            if (entries.get(i).slot() == slot)
+                return i;
+        }
+        return -1;
+    }
+
+    private static boolean edit(ItemStack stack, int slot, UnaryOperator<GeneralFilterEntry> change) {
+        if (!isFilterItem(stack) || slot < 0 || slot >= getCapacity(stack)
+                || !LegacyComponentMigration.migrateGeneralFilter(stack, null))
+            return false;
+        List<GeneralFilterEntry> entries = new ArrayList<>(entries(stack));
+        int index = indexOfSlot(entries, slot);
+        GeneralFilterEntry current = index < 0 ? GeneralFilterEntry.empty(slot) : entries.get(index);
+        GeneralFilterEntry next = change.apply(current);
+        if (next.equals(current))
+            return false;
+        if (index < 0)
+            entries.add(next);
+        else if (next.isEmpty())
+            entries.remove(index);
+        else
+            entries.set(index, next);
+        if (entries.isEmpty())
+            stack.remove(LogisticsDataComponents.FILTER_ENTRIES);
+        else
+            stack.set(LogisticsDataComponents.FILTER_ENTRIES, new GeneralFilterConfig(entries));
+        return true;
+    }
+
+    private static boolean hasNbt(GeneralFilterEntry entry) {
+        return !entry.nbt().rules().isEmpty() || !entry.nbt().raw().isEmpty();
+    }
+
+    private static int stockOf(GeneralFilterEntry entry) {
+        return entry.counts().stock() != 0 ? entry.counts().stock() : entry.counts().amount();
+    }
+
+    private static boolean isNbtOnly(GeneralFilterEntry entry) {
+        return (hasNbt(entry) || entry.counts().batch() > 0 || stockOf(entry) > 0)
+                && entry.item() == null && FilterTagUtil.normalizeTag(entry.tag()) == null
+                && nonEmpty(entry.fluidId()) == null && nonEmpty(entry.chemicalId()) == null;
     }
 
     private static ParsedRawNbt parseRawNbt(String raw) {

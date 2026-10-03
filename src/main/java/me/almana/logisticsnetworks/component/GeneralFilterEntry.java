@@ -24,8 +24,8 @@ public record GeneralFilterEntry(
         NbtConstraints nbt,
         @Nullable DurabilityConstraint durability) {
 
-    private static final NbtPath ENCHANTED_PATH = NbtPath.of(NbtPath.Component.of("minecraft:enchanted"));
-    private static final NbtPath DURABILITY_PATH = NbtPath.of(NbtPath.Component.of("minecraft:durability"));
+    public static final NbtPath ENCHANTED_PATH = NbtPath.of(NbtPath.Component.of("minecraft:enchanted"));
+    public static final NbtPath DURABILITY_PATH = NbtPath.of(NbtPath.Component.of("minecraft:durability"));
 
     public static final Codec<GeneralFilterEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.fieldOf("slot").forGetter(GeneralFilterEntry::slot),
@@ -65,6 +65,15 @@ public record GeneralFilterEntry(
     public static GeneralFilterEntry empty(int slot) {
         return new GeneralFilterEntry(slot, null, null, null, null, EntryCounts.EMPTY, SlotMapping.EMPTY,
                 null, NbtConstraints.EMPTY, null);
+    }
+
+    public boolean isEmpty() {
+        return equals(empty(slot));
+    }
+
+    public GeneralFilterEntry withItem(@Nullable StackSnapshot value) {
+        return new GeneralFilterEntry(slot, value, fluidId, chemicalId, tag, counts, slotMapping, enchanted,
+                nbt, durability);
     }
 
     public GeneralFilterEntry withNbt(NbtConstraints value) {
