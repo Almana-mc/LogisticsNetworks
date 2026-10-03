@@ -115,7 +115,10 @@ public final class LegacyComponentMigration {
                     continue;
                 }
             }
-            entries.add(readEntry(entry, item));
+            GeneralFilterEntry read = readEntry(entry, item);
+            if (!read.isEmpty()) {
+                entries.add(read);
+            }
         }
         return new GeneralFilterConfig(entries);
     }
