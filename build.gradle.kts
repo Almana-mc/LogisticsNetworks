@@ -198,12 +198,16 @@ neoForge.ideSyncTask(generateModMetadata)
 publishing {
     publications {
         register<MavenPublication>("mavenJava") {
+            artifactId = mod_id
             from(components["java"])
         }
     }
     repositories {
         maven {
-            url = project.layout.projectDirectory.dir("repo").asFile.toURI()
+            name = "almana"
+            val channel = if (version.toString().endsWith("-SNAPSHOT")) "snapshots" else "releases"
+            url = uri("https://maven.almanax21.com/$channel")
+            credentials(PasswordCredentials::class)
         }
     }
 }
