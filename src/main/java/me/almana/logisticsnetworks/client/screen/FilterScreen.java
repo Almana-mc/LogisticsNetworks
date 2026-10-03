@@ -4354,7 +4354,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void cycleDetailNbtOp(NbtPath path) {
-        String currentOp = detailNbtActiveOps.getOrDefault(path, "=");
+        String currentOp = detailNbtActiveOps.getOrDefault(path.toString(), "=");
         String nextOp = FilterItemData.nextNbtOperator(currentOp);
         detailNbtActiveOps.put(path.toString(), nextOp);
         detailNbtOp = nextOp;
