@@ -111,6 +111,9 @@ public final class LegacyComponentMigration {
                     // Retry once registries exist
                     return null;
                 }
+                if (item == null) {
+                    continue;
+                }
             }
             entries.add(readEntry(entry, item));
         }
