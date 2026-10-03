@@ -1,0 +1,10 @@
+name: Nightly
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  nightly:
+    uses: Almana-mc/.github/.github/workflows/nightly.yml@main
+    secrets: inherit
