@@ -25,6 +25,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -377,66 +378,17 @@ public final class FilterItemData {
 
     @Nullable
     public static String getEntryTag(ItemStack stack, int slot) {
-        if (!isFilterItem(stack))
-            return null;
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_TAG, Tag.TAG_STRING)) {
-                    return FilterTagUtil.normalizeTag(entry.getString(KEY_TAG));
-                }
-            }
-        }
-        return null;
+        GeneralFilterEntry entry = entry(stack, slot);
+        return entry == null ? null : FilterTagUtil.normalizeTag(entry.tag());
     }
 
     public static void setEntryTag(ItemStack stack, int slot, @Nullable String tag) {
-        if (!isFilterItem(stack))
-            return;
-        if (slot < 0 || slot >= getCapacity(stack))
-            return;
-
-        String normalizedTag = FilterTagUtil.normalizeTag(tag);
-
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-
-            CompoundTag existing = null;
-            for (Tag t : list) {
-                if (t instanceof CompoundTag c && c.getInt(KEY_SLOT) == slot) {
-                    existing = c;
-                    break;
-                }
-            }
-
-            if (normalizedTag != null) {
-                if (existing != null) {
-                    existing.putString(KEY_TAG, normalizedTag);
-                } else {
-                    CompoundTag entry = new CompoundTag();
-                    entry.putInt(KEY_SLOT, slot);
-                    entry.putString(KEY_TAG, normalizedTag);
-                    list.add(entry);
-                }
-            } else if (existing != null) {
-                existing.remove(KEY_TAG);
-            }
-
-            if (list.isEmpty()) {
-                root.remove(KEY_ITEMS);
-            } else {
-                root.put(KEY_ITEMS, list);
-            }
-        });
+        String normalized = FilterTagUtil.normalizeTag(tag);
+        edit(stack, slot, entry -> entry.withTag(normalized));
     }
 
     public static boolean hasAnyTagEntries(ItemStack stack, @Nullable ReadCache readCache) {
-        if (!isFilterItem(stack))
-            return false;
-        if (readCache == null)
-            return hasEntryType(stack, KEY_TAG);
-        return getItemFilterView(stack, readCache).hasTagEntries();
+        return isFilterItem(stack) && getItemFilterView(stack, readCache).hasTagEntries();
     }
 
     public static boolean hasAnyAmountEntries(ItemStack stack, @Nullable ReadCache readCache) {
@@ -456,122 +408,35 @@ public final class FilterItemData {
     // ── Batch/Stock per-slot methods ──
 
     public static int getEntryBatch(ItemStack stack, int slot) {
-        if (!isFilterItem(stack)) return 0;
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                return entry.contains(KEY_BATCH, Tag.TAG_INT) ? entry.getInt(KEY_BATCH) : 0;
-            }
-        }
-        return 0;
+        GeneralFilterEntry entry = entry(stack, slot);
+        return entry == null ? 0 : entry.counts().batch();
     }
 
     public static void setEntryBatch(ItemStack stack, int slot, int batch) {
-        if (!isFilterItem(stack)) return;
-        if (slot < 0 || slot >= getCapacity(stack)) return;
-
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-            for (Tag t : list) {
-                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    if (batch <= 0) {
-                        entry.remove(KEY_BATCH);
-                    } else {
-                        entry.putInt(KEY_BATCH, batch);
-                    }
-                    root.put(KEY_ITEMS, list);
-                    return;
-                }
-            }
-            if (batch > 0) {
-                CompoundTag entry = new CompoundTag();
-                entry.putInt(KEY_SLOT, slot);
-                entry.putInt(KEY_BATCH, batch);
-                list.add(entry);
-                root.put(KEY_ITEMS, list);
-            }
-        });
+        edit(stack, slot, entry -> entry.withCounts(new GeneralFilterEntry.EntryCounts(
+                entry.counts().amount(), Math.max(0, batch), entry.counts().stock())));
     }
 
     public static int getEntryStock(ItemStack stack, int slot) {
-        if (!isFilterItem(stack)) return 0;
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_STOCK, Tag.TAG_INT)) return entry.getInt(KEY_STOCK);
-                if (entry.contains(KEY_AMOUNT, Tag.TAG_INT)) return entry.getInt(KEY_AMOUNT);
-                return 0;
-            }
-        }
-        return 0;
+        GeneralFilterEntry entry = entry(stack, slot);
+        return entry == null ? 0 : stockOf(entry);
     }
 
     public static void setEntryStock(ItemStack stack, int slot, int stock) {
-        if (!isFilterItem(stack)) return;
-        if (slot < 0 || slot >= getCapacity(stack)) return;
-
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-            for (Tag t : list) {
-                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    entry.remove(KEY_AMOUNT);
-                    if (stock <= 0) {
-                        entry.remove(KEY_STOCK);
-                    } else {
-                        entry.putInt(KEY_STOCK, stock);
-                    }
-                    root.put(KEY_ITEMS, list);
-                    return;
-                }
-            }
-            if (stock > 0) {
-                CompoundTag entry = new CompoundTag();
-                entry.putInt(KEY_SLOT, slot);
-                entry.putInt(KEY_STOCK, stock);
-                list.add(entry);
-                root.put(KEY_ITEMS, list);
-            }
-        });
+        edit(stack, slot, entry -> entry.withCounts(new GeneralFilterEntry.EntryCounts(
+                0, entry.counts().batch(), Math.max(0, stock))));
     }
 
     // ── Slot mapping per-entry methods ──
 
-    @Nullable
-    public static int[] getEntrySlotMapping(ItemStack stack, int slot) {
-        if (!isFilterItem(stack)) return null;
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                if (entry.contains(KEY_SLOT_MAPPING, Tag.TAG_INT_ARRAY)) {
-                    int[] mapping = entry.getIntArray(KEY_SLOT_MAPPING);
-                    return mapping.length > 0 ? mapping : null;
-                }
-            }
-        }
-        return null;
-    }
-
     public static String getEntrySlotMappingExpression(ItemStack stack, int slot) {
-        if (!isFilterItem(stack)) return "";
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                String stored = entry.getString(KEY_SLOT_MAPPING_EXPR);
-                if (!stored.isEmpty()) {
-                    return stored;
-                }
-                break;
-            }
-        }
-        int[] mapping = getEntrySlotMapping(stack, slot);
-        if (mapping == null) return "";
-        List<Integer> sorted = new ArrayList<>();
-        for (int s : mapping) sorted.add(s);
-        return SlotExpressionUtil.formatSlots(sorted);
+        GeneralFilterEntry entry = entry(stack, slot);
+        if (entry == null)
+            return "";
+        GeneralFilterEntry.SlotMapping mapping = entry.slotMapping();
+        if (!mapping.expression().isEmpty())
+            return mapping.expression();
+        return mapping.slots().isEmpty() ? "" : SlotExpressionUtil.formatSlots(mapping.slots());
     }
 
     public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots) {
@@ -580,45 +445,15 @@ public final class FilterItemData {
 
     public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots,
             @Nullable String expression) {
-        if (!isFilterItem(stack)) return;
-        if (slot < 0 || slot >= getCapacity(stack)) return;
-
-        boolean hasSlots = slots != null && slots.length > 0;
-        boolean hasExpr = expression != null && !expression.isEmpty();
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-            for (Tag t : list) {
-                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    if (hasSlots) {
-                        entry.putIntArray(KEY_SLOT_MAPPING, slots);
-                        if (hasExpr) {
-                            entry.putString(KEY_SLOT_MAPPING_EXPR, expression);
-                        } else {
-                            entry.remove(KEY_SLOT_MAPPING_EXPR);
-                        }
-                    } else {
-                        entry.remove(KEY_SLOT_MAPPING);
-                        entry.remove(KEY_SLOT_MAPPING_EXPR);
-                    }
-                    root.put(KEY_ITEMS, list);
-                    return;
-                }
-            }
-            if (hasSlots) {
-                CompoundTag entry = new CompoundTag();
-                entry.putInt(KEY_SLOT, slot);
-                entry.putIntArray(KEY_SLOT_MAPPING, slots);
-                if (hasExpr) {
-                    entry.putString(KEY_SLOT_MAPPING_EXPR, expression);
-                }
-                list.add(entry);
-                root.put(KEY_ITEMS, list);
-            }
-        });
+        GeneralFilterEntry.SlotMapping mapping = slots == null || slots.length == 0
+                ? GeneralFilterEntry.SlotMapping.EMPTY
+                : new GeneralFilterEntry.SlotMapping(Arrays.stream(slots).boxed().toList(), expression);
+        edit(stack, slot, entry -> entry.withSlotMapping(mapping));
     }
 
     public static boolean hasEntrySlotMapping(ItemStack stack, int slot) {
-        return getEntrySlotMapping(stack, slot) != null;
+        GeneralFilterEntry entry = entry(stack, slot);
+        return entry != null && !entry.slotMapping().slots().isEmpty();
     }
 
     public static boolean hasAnySlotMappings(ItemStack filter, @Nullable ReadCache readCache) {
@@ -1550,41 +1385,13 @@ public final class FilterItemData {
     }
 
     public static int getEntryAmount(ItemStack stack, int slot) {
-        if (!isFilterItem(stack))
-            return 0;
-
-        CompoundTag root = getRoot(stack);
-        ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-
-        for (Tag t : list) {
-            if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                return entry.contains(KEY_AMOUNT, Tag.TAG_INT) ? entry.getInt(KEY_AMOUNT) : 0;
-            }
-        }
-        return 0;
+        GeneralFilterEntry entry = entry(stack, slot);
+        return entry == null ? 0 : entry.counts().amount();
     }
 
     public static void setEntryAmount(ItemStack stack, int slot, int amount) {
-        if (!isFilterItem(stack))
-            return;
-        if (slot < 0 || slot >= getCapacity(stack))
-            return;
-
-        updateRoot(stack, root -> {
-            ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-
-            for (Tag t : list) {
-                if (t instanceof CompoundTag entry && entry.getInt(KEY_SLOT) == slot) {
-                    if (amount <= 0) {
-                        entry.remove(KEY_AMOUNT);
-                    } else {
-                        entry.putInt(KEY_AMOUNT, amount);
-                    }
-                    root.put(KEY_ITEMS, list);
-                    return;
-                }
-            }
-        });
+        edit(stack, slot, entry -> entry.isEmpty() ? entry : entry.withCounts(new GeneralFilterEntry.EntryCounts(
+                Math.max(0, amount), entry.counts().batch(), entry.counts().stock())));
     }
 
     /**

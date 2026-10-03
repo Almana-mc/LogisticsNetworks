@@ -76,6 +76,16 @@ public record GeneralFilterEntry(
                 nbt, durability);
     }
 
+    public GeneralFilterEntry withTag(@Nullable String value) {
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, value, counts, slotMapping, enchanted,
+                nbt, durability);
+    }
+
+    public GeneralFilterEntry withCounts(EntryCounts value) {
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, value, slotMapping, enchanted,
+                nbt, durability);
+    }
+
     public GeneralFilterEntry withNbt(NbtConstraints value) {
         return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, slotMapping, enchanted,
                 value, durability);
