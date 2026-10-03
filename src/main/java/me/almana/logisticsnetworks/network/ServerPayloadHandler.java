@@ -777,8 +777,6 @@ public class ServerPayloadHandler {
             boolean isSpecial = type.isSpecial();
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
             ItemStack openedStack = stack.copyWithCount(1);
-            CompoundTag stackTag = new CompoundTag();
-            stackTag.put("Item", openedStack.save(serverPlayer.level().registryAccess()));
             GraphMenuContext graphContext = GraphPayloadHandler.getContext(serverPlayer.containerMenu);
 
             serverPlayer.openMenu(new SimpleMenuProvider(
@@ -796,7 +794,7 @@ public class ServerPayloadHandler {
                         if (graphContext != null) graphContext.write(buf);
                         buf.writeVarInt(ch);
                         buf.writeVarInt(fs);
-                        buf.writeNbt(stackTag);
+                        ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, openedStack);
                         buf.writeVarInt(slotCount);
                         buf.writeBoolean(false);
                         buf.writeBoolean(false);

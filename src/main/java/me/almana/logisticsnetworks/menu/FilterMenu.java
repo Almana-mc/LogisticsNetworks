@@ -12,12 +12,12 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
@@ -294,7 +294,7 @@ public class FilterMenu extends AbstractContainerMenu {
         else if (ModFilterData.isModFilter(stack)) ModFilterData.setTargetType(stack, target);
     }
 
-    public FilterMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
+    public FilterMenu(int containerId, Inventory playerInv, RegistryFriendlyByteBuf buf) {
         super(Registration.FILTER_MENU.get(), containerId);
         int handOrdinal = buf.readVarInt();
         if (handOrdinal == -2) {
@@ -309,10 +309,7 @@ public class FilterMenu extends AbstractContainerMenu {
             this.lockedSlot = -1;
             this.nodeSource = NodeMenuSync.findOrCreateClientNode(playerInv.player, entityId, nodeId, dimension);
             this.clipboardSource = null;
-            CompoundTag stackTag = buf.readNbt();
-            ItemStack openedStack = stackTag != null
-                    ? ItemStack.parseOptional(playerInv.player.level().registryAccess(), stackTag.getCompound("Item"))
-                    : ItemStack.EMPTY;
+            ItemStack openedStack = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
             if (this.nodeSource != null && !openedStack.isEmpty()) {
                 ChannelData channel = this.nodeSource.getChannel(this.nodeChannel);
                 if (channel != null) {
