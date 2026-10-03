@@ -142,20 +142,18 @@ public final class NbtFilterData {
     }
 
     public static @Nullable Tag resolvePathValue(ItemStack stack, @Nullable NbtPath path, HolderLookup.Provider provider) {
-        if (path == null) {
+        if (path == null || stack.isEmpty()) {
             return null;
         }
 
         if (isFluidPath(path)) {
             return FluidUtil.getFluidContained(stack)
-                    .map(fluid -> {
-                        CompoundTag tags = getSerializedComponents(fluid, provider);
-                        return resolvePathValue(tags, path);
-                    })
+                    .map(fluid -> CandidateComponents.of(fluid, provider))
+                    .map(components -> components.resolve(path))
                     .orElse(null);
         }
 
-        return resolvePathValue(getSerializedComponents(stack, provider), path);
+        return new CandidateComponents(stack, provider).resolve(path);
     }
 
     public static @Nullable Tag resolvePathValue(@Nullable CompoundTag components, @Nullable NbtPath path) {
@@ -199,39 +197,14 @@ public final class NbtFilterData {
     public static @Nullable CompoundTag getSerializedComponents(ItemStack stack, HolderLookup.Provider provider) {
         if (stack.isEmpty() || provider == null)
             return null;
-
-        Tag tag = stack.copyWithCount(1).save(provider);
-        CompoundTag components = new CompoundTag();
-        if (tag instanceof CompoundTag c && c.contains("components", Tag.TAG_COMPOUND)) {
-            components = c.getCompound("components").copy();
-        }
-
-        if (!components.contains("minecraft:max_stack_size"))
-            components.putInt("minecraft:max_stack_size", stack.getMaxStackSize());
-        if (!components.contains("minecraft:rarity"))
-            components.putString("minecraft:rarity", stack.getRarity().getSerializedName());
-        if (stack.isDamageableItem()) {
-            if (!components.contains("minecraft:damage"))
-                components.putInt("minecraft:damage", stack.getDamageValue());
-            if (!components.contains("minecraft:max_damage"))
-                components.putInt("minecraft:max_damage", stack.getMaxDamage());
-        }
-        int durability = stack.isDamageableItem() ? Math.max(0, stack.getMaxDamage() - stack.getDamageValue()) : 0;
-        components.putInt("minecraft:durability", durability);
-        components.put("minecraft:enchanted", ByteTag.valueOf(stack.isEnchanted()));
-
-        return components.isEmpty() ? null : components;
+        return new CandidateComponents(stack, provider).full();
     }
 
     public static @Nullable CompoundTag getSerializedComponents(FluidStack stack, HolderLookup.Provider provider) {
-        if (stack == null || stack.isEmpty() || provider == null)
+        if (stack == null || provider == null)
             return null;
-
-        Tag tag = stack.saveOptional(provider);
-        if (tag instanceof CompoundTag c && c.contains("components", Tag.TAG_COMPOUND)) {
-            return c.getCompound("components");
-        }
-        return null;
+        CandidateComponents components = CandidateComponents.of(stack, provider);
+        return components == null ? null : components.full();
     }
 
     public static boolean isFluidPath(@Nullable NbtPath path) {
