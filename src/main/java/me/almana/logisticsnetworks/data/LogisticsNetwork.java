@@ -35,7 +35,7 @@ public class LogisticsNetwork {
             Codec.BOOL.lenientOptionalFieldOf("sleeping", true).forGetter(LogisticsNetwork::isSleeping),
             Codec.INT.lenientOptionalFieldOf("color").forGetter(network -> Optional.of(network.color)),
             Codec.LONG.lenientOptionalFieldOf("created_at", 0L).forGetter(LogisticsNetwork::getCreatedAt),
-            UUIDUtil.CODEC.lenientOptionalFieldOf("owner")
+            UUIDUtil.CODEC.optionalFieldOf("owner")
                     .forGetter(network -> Optional.ofNullable(network.ownerUuid)),
             ComponentCodecs.lenientList(UUIDUtil.CODEC).lenientOptionalFieldOf("nodes", List.of())
                     .forGetter(network -> List.copyOf(network.nodeUuids)),
@@ -54,7 +54,7 @@ public class LogisticsNetwork {
             Codec.BOOL.lenientOptionalFieldOf("Sleeping", true).forGetter(LogisticsNetwork::isSleeping),
             Codec.INT.lenientOptionalFieldOf("Color").forGetter(network -> Optional.of(network.color)),
             Codec.LONG.lenientOptionalFieldOf("CreatedAt", 0L).forGetter(LogisticsNetwork::getCreatedAt),
-            UUIDUtil.CODEC.lenientOptionalFieldOf("OwnerUUID")
+            UUIDUtil.CODEC.optionalFieldOf("OwnerUUID")
                     .forGetter(network -> Optional.ofNullable(network.ownerUuid)),
             ComponentCodecs.lenientList(UUIDUtil.CODEC.fieldOf("Node").codec())
                     .lenientOptionalFieldOf("Nodes", List.of())
