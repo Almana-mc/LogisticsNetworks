@@ -756,7 +756,7 @@ public final class FilterItemData {
                             candidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
                             candidateComponentsResolved = true;
                         }
-                        if (!checkNbtConstraint(slot, candidateComponents))
+                        if (!checkNbtConstraint(slot, candidateComponents, false))
                             continue;
                     }
                     return true;
@@ -770,7 +770,7 @@ public final class FilterItemData {
                         candidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
                         candidateComponentsResolved = true;
                     }
-                    if (!checkNbtConstraint(slot, candidateComponents))
+                    if (!checkNbtConstraint(slot, candidateComponents, false))
                         continue;
                 }
                 return true;
@@ -987,7 +987,8 @@ public final class FilterItemData {
 
     private static boolean entryConstraintsMatch(ItemFilterSlot entry, ItemStack candidate,
             HolderLookup.Provider provider, LazyComponents components) {
-        if (entry.hasNbt() && !checkNbtConstraint(entry, components.of(candidate, provider)))
+        if (entry.hasNbt() && !checkNbtConstraint(entry, components.of(candidate, provider),
+                candidate.isDamageableItem()))
             return false;
         return checkDurabilityConstraint(entry, candidate) && checkEnchantedConstraint(entry, candidate);
     }
@@ -1003,7 +1004,8 @@ public final class FilterItemData {
         return entryConstraintsMatch(entry, candidate, provider, components);
     }
 
-    private static boolean checkNbtConstraint(ItemFilterSlot entry, @Nullable CompoundTag components) {
+    private static boolean checkNbtConstraint(ItemFilterSlot entry, @Nullable CompoundTag components,
+            boolean damageable) {
         if (!entry.hasNbt())
             return true;
         if (components == null)
@@ -1012,13 +1014,18 @@ public final class FilterItemData {
         List<NbtCriterion> rules = entry.nbtRules();
         if (!rules.isEmpty()) {
             boolean matchAny = entry.nbtMatchAny();
+            boolean evaluated = false;
             for (NbtCriterion rule : rules) {
+                // Durability ignores undamageable items
+                if (!damageable && rule.path().equals(GeneralFilterEntry.DURABILITY_PATH))
+                    continue;
+                evaluated = true;
                 Tag actual = NbtFilterData.resolvePathValue(components, rule.path());
                 boolean matches = rule.matches(actual);
                 if (matchAny && matches) return true;
                 if (!matchAny && !matches) return false;
             }
-            return !matchAny;
+            return !matchAny || !evaluated;
         }
 
         CompoundTag rawNbt = entry.rawNbt();
