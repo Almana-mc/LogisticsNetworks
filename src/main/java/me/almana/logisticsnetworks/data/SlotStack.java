@@ -12,10 +12,8 @@ import java.util.List;
 
 public record SlotStack(int slot, ItemStack stack) {
 
-    public static final MapCodec<SlotStack> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
-            Codec.INT.fieldOf("slot").forGetter(SlotStack::slot),
-            ComponentCodecs.STACK.lenientOptionalFieldOf("item", ItemStack.EMPTY).forGetter(SlotStack::stack)
-    ).apply(instance, SlotStack::new));
+    public static final MapCodec<SlotStack> MAP_CODEC = mapCodec(ComponentCodecs.STACK);
+    static final MapCodec<SlotStack> QUIET_MAP_CODEC = mapCodec(ComponentCodecs.QUIET_STACK);
     public static final Codec<List<SlotStack>> LIST_CODEC = ComponentCodecs.lenientList(MAP_CODEC.codec());
 
     private static final Codec<SlotStack> LEGACY_CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -23,6 +21,13 @@ public record SlotStack(int slot, ItemStack stack) {
             ComponentCodecs.STACK.lenientOptionalFieldOf("Item", ItemStack.EMPTY).forGetter(SlotStack::stack)
     ).apply(instance, SlotStack::new));
     public static final Codec<List<SlotStack>> LEGACY_LIST_CODEC = ComponentCodecs.lenientList(LEGACY_CODEC);
+
+    private static MapCodec<SlotStack> mapCodec(Codec<ItemStack> stack) {
+        return RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.INT.fieldOf("slot").forGetter(SlotStack::slot),
+                stack.lenientOptionalFieldOf("item", ItemStack.EMPTY).forGetter(SlotStack::stack)
+        ).apply(instance, SlotStack::new));
+    }
 
     public static List<SlotStack> nonEmpty(List<ItemStack> stacks) {
         List<SlotStack> entries = new ArrayList<>();

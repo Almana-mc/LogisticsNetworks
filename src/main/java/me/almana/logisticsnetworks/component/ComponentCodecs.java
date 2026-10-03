@@ -28,6 +28,7 @@ public final class ComponentCodecs {
             tag -> new Dynamic<>(NbtOps.INSTANCE, tag.copy()));
 
     public static final Codec<ItemStack> STACK = lenient(ItemStack.OPTIONAL_CODEC, () -> ItemStack.EMPTY);
+    public static final Codec<ItemStack> QUIET_STACK = quietLenient(ItemStack.OPTIONAL_CODEC, () -> ItemStack.EMPTY);
 
     private ComponentCodecs() {
     }
@@ -43,18 +44,30 @@ public final class ComponentCodecs {
         }, value -> value.name().toLowerCase(Locale.ROOT));
     }
 
-    // Keeps partials, like parseOptional
     public static <A> Codec<A> lenient(Codec<A> codec, Supplier<? extends A> fallback) {
+        return lenient(codec, fallback, true);
+    }
+
+    // Client-sendable data, never logs
+    public static <A> Codec<A> quietLenient(Codec<A> codec, Supplier<? extends A> fallback) {
+        return lenient(codec, fallback, false);
+    }
+
+    // Keeps partials, like parseOptional
+    private static <A> Codec<A> lenient(Codec<A> codec, Supplier<? extends A> fallback, boolean logErrors) {
         return Codec.of(codec, new Decoder<>() {
             @Override
             public <T> DataResult<Pair<A, T>> decode(DynamicOps<T> ops, T input) {
                 A value;
                 try {
-                    value = codec.parse(ops, input)
-                            .resultOrPartial(error -> LOGGER.error("Malformed entry: {}", error))
-                            .orElseGet(fallback);
+                    DataResult<A> result = codec.parse(ops, input);
+                    value = (logErrors
+                            ? result.resultOrPartial(error -> LOGGER.error("Malformed entry: {}", error))
+                            : result.resultOrPartial()).orElseGet(fallback);
                 } catch (RuntimeException e) {
-                    LOGGER.error("Malformed entry", e);
+                    if (logErrors) {
+                        LOGGER.error("Malformed entry", e);
+                    }
                     value = fallback.get();
                 }
                 return DataResult.success(Pair.of(value, input));
@@ -67,8 +80,16 @@ public final class ComponentCodecs {
     }
 
     public static <E> Codec<List<E>> lenientList(Codec<E> element, int maxSize) {
+        return lenientList(element, maxSize, true);
+    }
+
+    public static <E> Codec<List<E>> quietLenientList(Codec<E> element, int maxSize) {
+        return lenientList(element, maxSize, false);
+    }
+
+    private static <E> Codec<List<E>> lenientList(Codec<E> element, int maxSize, boolean logErrors) {
         Codec<Optional<E>> optional = element.xmap(Optional::of, Optional::get);
-        return NeoForgeExtraCodecs.listWithoutEmpty(lenient(optional, Optional::empty).listOf(0, maxSize));
+        return NeoForgeExtraCodecs.listWithoutEmpty(lenient(optional, Optional::empty, logErrors).listOf(0, maxSize));
     }
 
     public static <A> Optional<A> parse(Codec<A> codec, HolderLookup.Provider provider, Tag tag) {

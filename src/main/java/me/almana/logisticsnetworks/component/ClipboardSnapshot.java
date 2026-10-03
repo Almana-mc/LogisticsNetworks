@@ -33,10 +33,10 @@ public record ClipboardSnapshot(
     public static final MapCodec<ClipboardSnapshot> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             ChannelState.LIST_CODEC.lenientOptionalFieldOf("channels", List.of())
                     .forGetter(ClipboardSnapshot::channels),
-            ComponentCodecs.lenientList(FilterSlot.CODEC, LogisticsNodeEntity.CHANNEL_COUNT * ChannelData.FILTER_SIZE)
+            ComponentCodecs.quietLenientList(FilterSlot.CODEC, LogisticsNodeEntity.CHANNEL_COUNT * ChannelData.FILTER_SIZE)
                     .lenientOptionalFieldOf("filters", List.of())
                     .forGetter(ClipboardSnapshot::filters),
-            ComponentCodecs.lenientList(ItemSlot.CODEC, LogisticsNodeEntity.UPGRADE_SLOT_COUNT)
+            ComponentCodecs.quietLenientList(ItemSlot.CODEC, LogisticsNodeEntity.UPGRADE_SLOT_COUNT)
                     .lenientOptionalFieldOf("upgrades", List.of())
                     .forGetter(ClipboardSnapshot::upgrades),
             UUIDUtil.CODEC.lenientOptionalFieldOf("network_id").forGetter(ClipboardSnapshot::networkId),
@@ -96,7 +96,7 @@ public record ClipboardSnapshot(
         ).apply(instance, ChannelState::fromSerialized));
         public static final Codec<ChannelState> CODEC = MAP_CODEC.codec();
         public static final Codec<List<ChannelState>> LIST_CODEC =
-                ComponentCodecs.lenient(CODEC, () -> DEFAULT).listOf(0, LogisticsNodeEntity.CHANNEL_COUNT);
+                ComponentCodecs.quietLenient(CODEC, () -> DEFAULT).listOf(0, LogisticsNodeEntity.CHANNEL_COUNT);
 
         public ChannelState {
             mode = mode == null ? ChannelMode.IMPORT : mode;
