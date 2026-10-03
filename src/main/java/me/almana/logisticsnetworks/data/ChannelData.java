@@ -1,5 +1,10 @@
 package me.almana.logisticsnetworks.data;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import me.almana.logisticsnetworks.component.ClipboardSnapshot.ChannelState;
+import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.logic.ChannelTelemetry;
 import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import me.almana.logisticsnetworks.logic.FluidResourceOrder;
@@ -7,30 +12,52 @@ import me.almana.logisticsnetworks.logic.PriorityRobin;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 public class ChannelData {
 
     public static final int FILTER_SIZE = 6;
-    private static final String KEY_ENABLED = "Enabled";
-    private static final String KEY_MODE = "Mode";
-    private static final String KEY_TYPE = "Type";
-    private static final String KEY_BATCH = "BatchSize";
-    private static final String KEY_DELAY = "TickDelay";
-    private static final String KEY_IO = "IoDirection";
-    private static final String KEY_REDSTONE = "RedstoneMode";
-    private static final String KEY_DISTRIB = "DistributionMode";
-    private static final String KEY_FILTER_MODE = "FilterMode";
-    private static final String KEY_PRIORITY = "Priority";
-    private static final String KEY_FILTERS = "Filters";
-    private static final String KEY_NAME = "Name";
+
+    private static final MapCodec<ChannelState> LEGACY_SETTINGS = RecordCodecBuilder.mapCodec(instance -> instance.group(
+            Codec.BOOL.lenientOptionalFieldOf("Enabled", false).forGetter(ChannelState::enabled),
+            ChannelMode.CODEC.lenientOptionalFieldOf("Mode", ChannelMode.IMPORT).forGetter(ChannelState::mode),
+            ChannelType.CODEC.lenientOptionalFieldOf("Type", ChannelType.ITEM).forGetter(ChannelState::type),
+            Codec.INT.lenientOptionalFieldOf("BatchSize", 8).forGetter(ChannelState::batchSize),
+            Codec.INT.lenientOptionalFieldOf("TickDelay", 20).forGetter(ChannelState::tickDelay),
+            ChannelState.DIRECTION.lenientOptionalFieldOf("IoDirection", Optional.of(Direction.UP))
+                    .forGetter(ChannelState::direction),
+            Codec.STRING.lenientOptionalFieldOf("RedstoneMode", "").forGetter(state -> state.redstoneMode().name()),
+            DistributionMode.CODEC.lenientOptionalFieldOf("DistributionMode", DistributionMode.PRIORITY)
+                    .forGetter(ChannelState::distributionMode),
+            FilterMode.CODEC.lenientOptionalFieldOf("FilterMode", FilterMode.MATCH_ANY)
+                    .forGetter(ChannelState::filterMode),
+            Codec.INT.lenientOptionalFieldOf("Priority", 0).forGetter(ChannelState::priority),
+            Codec.STRING.lenientOptionalFieldOf("Name", "").forGetter(ChannelState::name),
+            Codec.BOOL.lenientOptionalFieldOf("ResourceRoundRobin", false)
+                    .forGetter(ChannelState::resourceRoundRobin)
+    ).apply(instance, ChannelState::fromSerialized));
+
+    static final Codec<ChannelData> CURRENT_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            ChannelState.MAP_CODEC.forGetter(ChannelData::settings),
+            SlotStack.LIST_CODEC.lenientOptionalFieldOf("filters", List.of()).forGetter(ChannelData::filterSlots)
+    ).apply(instance, ChannelData::of));
+    static final Codec<ChannelData> LEGACY_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            LEGACY_SETTINGS.forGetter(ChannelData::settings),
+            SlotStack.LEGACY_LIST_CODEC.lenientOptionalFieldOf("Filters")
+                    .forGetter(channel -> Optional.of(channel.filterSlots())),
+            ComponentCodecs.STACK.lenientOptionalFieldOf("FilterItem", ItemStack.EMPTY)
+                    .forGetter(channel -> ItemStack.EMPTY)
+    ).apply(instance, (settings, filters, filterItem) ->
+            of(settings, filters.orElseGet(() -> List.of(new SlotStack(0, filterItem))))));
+    public static final Codec<ChannelData> CODEC = Codec.withAlternative(CURRENT_CODEC, LEGACY_CODEC);
+    public static final Codec<List<ChannelData>> LIST_CODEC =
+            ComponentCodecs.lenient(CODEC, ChannelData::new).listOf();
 
     private boolean enabled;
     private ChannelMode mode = ChannelMode.IMPORT;
@@ -61,104 +88,53 @@ public class ChannelData {
         Arrays.fill(filterItems, ItemStack.EMPTY);
     }
 
-    public CompoundTag save(@Nullable HolderLookup.Provider provider) {
-        CompoundTag tag = new CompoundTag();
-        tag.putBoolean(KEY_ENABLED, enabled);
-        tag.putString(KEY_MODE, mode.name());
-        tag.putString(KEY_TYPE, type.name());
-        tag.putInt(KEY_BATCH, batchSize);
-        tag.putInt(KEY_DELAY, tickDelay);
-        tag.putString(KEY_IO, ioDirection != null ? ioDirection.getName() : "all");
-        tag.putString(KEY_REDSTONE, redstoneMode.name());
-        if (!name.isEmpty())
-            tag.putString(KEY_NAME, name);
-        tag.putString(KEY_DISTRIB, distributionMode.name());
-        tag.putString(KEY_FILTER_MODE, filterMode.name());
-        tag.putInt(KEY_PRIORITY, priority);
-        tag.putBoolean("ResourceRoundRobin", resourceRoundRobin);
-
-        if (provider != null) {
-            ListTag list = new ListTag();
-            for (int i = 0; i < FILTER_SIZE; i++) {
-                if (!filterItems[i].isEmpty()) {
-                    CompoundTag entry = new CompoundTag();
-                    entry.putInt("Slot", i);
-                    entry.put("Item", filterItems[i].save(provider));
-                    list.add(entry);
-                }
-            }
-            if (!list.isEmpty()) {
-                tag.put(KEY_FILTERS, list);
-            }
-        }
-        return tag;
+    public CompoundTag save(HolderLookup.Provider provider) {
+        return (CompoundTag) ComponentCodecs.encode(CODEC, provider, this);
     }
 
-    public void load(CompoundTag tag, @Nullable HolderLookup.Provider provider) {
-        resourceRoundRobin = tag.getBoolean("ResourceRoundRobin");
-        resetResourceRotation();
-        if (tag.contains(KEY_ENABLED))
-            enabled = tag.getBoolean(KEY_ENABLED);
+    public void load(CompoundTag tag, HolderLookup.Provider provider) {
+        ComponentCodecs.parse(CODEC, provider, tag).ifPresent(this::copyFrom);
+    }
 
-        mode = getEnum(tag, KEY_MODE, ChannelMode.class, ChannelMode.IMPORT);
-        setType(getEnum(tag, KEY_TYPE, ChannelType.class, ChannelType.ITEM));
-        String savedRedstoneMode = tag.getString(KEY_REDSTONE);
-        if (RedstoneMode.disablesChannel(savedRedstoneMode))
-            enabled = false;
-        redstoneMode = RedstoneMode.fromSerialized(savedRedstoneMode);
-        distributionMode = getEnum(tag, KEY_DISTRIB, DistributionMode.class, DistributionMode.PRIORITY);
-        filterMode = getEnum(tag, KEY_FILTER_MODE, FilterMode.class, FilterMode.MATCH_ANY);
+    private static ChannelData of(ChannelState settings, List<SlotStack> filters) {
+        ChannelData channel = new ChannelData(settings.enabled());
+        channel.setMode(settings.mode());
+        channel.setType(settings.type());
+        channel.setBatchSize(settings.batchSize());
+        channel.setTickDelay(settings.tickDelay());
+        channel.setIoDirection(settings.direction().orElse(null));
+        channel.setRedstoneMode(settings.redstoneMode());
+        channel.setDistributionMode(settings.distributionMode());
+        channel.setFilterMode(settings.filterMode());
+        channel.setPriority(settings.priority());
+        channel.setName(settings.name());
+        channel.resourceRoundRobin = settings.resourceRoundRobin();
+        channel.placeFilters(filters);
+        return channel;
+    }
 
-        if (tag.contains(KEY_BATCH))
-            batchSize = Math.max(1, tag.getInt(KEY_BATCH));
-        if (tag.contains(KEY_DELAY))
-            setTickDelay(tag.getInt(KEY_DELAY));
+    private ChannelState settings() {
+        return new ChannelState(enabled, mode, type, batchSize, tickDelay, Optional.ofNullable(ioDirection),
+                redstoneMode, distributionMode, filterMode, priority, name, resourceRoundRobin);
+    }
 
-        if (tag.contains(KEY_IO)) {
-            String dirStr = tag.getString(KEY_IO);
-            if ("all".equals(dirStr)) {
-                ioDirection = null;
+    private List<SlotStack> filterSlots() {
+        return SlotStack.nonEmpty(Arrays.asList(filterItems));
+    }
+
+    private void placeFilters(List<SlotStack> filters) {
+        List<ItemStack> overflow = new ArrayList<>();
+        for (SlotStack filter : filters) {
+            if (filter.slot() < 0 || filter.stack().isEmpty()) {
+                continue;
+            }
+            if (filter.slot() < FILTER_SIZE) {
+                filterItems[filter.slot()] = filter.stack();
             } else {
-                ioDirection = Direction.byName(dirStr);
-                if (ioDirection == null)
-                    ioDirection = Direction.UP;
+                overflow.add(filter.stack());
             }
         }
-
-        if (tag.contains(KEY_NAME))
-            name = tag.getString(KEY_NAME);
-        else
-            name = "";
-
-        if (tag.contains(KEY_PRIORITY)) {
-            priority = Math.max(-99, Math.min(99, tag.getInt(KEY_PRIORITY)));
-        }
-
-        Arrays.fill(filterItems, ItemStack.EMPTY);
-        if (provider != null && tag.contains(KEY_FILTERS, Tag.TAG_LIST)) {
-            ListTag list = tag.getList(KEY_FILTERS, Tag.TAG_COMPOUND);
-            List<ItemStack> overflow = new ArrayList<>();
-            for (Tag t : list) {
-                if (t instanceof CompoundTag ct) {
-                    int slot = ct.getInt("Slot");
-                    if (slot < 0) {
-                        continue;
-                    }
-                    ItemStack stack = ItemStack.parseOptional(provider, ct.getCompound("Item"));
-                    if (stack.isEmpty()) {
-                        continue;
-                    }
-                    if (slot < FILTER_SIZE) {
-                        filterItems[slot] = stack;
-                    } else {
-                        overflow.add(stack);
-                    }
-                }
-            }
-            placeOverflowFilters(overflow);
-        } else if (provider != null && tag.contains("FilterItem", Tag.TAG_COMPOUND)) {
-            filterItems[0] = ItemStack.parseOptional(provider, tag.getCompound("FilterItem"));
-        }
+        placeOverflowFilters(overflow);
     }
 
     // Relocate legacy overflow filters
@@ -177,16 +153,6 @@ public class ChannelData {
             filterItems[next] = stack;
             next++;
         }
-    }
-
-    private <E extends Enum<E>> E getEnum(CompoundTag tag, String key, Class<E> enumClass, E defaultValue) {
-        if (tag.contains(key)) {
-            try {
-                return Enum.valueOf(enumClass, tag.getString(key));
-            } catch (IllegalArgumentException ignored) {
-            }
-        }
-        return defaultValue;
     }
 
     public boolean isEnabled() {

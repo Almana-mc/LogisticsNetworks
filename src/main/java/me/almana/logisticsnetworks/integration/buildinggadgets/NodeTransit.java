@@ -2,10 +2,14 @@ package me.almana.logisticsnetworks.integration.buildinggadgets;
 
 import java.util.HashMap;
 import java.util.Map;
+import me.almana.logisticsnetworks.component.ComponentCodecs;
+import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
+import me.almana.logisticsnetworks.entity.NodeState;
 import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.block.Rotation;
 
 public final class NodeTransit {
@@ -46,29 +50,25 @@ public final class NodeTransit {
         return total <= MAX_COPY_BYTES;
     }
 
-    public static CompoundTag rotateCopy(CompoundTag config) {
-        CompoundTag rotated = config.copy();
-        ListTag channels = rotated.getList("channels", Tag.TAG_COMPOUND);
-        for (int i = 0; i < channels.size(); i++) {
-            rotateKey(channels.getCompound(i), "io");
+    public static CompoundTag rotateCopy(CompoundTag config, HolderLookup.Provider registries) {
+        NodeClipboardConfig clipboard = NodeClipboardConfig.load(config, registries);
+        if (clipboard == null) return config.copy();
+        for (int channel = 0; channel < clipboard.getChannelCount(); channel++) {
+            Direction direction = clipboard.getChannelDirection(channel);
+            if (direction != null) clipboard.setChannelDirection(channel, Rotation.CLOCKWISE_90.rotate(direction));
         }
-        return rotated;
+        return clipboard.save(registries);
     }
 
-    public static CompoundTag rotateMove(CompoundTag payload) {
+    public static CompoundTag rotateMove(CompoundTag payload, HolderLookup.Provider registries) {
         CompoundTag rotated = payload.copy();
-        CompoundTag channels = rotated.getCompound("state").getCompound("Channels");
-        for (String key : channels.getAllKeys()) {
-            rotateKey(channels.getCompound(key), "IoDirection");
-        }
+        ComponentCodecs.parse(NodeState.CODEC, registries, payload.getCompound("state")).ifPresent(state -> {
+            for (ChannelData channel : state.channels()) {
+                Direction direction = channel.getIoDirection();
+                if (direction != null) channel.setIoDirection(Rotation.CLOCKWISE_90.rotate(direction));
+            }
+            rotated.put("state", ComponentCodecs.encode(NodeState.CODEC, registries, state));
+        });
         return rotated;
-    }
-
-    private static void rotateKey(CompoundTag tag, String key) {
-        if (!tag.contains(key, Tag.TAG_STRING)) return;
-        Direction direction = Direction.byName(tag.getString(key));
-        if (direction != null && direction.getAxis().isHorizontal()) {
-            tag.putString(key, Rotation.CLOCKWISE_90.rotate(direction).getName());
-        }
     }
 }

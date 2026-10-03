@@ -200,7 +200,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
         return true;
     }
 
-    private static void normalize(NodeClipboardConfig config) {
+    static void normalize(NodeClipboardConfig config) {
         config.setNetworkTarget(config.getNetworkId(), config.getNetworkName());
         config.setNodeLabel(config.getNodeLabel());
         boolean chemical = MekanismCompat.isLoaded() && hasUpgrade(config, Registration.MEKANISM_CHEMICAL_UPGRADE.get());
