@@ -760,18 +760,6 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     // Per-slot NBT
-    public String getEntryNbtPath(int slot) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount)
-            return null;
-        return FilterItemData.getEntryNbtPath(getOpenedStack(), slot);
-    }
-
-    public String getEntryNbtOperator(int slot) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount)
-            return null;
-        return FilterItemData.getEntryNbtOperator(getOpenedStack(), slot);
-    }
-
     public List<NbtCriterion> getSlotNbtRules(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return List.of();
@@ -827,7 +815,7 @@ public class FilterMenu extends AbstractContainerMenu {
             value = NbtFilterData.parseValueString(fallbackValue);
         if (value == null)
             return;
-        FilterItemData.addSlotNbtRule(filterStack, slot, path.toString(), operator, value);
+        FilterItemData.addSlotNbtRule(filterStack, slot, path, operator, value);
         broadcastChanges();
     }
 
@@ -884,20 +872,6 @@ public class FilterMenu extends AbstractContainerMenu {
         return FilterItemData.getEntryDurabilityValue(getOpenedStack(), slot);
     }
 
-    public void setEntryNbt(Player player, int slot, NbtPath path, String operator) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount)
-            return;
-        ItemStack filterStack = getOpenedStack();
-        ItemStack slotItem = FilterItemData.getEntry(filterStack, slot, player.level().registryAccess());
-        if (slotItem.isEmpty())
-            return;
-        Tag value = NbtFilterData.resolvePathValue(slotItem, path, player.level().registryAccess());
-        if (value == null)
-            return;
-        FilterItemData.setEntryNbt(filterStack, slot, path, value, operator);
-        broadcastChanges();
-    }
-
     public void setEntryNbtRaw(Player player, int slot, NbtPath path, String rawValue) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
@@ -908,7 +882,6 @@ public class FilterMenu extends AbstractContainerMenu {
     public void clearEntryNbt(Player player, int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
-        FilterItemData.setEntryNbt(getOpenedStack(), slot, null, null);
         FilterItemData.setEntryNbtRaw(getOpenedStack(), slot, null);
         FilterItemData.clearSlotNbtRules(getOpenedStack(), slot);
         broadcastChanges();
@@ -1115,7 +1088,6 @@ public class FilterMenu extends AbstractContainerMenu {
             FilterItemData.setFluidEntry(stack, s, FluidStack.EMPTY);
             FilterItemData.setChemicalEntry(stack, s, null);
             FilterItemData.setEntryTag(stack, s, null);
-            FilterItemData.setEntryNbt(stack, s, null, null);
             FilterItemData.clearSlotNbtRules(stack, s);
             FilterItemData.setEntryDurability(stack, s, null, 0);
             FilterItemData.setEntrySlotMapping(stack, s, null);

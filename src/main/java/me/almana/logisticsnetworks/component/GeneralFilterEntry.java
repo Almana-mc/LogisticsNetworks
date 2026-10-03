@@ -132,6 +132,22 @@ public record GeneralFilterEntry(
             strict = strict == null ? Optional.empty() : strict;
             raw = raw == null ? "" : raw;
         }
+
+        public NbtConstraints withRules(List<NbtCriterion> value) {
+            return new NbtConstraints(value, matchAny, strict, raw);
+        }
+
+        public NbtConstraints withMatchAny(boolean value) {
+            return new NbtConstraints(rules, value, strict, raw);
+        }
+
+        public NbtConstraints withStrict(boolean value) {
+            return new NbtConstraints(rules, matchAny, Optional.of(value), raw);
+        }
+
+        public NbtConstraints withRaw(@Nullable String value) {
+            return new NbtConstraints(rules, matchAny, strict, value);
+        }
     }
 
     public record DurabilityConstraint(DurabilityFilterData.Operator operator, int value) {
