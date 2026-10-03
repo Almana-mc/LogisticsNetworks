@@ -446,7 +446,7 @@ public final class GraphPayloadHandler {
         NetworkRegistry.get(player.serverLevel()).setDirty();
     }
 
-    private static List<GraphNode> loadedNodes(MinecraftServer server, LogisticsNetwork network) {
+    public static List<GraphNode> loadedNodes(MinecraftServer server, LogisticsNetwork network) {
         List<GraphNode> nodes = new ArrayList<>();
         for (UUID nodeId : network.getNodeUuids()) {
             LogisticsNodeEntity node = findNode(server, nodeId);
