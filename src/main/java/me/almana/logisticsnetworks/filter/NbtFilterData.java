@@ -38,8 +38,8 @@ public final class NbtFilterData {
             new NbtEntry(NbtPath.of(NbtPath.Component.of("minecraft:rarity")), "\"common\"")
     );
 
-    private static final NbtPath COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("components"));
-    private static final NbtPath FLUID_COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("fluid"),
+    static final NbtPath COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("components"));
+    static final NbtPath FLUID_COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("fluid"),
             NbtPath.Component.of("components"));
 
     public static List<NbtEntry> getDefaultEntries() {
