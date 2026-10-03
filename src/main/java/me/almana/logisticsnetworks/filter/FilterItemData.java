@@ -120,10 +120,8 @@ public final class FilterItemData {
     }
 
     public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
-        if (!isFilterItem(stack))
+        if (!isFilterItem(stack) || !LegacyComponentMigration.migrateGeneralFilter(stack, null))
             return;
-
-        LegacyComponentMigration.migrateGeneralFilter(stack, null);
         FilterSettingsData.setBlacklist(stack, isBlacklist);
     }
 
@@ -135,9 +133,8 @@ public final class FilterItemData {
     }
 
     public static void setTargetType(ItemStack stack, FilterTargetType type) {
-        if (!isFilterItem(stack))
+        if (!isFilterItem(stack) || !LegacyComponentMigration.migrateGeneralFilter(stack, null))
             return;
-        LegacyComponentMigration.migrateGeneralFilter(stack, null);
         FilterSettingsData.setTarget(stack, type);
     }
 
