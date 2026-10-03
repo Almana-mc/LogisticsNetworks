@@ -57,22 +57,17 @@ public record ClipboardSnapshot(
             String name,
             boolean resourceRoundRobin) {
 
-        private static final Codec<ChannelMode> MODE_CODEC = enumCodec(ChannelMode.values(), ChannelMode.IMPORT);
-        private static final Codec<ChannelType> TYPE_CODEC = enumCodec(ChannelType.values(), ChannelType.ITEM);
-        private static final Codec<DistributionMode> DISTRIBUTION_CODEC = enumCodec(
-                DistributionMode.values(), DistributionMode.PRIORITY);
-        private static final Codec<FilterMode> FILTER_CODEC = enumCodec(FilterMode.values(), FilterMode.MATCH_ANY);
         public static final Codec<ChannelState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.BOOL.fieldOf("enabled").forGetter(ChannelState::enabled),
-                MODE_CODEC.fieldOf("mode").forGetter(ChannelState::mode),
-                TYPE_CODEC.fieldOf("type").forGetter(ChannelState::type),
+                ChannelMode.CODEC.fieldOf("mode").forGetter(ChannelState::mode),
+                ChannelType.CODEC.fieldOf("type").forGetter(ChannelState::type),
                 Codec.INT.fieldOf("batch_size").forGetter(ChannelState::batchSize),
                 Codec.INT.fieldOf("tick_delay").forGetter(ChannelState::tickDelay),
                 Direction.CODEC.optionalFieldOf("direction").forGetter(ChannelState::direction),
                 Codec.STRING.optionalFieldOf("redstone_mode")
                         .forGetter(state -> Optional.of(state.redstoneMode.name().toLowerCase(Locale.ROOT))),
-                DISTRIBUTION_CODEC.fieldOf("distribution_mode").forGetter(ChannelState::distributionMode),
-                FILTER_CODEC.fieldOf("filter_mode").forGetter(ChannelState::filterMode),
+                DistributionMode.CODEC.fieldOf("distribution_mode").forGetter(ChannelState::distributionMode),
+                FilterMode.CODEC.fieldOf("filter_mode").forGetter(ChannelState::filterMode),
                 Codec.INT.fieldOf("priority").forGetter(ChannelState::priority),
                 Codec.STRING.optionalFieldOf("name", "").forGetter(ChannelState::name),
                 Codec.BOOL.optionalFieldOf("resource_round_robin", false).forGetter(ChannelState::resourceRoundRobin)
@@ -125,16 +120,5 @@ public record ClipboardSnapshot(
                 Codec.INT.fieldOf("slot").forGetter(ItemSlot::slot),
                 StackSnapshot.CODEC.fieldOf("stack").forGetter(ItemSlot::stack)
         ).apply(instance, ItemSlot::new));
-    }
-
-    private static <E extends Enum<E>> Codec<E> enumCodec(E[] values, E fallback) {
-        return Codec.STRING.xmap(value -> {
-            for (E candidate : values) {
-                if (candidate.name().equalsIgnoreCase(value)) {
-                    return candidate;
-                }
-            }
-            return fallback;
-        }, value -> value.name().toLowerCase(Locale.ROOT));
     }
 }
