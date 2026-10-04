@@ -60,6 +60,11 @@ public class NameFilterItem extends Item {
                         : "tooltip.logisticsnetworks.filter.mode.whitelist")
                 .withStyle(ChatFormatting.GRAY));
 
+        tooltip.add(Component.translatable("tooltip.logisticsnetworks.filter.name.scope",
+                Component.translatable("gui.logisticsnetworks.filter.name.scope."
+                        + NameFilterData.getMatchScope(stack).serializedName()))
+                .withStyle(ChatFormatting.GRAY));
+
         tooltip.add(Component.translatable(
                 "tooltip.logisticsnetworks.filter.name",
                 selected).withStyle(ChatFormatting.DARK_GRAY));

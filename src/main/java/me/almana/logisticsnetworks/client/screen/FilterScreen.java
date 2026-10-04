@@ -1371,9 +1371,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void syncNameScope(NameMatchScope scope) {
-        int guard = 0;
-        while (menu.getNameMatchScope() != scope && guard++ < NameMatchScope.values().length
-                && minecraft != null && minecraft.gameMode != null) {
+        if (minecraft == null || minecraft.gameMode == null)
+            return;
+        int count = NameMatchScope.values().length;
+        int presses = ((scope.ordinal() - menu.getNameMatchScope().ordinal()) % count + count) % count;
+        for (int i = 0; i < presses; i++) {
             minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
         }
     }
@@ -1747,6 +1749,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 : tr("gui.logisticsnetworks.filter.mode.whitelist");
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
         drawButton(g, modeBtnX, btnY, modeBtnW, btnH, modeLabel, mx, my, true);
+
+        String scopeLabel = tr("gui.logisticsnetworks.filter.name.scope." + menu.getNameMatchScope().serializedName());
+        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
+        drawButton(g, modeBtnX + modeBtnW + 4, btnY, scopeBtnW, btnH, scopeLabel, mx, my, true);
     }
 
     private boolean handleNameClick(double mx, double my, int action) {
@@ -1800,6 +1806,15 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (isHovering(modeBtnX, btnY, modeBtnW, btnH, (int) mx, (int) my)) {
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
+            }
+            return true;
+        }
+
+        String scopeLabel = tr("gui.logisticsnetworks.filter.name.scope." + menu.getNameMatchScope().serializedName());
+        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
+        if (isHovering(modeBtnX + modeBtnW + 4, btnY, scopeBtnW, btnH, (int) mx, (int) my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
             }
             return true;
         }
