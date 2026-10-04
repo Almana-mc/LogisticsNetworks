@@ -77,6 +77,7 @@ import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.integration.computercraft.ComputerPeripheral;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.filter.TooltipLines;
 import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -143,6 +144,7 @@ public class LogisticsNetworks {
                 AsyncTransferRuntime.stop();
                 LinkedStorage.stopCraftingRequests();
                 ServerPayloadHandler.clearModifierKeys();
+                TooltipLines.clear();
                 ThreadGuard.clearServerThread();
         }
 
