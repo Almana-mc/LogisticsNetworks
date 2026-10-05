@@ -113,7 +113,7 @@ public final class WrenchFlowRenderer {
         var buffers = Minecraft.getInstance().renderBuffers().bufferSource();
         var base = buffers.getBuffer(ModRenderTypes.FLOW_LINES);
         for (FlowTopology.Bundle route : topology) {
-            FlowBundle bundle = BUNDLES.computeIfAbsent(route.key(), ignored -> new FlowBundle(now));
+            FlowBundle bundle = BUNDLES.computeIfAbsent(route.key(), ignored -> new FlowBundle(now, flow.style()));
             bundle.update(route, anchors, now);
             FlowLines.drawBase(bundle, route.key().type(), flow, now, event.getPoseStack().last(),
                     event.getCamera().getPosition(), base);

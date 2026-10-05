@@ -26,6 +26,13 @@ record FlowAnchor(Vec3 position, Quaternionf rotation) {
     }
 
     Vec3 boundary(Vec3 inside, Vec3 outside) {
+        Vec3 boundary = exit(inside, outside);
+        if (inside.x != outside.x) return new Vec3(snap(boundary.x), inside.y, inside.z);
+        if (inside.y != outside.y) return new Vec3(inside.x, snap(boundary.y), inside.z);
+        return new Vec3(inside.x, inside.y, snap(boundary.z));
+    }
+
+    Vec3 exit(Vec3 inside, Vec3 outside) {
         Vector3f start = local(inside.subtract(position));
         Vector3f delta = local(outside.subtract(inside));
         double fraction = 1;
@@ -35,10 +42,7 @@ record FlowAnchor(Vec3 position, Quaternionf rotation) {
                 fraction = Math.min(fraction, (Math.copySign(0.52, direction) - start.get(axis)) / direction);
             }
         }
-        Vec3 boundary = inside.lerp(outside, fraction);
-        if (inside.x != outside.x) return new Vec3(snap(boundary.x), inside.y, inside.z);
-        if (inside.y != outside.y) return new Vec3(inside.x, snap(boundary.y), inside.z);
-        return new Vec3(inside.x, inside.y, snap(boundary.z));
+        return inside.lerp(outside, fraction);
     }
 
     private static double snap(double coordinate) {

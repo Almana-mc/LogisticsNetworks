@@ -51,6 +51,23 @@ final class FlowLayout {
         return sorted(result);
     }
 
+    static List<FlowSegment> straight(List<FlowAnchor> sources, List<FlowAnchor> targets, int axis, double lane,
+                                      List<Double> sourceTimes, List<Double> targetTimes) {
+        Vec3 shift = FlowMesh.coordinate(Vec3.ZERO, axis == 0 ? 2 : 0, lane);
+        List<FlowSegment> result = new ArrayList<>();
+        for (int i = 0; i < sources.size(); i++) {
+            for (int j = 0; j < targets.size(); j++) {
+                Vec3 from = sources.get(i).position().add(shift);
+                Vec3 to = targets.get(j).position().add(shift);
+                Vec3 start = sources.get(i).exit(from, to);
+                if (targets.get(j).contains(start)) continue;
+                result.add(new FlowSegment(start, targets.get(j).exit(to, from), 0,
+                        Math.max(sourceTimes.get(i), targetTimes.get(j))));
+            }
+        }
+        return sorted(result);
+    }
+
     private static Arrival collect(List<Branch> paths, Vec3 hub, double initial, List<FlowSegment> result) {
         if (paths.isEmpty()) return new Arrival(initial, 0);
         FlowMesh mesh = mesh(paths, Set.of(hub));
