@@ -51,17 +51,22 @@ final class FlowLayout {
         return sorted(result);
     }
 
-    static List<FlowSegment> straight(List<FlowAnchor> sources, List<FlowAnchor> targets, int axis, double lane,
+    static List<FlowSegment> straight(List<FlowAnchor> sources, List<FlowAnchor> targets, double lane,
                                       List<Double> sourceTimes, List<Double> targetTimes) {
-        Vec3 shift = FlowMesh.coordinate(Vec3.ZERO, axis == 0 ? 2 : 0, lane);
         List<FlowSegment> result = new ArrayList<>();
         for (int i = 0; i < sources.size(); i++) {
             for (int j = 0; j < targets.size(); j++) {
-                Vec3 from = sources.get(i).position().add(shift);
-                Vec3 to = targets.get(j).position().add(shift);
+                Vec3 sourceCenter = sources.get(i).position();
+                Vec3 targetCenter = targets.get(j).position();
+                int pairAxis = FlowMesh.axis(targetCenter.subtract(sourceCenter));
+                Vec3 shift = FlowMesh.coordinate(Vec3.ZERO, pairAxis == 0 ? 2 : 0, lane);
+                Vec3 from = sourceCenter.add(shift);
+                Vec3 to = targetCenter.add(shift);
                 Vec3 start = sources.get(i).exit(from, to);
                 if (targets.get(j).contains(start)) continue;
-                result.add(new FlowSegment(start, targets.get(j).exit(to, from), 0,
+                Vec3 end = targets.get(j).exit(to, from);
+                if (end.distanceToSqr(start) <= 1.0E-16) continue;
+                result.add(new FlowSegment(start, end, 0,
                         Math.max(sourceTimes.get(i), targetTimes.get(j))));
             }
         }

@@ -42,7 +42,7 @@ final class FlowBundle {
         List<Double> sourceStarts = updated.sources().stream().map(sourceTimes::get).toList();
         List<Double> targetStarts = updated.targets().stream().map(targetTimes::get).toList();
         segments = style == WrenchFlow.Style.DIRECT
-                ? FlowLayout.straight(nextSources, nextTargets, axis, lane, sourceStarts, targetStarts)
+                ? FlowLayout.straight(nextSources, nextTargets, lane, sourceStarts, targetStarts)
                 : FlowLayout.build(nextSources, nextTargets, axis, lane, sourceStarts, targetStarts);
         topology = updated;
         sources = nextSources;
