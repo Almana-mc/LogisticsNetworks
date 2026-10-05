@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks.client;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
-import me.almana.logisticsnetworks.client.screen.WrenchColorScreen;
+import me.almana.logisticsnetworks.client.screen.WrenchSettingsScreen;
 import me.almana.logisticsnetworks.client.screen.WrenchModeScreen;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
 import me.almana.logisticsnetworks.item.PatternSetterItem;
@@ -93,7 +93,7 @@ public class WrenchInputHandler {
 
         InteractionHand hand = findWrenchHand(player);
         if (hand != null) {
-            minecraft.setScreen(new WrenchColorScreen(player.getItemInHand(hand), hand));
+            minecraft.setScreen(new WrenchSettingsScreen(player.getItemInHand(hand), hand));
         }
     }
 

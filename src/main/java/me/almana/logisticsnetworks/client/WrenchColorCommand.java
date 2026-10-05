@@ -2,7 +2,7 @@ package me.almana.logisticsnetworks.client;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import me.almana.logisticsnetworks.LogisticsNetworks;
-import me.almana.logisticsnetworks.client.screen.WrenchColorScreen;
+import me.almana.logisticsnetworks.client.screen.WrenchSettingsScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.commands.CommandSourceStack;
@@ -37,7 +37,7 @@ public class WrenchColorCommand {
                 return 0;
             }
             minecraft.execute(() -> minecraft.setScreen(
-                    new WrenchColorScreen(player.getItemInHand(hand), hand)));
+                    new WrenchSettingsScreen(player.getItemInHand(hand), hand)));
             return 1;
         });
     }
