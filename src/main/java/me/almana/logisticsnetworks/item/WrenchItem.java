@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.component.LegacyComponentMigration;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.WrenchClipboard;
 import me.almana.logisticsnetworks.component.WrenchColors;
+import me.almana.logisticsnetworks.component.WrenchFlow;
 import me.almana.logisticsnetworks.component.WrenchMassPlacement;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -719,6 +720,18 @@ public class WrenchItem extends Item {
             return;
         }
         stack.remove(LogisticsDataComponents.WRENCH_COLORS);
+    }
+
+    public static WrenchFlow getFlow(ItemStack stack) {
+        return stack.getOrDefault(LogisticsDataComponents.WRENCH_FLOW, WrenchFlow.DEFAULT);
+    }
+
+    public static void setFlow(ItemStack stack, WrenchFlow flow) {
+        if (flow.equals(WrenchFlow.DEFAULT)) {
+            stack.remove(LogisticsDataComponents.WRENCH_FLOW);
+        } else {
+            stack.set(LogisticsDataComponents.WRENCH_FLOW, flow);
+        }
     }
 
     public static void setMode(ItemStack stack, Mode mode) {
