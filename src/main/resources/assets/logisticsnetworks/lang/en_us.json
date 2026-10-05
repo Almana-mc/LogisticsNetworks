@@ -496,7 +496,7 @@
   "gui.logisticsnetworks.wrench.flow.pulseSpacing": "Pulse Spacing",
   "gui.logisticsnetworks.wrench.flow.pulseLength": "Pulse Length",
   "gui.logisticsnetworks.wrench.flow.throughBlocks": "Show Through Blocks",
-  "message.logisticsnetworks.wrench.colors.no_wrench": "Hold a wrench to edit its colors",
+  "message.logisticsnetworks.wrench.colors.no_wrench": "Hold a wrench to edit its settings",
   "message.logisticsnetworks.wrench_hud.enabled": "Wrench HUD enabled (press %s to hide)",
   "message.logisticsnetworks.wrench_hud.disabled": "Wrench HUD disabled (press %s to show)",
   "gui.logisticsnetworks.filter.detail.title": "Detail: Slot %s",
