@@ -17,7 +17,7 @@ record FlowAnchor(Vec3 position, Quaternionf rotation) {
 
     static FlowAnchor fromContext(NodeRenderContext context) {
         Vector3f up = context.rotation().transform(new Vector3f(0, 0.5F, 0));
-        return new FlowAnchor(context.position().add(up.x, up.y, up.z), new Quaternionf(context.rotation()));
+        return new FlowAnchor(context.position().add(up.x, up.y, up.z), new Quaternionf(context.rotation()).normalize());
     }
 
     boolean contains(Vec3 point) {

@@ -31,6 +31,8 @@ import java.util.UUID;
 
 @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
 public final class WrenchFlowRenderer {
+    // skips Sable plotgrid positions
+    private static final double OFFSCREEN_RANGE_SQR = 96 * 96;
     private static final FlowFrame FRAME = new FlowFrame();
     private static final FlowAnimation ANIMATION = new FlowAnimation();
     private static final Map<FlowTopology.Key, FlowBundle> BUNDLES = new HashMap<>();
@@ -57,12 +59,12 @@ public final class WrenchFlowRenderer {
         }
     }
 
-    // ponytail: full entity scan per frame, index nodes if profiling shows cost
-    private static void recordUnrendered(ClientLevel level, float partialTick) {
+    // ponytail: per-frame full entity scan
+    private static void recordUnrendered(ClientLevel level, float partialTick, Vec3 camera) {
         for (Entity entity : level.entitiesForRendering()) {
             if (!(entity instanceof LogisticsNodeEntity node) || FRAME.contains(node.getUUID()) || !routed(node)) continue;
             NodeRenderContext context = CreateCompat.getRenderContext(node, partialTick);
-            if (context != null) FRAME.record(topologyNode(node), FlowAnchor.fromContext(context));
+            if (context != null && context.position().distanceToSqr(camera) <= OFFSCREEN_RANGE_SQR) FRAME.record(topologyNode(node), FlowAnchor.fromContext(context));
         }
     }
 
@@ -86,7 +88,7 @@ public final class WrenchFlowRenderer {
         Minecraft minecraft = Minecraft.getInstance();
         if (!ready(minecraft)) return;
         float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
-        if (flow.offscreen()) recordUnrendered(minecraft.level, partialTick);
+        if (flow.offscreen()) recordUnrendered(minecraft.level, partialTick, event.getCamera().getPosition());
         updateTopology();
         double now = ANIMATION.distance(partialTick, flow.speed());
         Map<UUID, FlowAnchor> anchors = FRAME.anchors();
