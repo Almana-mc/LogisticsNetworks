@@ -94,8 +94,8 @@ public class WrenchSettingsScreen extends Screen {
         g.fill(0, 0, width, height, theme.bg());
         ThemePaint.window(g, x, y, W, H, theme);
         ThemePaint.drawCentered(g, font, title, x + W / 2, y + PAD, theme.accent());
-        renderTabs(g, mouseX, mouseY, theme, TABS, y + TOP_Y, TOP_W, tab);
-        if (tab == 1) renderTabs(g, mouseX, mouseY, theme, FLOW_TABS, y + INNER_Y, INNER_W, flowTab);
+        renderTabs(g, mouseX, mouseY, theme, TABS, y + TOP_Y, TOP_W, tab, advanced.valid() ? -1 : 1);
+        if (tab == 1) renderTabs(g, mouseX, mouseY, theme, FLOW_TABS, y + INNER_Y, INNER_W, flowTab, -1);
         active().render(g, font, mouseX, mouseY, theme);
         for (int i = 0; i < BUTTONS.length; i++) {
             String label = Component.translatable(BUTTONS[i]).getString();
@@ -109,13 +109,14 @@ public class WrenchSettingsScreen extends Screen {
     }
 
     private void renderTabs(GuiGraphics g, int mouseX, int mouseY, Theme theme, String[] labels, int tabY, int tabW,
-                            int selected) {
+                            int selected, int flagged) {
         for (int i = 0; i < labels.length; i++) {
             int tx = x + PAD + i * (tabW + 4);
             boolean hovered = ColorPicker.inRect(mouseX, mouseY, tx, tabY, tabW, TAB_H);
             ThemePaint.button(g, font, tx, tabY, tabW, TAB_H, Component.translatable(labels[i]).getString(),
                     hovered || selected == i, theme);
-            if (selected == i) g.renderOutline(tx, tabY, tabW, TAB_H, theme.accent());
+            if (flagged == i) g.renderOutline(tx, tabY, tabW, TAB_H, theme.danger());
+            else if (selected == i) g.renderOutline(tx, tabY, tabW, TAB_H, theme.accent());
         }
     }
 
@@ -155,6 +156,7 @@ public class WrenchSettingsScreen extends Screen {
             return true;
         }
         setFocused(null);
+        blurPickers();
         int top = clickedTab(mouseX, mouseY, TABS.length, y + TOP_Y, TOP_W);
         int inner = tab == 1 ? clickedTab(mouseX, mouseY, FLOW_TABS.length, y + INNER_Y, INNER_W) : -1;
         if (top >= 0) {

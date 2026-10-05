@@ -49,9 +49,8 @@ final class FlowAdvancedTab implements WrenchTab {
     }
 
     private static EditBox box(String key) {
-        EditBox box = new EditBox(Minecraft.getInstance().font, 0, 0, FIELD_W - 8, ROW_H,
+        EditBox box = new FlatEditBox(Minecraft.getInstance().font, 0, 0, FIELD_W - 8, ROW_H,
                 Component.translatable(PREFIX + key));
-        box.setBordered(false);
         box.setMaxLength(8);
         box.setFilter(text -> text.matches("[0-9]*\\.?[0-9]*"));
         box.setTextColor(ThemeState.active().text());
@@ -93,6 +92,9 @@ final class FlowAdvancedTab implements WrenchTab {
         for (NumberField number : numbers) {
             label(g, font, number.key(), number.row(), number.valid() ? theme.text() : theme.danger());
             ThemePaint.sunkPanel(g, x + FIELD_X, rowY(number.row()), FIELD_W, ROW_H, theme);
+            if (number.box().isFocused()) {
+                g.renderOutline(x + FIELD_X, rowY(number.row()), FIELD_W, ROW_H, theme.accent());
+            }
         }
         toggle(g, font, "pulses", 4, pulses, mouseX, mouseY, theme);
         toggle(g, font, "throughBlocks", 7, throughBlocks, mouseX, mouseY, theme);

@@ -84,7 +84,9 @@ final class FlowSimpleTab implements WrenchTab {
         Network shown = networks.get(network);
         ThemePaint.button(g, font, x + NETWORK_X, y + 82, W - NETWORK_X, ROW_H, "< " + shown.name() + " >",
                 ColorPicker.inRect(mouseX, mouseY, x + NETWORK_X, y + 82, W - NETWORK_X, ROW_H), theme);
-        g.fill(x + NETWORK_X + 4, y + 85, x + NETWORK_X + 12, y + 93, 0xFF000000 | shown.color());
+        if (shown.id().isPresent()) {
+            g.fill(x + NETWORK_X + 4, y + 85, x + NETWORK_X + 12, y + 93, 0xFF000000 | shown.color());
+        }
         toggle(g, font, x, y + 102, W, label("offscreen"), offscreen, mouseX, mouseY, theme);
     }
 
