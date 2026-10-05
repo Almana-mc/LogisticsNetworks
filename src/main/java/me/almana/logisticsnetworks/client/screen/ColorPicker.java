@@ -50,6 +50,10 @@ final class ColorPicker {
         hexFocused = false;
     }
 
+    void blur() {
+        hexFocused = false;
+    }
+
     private int hueY() {
         return y + svHeight + 6;
     }

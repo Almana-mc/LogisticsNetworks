@@ -10,7 +10,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
-final class WrenchColoursTab {
+final class WrenchColoursTab implements WrenchTab {
     private static final ResourceLocation CASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             LogisticsNetworks.MOD_ID, "textures/item/wrench_case.png");
     private static final ResourceLocation SCREEN_TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -34,13 +34,15 @@ final class WrenchColoursTab {
         picker.load(caseColor);
     }
 
-    void place(int x, int y) {
+    @Override
+    public void place(int x, int y) {
         this.x = x;
         this.y = y;
         picker.place(x, y + TARGET_H + 8);
     }
 
-    void render(GuiGraphics g, Font font, int mouseX, int mouseY, Theme theme) {
+    @Override
+    public void render(GuiGraphics g, Font font, int mouseX, int mouseY, Theme theme) {
         for (int i = 0; i < TARGETS.length; i++) {
             int tx = x + i * (TARGET_W + 4);
             boolean hovered = ColorPicker.inRect(mouseX, mouseY, tx, y, TARGET_W, TARGET_H);
@@ -72,7 +74,8 @@ final class WrenchColoursTab {
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
     }
 
-    boolean mouseClicked(double mouseX, double mouseY) {
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY) {
         for (int i = 0; i < TARGETS.length; i++) {
             if (ColorPicker.inRect(mouseX, mouseY, x + i * (TARGET_W + 4), y, TARGET_W, TARGET_H)) {
                 select(i);
@@ -89,12 +92,14 @@ final class WrenchColoursTab {
         picker.load(colors[target]);
     }
 
-    void reset() {
+    @Override
+    public void reset() {
         System.arraycopy(DEFAULTS, 0, colors, 0, colors.length);
         picker.load(colors[target]);
     }
 
-    ColorPicker picker() {
+    @Override
+    public ColorPicker picker() {
         return picker;
     }
 
