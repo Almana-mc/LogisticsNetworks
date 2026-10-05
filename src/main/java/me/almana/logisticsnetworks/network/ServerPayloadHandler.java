@@ -26,9 +26,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -814,7 +816,8 @@ public class ServerPayloadHandler {
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
             ItemStack openedStack = stack.copyWithCount(1);
             CompoundTag stackTag = new CompoundTag();
-            stackTag.store("Item", ItemStack.OPTIONAL_CODEC, openedStack);
+            RegistryOps<Tag> ops = serverPlayer.registryAccess().createSerializationContext(NbtOps.INSTANCE);
+            stackTag.store("Item", ItemStack.OPTIONAL_CODEC, ops, openedStack);
 
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> {

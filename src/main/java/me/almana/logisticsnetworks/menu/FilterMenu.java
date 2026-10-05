@@ -14,6 +14,7 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -29,6 +30,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.*;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.resources.RegistryOps;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.transfer.fluid.FluidUtil;
 
@@ -323,8 +325,9 @@ public class FilterMenu extends AbstractContainerMenu {
             this.nodeSource = NodeMenuSync.findOrCreateClientNode(playerInv.player, entityId, nodeId, dimension);
             this.clipboardSource = null;
             CompoundTag stackTag = buf.readNbt();
+            RegistryOps<Tag> ops = playerInv.player.registryAccess().createSerializationContext(NbtOps.INSTANCE);
             ItemStack openedStack = stackTag != null
-                    ? stackTag.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY)
+                    ? stackTag.read("Item", ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY)
                     : ItemStack.EMPTY;
             if (this.nodeSource != null && !openedStack.isEmpty()) {
                 ChannelData channel = this.nodeSource.getChannel(this.nodeChannel);
