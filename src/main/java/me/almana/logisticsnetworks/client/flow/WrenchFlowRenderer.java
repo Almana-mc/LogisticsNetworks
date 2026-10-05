@@ -5,11 +5,14 @@ import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.ModRenderTypes;
 import me.almana.logisticsnetworks.component.WrenchFlow;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.integration.create.NodeRenderContext;
 import me.almana.logisticsnetworks.integration.iris.IrisCompat;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
@@ -49,10 +52,26 @@ public final class WrenchFlowRenderer {
     }
 
     public static void queue(LogisticsNodeEntity node, PoseStack.Pose pose, Vec3 cameraPosition) {
-        if (!node.isActive() || node.getNetworkId() == null
-                || node.getRouteChannels() == 0) return;
-        FRAME.record(new FlowTopology.Node(node.getUUID(), node.getNetworkId(), node.getRouteChannels()),
-                FlowAnchor.fromRenderPose(pose, cameraPosition));
+        if (flow.enabled() && routed(node)) {
+            FRAME.record(topologyNode(node), FlowAnchor.fromRenderPose(pose, cameraPosition));
+        }
+    }
+
+    // ponytail: full entity scan per frame, index nodes if profiling shows cost
+    private static void recordUnrendered(ClientLevel level, float partialTick) {
+        for (Entity entity : level.entitiesForRendering()) {
+            if (!(entity instanceof LogisticsNodeEntity node) || FRAME.contains(node.getUUID()) || !routed(node)) continue;
+            NodeRenderContext context = CreateCompat.getRenderContext(node, partialTick);
+            if (context != null) FRAME.record(topologyNode(node), FlowAnchor.fromContext(context));
+        }
+    }
+
+    private static boolean routed(LogisticsNodeEntity node) {
+        return node.isActive() && node.getNetworkId() != null && node.getRouteChannels() != 0;
+    }
+
+    private static FlowTopology.Node topologyNode(LogisticsNodeEntity node) {
+        return new FlowTopology.Node(node.getUUID(), node.getNetworkId(), node.getRouteChannels());
     }
 
     @SubscribeEvent
@@ -66,8 +85,9 @@ public final class WrenchFlowRenderer {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_LEVEL) return;
         Minecraft minecraft = Minecraft.getInstance();
         if (!ready(minecraft)) return;
-        updateTopology();
         float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
+        if (flow.offscreen()) recordUnrendered(minecraft.level, partialTick);
+        updateTopology();
         double now = ANIMATION.distance(partialTick, flow.speed());
         Map<UUID, FlowAnchor> anchors = FRAME.anchors();
         var buffers = minecraft.renderBuffers().bufferSource();
@@ -137,8 +157,9 @@ public final class WrenchFlowRenderer {
 
     private static void updateTopology() {
         List<FlowTopology.Node> snapshot = FRAME.nodes();
-        if (snapshot.equals(nodeSnapshot) && flow.equals(appliedFlow)) return;
-        if (!flow.equals(appliedFlow)) BUNDLES.clear();
+        boolean changed = !flow.equals(appliedFlow);
+        if (!changed && snapshot.equals(nodeSnapshot)) return;
+        if (changed) BUNDLES.clear();
         appliedFlow = flow;
         nodeSnapshot = List.copyOf(snapshot);
         topology = FlowTopology.build(snapshot, flow);

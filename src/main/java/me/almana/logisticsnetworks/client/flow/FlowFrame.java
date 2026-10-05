@@ -15,6 +15,10 @@ final class FlowFrame {
         anchors.put(node.id(), anchor);
     }
 
+    boolean contains(UUID id) {
+        return anchors.containsKey(id);
+    }
+
     List<FlowTopology.Node> nodes() {
         return nodes.values().stream().sorted(Comparator.comparing(FlowTopology.Node::id)).toList();
     }

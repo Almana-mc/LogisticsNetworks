@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.client.flow;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import me.almana.logisticsnetworks.integration.create.NodeRenderContext;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -12,6 +13,11 @@ record FlowAnchor(Vec3 position, Quaternionf rotation) {
         Vector3f center = pose.pose().transformPosition(new Vector3f(0, 0.5F, 0));
         Quaternionf rotation = new Quaternionf().setFromNormalized(pose.normal()).normalize();
         return new FlowAnchor(cameraPosition.add(center.x, center.y, center.z), rotation);
+    }
+
+    static FlowAnchor fromContext(NodeRenderContext context) {
+        Vector3f up = context.rotation().transform(new Vector3f(0, 0.5F, 0));
+        return new FlowAnchor(context.position().add(up.x, up.y, up.z), new Quaternionf(context.rotation()));
     }
 
     boolean contains(Vec3 point) {
