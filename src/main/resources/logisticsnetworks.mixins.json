@@ -3,6 +3,9 @@
   "minVersion": "0.8.5",
   "package": "me.almana.logisticsnetworks.mixin",
   "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ExternalStorageFacadeMixin"
+  ],
   "client": [
     "GuideItemMixin"
   ]
