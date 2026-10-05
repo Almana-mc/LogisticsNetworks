@@ -452,6 +452,25 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleSetWrenchFlow(SetWrenchFlowPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+
+            InteractionHand hand = payload.handOrdinal() == InteractionHand.OFF_HAND.ordinal()
+                    ? InteractionHand.OFF_HAND
+                    : InteractionHand.MAIN_HAND;
+            ItemStack heldStack = player.getItemInHand(hand);
+            if (!(heldStack.getItem() instanceof WrenchItem)) {
+                return;
+            }
+
+            WrenchItem.setFlow(heldStack, payload.flow());
+            player.getInventory().setChanged();
+        });
+    }
+
     public static void handleToggleComputerPinnedNetwork(ToggleComputerPinnedNetworkPayload payload,
             IPayloadContext context) {
         context.enqueueWork(() -> {

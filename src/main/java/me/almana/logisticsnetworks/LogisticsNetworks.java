@@ -43,6 +43,7 @@ import me.almana.logisticsnetworks.network.InstallStorageUpgradePayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.SetNetworkColorPayload;
 import me.almana.logisticsnetworks.network.SetWrenchColorsPayload;
+import me.almana.logisticsnetworks.network.SetWrenchFlowPayload;
 import me.almana.logisticsnetworks.network.RequestChannelListPayload;
 import me.almana.logisticsnetworks.network.RequestStorageUpgradeCatalogPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
@@ -157,7 +158,7 @@ public class LogisticsNetworks {
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("12");
+                final var registrar = event.registrar(MOD_ID).versioned("13");
 
                 // Client -> Server
                 registrar.playToServer(UpdateChannelPayload.TYPE, UpdateChannelPayload.STREAM_CODEC,
@@ -236,6 +237,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetNetworkColor);
                 registrar.playToServer(SetWrenchColorsPayload.TYPE, SetWrenchColorsPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetWrenchColors);
+                registrar.playToServer(SetWrenchFlowPayload.TYPE, SetWrenchFlowPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetWrenchFlow);
                 registrar.playToServer(ApplyPatternPayload.TYPE, ApplyPatternPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleApplyPattern);
                 registrar.playToServer(RequestNetworkNodesPayload.TYPE, RequestNetworkNodesPayload.STREAM_CODEC,
