@@ -154,6 +154,8 @@ jobs:
           curseforge_projects = {
               "ae2": {"slug": "applied-energistics-2", "projectID": 223794},
               "ars_nouveau": {"slug": "ars-nouveau", "projectID": 401955},
+              "buildinggadgets2": {"slug": "building-gadgets", "projectID": 298187},
+              "computercraft": {"slug": "cc-tweaked", "projectID": 282001},
               "create": {"slug": "create", "projectID": 328085},
               "ftbteams": {"slug": "ftb-teams-forge", "projectID": 404468},
               "guideme": {"slug": "guideme", "projectID": 1173950},
