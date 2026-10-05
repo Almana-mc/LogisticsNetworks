@@ -8,7 +8,9 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -80,12 +82,13 @@ public class ChannelData {
         tag.putBoolean("ResourceRoundRobin", resourceRoundRobin);
 
         if (provider != null) {
+            RegistryOps<Tag> ops = provider.createSerializationContext(NbtOps.INSTANCE);
             ListTag list = new ListTag();
             for (int i = 0; i < FILTER_SIZE; i++) {
                 if (!filterItems[i].isEmpty()) {
                     CompoundTag entry = new CompoundTag();
                     entry.putInt("Slot", i);
-                    entry.store("Item", ItemStack.OPTIONAL_CODEC, filterItems[i]);
+                    entry.store("Item", ItemStack.OPTIONAL_CODEC, ops, filterItems[i]);
                     list.add(entry);
                 }
             }
@@ -136,6 +139,7 @@ public class ChannelData {
             priority = Math.max(-99, Math.min(99, tag.getIntOr(KEY_PRIORITY, priority)));
         }
 
+        RegistryOps<Tag> ops = provider != null ? provider.createSerializationContext(NbtOps.INSTANCE) : null;
         Arrays.fill(filterItems, ItemStack.EMPTY);
         if (provider != null && tag.contains(KEY_FILTERS)) {
             ListTag list = tag.getListOrEmpty(KEY_FILTERS);
@@ -146,7 +150,7 @@ public class ChannelData {
                     if (slot < 0) {
                         continue;
                     }
-                    ItemStack stack = ct.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+                    ItemStack stack = ct.read("Item", ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY);
                     if (stack.isEmpty()) {
                         continue;
                     }
@@ -159,7 +163,7 @@ public class ChannelData {
             }
             placeOverflowFilters(overflow); // Filter Upper Fixer
         } else if (provider != null && tag.contains("FilterItem")) {
-            filterItems[0] = tag.read("FilterItem", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+            filterItems[0] = tag.read("FilterItem", ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY);
         }
     }
 
