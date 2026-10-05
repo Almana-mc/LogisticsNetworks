@@ -2,7 +2,6 @@ package me.almana.logisticsnetworks.client;
 
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import me.almana.logisticsnetworks.ClientConfig;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 
@@ -28,11 +27,10 @@ public class ModRenderTypes extends RenderStateShard {
     public static RenderType FLOW_PULSES = flowLines("logisticsnetworks_flow_pulses", flowWidth * 1.5,
             flowThroughBlocks);
 
-    public static void refreshFlowState() {
-        if (flowWidth == ClientConfig.flowLineThickness
-                && flowThroughBlocks == ClientConfig.flowLinesThroughBlocks) return;
-        flowWidth = ClientConfig.flowLineThickness;
-        flowThroughBlocks = ClientConfig.flowLinesThroughBlocks;
+    public static void refreshFlowState(double width, boolean throughBlocks) {
+        if (flowWidth == width && flowThroughBlocks == throughBlocks) return;
+        flowWidth = width;
+        flowThroughBlocks = throughBlocks;
         FLOW_LINES = flowLines("logisticsnetworks_flow_lines", flowWidth, flowThroughBlocks);
         FLOW_PULSES = flowLines("logisticsnetworks_flow_pulses", flowWidth * 1.5, flowThroughBlocks);
     }
