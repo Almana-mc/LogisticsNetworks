@@ -118,10 +118,6 @@ public class ModConfigScreen extends Screen {
     private boolean pendingConnectedNodeTextures;
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
-    private FlowConfigPage flowOptions;
-    private boolean flowPage;
-    private Button doneButton;
-    private Button flowNavigation;
 
     private String pendingTheme;
 
@@ -163,7 +159,6 @@ public class ModConfigScreen extends Screen {
         pendingConnectedNodeTextures = ClientConfig.connectedNodeTexturesSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
         pendingTiers = UpgradeLimitsConfig.getAll();
-        if (flowOptions == null) flowOptions = new FlowConfigPage();
 
         buildTab();
     }
@@ -182,7 +177,7 @@ public class ModConfigScreen extends Screen {
         int btnY = y0 + GUI_HEIGHT - 24;
         int btnStartX = x0 + (GUI_WIDTH - totalW) / 2;
 
-        doneButton = addRenderableWidget(Button.builder(TEXT_DONE, b -> save())
+        addRenderableWidget(Button.builder(TEXT_DONE, b -> save())
                 .bounds(btnStartX, btnY, doneW, 18).build());
         addRenderableWidget(Button.builder(TEXT_CANCEL, b -> cancel())
                 .bounds(btnStartX + doneW + gap, btnY, cancelW, 18).build());
@@ -218,14 +213,6 @@ public class ModConfigScreen extends Screen {
     }
 
     private void buildClientTab(int cx, int cy, int cw) {
-        if (flowPage) {
-            flowNavigation = addWidget(Button.builder(Component.literal("< ").append(Component.translatable("gui.logisticsnetworks.config.tab.client")),
-                    button -> switchClientPage(false)).bounds(cx, cy, 86, 18).build());
-            flowOptions.build(font, cx, cy + 22, cw).forEach(this::addWidget);
-            return;
-        }
-        flowNavigation = addWidget(Button.builder(Component.translatable("gui.logisticsnetworks.config.client.flowLines"),
-                button -> switchClientPage(true)).bounds(cx, cy + 152, cw, 18).build());
         maxRenderedNodesBox = new EditBox(font, cx + 150, cy + 18, 80, 14, Component.empty());
         maxRenderedNodesBox.setMaxLength(10);
         maxRenderedNodesBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
@@ -239,13 +226,6 @@ public class ModConfigScreen extends Screen {
         maxVisibleNodesBox.setValue(String.valueOf(pendingMaxVisibleNodes));
         maxVisibleNodesBox.setBordered(false);
         addWidget(maxVisibleNodesBox);
-    }
-
-    private void switchClientPage(boolean flow) {
-        stashCurrentTab();
-        unfocusEditBoxes();
-        flowPage = flow;
-        buildTab();
     }
 
     private void buildUpgradesTab(int cx, int cy, int cw) {
@@ -280,7 +260,6 @@ public class ModConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        doneButton.active = flowOptions.valid();
         g.fill(x0 + 4, y0 + 4, x0 + GUI_WIDTH + 4, y0 + GUI_HEIGHT + 4, COL_SHADOW);
         g.fill(x0 + 3, y0 + 3, x0 + GUI_WIDTH + 3, y0 + GUI_HEIGHT + 3, COL_SHADOW_SOFT);
 
@@ -319,11 +298,6 @@ public class ModConfigScreen extends Screen {
         renderEditBox(g, maxVisibleNodesBox);
         for (EditBox box : upgradeBoxes) {
             renderEditBox(g, box);
-        }
-
-        if (currentTab == Tab.CLIENT) {
-            renderFlowNavigation(g, mouseX, mouseY);
-            if (flowPage) flowOptions.renderTooltips(g, font, mouseX, mouseY);
         }
 
         if (!canEditServerConfig && (currentTab == Tab.COMMON || currentTab == Tab.UPGRADES)) {
@@ -408,17 +382,6 @@ public class ModConfigScreen extends Screen {
         }
     }
 
-    private void renderFlowNavigation(GuiGraphics g, int mouseX, int mouseY) {
-        int x = flowNavigation.getX(), y = flowNavigation.getY();
-        int w = flowNavigation.getWidth(), h = flowNavigation.getHeight();
-        boolean highlighted = flowNavigation.isMouseOver(mouseX, mouseY) || flowNavigation.isFocused();
-        g.fill(x, y, x + w, y + h, highlighted ? COL_TAB_ACTIVE : COL_TAB_INACTIVE);
-        g.renderOutline(x, y, w, h, COL_BORDER);
-        if (flowNavigation.isFocused()) g.renderOutline(x + 1, y + 1, w - 2, h - 2, COL_INK_FADED);
-        Component label = flowNavigation.getMessage();
-        g.drawString(font, label, x + (w - font.width(label)) / 2, y + (h - 8) / 2, COL_INK, false);
-    }
-
     private void renderCommonTab(GuiGraphics g, int cx, int cy, int cw, int mx, int my) {
         boolean locked = !canEditServerConfig;
         int y = cy + 20;
@@ -444,12 +407,6 @@ public class ModConfigScreen extends Screen {
     }
 
     private void renderClientTab(GuiGraphics g, int cx, int cy, int cw, int mx, int my) {
-        if (flowPage) {
-            g.drawString(font, Component.translatable("gui.logisticsnetworks.config.client.flowLines"),
-                    cx + 100, cy + 5, COL_INK, false);
-            flowOptions.render(this, g, font, cx, cy + 22, cw, mx, my);
-            return;
-        }
         int y = cy;
         y = renderCheckbox(g, cx, y, cw, TEXT_DEFAULT_NODE_VISIBILITY, pendingDefaultNodeVisibility, mx, my, false);
 
@@ -493,7 +450,6 @@ public class ModConfigScreen extends Screen {
     }
 
     private boolean handleClientClick(double mx, double my, int cx, int cy, int cw) {
-        if (flowPage) return false;
         int boxX = cx + cw - 14;
         if (inBox(mx, my, boxX, cy + 2, 9)) {
             pendingDefaultNodeVisibility = !pendingDefaultNodeVisibility;
@@ -745,7 +701,6 @@ public class ModConfigScreen extends Screen {
     }
 
     private void save() {
-        if (!flowOptions.valid()) return;
         stashCurrentTab();
 
         if (canEditServerConfig) {
@@ -782,8 +737,7 @@ public class ModConfigScreen extends Screen {
         ClientConfig.invertCopyPasteControlsSpec.set(pendingInvertCopyPasteControls);
         ClientConfig.confirmNetworkCreationSpec.set(pendingConfirmNetworkCreation);
         ClientConfig.themeSpec.set(pendingTheme);
-        flowOptions.save();
-        ClientConfig.flowLinesEnabledSpec.save();
+        ClientConfig.themeSpec.save();
         ClientConfig.refresh();
         DefaultNodeVisibilitySync.send();
         ThemeState.setTheme(Themes.byId(pendingTheme));
@@ -853,7 +807,6 @@ public class ModConfigScreen extends Screen {
     }
 
     private EditBox findFocusedEditBox() {
-        if (currentTab == Tab.CLIENT && flowPage && flowOptions.focused() != null) return flowOptions.focused();
         if (backoffMaxTicksBox != null && backoffMaxTicksBox.isFocused()) return backoffMaxTicksBox;
         if (maxRenderedNodesBox != null && maxRenderedNodesBox.isFocused()) return maxRenderedNodesBox;
         if (maxVisibleNodesBox != null && maxVisibleNodesBox.isFocused()) return maxVisibleNodesBox;
@@ -864,7 +817,6 @@ public class ModConfigScreen extends Screen {
     }
 
     private void unfocusEditBoxes() {
-        flowOptions.unfocus();
         if (backoffMaxTicksBox != null) backoffMaxTicksBox.setFocused(false);
         if (maxRenderedNodesBox != null) maxRenderedNodesBox.setFocused(false);
         if (maxVisibleNodesBox != null) maxVisibleNodesBox.setFocused(false);

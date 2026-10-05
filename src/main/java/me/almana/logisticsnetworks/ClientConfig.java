@@ -38,38 +38,6 @@ public class ClientConfig {
             .comment("Whether adjacent visible nodes should render as connected.")
             .define("connectedNodeTextures", true);
 
-    public static final ModConfigSpec.BooleanValue flowLinesEnabledSpec = builder
-            .comment("Show wrench flow connections.")
-            .define("flowLinesEnabled", true);
-
-    public static final ModConfigSpec.DoubleValue flowLineThicknessSpec = builder
-            .comment("Line width in pixels.")
-            .defineInRange("flowLineThickness", 6.0, 1.0, 20.0);
-
-    public static final ModConfigSpec.DoubleValue flowLineSpeedSpec = builder
-            .comment("Reveal and pulse blocks/second.")
-            .defineInRange("flowLineSpeed", 3.0, 0.1, 60.0);
-
-    public static final ModConfigSpec.DoubleValue flowLineOpacitySpec = builder
-            .comment("Line opacity, including pulses.")
-            .defineInRange("flowLineOpacity", 0.95, 0.05, 1.0);
-
-    public static final ModConfigSpec.BooleanValue flowLinePulsesSpec = builder
-            .comment("Show moving resource pulses.")
-            .define("flowLinePulses", true);
-
-    public static final ModConfigSpec.DoubleValue flowLinePulseSpacingSpec = builder
-            .comment("Pulse spacing in blocks.")
-            .defineInRange("flowLinePulseSpacing", 3.0, 0.5, 32.0);
-
-    public static final ModConfigSpec.DoubleValue flowLinePulseLengthSpec = builder
-            .comment("Pulse length in blocks.")
-            .defineInRange("flowLinePulseLength", 0.6, 0.1, 8.0);
-
-    public static final ModConfigSpec.BooleanValue flowLinesThroughBlocksSpec = builder
-            .comment("Show connections through blocks.")
-            .define("flowLinesThroughBlocks", true);
-
     private static final List<String> THEMES = List.of(
             "light", "dark", "redstone", "nebula", "glass", "terminal", "pastel", "brutalist");
 
@@ -85,14 +53,6 @@ public class ClientConfig {
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
     public static boolean connectedNodeTextures = true;
-    public static boolean flowLinesEnabled = true;
-    public static double flowLineThickness = 6;
-    public static double flowLineSpeed = 3;
-    public static double flowLineOpacity = 0.95;
-    public static boolean flowLinePulses = true;
-    public static double flowLinePulseSpacing = 3;
-    public static double flowLinePulseLength = 0.6;
-    public static boolean flowLinesThroughBlocks = true;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -107,14 +67,6 @@ public class ClientConfig {
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
         connectedNodeTextures = connectedNodeTexturesSpec.get();
-        flowLinesEnabled = flowLinesEnabledSpec.get();
-        flowLineThickness = flowLineThicknessSpec.get();
-        flowLineSpeed = flowLineSpeedSpec.get();
-        flowLineOpacity = flowLineOpacitySpec.get();
-        flowLinePulses = flowLinePulsesSpec.get();
-        flowLinePulseSpacing = flowLinePulseSpacingSpec.get();
-        flowLinePulseLength = flowLinePulseLengthSpec.get();
-        flowLinesThroughBlocks = flowLinesThroughBlocksSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());
     }
 }
