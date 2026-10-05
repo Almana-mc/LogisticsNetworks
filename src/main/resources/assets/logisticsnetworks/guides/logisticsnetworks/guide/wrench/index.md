@@ -20,6 +20,28 @@ You can also cycle modes with **Modifier Key 1 (default: Shift) + Mouse Wheel**.
 - [Copy / Paste](copy-paste.md) — clone a node's entire setup — channels, filters, upgrades, label — onto another node. Supports bulk-paste to every connected node of the same block type.
 - [Mass Placement](mass-placement.md) — select a two-corner area, choose a target block type, then place configured nodes on matching blocks with **Primary Interaction (default: Left Click)**.
 
+## Wrench Settings
+
+Press **G** while holding the wrench to open its settings. Every wrench keeps its own settings, so one wrench can show the whole base while another focuses on a single network.
+
+**Colors** recolors the wrench's case and screen.
+
+**Flow Lines** controls the lines drawn between senders and receivers while you hold the wrench.
+
+- *Simple*:
+  - turn lines on or off
+  - show only some resource types (Items, Fluids, Energy, Chemicals, Source)
+  - show only some channels (1–9)
+  - limit lines to one nearby network
+  - choose whether nodes that are off-screen, or too far away to render, still get lines. This reaches every node your game is tracking, roughly 64 blocks.
+- *Advanced*:
+  - pick the line style: **Routed** (grouped right-angle paths) or **Direct** (a straight line from each sender to each receiver)
+  - set thickness, speed, opacity and the pulses
+  - choose whether lines show through blocks
+  - set the color of each resource type
+
+Press **Apply** to save. **Reset** restores the defaults of the tab you're on.
+
 ## Quick Reference
 
 | Mode | Secondary Interaction (default: Right Click) | Modifier Key 1 + Secondary Interaction | Modifier Key 2 (default: Ctrl) + Secondary Interaction |
