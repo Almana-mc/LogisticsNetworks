@@ -18,6 +18,7 @@ import me.almana.logisticsnetworks.integration.storage.StorageAction;
 import me.almana.logisticsnetworks.integration.storage.StorageInventory;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.Direction;
@@ -944,6 +945,7 @@ public final class NodeClipboardConfig {
             ChannelData ch = node.getChannel(i);
             if (ch != null) {
                 ch.setName(network.getChannelName(i));
+                ServerPayloadHandler.sendChannelSyncToViewers(node, i, ch);
             }
         }
     }
