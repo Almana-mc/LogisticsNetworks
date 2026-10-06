@@ -48,3 +48,9 @@ Requires the **Ars Nouveau** mod to be installed to both craft and use. The reci
 **Unlocks direct storage network access.** A node with this upgrade on an Applied Energistics 2 or Refined Storage Interface moves items and fluids straight through the whole connected storage network, as described in [Channel Settings](channel-settings.md). Without it, the Interface is just another inventory and the node only sees what is stocked in the Interface itself.
 
 Each node on an Interface that should reach the network needs its own Network Upgrade. Nodes on other blocks do not need it.
+
+There are two recipes, one per storage mod. Each one only appears when that mod is loaded.
+
+<Recipe id="logisticsnetworks:network_upgrade_ae2" fallbackText="Install Applied Energistics 2 to unlock this recipe." />
+
+<Recipe id="logisticsnetworks:network_upgrade_refinedstorage" fallbackText="Install Refined Storage to unlock this recipe." />
