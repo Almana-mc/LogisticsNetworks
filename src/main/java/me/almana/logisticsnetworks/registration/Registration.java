@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.block.ServerRackBlock;
+import me.almana.logisticsnetworks.block.ServerRackBlockEntity;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.item.AmountFilterItem;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
@@ -101,6 +102,10 @@ public class Registration {
                         () -> new ServerRackBlock());
         public static final DeferredHolder<Item, BlockItem> SERVER_RACK_ITEM = ITEMS.register("server_rack",
                         () -> new BlockItem(SERVER_RACK_BLOCK.get(), new Item.Properties()));
+        public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ServerRackBlockEntity>> SERVER_RACK_BLOCK_ENTITY = BLOCK_ENTITY_TYPES
+                        .register("server_rack", () -> BlockEntityType.Builder.of(
+                                        ServerRackBlockEntity::new,
+                                        SERVER_RACK_BLOCK.get()).build(null));
 
         public static final DeferredHolder<Item, WrenchItem> WRENCH = ITEMS.register("wrench",
                         () -> new WrenchItem(new Item.Properties().stacksTo(1)));
