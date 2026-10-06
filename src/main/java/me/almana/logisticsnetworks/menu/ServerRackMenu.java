@@ -49,7 +49,12 @@ public class ServerRackMenu extends AbstractContainerMenu {
                 && canApply(player, rack.getConfig(), next)) {
             rack.setConfig(next);
         }
-        sync(player);
+        for (ServerPlayer viewer : player.server.getPlayerList().getPlayers()) {
+            if (viewer.containerMenu instanceof ServerRackMenu menu && menu.rackPos.equals(rackPos)
+                    && viewer.level() == player.level()) {
+                menu.sync(viewer);
+            }
+        }
     }
 
     public void sync(ServerPlayer player) {
@@ -105,7 +110,7 @@ public class ServerRackMenu extends AbstractContainerMenu {
                 && canUse(player, registry, current.right(), next.right());
     }
 
-    // Old and new must be reachable
+    // Both old and new reachable
     private static boolean canUse(ServerPlayer player, NetworkRegistry registry, Optional<UUID> current,
             Optional<UUID> next) {
         for (Optional<UUID> id : List.of(current, next)) {
