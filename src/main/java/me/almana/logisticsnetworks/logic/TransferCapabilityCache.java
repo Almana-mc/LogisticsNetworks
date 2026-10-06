@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolutio
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -115,8 +116,7 @@ public final class TransferCapabilityCache {
         if (node.isMountedOnCreate()) {
             return CreateCompat.findMountedItemHandler(node);
         }
-        InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(
-                (ServerLevel) node.level(), node.getAttachedPos(), direction);
+        InterfaceStorageResolution resolution = resolveInterface(node, direction);
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE) {
             if (directInterfaces) {
                 IItemHandler buffer = exporting
@@ -134,6 +134,12 @@ public final class TransferCapabilityCache {
         }
         if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
         return findItemHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
+    }
+
+    private static InterfaceStorageResolution resolveInterface(LogisticsNodeEntity node,
+            @Nullable Direction direction) {
+        if (!NodeUpgradeData.hasNetworkUpgrade(node)) return InterfaceStorageResolution.unsupported();
+        return LinkedStorage.resolveInterface((ServerLevel) node.level(), node.getAttachedPos(), direction);
     }
 
     @Nullable
@@ -203,8 +209,7 @@ public final class TransferCapabilityCache {
         if (node.isMountedOnCreate()) {
             return CreateCompat.findMountedFluidHandler(node);
         }
-        InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(
-                (ServerLevel) node.level(), node.getAttachedPos(), direction);
+        InterfaceStorageResolution resolution = resolveInterface(node, direction);
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE) {
             if (directInterfaces) {
                 return exporting
