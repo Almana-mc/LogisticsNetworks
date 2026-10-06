@@ -49,9 +49,16 @@ public final class ServerRackLinks {
                 if (!row.linked()) {
                     continue;
                 }
-                byNetwork.computeIfAbsent(left, id -> new ArrayList<>()).add(new Link(row.left(), right, row.right()));
-                byNetwork.computeIfAbsent(right, id -> new ArrayList<>()).add(new Link(row.right(), left, row.left()));
+                addLink(left, new Link(row.left(), right, row.right()));
+                addLink(right, new Link(row.right(), left, row.left()));
             }
+        }
+    }
+
+    private void addLink(UUID network, Link link) {
+        List<Link> list = byNetwork.computeIfAbsent(network, id -> new ArrayList<>());
+        if (!list.contains(link)) {
+            list.add(link);
         }
     }
 

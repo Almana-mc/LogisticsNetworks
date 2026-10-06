@@ -13,7 +13,6 @@ import net.minecraft.server.MinecraftServer;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,9 +51,8 @@ final class BridgedImports {
                 }
                 List<ImportTarget> slot = new ArrayList<>(imports[type][link.channel()]);
                 addTargets(refs, peer, link.peerChannel(), server, slot, dimensionalCache);
-                List<ImportTarget> merged = new ArrayList<>(new LinkedHashSet<>(slot));
-                merged.sort(ORDER);
-                imports[type][link.channel()] = merged;
+                slot.sort(ORDER);
+                imports[type][link.channel()] = slot;
             }
         }
     }
