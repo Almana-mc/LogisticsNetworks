@@ -21,6 +21,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -28,8 +29,6 @@ import net.minecraft.world.phys.shapes.Shapes;
 
 import com.mojang.serialization.MapCodec;
 
-import java.util.EnumMap;
-import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 public class ComputerBlock extends HorizontalDirectionalBlock implements EntityBlock {
@@ -41,25 +40,31 @@ public class ComputerBlock extends HorizontalDirectionalBlock implements EntityB
         return CODEC;
     }
 
-    private static final Map<Direction, VoxelShape> SHAPES = new EnumMap<>(Direction.class);
+    private static final VoxelShape[] SHAPES = new VoxelShape[4];
 
     static {
-        // Screen faces NORTH by default (screen at low Z, base extends toward high Z)
-        VoxelShape baseN = Shapes.box(0.0, 0.0, 0.0625, 1.0, 0.0625, 1.0);
-        VoxelShape screenN = Shapes.box(0.0, 0.0625, 0.0, 1.0, 0.9375, 0.25);
-        SHAPES.put(Direction.NORTH, Shapes.or(baseN, screenN));
+        // Front faces player at south
+        VoxelShape desktop = Shapes.or(
+                box(11, 0, 1, 14, 2, 6),
+                box(0, 0, 0, 9, 16, 16),
+                box(12, 4, 12, 32, 16, 14),
+                box(20, 1, 14, 24, 12, 16),
+                box(17, 0, 12, 27, 1, 16),
+                box(16, 0, 0, 32, 1, 8));
+        for (int turns = 0; turns < 4; turns++) {
+            SHAPES[turns] = rotate(desktop, turns);
+        }
+    }
 
-        VoxelShape baseS = Shapes.box(0.0, 0.0, 0.0, 1.0, 0.0625, 0.9375);
-        VoxelShape screenS = Shapes.box(0.0, 0.0625, 0.75, 1.0, 0.9375, 1.0);
-        SHAPES.put(Direction.SOUTH, Shapes.or(baseS, screenS));
-
-        VoxelShape baseW = Shapes.box(0.0625, 0.0, 0.0, 1.0, 0.0625, 1.0);
-        VoxelShape screenW = Shapes.box(0.0, 0.0625, 0.0, 0.25, 0.9375, 1.0);
-        SHAPES.put(Direction.WEST, Shapes.or(baseW, screenW));
-
-        VoxelShape baseE = Shapes.box(0.0, 0.0, 0.0, 0.9375, 0.0625, 1.0);
-        VoxelShape screenE = Shapes.box(0.75, 0.0625, 0.0, 1.0, 0.9375, 1.0);
-        SHAPES.put(Direction.EAST, Shapes.or(baseE, screenE));
+    static VoxelShape rotate(VoxelShape shape, int turns) {
+        for (int i = 0; i < turns; i++) {
+            VoxelShape turned = Shapes.empty();
+            for (AABB b : shape.toAabbs()) {
+                turned = Shapes.or(turned, Shapes.box(1 - b.maxZ, b.minY, b.minX, 1 - b.minZ, b.maxY, b.maxX));
+            }
+            shape = turned;
+        }
+        return shape;
     }
 
     public ComputerBlock() {
@@ -82,7 +87,7 @@ public class ComputerBlock extends HorizontalDirectionalBlock implements EntityB
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return SHAPES.get(state.getValue(FACING));
+        return SHAPES[state.getValue(FACING).get2DDataValue()];
     }
 
     @Override
