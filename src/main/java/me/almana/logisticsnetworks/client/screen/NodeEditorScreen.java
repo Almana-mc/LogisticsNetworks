@@ -533,12 +533,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         ThemePaint.button(g, font, x, y, w, h, label, hovered, theme());
     }
 
-    private static final int SORT_ICON_W = 5;
-    private static final int SORT_ICON_GAP = 4;
-
     private int[] sortButtonBounds() {
         String label = tr(sortMode.labelKey());
-        int w = font.width(label) + 12 + SORT_ICON_W + SORT_ICON_GAP;
+        int w = ThemePaint.sortButtonWidth(font, label);
         int h = 13;
         int x = leftPos + GUI_WIDTH - 14 - w;
         int y = topPos + 79;
@@ -546,26 +543,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     }
 
     private void drawSortButton(GuiGraphics g, int mx, int my) {
-        String label = tr(sortMode.labelKey());
         int[] b = sortButtonBounds();
         boolean hovered = mx >= b[0] && mx <= b[0] + b[2] && my >= b[1] && my <= b[1] + b[3];
-        int fg = hovered ? ((cBorderStrong() == cText()) ? theme().bg() : cText()) : cMuted();
-        g.fill(b[0], b[1], b[0] + b[2], b[1] + b[3], hovered ? cBorderStrong() : cPanel());
-        g.renderOutline(b[0], b[1], b[2], b[3], hovered ? cAccent() : cBorder());
-
-        int iconX = b[0] + 5;
-        int iconY = b[1] + 3;
-        drawSortIcon(g, iconX, iconY, fg);
-        g.drawString(font, label, iconX + SORT_ICON_W + SORT_ICON_GAP, b[1] + 3, fg, false);
-    }
-
-    private void drawSortIcon(GuiGraphics g, int x, int y, int color) {
-        g.fill(x + 2, y, x + 3, y + 1, color);
-        g.fill(x + 1, y + 1, x + 4, y + 2, color);
-        g.fill(x, y + 2, x + 5, y + 3, color);
-        g.fill(x, y + 4, x + 5, y + 5, color);
-        g.fill(x + 1, y + 5, x + 4, y + 6, color);
-        g.fill(x + 2, y + 6, x + 3, y + 7, color);
+        ThemePaint.sortButton(g, font, b[0], b[1], tr(sortMode.labelKey()), hovered, theme());
     }
 
     private void drawNetworkListEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, int x, int y, int w,
