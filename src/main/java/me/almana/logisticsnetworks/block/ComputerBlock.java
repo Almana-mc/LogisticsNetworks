@@ -56,7 +56,7 @@ public class ComputerBlock extends HorizontalDirectionalBlock implements EntityB
         }
     }
 
-    static VoxelShape rotateShape(VoxelShape shape, int turns) {
+    private static VoxelShape rotateShape(VoxelShape shape, int turns) {
         for (int i = 0; i < turns; i++) {
             VoxelShape turned = Shapes.empty();
             for (AABB b : shape.toAabbs()) {
