@@ -45,6 +45,7 @@ public class ServerRackMenu extends AbstractContainerMenu {
 
     public void update(ServerPlayer player, ServerRackConfig next) {
         if (player.serverLevel().getBlockEntity(rackPos) instanceof ServerRackBlockEntity rack
+                && !next.equals(rack.getConfig())
                 && canApply(player, rack.getConfig(), next)) {
             rack.setConfig(next);
         }
