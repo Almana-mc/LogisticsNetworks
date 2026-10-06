@@ -43,7 +43,7 @@ public class ComputerBlock extends HorizontalDirectionalBlock implements EntityB
     private static final VoxelShape[] SHAPES = new VoxelShape[4];
 
     static {
-        // Front faces player at south
+        // Unrotated is facing south
         VoxelShape desktop = Shapes.or(
                 box(11, 0, 1, 14, 2, 6),
                 box(0, 0, 0, 9, 16, 16),
@@ -52,11 +52,11 @@ public class ComputerBlock extends HorizontalDirectionalBlock implements EntityB
                 box(17, 0, 12, 27, 1, 16),
                 box(16, 0, 0, 32, 1, 8));
         for (int turns = 0; turns < 4; turns++) {
-            SHAPES[turns] = rotate(desktop, turns);
+            SHAPES[turns] = rotateShape(desktop, turns);
         }
     }
 
-    static VoxelShape rotate(VoxelShape shape, int turns) {
+    static VoxelShape rotateShape(VoxelShape shape, int turns) {
         for (int i = 0; i < turns; i++) {
             VoxelShape turned = Shapes.empty();
             for (AABB b : shape.toAabbs()) {
