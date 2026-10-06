@@ -448,6 +448,7 @@
   "tooltip.logisticsnetworks.mekanism_chemical_upgrade": "Unlocks Chemical channel transfer",
   "gui.logisticsnetworks.filter.target.chemicals": "Chemicals",
   "item.logisticsnetworks.ars_source_upgrade": "Ars Source Upgrade",
+  "item.logisticsnetworks.network_upgrade": "Network Upgrade",
   "tooltip.logisticsnetworks.ars_source_upgrade": "Unlocks Source channel transfer",
   "gui.logisticsnetworks.channel_type.source": "Source",
   "gui.logisticsnetworks.node.value.batch.source": "%s Source",

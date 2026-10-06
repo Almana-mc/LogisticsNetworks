@@ -150,6 +150,9 @@ public class Registration {
                                         "ars_source_upgrade",
                                         () -> new ArsSourceUpgradeItem(new Item.Properties()));
 
+        public static final DeferredHolder<Item, Item> NETWORK_UPGRADE = ITEMS.register("network_upgrade",
+                        () -> new Item(new Item.Properties()));
+
         public static final DeferredHolder<Item, PatternSetterItem> PATTERN_SETTER = ITEMS
                         .register(
                                         "pattern_setter",
