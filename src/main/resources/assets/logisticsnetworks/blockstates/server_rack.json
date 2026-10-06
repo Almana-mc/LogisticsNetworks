@@ -1,8 +1,9 @@
 {
   "variants": {
-    "facing=south": { "model": "logisticsnetworks:block/server_rack" },
-    "facing=west": { "model": "logisticsnetworks:block/server_rack", "y": 90 },
-    "facing=north": { "model": "logisticsnetworks:block/server_rack", "y": 180 },
-    "facing=east": { "model": "logisticsnetworks:block/server_rack", "y": 270 }
+    "facing=south,main=true": { "model": "logisticsnetworks:block/server_rack" },
+    "facing=west,main=true": { "model": "logisticsnetworks:block/server_rack", "y": 90 },
+    "facing=north,main=true": { "model": "logisticsnetworks:block/server_rack", "y": 180 },
+    "facing=east,main=true": { "model": "logisticsnetworks:block/server_rack", "y": 270 },
+    "main=false": { "model": "logisticsnetworks:block/server_rack_extension" }
   }
 }
