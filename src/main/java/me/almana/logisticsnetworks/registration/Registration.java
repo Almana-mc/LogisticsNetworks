@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.item.AmountFilterItem;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
+import me.almana.logisticsnetworks.item.NetworkUpgradeItem;
 import me.almana.logisticsnetworks.item.DurabilityFilterItem;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
 import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
@@ -150,8 +151,9 @@ public class Registration {
                                         "ars_source_upgrade",
                                         () -> new ArsSourceUpgradeItem(new Item.Properties()));
 
-        public static final DeferredHolder<Item, Item> NETWORK_UPGRADE = ITEMS.register("network_upgrade",
-                        () -> new Item(new Item.Properties()));
+        public static final DeferredHolder<Item, NetworkUpgradeItem> NETWORK_UPGRADE = ITEMS.register(
+                        "network_upgrade",
+                        () -> new NetworkUpgradeItem(new Item.Properties()));
 
         public static final DeferredHolder<Item, PatternSetterItem> PATTERN_SETTER = ITEMS
                         .register(
