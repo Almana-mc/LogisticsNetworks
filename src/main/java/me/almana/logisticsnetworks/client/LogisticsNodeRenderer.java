@@ -138,8 +138,15 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
     protected void renderNameTag(LogisticsNodeEntity entity, Component displayName, PoseStack poseStack,
             MultiBufferSource buffer, int packedLight, float partialTick) {
         String networkName = entity.getNetworkName();
-        String label = (networkName == null || networkName.isBlank()) ? "No Network" : networkName;
-        super.renderNameTag(entity, Component.literal(label), poseStack, buffer, packedLight, partialTick);
+        String title = (networkName == null || networkName.isBlank()) ? "No Network" : networkName;
+        String nodeLabel = entity.getNodeLabel();
+        poseStack.pushPose();
+        if (!nodeLabel.isEmpty()) {
+            super.renderNameTag(entity, Component.literal(nodeLabel), poseStack, buffer, packedLight, partialTick);
+            poseStack.translate(0.0F, 9.0F * 1.15F * 0.025F, 0.0F);
+        }
+        super.renderNameTag(entity, Component.literal(title), poseStack, buffer, packedLight, partialTick);
+        poseStack.popPose();
     }
 
     private void renderModel(LogisticsNodeEntity entity, NodeRenderContext context, float partialTick,
