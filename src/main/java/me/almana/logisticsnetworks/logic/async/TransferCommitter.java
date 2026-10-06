@@ -17,6 +17,7 @@ import me.almana.logisticsnetworks.logic.PriorityRobin;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import me.almana.logisticsnetworks.logic.ItemResourceOrder;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -253,7 +254,7 @@ public final class TransferCommitter {
             }
             if (!sourceNode.level().dimension().equals(node.level().dimension())
                     && !(network.getDimensionalCache().getOrDefault(sourceNode.getUUID(), false)
-                    && network.getDimensionalCache().getOrDefault(node.getUUID(), false))) continue;
+                    && NodeUpgradeData.hasDimensionalUpgrade(node))) continue;
             if (!sourceNode.isMountedOnCreate() && !node.isMountedOnCreate()
                     && TransferEngine.isSameItemStorage(
                             (ServerLevel) sourceNode.level(), sourceNode.getAttachedPos(),
