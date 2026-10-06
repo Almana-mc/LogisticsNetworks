@@ -15,6 +15,8 @@ final class WrenchColoursTab implements WrenchTab {
             LogisticsNetworks.MOD_ID, "textures/item/wrench_case.png");
     private static final ResourceLocation SCREEN_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             LogisticsNetworks.MOD_ID, "textures/item/wrench_screen.png");
+    private static final ResourceLocation BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            LogisticsNetworks.MOD_ID, "textures/item/wrench_base.png");
     private static final String[] TARGETS = {
             "gui.logisticsnetworks.wrench.colors.case", "gui.logisticsnetworks.wrench.colors.screen" };
     private static final int[] DEFAULTS = { WrenchItem.DEFAULT_CASE_COLOR, WrenchItem.DEFAULT_SCREEN_COLOR };
@@ -64,6 +66,7 @@ final class WrenchColoursTab implements WrenchTab {
         g.pose().scale(PREVIEW / 16f, PREVIEW / 16f, 1f);
         drawLayer(g, CASE_TEXTURE, shown[0]);
         drawLayer(g, SCREEN_TEXTURE, shown[1]);
+        drawLayer(g, BASE_TEXTURE, 0xFFFFFF);
         g.pose().popPose();
     }
 

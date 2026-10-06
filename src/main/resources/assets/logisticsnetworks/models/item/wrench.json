@@ -2,6 +2,7 @@
   "parent": "item/generated",
   "textures": {
     "layer0": "logisticsnetworks:item/wrench_case",
-    "layer1": "logisticsnetworks:item/wrench_screen"
+    "layer1": "logisticsnetworks:item/wrench_screen",
+    "layer2": "logisticsnetworks:item/wrench_base"
   }
 }

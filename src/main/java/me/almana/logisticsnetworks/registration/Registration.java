@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.registration;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
+import me.almana.logisticsnetworks.block.ServerRackBlock;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.item.AmountFilterItem;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
@@ -95,6 +96,10 @@ public class Registration {
                                         COMPUTER_BLOCK.get()).build(null));
         public static final DeferredHolder<Item, BlockItem> COMPUTER_ITEM = ITEMS.register("computer",
                         () -> new BlockItem(COMPUTER_BLOCK.get(), new Item.Properties()));
+        public static final DeferredHolder<Block, ServerRackBlock> SERVER_RACK_BLOCK = BLOCKS.register("server_rack",
+                        () -> new ServerRackBlock());
+        public static final DeferredHolder<Item, BlockItem> SERVER_RACK_ITEM = ITEMS.register("server_rack",
+                        () -> new BlockItem(SERVER_RACK_BLOCK.get(), new Item.Properties()));
 
         public static final DeferredHolder<Item, WrenchItem> WRENCH = ITEMS.register("wrench",
                         () -> new WrenchItem(new Item.Properties().stacksTo(1)));
@@ -144,6 +149,9 @@ public class Registration {
                         .register(
                                         "ars_source_upgrade",
                                         () -> new ArsSourceUpgradeItem(new Item.Properties()));
+
+        public static final DeferredHolder<Item, Item> NETWORK_UPGRADE = ITEMS.register("network_upgrade",
+                        () -> new Item(new Item.Properties()));
 
         public static final DeferredHolder<Item, PatternSetterItem> PATTERN_SETTER = ITEMS
                         .register(
