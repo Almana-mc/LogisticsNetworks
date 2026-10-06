@@ -54,6 +54,7 @@ final class NetworkDropdown {
     void close() {
         open = false;
         search.setFocused(false);
+        search.setValue("");
     }
 
     void renderHeader(GuiGraphics g, Theme t, String label, int swatch, int mx, int my) {
@@ -115,6 +116,7 @@ final class NetworkDropdown {
             } else {
                 open = true;
                 scroll = 0;
+                search.setFocused(true);
             }
             return true;
         }

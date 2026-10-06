@@ -201,9 +201,9 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
             return true;
         }
         boolean dropdownOpen = leftDropdown.isOpen() || rightDropdown.isOpen();
-        if (leftDropdown.mouseClicked(mx, my, networks, config.right().orElse(null))
-                || rightDropdown.mouseClicked(mx, my, networks, config.left().orElse(null))
-                || dropdownOpen) {
+        boolean handled = leftDropdown.mouseClicked(mx, my, networks, config.right().orElse(null))
+                | rightDropdown.mouseClicked(mx, my, networks, config.left().orElse(null));
+        if (handled || dropdownOpen) {
             return true;
         }
         for (int row = 0; row < ServerRackConfig.ROWS; row++) {
@@ -251,6 +251,7 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
     }
 
     private void send(ServerRackConfig next) {
+        config = next;
         PacketDistributor.sendToServer(new UpdateServerRackPayload(menu.getRackPos(), next));
     }
 
