@@ -394,6 +394,7 @@ public final class GraphPayloadHandler {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (player.containerMenu instanceof NodeGraphMenu && authorized(player, networkId)) sendSnapshot(player);
         }
+        ServerPayloadHandler.refreshNodeViewers(server, networkId);
     }
 
     public static void refreshTable(ServerPlayer player, UUID networkId) {
