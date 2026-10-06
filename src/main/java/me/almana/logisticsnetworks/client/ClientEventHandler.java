@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
 import me.almana.logisticsnetworks.client.screen.PatternSetterScreen;
+import me.almana.logisticsnetworks.client.screen.ServerRackScreen;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.client.tooltip.ClientFilterPreviewTooltip;
 import me.almana.logisticsnetworks.client.tooltip.FilterPreviewTooltip;
@@ -36,6 +37,7 @@ public class ClientEventHandler {
     @SubscribeEvent
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(Registration.NODE_MENU.get(), NodeScreen::new);
+        event.register(Registration.SERVER_RACK_MENU.get(), ServerRackScreen::new);
         event.register(Registration.NODE_GRAPH_MENU.get(), NodeGraphScreen::new);
         event.register(Registration.FILTER_MENU.get(), FilterScreen::new);
         event.register(Registration.CLIPBOARD_MENU.get(), ClipboardScreen::new);
