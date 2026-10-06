@@ -115,7 +115,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private NetworkSortMode sortMode = NetworkSortMode.NEW_OLD;
 
     private NetworkEditor networkEditor;
-    private NetworkCreationConfirmation networkCreationConfirmation;
+    private ConfirmationDialog confirmation;
 
     // Settings scroll state
     private int settingsScrollOffset = 0;
@@ -195,7 +195,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     protected void rebuildPageLayout() {
         stopNumericEdit(false);
         networkEditor = null;
-        networkCreationConfirmation = null;
+        confirmation = null;
         clearWidgets();
         getMenu().setNodeSlotsVisible(currentPage == Page.CHANNEL_CONFIG);
         if (currentPage == Page.NETWORK_SELECT) {
@@ -235,7 +235,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        boolean backgroundInteractive = networkEditor == null && networkCreationConfirmation == null
+        boolean backgroundInteractive = networkEditor == null && confirmation == null
                 && !storageUpgradePicker.isOpen();
         int backgroundMouseX = backgroundInteractive ? mx : Integer.MIN_VALUE;
         int backgroundMouseY = backgroundInteractive ? my : Integer.MIN_VALUE;
@@ -252,8 +252,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         if (tweaksOpen) {
             renderTweaksPanel(g, mx, my);
         }
-        if (networkCreationConfirmation != null) {
-            networkCreationConfirmation.render(g, mx, my, theme());
+        if (confirmation != null) {
+            confirmation.render(g, mx, my, theme());
             return;
         }
         if (networkEditor != null) {
@@ -1257,8 +1257,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
         int action = ClientControls.resolveMouseAction(btn);
-        if (networkCreationConfirmation != null) {
-            networkCreationConfirmation.mouseClicked(mx, my, action);
+        if (confirmation != null) {
+            confirmation.mouseClicked(mx, my, action);
             return true;
         }
         if (networkEditor != null) {
@@ -1280,8 +1280,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         if (action != 0 && action != 1)
             return false;
 
-        if (networkCreationConfirmation != null) {
-            networkCreationConfirmation.mouseClicked(mx, my, action);
+        if (confirmation != null) {
+            confirmation.mouseClicked(mx, my, action);
             return true;
         }
         if (networkEditor != null) {
@@ -1366,9 +1366,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             String value = networkNameField.getValue().trim();
             String name = value.isEmpty() ? tr("gui.logisticsnetworks.node.network.unnamed") : value;
             networkNameField.setFocused(false);
-            networkCreationConfirmation = NetworkCreationConfirmation.open(ClientConfig.confirmNetworkCreation,
+            confirmation = ConfirmationDialog.networkCreation(ClientConfig.confirmNetworkCreation,
                     font, width, height, name, () -> sendNetworkAssign(Optional.empty(), name),
-                    () -> networkCreationConfirmation = null);
+                    () -> confirmation = null);
             return true;
         }
 
@@ -1887,7 +1887,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
-        if (networkCreationConfirmation != null) return true;
+        if (confirmation != null) return true;
         if (networkEditor != null) {
             networkEditor.mouseDragged(mx, my, button);
             return true;
@@ -1898,7 +1898,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public boolean mouseReleased(double mx, double my, int button) {
-        if (networkCreationConfirmation != null) return true;
+        if (confirmation != null) return true;
         if (networkEditor != null) {
             networkEditor.mouseReleased(mx, my, button);
             return true;
@@ -1929,8 +1929,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
-        if (networkCreationConfirmation != null) {
-            networkCreationConfirmation.keyPressed(key, scan, modifiers);
+        if (confirmation != null) {
+            confirmation.keyPressed(key, scan, modifiers);
             return true;
         }
         if (networkEditor != null) {
@@ -2008,7 +2008,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public boolean charTyped(char ch, int modifiers) {
-        if (networkCreationConfirmation != null) return true;
+        if (confirmation != null) return true;
         if (networkEditor != null) {
             return networkEditor.charTyped(ch);
         }
@@ -2032,7 +2032,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
-        if (networkCreationConfirmation != null || networkEditor != null) {
+        if (confirmation != null || networkEditor != null) {
             return true;
         }
         if (storageUpgradePicker.isOpen()) {
