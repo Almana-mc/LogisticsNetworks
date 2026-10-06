@@ -32,6 +32,7 @@ import me.almana.logisticsnetworks.network.RequestStorageUpgradeCatalogPayload;
 import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.SetNetworkColorPayload;
+import me.almana.logisticsnetworks.network.DeleteNetworkLabelPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
 import me.almana.logisticsnetworks.network.SetChannelNamePayload;
@@ -143,6 +144,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private boolean labelPickerOpen = false;
     private EditBox labelEditBox = null;
     private List<String> networkLabels = new ArrayList<>();
+    private Map<String, Integer> labelNodeCounts = Map.of();
     private int labelScrollOffset = 0;
     private static final int LABEL_PICKER_ENTRY_H = 14;
     private static final int LABEL_PICKER_MAX_VISIBLE = 5;
@@ -153,7 +155,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             maxW = Math.max(maxW, font.width(labelEditBox.getValue()) + 24);
         }
         for (String lbl : networkLabels) {
-            maxW = Math.max(maxW, font.width(lbl) + 24);
+            maxW = Math.max(maxW, font.width(lbl) + 28);
         }
         if (labelEditBox != null && labelEditBox.getValue().length() > 40) {
             maxW = Math.max(maxW, 90);
@@ -241,7 +243,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         int backgroundMouseY = backgroundInteractive ? my : Integer.MIN_VALUE;
         super.render(g, backgroundMouseX, backgroundMouseY, pt);
         if (labelPickerOpen && currentPage == Page.CHANNEL_CONFIG) {
-            renderLabelPicker(g, mx, my, pt);
+            renderLabelPicker(g, backgroundMouseX, backgroundMouseY, pt);
         }
         if (filterPickerOpen && currentPage == Page.CHANNEL_CONFIG) {
             renderFilterPicker(g, mx, my);
@@ -715,9 +717,11 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                         entryY + LABEL_PICKER_ENTRY_H, cHover());
             }
             String display = label;
-            if (font.width(display) > pickerW - 8) {
-                display = font.plainSubstrByWidth(display, pickerW - 13) + "...";
+            if (font.width(display) > pickerW - 28) {
+                display = font.plainSubstrByWidth(display, pickerW - 37) + "...";
             }
+            ThemePaint.labelDeleteIcon(g, pickerX + 4, entryY + 3,
+                    isOverLabelDelete(pickerX, entryY, mx, my), theme());
             ThemePaint.drawCentered(g, font, display, pickerX + pickerW / 2, entryY + 3, cInfo());
         }
 
@@ -1473,7 +1477,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             int entryY = listY + i * LABEL_PICKER_ENTRY_H;
             if (mx >= pickerX + 2 && mx < pickerX + pickerW - 2
                     && my >= entryY && my < entryY + LABEL_PICKER_ENTRY_H) {
-                commitLabelChange(networkLabels.get(idx));
+                if (isOverLabelDelete(pickerX, entryY, mx, my)) requestLabelDeletion(node, networkLabels.get(idx));
+                else commitLabelChange(networkLabels.get(idx));
                 return true;
             }
         }
@@ -1491,8 +1496,25 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         return true; // Absorb click inside picker
     }
 
-    public void receiveNetworkLabels(List<String> labels) {
-        this.networkLabels = new ArrayList<>(labels);
+    private boolean isOverLabelDelete(int pickerX, int entryY, double mx, double my) {
+        return mx >= pickerX + 2 && mx < pickerX + 14 && my >= entryY && my < entryY + LABEL_PICKER_ENTRY_H;
+    }
+
+    private void requestLabelDeletion(LogisticsNodeEntity node, String label) {
+        UUID networkId = node.getNetworkId();
+        confirmation = ConfirmationDialog.labelDeletion(font, width, height, label,
+                labelNodeCounts.getOrDefault(label, 0), () -> deleteLabel(networkId, label),
+                () -> confirmation = null);
+    }
+
+    private void deleteLabel(UUID networkId, String label) {
+        PacketDistributor.sendToServer(new DeleteNetworkLabelPayload(networkId, label));
+        if (labelEditBox != null && label.equals(labelEditBox.getValue())) labelEditBox.setValue("");
+    }
+
+    public void receiveNetworkLabels(Map<String, Integer> labels) {
+        this.networkLabels = new ArrayList<>(labels.keySet());
+        this.labelNodeCounts = labels;
         this.labelScrollOffset = 0;
     }
 

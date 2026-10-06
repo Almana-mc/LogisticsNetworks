@@ -6,10 +6,10 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-public record SyncNetworkLabelsPayload(List<String> labels) implements CustomPacketPayload {
+public record SyncNetworkLabelsPayload(Map<String, Integer> labels) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SyncNetworkLabelsPayload> TYPE = new CustomPacketPayload.Type<>(
             ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "sync_network_labels"));
@@ -19,18 +19,19 @@ public record SyncNetworkLabelsPayload(List<String> labels) implements CustomPac
 
     public static SyncNetworkLabelsPayload read(FriendlyByteBuf buf) {
         int count = buf.readVarInt();
-        List<String> labels = new ArrayList<>(count);
+        Map<String, Integer> labels = new LinkedHashMap<>();
         for (int i = 0; i < count; i++) {
-            labels.add(buf.readUtf(64));
+            labels.put(buf.readUtf(64), buf.readVarInt());
         }
         return new SyncNetworkLabelsPayload(labels);
     }
 
     public static void write(FriendlyByteBuf buf, SyncNetworkLabelsPayload payload) {
         buf.writeVarInt(payload.labels.size());
-        for (String label : payload.labels) {
+        payload.labels.forEach((label, nodeCount) -> {
             buf.writeUtf(label, 64);
-        }
+            buf.writeVarInt(nodeCount);
+        });
     }
 
     @Override

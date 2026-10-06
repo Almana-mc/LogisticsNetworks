@@ -466,6 +466,8 @@
   "gui.logisticsnetworks.pattern_setter.applied": "Applied!",
   "gui.logisticsnetworks.node.label.set": "Set Label",
   "gui.logisticsnetworks.node.label.clear": "Clear Label",
+  "gui.logisticsnetworks.node.label.delete": "Delete",
+  "gui.logisticsnetworks.node.label.confirm_delete": "Delete label \"%s\"? It is used by %s node(s), which will be unlabeled.",
   "key.categories.logisticsnetworks": "Logistics Networks",
   "key.logisticsnetworks.modifier_1": "Modifier Key 1",
   "key.logisticsnetworks.modifier_2": "Modifier Key 2",

@@ -25,6 +25,7 @@ import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.network.RequestChannelListPayload;
+import me.almana.logisticsnetworks.network.DeleteNetworkLabelPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SetComputerWrenchClipboardPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
@@ -48,6 +49,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -87,7 +89,9 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     private boolean labelPickerOpen;
     private EditBox labelEditBox;
     private List<String> networkLabels = new ArrayList<>();
+    private Map<String, Integer> labelNodeCounts = Map.of();
     private int labelScrollOffset;
+    private ConfirmationDialog confirmation;
 
     private boolean channelNameEditing;
     private EditBox channelNameEditBox;
@@ -209,6 +213,12 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        if (confirmation != null) {
+            super.render(g, Integer.MIN_VALUE, Integer.MIN_VALUE, partialTick);
+            if (labelPickerOpen) renderLabelPicker(g, Integer.MIN_VALUE, Integer.MIN_VALUE, partialTick);
+            confirmation.render(g, mouseX, mouseY, theme());
+            return;
+        }
         super.render(g, tweaksOpen ? Integer.MIN_VALUE : mouseX, tweaksOpen ? Integer.MIN_VALUE : mouseY, partialTick);
         if (labelPickerOpen) renderLabelPicker(g, mouseX, mouseY, partialTick);
         if (filterPickerOpen) renderFilterPicker(g, mouseX, mouseY);
@@ -499,7 +509,9 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             if (isInside(x + 2, rowY, width - 4, LABEL_PICKER_ENTRY_H, mouseX, mouseY)) {
                 g.fill(x + 2, rowY, x + width - 2, rowY + LABEL_PICKER_ENTRY_H, cHover());
             }
-            ThemePaint.drawCentered(g, font, clip(label, width - 10), x + width / 2, rowY + 3, cInfo());
+            ThemePaint.labelDeleteIcon(g, x + 4, rowY + 3,
+                    isInside(x + 2, rowY, 12, LABEL_PICKER_ENTRY_H, mouseX, mouseY), theme());
+            ThemePaint.drawCentered(g, font, clip(label, width - 28), x + width / 2, rowY + 3, cInfo());
         }
         int clearY = y + 22 + entries * LABEL_PICKER_ENTRY_H + 2;
         ThemePaint.ghostButton(g, font, x + 4, clearY, width - 8, 12,
@@ -579,6 +591,10 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int action = ClientControls.resolveMouseAction(button);
+        if (confirmation != null) {
+            confirmation.mouseClicked(mouseX, mouseY, action);
+            return true;
+        }
         if (action != -1 && handleInteraction(mouseX, mouseY, action)) return true;
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -901,7 +917,9 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         for (int row = 0; row < entries; row++) {
             int rowY = y + 22 + row * LABEL_PICKER_ENTRY_H;
             if (isInside(x + 2, rowY, width - 4, LABEL_PICKER_ENTRY_H, mouseX, mouseY)) {
-                commitNodeLabel(networkLabels.get(row + labelScrollOffset));
+                String label = networkLabels.get(row + labelScrollOffset);
+                if (isInside(x + 2, rowY, 12, LABEL_PICKER_ENTRY_H, mouseX, mouseY)) requestLabelDeletion(label);
+                else commitNodeLabel(label);
                 return true;
             }
         }
@@ -987,8 +1005,21 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         }
     }
 
-    public void receiveNetworkLabels(List<String> labels) {
-        networkLabels = new ArrayList<>(labels);
+    private void requestLabelDeletion(String label) {
+        UUID networkId = config().getNetworkId();
+        confirmation = ConfirmationDialog.labelDeletion(font, width, height, label,
+                labelNodeCounts.getOrDefault(label, 0), () -> deleteLabel(networkId, label),
+                () -> confirmation = null);
+    }
+
+    private void deleteLabel(UUID networkId, String label) {
+        PacketDistributor.sendToServer(new DeleteNetworkLabelPayload(networkId, label));
+        if (labelEditBox != null && label.equals(labelEditBox.getValue())) labelEditBox.setValue("");
+    }
+
+    public void receiveNetworkLabels(Map<String, Integer> labels) {
+        networkLabels = new ArrayList<>(labels.keySet());
+        labelNodeCounts = labels;
         labelScrollOffset = 0;
     }
 
@@ -1021,6 +1052,10 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
 
     @Override
     public boolean keyPressed(int key, int scanCode, int modifiers) {
+        if (confirmation != null) {
+            confirmation.keyPressed(key, scanCode, modifiers);
+            return true;
+        }
         if (key == 256) {
             if (tweaksOpen) {
                 tweaksOpen = false;
@@ -1082,6 +1117,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
+        if (confirmation != null) return true;
         if (channelNameEditBox != null) return channelNameEditBox.charTyped(codePoint, modifiers);
         if (numericEditBox != null) {
             return ArithmeticExpression.accepts(codePoint)
@@ -1096,6 +1132,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (confirmation != null) return true;
         if (labelPickerOpen && networkLabels.size() > LABEL_PICKER_MAX_VISIBLE) {
             int max = networkLabels.size() - LABEL_PICKER_MAX_VISIBLE;
             labelScrollOffset = Math.clamp(labelScrollOffset + (scrollY < 0 ? 1 : -1), 0, max);
@@ -1153,7 +1190,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
 
     private int labelPickerWidth() {
         int width = 90;
-        for (String label : networkLabels) width = Math.max(width, font.width(label) + 24);
+        for (String label : networkLabels) width = Math.max(width, font.width(label) + 28);
         return Math.min(144, width);
     }
 

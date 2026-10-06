@@ -1,11 +1,17 @@
 package me.almana.logisticsnetworks.client.theme;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.data.ChannelType;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 
 public final class ThemePaint {
+
+    private static final ResourceLocation LABEL_DELETE_ICON = ResourceLocation.fromNamespaceAndPath(
+            LogisticsNetworks.MOD_ID, "textures/gui/label_delete.png");
 
     public static void drawCentered(GuiGraphics g, Font font, String text, int cx, int y, int color) {
         int w = font.width(text);
@@ -243,6 +249,16 @@ public final class ThemePaint {
         g.fill(px, py + 2, px + 2, py + 3, fg);
         g.fill(px, py + 3, px + 1, py + 4, fg);
         g.drawString(font, label, x + 10, y + (h - 7) / 2, fg, false);
+    }
+
+    public static void labelDeleteIcon(GuiGraphics g, int x, int y, boolean hovered, Theme t) {
+        int color = hovered ? t.danger() : t.textMuted();
+        RenderSystem.enableBlend();
+        RenderSystem.setShaderColor((color >> 16 & 0xFF) / 255f, (color >> 8 & 0xFF) / 255f,
+                (color & 0xFF) / 255f, 1f);
+        g.blit(LABEL_DELETE_ICON, x, y, 8, 8, 0, 0, 512, 512, 512, 512);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        RenderSystem.disableBlend();
     }
 
     public static void stepper(GuiGraphics g, Font font, int x, int y, int w, int h,

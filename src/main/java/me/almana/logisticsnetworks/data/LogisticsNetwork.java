@@ -278,6 +278,11 @@ public class LogisticsNetwork {
         if (!label.isBlank()) labelTemplates.put(label, template);
     }
 
+    public void removeLabel(String label) {
+        labelTemplates.remove(label);
+        graphPositions.remove("label:" + label);
+    }
+
     public boolean isSleeping() {
         return sleeping;
     }

@@ -18,6 +18,7 @@ import me.almana.logisticsnetworks.network.AssignNetworkPayload;
 import me.almana.logisticsnetworks.network.ClientPayloadHandler;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
+import me.almana.logisticsnetworks.network.DeleteNetworkLabelPayload;
 import me.almana.logisticsnetworks.network.DeleteNetworkPayload;
 import me.almana.logisticsnetworks.network.ModifyFilterModPayload;
 import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
@@ -158,7 +159,7 @@ public class LogisticsNetworks {
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("13");
+                final var registrar = event.registrar(MOD_ID).versioned("14");
 
                 // Client -> Server
                 registrar.playToServer(UpdateChannelPayload.TYPE, UpdateChannelPayload.STREAM_CODEC,
@@ -247,6 +248,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetNodeLabel);
                 registrar.playToServer(RequestNetworkLabelsPayload.TYPE, RequestNetworkLabelsPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleRequestNetworkLabels);
+                registrar.playToServer(DeleteNetworkLabelPayload.TYPE, DeleteNetworkLabelPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleDeleteNetworkLabel);
                 registrar.playToServer(SetNetworkNodesVisibilityPayload.TYPE,
                                 SetNetworkNodesVisibilityPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetNetworkNodesVisibility);
