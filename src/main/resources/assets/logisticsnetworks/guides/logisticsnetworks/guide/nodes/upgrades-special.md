@@ -1,5 +1,5 @@
 ---
-item_ids: [logisticsnetworks:dimensional_upgrade, logisticsnetworks:mekanism_chemical_upgrade, logisticsnetworks:ars_source_upgrade]
+item_ids: [logisticsnetworks:dimensional_upgrade, logisticsnetworks:mekanism_chemical_upgrade, logisticsnetworks:ars_source_upgrade, logisticsnetworks:network_upgrade]
 navigation:
   title: Special Upgrades
   parent: nodes/index.md
@@ -9,7 +9,7 @@ navigation:
 
 # Special Upgrades
 
-Special upgrades do not change a node's throughput caps. They unlock **new capabilities** — cross-dimension transfers, Mekanism chemicals, Ars Nouveau source. Each one sits in an upgrade slot and can be combined with a [performance upgrade](upgrades-performance.md) on the same node.
+Special upgrades do not change a node's throughput caps. They unlock **new capabilities** — cross-dimension transfers, Mekanism chemicals, Ars Nouveau source, storage network access. Each one sits in an upgrade slot and can be combined with a [performance upgrade](upgrades-performance.md) on the same node.
 
 Upgrade slots are on the [Filters & Upgrades](filters-upgrades.md) panel. Duplicates are rejected, but different upgrades stack fine — a typical high-end node might hold one Netherite + one Dimensional + one Mekanism Chemical + one Ars Source.
 
@@ -42,3 +42,9 @@ Each node that moves source (Sender or Receiver) needs its own Ars Source Upgrad
 Requires the **Ars Nouveau** mod to be installed to both craft and use. The recipe below only appears when Ars Nouveau is loaded.
 
 <RecipeFor id="logisticsnetworks:ars_source_upgrade" fallbackText="Install Ars Nouveau to unlock this recipe." />
+
+## Network Upgrade
+
+**Unlocks direct storage network access.** A node with this upgrade on an Applied Energistics 2 or Refined Storage Interface moves items and fluids straight through the whole connected storage network, as described in [Channel Settings](channel-settings.md). Without it, the Interface is just another inventory and the node only sees what is stocked in the Interface itself.
+
+Each node on an Interface that should reach the network needs its own Network Upgrade. Nodes on other blocks do not need it.
