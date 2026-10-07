@@ -86,6 +86,8 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         state.debugNodeId = "";
         state.debugChannels = "";
         updateRenderBounds(entity, state);
+        String nodeLabel = entity.getNodeLabel();
+        state.scoreText = state.nameTag != null && !nodeLabel.isEmpty() ? Component.literal(nodeLabel) : null;
 
         if (state.wrenchVisible && state.debugMode) {
             state.debugNodeId = "Node: " + entity.getUUID().toString().substring(0, 8);
