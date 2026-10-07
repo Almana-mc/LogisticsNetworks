@@ -1,6 +1,7 @@
 {
   "itemGroup.logisticsnetworks": "Logistics Networks",
   "block.logisticsnetworks.computer": "Computer",
+  "block.logisticsnetworks.server_rack": "Logistics Server",
   "container.logisticsnetworks.computer": "Network Manager",
   "gui.logisticsnetworks.computer.no_networks": "No networks available",
   "gui.logisticsnetworks.computer.search_hint": "Search networks...",

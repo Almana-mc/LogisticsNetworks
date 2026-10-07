@@ -1,13 +1,16 @@
 package me.almana.logisticsnetworks.datagen;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.block.TwoCellBlock;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.color.item.CustomModelDataSource;
 import net.minecraft.client.data.models.BlockModelGenerators;
 import net.minecraft.client.data.models.ItemModelGenerators;
 import net.minecraft.client.data.models.ModelProvider;
+import net.minecraft.client.data.models.MultiVariant;
 import net.minecraft.client.data.models.blockstates.MultiVariantGenerator;
+import net.minecraft.client.data.models.blockstates.PropertyDispatch;
 import net.minecraft.client.data.models.model.ItemModelUtils;
 import net.minecraft.client.data.models.model.ModelLocationUtils;
 import net.minecraft.client.data.models.model.ModelTemplates;
@@ -16,6 +19,7 @@ import net.minecraft.client.resources.model.sprite.Material;
 import net.minecraft.data.PackOutput;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
 
 public class ModModelProvider extends ModelProvider {
     public ModModelProvider(PackOutput output) {
@@ -55,13 +59,28 @@ public class ModModelProvider extends ModelProvider {
                         new CustomModelDataSource(0, WrenchItem.DEFAULT_CASE_COLOR),
                         new CustomModelDataSource(1, WrenchItem.DEFAULT_SCREEN_COLOR)));
 
-        Identifier laptop = Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "block/laptop");
-        blockModels.blockStateOutput.accept(
-                MultiVariantGenerator.dispatch(Registration.COMPUTER_BLOCK.get(), BlockModelGenerators.plainVariant(laptop))
-                        .with(BlockModelGenerators.ROTATION_HORIZONTAL_FACING));
-        itemModels.itemModelOutput.accept(Registration.COMPUTER_ITEM.get(), ItemModelUtils.plainModel(laptop));
+        twoCell(blockModels, itemModels, Registration.COMPUTER_BLOCK.get(), "desktop");
+        twoCell(blockModels, itemModels, Registration.SERVER_RACK_BLOCK.get(), "server_rack");
 
         Identifier node = Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "item/logistics_node");
         itemModels.itemModelOutput.accept(Registration.LOGISTICS_NODE_ITEM.get(), ItemModelUtils.plainModel(node));
+    }
+
+    private static void twoCell(BlockModelGenerators blockModels, ItemModelGenerators itemModels, Block block,
+            String model) {
+        MultiVariant main = BlockModelGenerators.plainVariant(
+                Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "block/" + model));
+        MultiVariant extension = BlockModelGenerators.plainVariant(
+                Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "block/" + model + "_extension"));
+        blockModels.blockStateOutput.accept(MultiVariantGenerator.dispatch(block).with(
+                PropertyDispatch.initial(TwoCellBlock.MAIN, TwoCellBlock.FACING)
+                        .generate((isMain, facing) -> isMain ? main.with(switch (facing) {
+                            case WEST -> BlockModelGenerators.Y_ROT_90;
+                            case NORTH -> BlockModelGenerators.Y_ROT_180;
+                            case EAST -> BlockModelGenerators.Y_ROT_270;
+                            default -> BlockModelGenerators.NOP;
+                        }) : extension)));
+        itemModels.itemModelOutput.accept(block.asItem(),
+                ItemModelUtils.plainModel(ModelLocationUtils.getModelLocation(block.asItem())));
     }
 }

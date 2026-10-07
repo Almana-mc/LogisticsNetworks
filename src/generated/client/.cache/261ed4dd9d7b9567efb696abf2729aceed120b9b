@@ -1,8 +1,9 @@
-// 26.1.2	2026-10-07T19:17:40.4441173	Model Definitions - logisticsnetworks
-eb50e3d26484cda57c437234b2762adcc5f987bb assets/logisticsnetworks/blockstates/computer.json
+// 26.1.2	2026-10-07T19:20:54.3826541	Model Definitions - logisticsnetworks
+5c55e2b891c042b59d9b0e90c1aac312cc99b305 assets/logisticsnetworks/blockstates/computer.json
+6bf87783f23b4ce3d48d7a51bfd9c2b99541ce7f assets/logisticsnetworks/blockstates/server_rack.json
 bd8c48229778b02e30f83662cd8686414d0072ec assets/logisticsnetworks/items/ars_source_upgrade.json
 31de821618fb4abd9bb507e5c1a2dec00a09b697 assets/logisticsnetworks/items/big_filter.json
-ce5cc7cc3824e64dab527a1cf0cfa4baf8017c8e assets/logisticsnetworks/items/computer.json
+e7efa077540276835a1cbdb83ba05c132b36a7af assets/logisticsnetworks/items/computer.json
 b0948c428f23328d4b85dbec84447788ddd6d9b1 assets/logisticsnetworks/items/diamond_upgrade.json
 097ae342e7e8b9abf0a67b19e92c869b8c57bc1d assets/logisticsnetworks/items/dimensional_upgrade.json
 5827791a70b72883b1fd4f5af7946eea6fdb07f2 assets/logisticsnetworks/items/gold_upgrade.json
@@ -14,6 +15,7 @@ a7d8d29cc4ed3b9f18b777c0013e1df34a7743f1 assets/logisticsnetworks/items/mod_filt
 4d1070d07c3b0bd1eef4b2ce4305fcc33b392e35 assets/logisticsnetworks/items/name_filter.json
 c4e714cfbdffbe35fb7f678df7921b31e274ef9f assets/logisticsnetworks/items/netherite_upgrade.json
 c69d542a77783da2a11074fe4b8194506b9cfcdd assets/logisticsnetworks/items/pattern_setter.json
+92dd451b74d5d249cf92cfe886802998c758d5b5 assets/logisticsnetworks/items/server_rack.json
 04f71bc1d50383843485975f1bf326622afeb27e assets/logisticsnetworks/items/small_filter.json
 e8ae17dcfad325becb5c911f3028a1389e6e7fc8 assets/logisticsnetworks/items/wrench.json
 c0b3aeb6fb83bcb47cabfa0c6b113909c9afa90b assets/logisticsnetworks/models/item/ars_source_upgrade.json

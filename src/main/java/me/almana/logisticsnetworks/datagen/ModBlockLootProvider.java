@@ -29,11 +29,12 @@ public final class ModBlockLootProvider {
         @Override
         protected void generate() {
             dropSelf(Registration.COMPUTER_BLOCK.get());
+            dropSelf(Registration.SERVER_RACK_BLOCK.get());
         }
 
         @Override
         protected Iterable<Block> getKnownBlocks() {
-            return List.of(Registration.COMPUTER_BLOCK.get());
+            return List.of(Registration.COMPUTER_BLOCK.get(), Registration.SERVER_RACK_BLOCK.get());
         }
     }
 }

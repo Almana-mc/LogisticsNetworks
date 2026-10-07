@@ -1,19 +1,31 @@
 {
   "variants": {
-    "facing=east": {
-      "model": "logisticsnetworks:block/laptop",
-      "y": 90
+    "facing=east,main=false": {
+      "model": "logisticsnetworks:block/desktop_extension"
     },
-    "facing=north": {
-      "model": "logisticsnetworks:block/laptop"
+    "facing=east,main=true": {
+      "model": "logisticsnetworks:block/desktop",
+      "y": 270
     },
-    "facing=south": {
-      "model": "logisticsnetworks:block/laptop",
+    "facing=north,main=false": {
+      "model": "logisticsnetworks:block/desktop_extension"
+    },
+    "facing=north,main=true": {
+      "model": "logisticsnetworks:block/desktop",
       "y": 180
     },
-    "facing=west": {
-      "model": "logisticsnetworks:block/laptop",
-      "y": 270
+    "facing=south,main=false": {
+      "model": "logisticsnetworks:block/desktop_extension"
+    },
+    "facing=south,main=true": {
+      "model": "logisticsnetworks:block/desktop"
+    },
+    "facing=west,main=false": {
+      "model": "logisticsnetworks:block/desktop_extension"
+    },
+    "facing=west,main=true": {
+      "model": "logisticsnetworks:block/desktop",
+      "y": 90
     }
   }
 }

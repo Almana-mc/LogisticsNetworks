@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.registration;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
+import me.almana.logisticsnetworks.block.ServerRackBlock;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
@@ -85,6 +86,10 @@ public class Registration {
                         .register("computer", Registration::createComputerBlockEntityType);
         public static final DeferredItem<BlockItem> COMPUTER_ITEM = ITEMS.register("computer",
                         id -> new BlockItem(COMPUTER_BLOCK.get(), blockItemProperties(id)));
+        public static final DeferredBlock<ServerRackBlock> SERVER_RACK_BLOCK = BLOCKS.register("server_rack",
+                        id -> new ServerRackBlock(computerBlockProperties(id)));
+        public static final DeferredItem<BlockItem> SERVER_RACK_ITEM = ITEMS.register("server_rack",
+                        id -> new BlockItem(SERVER_RACK_BLOCK.get(), blockItemProperties(id)));
 
         public static final DeferredItem<WrenchItem> WRENCH = ITEMS.register("wrench",
                         id -> new WrenchItem(itemProperties(id).stacksTo(1)));
