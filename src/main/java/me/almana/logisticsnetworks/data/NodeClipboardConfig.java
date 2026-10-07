@@ -983,7 +983,6 @@ public final class NodeClipboardConfig {
             if (byId != null && NodeAccessPolicy.canAccess(byId.getOwnerUuid(), player)) {
                 return byId;
             }
-            if (byId != null) return null;
         }
 
         if (networkName != null && !networkName.isBlank()) {
