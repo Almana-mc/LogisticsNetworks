@@ -1486,7 +1486,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     public void receiveNetworkLabels(Map<String, Integer> labels) {
         this.networkLabels = new ArrayList<>(labels.keySet());
         this.labelNodeCounts = labels;
-        this.labelScrollOffset = 0;
     }
 
     private boolean handleChannelPageClick(double mx, double my, int action) {

@@ -409,6 +409,7 @@ public class ServerPayloadHandler {
                 }
             }
 
+            GraphPayloadHandler.broadcast(player.level().getServer(), network.getId());
             if (player.containerMenu instanceof NodeMenu menu) {
                 menu.sendNetworkListToClient(player);
             }
@@ -1424,6 +1425,7 @@ public class ServerPayloadHandler {
                     || LabelUpgradeSync.synchronizeLabels(player, network, nodes, player.getUUID(), "", null)) {
                 network.removeLabel(label);
                 registry.setDirty();
+                GraphPayloadHandler.broadcast(player.level().getServer(), network.getId());
             }
             sendNetworkLabels(player, network);
         });
@@ -1624,6 +1626,18 @@ public class ServerPayloadHandler {
                     && menu.getNode().getUUID().equals(node.getUUID())) {
                 PacketDistributor.sendToPlayer(player,
                         new SyncChannelDataPayload(node.getId(), channelIndex, snapshot));
+            }
+        }
+    }
+
+    public static void refreshNodeViewers(MinecraftServer server, UUID networkId) {
+        LogisticsNetwork network = NetworkRegistry.get(server.overworld()).getNetwork(networkId);
+        if (network == null) return;
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.containerMenu instanceof NodeMenu menu && menu.getNode() != null
+                    && networkId.equals(menu.getNode().getNetworkId()) && canAccessNetwork(player, network)) {
+                sendNetworkLabels(player, network);
+                NodeMenu.sendAvailableNetworkListToClient(player);
             }
         }
     }
