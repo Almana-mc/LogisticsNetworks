@@ -85,6 +85,7 @@ import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.datagen.ModDataGenerators;
 import me.almana.logisticsnetworks.integration.computercraft.ComputerPeripheral;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.filter.TooltipLines;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import net.neoforged.api.distmarker.Dist;
@@ -152,6 +153,7 @@ public class LogisticsNetworks {
                 NetworkRegistry.get(event.getServer().overworld()).stopAsyncPlanning();
                 LinkedStorage.stopCraftingRequests();
                 ServerPayloadHandler.clearModifierKeys();
+                TooltipLines.clear();
                 ThreadGuard.clearServerThread();
         }
 

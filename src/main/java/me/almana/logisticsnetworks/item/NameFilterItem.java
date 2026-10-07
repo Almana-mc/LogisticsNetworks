@@ -54,7 +54,9 @@ public class NameFilterItem extends Item {
                 .withStyle(ChatFormatting.GRAY));
 
         tooltip.accept(Component.translatable("tooltip.logisticsnetworks.filter.name.scope",
-                Component.translatable("gui.logisticsnetworks.filter.name.scope.name")).withStyle(ChatFormatting.GRAY));
+                Component.translatable("gui.logisticsnetworks.filter.name.scope."
+                        + NameFilterData.getMatchScope(stack).serializedName()))
+                .withStyle(ChatFormatting.GRAY));
 
         tooltip.accept(Component.translatable(
                 "tooltip.logisticsnetworks.filter.name",

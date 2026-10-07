@@ -15,6 +15,10 @@ public final class ThreadGuard {
         serverThread = null;
     }
 
+    public static boolean isServerThread() {
+        return Thread.currentThread() == serverThread;
+    }
+
     public static void requireServerThread() {
         if (Thread.currentThread() != serverThread) {
             throw new IllegalStateException(

@@ -12,6 +12,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -107,7 +108,7 @@ public final class NameFilterData {
     }
 
     record NameFilterView(FilterTargetType targetType, boolean blacklist, String expression,
-            ValidationResult pattern) {
+            NameMatchScope scope, ValidationResult pattern) {
     }
 
     record CachedNameView(@Nullable FilterSettings settings, @Nullable NameFilterConfig config, NameFilterView view) {
@@ -131,12 +132,13 @@ public final class NameFilterData {
 
     private static NameFilterView buildNameFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
         if (!isNameFilter(stack))
-            return new NameFilterView(FilterTargetType.ITEMS, false, "", validateRegex(""));
+            return new NameFilterView(FilterTargetType.ITEMS, false, "", NameMatchScope.NAME, validateRegex(""));
 
         LegacyComponentMigration.migrateNameFilter(stack);
         FilterSettings settings = FilterSettingsData.get(stack);
-        String expression = getConfig(stack).expression();
-        return new NameFilterView(settings.target(), settings.blacklist(), expression, resolveRegex(expression, readCache));
+        NameFilterConfig config = getConfig(stack);
+        return new NameFilterView(settings.target(), settings.blacklist(), config.expression(), config.scope(),
+                resolveRegex(config.expression(), readCache));
     }
 
     public static boolean hasNameFilter(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
@@ -180,11 +182,23 @@ public final class NameFilterData {
         NameFilterView view = getNameFilterView(filter, readCache);
         if (view.targetType() != FilterTargetType.ITEMS)
             return false;
-        if (view.expression().isEmpty())
+        if (view.expression().isEmpty() || !view.pattern().accepted())
             return false;
 
-        String candidateName = candidate.getHoverName().getString();
-        return matchesView(view, candidateName);
+        NameMatchScope scope = view.scope();
+        if (scope != NameMatchScope.TOOLTIP && matchesView(view, candidate.getHoverName().getString()))
+            return true;
+        if (scope == NameMatchScope.NAME)
+            return false;
+
+        List<String> lines = TooltipLines.get(candidate);
+        if (lines == null)
+            return false;
+        for (int i = 1; i < lines.size(); i++) {
+            if (matchesView(view, lines.get(i)))
+                return true;
+        }
+        return false;
     }
 
     public static boolean containsName(ItemStack filter, FluidStack candidate) {

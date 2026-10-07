@@ -353,6 +353,8 @@
   "gui.logisticsnetworks.filter.name.pattern": "模式: %s",
   "gui.logisticsnetworks.filter.name.none": "未设置正则表达式",
   "gui.logisticsnetworks.filter.name.scope.name": "名称",
+  "gui.logisticsnetworks.filter.name.scope.tooltip": "工具提示",
+  "gui.logisticsnetworks.filter.name.scope.both": "两者",
   "gui.logisticsnetworks.filter.name.invalid_regex": "正则表达式无效！",
   "gui.logisticsnetworks.filter.name.unsafe_regex": "不支持的正则表达式语法！",
   "gui.logisticsnetworks.filter.name.too_long": "正则表达式超过 128 个字符！",
