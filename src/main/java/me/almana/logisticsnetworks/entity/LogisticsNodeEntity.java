@@ -24,6 +24,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.level.storage.ValueInput;
@@ -226,6 +227,16 @@ public class LogisticsNodeEntity extends Entity {
     @Override
     public boolean hurtServer(ServerLevel level, DamageSource damageSource, float amount) {
         return false;
+    }
+
+    @Override
+    public void teleportTo(double x, double y, double z) {
+    }
+
+    @Nullable
+    @Override
+    public Entity teleport(TeleportTransition transition) {
+        return null;
     }
 
     @Override
