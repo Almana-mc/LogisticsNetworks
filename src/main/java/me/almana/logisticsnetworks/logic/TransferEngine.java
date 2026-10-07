@@ -948,6 +948,7 @@ public class TransferEngine {
                             extractable = extractItem(source, slot, allowed, check).getCount();
                         }
                         if (extractable <= 0) {
+                            slotVerdicts[entry] = SLOT_REJECTED;
                             continue;
                         }
 
@@ -989,9 +990,9 @@ public class TransferEngine {
                             }
                             insertRejections.clear();
                             // Source changed, recheck slots
-                            slotVerdicts = new byte[slotCount];
+                            Arrays.fill(slotVerdicts, (byte) 0);
                             if (slotComponents != null) {
-                                slotComponents = new CompoundTag[slotCount];
+                                Arrays.fill(slotComponents, null);
                             }
                             movedAny = true;
                             movedForTarget = true;
