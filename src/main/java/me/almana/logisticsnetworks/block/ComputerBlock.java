@@ -104,11 +104,15 @@ public class ComputerBlock extends TwoCellBlock implements EntityBlock {
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
             Player player, BlockHitResult hit) {
+        BlockPos main = mainPos(state, pos);
+        if (!state.getValue(MAIN) && !isPartner(state, level.getBlockState(main))) {
+            return InteractionResult.PASS;
+        }
+
         if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
         }
 
-        BlockPos main = mainPos(state, pos);
         if (level.getBlockEntity(main) == null) {
             level.setBlockEntity(new ComputerBlockEntity(main, level.getBlockState(main)));
         }
