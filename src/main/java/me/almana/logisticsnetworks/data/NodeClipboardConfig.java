@@ -783,7 +783,7 @@ public final class NodeClipboardConfig {
         }
         Arrays.fill(upgrades, ItemStack.EMPTY);
         UUID networkId = parseOptionalUuid(root.getStringOr(KEY_NETWORK_ID, null));
-        String networkName = root.contains(KEY_NETWORK_NAME) ? root.getStringOr(KEY_NETWORK_NAME, null) : null;
+        String networkName = root.contains(KEY_NETWORK_NAME) ? trim(root.getStringOr(KEY_NETWORK_NAME, null), 32) : null;
         if (networkName != null && networkName.isBlank()) {
             networkName = null;
         }
@@ -827,7 +827,7 @@ public final class NodeClipboardConfig {
                     FilterMode.MATCH_ANY);
             config.priority = Math.max(-99, Math.min(99, channelTag.getIntOr(KEY_PRIORITY, 0)));
             if (channelTag.contains(KEY_CH_NAME))
-                config.name = channelTag.getStringOr(KEY_CH_NAME, "");
+                config.name = trim(channelTag.getStringOr(KEY_CH_NAME, ""), 24);
             channels[index] = config;
         }
 
@@ -870,7 +870,7 @@ public final class NodeClipboardConfig {
             config.renderVisible = root.getBooleanOr(KEY_VISIBLE, config.renderVisible);
         }
         if (root.contains(KEY_NODE_LABEL)) {
-            config.nodeLabel = root.getStringOr(KEY_NODE_LABEL, "");
+            config.nodeLabel = trim(root.getStringOr(KEY_NODE_LABEL, ""), 48);
         }
         return config.isStructurallyValid() ? config : null;
     }
@@ -1029,22 +1029,34 @@ public final class NodeClipboardConfig {
             return;
         }
 
-        UUID targetNetworkId = targetNetwork.getId();
-        if (currentNetworkId != null && !currentNetworkId.equals(targetNetworkId)) {
+        joinNetwork(node, registry, targetNetwork);
+    }
+
+    public static void joinNetwork(LogisticsNodeEntity node, NetworkRegistry registry, LogisticsNetwork network) {
+        UUID currentNetworkId = node.getNetworkId();
+        if (currentNetworkId != null && !currentNetworkId.equals(network.getId())) {
             registry.removeNodeFromNetwork(currentNetworkId, node.getUUID());
         }
 
-        node.setNetworkId(targetNetworkId);
-        node.setNetworkName(targetNetwork.getName());
-        node.setNetworkColor(targetNetwork.getColor());
-        registry.addNodeToNetwork(targetNetworkId, node.getUUID());
+        node.setNetworkId(network.getId());
+        node.setNetworkName(network.getName());
+        node.setNetworkColor(network.getColor());
+        registry.addNodeToNetwork(network.getId(), node.getUUID());
 
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
             ChannelData ch = node.getChannel(i);
             if (ch != null) {
-                ch.setName(targetNetwork.getChannelName(i));
+                ch.setName(network.getChannelName(i));
             }
         }
+    }
+
+    @Nullable
+    public UUID resolveNetworkId(ServerPlayer player) {
+        if (networkId == null && (networkName == null || networkName.isBlank())) return null;
+        LogisticsNetwork network = resolveTargetNetwork(NetworkRegistry.get(player.level()), player.getUUID(),
+                player);
+        return network == null ? null : network.getId();
     }
 
     @Nullable
@@ -1175,7 +1187,7 @@ public final class NodeClipboardConfig {
         }
     }
 
-    private void applyToNode(LogisticsNodeEntity node) {
+    public void applyToNode(LogisticsNodeEntity node) {
         for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
             ItemStack expected = upgradeItems[slot];
             ItemStack current = node.getUpgradeItem(slot);

@@ -4,7 +4,18 @@
   "package": "me.almana.logisticsnetworks.integration.buildinggadgets.mixin",
   "plugin": "me.almana.logisticsnetworks.integration.create.mixin.CreateMixinPlugin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [],
+  "mixins": [
+    "BG2DataMixin",
+    "BuildingUtilsMixin",
+    "GadgetCopyPasteMixin",
+    "GadgetCutPasteMixin",
+    "RenderBlockBEMixin",
+    "ServerTickHandlerMixin",
+    "StatePosMixin"
+  ],
+  "client": [
+    "StatePosClientMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
