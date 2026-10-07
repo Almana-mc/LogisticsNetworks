@@ -1,7 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
-import io.netty.handler.codec.DecoderException;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -20,7 +19,6 @@ public record SyncNetworkLabelsPayload(Map<String, Integer> labels) implements C
 
     public static SyncNetworkLabelsPayload read(FriendlyByteBuf buf) {
         int count = buf.readVarInt();
-        if (count > 1024) throw new DecoderException("Too many labels: " + count);
         Map<String, Integer> labels = new LinkedHashMap<>();
         for (int i = 0; i < count; i++) {
             labels.put(buf.readUtf(64), buf.readVarInt());
