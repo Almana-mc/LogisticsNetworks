@@ -2,8 +2,6 @@
 /*
 Source owner: LogisticsNodeEntity
 
-private static final String KEY_CREATE_CONTRAPTION_ID = "CreateContraptionId";
-private static final String KEY_CREATE_LOCAL_POS = "CreateLocalPos";
 private static final EntityDataAccessor<Optional<UUID>> CREATE_CONTRAPTION_ID = SynchedEntityData
         .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
 private static final EntityDataAccessor<BlockPos> CREATE_LOCAL_POS = SynchedEntityData
@@ -14,24 +12,16 @@ protected void defineSynchedData(SynchedEntityData.Builder builder) {
     builder.define(CREATE_LOCAL_POS, BlockPos.ZERO);
 }
 
-protected void readAdditionalSaveData(CompoundTag compound) {
-    if (compound.contains(KEY_CREATE_CONTRAPTION_ID)) {
-        entityData.set(CREATE_CONTRAPTION_ID, Optional.of(compound.getUUID(KEY_CREATE_CONTRAPTION_ID)));
-        entityData.set(CREATE_LOCAL_POS, compound.contains(KEY_CREATE_LOCAL_POS)
-                ? BlockPos.of(compound.getLong(KEY_CREATE_LOCAL_POS))
-                : BlockPos.ZERO);
-    } else {
-        entityData.set(CREATE_CONTRAPTION_ID, Optional.empty());
-        entityData.set(CREATE_LOCAL_POS, BlockPos.ZERO);
-    }
+NodeState captureState() {
+    return new NodeState(getAttachedPos(), isValid(), Optional.ofNullable(getNetworkId()), getNetworkName(),
+            getNetworkColor(), isRenderVisible(), Optional.ofNullable(getOwnerUUID()), getNodeLabel(),
+            labelRevision, isHighlighted(), Optional.ofNullable(getCreateContraptionId()), getCreateLocalPos(),
+            List.of(channels), SlotStack.nonEmpty(Arrays.asList(upgradeItems)));
 }
 
-protected void addAdditionalSaveData(CompoundTag compound) {
-    UUID createContraptionId = getCreateContraptionId();
-    if (createContraptionId != null) {
-        compound.putUUID(KEY_CREATE_CONTRAPTION_ID, createContraptionId);
-        compound.putLong(KEY_CREATE_LOCAL_POS, getCreateLocalPos().asLong());
-    }
+void applyState(NodeState state) {
+    entityData.set(CREATE_CONTRAPTION_ID, state.createContraptionId());
+    entityData.set(CREATE_LOCAL_POS, state.createLocalPos());
 }
 
 public void tick() {

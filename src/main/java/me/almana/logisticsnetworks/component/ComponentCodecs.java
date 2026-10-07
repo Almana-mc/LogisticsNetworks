@@ -76,13 +76,21 @@ public final class ComponentCodecs {
     }
 
     public static <E> Codec<List<E>> lenientList(Codec<E> element) {
+        return lenientList(element, Integer.MAX_VALUE);
+    }
+
+    public static <E> Codec<List<E>> lenientList(Codec<E> element, int maxSize) {
         Codec<Optional<E>> optional = element.xmap(Optional::of, Optional::get);
-        return NeoForgeExtraCodecs.listWithOptionalElements(lenient(optional, Optional::empty));
+        return NeoForgeExtraCodecs.listWithoutEmpty(lenient(optional, Optional::empty).listOf(0, maxSize));
     }
 
     public static <A> Optional<A> parse(Codec<A> codec, HolderLookup.Provider provider, Tag tag) {
+        return parse(codec, new Dynamic<>(provider.createSerializationContext(NbtOps.INSTANCE), tag));
+    }
+
+    public static <A> Optional<A> parse(Codec<A> codec, Dynamic<?> data) {
         try {
-            return codec.parse(provider.createSerializationContext(NbtOps.INSTANCE), tag)
+            return codec.parse(data)
                     .ifError(error -> LOGGER.error("Failed to decode saved data: {}", error.message()))
                     .result();
         } catch (RuntimeException e) {
