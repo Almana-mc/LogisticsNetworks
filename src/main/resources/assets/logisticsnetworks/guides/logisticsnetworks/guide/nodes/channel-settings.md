@@ -132,7 +132,7 @@ Redstone gating applies to both Senders and Receivers.
 
 **How to change it:** use Primary Interaction to cycle to the next mode.
 
-**Gotcha:** Equal Distribution does not keep a rotation pointer, and unused shares flow to Receivers with space. It only splits item batches; on fluid, energy, chemical and Source channels it behaves like **Priority**.
+**Gotcha:** Equal Distribution does not keep a rotation pointer, and unused shares flow to Receivers with space. It only splits item batches; on fluid and energy channels it behaves like **Priority**.
 
 **Gotcha:** Priority Robin's position resets to the highest-priority Receiver when the world or the Sender's chunk reloads. If the chosen Receiver accepts only part of a batch, the rest waits for the next operation. It works on every channel type.
 
