@@ -113,7 +113,17 @@ public final class Snapshots {
                 itemWakeDelta = itemWakeDelta(itemWakeDelta, targets, cooldown);
                 continue;
             }
-            NetworkSnapshot.ChannelUnit unit = captureChannel(node, channel, index, tier, context, endpoints, occupiedSlots);
+            if (!level.isLoaded(node.getAttachedPos())) continue;
+            boolean directSource = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), channel.getReadCache());
+            ResourceHandler<ItemResource> sourceHandler = node.capabilities().findItemExportHandler(
+                    channel.getIoDirection(), directSource);
+            if (sourceHandler == null) {
+                itemWakeDelta = itemWakeDelta(itemWakeDelta, targets,
+                        TransferEngine.finishChannelAttempt(node, channel, index, 0, gameTime, tier, false));
+                continue;
+            }
+            NetworkSnapshot.ChannelUnit unit = captureChannel(
+                    node, channel, index, tier, sourceHandler, context, endpoints, occupiedSlots);
             if (unit != null) units.add(unit);
         }
         return itemWakeDelta;
@@ -121,15 +131,10 @@ public final class Snapshots {
 
     @Nullable
     private static NetworkSnapshot.ChannelUnit captureChannel(LogisticsNodeEntity node, ChannelData channel,
-            int index, int tier, TransferEngine.NetworkContext context, ItemEndpointTable endpoints,
-            OccupiedSlotBudget occupiedSlots) {
+            int index, int tier, ResourceHandler<ItemResource> sourceHandler, TransferEngine.NetworkContext context,
+            ItemEndpointTable endpoints, OccupiedSlotBudget occupiedSlots) {
         ServerLevel level = (ServerLevel) node.level();
-        if (!level.isLoaded(node.getAttachedPos())) return null;
         FilterItemData.ReadCache readCache = channel.getReadCache();
-        boolean directSource = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), readCache);
-        ResourceHandler<ItemResource> sourceHandler = node.capabilities().findItemExportHandler(
-                channel.getIoDirection(), directSource);
-        if (sourceHandler == null) return null;
         TransferEngine.ResolvedItemTargets resolved = TransferEngine.resolveItemTargets(
                 node, level, channel, context.itemImports()[index], sourceHandler, context.dimensionalCache(), readCache);
         if (resolved.status() != TransferEngine.ResolvedItemTargets.OK) return null;

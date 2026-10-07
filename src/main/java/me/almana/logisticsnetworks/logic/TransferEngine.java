@@ -406,7 +406,7 @@ public class TransferEngine {
         ResourceHandler<ItemResource> sourceHandler = sourceNode.capabilities().findItemExportHandler(
                 exportChannel.getIoDirection(), directSource);
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
         ResolvedItemTargets resolved = resolveItemTargets(sourceNode, sourceLevel, exportChannel, targets,
                 sourceHandler, dimensionalCache, filterReadCache);
@@ -482,7 +482,7 @@ public class TransferEngine {
         ResourceHandler<FluidResource> sourceHandler = sourceNode.capabilities().findFluidExportHandler(
                 exportChannel.getIoDirection(), true);
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
         targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
@@ -530,7 +530,7 @@ public class TransferEngine {
             return -1;
         EnergyHandler sourceHandler = sourceNode.capabilities().findEnergyHandler(exportChannel.getIoDirection());
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
         targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);

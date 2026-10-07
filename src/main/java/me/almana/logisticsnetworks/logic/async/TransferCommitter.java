@@ -105,7 +105,8 @@ public final class TransferCommitter {
         boolean directSource = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), cache);
         ResourceHandler<ItemResource> source = sourceNode.capabilities().findItemExportHandler(
                 channel.getIoDirection(), directSource);
-        if (source == null) return skipped(planned, Long.MAX_VALUE);
+        if (source == null) return skipped(planned, TransferEngine.finishChannelAttempt(
+                sourceNode, channel, plan.channelIndex(), 0, level.getGameTime(), tier, telemetry));
         if (!matchesBinding(plan.sourceStorageBinding(), source, bindings)) return revalidated(planned);
 
         TransferEngine.ResolvedItemTargets resolved = resolveTargets(
