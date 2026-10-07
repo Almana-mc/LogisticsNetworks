@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
@@ -52,6 +53,7 @@ public class NetworkRegistry extends SavedData {
     private final NetworkDispatcher dispatcher = new NetworkDispatcher();
     private long reloadVersion = AsyncTransferRuntime.reloadVersion();
     private final TelemetryManager telemetryManager = new TelemetryManager();
+    private final ServerRackLinks rackLinks = new ServerRackLinks();
 
     public NetworkRegistry() {
     }
@@ -154,14 +156,36 @@ public class NetworkRegistry extends SavedData {
         return telemetryManager;
     }
 
+    public ServerRackLinks getRackLinks() {
+        return rackLinks;
+    }
+
+    public void putRack(GlobalPos pos, ServerRackConfig config) {
+        rackLinks.put(pos, config).forEach(this::invalidateNetwork);
+    }
+
+    public void removeRack(GlobalPos pos) {
+        rackLinks.remove(pos).forEach(this::invalidateNetwork);
+    }
+
+    // Rack peers share wakeups
+    private void markDirty(UUID networkId) {
+        dispatcher.markDirty(networkId);
+        for (ServerRackLinks.Link link : rackLinks.linksFor(networkId)) {
+            if (networks.containsKey(link.peer())) {
+                dispatcher.markDirty(link.peer());
+            }
+        }
+    }
+
     public void wakeNetwork(UUID networkId) {
-        if (networks.containsKey(networkId)) dispatcher.markDirty(networkId);
+        if (networks.containsKey(networkId)) markDirty(networkId);
     }
 
     public void invalidateNetwork(UUID networkId) {
         LogisticsNetwork network = networks.get(networkId);
         if (network != null) {
-            dispatcher.markDirty(networkId);
+            markDirty(networkId);
             network.markCacheDirty();
         }
     }
@@ -174,7 +198,7 @@ public class NetworkRegistry extends SavedData {
                 if (Config.debugMode) LOGGER.warn("Network {} has exceeded {} nodes (Count: {}). Performance may degrade.",
                         networkId, WARNING_NODE_COUNT, network.getNodeUuids().size());
             }
-            dispatcher.markDirty(networkId);
+            markDirty(networkId);
             setDirty();
         }
     }
@@ -183,7 +207,7 @@ public class NetworkRegistry extends SavedData {
         LogisticsNetwork network = networks.get(networkId);
         if (network != null) {
             network.removeNode(nodeId);
-            dispatcher.markDirty(networkId);
+            markDirty(networkId);
 
             if (network.getNodeUuids().isEmpty()) {
                 if (Config.debugMode) LOGGER.info("Network {} is empty, deleting.", networkId);
