@@ -42,8 +42,6 @@ import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
-import me.almana.logisticsnetworks.network.SetFilterPayload;
-import me.almana.logisticsnetworks.network.SetNodeUpgradeItemPayload;
 import me.almana.logisticsnetworks.network.SetWrenchColorsPayload;
 import me.almana.logisticsnetworks.network.SetWrenchModePayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelsPayload;
@@ -170,14 +168,10 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleUpdateChannel);
                 registrar.playToServer(AssignNetworkPayload.TYPE, AssignNetworkPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleAssignNetwork);
-                registrar.playToServer(SetFilterPayload.TYPE, SetFilterPayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleSetFilter);
                 registrar.playToServer(SetChannelFilterItemPayload.TYPE, SetChannelFilterItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetChannelFilterItem);
                 registrar.playToServer(AddNodeFilterItemPayload.TYPE, AddNodeFilterItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleAddNodeFilterItem);
-                registrar.playToServer(SetNodeUpgradeItemPayload.TYPE, SetNodeUpgradeItemPayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleSetNodeUpgradeItem);
                 registrar.playToServer(SelectNodeChannelPayload.TYPE, SelectNodeChannelPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSelectNodeChannel);
                 registrar.playToServer(ModifyFilterModPayload.TYPE, ModifyFilterModPayload.STREAM_CODEC,

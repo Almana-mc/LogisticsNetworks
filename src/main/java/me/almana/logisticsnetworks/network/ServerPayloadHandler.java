@@ -588,20 +588,6 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleSetFilter(SetFilterPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            if (node == null)
-                return;
-            ChannelData channel = node.getChannel(payload.channelIndex());
-            if (channel != null) {
-                channel.setFilterItem(payload.filterSlot(), payload.filterItem().copyWithCount(1));
-                propagateToLabelGroup(node, payload.channelIndex());
-                markNetworkDirty(node);
-            }
-        });
-    }
-
     public static void handleSetChannelFilterItem(SetChannelFilterItemPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
@@ -611,30 +597,9 @@ public class ServerPayloadHandler {
             if (channel == null)
                 return;
 
-            channel.setFilterItem(payload.filterSlot(),
-                    payload.filterItem().is(ModTags.FILTERS) ? payload.filterItem().copyWithCount(1) : ItemStack.EMPTY);
+            channel.setFilterItem(payload.filterSlot(), ItemStack.EMPTY);
             propagateToLabelGroup(node, payload.channelIndex());
             markNetworkDirty(node);
-        });
-    }
-
-    public static void handleSetNodeUpgradeItem(SetNodeUpgradeItemPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            if (node == null)
-                return;
-
-            List<ItemStack> original = LabelUpgradeSync.snapshotUpgrades(node);
-            node.setUpgradeItem(payload.upgradeSlot(), payload.upgradeItem());
-
-            if (context.player() instanceof ServerPlayer player) {
-                StorageLink link = player.containerMenu instanceof NodeMenu menu
-                        ? menu.getAccessibleStorageLink(player)
-                        : null;
-                LabelUpgradeSync.synchronizeMenuClose(player, node, original, link);
-            } else {
-                markNetworkDirty(node);
-            }
         });
     }
 
