@@ -118,7 +118,7 @@ public final class LegacyComponentMigration {
         if (!stack.has(LogisticsDataComponents.WRENCH_CLIPBOARD)) {
             Tag tag = root.get("clipboard");
             if (tag instanceof CompoundTag clipboard) {
-                if (!NodeClipboardConfig.canDecodeItems(clipboard, provider)) return false;
+                if (provider == null && !NodeClipboardConfig.canDecodeItems(clipboard, null)) return false;
                 NodeClipboardConfig config = NodeClipboardConfig.load(clipboard, provider);
                 stack.set(LogisticsDataComponents.WRENCH_CLIPBOARD, config == null
                         ? WrenchClipboard.invalid() : WrenchClipboard.valid(config.toComponentSnapshot(provider)));
