@@ -262,6 +262,12 @@ public class LogisticsNetwork {
         return createdAt;
     }
 
+    public boolean stampCreatedAtIfMissing() {
+        if (createdAt != 0L) return false;
+        createdAt = System.currentTimeMillis();
+        return true;
+    }
+
     public String getName() {
         return name;
     }

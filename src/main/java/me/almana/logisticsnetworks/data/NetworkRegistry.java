@@ -126,6 +126,13 @@ public class NetworkRegistry extends SavedData {
         }
     }
 
+    public void stampCreatedAt(UUID networkId) {
+        LogisticsNetwork network = networks.get(networkId);
+        if (network != null && network.stampCreatedAtIfMissing()) {
+            setDirty();
+        }
+    }
+
     public LogisticsNetwork getNetwork(UUID id) {
         return networks.get(id);
     }

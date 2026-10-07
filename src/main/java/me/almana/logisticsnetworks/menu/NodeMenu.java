@@ -218,6 +218,9 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     public void sendNetworkListToClient(ServerPlayer player) {
+        if (node != null && node.getNetworkId() != null) {
+            NetworkRegistry.get(player.level()).stampCreatedAt(node.getNetworkId());
+        }
         sendAvailableNetworkListToClient(player);
     }
 

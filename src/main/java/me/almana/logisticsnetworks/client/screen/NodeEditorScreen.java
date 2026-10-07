@@ -70,23 +70,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         NETWORK_SELECT, CHANNEL_CONFIG
     }
 
-    private enum SortMode {
-        NAME_ASC, NAME_DESC, OLD_NEW, NEW_OLD;
-
-        SortMode next() {
-            return values()[(ordinal() + 1) % values().length];
-        }
-
-        String labelKey() {
-            return switch (this) {
-                case NAME_ASC -> "gui.logisticsnetworks.node.sort.az";
-                case NAME_DESC -> "gui.logisticsnetworks.node.sort.za";
-                case OLD_NEW -> "gui.logisticsnetworks.node.sort.old_new";
-                case NEW_OLD -> "gui.logisticsnetworks.node.sort.new_old";
-            };
-        }
-    }
-
     // Constants
     private static final int GUI_WIDTH = 256;
     private static final int GUI_HEIGHT = 298;
@@ -131,7 +114,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private List<SyncNetworkListPayload.NetworkEntry> networkList = new ArrayList<>();
     private String lastNetworkFilter = "";
     private int networkScrollOffset = 0;
-    private SortMode sortMode = SortMode.NAME_ASC;
+    private NetworkSortMode sortMode = NetworkSortMode.NEW_OLD;
 
     private NetworkEditor networkEditor;
     private NetworkCreationConfirmation networkCreationConfirmation;
@@ -2110,21 +2093,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             if (filter.isEmpty() || entry.name().toLowerCase().contains(filter))
                 filtered.add(entry);
         }
-        sortNetworks(filtered);
+        filtered.sort(sortMode.comparator());
         return filtered;
-    }
-
-    private void sortNetworks(List<SyncNetworkListPayload.NetworkEntry> list) {
-        Comparator<SyncNetworkListPayload.NetworkEntry> byName =
-                Comparator.comparing(e -> e.name().toLowerCase());
-        switch (sortMode) {
-            case NAME_ASC -> list.sort(byName);
-            case NAME_DESC -> list.sort(byName.reversed());
-            case OLD_NEW -> list.sort(Comparator.comparingLong(
-                    SyncNetworkListPayload.NetworkEntry::createdAt).thenComparing(byName));
-            case NEW_OLD -> list.sort(Comparator.comparingLong(
-                    SyncNetworkListPayload.NetworkEntry::createdAt).reversed().thenComparing(byName));
-        }
     }
 
     private String tr(String key, Object... args) {
