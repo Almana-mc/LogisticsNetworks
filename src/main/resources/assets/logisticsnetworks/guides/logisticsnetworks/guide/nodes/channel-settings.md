@@ -159,7 +159,7 @@ Redstone gating applies to both Senders and Receivers.
 - **Fluid** — millibuckets (e.g. Batch 1000 = up to 1 bucket per operation).
 - **Energy** — Forge Energy / RF per operation.
 
-**How to change it:** use Primary Interaction on the number field to open a text box, type the new value, and press Enter. Minimum is 1.
+**How to change it:** use Primary Interaction on the number field to open a text box, type the new value, and press Enter. Minimum is 1. The box also takes simple math with `+ - * /` and parentheses, so `64*7` saves as 448. Priority and Delay work the same way.
 
 **Gotcha:** Batch is capped by the upgrades installed on the node. You can type 10,000 but if your upgrade tier only allows 500, the engine uses 500. Install higher-tier upgrades to raise the ceiling — see [Performance Upgrades](upgrades-performance.md).
 

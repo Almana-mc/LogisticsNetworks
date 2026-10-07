@@ -260,13 +260,13 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailIdInputBox.setHint(Component.literal("Item or #tag"));
 
         detailBatchInputBox = new EditBox(font, leftPos + 12, topPos + 50, 50, 14, Component.empty());
-        detailBatchInputBox.setMaxLength(10);
+        detailBatchInputBox.setMaxLength(32);
         detailBatchInputBox.setVisible(false);
         detailBatchInputBox.setBordered(true);
         detailBatchInputBox.setTextColor(cText());
 
         detailStockInputBox = new EditBox(font, leftPos + 12, topPos + 66, 50, 14, Component.empty());
-        detailStockInputBox.setMaxLength(10);
+        detailStockInputBox.setMaxLength(32);
         detailStockInputBox.setVisible(false);
         detailStockInputBox.setBordered(true);
         detailStockInputBox.setTextColor(cText());
@@ -3355,15 +3355,17 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         String batchStr = detailBatchInputBox.getValue().trim();
         int batchVal = 0;
         if (!batchStr.isEmpty()) {
-            try { batchVal = Integer.parseInt(batchStr); } catch (NumberFormatException ignored) {}
+            try { batchVal = ArithmeticExpression.evaluate(batchStr); } catch (NumberFormatException ignored) {}
         }
         String stockStr = detailStockInputBox.getValue().trim();
         int stockVal = 0;
         if (!stockStr.isEmpty()) {
-            try { stockVal = Integer.parseInt(stockStr); } catch (NumberFormatException ignored) {}
+            try { stockVal = ArithmeticExpression.evaluate(stockStr); } catch (NumberFormatException ignored) {}
         }
         batchVal = Math.max(0, batchVal);
         stockVal = Math.max(0, stockVal);
+        detailBatchInputBox.setValue(batchVal > 0 ? String.valueOf(batchVal) : "");
+        detailStockInputBox.setValue(stockVal > 0 ? String.valueOf(stockVal) : "");
         if (batchVal != menu.getEntryBatch(slot) || stockVal != menu.getEntryStock(slot)) {
             menu.setEntryBatch(minecraft.player, slot, batchVal);
             menu.setEntryStock(minecraft.player, slot, stockVal);
@@ -4537,7 +4539,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             String str = detailBatchInputBox.getValue().trim();
             int current = 0;
             if (!str.isEmpty()) {
-                try { current = Integer.parseInt(str); } catch (NumberFormatException ignored) {}
+                try { current = ArithmeticExpression.evaluate(str); } catch (NumberFormatException ignored) {}
             }
             int scrollDelta = computeScrollDelta(delta, menu.getTargetType());
             int next = Math.max(0, current + scrollDelta);
@@ -4548,7 +4550,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             String str = detailStockInputBox.getValue().trim();
             int current = 0;
             if (!str.isEmpty()) {
-                try { current = Integer.parseInt(str); } catch (NumberFormatException ignored) {}
+                try { current = ArithmeticExpression.evaluate(str); } catch (NumberFormatException ignored) {}
             }
             int scrollDelta = computeScrollDelta(delta, menu.getTargetType());
             int next = Math.max(0, current + scrollDelta);

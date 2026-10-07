@@ -1724,7 +1724,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         };
 
         numericEditBox = new FlatEditBox(font, x, y, 70, 11, Component.empty());
-        numericEditBox.setMaxLength(10);
+        numericEditBox.setMaxLength(32);
         numericEditBox.setValue(val);
         numericEditBox.setTextColor(cText());
         numericEditBox.setFocused(true);
@@ -1738,7 +1738,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
         if (commit) {
             try {
-                int val = Integer.parseInt(numericEditBox.getValue().trim());
+                int val = ArithmeticExpression.evaluate(numericEditBox.getValue().trim());
                 LogisticsNodeEntity node = getMenu().getNode();
                 ChannelData ch = node.getChannel(selectedChannel);
                 if (ch != null) {
@@ -2030,7 +2030,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             return labelEditBox.charTyped(ClientInput.character(ch));
         }
         if (editingRow != -1 && numericEditBox != null) {
-            if (Character.isDigit(ch) || ch == '-')
+            if (ArithmeticExpression.accepts(ch))
                 return numericEditBox.charTyped(ClientInput.character(ch));
             return true;
         }

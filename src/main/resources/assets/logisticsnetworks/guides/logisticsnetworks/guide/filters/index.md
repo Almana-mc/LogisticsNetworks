@@ -110,6 +110,8 @@ Every slot in a Normal Filter's main grid is more than a single-item check. Open
 
 Leave Batch or Stock at `0` to fall back to the channel settings or disable the threshold.
 
+Batch and Stock also take simple math such as `64*7`. The result appears when you press Enter.
+
 ## Copy & Paste a Filter
 
 While a filter screen is open you can copy its whole configuration and paste it into another open filter. Use **Ctrl+C** to copy and **Ctrl+V** to paste, or use **Primary Interaction (default: Left Click)** on the **copy** and **paste** icon buttons in the top-right of the filter header. Hover either button for a tooltip; the paste button is dimmed until something has been copied.
