@@ -609,12 +609,13 @@ public final class FilterItemData {
     // ── Full matching methods (tag + NBT + durability aware) ──
 
     public static boolean containsItemFull(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider,
-            @Nullable CompoundTag candidateComponents, @Nullable ReadCache readCache) {
+            @Nullable CandidateComponents candidateComponents, @Nullable ReadCache readCache) {
         if (!isFilterItem(filter) || candidate.isEmpty())
             return false;
 
         ItemFilterView view = getItemFilterView(filter, readCache);
-        LazyComponents components = new LazyComponents(candidateComponents);
+        CandidateComponents components = candidateComponents != null ? candidateComponents
+                : new CandidateComponents(candidate, provider);
         for (ItemFilterSlot entry : view.entriesBySlot()) {
             if (entry == null)
                 continue;
@@ -624,29 +625,30 @@ public final class FilterItemData {
             String tag = entry.tag();
             if (tag != null) {
                 if (entry.itemTag() != null && candidate.is(entry.itemTag())
-                        && entryConstraintsMatch(entry, candidate, provider, components)) return true;
+                        && entryConstraintsMatch(entry, candidate, components)) return true;
                 continue;
             }
 
             if (entry.nbtOnly()) {
-                if (entryConstraintsMatch(entry, candidate, provider, components)) return true;
+                if (entryConstraintsMatch(entry, candidate, components)) return true;
                 continue;
             }
 
             Item itemEntry = entry.item();
             if (itemEntry != null && itemEntry == candidate.getItem()
-                    && itemEntryConstraintsMatch(entry, candidate, provider, components)) return true;
+                    && itemEntryConstraintsMatch(entry, candidate, components)) return true;
         }
         return false;
     }
 
     public static boolean containsItemFullInSlot(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider,
-            @Nullable CompoundTag candidateComponents, @Nullable ReadCache readCache, int inventorySlot) {
+            @Nullable CandidateComponents candidateComponents, @Nullable ReadCache readCache, int inventorySlot) {
         if (!isFilterItem(filter) || candidate.isEmpty())
             return false;
 
         ItemFilterView view = getItemFilterView(filter, readCache);
-        LazyComponents components = new LazyComponents(candidateComponents);
+        CandidateComponents components = candidateComponents != null ? candidateComponents
+                : new CandidateComponents(candidate, provider);
         for (ItemFilterSlot entry : view.entriesBySlot()) {
             if (entry == null || !coversSlot(entry, inventorySlot))
                 continue;
@@ -656,18 +658,18 @@ public final class FilterItemData {
             String tag = entry.tag();
             if (tag != null) {
                 if (entry.itemTag() != null && candidate.is(entry.itemTag())
-                        && entryConstraintsMatch(entry, candidate, provider, components)) return true;
+                        && entryConstraintsMatch(entry, candidate, components)) return true;
                 continue;
             }
 
             if (entry.nbtOnly()) {
-                if (entryConstraintsMatch(entry, candidate, provider, components)) return true;
+                if (entryConstraintsMatch(entry, candidate, components)) return true;
                 continue;
             }
 
             Item itemEntry = entry.item();
             if (itemEntry != null && itemEntry == candidate.getItem()
-                    && itemEntryConstraintsMatch(entry, candidate, provider, components)) return true;
+                    && itemEntryConstraintsMatch(entry, candidate, components)) return true;
         }
         return false;
     }
@@ -678,7 +680,7 @@ public final class FilterItemData {
             return false;
 
         ItemFilterView view = getItemFilterView(filter, readCache);
-        CompoundTag candidateComponents = null;
+        CandidateComponents candidateComponents = null;
         boolean candidateComponentsResolved = false;
         for (ItemFilterSlot slot : view.entriesBySlot()) {
             if (slot == null)
@@ -689,7 +691,7 @@ public final class FilterItemData {
                 if (tag == null || (slot.fluidTag() != null && candidate.is(slot.fluidTag()))) {
                     if (slot.hasNbt()) {
                         if (!candidateComponentsResolved) {
-                            candidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
+                            candidateComponents = CandidateComponents.of(candidate, provider);
                             candidateComponentsResolved = true;
                         }
                         if (!checkNbtConstraint(slot, candidateComponents, false))
@@ -704,7 +706,7 @@ public final class FilterItemData {
             if (entry != null && !entry.isEmpty() && FluidStack.isSameFluidSameComponents(entry, candidate)) {
                 if (slot.hasNbt()) {
                     if (!candidateComponentsResolved) {
-                        candidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
+                        candidateComponents = CandidateComponents.of(candidate, provider);
                         candidateComponentsResolved = true;
                     }
                     if (!checkNbtConstraint(slot, candidateComponents, false))
@@ -746,30 +748,31 @@ public final class FilterItemData {
     // ── Full amount threshold methods (tag-aware + constraint-aware) ──
 
     public static List<ItemStock> getItemStocksFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents, @Nullable ReadCache readCache,
-            int inventorySlot) {
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
+            @Nullable ReadCache readCache, int inventorySlot) {
         if (!isFilterItem(filter) || candidate.isEmpty())
             return List.of();
         ItemFilterView view = getItemFilterView(filter, readCache);
-        LazyComponents components = new LazyComponents(candidateComponents);
+        CandidateComponents components = candidateComponents != null ? candidateComponents
+                : new CandidateComponents(candidate, provider);
         List<ItemStock> stocks = new ArrayList<>();
         for (ItemFilterSlot entry : view.entriesBySlot()) {
             if (entry != null && coversSlot(entry, inventorySlot)
-                    && itemEntryMatches(entry, candidate, provider, components))
+                    && itemEntryMatches(entry, candidate, components))
                 stocks.add(new ItemStock(entry.stock(), entry.slotMapping()));
         }
         return stocks;
     }
 
     private static boolean itemEntryMatches(ItemFilterSlot entry, ItemStack candidate,
-            HolderLookup.Provider provider, LazyComponents components) {
+            CandidateComponents components) {
         if (entry.tag() != null)
             return entry.itemTag() != null && candidate.is(entry.itemTag())
-                    && entryConstraintsMatch(entry, candidate, provider, components);
+                    && entryConstraintsMatch(entry, candidate, components);
         if (entry.nbtOnly())
-            return entryConstraintsMatch(entry, candidate, provider, components);
+            return entryConstraintsMatch(entry, candidate, components);
         return entry.item() == candidate.getItem()
-                && itemEntryConstraintsMatch(entry, candidate, provider, components);
+                && itemEntryConstraintsMatch(entry, candidate, components);
     }
 
     private static boolean coversSlot(ItemFilterSlot entry, int inventorySlot) {
@@ -781,11 +784,13 @@ public final class FilterItemData {
     }
 
     public static int getItemBatchLimitFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents, @Nullable ReadCache readCache) {
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
+            @Nullable ReadCache readCache) {
         if (!isFilterItem(filter) || candidate.isEmpty())
             return 0;
         ItemFilterView view = getItemFilterView(filter, readCache);
-        LazyComponents components = new LazyComponents(candidateComponents);
+        CandidateComponents components = candidateComponents != null ? candidateComponents
+                : new CandidateComponents(candidate, provider);
         for (ItemFilterSlot entry : view.entriesBySlot()) {
             if (entry == null)
                 continue;
@@ -793,20 +798,20 @@ public final class FilterItemData {
             String tag = entry.tag();
             if (tag != null) {
                 if (entry.itemTag() != null && candidate.is(entry.itemTag())
-                        && entryConstraintsMatch(entry, candidate, provider, components))
+                        && entryConstraintsMatch(entry, candidate, components))
                     return entry.batch();
                 continue;
             }
 
             if (entry.nbtOnly()) {
-                if (entryConstraintsMatch(entry, candidate, provider, components))
+                if (entryConstraintsMatch(entry, candidate, components))
                     return entry.batch();
                 continue;
             }
 
             Item itemEntry = entry.item();
             if (itemEntry != null && itemEntry == candidate.getItem()
-                    && itemEntryConstraintsMatch(entry, candidate, provider, components)) return entry.batch();
+                    && itemEntryConstraintsMatch(entry, candidate, components)) return entry.batch();
         }
         return 0;
     }
@@ -905,39 +910,19 @@ public final class FilterItemData {
 
     // ── Constraint helpers ──
 
-    private static final class LazyComponents {
-        private CompoundTag components;
-        private boolean resolved;
-
-        LazyComponents(@Nullable CompoundTag preresolved) {
-            components = preresolved;
-            resolved = preresolved != null;
-        }
-
-        @Nullable
-        CompoundTag of(ItemStack stack, HolderLookup.Provider provider) {
-            if (!resolved) {
-                components = NbtFilterData.getSerializedComponents(stack, provider);
-                resolved = true;
-            }
-            return components;
-        }
-    }
-
     private static boolean entryConstraintsMatch(ItemFilterSlot entry, ItemStack candidate,
-            HolderLookup.Provider provider, LazyComponents components) {
-        return !entry.hasNbt()
-                || checkNbtConstraint(entry, components.of(candidate, provider), candidate.isDamageableItem());
+            CandidateComponents components) {
+        return !entry.hasNbt() || checkNbtConstraint(entry, components, candidate.isDamageableItem());
     }
 
     private static boolean itemEntryConstraintsMatch(ItemFilterSlot entry, ItemStack candidate,
-            HolderLookup.Provider provider, LazyComponents components) {
+            CandidateComponents components) {
         if (entry.nbtStrict())
             return entry.expectedComponents().equals(candidate.getComponents());
-        return entryConstraintsMatch(entry, candidate, provider, components);
+        return entryConstraintsMatch(entry, candidate, components);
     }
 
-    private static boolean checkNbtConstraint(ItemFilterSlot entry, @Nullable CompoundTag components,
+    private static boolean checkNbtConstraint(ItemFilterSlot entry, @Nullable CandidateComponents components,
             boolean damageable) {
         if (!entry.hasNbt())
             return true;
@@ -953,7 +938,7 @@ public final class FilterItemData {
                 if (components == null)
                     return false;
                 evaluated = true;
-                Tag actual = NbtFilterData.resolvePathValue(components, rule.path());
+                Tag actual = components.resolve(rule.path());
                 boolean matches = rule.matches(actual);
                 if (matchAny && matches) return true;
                 if (!matchAny && !matches) return false;
@@ -965,7 +950,7 @@ public final class FilterItemData {
 
         CompoundTag rawNbt = entry.rawNbt();
         if (rawNbt != null) {
-            return NbtRuleMatcher.compoundContains(components, rawNbt);
+            return NbtRuleMatcher.compoundContains(components.select(rawNbt.keySet()), rawNbt);
         }
         return !entry.invalidRawNbt();
     }

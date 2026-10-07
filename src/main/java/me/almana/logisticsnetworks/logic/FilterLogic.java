@@ -3,7 +3,6 @@ package me.almana.logisticsnetworks.logic;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.filter.*;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
@@ -14,7 +13,7 @@ public final class FilterLogic {
     }
 
     public static boolean matchesItemInSlot(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateNbt,
             @Nullable FilterItemData.ReadCache filterReadCache, int inventorySlot) {
         if (inventorySlot < 0)
             return matchesItem(filters, filterMode, candidate, provider, candidateNbt, filterReadCache);
@@ -89,7 +88,7 @@ public final class FilterLogic {
     }
 
     public static boolean matchesItem(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateNbt,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         if (filters == null || filters.length == 0)
             return true;

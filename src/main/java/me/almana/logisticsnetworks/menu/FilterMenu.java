@@ -808,10 +808,9 @@ public class FilterMenu extends AbstractContainerMenu {
 
         if (getTargetType() == FilterTargetType.FLUIDS) {
             FluidStack fluid = FilterItemData.getFluidEntry(filterStack, slot);
-            if (!fluid.isEmpty()) {
-                net.minecraft.nbt.CompoundTag fluidComponents = NbtFilterData.getSerializedComponents(
-                        fluid, player.level().registryAccess());
-                value = NbtFilterData.resolvePathValue(fluidComponents, path);
+            CandidateComponents components = CandidateComponents.of(fluid, player.level().registryAccess());
+            if (components != null) {
+                value = components.resolve(path);
             }
         } else {
             ItemStack slotItem = FilterItemData.getEntry(filterStack, slot);

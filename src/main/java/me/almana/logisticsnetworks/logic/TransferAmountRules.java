@@ -1,10 +1,10 @@
 package me.almana.logisticsnetworks.logic;
 
+import me.almana.logisticsnetworks.filter.CandidateComponents;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.storage.DirectFluidHandler;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -134,7 +134,7 @@ public final class TransferAmountRules {
             ItemStack[] importFilters, ResourceHandler<ItemResource> source, int sourceSlot,
             ResourceHandler<ItemResource> target, @Nullable boolean[] importMask,
             Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         int allowed = Integer.MAX_VALUE;
 
@@ -206,7 +206,7 @@ public final class TransferAmountRules {
     }
 
     static int perEntryItemBatch(ItemStack candidate, ItemStack[] exportFilters,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         if (exportFilters == null) {
             return -1;

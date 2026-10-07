@@ -6,10 +6,8 @@ import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -42,8 +40,8 @@ public final class NbtFilterData {
             new NbtEntry(NbtPath.of(NbtPath.Component.of("minecraft:rarity")), "\"common\"")
     );
 
-    private static final NbtPath COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("components"));
-    private static final NbtPath FLUID_COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("fluid"),
+    static final NbtPath COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("components"));
+    static final NbtPath FLUID_COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("fluid"),
             NbtPath.Component.of("components"));
 
     public static List<NbtEntry> getDefaultEntries() {
@@ -130,36 +128,16 @@ public final class NbtFilterData {
     }
 
     public static @Nullable Tag resolvePathValue(ItemStack stack, @Nullable NbtPath path, HolderLookup.Provider provider) {
-        if (path == null) {
+        if (path == null || stack.isEmpty()) {
             return null;
         }
 
         if (isFluidPath(path)) {
-            FluidStack fluid = FluidUtil.getFirstStackContained(stack);
-            if (fluid.isEmpty()) {
-                return null;
-            }
-            CompoundTag tags = getSerializedComponents(fluid, provider);
-            return resolvePathValue(tags, path);
+            CandidateComponents components = CandidateComponents.of(FluidUtil.getFirstStackContained(stack), provider);
+            return components == null ? null : components.resolve(path);
         }
 
-        return resolvePathValue(getSerializedComponents(stack, provider), path);
-    }
-
-    public static @Nullable Tag resolvePathValue(@Nullable CompoundTag components, @Nullable NbtPath path) {
-        if (components == null || path == null || path.isEmpty())
-            return null;
-
-        if (path.equals(COMPONENTS_PATH) || path.equals(FLUID_COMPONENTS_PATH))
-            return components.copy();
-
-        if (path.startsWith(FLUID_COMPONENTS_PATH))
-            path = path.drop(2);
-        else if (path.startsWith(COMPONENTS_PATH))
-            path = path.drop(1);
-
-        Tag found = path.getFrom(components);
-        return found == null ? null : found.copy();
+        return new CandidateComponents(stack, provider).resolve(path);
     }
 
     public static List<NbtEntry> extractEntries(ItemStack stack, HolderLookup.Provider provider) {
@@ -187,48 +165,14 @@ public final class NbtFilterData {
     public static @Nullable CompoundTag getSerializedComponents(ItemStack stack, HolderLookup.Provider provider) {
         if (stack.isEmpty() || provider == null)
             return null;
-
-        CompoundTag wrapper = new CompoundTag();
-        RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, provider);
-        wrapper.store("stack", ItemStack.OPTIONAL_CODEC, ops, stack.copyWithCount(1));
-        CompoundTag components = new CompoundTag();
-        if (wrapper.contains("stack")) {
-            CompoundTag stackTag = wrapper.getCompound("stack").orElseGet(CompoundTag::new);
-            if (stackTag.contains("components")) {
-                components = stackTag.getCompound("components").map(CompoundTag::copy).orElseGet(CompoundTag::new);
-            }
-        }
-
-        if (!components.contains("minecraft:max_stack_size"))
-            components.putInt("minecraft:max_stack_size", stack.getMaxStackSize());
-        if (!components.contains("minecraft:rarity"))
-            components.putString("minecraft:rarity", stack.getRarity().getSerializedName());
-        if (stack.isDamageableItem()) {
-            if (!components.contains("minecraft:damage"))
-                components.putInt("minecraft:damage", stack.getDamageValue());
-            if (!components.contains("minecraft:max_damage"))
-                components.putInt("minecraft:max_damage", stack.getMaxDamage());
-        }
-        int durability = stack.isDamageableItem() ? Math.max(0, stack.getMaxDamage() - stack.getDamageValue()) : 0;
-        components.putInt("minecraft:durability", durability);
-        components.put("minecraft:enchanted", ByteTag.valueOf(stack.isEnchanted()));
-
-        return components.isEmpty() ? null : components;
+        return new CandidateComponents(stack, provider).full();
     }
 
     public static @Nullable CompoundTag getSerializedComponents(FluidStack stack, HolderLookup.Provider provider) {
-        if (stack == null || stack.isEmpty() || provider == null)
+        if (stack == null || provider == null)
             return null;
-
-        CompoundTag wrapper = new CompoundTag();
-        wrapper.store("stack", FluidStack.OPTIONAL_CODEC, stack);
-        if (wrapper.contains("stack")) {
-            CompoundTag itemTag = wrapper.getCompound("stack").orElseGet(CompoundTag::new);
-            if (itemTag.contains("components")) {
-                return itemTag.getCompound("components").orElseGet(CompoundTag::new);
-            }
-        }
-        return null;
+        CandidateComponents components = CandidateComponents.of(stack, provider);
+        return components == null ? null : components.full();
     }
 
     public static boolean isFluidPath(@Nullable NbtPath path) {
