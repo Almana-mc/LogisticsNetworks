@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import me.almana.logisticsnetworks.logic.PlannedItemValidation;
+import me.almana.logisticsnetworks.logic.PriorityRobin;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.server.MinecraftServer;
@@ -19,6 +20,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.item.ItemResource;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,7 +41,8 @@ public final class TransferCommitter {
     }
 
     private record CommittedItems(int amount, Map<Item, Integer> byItem,
-            Map<UUID, Map<Item, Integer>> byTarget, ItemResource resource, ItemResourceOrder.Cursor cursor) {
+            Map<UUID, Map<Item, Integer>> byTarget, ItemResource resource, ItemResourceOrder.Cursor cursor,
+            int servedTarget) {
     }
 
     private record ResolvedTarget(TransferEngine.ItemTransferTarget target, ChannelData channel) {
@@ -110,7 +113,7 @@ public final class TransferCommitter {
         if (!matchesBinding(plan.sourceStorageBinding(), source, bindings)) return revalidated(planned);
 
         TransferEngine.ResolvedItemTargets resolved = resolveTargets(
-                sourceNode, channel, plan.channelIndex(), source, network, context, cache);
+                sourceNode, channel, plan.channelIndex(), source, network, context, cache, null);
         ResolvedTarget[] targets = new ResolvedTarget[plan.targets().size()];
         for (int index = 0; index < targets.length; index++) {
             targets[index] = plannedTarget(plan.targets().get(index), resolved);
@@ -125,19 +128,25 @@ public final class TransferCommitter {
         CommittedItems progress = commitMoves(
                 plan, source, channel, level, targets, batch, network, generation);
         int committed = progress.amount();
+        UUID servedNode = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
+                && progress.servedTarget() >= 0 ? plan.targets().get(progress.servedTarget()).nodeId() : null;
         int recoveryGoal = DirectStorageHandlers.isDirect(source) ? batch : Math.min(planned, batch);
         int recovered = 0;
         ItemResourceOrder.Cursor cursor = progress.cursor();
         if (committed < recoveryGoal && network.getGeneration() == generation) {
             try (var operation = TransferCapabilityCache.storageOperation(true)) {
                 var recovery = recoverItemChannel(plan, network, server, recoveryGoal - committed, committed,
-                        progress.byItem(), progress.byTarget(), progress.resource());
+                        progress.byItem(), progress.byTarget(), progress.resource(), servedNode);
                 recovered = recovery.moved();
                 if (recovery.cursor() != null) cursor = recovery.cursor();
             }
         }
         int total = committed + recovered;
         if (channel.canRotateResources() && total > 0 && cursor != null) channel.setItemResourceCursor(cursor);
+        if (servedNode != null) {
+            channel.setRobinCursor(new PriorityRobin.Cursor(
+                    targets[progress.servedTarget()].channel().getPriority(), servedNode));
+        }
         long wake = TransferEngine.finishChannelAttempt(sourceNode, channel, plan.channelIndex(), total,
                 level.getGameTime(), tier, telemetry);
         return new ItemCommitResult(total, wake, planned, committed, recovered,
@@ -152,6 +161,7 @@ public final class TransferCommitter {
         Map<UUID, Map<Item, Integer>> movedByTarget = new HashMap<>();
         ItemResource movedResource = null;
         ItemResourceOrder.Cursor cursor = null;
+        int servedTarget = -1;
         boolean roundRobin = channel.getDistributionMode() == DistributionMode.ROUND_ROBIN;
         PlannedItemValidation validation = new PlannedItemValidation(
                 source, channel, level.registryAccess(), plan.moves());
@@ -172,18 +182,19 @@ public final class TransferCommitter {
             int moved = TransferEngine.commitSingleMove(source, resolved.target(), validated);
             if (moved == 0) continue;
             if (nextCursor != null) cursor = nextCursor;
+            servedTarget = intent.targetIndex();
             movedResource = intent.resource();
             committed += moved;
             movedByItem.merge(intent.getItem(), moved, Integer::sum);
             targetTotals.merge(intent.getItem(), moved, Integer::sum);
             validation.moved(intent.getItem(), moved, resolved.target().handler());
         }
-        return new CommittedItems(committed, movedByItem, movedByTarget, movedResource, cursor);
+        return new CommittedItems(committed, movedByItem, movedByTarget, movedResource, cursor, servedTarget);
     }
 
     public static ItemResourceOrder.Result recoverItemChannel(TransferPlan.ChannelMoves plan, LogisticsNetwork network,
             MinecraftServer server, int shortfall, int committed, Map<Item, Integer> movedByItem,
-            Map<UUID, Map<Item, Integer>> movedByTarget, ItemResource requiredResource) {
+            Map<UUID, Map<Item, Integer>> movedByTarget, ItemResource requiredResource, @Nullable UUID onlyTarget) {
         ThreadGuard.requireServerThread();
         if (shortfall <= 0) return ItemResourceOrder.EMPTY;
         long generation = network.getGeneration();
@@ -201,15 +212,18 @@ public final class TransferCommitter {
                 channel.getIoDirection(), directSource);
         if (source == null) return ItemResourceOrder.EMPTY;
         TransferEngine.ResolvedItemTargets targets = resolveTargets(
-                node, channel, plan.channelIndex(), source, network, context, cache);
+                node, channel, plan.channelIndex(), source, network, context, cache, onlyTarget);
         Map<ResourceHandler<ItemResource>, Map<Item, Integer>> targetBatches = new IdentityHashMap<>();
         for (int index = 0; index < targets.refs().size(); index++) {
             Map<Item, Integer> moved = movedByTarget.get(targets.refs().get(index).node().getUUID());
             if (moved != null) targetBatches.put(targets.targets().get(index).handler(), moved);
         }
+        TransferEngine.MoveRecorder served = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
+                ? (slot, index, moved, mask) -> TransferEngine.markServed(channel, targets.refs().get(index))
+                : null;
         return TransferEngine.executeItemOperation(source, targets.targets(), limit, channel.getFilterItems(),
                 channel.getFilterMode(), null, ((ServerLevel) node.level()).registryAccess(),
-                channel.getDistributionMode() == DistributionMode.ROUND_ROBIN, cache, null,
+                channel.getDistributionMode(), cache, served,
                 movedByItem, targetBatches, () -> network.getGeneration() == generation,
                 channel.canRotateResources(), channel.getItemResourceCursor(), requiredResource);
     }
@@ -244,9 +258,12 @@ public final class TransferCommitter {
 
     private static TransferEngine.ResolvedItemTargets resolveTargets(LogisticsNodeEntity sourceNode,
             ChannelData channel, int index, ResourceHandler<ItemResource> source,
-            LogisticsNetwork network, TransferEngine.NetworkContext context, FilterItemData.ReadCache cache) {
+            LogisticsNetwork network, TransferEngine.NetworkContext context, FilterItemData.ReadCache cache,
+            @Nullable UUID onlyTarget) {
         List<TransferEngine.ImportTarget> targets = new ArrayList<>();
         for (TransferEngine.ImportTarget ref : context.itemImports()[index]) {
+            // Robin recovery stays on receiver
+            if (onlyTarget != null && !onlyTarget.equals(ref.node().getUUID())) continue;
             ChannelData current = ref.node().getChannel(index);
             if (network.getNodeUuids().contains(ref.node().getUUID())
                     && isActive(ref.node(), current, ChannelMode.IMPORT)) {

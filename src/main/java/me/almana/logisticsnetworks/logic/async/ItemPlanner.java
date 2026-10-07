@@ -36,7 +36,7 @@ public final class ItemPlanner {
         ResourceHandler<ItemResource> sourceHandler = endpoints.get(unit.sourceEndpoint());
 
         TransferEngine.executeItemOperation(sourceHandler, engineTargets, unit.batchLimit(), exportFilters,
-                unit.exportFilterMode(), null, snapshot.registries(), unit.roundRobin(), readCache,
+                unit.exportFilterMode(), null, snapshot.registries(), unit.distributionMode(), readCache,
                 (sourceSlot, targetIndex, moved, mask) -> moves.add(new TransferPlan.MoveIntent(
                         sourceSlot, targetIndex, ItemResource.of(moved), moved.getCount(), mask)),
                 java.util.Map.of(), null, null, unit.resourceRoundRobin(), unit.resourceCursor(), null);

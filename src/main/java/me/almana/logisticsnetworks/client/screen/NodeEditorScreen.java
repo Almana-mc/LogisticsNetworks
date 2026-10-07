@@ -941,7 +941,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private Theme.Variant getDistributionVariant(DistributionMode mode) {
         return switch (mode) {
             case PRIORITY -> Theme.Variant.INFO;
-            case ROUND_ROBIN -> Theme.Variant.ACCENT;
+            case ROUND_ROBIN, PRIORITY_ROBIN -> Theme.Variant.ACCENT;
             case NEAREST_FIRST -> Theme.Variant.WARN;
             case FARTHEST_FIRST -> Theme.Variant.WARN;
         };

@@ -118,7 +118,7 @@ Redstone gating applies to both Senders and Receivers.
 
 ![Distribution: Farthest First](images/channel-distribution-farthest-first.png)
 
-![Distribution: Round Robin](images/channel-distribution-round-robin.png)
+![Distribution: Equal Distribution](images/channel-distribution-round-robin.png)
 
 **What it is:** how a Sender picks between multiple matching Receivers on the same channel number.
 
@@ -127,11 +127,14 @@ Redstone gating applies to both Senders and Receivers.
 - **Priority** — sort by each Receiver's **Priority** value. Higher numbers are served first. Ties are broken in no particular order.
 - **Nearest First** — serve the Receivers closest to the Sender first (by straight-line distance).
 - **Farthest First** — opposite of Nearest First: serve the furthest Receiver first.
-- **Round Robin** — distribute each operation's item batch as evenly as possible across matching Receivers. For example, a batch of 8 ordinary items sent to two empty Receivers is split 4 and 4.
+- **Equal Distribution** — split each operation's item batch as evenly as possible across matching Receivers. For example, a batch of 8 ordinary items sent to two empty Receivers is split 4 and 4.
+- **Priority Robin** — each operation goes to one Receiver, then the next. Receivers are visited from highest to lowest **Priority**, then the cycle repeats. A full Receiver is skipped.
 
 **How to change it:** use Primary Interaction to cycle to the next mode.
 
-**Gotcha:** Round Robin does not keep a rotation pointer. Available items are divided during the same operation, and unused shares flow to Receivers with storage space.
+**Gotcha:** Equal Distribution does not keep a rotation pointer, and unused shares flow to Receivers with space. It only splits item batches; on fluid, energy, chemical and Source channels it behaves like **Priority**.
+
+**Gotcha:** Priority Robin's position resets to the highest-priority Receiver when the world or the Sender's chunk reloads. If the chosen Receiver accepts only part of a batch, the rest waits for the next operation. It works on every channel type.
 
 **Disabled on Receivers:** this row is greyed out when Mode is Receiver. Distribution only makes sense on the Sender side.
 
@@ -141,11 +144,11 @@ Redstone gating applies to both Senders and Receivers.
 
 **What it is:** a small integer attached to this channel. Range: **–99 to +99**.
 
-**What it does:** used by a Sender that has Distribution set to **Priority**. The Sender sorts its target Receivers by this number, highest first, and serves them in that order. Items are read from source slots in order, so a batch spread across source slots can fill the first Receiver with the earlier slots before moving the remainder to the next Receiver.
+**What it does:** the Sender sorts its target Receivers by this number, highest first. Under **Priority**, higher-priority Receivers get resources before lower-priority ones. Items are read from source slots in order, so a batch spread across source slots can fill the first Receiver with the earlier slots before moving the remainder to the next Receiver. Under **Priority Robin**, it sets the order Receivers take turns in.
 
 **How to change it:** use Primary Interaction on the number field to open a text box, type a number between –99 and 99, and press Enter.
 
-**Gotcha:** Priority is only consulted when Distribution = Priority. Under Nearest/Farthest/Round Robin it is ignored — the sorter never reads it. Set Priority on the **Receivers** you want served first, not on the Sender.
+**Gotcha:** Priority sets the serving order under Priority, Priority Robin, and Equal Distribution on non-item channels. Under Nearest/Farthest it is ignored — the sorter never reads it. Set Priority on the **Receivers** you want served first, not on the Sender.
 
 ## Batch
 

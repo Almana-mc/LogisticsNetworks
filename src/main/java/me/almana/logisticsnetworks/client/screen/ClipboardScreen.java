@@ -1231,7 +1231,7 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> implem
     private Theme.Variant distributionVariant(DistributionMode mode) {
         return switch (mode) {
             case PRIORITY -> Theme.Variant.INFO;
-            case ROUND_ROBIN -> Theme.Variant.ACCENT;
+            case ROUND_ROBIN, PRIORITY_ROBIN -> Theme.Variant.ACCENT;
             case NEAREST_FIRST, FARTHEST_FIRST -> Theme.Variant.WARN;
         };
     }

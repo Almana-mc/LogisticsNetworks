@@ -4,5 +4,7 @@ public enum DistributionMode {
     PRIORITY,
     NEAREST_FIRST,
     FARTHEST_FIRST,
-    ROUND_ROBIN
+    // Displayed as Equal Distribution
+    ROUND_ROBIN,
+    PRIORITY_ROBIN
 }
