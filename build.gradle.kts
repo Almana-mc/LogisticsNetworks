@@ -29,8 +29,10 @@ val ftb_library_version: String by project
 val emi_version: String by project
 val guideme_version: String by project
 val sophisticated_core_version: String by project
+val building_gadgets_file_id: String by project
 val ae2Runtime = providers.gradleProperty("ae2_runtime").orElse("true").map { it.toBoolean() }
 val refinedStorageRuntime = providers.gradleProperty("refined_storage_runtime").orElse("true").map { it.toBoolean() }
+val buildingGadgetsRuntime = providers.gradleProperty("building_gadgets_runtime").orElse("true").map { it.toBoolean() }
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -44,6 +46,9 @@ repositories {
     maven("https://maven.ftb.dev/releases")
     maven("https://maven.terraformersmc.com/releases")
     maven("https://maven.creeperhost.net")
+    maven("https://cursemaven.com") {
+        content { includeGroup("curse.maven") }
+    }
     // Enable when 26.1.2 is supported.
     /*
     maven("https://maven.createmod.net")
@@ -144,6 +149,11 @@ dependencies {
     compileOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
     if (refinedStorageRuntime.get()) {
         localRuntime("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+    }
+
+    compileOnly("curse.maven:building-gadgets-298187:${building_gadgets_file_id}")
+    if (buildingGadgetsRuntime.get()) {
+        localRuntime("curse.maven:building-gadgets-298187:${building_gadgets_file_id}")
     }
 
     // Iris API — compile-only; shaders are an optional runtime dependency.

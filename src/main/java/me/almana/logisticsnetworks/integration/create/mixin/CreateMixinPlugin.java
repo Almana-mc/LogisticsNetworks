@@ -1,5 +1,3 @@
-// Enable when 26.1.2 is supported.
-/*
 package me.almana.logisticsnetworks.integration.create.mixin;
 
 import java.util.List;
@@ -32,4 +30,3 @@ public final class CreateMixinPlugin implements IMixinConfigPlugin {
             IMixinInfo mixinInfo) {
     }
 }
-*/
