@@ -214,6 +214,19 @@ public final class ThemePaint {
         graphics.drawString(font, text, x + 6, y + (height - 7) / 2, theme.accent(), false);
     }
 
+    public static void searchBox(GuiGraphics g, Font font, int x, int y, int w, int h,
+                                  String placeholder, boolean focused, Theme t) {
+        int bg = t.surface2();
+        int border = focused ? t.accent() : t.border();
+        roundRect(g, x, y, w, h, 2, bg, t.sharpCorners());
+        roundOutline(g, x, y, w, h, 2, border, t.sharpCorners());
+        int gx = x + 3;
+        int gy = y + h / 2 - 2;
+        g.renderOutline(gx, gy, 4, 4, t.textSubtle());
+        g.fill(gx + 3, gy + 3, gx + 5, gy + 5, t.textSubtle());
+        g.drawString(font, placeholder, x + 10, y + (h - 7) / 2, t.textSubtle(), false);
+    }
+
     public static int sortButtonWidth(Font font, String label) {
         return font.width(label) + 21;
     }

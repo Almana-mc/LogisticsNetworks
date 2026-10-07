@@ -72,6 +72,7 @@ import me.almana.logisticsnetworks.network.SyncStorageUpgradeCatalogPayload;
 import me.almana.logisticsnetworks.network.SyncQueuedNodePlacementPayload;
 import me.almana.logisticsnetworks.network.SyncFilterScanResultPayload;
 import me.almana.logisticsnetworks.network.SyncChannelListPayload;
+import me.almana.logisticsnetworks.network.SyncServerRackPayload;
 import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkExportPayload;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
@@ -322,6 +323,8 @@ public class LogisticsNetworks {
                                 ClientPayloadHandler::handleSyncTelemetry);
                 registrar.playToClient(SyncChannelListPayload.TYPE, SyncChannelListPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncChannelList);
+                registrar.playToClient(SyncServerRackPayload.TYPE, SyncServerRackPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncServerRack);
                 registrar.playToClient(SyncNetworkExportPayload.TYPE, SyncNetworkExportPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkExport);
                 registrar.playToClient(SyncStorageUpgradeCatalogPayload.TYPE,
