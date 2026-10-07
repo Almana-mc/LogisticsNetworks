@@ -130,6 +130,12 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
     }
 
     @Override
+    protected AABB getBoundingBoxForCulling(LogisticsNodeEntity entity) {
+        return new AABB(entity.getX() - 0.5, entity.getY(), entity.getZ() - 0.5,
+                entity.getX() + 0.5, entity.getY() + 1.0, entity.getZ() + 0.5);
+    }
+
+    @Override
     protected int getBlockLightLevel(LogisticsNodeEntity entity, BlockPos pos) {
         return 15;
     }
