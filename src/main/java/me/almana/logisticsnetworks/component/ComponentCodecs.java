@@ -7,6 +7,7 @@ import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Decoder;
 import com.mojang.serialization.Dynamic;
 import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.Encoder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
@@ -55,7 +56,24 @@ public final class ComponentCodecs {
 
     // Keeps partials, like parseOptional
     private static <A> Codec<A> lenient(Codec<A> codec, Supplier<? extends A> fallback, boolean logErrors) {
-        return Codec.of(codec, new Decoder<>() {
+        return Codec.of(new Encoder<>() {
+            @Override
+            public <T> DataResult<T> encode(A input, DynamicOps<T> ops, T prefix) {
+                DataResult<T> result = tryEncode(codec, input, ops, prefix);
+                if (result.isSuccess()) {
+                    return result;
+                }
+                if (logErrors) {
+                    LOGGER.warn("Unencodable entry, saving fallback: {}", result.error().orElseThrow().message());
+                }
+                Optional<T> partial = result.resultOrPartial();
+                if (partial.isPresent()) {
+                    return DataResult.success(partial.get());
+                }
+                DataResult<T> replacement = tryEncode(codec, fallback.get(), ops, prefix);
+                return replacement.isSuccess() ? replacement : result;
+            }
+        }, new Decoder<>() {
             @Override
             public <T> DataResult<Pair<A, T>> decode(DynamicOps<T> ops, T input) {
                 A value;
@@ -73,6 +91,14 @@ public final class ComponentCodecs {
                 return DataResult.success(Pair.of(value, input));
             }
         });
+    }
+
+    private static <A, T> DataResult<T> tryEncode(Encoder<A> encoder, A value, DynamicOps<T> ops, T prefix) {
+        try {
+            return encoder.encode(value, ops, prefix);
+        } catch (RuntimeException e) {
+            return DataResult.error(e::toString);
+        }
     }
 
     public static <E> Codec<List<E>> lenientList(Codec<E> element) {
