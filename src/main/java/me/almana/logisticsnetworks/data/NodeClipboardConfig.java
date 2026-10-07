@@ -1,6 +1,14 @@
 package me.almana.logisticsnetworks.data;
 
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import me.almana.logisticsnetworks.component.ClipboardSnapshot;
+import me.almana.logisticsnetworks.component.ClipboardSnapshot.ChannelState;
+import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.component.FilterComponentData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -14,8 +22,9 @@ import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.UUIDUtil;
+import net.minecraft.nbt.CollectionTag;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
@@ -26,41 +35,69 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 public final class NodeClipboardConfig {
 
-    private static final int VERSION = 1;
-
+    private static final int LEGACY_VERSION = 1;
+    private static final int VERSION = 2;
     private static final String KEY_VERSION = "version";
-    private static final String KEY_CHANNELS = "channels";
-    private static final String KEY_FILTERS = "filters";
-    private static final String KEY_UPGRADES = "upgrades";
-    private static final String KEY_REQUIRED_ITEMS = "required_items";
-    private static final String KEY_NETWORK_ID = "network_id";
-    private static final String KEY_NETWORK_NAME = "network_name";
 
-    private static final String KEY_INDEX = "index";
-    private static final String KEY_ENABLED = "enabled";
-    private static final String KEY_MODE = "mode";
-    private static final String KEY_TYPE = "type";
-    private static final String KEY_BATCH = "batch";
-    private static final String KEY_DELAY = "delay";
-    private static final String KEY_IO = "io";
-    private static final String KEY_REDSTONE = "redstone";
-    private static final String KEY_DISTRIBUTION = "distribution";
-    private static final String KEY_FILTER_MODE = "filter_mode";
-    private static final String KEY_PRIORITY = "priority";
-    private static final String KEY_VISIBLE = "renderVisible";
-    private static final String KEY_NODE_LABEL = "node_label";
+    private static final MapCodec<ChannelState> LEGACY_CHANNEL_STATE = RecordCodecBuilder.mapCodec(instance ->
+            instance.group(
+                    Codec.BOOL.lenientOptionalFieldOf("enabled", false).forGetter(ChannelState::enabled),
+                    ChannelMode.CODEC.lenientOptionalFieldOf("mode", ChannelMode.IMPORT)
+                            .forGetter(ChannelState::mode),
+                    ChannelType.CODEC.lenientOptionalFieldOf("type", ChannelType.ITEM)
+                            .forGetter(ChannelState::type),
+                    Codec.INT.lenientOptionalFieldOf("batch", 8).forGetter(ChannelState::batchSize),
+                    Codec.INT.lenientOptionalFieldOf("delay", 20).forGetter(ChannelState::tickDelay),
+                    ChannelState.DIRECTION.lenientOptionalFieldOf("io", Optional.of(Direction.UP))
+                            .forGetter(ChannelState::direction),
+                    Codec.STRING.lenientOptionalFieldOf("redstone", "IGNORED")
+                            .forGetter(state -> state.redstoneMode().name()),
+                    DistributionMode.CODEC.lenientOptionalFieldOf("distribution", DistributionMode.PRIORITY)
+                            .forGetter(ChannelState::distributionMode),
+                    FilterMode.CODEC.lenientOptionalFieldOf("filter_mode", FilterMode.MATCH_ANY)
+                            .forGetter(ChannelState::filterMode),
+                    Codec.INT.lenientOptionalFieldOf("priority", 0).forGetter(ChannelState::priority),
+                    Codec.STRING.lenientOptionalFieldOf("name", "").forGetter(ChannelState::name),
+                    Codec.BOOL.lenientOptionalFieldOf("resource_round_robin", false)
+                            .forGetter(ChannelState::resourceRoundRobin)
+            ).apply(instance, ChannelState::fromSerialized));
+    private static final Codec<Pair<Integer, ChannelState>> LEGACY_CHANNEL =
+            Codec.mapPair(Codec.INT.lenientOptionalFieldOf("index", 0), LEGACY_CHANNEL_STATE).codec();
+    private static final Codec<Pair<Integer, SlotStack>> LEGACY_FILTER =
+            Codec.mapPair(Codec.INT.lenientOptionalFieldOf("channel", 0), SlotStack.QUIET_MAP_CODEC).codec();
 
-    private static final String KEY_CHANNEL = "channel";
-    private static final String KEY_SLOT = "slot";
-    private static final String KEY_ITEM = "item";
-    private static final String KEY_COUNT = "count";
-    private static final String KEY_CH_NAME = "name";
+    static final Codec<ClipboardSnapshot> CURRENT_CODEC = Codec.INT.validate(NodeClipboardConfig::checkVersion)
+            .dispatch(KEY_VERSION, snapshot -> VERSION, version -> ClipboardSnapshot.MAP_CODEC);
+    static final Codec<ClipboardSnapshot> LEGACY_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            ComponentCodecs.quietLenientList(LEGACY_CHANNEL, LogisticsNodeEntity.CHANNEL_COUNT).fieldOf("channels")
+                    .forGetter(snapshot -> IntStream.range(0, snapshot.channels().size())
+                            .mapToObj(index -> Pair.of(index, snapshot.channels().get(index)))
+                            .toList()),
+            ComponentCodecs.quietLenientList(LEGACY_FILTER, LogisticsNodeEntity.CHANNEL_COUNT * ChannelData.FILTER_SIZE)
+                    .lenientOptionalFieldOf("filters", List.of())
+                    .forGetter(snapshot -> snapshot.filters().stream()
+                            .map(filter -> Pair.of(filter.channel(),
+                                    new SlotStack(filter.slot(), filter.stack().toStack())))
+                            .toList()),
+            ComponentCodecs.quietLenientList(SlotStack.QUIET_MAP_CODEC.codec(), LogisticsNodeEntity.UPGRADE_SLOT_COUNT)
+                    .lenientOptionalFieldOf("upgrades", List.of())
+                    .forGetter(snapshot -> snapshot.upgrades().stream()
+                            .map(upgrade -> new SlotStack(upgrade.slot(), upgrade.stack().toStack()))
+                            .toList()),
+            UUIDUtil.LENIENT_CODEC.lenientOptionalFieldOf("network_id").forGetter(ClipboardSnapshot::networkId),
+            Codec.STRING.lenientOptionalFieldOf("network_name").forGetter(ClipboardSnapshot::networkName),
+            Codec.BOOL.lenientOptionalFieldOf("renderVisible", true).forGetter(ClipboardSnapshot::renderVisible),
+            Codec.STRING.lenientOptionalFieldOf("node_label", "").forGetter(ClipboardSnapshot::nodeLabel)
+    ).apply(instance, NodeClipboardConfig::legacySnapshot));
+    private static final Codec<ClipboardSnapshot> CODEC = Codec.withAlternative(CURRENT_CODEC, LEGACY_CODEC);
 
     private final ChannelConfig[] channels;
     private final ItemStack[][] filterItems;
@@ -435,6 +472,12 @@ public final class NodeClipboardConfig {
         }
     }
 
+    public void stripUpgradeComponents() {
+        for (int slot = 0; slot < upgradeItems.length; slot++) {
+            setUpgradeItem(slot, new ItemStack(upgradeItems[slot].getItem()));
+        }
+    }
+
     public int getUpgradeTier() {
         int tier = 0;
         for (ItemStack stack : upgradeItems) {
@@ -661,218 +704,92 @@ public final class NodeClipboardConfig {
     }
 
     public CompoundTag save(HolderLookup.Provider provider) {
-        var ops = provider == null ? NbtOps.INSTANCE : provider.createSerializationContext(NbtOps.INSTANCE);
-        CompoundTag root = new CompoundTag();
-        root.putInt(KEY_VERSION, VERSION);
-        if (networkId != null) {
-            root.putString(KEY_NETWORK_ID, networkId.toString());
-        }
-        if (networkName != null && !networkName.isBlank()) {
-            root.putString(KEY_NETWORK_NAME, networkName);
-        }
-
-        ListTag channelsTag = new ListTag();
-        for (int channelIndex = 0; channelIndex < channels.length; channelIndex++) {
-            ChannelConfig channel = channels[channelIndex];
-            CompoundTag channelTag = new CompoundTag();
-            channelTag.putInt(KEY_INDEX, channelIndex);
-            channelTag.putBoolean(KEY_ENABLED, channel.enabled);
-            channelTag.putString(KEY_MODE, channel.mode.name());
-            channelTag.putString(KEY_TYPE, channel.type.name());
-            channelTag.putInt(KEY_BATCH, channel.batchSize);
-            channelTag.putInt(KEY_DELAY, channel.tickDelay);
-            channelTag.putString(KEY_IO, channel.ioDirection != null ? channel.ioDirection.getName() : "all");
-            channelTag.putString(KEY_REDSTONE, channel.redstoneMode.name());
-            channelTag.putString(KEY_DISTRIBUTION, channel.distributionMode.name());
-            channelTag.putString(KEY_FILTER_MODE, channel.filterMode.name());
-            channelTag.putBoolean("resource_round_robin", channel.resourceRoundRobin);
-            channelTag.putInt(KEY_PRIORITY, channel.priority);
-            if (!channel.name.isEmpty())
-                channelTag.putString(KEY_CH_NAME, channel.name);
-            channelsTag.add(channelTag);
-        }
-        root.put(KEY_CHANNELS, channelsTag);
-        root.putBoolean(KEY_VISIBLE, renderVisible);
-        if (!nodeLabel.isEmpty()) {
-            root.putString(KEY_NODE_LABEL, nodeLabel);
-        }
-
-        ListTag filtersTag = new ListTag();
-        for (int channelIndex = 0; channelIndex < filterItems.length; channelIndex++) {
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack stack = filterItems[channelIndex][slot];
-                if (stack.isEmpty()) {
-                    continue;
-                }
-                CompoundTag entry = new CompoundTag();
-                entry.putInt(KEY_CHANNEL, channelIndex);
-                entry.putInt(KEY_SLOT, slot);
-                entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, ops, stack);
-                filtersTag.add(entry);
-            }
-        }
-        if (!filtersTag.isEmpty()) {
-            root.put(KEY_FILTERS, filtersTag);
-        }
-
-        ListTag upgradesTag = new ListTag();
-        for (int slot = 0; slot < upgradeItems.length; slot++) {
-            ItemStack stack = upgradeItems[slot];
-            if (stack.isEmpty()) {
-                continue;
-            }
-            CompoundTag entry = new CompoundTag();
-            entry.putInt(KEY_SLOT, slot);
-            entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, ops, stack);
-            upgradesTag.add(entry);
-        }
-        if (!upgradesTag.isEmpty()) {
-            root.put(KEY_UPGRADES, upgradesTag);
-        }
-
-        ListTag requiredTag = new ListTag();
-        for (Requirement requirement : buildUpgradeRequirements(null)) {
-            CompoundTag entry = new CompoundTag();
-            entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, ops, requirement.stack());
-            entry.putInt(KEY_COUNT, requirement.count());
-            requiredTag.add(entry);
-        }
-        if (!requiredTag.isEmpty()) {
-            root.put(KEY_REQUIRED_ITEMS, requiredTag);
-        }
-
-        return root;
+        return (CompoundTag) ComponentCodecs.encode(CODEC, provider, toComponentSnapshot(provider));
     }
 
     public static boolean canDecodeItems(CompoundTag root, @Nullable HolderLookup.Provider provider) {
         var ops = provider == null ? NbtOps.INSTANCE : provider.createSerializationContext(NbtOps.INSTANCE);
-        for (String key : List.of(KEY_FILTERS, KEY_UPGRADES)) {
+        for (String key : List.of("filters", "upgrades")) {
             for (Tag tag : root.getListOrEmpty(key)) {
-                if (!(tag instanceof CompoundTag entry) || !entry.contains(KEY_ITEM)) continue;
-                int slot = entry.getIntOr(KEY_SLOT, -1);
-                int limit = key.equals(KEY_FILTERS) ? ChannelData.FILTER_SIZE : LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
+                if (!(tag instanceof CompoundTag entry) || !entry.contains("item")) continue;
+                int slot = entry.getIntOr("slot", -1);
+                int limit = key.equals("filters") ? ChannelData.FILTER_SIZE : LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
                 if (slot < 0 || slot >= limit) continue;
-                if (key.equals(KEY_FILTERS)) {
-                    int channel = entry.getIntOr(KEY_CHANNEL, -1);
+                if (key.equals("filters")) {
+                    int channel = entry.getIntOr("channel", -1);
                     if (channel < 0 || channel >= LogisticsNodeEntity.CHANNEL_COUNT) continue;
                 }
-                if (ItemStack.OPTIONAL_CODEC.parse(ops, entry.get(KEY_ITEM)).result().isEmpty()) return false;
+                if (ItemStack.OPTIONAL_CODEC.parse(ops, entry.get("item")).result().isEmpty()) return false;
             }
         }
         return true;
     }
 
-    public static NodeClipboardConfig load(CompoundTag root, HolderLookup.Provider provider) {
-        if (root == null || root.isEmpty() || !canDecodeItems(root, provider)) {
+    @Nullable
+    public static NodeClipboardConfig load(@Nullable CompoundTag root, @Nullable HolderLookup.Provider provider) {
+        if (root == null || isUnsupportedVersion(root) || isOversized(root)) {
             return null;
         }
-
-        if (root.contains(KEY_VERSION) && root.getIntOr(KEY_VERSION, VERSION) != VERSION) {
+        DynamicOps<Tag> ops = provider == null ? NbtOps.INSTANCE : provider.createSerializationContext(NbtOps.INSTANCE);
+        NodeClipboardConfig config = CODEC.parse(ops, root).result()
+                .map(NodeClipboardConfig::fromComponentSnapshot)
+                .orElse(null);
+        if (config == null) {
             return null;
         }
-
-        var ops = provider == null ? NbtOps.INSTANCE : provider.createSerializationContext(NbtOps.INSTANCE);
-        ChannelConfig[] channels = new ChannelConfig[LogisticsNodeEntity.CHANNEL_COUNT];
-        ItemStack[][] filters = new ItemStack[LogisticsNodeEntity.CHANNEL_COUNT][ChannelData.FILTER_SIZE];
-        ItemStack[] upgrades = new ItemStack[LogisticsNodeEntity.UPGRADE_SLOT_COUNT];
-
-        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-            ChannelConfig defaults = defaultChannelConfig();
-            channels[i] = defaults;
-            Arrays.fill(filters[i], ItemStack.EMPTY);
-        }
-        Arrays.fill(upgrades, ItemStack.EMPTY);
-        UUID networkId = parseOptionalUuid(root.getStringOr(KEY_NETWORK_ID, null));
-        String networkName = root.contains(KEY_NETWORK_NAME) ? trim(root.getStringOr(KEY_NETWORK_NAME, null), 32) : null;
-        if (networkName != null && networkName.isBlank()) {
-            networkName = null;
-        }
-
-        if (!root.contains(KEY_CHANNELS)) {
-            return null;
-        }
-
-        ListTag channelsTag = root.getListOrEmpty(KEY_CHANNELS);
-        for (Tag tag : channelsTag) {
-            if (!(tag instanceof CompoundTag channelTag)) {
-                continue;
-            }
-            int index = channelTag.getIntOr(KEY_INDEX, -1);
-            if (index < 0 || index >= LogisticsNodeEntity.CHANNEL_COUNT) {
-                continue;
-            }
-
-            ChannelConfig config = defaultChannelConfig();
-            config.enabled = channelTag.getBooleanOr(KEY_ENABLED, false);
-            config.mode = parseEnum(channelTag.getStringOr(KEY_MODE, ChannelMode.IMPORT.name()), ChannelMode.values(), ChannelMode.IMPORT);
-            config.type = parseEnum(channelTag.getStringOr(KEY_TYPE, ChannelType.ITEM.name()), ChannelType.values(), ChannelType.ITEM);
-            config.batchSize = Math.max(1, channelTag.getIntOr(KEY_BATCH, 8));
-            config.tickDelay = config.type == ChannelType.ENERGY ? 1 : Math.max(1, channelTag.getIntOr(KEY_DELAY, 20));
-
-            String dirStr = channelTag.getStringOr(KEY_IO, Direction.UP.getName());
-            if ("all".equals(dirStr)) {
-                config.ioDirection = null;
-            } else {
-                Direction direction = Direction.byName(dirStr);
-                config.ioDirection = direction == null ? Direction.UP : direction;
-            }
-            String savedRedstoneMode = channelTag.getStringOr(KEY_REDSTONE, "");
-            if (RedstoneMode.disablesChannel(savedRedstoneMode))
-                config.enabled = false;
-            config.redstoneMode = RedstoneMode.fromSerialized(savedRedstoneMode);
-            config.distributionMode = parseEnum(channelTag.getStringOr(KEY_DISTRIBUTION, DistributionMode.PRIORITY.name()), DistributionMode.values(),
-                    DistributionMode.PRIORITY);
-            config.resourceRoundRobin = channelTag.getBooleanOr("resource_round_robin", false);
-            config.filterMode = parseEnum(channelTag.getStringOr(KEY_FILTER_MODE, FilterMode.MATCH_ANY.name()), FilterMode.values(),
-                    FilterMode.MATCH_ANY);
-            config.priority = Math.max(-99, Math.min(99, channelTag.getIntOr(KEY_PRIORITY, 0)));
-            if (channelTag.contains(KEY_CH_NAME))
-                config.name = trim(channelTag.getStringOr(KEY_CH_NAME, ""), 24);
-            channels[index] = config;
-        }
-
-        if (root.contains(KEY_FILTERS)) {
-            ListTag filtersTag = root.getListOrEmpty(KEY_FILTERS);
-            for (Tag tag : filtersTag) {
-                if (!(tag instanceof CompoundTag entry)) {
-                    continue;
-                }
-                int channel = entry.getIntOr(KEY_CHANNEL, -1);
-                int slot = entry.getIntOr(KEY_SLOT, -1);
-                if (channel < 0 || channel >= LogisticsNodeEntity.CHANNEL_COUNT || slot < 0
-                        || slot >= ChannelData.FILTER_SIZE) {
-                    continue;
-                }
-
-                ItemStack stack = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY);
-                filters[channel][slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
-            }
-        }
-
-        if (root.contains(KEY_UPGRADES)) {
-            ListTag upgradesTag = root.getListOrEmpty(KEY_UPGRADES);
-            for (Tag tag : upgradesTag) {
-                if (!(tag instanceof CompoundTag entry)) {
-                    continue;
-                }
-                int slot = entry.getIntOr(KEY_SLOT, -1);
-                if (slot < 0 || slot >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT) {
-                    continue;
-                }
-
-                ItemStack stack = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY);
-                upgrades[slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
-            }
-        }
-
-        NodeClipboardConfig config = new NodeClipboardConfig(channels, filters, upgrades, networkId, networkName);
-        if (root.contains(KEY_VISIBLE)) {
-            config.renderVisible = root.getBooleanOr(KEY_VISIBLE, config.renderVisible);
-        }
-        if (root.contains(KEY_NODE_LABEL)) {
-            config.nodeLabel = trim(root.getStringOr(KEY_NODE_LABEL, ""), 48);
-        }
+        config.sanitizeText();
         return config.isStructurallyValid() ? config : null;
+    }
+
+    private static boolean isUnsupportedVersion(CompoundTag root) {
+        return root.getInt(KEY_VERSION).filter(version -> version != LEGACY_VERSION && version != VERSION).isPresent();
+    }
+
+    private static boolean isOversized(CompoundTag root) {
+        return size(root, "channels") > LogisticsNodeEntity.CHANNEL_COUNT
+                || size(root, "filters") > LogisticsNodeEntity.CHANNEL_COUNT * ChannelData.FILTER_SIZE
+                || size(root, "upgrades") > LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
+    }
+
+    private static int size(CompoundTag root, String key) {
+        return root.get(key) instanceof CollectionTag list ? list.size() : 0;
+    }
+
+    private static DataResult<Integer> checkVersion(int version) {
+        return version == VERSION
+                ? DataResult.success(version)
+                : DataResult.error(() -> "Not a version " + VERSION + " clipboard");
+    }
+
+    private void sanitizeText() {
+        setNetworkTarget(networkId, networkName);
+        setNodeLabel(nodeLabel);
+        for (int channel = 0; channel < channels.length; channel++) {
+            setChannelName(channel, channels[channel].name);
+        }
+    }
+
+    private static ClipboardSnapshot legacySnapshot(List<Pair<Integer, ChannelState>> channels,
+            List<Pair<Integer, SlotStack>> filters, List<SlotStack> upgrades, Optional<UUID> networkId,
+            Optional<String> networkName, boolean renderVisible, String nodeLabel) {
+        List<ChannelState> states = new ArrayList<>(
+                Collections.nCopies(LogisticsNodeEntity.CHANNEL_COUNT, ChannelState.DEFAULT));
+        for (Pair<Integer, ChannelState> channel : channels) {
+            if (channel.getFirst() >= 0 && channel.getFirst() < states.size()) {
+                states.set(channel.getFirst(), channel.getSecond());
+            }
+        }
+        List<ClipboardSnapshot.FilterSlot> filterSlots = filters.stream()
+                .filter(filter -> !filter.getSecond().stack().isEmpty())
+                .map(filter -> new ClipboardSnapshot.FilterSlot(filter.getFirst(), filter.getSecond().slot(),
+                        StackSnapshot.of(filter.getSecond().stack())))
+                .toList();
+        List<ClipboardSnapshot.ItemSlot> upgradeSlots = upgrades.stream()
+                .filter(upgrade -> !upgrade.stack().isEmpty())
+                .map(upgrade -> new ClipboardSnapshot.ItemSlot(upgrade.slot(), StackSnapshot.of(upgrade.stack())))
+                .toList();
+        return new ClipboardSnapshot(states, filterSlots, upgradeSlots, networkId, networkName, renderVisible,
+                nodeLabel);
     }
 
     public PasteOutcome applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack) {
@@ -1194,8 +1111,8 @@ public final class NodeClipboardConfig {
 
             if (expected.isEmpty()) {
                 node.setUpgradeItem(slot, ItemStack.EMPTY);
-            } else if (!ItemStack.isSameItemSameComponents(expected, current)) {
-                node.setUpgradeItem(slot, expected.copyWithCount(1));
+            } else if (!ItemStack.isSameItem(expected, current)) {
+                node.setUpgradeItem(slot, new ItemStack(expected.getItem()));
             }
         }
 
@@ -1249,29 +1166,5 @@ public final class NodeClipboardConfig {
         config.filterMode = FilterMode.MATCH_ANY;
         config.priority = 0;
         return config;
-    }
-
-    private static <E extends Enum<E>> E parseEnum(String value, E[] values, E fallback) {
-        if (value == null || value.isBlank()) {
-            return fallback;
-        }
-        for (E candidate : values) {
-            if (candidate.name().equals(value)) {
-                return candidate;
-            }
-        }
-        return fallback;
-    }
-
-    @Nullable
-    private static UUID parseOptionalUuid(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(value);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
     }
 }

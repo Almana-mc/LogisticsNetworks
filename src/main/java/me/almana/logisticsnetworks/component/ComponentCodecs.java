@@ -106,8 +106,16 @@ public final class ComponentCodecs {
     }
 
     public static <E> Codec<List<E>> lenientList(Codec<E> element, int maxSize) {
+        return lenientList(element, maxSize, true);
+    }
+
+    public static <E> Codec<List<E>> quietLenientList(Codec<E> element, int maxSize) {
+        return lenientList(element, maxSize, false);
+    }
+
+    private static <E> Codec<List<E>> lenientList(Codec<E> element, int maxSize, boolean logErrors) {
         Codec<Optional<E>> optional = element.xmap(Optional::of, Optional::get);
-        return NeoForgeExtraCodecs.listWithoutEmpty(lenient(optional, Optional::empty).listOf(0, maxSize));
+        return NeoForgeExtraCodecs.listWithoutEmpty(lenient(optional, Optional::empty, logErrors).listOf(0, maxSize));
     }
 
     public static <A> Optional<A> parse(Codec<A> codec, HolderLookup.Provider provider, Tag tag) {

@@ -3,11 +3,13 @@ package me.almana.logisticsnetworks.component;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.data.RedstoneMode;
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.core.Direction;
 import net.minecraft.core.UUIDUtil;
 
@@ -28,9 +30,11 @@ public record ClipboardSnapshot(
     public static final MapCodec<ClipboardSnapshot> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             ChannelState.LIST_CODEC.lenientOptionalFieldOf("channels", List.of())
                     .forGetter(ClipboardSnapshot::channels),
-            ComponentCodecs.lenientList(FilterSlot.CODEC).lenientOptionalFieldOf("filters", List.of())
+            ComponentCodecs.quietLenientList(FilterSlot.CODEC, LogisticsNodeEntity.CHANNEL_COUNT * ChannelData.FILTER_SIZE)
+                    .lenientOptionalFieldOf("filters", List.of())
                     .forGetter(ClipboardSnapshot::filters),
-            ComponentCodecs.lenientList(ItemSlot.CODEC).lenientOptionalFieldOf("upgrades", List.of())
+            ComponentCodecs.quietLenientList(ItemSlot.CODEC, LogisticsNodeEntity.UPGRADE_SLOT_COUNT)
+                    .lenientOptionalFieldOf("upgrades", List.of())
                     .forGetter(ClipboardSnapshot::upgrades),
             UUIDUtil.CODEC.lenientOptionalFieldOf("network_id").forGetter(ClipboardSnapshot::networkId),
             Codec.STRING.lenientOptionalFieldOf("network_name").forGetter(ClipboardSnapshot::networkName),
@@ -87,7 +91,7 @@ public record ClipboardSnapshot(
         ).apply(instance, ChannelState::fromSerialized));
         public static final Codec<ChannelState> CODEC = MAP_CODEC.codec();
         public static final Codec<List<ChannelState>> LIST_CODEC =
-                ComponentCodecs.lenient(CODEC, () -> DEFAULT).listOf();
+                ComponentCodecs.quietLenient(CODEC, () -> DEFAULT).listOf(0, LogisticsNodeEntity.CHANNEL_COUNT);
 
         public ChannelState {
             mode = mode == null ? ChannelMode.IMPORT : mode;

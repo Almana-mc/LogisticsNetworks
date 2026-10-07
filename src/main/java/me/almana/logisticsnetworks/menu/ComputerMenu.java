@@ -171,6 +171,7 @@ public class ComputerMenu extends AbstractContainerMenu {
         if (!hasWrench() || config == null) {
             return false;
         }
+        ClipboardMenu.normalize(config);
         WrenchItem.setClipboard(wrenchStack, config, provider);
         wrenchContainer.setChanged();
         broadcastChanges();

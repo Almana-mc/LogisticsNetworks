@@ -110,10 +110,7 @@ public final class BuildingGadgetsCompat {
     private static NodeClipboardConfig loadSanitized(CompoundTag config, HolderLookup.Provider registries) {
         NodeClipboardConfig clipboard = NodeClipboardConfig.load(config, registries);
         if (clipboard == null || !clipboard.isStructurallyValid()) return null;
-        // Strip untrusted upgrade components
-        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
-            clipboard.setUpgradeItem(slot, new ItemStack(clipboard.getUpgradeItem(slot).getItem()));
-        }
+        clipboard.stripUpgradeComponents();
         return clipboard;
     }
 

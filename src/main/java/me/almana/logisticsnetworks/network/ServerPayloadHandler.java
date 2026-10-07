@@ -1464,6 +1464,7 @@ public class ServerPayloadHandler {
                 player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.invalid_clipboard"), true);
                 return;
             }
+            config.stripUpgradeComponents();
 
             if (player.containerMenu instanceof ClipboardMenu clipboardMenu) {
                 if (!clipboardMenu.replaceClipboard(config, player)) {
