@@ -1,4 +1,4 @@
-// 26.1.2	2026-07-12T19:05:34.6941337	Model Definitions - logisticsnetworks
+// 26.1.2	2026-10-07T19:17:40.4441173	Model Definitions - logisticsnetworks
 eb50e3d26484cda57c437234b2762adcc5f987bb assets/logisticsnetworks/blockstates/computer.json
 bd8c48229778b02e30f83662cd8686414d0072ec assets/logisticsnetworks/items/ars_source_upgrade.json
 31de821618fb4abd9bb507e5c1a2dec00a09b697 assets/logisticsnetworks/items/big_filter.json
@@ -29,4 +29,4 @@ a0eb26d06b21370c53e56a20555860b6ee1d7d04 assets/logisticsnetworks/models/item/na
 48d5b053c70fe6537568a42905da78eb139e8b40 assets/logisticsnetworks/models/item/netherite_upgrade.json
 e2f807769ae742e6f712d0631689301e26645d84 assets/logisticsnetworks/models/item/pattern_setter.json
 09b711a1d6770b344df74c3bb106634b2c89515a assets/logisticsnetworks/models/item/small_filter.json
-49ff061ed1cb1d2d07453274861970830ff1e36c assets/logisticsnetworks/models/item/wrench.json
+420766ef059a0b0b21730f7812c6d2c26052f692 assets/logisticsnetworks/models/item/wrench.json

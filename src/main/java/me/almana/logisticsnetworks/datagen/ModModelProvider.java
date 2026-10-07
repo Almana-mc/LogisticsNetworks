@@ -43,11 +43,12 @@ public class ModModelProvider extends ModelProvider {
             itemModels.generateFlatItem(item, ModelTemplates.FLAT_ITEM);
         }
 
-        Identifier wrenchModel = ModelTemplates.TWO_LAYERED_ITEM.create(
+        Identifier wrenchModel = ModelTemplates.THREE_LAYERED_ITEM.create(
                 ModelLocationUtils.getModelLocation(Registration.WRENCH.get()),
                 TextureMapping.layered(
                         new Material(Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "item/wrench_case")),
-                        new Material(Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "item/wrench_screen"))),
+                        new Material(Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "item/wrench_screen")),
+                        new Material(Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "item/wrench_base"))),
                 itemModels.modelOutput);
         itemModels.itemModelOutput.accept(Registration.WRENCH.get(),
                 ItemModelUtils.tintedModel(wrenchModel,
