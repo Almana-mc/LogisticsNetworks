@@ -139,23 +139,6 @@ public final class ModFilterData {
         return checkModMatch(view.namespaces(), Identifier.tryParse(chemicalId));
     }
 
-    public static boolean addModFilter(ItemStack stack, String rawModId) {
-        if (!isModFilter(stack))
-            return false;
-        String modId = normalizeModId(rawModId);
-        if (modId == null)
-            return false;
-
-        LegacyComponentMigration.migrateModFilter(stack);
-        List<String> mods = new ArrayList<>(getModFilters(stack));
-        if (mods.contains(modId)) {
-            return false;
-        }
-        mods.add(modId);
-        stack.set(LogisticsDataComponents.MOD_FILTER, new ModFilterConfig(mods));
-        return true;
-    }
-
     public static boolean setSingleModFilter(ItemStack stack, String rawModId) {
         if (!isModFilter(stack))
             return false;

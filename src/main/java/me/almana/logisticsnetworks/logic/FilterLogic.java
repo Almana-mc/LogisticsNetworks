@@ -13,11 +13,6 @@ public final class FilterLogic {
     private FilterLogic() {
     }
 
-    public static boolean matchesItem(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt) {
-        return matchesItem(filters, filterMode, candidate, provider, candidateNbt, null);
-    }
-
     public static boolean matchesItemInSlot(ItemStack[] filters, FilterMode filterMode, ItemStack candidate,
             HolderLookup.Provider provider, @Nullable CompoundTag candidateNbt,
             @Nullable FilterItemData.ReadCache filterReadCache, int inventorySlot) {
@@ -158,11 +153,6 @@ public final class FilterLogic {
             return true;
 
         return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
-    }
-
-    public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
-            HolderLookup.Provider provider) {
-        return matchesFluid(filters, filterMode, candidate, provider, null);
     }
 
     public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
