@@ -83,11 +83,13 @@ import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.datagen.ModDataGenerators;
+import me.almana.logisticsnetworks.integration.computercraft.ComputerPeripheral;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
@@ -107,6 +109,9 @@ public class LogisticsNetworks {
                 modBus.addListener(ModDataGenerators::gatherServer);
                 modBus.addListener(this::registerPayloads);
                 modBus.addListener(this::commonSetup);
+                if (ModList.get().isLoaded("computercraft")) {
+                        modBus.addListener(ComputerPeripheral::register);
+                }
                 if (FMLEnvironment.getDist() == Dist.CLIENT) {
                         modBus.addListener(LogisticsClientEvents::registerRenderers);
                         modBus.addListener(LogisticsClientEvents::registerScreens);

@@ -1167,28 +1167,31 @@ public class ServerPayloadHandler {
                 return;
             }
 
-            List<SyncNetworkNodesPayload.NodeInfo> nodeInfos = new ArrayList<>();
-            for (UUID nodeId : network.getNodeUuids()) {
-                for (ServerLevel level : player.level().getServer().getAllLevels()) {
-                    Entity entity = level.getEntity(nodeId);
-                    if (entity instanceof LogisticsNodeEntity node) {
-                        BlockPos attachedPos = node.getAttachedPos();
-                        String blockName = "unknown";
-                        if (level.isLoaded(attachedPos)) {
-                            BlockState state = level.getBlockState(attachedPos);
-                            blockName = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-                        }
-                        nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
-                                nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
-                                level.dimension().identifier(), node.isRenderVisible(), node.isHighlighted()));
-                        break;
+            PacketDistributor.sendToPlayer(player,
+                    new SyncNetworkNodesPayload(payload.networkId(), nodeInfos(network, player.level().getServer())));
+        });
+    }
+
+    public static List<SyncNetworkNodesPayload.NodeInfo> nodeInfos(LogisticsNetwork network, MinecraftServer server) {
+        List<SyncNetworkNodesPayload.NodeInfo> nodeInfos = new ArrayList<>();
+        for (UUID nodeId : network.getNodeUuids()) {
+            for (ServerLevel level : server.getAllLevels()) {
+                Entity entity = level.getEntity(nodeId);
+                if (entity instanceof LogisticsNodeEntity node) {
+                    BlockPos attachedPos = node.getAttachedPos();
+                    String blockName = "unknown";
+                    if (level.isLoaded(attachedPos)) {
+                        BlockState state = level.getBlockState(attachedPos);
+                        blockName = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                     }
+                    nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
+                            nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
+                            level.dimension().identifier(), node.isRenderVisible(), node.isHighlighted()));
+                    break;
                 }
             }
-
-            PacketDistributor.sendToPlayer(player,
-                    new SyncNetworkNodesPayload(payload.networkId(), nodeInfos));
-        });
+        }
+        return nodeInfos;
     }
 
     public static void handleRequestNetworkExport(RequestNetworkExportPayload payload, IPayloadContext context) {
@@ -1513,39 +1516,46 @@ public class ServerPayloadHandler {
             if (network == null || !canAccessNetwork(player, network))
                 return;
 
-            int[] nodeCounts = new int[LogisticsNodeEntity.CHANNEL_COUNT];
-            int[] typeOrdinals = new int[LogisticsNodeEntity.CHANNEL_COUNT];
-            boolean[] found = new boolean[LogisticsNodeEntity.CHANNEL_COUNT];
-
-            for (UUID nodeId : network.getNodeUuids()) {
-                LogisticsNodeEntity node = findNode(player, nodeId);
-                if (node == null) continue;
-
-                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                    ChannelData channel = node.getChannel(i);
-                    if (channel == null) continue;
-                    if (channel.isEnabled()) {
-                        nodeCounts[i]++;
-                        if (!found[i]) {
-                            typeOrdinals[i] = channel.getType().ordinal();
-                            found[i] = true;
-                        }
-                    }
-                }
-            }
-
-            List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
             List<String> channelNames = new ArrayList<>(LogisticsNodeEntity.CHANNEL_COUNT);
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 channelNames.add(network.getChannelName(i));
-                if (nodeCounts[i] > 0) {
-                    entries.add(new SyncChannelListPayload.ChannelEntry(i, typeOrdinals[i], nodeCounts[i]));
-                }
             }
 
-            PacketDistributor.sendToPlayer(player,
-                    new SyncChannelListPayload(payload.networkId(), entries, channelNames));
+            PacketDistributor.sendToPlayer(player, new SyncChannelListPayload(payload.networkId(),
+                    channelEntries(network, player.level().getServer()), channelNames));
         });
+    }
+
+    public static List<SyncChannelListPayload.ChannelEntry> channelEntries(LogisticsNetwork network,
+            MinecraftServer server) {
+        int[] nodeCounts = new int[LogisticsNodeEntity.CHANNEL_COUNT];
+        int[] typeOrdinals = new int[LogisticsNodeEntity.CHANNEL_COUNT];
+        boolean[] found = new boolean[LogisticsNodeEntity.CHANNEL_COUNT];
+
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(server, nodeId);
+            if (node == null) continue;
+
+            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                ChannelData channel = node.getChannel(i);
+                if (channel == null) continue;
+                if (channel.isEnabled()) {
+                    nodeCounts[i]++;
+                    if (!found[i]) {
+                        typeOrdinals[i] = channel.getType().ordinal();
+                        found[i] = true;
+                    }
+                }
+            }
+        }
+
+        List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
+        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+            if (nodeCounts[i] > 0) {
+                entries.add(new SyncChannelListPayload.ChannelEntry(i, typeOrdinals[i], nodeCounts[i]));
+            }
+        }
+        return entries;
     }
 
     private static boolean canAccessNetwork(ServerPlayer player, LogisticsNetwork network) {
@@ -1553,7 +1563,11 @@ public class ServerPayloadHandler {
     }
 
     private static LogisticsNodeEntity findNode(ServerPlayer player, UUID nodeId) {
-        for (ServerLevel level : player.level().getServer().getAllLevels()) {
+        return findNode(player.level().getServer(), nodeId);
+    }
+
+    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
+        for (ServerLevel level : server.getAllLevels()) {
             Entity entity = level.getEntity(nodeId);
             if (entity instanceof LogisticsNodeEntity node) {
                 return node;
