@@ -83,6 +83,7 @@ import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
+import me.almana.logisticsnetworks.network.UpdateServerRackPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.datagen.ModDataGenerators;
 import me.almana.logisticsnetworks.integration.computercraft.ComputerPeripheral;
@@ -281,6 +282,8 @@ public class LogisticsNetworks {
                 registrar.playToServer(ToggleComputerPinnedNetworkPayload.TYPE,
                                 ToggleComputerPinnedNetworkPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleToggleComputerPinnedNetwork);
+                registrar.playToServer(UpdateServerRackPayload.TYPE, UpdateServerRackPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleUpdateServerRack);
                 registrar.playToServer(RequestNetworkExportPayload.TYPE,
                                 RequestNetworkExportPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleRequestNetworkExport);

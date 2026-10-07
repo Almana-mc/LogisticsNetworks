@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.block.ServerRackBlock;
+import me.almana.logisticsnetworks.block.ServerRackBlockEntity;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
 import me.almana.logisticsnetworks.item.NetworkUpgradeItem;
@@ -24,6 +25,7 @@ import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
+import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.GuideRecipe;
 import net.minecraft.core.registries.Registries;
@@ -51,6 +53,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
+import java.util.Set;
 import java.util.function.Supplier;
 
 public class Registration {
@@ -91,6 +94,9 @@ public class Registration {
                         id -> new ServerRackBlock(computerBlockProperties(id)));
         public static final DeferredItem<BlockItem> SERVER_RACK_ITEM = ITEMS.register("server_rack",
                         id -> new BlockItem(SERVER_RACK_BLOCK.get(), blockItemProperties(id)));
+        public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ServerRackBlockEntity>> SERVER_RACK_BLOCK_ENTITY = BLOCK_ENTITY_TYPES
+                        .register("server_rack", () -> new BlockEntityType<>(ServerRackBlockEntity::new,
+                                        Set.of(SERVER_RACK_BLOCK.get())));
 
         public static final DeferredItem<WrenchItem> WRENCH = ITEMS.register("wrench",
                         id -> new WrenchItem(itemProperties(id).stacksTo(1)));
@@ -161,6 +167,9 @@ public class Registration {
         public static final DeferredHolder<MenuType<?>, MenuType<ComputerMenu>> COMPUTER_MENU = MENUS.register(
                         "computer_menu",
                         () -> IMenuTypeExtension.create(ComputerMenu::new));
+        public static final DeferredHolder<MenuType<?>, MenuType<ServerRackMenu>> SERVER_RACK_MENU = MENUS.register(
+                        "server_rack_menu",
+                        () -> IMenuTypeExtension.create(ServerRackMenu::new));
 
         public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
