@@ -1,11 +1,11 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
-import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -14,54 +14,51 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 public class TelemetryManager {
 
-    public static final int HISTORY_SIZE = 120;
+    static final int TOP_RESOURCES = 16;
     private static final int SYNC_INTERVAL = 20;
 
-    record ViewerTarget(UUID networkId, int channelIndex) {}
-    record WatchKey(UUID networkId, int channelIndex) {}
-
-    private final Map<ServerPlayer, ViewerTarget> viewerTargets = new HashMap<>();
-    private final Set<UUID> activeNetworks = new HashSet<>();
-    private final Map<WatchKey, long[]> histories = new HashMap<>();
-    private final Map<WatchKey, Integer> historyIndices = new HashMap<>();
-    private final Map<UUID, int[]> channelTypeOrdinals = new HashMap<>();
-    private int tickCounter;
-
-    public void subscribe(UUID networkId, int channelIndex,
-            ServerPlayer player, NetworkRegistry registry, MinecraftServer server) {
-        unsubscribe(player);
-
-        ViewerTarget target = new ViewerTarget(networkId, channelIndex);
-        viewerTargets.put(player, target);
-        rebuildActiveNetworks();
-
-        WatchKey key = new WatchKey(networkId, channelIndex);
-        histories.computeIfAbsent(key, k -> new long[HISTORY_SIZE]);
-        historyIndices.putIfAbsent(key, 0);
-
-        drainNetwork(networkId, registry, server);
-        sendToPlayer(player, target);
-    }
-
-    public void unsubscribe(ServerPlayer player) {
-        ViewerTarget old = viewerTargets.remove(player);
-        if (old != null) {
-            rebuildActiveNetworks();
-            cleanupUnwatchedHistories();
+    record ChannelDrain(int typeOrdinal, long total, List<Map.Entry<FlowResource, Long>> top) {
+        static ChannelDrain of(int typeOrdinal, long total, Map<FlowResource, Long> resources) {
+            return new ChannelDrain(typeOrdinal, total, resources.entrySet().stream()
+                    .sorted(Map.Entry.<FlowResource, Long>comparingByValue().reversed())
+                    .limit(TOP_RESOURCES)
+                    .toList());
         }
     }
 
-    public void unsubscribeAll(ServerPlayer player) {
-        unsubscribe(player);
+    private record Viewer(UUID networkId, TelemetryDictionary dictionary) {
+    }
+
+    private final Map<ServerPlayer, Viewer> viewers = new HashMap<>();
+    private final Set<UUID> activeNetworks = new HashSet<>();
+    private int tickCounter;
+
+    public void subscribe(UUID networkId, ServerPlayer player, NetworkRegistry registry, MinecraftServer server) {
+        boolean wasActive = activeNetworks.contains(networkId);
+        viewers.put(player, new Viewer(networkId, new TelemetryDictionary()));
+        rebuildActiveNetworks();
+        LogisticsNetwork network = registry.getNetwork(networkId);
+        if (!wasActive && network != null) {
+            // Discard flow from before viewing
+            drainNetwork(network, server);
+        }
+    }
+
+    public void unsubscribe(ServerPlayer player) {
+        if (viewers.remove(player) != null) {
+            rebuildActiveNetworks();
+        }
     }
 
     public boolean isActive(UUID networkId) {
@@ -69,102 +66,63 @@ public class TelemetryManager {
     }
 
     public void tick(NetworkRegistry registry, MinecraftServer server) {
-        if (viewerTargets.isEmpty()) return;
-
-        int sizeBefore = viewerTargets.size();
-        viewerTargets.keySet().removeIf(p -> p.isRemoved() || !(p.containerMenu instanceof ComputerMenu));
-        if (viewerTargets.isEmpty()) {
-            activeNetworks.clear();
-            histories.clear();
-            historyIndices.clear();
-            channelTypeOrdinals.clear();
-            return;
+        if (viewers.isEmpty()) return;
+        if (viewers.keySet().removeIf(p -> p.isRemoved() || !(p.containerMenu instanceof ComputerMenu))) {
+            rebuildActiveNetworks();
         }
-        rebuildActiveNetworks();
-        if (viewerTargets.size() < sizeBefore) {
-            cleanupUnwatchedHistories();
-        }
-
-        tickCounter++;
-        if (tickCounter < SYNC_INTERVAL) return;
+        if (++tickCounter < SYNC_INTERVAL) return;
         tickCounter = 0;
 
+        Map<UUID, List<ChannelDrain>> drained = new HashMap<>();
         for (UUID networkId : activeNetworks) {
-            drainNetwork(networkId, registry, server);
+            LogisticsNetwork network = registry.getNetwork(networkId);
+            if (network != null) {
+                drained.put(networkId, drainNetwork(network, server));
+            }
         }
-
-        for (Map.Entry<ServerPlayer, ViewerTarget> entry : viewerTargets.entrySet()) {
-            sendToPlayer(entry.getKey(), entry.getValue());
-        }
+        viewers.forEach((player, viewer) -> {
+            List<ChannelDrain> channels = drained.get(viewer.networkId());
+            if (channels != null) {
+                PacketDistributor.sendToPlayer(player, viewer.dictionary().encode(viewer.networkId(), channels));
+            }
+        });
     }
 
-    private void drainNetwork(UUID networkId, NetworkRegistry registry, MinecraftServer server) {
-        LogisticsNetwork network = registry.getNetwork(networkId);
-        if (network == null) return;
-
-        long[] aggregated = new long[LogisticsNodeEntity.CHANNEL_COUNT];
-        int[] typeOrdinals = new int[LogisticsNodeEntity.CHANNEL_COUNT];
-        Arrays.fill(typeOrdinals, -1);
+    private static List<ChannelDrain> drainNetwork(LogisticsNetwork network, MinecraftServer server) {
+        int count = LogisticsNodeEntity.CHANNEL_COUNT;
+        long[] totals = new long[count];
+        int[] types = new int[count];
+        Arrays.fill(types, -1);
+        List<Map<FlowResource, Long>> resources = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            resources.add(new HashMap<>());
+        }
 
         for (UUID nodeId : network.getNodeUuids()) {
             LogisticsNodeEntity node = findNode(server, nodeId, network.getNodeDimension(nodeId));
             if (node == null) continue;
-
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+            for (int i = 0; i < count; i++) {
                 ChannelData channel = node.getChannel(i);
-                aggregated[i] += channel.getTelemetry().drainFlow();
-                if (typeOrdinals[i] < 0 && channel.isEnabled()) {
-                    typeOrdinals[i] = channel.getType().ordinal();
+                totals[i] += channel.getTelemetry().drainFlow();
+                channel.getTelemetry().drainResources(resources.get(i));
+                if (types[i] < 0 && channel.isEnabled()) {
+                    types[i] = channel.getType().ordinal();
                 }
             }
         }
 
-        channelTypeOrdinals.put(networkId, typeOrdinals);
-
-        for (int i = 0; i < aggregated.length; i++) {
-            WatchKey key = new WatchKey(networkId, i);
-            long[] history = histories.get(key);
-            if (history != null) {
-                int idx = historyIndices.getOrDefault(key, 0);
-                history[idx] = aggregated[i];
-                historyIndices.put(key, (idx + 1) % HISTORY_SIZE);
-            }
+        List<ChannelDrain> channels = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            channels.add(ChannelDrain.of(types[i], totals[i], resources.get(i)));
         }
-    }
-
-    private void sendToPlayer(ServerPlayer player, ViewerTarget target) {
-        WatchKey key = new WatchKey(target.networkId(), target.channelIndex());
-        long[] history = histories.get(key);
-        if (history == null) return;
-
-        int typeOrdinal = channelType(target.networkId(), target.channelIndex());
-        PacketDistributor.sendToPlayer(player, new SyncTelemetryPayload(
-                target.networkId(), target.channelIndex(),
-                typeOrdinal, history.clone(), historyIndices.getOrDefault(key, 0)));
-    }
-
-    private int channelType(UUID networkId, int channelIndex) {
-        int[] types = channelTypeOrdinals.get(networkId);
-        if (types == null) return 0;
-        int ordinal = types[channelIndex];
-        return ordinal < 0 ? 0 : ordinal;
+        return channels;
     }
 
     private void rebuildActiveNetworks() {
         activeNetworks.clear();
-        for (ViewerTarget target : viewerTargets.values()) {
-            activeNetworks.add(target.networkId());
+        for (Viewer viewer : viewers.values()) {
+            activeNetworks.add(viewer.networkId());
         }
-    }
-
-    private void cleanupUnwatchedHistories() {
-        Set<WatchKey> watched = new HashSet<>();
-        for (ViewerTarget target : viewerTargets.values()) {
-            watched.add(new WatchKey(target.networkId(), target.channelIndex()));
-        }
-        histories.keySet().retainAll(watched);
-        historyIndices.keySet().retainAll(watched);
-        channelTypeOrdinals.keySet().retainAll(activeNetworks);
     }
 
     private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,

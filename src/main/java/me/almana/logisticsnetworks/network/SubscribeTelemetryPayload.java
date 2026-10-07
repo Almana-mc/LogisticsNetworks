@@ -8,8 +8,7 @@ import net.minecraft.resources.Identifier;
 
 import java.util.UUID;
 
-public record SubscribeTelemetryPayload(UUID networkId, boolean subscribe,
-        int channelIndex) implements CustomPacketPayload {
+public record SubscribeTelemetryPayload(UUID networkId, boolean subscribe) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SubscribeTelemetryPayload> TYPE = new CustomPacketPayload.Type<>(
             Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "subscribe_telemetry"));
@@ -18,13 +17,12 @@ public record SubscribeTelemetryPayload(UUID networkId, boolean subscribe,
             .of(SubscribeTelemetryPayload::write, SubscribeTelemetryPayload::read);
 
     public static SubscribeTelemetryPayload read(FriendlyByteBuf buf) {
-        return new SubscribeTelemetryPayload(buf.readUUID(), buf.readBoolean(), buf.readVarInt());
+        return new SubscribeTelemetryPayload(buf.readUUID(), buf.readBoolean());
     }
 
     public static void write(FriendlyByteBuf buf, SubscribeTelemetryPayload payload) {
         buf.writeUUID(payload.networkId);
         buf.writeBoolean(payload.subscribe);
-        buf.writeVarInt(payload.channelIndex);
     }
 
     @Override

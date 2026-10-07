@@ -222,6 +222,33 @@ public final class ThemePaint {
         graphics.drawString(font, label, x + 10, y + (height - 7) / 2, fg, false);
     }
 
+    public static void segmented(GuiGraphics graphics, Font font, int x, int y, int height, String[] labels,
+            int activeIdx, Theme theme) {
+        int[] widths = new int[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            widths[i] = font.width(labels[i]) + 10;
+        }
+        int totalWidth = segmentedWidth(font, labels);
+        roundRect(graphics, x, y, totalWidth, height, 2, theme.surfaceSunken(), theme.sharpCorners());
+        roundOutline(graphics, x, y, totalWidth, height, 2, theme.border(), theme.sharpCorners());
+        int cx = x + 2;
+        for (int i = 0; i < labels.length; i++) {
+            int fg = theme.textMuted();
+            if (i == activeIdx) {
+                roundRect(graphics, cx, y + 1, widths[i], height - 2, 2, theme.surface(), theme.sharpCorners());
+                fg = theme.text();
+            }
+            drawCentered(graphics, font, labels[i], cx + widths[i] / 2, y + (height - 7) / 2, fg);
+            cx += widths[i];
+        }
+    }
+
+    public static int segmentedWidth(Font font, String[] labels) {
+        int totalWidth = 4;
+        for (String label : labels) totalWidth += font.width(label) + 10;
+        return totalWidth;
+    }
+
     public static void modalVeil(GuiGraphics graphics, int x, int y, int width, int height, Theme theme) {
         int base = theme.bg() & 0x00FFFFFF;
         graphics.fill(x, y, x + width, y + height, 0xC0000000 | base);

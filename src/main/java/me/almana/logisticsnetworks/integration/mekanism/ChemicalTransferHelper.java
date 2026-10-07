@@ -11,6 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.ObjLongConsumer;
 
 public final class ChemicalTransferHelper {
 
@@ -134,7 +135,7 @@ public final class ChemicalTransferHelper {
     public static long transferBetween(ServerLevel sourceLevel, BlockPos sourcePos, @Nullable Direction sourceSide,
             ServerLevel targetLevel, BlockPos targetPos, @Nullable Direction targetSide, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
-            ItemStack[] importFilters, FilterMode importFilterMode) {
+            ItemStack[] importFilters, FilterMode importFilterMode, @Nullable ObjLongConsumer<String> onMoved) {
         // Enable when 26.1.2 is supported.
         /*
         IChemicalHandler source = getHandler(sourceLevel, sourcePos, sourceSide);
@@ -153,7 +154,7 @@ public final class ChemicalTransferHelper {
             LOGGER.debug("[Chemical] Transferring {} -> {}, limit={}, srcTanks={}, tgtTanks={}",
                     sourcePos, targetPos, limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
-                importFilters, importFilterMode);
+                importFilters, importFilterMode, onMoved);
         */
         return 0;
     }
@@ -241,7 +242,7 @@ public final class ChemicalTransferHelper {
 
     private static long executeChemicalMove(IChemicalHandler source, IChemicalHandler target, long limitAmount,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
-            ItemStack[] importFilters, FilterMode importFilterMode) {
+            ItemStack[] importFilters, FilterMode importFilterMode, @Nullable ObjLongConsumer<String> onMoved) {
         long remaining = limitAmount;
 
         for (int tank = 0; tank < source.getChemicalTanks(); tank++) {
@@ -299,6 +300,9 @@ public final class ChemicalTransferHelper {
 
             if (moved > 0) {
                 remaining -= moved;
+                if (onMoved != null && chemId != null) {
+                    onMoved.accept(chemId, moved);
+                }
                 if (Config.debugMode)
                     LOGGER.debug("[Chemical] Moved {} from tank {}", moved, tank);
             }

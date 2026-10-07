@@ -87,7 +87,7 @@ public class ClientPayloadHandler {
         context.enqueueWork(() -> {
             var screen = Minecraft.getInstance().screen;
             if (screen instanceof ComputerScreen computerScreen) {
-                computerScreen.receiveChannelList(payload.networkId(), payload.channels());
+                computerScreen.receiveChannelList(payload);
             } else if (screen instanceof ClipboardScreen clipboardScreen) {
                 clipboardScreen.receiveChannelList(payload.networkId(), payload.channelNames());
             }

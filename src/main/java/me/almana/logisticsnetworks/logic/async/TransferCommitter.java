@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
+import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -126,7 +127,7 @@ public final class TransferCommitter {
 
         int batch = batchLimit(channel, tier);
         CommittedItems progress = commitMoves(
-                plan, source, channel, level, targets, batch, network, generation);
+                plan, source, channel, level, targets, batch, network, generation, telemetry);
         int committed = progress.amount();
         UUID servedNode = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
                 && progress.servedTarget() >= 0 ? plan.targets().get(progress.servedTarget()).nodeId() : null;
@@ -155,7 +156,7 @@ public final class TransferCommitter {
 
     private static CommittedItems commitMoves(TransferPlan.ChannelMoves plan,
             ResourceHandler<ItemResource> source, ChannelData channel, ServerLevel level,
-            ResolvedTarget[] targets, int batch, LogisticsNetwork network, long generation) {
+            ResolvedTarget[] targets, int batch, LogisticsNetwork network, long generation, boolean telemetry) {
         int committed = 0;
         Map<Item, Integer> movedByItem = new HashMap<>();
         Map<UUID, Map<Item, Integer>> movedByTarget = new HashMap<>();
@@ -181,6 +182,9 @@ public final class TransferCommitter {
                     ? ItemResourceOrder.after(source, intent.resource()) : null;
             int moved = TransferEngine.commitSingleMove(source, resolved.target(), validated);
             if (moved == 0) continue;
+            if (telemetry) {
+                channel.getTelemetry().recordResource(new FlowResource.Item(intent.resource().toStack(1)), moved);
+            }
             if (nextCursor != null) cursor = nextCursor;
             servedTarget = intent.targetIndex();
             movedResource = intent.resource();
@@ -221,9 +225,12 @@ public final class TransferCommitter {
         TransferEngine.MoveRecorder served = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
                 ? (slot, index, moved, mask) -> TransferEngine.markServed(channel, targets.refs().get(index))
                 : null;
+        boolean telemetry = NetworkRegistry.get(server.overworld()).getTelemetryManager().isActive(network.getId());
+        TransferEngine.MoveRecorder recorder = telemetry
+                ? TransferEngine.withTelemetry(served, channel.getTelemetry()) : served;
         return TransferEngine.executeItemOperation(source, targets.targets(), limit, channel.getFilterItems(),
                 channel.getFilterMode(), null, ((ServerLevel) node.level()).registryAccess(),
-                channel.getDistributionMode(), cache, served,
+                channel.getDistributionMode(), cache, recorder,
                 movedByItem, targetBatches, () -> network.getGeneration() == generation,
                 channel.canRotateResources(), channel.getItemResourceCursor(), requiredResource);
     }
