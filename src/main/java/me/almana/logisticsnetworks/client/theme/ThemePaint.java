@@ -1,11 +1,17 @@
 package me.almana.logisticsnetworks.client.theme;
 
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.data.ChannelType;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 public final class ThemePaint {
+
+    private static final Identifier LABEL_DELETE_ICON = Identifier.fromNamespaceAndPath(
+            LogisticsNetworks.MOD_ID, "textures/gui/label_delete.png");
 
     public static void drawCentered(GuiGraphics graphics, Font font, String text, int centerX, int y, int color) {
         int width = font.width(text);
@@ -186,6 +192,11 @@ public final class ThemePaint {
         roundRect(graphics, x, y, width, height, 2, bg, theme.sharpCorners());
         roundOutline(graphics, x, y, width, height, 2, border, theme.sharpCorners());
         drawCentered(graphics, font, label, x + width / 2, y + (height - 7) / 2, fg);
+    }
+
+    public static void labelDeleteIcon(GuiGraphics g, int x, int y, boolean hovered, Theme t) {
+        int color = (hovered ? t.danger() : t.textMuted()) | 0xFF000000;
+        g.raw().blit(RenderPipelines.GUI_TEXTURED, LABEL_DELETE_ICON, x, y, 0, 0, 8, 8, 512, 512, 512, 512, color);
     }
 
     public static void ghostButton(GuiGraphics graphics, Font font, int x, int y, int width, int height,

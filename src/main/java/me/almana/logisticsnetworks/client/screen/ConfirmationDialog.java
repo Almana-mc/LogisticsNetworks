@@ -45,6 +45,17 @@ final class ConfirmationDialog {
                 Component.translatable("gui.logisticsnetworks.node.network_create"), create, close);
     }
 
+    static ConfirmationDialog labelDeletion(Font font, int width, int height, String label, int nodeCount,
+                                            Runnable delete, Runnable close) {
+        if (nodeCount == 0) {
+            delete.run();
+            return null;
+        }
+        return new ConfirmationDialog(font, width, height,
+                Component.translatable("gui.logisticsnetworks.node.label.confirm_delete", label, nodeCount),
+                Component.translatable("gui.logisticsnetworks.node.label.delete"), delete, close);
+    }
+
     void render(GuiGraphics graphics, int mouseX, int mouseY, Theme theme) {
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 450);

@@ -48,7 +48,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1405,23 +1405,44 @@ public class ServerPayloadHandler {
             if (network == null || !canAccessNetwork(player, network))
                 return;
 
-            Set<String> labels = new LinkedHashSet<>(network.getLabelNames());
-            for (UUID nodeId : network.getNodeUuids()) {
-                for (ServerLevel level : player.level().getServer().getAllLevels()) {
-                    Entity entity = level.getEntity(nodeId);
-                    if (entity instanceof LogisticsNodeEntity node) {
-                        String label = node.getNodeLabel();
-                        if (!label.isEmpty()) {
-                            labels.add(label);
-                        }
-                        break;
-                    }
-                }
-            }
-
-            PacketDistributor.sendToPlayer(player,
-                    new SyncNetworkLabelsPayload(new ArrayList<>(labels)));
+            sendNetworkLabels(player, network);
         });
+    }
+
+    public static void handleDeleteNetworkLabel(DeleteNetworkLabelPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network))
+                return;
+
+            String label = payload.label();
+            List<LogisticsNodeEntity> nodes = network.getNodeUuids().stream()
+                    .map(id -> findNode(player, id))
+                    .filter(node -> node != null && label.equals(node.getNodeLabel()))
+                    .toList();
+            if (nodes.isEmpty()
+                    || LabelUpgradeSync.synchronizeLabels(player, network, nodes, player.getUUID(), "", null)) {
+                network.removeLabel(label);
+                registry.setDirty();
+            }
+            sendNetworkLabels(player, network);
+        });
+    }
+
+    private static void sendNetworkLabels(ServerPlayer player, LogisticsNetwork network) {
+        Map<String, Integer> labels = new LinkedHashMap<>();
+        network.getLabelNames().forEach(label -> labels.put(label, 0));
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(player, nodeId);
+            if (node != null && !node.getNodeLabel().isEmpty()) {
+                labels.merge(node.getNodeLabel(), 1, Integer::sum);
+            }
+        }
+        PacketDistributor.sendToPlayer(player, new SyncNetworkLabelsPayload(labels));
     }
 
     public static void propagateToLabelGroup(LogisticsNodeEntity sourceNode, int channelIndex) {
