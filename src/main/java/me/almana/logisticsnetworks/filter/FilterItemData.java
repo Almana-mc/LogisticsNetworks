@@ -63,6 +63,11 @@ public final class FilterItemData {
     private static final String KEY_RULE_O = "o";
     private static final String KEY_RULE_V = "v";
     private static final int MAX_NBT_RULES_PER_SLOT = 8;
+    private static final int MAX_NBT_PATH_LENGTH = 512;
+    private static final int MAX_NBT_VALUE_LENGTH = 1024;
+    // Bounds nbt rule sizes
+    private static final int MAX_NBT_VALUE_BYTES = 2048;
+    private static final int MAX_NBT_RAW_LENGTH = 4096;
     private static final String NBT_OP_EQUALS = "=";
 
     public static final class ReadCache {
@@ -88,7 +93,7 @@ public final class FilterItemData {
             @Nullable FluidStack fluidEntry,
             int batch,
             int stock,
-            @Nullable String nbtPath,
+            @Nullable NbtPath nbtPath,
             @Nullable Tag nbtValue,
             @Nullable String nbtOp,
             @Nullable CompoundTag rawNbt,
@@ -119,7 +124,7 @@ public final class FilterItemData {
             ItemFilterSlot[] entriesBySlot) {
     }
 
-    public record SlotNbtRule(String path, String operator, Tag value) {
+    public record SlotNbtRule(NbtPath path, String operator, Tag value) {
         public String displayText() {
             String val = value != null ? value.toString() : "";
             return path + " " + operator + " " + val;
@@ -933,11 +938,11 @@ public final class FilterItemData {
         return null;
     }
 
-    public static void setEntryNbt(ItemStack stack, int slot, @Nullable String path, @Nullable Tag value) {
+    public static void setEntryNbt(ItemStack stack, int slot, @Nullable NbtPath path, @Nullable Tag value) {
         setEntryNbt(stack, slot, path, value, NBT_OP_EQUALS);
     }
 
-    public static void setEntryNbt(ItemStack stack, int slot, @Nullable String path, @Nullable Tag value,
+    public static void setEntryNbt(ItemStack stack, int slot, @Nullable NbtPath path, @Nullable Tag value,
             @Nullable String operator) {
         if (!isFilterItem(stack))
             return;
@@ -952,7 +957,7 @@ public final class FilterItemData {
                 if (t instanceof CompoundTag entry && getSlotIndex(entry) == slot) {
                     if (path != null && !path.isEmpty() && value != null) {
                         entry.remove(KEY_NBT_RAW);
-                        entry.putString(KEY_NBT_PATH, path);
+                        entry.putString(KEY_NBT_PATH, path.toString());
                         entry.put(KEY_NBT_VALUE, value.copy());
                         entry.putString(KEY_NBT_OP, normalizedOperator);
                     } else {
@@ -1006,6 +1011,8 @@ public final class FilterItemData {
 
     public static void setEntryNbtRaw(ItemStack stack, int slot, @Nullable String rawSnbt) {
         if (!isFilterItem(stack))
+            return;
+        if (rawSnbt != null && rawSnbt.length() > MAX_NBT_RAW_LENGTH)
             return;
         if (slot < 0 || slot >= getCapacity(stack))
             return;
@@ -1110,6 +1117,8 @@ public final class FilterItemData {
 
     public static boolean addSlotNbtRule(ItemStack stack, int slot, String path, String operator, Tag value) {
         if (!isFilterItem(stack) || path == null || path.isEmpty() || value == null)
+            return false;
+        if (path.length() > MAX_NBT_PATH_LENGTH || isOversizedNbtValue(value))
             return false;
         if (slot < 0 || slot >= getCapacity(stack))
             return false;
@@ -1250,6 +1259,8 @@ public final class FilterItemData {
     public static boolean setSlotNbtRuleValue(ItemStack stack, int slot, int ruleIndex, Tag newValue) {
         if (!isFilterItem(stack) || newValue == null)
             return false;
+        if (isOversizedNbtValue(newValue))
+            return false;
 
         boolean[] result = { false };
         updateRoot(stack, root -> {
@@ -1273,13 +1284,17 @@ public final class FilterItemData {
         return result[0];
     }
 
+    private static boolean isOversizedNbtValue(Tag value) {
+        return value.sizeInBytes() > MAX_NBT_VALUE_BYTES || value.toString().length() > MAX_NBT_VALUE_LENGTH;
+    }
+
     private static List<SlotNbtRule> readSlotNbtRules(CompoundTag entry) {
         if (entry.contains(KEY_NBT_RULES)) {
             ListTag rules = entry.getListOrEmpty(KEY_NBT_RULES);
             List<SlotNbtRule> result = new ArrayList<>(rules.size());
             for (Tag t : rules) {
                 if (t instanceof CompoundTag r) {
-                    String p = r.getStringOr(KEY_RULE_P, "");
+                    NbtPath p = NbtPath.parseLenient(r.getStringOr(KEY_RULE_P, ""));
                     String o = r.contains(KEY_RULE_O) ? r.getStringOr(KEY_RULE_O, NBT_OP_EQUALS) : NBT_OP_EQUALS;
                     Tag v = r.get(KEY_RULE_V);
                     if (!p.isEmpty() && v != null) {
@@ -1290,7 +1305,8 @@ public final class FilterItemData {
             return result;
         }
 
-        String path = getEntryNbtPath(entry);
+        String rawPath = getEntryNbtPath(entry);
+        NbtPath path = rawPath == null ? null : NbtPath.parseLenient(rawPath);
         Tag value = getEntryNbtValue(entry);
         if (path != null && value != null) {
             String op = getEntryNbtOperator(entry);
@@ -1780,7 +1796,7 @@ public final class FilterItemData {
             return false;
         }
 
-        String nbtPath = entry.nbtPath();
+        NbtPath nbtPath = entry.nbtPath();
         Tag nbtExpected = entry.nbtValue();
         if (nbtPath == null || nbtExpected == null)
             return true;
@@ -1816,7 +1832,7 @@ public final class FilterItemData {
             }
         }
 
-        String nbtPath = getEntryNbtPath(entry);
+        NbtPath nbtPath = NbtPath.parse(getEntryNbtPath(entry));
         Tag nbtExpected = getEntryNbtValue(entry);
         if (nbtPath == null || nbtExpected == null)
             return true;
@@ -2161,7 +2177,8 @@ public final class FilterItemData {
             List<SlotNbtRule> nbtRules = readSlotNbtRules(entry);
             boolean nbtMatchAny = entry.getBooleanOr(KEY_NBT_MATCH_ANY, false);
 
-            String nbtPath = getEntryNbtPath(entry);
+            String rawNbtPath = getEntryNbtPath(entry);
+            NbtPath nbtPath = rawNbtPath == null ? null : NbtPath.parseLenient(rawNbtPath);
             Tag nbtValue = getEntryNbtValue(entry);
             String nbtOp = getEntryNbtOperator(entry);
             String raw = getEntryNbtRaw(entry);

@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.component;
 
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import me.almana.logisticsnetworks.filter.NbtRuleMatcher;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -165,7 +166,7 @@ public final class GeneralFilterBridge {
             if (!(tag instanceof CompoundTag rule)) {
                 continue;
             }
-            String path = rule.getStringOr("p", "");
+            NbtPath path = NbtPath.parseLenient(rule.getStringOr("p", ""));
             Tag value = rule.get("v");
             if (!path.isEmpty() && value != null) {
                 result.add(new NbtCriterion(path,
@@ -175,7 +176,7 @@ public final class GeneralFilterBridge {
         if (!result.isEmpty()) {
             return result;
         }
-        String path = entry.getStringOr("nbt_path", "");
+        NbtPath path = NbtPath.parseLenient(entry.getStringOr("nbt_path", ""));
         Tag value = entry.get("nbt_val");
         return path.isEmpty() || value == null
                 ? List.of()
@@ -186,14 +187,14 @@ public final class GeneralFilterBridge {
     private static void writeNbt(CompoundTag entry, GeneralFilterEntry.NbtConstraints nbt) {
         if (nbt.rules().size() == 1) {
             NbtCriterion rule = nbt.rules().getFirst();
-            entry.putString("nbt_path", rule.path());
+            entry.putString("nbt_path", rule.path().toString());
             entry.putString("nbt_op", rule.operator());
             entry.put("nbt_val", rule.value());
         } else if (!nbt.rules().isEmpty()) {
             ListTag rules = new ListTag();
             for (NbtCriterion criterion : nbt.rules()) {
                 CompoundTag rule = new CompoundTag();
-                rule.putString("p", criterion.path());
+                rule.putString("p", criterion.path().toString());
                 rule.putString("o", criterion.operator());
                 rule.put("v", criterion.value());
                 rules.add(rule);

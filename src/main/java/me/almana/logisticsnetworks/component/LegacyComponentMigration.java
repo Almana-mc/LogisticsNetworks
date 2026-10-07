@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.component;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import net.minecraft.core.HolderLookup;
@@ -342,7 +343,9 @@ public final class LegacyComponentMigration {
     public static void migrateNbtFilter(ItemStack stack) {
         migrate(stack, NBT_ROOT, root -> {
             List<NbtFilterConfig.Rule> rules = readNbtRules(root);
-            String inferredPath = rules.isEmpty() ? root.getStringOr("path", "") : rules.getFirst().path();
+            NbtPath inferredPath = rules.isEmpty()
+                    ? NbtPath.parseLenient(root.getStringOr("path", ""))
+                    : rules.getFirst().path();
             FilterTargetType inferred = NbtFilterData.isFluidPath(inferredPath)
                     ? FilterTargetType.FLUIDS
                     : FilterTargetType.ITEMS;
@@ -380,7 +383,7 @@ public final class LegacyComponentMigration {
             if (!(tag instanceof CompoundTag rule)) {
                 continue;
             }
-            String path = rule.getStringOr("path", "").trim();
+            NbtPath path = NbtPath.parseLenient(rule.getStringOr("path", "").trim());
             Tag value = rule.get("value");
             if (path.isEmpty() || value == null) {
                 continue;
@@ -394,7 +397,7 @@ public final class LegacyComponentMigration {
         if (!rules.isEmpty()) {
             return rules;
         }
-        String path = root.getStringOr("path", "").trim();
+        NbtPath path = NbtPath.parseLenient(root.getStringOr("path", "").trim());
         Tag value = root.get("value");
         return path.isEmpty() || value == null
                 ? List.of()

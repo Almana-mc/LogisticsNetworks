@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.component;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.IntTag;
 import org.jetbrains.annotations.Nullable;
@@ -22,6 +23,9 @@ public record GeneralFilterEntry(
         @Nullable Boolean enchanted,
         NbtConstraints nbt,
         @Nullable DurabilityConstraint durability) {
+
+    private static final NbtPath ENCHANTED_PATH = NbtPath.of(NbtPath.Component.of("minecraft:enchanted"));
+    private static final NbtPath DURABILITY_PATH = NbtPath.of(NbtPath.Component.of("minecraft:durability"));
 
     public static final Codec<GeneralFilterEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.fieldOf("slot").forGetter(GeneralFilterEntry::slot),
@@ -45,11 +49,11 @@ public record GeneralFilterEntry(
         nbt = nbt == null ? NbtConstraints.EMPTY : nbt;
         if (enchanted != null || durability != null) {
             List<NbtCriterion> rules = new ArrayList<>(nbt.rules());
-            if (enchanted != null && rules.stream().noneMatch(rule -> rule.path().equals("minecraft:enchanted"))) {
-                rules.add(new NbtCriterion("minecraft:enchanted", "=", ByteTag.valueOf(enchanted)));
+            if (enchanted != null && rules.stream().noneMatch(rule -> rule.path().equals(ENCHANTED_PATH))) {
+                rules.add(new NbtCriterion(ENCHANTED_PATH, "=", ByteTag.valueOf(enchanted)));
             }
-            if (durability != null && rules.stream().noneMatch(rule -> rule.path().equals("minecraft:durability"))) {
-                rules.add(new NbtCriterion("minecraft:durability", durability.operator().symbol(),
+            if (durability != null && rules.stream().noneMatch(rule -> rule.path().equals(DURABILITY_PATH))) {
+                rules.add(new NbtCriterion(DURABILITY_PATH, durability.operator().symbol(),
                         IntTag.valueOf(durability.value())));
             }
             nbt = new NbtConstraints(rules, nbt.matchAny(), nbt.strict(), nbt.raw());

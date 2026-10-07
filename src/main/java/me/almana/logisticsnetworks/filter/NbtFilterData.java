@@ -32,17 +32,21 @@ public final class NbtFilterData {
     private static final String KEY_RULE_OPERATOR = "operator";
     private static final String KEY_RULE_ENABLED = "enabled";
 
-    public record NbtEntry(String path, String valueDisplay) {
+    public record NbtEntry(NbtPath path, String valueDisplay) {
     }
 
     private static final List<NbtEntry> DEFAULT_ENTRIES = List.of(
-            new NbtEntry("minecraft:enchanted", "false"),
-            new NbtEntry("minecraft:damage", "0"),
-            new NbtEntry("minecraft:durability", "0"),
-            new NbtEntry("minecraft:max_damage", "0"),
-            new NbtEntry("minecraft:max_stack_size", "64"),
-            new NbtEntry("minecraft:rarity", "\"common\"")
+            new NbtEntry(NbtPath.of(NbtPath.Component.of("minecraft:enchanted")), "false"),
+            new NbtEntry(NbtPath.of(NbtPath.Component.of("minecraft:damage")), "0"),
+            new NbtEntry(NbtPath.of(NbtPath.Component.of("minecraft:durability")), "0"),
+            new NbtEntry(NbtPath.of(NbtPath.Component.of("minecraft:max_damage")), "0"),
+            new NbtEntry(NbtPath.of(NbtPath.Component.of("minecraft:max_stack_size")), "64"),
+            new NbtEntry(NbtPath.of(NbtPath.Component.of("minecraft:rarity")), "\"common\"")
     );
+
+    private static final NbtPath COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("components"));
+    private static final NbtPath FLUID_COMPONENTS_PATH = NbtPath.of(NbtPath.Component.of("fluid"),
+            NbtPath.Component.of("components"));
 
     public static List<NbtEntry> getDefaultEntries() {
         return DEFAULT_ENTRIES;
@@ -99,7 +103,7 @@ public final class NbtFilterData {
         }
     }
 
-    public record NbtRule(String path, Operator operator, Tag value, boolean enabled) {
+    public record NbtRule(NbtPath path, Operator operator, Tag value, boolean enabled) {
         public String valueDisplay() {
             return value == null ? "" : value.toString();
         }
@@ -140,12 +144,12 @@ public final class NbtFilterData {
             return FilterTargetType.fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
         }
 
-        String path = root.getStringOr(KEY_PATH, "");
+        NbtPath path = NbtPath.parseLenient(root.getStringOr(KEY_PATH, ""));
         if (path.isEmpty()) {
             List<NbtRule> rules = readRules(root);
             if (rules.isEmpty()) {
                 NbtRule legacy = readLegacyRule(root);
-                path = legacy == null ? "" : legacy.path();
+                path = legacy == null ? NbtPath.EMPTY : legacy.path();
             } else {
                 path = rules.get(0).path();
             }
@@ -171,7 +175,7 @@ public final class NbtFilterData {
         return hasAnyRules(stack);
     }
 
-    public static @Nullable String getSelectedPath(ItemStack stack) {
+    public static @Nullable NbtPath getSelectedPath(ItemStack stack) {
         List<NbtRule> rules = getRules(stack);
         return rules.isEmpty() ? null : rules.get(0).path();
     }
@@ -202,9 +206,14 @@ public final class NbtFilterData {
         if (!isNbtFilter(stack) || value == null)
             return false;
 
-        String path = normalizePath(rawPath);
-        if (path == null)
+        String pathString = normalizePath(rawPath);
+        if (pathString == null)
             return false;
+
+        var path = NbtPath.parse(pathString);
+        if (path == null) {
+            return false;
+        }
 
         Operator resolvedOperator = operator == null ? Operator.EQUALS : operator;
         boolean[] result = { false };
@@ -365,73 +374,63 @@ public final class NbtFilterData {
         return hasEnabledRule;
     }
 
-    public static boolean matchesSelection(ItemStack filter, String path, @Nullable CompoundTag components) {
-        if (!isNbtFilter(filter))
-            return false;
-        String normalized = normalizePath(path);
-        if (normalized == null)
+    public static boolean matchesSelection(ItemStack filter, @Nullable NbtPath path, @Nullable CompoundTag components) {
+        if (path == null || !isNbtFilter(filter))
             return false;
 
-        Tag actual = resolvePathValue(components, normalized);
-        Tag expected = resolveExpectedValue(filter, normalized);
+        Tag actual = resolvePathValue(components, path);
+        Tag expected = resolveExpectedValue(filter, path);
         return expected != null && actual != null && expected.equals(actual);
     }
 
-    public static @Nullable Tag resolvePathValue(ItemStack stack, String path, HolderLookup.Provider provider) {
-        String normalized = normalizePath(path);
-        if (normalized == null)
+    public static @Nullable Tag resolvePathValue(ItemStack stack, @Nullable NbtPath path, HolderLookup.Provider provider) {
+        if (path == null) {
             return null;
+        }
 
-        if (isFluidPath(normalized)) {
+        if (isFluidPath(path)) {
             FluidStack fluid = FluidUtil.getFirstStackContained(stack);
             if (fluid.isEmpty()) {
                 return null;
             }
             CompoundTag tags = getSerializedComponents(fluid, provider);
-            return resolvePathValue(tags, normalized);
+            return resolvePathValue(tags, path);
         }
 
-        return resolvePathValue(getSerializedComponents(stack, provider), normalized);
+        return resolvePathValue(getSerializedComponents(stack, provider), path);
     }
 
-    public static @Nullable Tag resolvePathValue(@Nullable CompoundTag components, String path) {
-        if (components == null)
+    public static @Nullable Tag resolvePathValue(@Nullable CompoundTag components, @Nullable NbtPath path) {
+        if (components == null || path == null || path.isEmpty())
             return null;
 
-        String p = normalizePath(path);
-        if (p == null)
-            return null;
-
-        if (p.equals("components") || p.equals("fluid.components")) {
+        if (path.equals(COMPONENTS_PATH) || path.equals(FLUID_COMPONENTS_PATH))
             return components.copy();
-        }
 
-        p = stripPrefix(p, "components.");
-        p = stripPrefix(p, "fluid.components.");
+        if (path.startsWith(FLUID_COMPONENTS_PATH))
+            path = path.drop(2);
+        else if (path.startsWith(COMPONENTS_PATH))
+            path = path.drop(1);
 
-        Tag found = traverseTag(components, p);
+        Tag found = path.getFrom(components);
         return found == null ? null : found.copy();
     }
 
-    private static String stripPrefix(String s, String prefix) {
-        return s.startsWith(prefix) ? s.substring(prefix.length()) : s;
-    }
-
     public static List<NbtEntry> extractEntries(ItemStack stack, HolderLookup.Provider provider) {
-        return extractEntriesInternal(getSerializedComponents(stack, provider), "");
+        return extractEntriesInternal(getSerializedComponents(stack, provider), NbtPath.EMPTY);
     }
 
     public static List<NbtEntry> extractEntries(FluidStack stack, HolderLookup.Provider provider) {
-        return extractEntriesInternal(getSerializedComponents(stack, provider), "fluid.components");
+        return extractEntriesInternal(getSerializedComponents(stack, provider), FLUID_COMPONENTS_PATH);
     }
 
-    private static List<NbtEntry> extractEntriesInternal(@Nullable CompoundTag root, String rootPath) {
+    private static List<NbtEntry> extractEntriesInternal(@Nullable CompoundTag root, NbtPath rootPath) {
         if (root == null)
             return List.of();
 
         List<NbtEntry> entries = new ArrayList<>();
         collectLeaves(root, rootPath, entries);
-        entries.sort(Comparator.comparing(NbtEntry::path));
+        entries.sort(Comparator.comparing(e -> e.path().toString()));
         return entries;
     }
 
@@ -486,12 +485,11 @@ public final class NbtFilterData {
         return null;
     }
 
-    public static boolean isFluidPath(@Nullable String path) {
-        String p = normalizePath(path);
-        return p != null && (p.equals("fluid.components") || p.startsWith("fluid.components."));
+    public static boolean isFluidPath(@Nullable NbtPath path) {
+        return path != null && path.startsWith(FLUID_COMPONENTS_PATH);
     }
 
-    private static void collectLeaves(Tag tag, String currentPath, List<NbtEntry> out) {
+    private static void collectLeaves(Tag tag, NbtPath currentPath, List<NbtEntry> out) {
         if (tag instanceof CompoundTag c) {
             if (c.isEmpty() && !currentPath.isEmpty()) {
                 out.add(new NbtEntry(currentPath, "true"));
@@ -500,7 +498,7 @@ public final class NbtFilterData {
             c.keySet().stream().sorted().forEach(key -> {
                 Tag child = c.get(key);
                 if (child != null) {
-                    String nextPath = currentPath.isEmpty() ? key : currentPath + "." + key;
+                    var nextPath = currentPath.then(new NbtPath.StringComponent(key));
                     collectLeaves(child, nextPath, out);
                 }
             });
@@ -513,7 +511,7 @@ public final class NbtFilterData {
                 return;
             }
             for (int i = 0; i < l.size(); i++) {
-                collectLeaves(l.get(i), currentPath + "[" + i + "]", out);
+                collectLeaves(l.get(i), currentPath.then(new NbtPath.IndexComponent(i)), out);
             }
             return;
         }
@@ -521,61 +519,6 @@ public final class NbtFilterData {
         if (!currentPath.isEmpty()) {
             out.add(new NbtEntry(currentPath, tag.toString()));
         }
-    }
-
-    private static @Nullable Tag traverseTag(Tag root, String path) {
-        if (root == null || path.isEmpty())
-            return null;
-
-        Tag current = root;
-        int len = path.length();
-        int i = 0;
-
-        while (i < len) {
-            int start = i;
-            while (i < len && path.charAt(i) != '.' && path.charAt(i) != '[') {
-                i++;
-            }
-            String key = path.substring(start, i);
-
-            if (!key.isEmpty()) {
-                if (!(current instanceof CompoundTag c) || !c.contains(key)) {
-                    return null;
-                }
-                current = c.get(key);
-            }
-
-            while (i < len && path.charAt(i) == '[') {
-                i++;
-                int numStart = i;
-                while (i < len && Character.isDigit(path.charAt(i))) {
-                    i++;
-                }
-
-                if (i >= len || path.charAt(i) != ']')
-                    return null;
-
-                String numStr = path.substring(numStart, i);
-                i++;
-
-                if (!(current instanceof ListTag list) || numStr.isEmpty())
-                    return null;
-
-                try {
-                    int idx = Integer.parseInt(numStr);
-                    if (idx < 0 || idx >= list.size())
-                        return null;
-                    current = list.get(idx);
-                } catch (NumberFormatException e) {
-                    return null;
-                }
-            }
-            if (i < len && path.charAt(i) == '.') {
-                i++;
-            }
-        }
-
-        return current;
     }
 
     private static @Nullable String normalizePath(String path) {
@@ -592,7 +535,7 @@ public final class NbtFilterData {
         };
     }
 
-    private static @Nullable Tag resolveExpectedValue(ItemStack filter, String path) {
+    private static @Nullable Tag resolveExpectedValue(ItemStack filter, NbtPath path) {
         for (NbtRule rule : getRules(filter)) {
             if (rule.path().equals(path))
                 return rule.value();
@@ -628,7 +571,7 @@ public final class NbtFilterData {
                     ? Operator.fromOrdinal(ruleTag.getIntOr(KEY_RULE_OPERATOR, Operator.EQUALS.ordinal()))
                     : Operator.EQUALS;
             boolean enabled = !ruleTag.contains(KEY_RULE_ENABLED) || ruleTag.getBooleanOr(KEY_RULE_ENABLED, true);
-            rules.add(new NbtRule(path, operator, value.copy(), enabled));
+            rules.add(new NbtRule(NbtPath.parseLenient(path), operator, value.copy(), enabled));
         }
         return rules;
     }
@@ -642,7 +585,7 @@ public final class NbtFilterData {
         if (path == null || value == null)
             return null;
 
-        return new NbtRule(path, Operator.EQUALS, value.copy(), true);
+        return new NbtRule(NbtPath.parseLenient(path), Operator.EQUALS, value.copy(), true);
     }
 
     private static void writeRules(CompoundTag root, List<NbtRule> rules) {
@@ -657,7 +600,7 @@ public final class NbtFilterData {
         ListTag ruleList = new ListTag();
         for (NbtRule rule : rules) {
             CompoundTag ruleTag = new CompoundTag();
-            ruleTag.putString(KEY_PATH, rule.path());
+            ruleTag.putString(KEY_PATH, rule.path().toString());
             ruleTag.putInt(KEY_RULE_OPERATOR, rule.operator().ordinal());
             ruleTag.put(KEY_VALUE, rule.value().copy());
             if (!rule.enabled())
@@ -667,7 +610,7 @@ public final class NbtFilterData {
         root.put(KEY_RULES, ruleList);
     }
 
-    private static int findRuleIndex(List<NbtRule> rules, String path, Operator operator) {
+    private static int findRuleIndex(List<NbtRule> rules, NbtPath path, Operator operator) {
         for (int i = 0; i < rules.size(); i++) {
             NbtRule rule = rules.get(i);
             if (rule.path().equals(path) && rule.operator() == operator)
