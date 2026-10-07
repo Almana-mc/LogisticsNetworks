@@ -50,4 +50,12 @@ Vec3 offset = request.position().subtract(cameraPosition);
 poseStack.translate(offset.x, offset.y, offset.z);
 poseStack.mulPose(request.rotation());
 renderBox(poseStack.last().pose(), bufferSource, request);
+
+protected AABB getBoundingBoxForCulling(LogisticsNodeEntity entity) {
+    if (entity.isMountedOnCreate()) {
+        return AABB.ofSize(entity.position(), 2.5, 2.5, 2.5);
+    }
+    return new AABB(entity.getX() - 0.5, entity.getY(), entity.getZ() - 0.5,
+            entity.getX() + 0.5, entity.getY() + 1.0, entity.getZ() + 0.5);
+}
 */
