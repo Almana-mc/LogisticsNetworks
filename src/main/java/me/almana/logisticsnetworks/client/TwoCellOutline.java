@@ -34,6 +34,7 @@ public final class TwoCellOutline {
                 otherState.getShape(level, other, context).move(other.subtract(pos)));
         event.getLevelRenderState().blockOutlineRenderState = new BlockOutlineRenderState(pos,
                 event.isInTranslucentPass(), event.isHighContrast(), shape, List.of());
+        // Cancel keeps our state
         event.setCanceled(true);
     }
 
