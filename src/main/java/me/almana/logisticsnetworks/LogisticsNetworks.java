@@ -43,6 +43,7 @@ import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 import me.almana.logisticsnetworks.network.SetWrenchColorsPayload;
+import me.almana.logisticsnetworks.network.SetWrenchFlowPayload;
 import me.almana.logisticsnetworks.network.SetWrenchModePayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelsPayload;
 import me.almana.logisticsnetworks.network.MoveGraphVerticesPayload;
@@ -226,6 +227,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleCycleWrenchMode);
                 registrar.playToServer(SetWrenchColorsPayload.TYPE, SetWrenchColorsPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetWrenchColors);
+                registrar.playToServer(SetWrenchFlowPayload.TYPE, SetWrenchFlowPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetWrenchFlow);
                 registrar.playToServer(SetWrenchModePayload.TYPE, SetWrenchModePayload.STREAM_CODEC,
                                 SetWrenchModePayload::handle);
                 registrar.playToServer(MoveGraphVerticesPayload.TYPE, MoveGraphVerticesPayload.STREAM_CODEC,
