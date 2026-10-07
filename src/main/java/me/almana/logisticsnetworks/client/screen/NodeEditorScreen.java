@@ -1046,7 +1046,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         } else {
             filter = filter.copy();
         }
-        if (!FilterItemData.addItem(filter, item, minecraft.level.registryAccess())) {
+        if (!FilterItemData.addItem(filter, item)) {
             return;
         }
         ch.setFilterItem(slot, filter);

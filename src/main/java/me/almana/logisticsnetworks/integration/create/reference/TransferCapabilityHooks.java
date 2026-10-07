@@ -43,8 +43,7 @@ public static Result scan(ServerLevel level, LogisticsNodeEntity node, ChannelDa
     }
 
     return switch (target) {
-        case ITEMS -> scanItems(capabilities.findItemHandler(node, channel.getIoDirection()),
-                filter, level.registryAccess());
+        case ITEMS -> scanItems(capabilities.findItemHandler(node, channel.getIoDirection()), filter);
         case FLUIDS -> scanFluids(capabilities.findFluidHandler(node, channel.getIoDirection()), filter);
         case CHEMICALS -> node.isMountedOnCreate()
                 ? new Result(0, false, false)

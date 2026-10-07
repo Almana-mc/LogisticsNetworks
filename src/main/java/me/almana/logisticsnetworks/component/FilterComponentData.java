@@ -62,6 +62,6 @@ public final class FilterComponentData {
         return !stack.has(LogisticsDataComponents.FILTER_SETTINGS)
                 && (legacy.getBooleanOr("blacklist", false) || legacy.getIntOr("target", 0) != 0)
                 || !stack.has(LogisticsDataComponents.FILTER_ENTRIES)
-                && !GeneralFilterBridge.read(legacy, provider, null).complete();
+                && LegacyComponentMigration.readGeneralFilter(legacy, provider) == null;
     }
 }
