@@ -1,3 +1,32 @@
 {
-  "values": []
+  "values": [
+    {
+      "id": "fluxnetworks:flux_block",
+      "required": false
+    },
+    {
+      "id": "fluxnetworks:flux_plug",
+      "required": false
+    },
+    {
+      "id": "fluxnetworks:flux_point",
+      "required": false
+    },
+    {
+      "id": "fluxnetworks:flux_controller",
+      "required": false
+    },
+    {
+      "id": "fluxnetworks:basic_flux_storage",
+      "required": false
+    },
+    {
+      "id": "fluxnetworks:herculean_flux_storage",
+      "required": false
+    },
+    {
+      "id": "fluxnetworks:gargantuan_flux_storage",
+      "required": false
+    }
+  ]
 }
