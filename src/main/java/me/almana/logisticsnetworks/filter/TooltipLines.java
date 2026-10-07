@@ -106,6 +106,8 @@ public final class TooltipLines {
             } catch (LinkageError | RuntimeException ignored) {
             }
         }
+        if (stack.has(DataComponents.UNBREAKABLE) && display.shows(DataComponents.UNBREAKABLE))
+            lines.add(ItemStack.UNBREAKABLE_TOOLTIP);
         return lines;
     }
 
