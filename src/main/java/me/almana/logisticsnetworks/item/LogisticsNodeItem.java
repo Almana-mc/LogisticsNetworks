@@ -10,6 +10,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -20,6 +22,11 @@ public class LogisticsNodeItem extends Item {
 
     public LogisticsNodeItem(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    public boolean canEquip(ItemStack stack, EquipmentSlot armorType, LivingEntity entity) {
+        return armorType == EquipmentSlot.HEAD;
     }
 
     @Override
