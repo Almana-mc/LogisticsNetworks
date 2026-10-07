@@ -1,0 +1,28 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        },
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "refinedstorage"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "KCK",
+        "SIS",
+        "KCK"
+    ],
+    "key": {
+        "K": "minecraft:clay",
+        "C": "#refinedstorage:cables",
+        "S": "refinedstorage:speed_upgrade",
+        "I": "refinedstorage:interface"
+    },
+    "result": {
+        "id": "logisticsnetworks:network_upgrade"
+    }
+}

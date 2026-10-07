@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.block.ServerRackBlock;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.DimensionalUpgradeItem;
+import me.almana.logisticsnetworks.item.NetworkUpgradeItem;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
 import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
 import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
@@ -129,6 +130,10 @@ public class Registration {
                         .register(
                                         "ars_source_upgrade",
                                         id -> new ArsSourceUpgradeItem(itemProperties(id)));
+
+        public static final DeferredItem<NetworkUpgradeItem> NETWORK_UPGRADE = ITEMS.register(
+                        "network_upgrade",
+                        id -> new NetworkUpgradeItem(itemProperties(id)));
 
         public static final DeferredItem<PatternSetterItem> PATTERN_SETTER = ITEMS
                         .register(

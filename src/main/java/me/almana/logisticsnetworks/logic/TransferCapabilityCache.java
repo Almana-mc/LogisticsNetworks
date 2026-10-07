@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.ChestBlock;
@@ -104,8 +105,7 @@ public final class TransferCapabilityCache {
     private ResourceHandler<ItemResource> findItemHandler(@Nullable Direction direction,
             boolean directInterfaces, boolean exporting) {
         if (!(node.level() instanceof ServerLevel level)) return null;
-        InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(
-                level, node.getAttachedPos(), direction);
+        InterfaceStorageResolution resolution = resolveInterface(level, direction);
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE && directInterfaces) {
             ResourceHandler<ItemResource> buffer = exporting
                     ? findInterfaceBuffer(level, direction, resolution.endpoint())
@@ -118,6 +118,11 @@ public final class TransferCapabilityCache {
         }
         if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
         return findItemCapability(level, direction);
+    }
+
+    private InterfaceStorageResolution resolveInterface(ServerLevel level, @Nullable Direction direction) {
+        if (!NodeUpgradeData.hasNetworkUpgrade(node)) return InterfaceStorageResolution.unsupported();
+        return LinkedStorage.resolveInterface(level, node.getAttachedPos(), direction);
     }
 
     @Nullable
@@ -155,8 +160,7 @@ public final class TransferCapabilityCache {
     private ResourceHandler<FluidResource> findFluidHandler(@Nullable Direction direction,
             boolean directInterfaces, boolean exporting) {
         if (!(node.level() instanceof ServerLevel level)) return null;
-        InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(
-                level, node.getAttachedPos(), direction);
+        InterfaceStorageResolution resolution = resolveInterface(level, direction);
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE && directInterfaces) {
             return exporting
                     ? DirectStorageHandlers.exportFluids(resolution.endpoint())

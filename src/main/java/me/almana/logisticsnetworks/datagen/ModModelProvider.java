@@ -41,6 +41,7 @@ public class ModModelProvider extends ModelProvider {
                 Registration.DIMENSIONAL_UPGRADE.get(),
                 Registration.MEKANISM_CHEMICAL_UPGRADE.get(),
                 Registration.ARS_SOURCE_UPGRADE.get(),
+                Registration.NETWORK_UPGRADE.get(),
                 Registration.PATTERN_SETTER.get()
         };
         for (Item item : flatItems) {
