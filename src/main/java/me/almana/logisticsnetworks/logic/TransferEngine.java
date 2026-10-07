@@ -2,7 +2,6 @@ package me.almana.logisticsnetworks.logic;
 
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
-import me.almana.logisticsnetworks.logic.async.SnapshotItemHandler;
 import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.data.*;
@@ -15,7 +14,6 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
-import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -56,6 +54,8 @@ public class TransferEngine {
     private static final float BACKOFF_MULTIPLIER = 1.3f;
     private static final float BACKOFF_DECAY_DIVISOR = 3f;
     private static final float BACKOFF_MAX_TICKS_ENERGY = 5f;
+    private static final byte SLOT_REJECTED = 1;
+    private static final byte SLOT_PASSED = 2;
 
     public record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
     }
@@ -768,7 +768,7 @@ public class TransferEngine {
             @Nullable BooleanSupplier isCurrent, @Nullable int[] sourceSlots, @Nullable ItemResource required) {
         int remaining = limit;
         int slotCount = sourceSlots == null ? source.size() : sourceSlots.length;
-        BulkInsertRejectionCache bulkRejections = new BulkInsertRejectionCache();
+        BulkInsertRejectionCache insertRejections = new BulkInsertRejectionCache();
         boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, filterReadCache);
         boolean hasAnyImportNbtFilter = false;
         for (ItemTransferTarget target : targets) {
@@ -829,6 +829,8 @@ public class TransferEngine {
         boolean[] openTargets = new boolean[targets.size()];
         Arrays.fill(openTargets, true);
         int openTargetCount = targets.size();
+        CompoundTag[] slotComponents = hasNbtFilter ? new CompoundTag[slotCount] : null;
+        byte[] slotVerdicts = new byte[slotCount];
 
         boolean flushDirect = DirectStorageHandlers.isDirect(source);
         for (ItemTransferTarget target : targets) {
@@ -858,23 +860,35 @@ public class TransferEngine {
                             continue;
                         }
 
-                        ItemStack inSlot = ItemUtil.getStack(source, slot);
-                        if (inSlot.isEmpty() || inSlot.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
+                        if (slotVerdicts[entry] == SLOT_REJECTED) {
                             continue;
                         }
-                        if (required != null && !required.matches(inSlot)) continue;
+
+                        ItemStack inSlot = ItemUtil.getStack(source, slot);
+                        boolean sourcePassed = slotVerdicts[entry] == SLOT_PASSED;
+                        if (inSlot.isEmpty() || !sourcePassed && (inSlot.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
+                                || required != null && !required.matches(inSlot))) {
+                            slotVerdicts[entry] = SLOT_REJECTED;
+                            continue;
+                        }
                         ItemStack extracted = inSlot.copyWithCount(Math.min(targetRemaining, inSlot.getCount()));
 
-                        CompoundTag candidateComponents = (provider != null && hasNbtFilter)
-                                ? NbtFilterData.getSerializedComponents(extracted, provider)
-                                : null;
+                        CompoundTag candidateComponents = null;
+                        if (provider != null && hasNbtFilter) {
+                            if (slotComponents[entry] == null) {
+                                slotComponents[entry] = NbtFilterData.getSerializedComponents(extracted, provider);
+                            }
+                            candidateComponents = slotComponents[entry];
+                        }
 
-                        if (provider != null) {
+                        if (provider != null && !sourcePassed) {
                             if (!FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode, extracted, provider,
                                     candidateComponents, filterReadCache, slot)) {
+                                slotVerdicts[entry] = SLOT_REJECTED;
                                 continue;
                             }
                         }
+                        slotVerdicts[entry] = SLOT_PASSED;
 
                         boolean[] importAllowedSlots = target.allowedSlots();
                         if (provider != null) {
@@ -939,11 +953,8 @@ public class TransferEngine {
 
                         ItemStack toMove = extracted.copyWithCount(Math.min(allowed, extractable));
                         ItemResource candidate = ItemResource.of(toMove);
-                        boolean bulk = importAllowedSlots == null && (target.handler() instanceof SnapshotItemHandler snapshot
-                                ? snapshot.supportsBulkInsertion()
-                                : DirectStorageHandlers.isDirect(target.handler())
-                                || SophisticatedCoreCompat.isBulkHandler(target.handler()));
-                        if (bulk && bulkRejections.isRejected(target.handler(), candidate, toMove.getCount())) {
+                        if (importAllowedSlots == null
+                                && insertRejections.isRejected(target.handler(), candidate, toMove.getCount())) {
                             continue;
                         }
 
@@ -954,8 +965,8 @@ public class TransferEngine {
                                     importAllowedSlots);
                             int targetAccepted = toMove.getCount() - uninserted.getCount();
                             if (targetAccepted <= 0) {
-                                if (bulk) {
-                                    bulkRejections.reject(target.handler(), candidate, toMove.getCount());
+                                if (importAllowedSlots == null) {
+                                    insertRejections.reject(target.handler(), candidate, toMove.getCount());
                                 }
                                 continue;
                             }
@@ -976,7 +987,12 @@ public class TransferEngine {
                             if (recorder != null) {
                                 recorder.record(slot, targetIndex, candidate.toStack(movedCount), importAllowedSlots);
                             }
-                            bulkRejections.clear();
+                            insertRejections.clear();
+                            // Source changed, recheck slots
+                            slotVerdicts = new byte[slotCount];
+                            if (slotComponents != null) {
+                                slotComponents = new CompoundTag[slotCount];
+                            }
                             movedAny = true;
                             movedForTarget = true;
                             remaining -= movedCount;

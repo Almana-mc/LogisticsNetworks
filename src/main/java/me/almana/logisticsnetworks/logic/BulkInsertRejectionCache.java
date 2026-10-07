@@ -8,6 +8,8 @@ import java.util.IdentityHashMap;
 import java.util.Set;
 
 final class BulkInsertRejectionCache {
+    private static final int MAX_REJECTIONS = 64;
+
     private record Candidate(ItemResource resource, int amount) {
     }
 
@@ -19,7 +21,10 @@ final class BulkInsertRejectionCache {
     }
 
     void reject(ResourceHandler<ItemResource> handler, ItemResource resource, int amount) {
-        rejected.computeIfAbsent(handler, key -> new HashSet<>()).add(new Candidate(resource, amount));
+        Set<Candidate> candidates = rejected.computeIfAbsent(handler, key -> new HashSet<>());
+        if (candidates.size() < MAX_REJECTIONS) {
+            candidates.add(new Candidate(resource, amount));
+        }
     }
 
     void clear() {

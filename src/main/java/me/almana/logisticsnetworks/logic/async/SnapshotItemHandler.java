@@ -30,8 +30,6 @@ public final class SnapshotItemHandler implements ResourceHandler<ItemResource> 
         }
     }
 
-    public boolean supportsBulkInsertion() { return bulkSlotLimits != null; }
-
     @Override
     public int size() { return totalSlots; }
 
