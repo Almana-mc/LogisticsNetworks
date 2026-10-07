@@ -86,13 +86,6 @@ public class TransferEngine {
         Map<UUID, Boolean> dimensionalCache = context.dimensionalCache();
         Map<UUID, Integer> tierCache = context.tierCache();
         Map<UUID, Integer> signalCache = context.signalCache();
-        Map<UUID, LogisticsNodeEntity> nodeCache = new HashMap<>(sortedNodes.size());
-        for (LogisticsNodeEntity node : sortedNodes) nodeCache.put(node.getUUID(), node);
-        List<ImportTarget>[] itemImports = context.itemImports();
-        List<ImportTarget>[] fluidImports = resolveCache(network.getFluidImports(), nodeCache, signalCache);
-        List<ImportTarget>[] energyImports = resolveCache(network.getEnergyImports(), nodeCache, signalCache);
-        List<ImportTarget>[] chemicalImports = resolveCache(network.getChemicalImports(), nodeCache, signalCache);
-        List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache, signalCache);
         NetworkRegistry registry = NetworkRegistry.get(server.overworld());
 
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
@@ -100,8 +93,9 @@ public class TransferEngine {
         try (var operation = TransferCapabilityCache.storageOperation(true)) {
             long minWakeDelta = Long.MAX_VALUE;
             for (LogisticsNodeEntity sourceNode : sortedNodes) {
-                long delta = processNode(sourceNode, itemImports, fluidImports, energyImports, chemicalImports,
-                        sourceImports, signalCache, dimensionalCache, tierCache, telemetryActive, includeItems);
+                long delta = processNode(sourceNode, context.itemImports(), context.fluidImports(),
+                        context.energyImports(), context.chemicalImports(), context.sourceImports(),
+                        signalCache, dimensionalCache, tierCache, telemetryActive, includeItems);
                 if (delta < minWakeDelta) minWakeDelta = delta;
             }
             return minWakeDelta;
@@ -109,7 +103,10 @@ public class TransferEngine {
     }
 
     public record NetworkContext(List<LogisticsNodeEntity> sortedNodes, Map<UUID, Integer> signalCache,
-            List<ImportTarget>[] itemImports, Map<UUID, Boolean> dimensionalCache, Map<UUID, Integer> tierCache) {
+            List<ImportTarget>[] itemImports, List<ImportTarget>[] fluidImports,
+            List<ImportTarget>[] energyImports, List<ImportTarget>[] chemicalImports,
+            List<ImportTarget>[] sourceImports, Map<UUID, Boolean> dimensionalCache,
+            Map<UUID, Integer> tierCache) {
     }
 
     public record ResolvedItemTargets(List<ItemTransferTarget> targets, List<ImportTarget> refs, int status) {
@@ -155,12 +152,22 @@ public class TransferEngine {
             return null;
         }
 
-        return new NetworkContext(
-                sortedNodes,
-                signalCache,
+        @SuppressWarnings("unchecked")
+        List<ImportTarget>[][] imports = new List[][] {
                 resolveCache(network.getItemImports(), nodeCache, signalCache),
-                network.getDimensionalCache(),
-                network.getTierCache());
+                resolveCache(network.getFluidImports(), nodeCache, signalCache),
+                resolveCache(network.getEnergyImports(), nodeCache, signalCache),
+                resolveCache(network.getChemicalImports(), nodeCache, signalCache),
+                resolveCache(network.getSourceImports(), nodeCache, signalCache) };
+        Map<UUID, Boolean> dimensionalCache = network.getDimensionalCache();
+        List<ServerRackLinks.Link> links = registry.getRackLinks().linksFor(network.getId());
+        if (!links.isEmpty()) {
+            dimensionalCache = new HashMap<>(dimensionalCache);
+            BridgedImports.merge(links, registry, server, imports, dimensionalCache);
+        }
+
+        return new NetworkContext(sortedNodes, signalCache, imports[0], imports[1], imports[2], imports[3],
+                imports[4], dimensionalCache, network.getTierCache());
     }
 
     private static Map<UUID, Integer> buildSignalCache(List<LogisticsNodeEntity> nodes) {
@@ -1365,7 +1372,7 @@ public class TransferEngine {
         return EnergyHandlerUtil.move(source, target, limitRF, null);
     }
 
-    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,
+    public static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,
             @Nullable ResourceKey<Level> cachedDim) {
         if (cachedDim != null) {
             ServerLevel level = server.getLevel(cachedDim);

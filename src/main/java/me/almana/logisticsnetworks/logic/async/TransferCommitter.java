@@ -114,7 +114,7 @@ public final class TransferCommitter {
         if (!matchesBinding(plan.sourceStorageBinding(), source, bindings)) return revalidated(planned);
 
         TransferEngine.ResolvedItemTargets resolved = resolveTargets(
-                sourceNode, channel, plan.channelIndex(), source, network, context, cache, null);
+                sourceNode, channel, plan.channelIndex(), source, context, cache, null);
         ResolvedTarget[] targets = new ResolvedTarget[plan.targets().size()];
         for (int index = 0; index < targets.length; index++) {
             targets[index] = plannedTarget(plan.targets().get(index), resolved);
@@ -216,7 +216,7 @@ public final class TransferCommitter {
                 channel.getIoDirection(), directSource);
         if (source == null) return ItemResourceOrder.EMPTY;
         TransferEngine.ResolvedItemTargets targets = resolveTargets(
-                node, channel, plan.channelIndex(), source, network, context, cache, onlyTarget);
+                node, channel, plan.channelIndex(), source, context, cache, onlyTarget);
         Map<ResourceHandler<ItemResource>, Map<Item, Integer>> targetBatches = new IdentityHashMap<>();
         for (int index = 0; index < targets.refs().size(); index++) {
             Map<Item, Integer> moved = movedByTarget.get(targets.refs().get(index).node().getUUID());
@@ -265,16 +265,14 @@ public final class TransferCommitter {
 
     private static TransferEngine.ResolvedItemTargets resolveTargets(LogisticsNodeEntity sourceNode,
             ChannelData channel, int index, ResourceHandler<ItemResource> source,
-            LogisticsNetwork network, TransferEngine.NetworkContext context, FilterItemData.ReadCache cache,
-            @Nullable UUID onlyTarget) {
+            TransferEngine.NetworkContext context, FilterItemData.ReadCache cache, @Nullable UUID onlyTarget) {
         List<TransferEngine.ImportTarget> targets = new ArrayList<>();
         for (TransferEngine.ImportTarget ref : context.itemImports()[index]) {
             // Robin recovery stays on receiver
             if (onlyTarget != null && !onlyTarget.equals(ref.node().getUUID())) continue;
-            ChannelData current = ref.node().getChannel(index);
-            if (network.getNodeUuids().contains(ref.node().getUUID())
-                    && isActive(ref.node(), current, ChannelMode.IMPORT)) {
-                targets.add(new TransferEngine.ImportTarget(ref.node(), current, index));
+            ChannelData current = ref.node().getChannel(ref.channelIndex());
+            if (isActive(ref.node(), current, ChannelMode.IMPORT)) {
+                targets.add(new TransferEngine.ImportTarget(ref.node(), current, ref.channelIndex()));
             }
         }
         return TransferEngine.resolveItemTargets(sourceNode, (ServerLevel) sourceNode.level(), channel,

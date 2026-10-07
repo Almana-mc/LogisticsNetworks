@@ -112,4 +112,19 @@ static boolean shouldPauseForUnavailableMountedTargets(boolean hasUsableTarget,
         boolean hasUnavailableMountedTarget, boolean hasStationaryTarget) {
     return !hasUsableTarget && hasUnavailableMountedTarget && !hasStationaryTarget;
 }
+
+Source owner: BridgedImports
+
+ChannelData data = node.getChannel(channel);
+if (!TransferEngine.canRunChannel(node, data) || !CreateCompat.isResolved(node)
+        || !TransferEngine.isRedstoneActive(data.getRedstoneMode(), signal(node, data))) {
+    continue;
+}
+
+private static int signal(LogisticsNodeEntity node, ChannelData data) {
+    if (data.getRedstoneMode() == RedstoneMode.IGNORED || node.isMountedOnCreate()) {
+        return 0;
+    }
+    return node.level().getBestNeighborSignal(node.getAttachedPos());
+}
 */
