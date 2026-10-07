@@ -214,6 +214,26 @@ public final class ThemePaint {
         graphics.drawString(font, text, x + 6, y + (height - 7) / 2, theme.accent(), false);
     }
 
+    public static int sortButtonWidth(Font font, String label) {
+        return font.width(label) + 21;
+    }
+
+    public static void sortButton(GuiGraphics g, Font font, int x, int y, String label, boolean hovered, Theme t) {
+        int w = sortButtonWidth(font, label);
+        int fg = hovered ? (t.borderStrong() == t.text() ? t.bg() : t.text()) : t.textMuted();
+        g.fill(x, y, x + w, y + 13, hovered ? t.borderStrong() : t.surface2());
+        g.renderOutline(x, y, w, 13, hovered ? t.accent() : t.border());
+        int ix = x + 5;
+        int iy = y + 3;
+        g.fill(ix + 2, iy, ix + 3, iy + 1, fg);
+        g.fill(ix + 1, iy + 1, ix + 4, iy + 2, fg);
+        g.fill(ix, iy + 2, ix + 5, iy + 3, fg);
+        g.fill(ix, iy + 4, ix + 5, iy + 5, fg);
+        g.fill(ix + 1, iy + 5, ix + 4, iy + 6, fg);
+        g.fill(ix + 2, iy + 6, ix + 3, iy + 7, fg);
+        g.drawString(font, label, ix + 9, y + 3, fg, false);
+    }
+
     public static void setLabelBtn(GuiGraphics graphics, Font font, int x, int y, int width, int height,
             String label, boolean hovered, Theme theme) {
         int bg = hovered ? brighten(theme.surface2(), 0x10) : theme.surface2();
