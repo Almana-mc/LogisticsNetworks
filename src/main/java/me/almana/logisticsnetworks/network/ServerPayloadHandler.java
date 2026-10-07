@@ -778,8 +778,6 @@ public class ServerPayloadHandler {
             boolean isSpecial = type.isSpecial();
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
             ItemStack openedStack = stack.copyWithCount(1);
-            CompoundTag stackTag = new CompoundTag();
-            stackTag.store("Item", ItemStack.OPTIONAL_CODEC, openedStack);
 
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> {
@@ -796,7 +794,7 @@ public class ServerPayloadHandler {
                         if (graphContext != null) graphContext.write(buf);
                         buf.writeVarInt(ch);
                         buf.writeVarInt(fs);
-                        buf.writeNbt(stackTag);
+                        ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, openedStack);
                         buf.writeVarInt(slotCount);
                         buf.writeBoolean(false);
                         buf.writeBoolean(false);
@@ -864,7 +862,7 @@ public class ServerPayloadHandler {
                     return menu;
                 }
             }, buf -> {
-                NodeMenuSync.write(buf, node, player.level().registryAccess(), selectedChannel);
+                NodeMenuSync.write(buf, node, selectedChannel);
             });
 
             if (player.containerMenu instanceof NodeMenu menu) {
@@ -1547,13 +1545,15 @@ public class ServerPayloadHandler {
     public static void sendChannelSyncToViewers(LogisticsNodeEntity node, int channelIndex, ChannelData channel) {
         if (!(node.level() instanceof ServerLevel level))
             return;
-        CompoundTag tag = channel.save(level.registryAccess());
+        // Netty encodes later; snapshot now
+        ChannelData snapshot = new ChannelData();
+        snapshot.copyFrom(channel);
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
             if (player.containerMenu instanceof NodeMenu menu
                     && menu.getNode() != null
                     && menu.getNode().getUUID().equals(node.getUUID())) {
                 PacketDistributor.sendToPlayer(player,
-                        new SyncChannelDataPayload(node.getId(), channelIndex, tag));
+                        new SyncChannelDataPayload(node.getId(), channelIndex, snapshot));
             }
         }
     }

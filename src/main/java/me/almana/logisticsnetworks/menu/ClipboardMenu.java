@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.component.ClipboardSnapshot;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -12,7 +13,7 @@ import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
@@ -63,7 +64,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
         addDataSlots(data);
     }
 
-    public ClipboardMenu(int containerId, Inventory inventory, FriendlyByteBuf buf) {
+    public ClipboardMenu(int containerId, Inventory inventory, RegistryFriendlyByteBuf buf) {
         super(Registration.CLIPBOARD_MENU.get(), containerId);
         int handOrdinal = buf.readVarInt();
         this.hand = handOrdinal == InteractionHand.OFF_HAND.ordinal()
@@ -72,8 +73,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
         this.lockedSlot = hand == InteractionHand.MAIN_HAND ? inventory.getSelectedSlot() : -1;
         data.set(DATA_SELECTED_CHANNEL,
                 Math.clamp(buf.readVarInt(), 0, LogisticsNodeEntity.CHANNEL_COUNT - 1));
-        NodeClipboardConfig loaded = NodeClipboardConfig.load(buf.readNbt(), player.registryAccess());
-        this.clipboard = loaded == null ? NodeClipboardConfig.createEmpty() : loaded;
+        this.clipboard = NodeClipboardConfig.fromComponentSnapshot(ClipboardSnapshot.STREAM_CODEC.decode(buf));
         layoutSlots(inventory);
         addDataSlots(data);
     }
@@ -87,7 +87,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
                 Component.translatable("gui.logisticsnetworks.clipboard")), buf -> {
                     buf.writeVarInt(hand.ordinal());
                     buf.writeVarInt(selected);
-                    buf.writeNbt(clipboard.save(player.registryAccess()));
+                    ClipboardSnapshot.STREAM_CODEC.encode(buf, clipboard.toComponentSnapshot(player.registryAccess()));
                 });
         NodeMenu.sendAvailableNetworkListToClient(player);
     }

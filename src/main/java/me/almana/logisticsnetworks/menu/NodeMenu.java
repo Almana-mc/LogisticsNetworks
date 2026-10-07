@@ -12,7 +12,7 @@ import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
@@ -89,7 +89,7 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     // Client-side
-    public NodeMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
+    public NodeMenu(int containerId, Inventory playerInv, RegistryFriendlyByteBuf buf) {
         super(Registration.NODE_MENU.get(), containerId);
         NodeMenuSync.ClientNodeState state = NodeMenuSync.read(buf, playerInv.player);
         this.nodeId = state.entityId();

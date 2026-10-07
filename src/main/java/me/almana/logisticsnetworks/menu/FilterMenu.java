@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.component.ClipboardSnapshot;
 import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
@@ -14,13 +15,13 @@ import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.SimpleContainer;
@@ -287,7 +288,7 @@ public class FilterMenu extends AbstractContainerMenu {
                     buf.writeVarInt(hand.ordinal());
                     buf.writeVarInt(channelIndex);
                     buf.writeVarInt(filterSlot);
-                    buf.writeNbt(clipboard.save(player.registryAccess()));
+                    ClipboardSnapshot.STREAM_CODEC.encode(buf, clipboard.toComponentSnapshot(player.registryAccess()));
                     writeModeData(buf, slots, isMod, false, isName);
                 });
         return true;
@@ -306,7 +307,7 @@ public class FilterMenu extends AbstractContainerMenu {
         else if (ModFilterData.isModFilter(stack)) ModFilterData.setTargetType(stack, target);
     }
 
-    public FilterMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
+    public FilterMenu(int containerId, Inventory playerInv, RegistryFriendlyByteBuf buf) {
         super(Registration.FILTER_MENU.get(), containerId);
         int handOrdinal = buf.readVarInt();
         if (handOrdinal == -2) {
@@ -322,10 +323,7 @@ public class FilterMenu extends AbstractContainerMenu {
             this.nodeAE2Link = null;
             this.nodeSource = NodeMenuSync.findOrCreateClientNode(playerInv.player, entityId, nodeId, dimension);
             this.clipboardSource = null;
-            CompoundTag stackTag = buf.readNbt();
-            ItemStack openedStack = stackTag != null
-                    ? stackTag.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY)
-                    : ItemStack.EMPTY;
+            ItemStack openedStack = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
             if (this.nodeSource != null && !openedStack.isEmpty()) {
                 ChannelData channel = this.nodeSource.getChannel(this.nodeChannel);
                 if (channel != null) {
@@ -342,8 +340,7 @@ public class FilterMenu extends AbstractContainerMenu {
             this.nodeSource = null;
             this.nodeChannel = buf.readVarInt();
             this.nodeFilterSlot = buf.readVarInt();
-            NodeClipboardConfig loaded = NodeClipboardConfig.load(buf.readNbt(), playerInv.player.registryAccess());
-            this.clipboardSource = loaded == null ? NodeClipboardConfig.createEmpty() : loaded;
+            this.clipboardSource = NodeClipboardConfig.fromComponentSnapshot(ClipboardSnapshot.STREAM_CODEC.decode(buf));
         } else if (handOrdinal == -1) {
             this.inventorySlotIndex = buf.readVarInt();
             this.hand = InteractionHand.MAIN_HAND;

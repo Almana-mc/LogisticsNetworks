@@ -816,7 +816,7 @@ public class WrenchItem extends Item {
                 public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
                     return new NodeMenu(containerId, playerInv, node, preferredStorageLink);
                 }
-            }, buf -> NodeMenuSync.write(buf, node, player.registryAccess(), 0));
+            }, buf -> NodeMenuSync.write(buf, node, 0));
 
             if (serverPlayer.containerMenu instanceof NodeMenu menu) {
                 menu.sendNetworkListToClient(serverPlayer);

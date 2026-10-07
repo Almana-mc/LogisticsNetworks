@@ -11,8 +11,9 @@ import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import me.almana.logisticsnetworks.logic.FluidResourceOrder;
 import me.almana.logisticsnetworks.logic.PriorityRobin;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -59,6 +60,8 @@ public class ChannelData {
     public static final Codec<ChannelData> CODEC = Codec.withAlternative(CURRENT_CODEC, LEGACY_CODEC);
     public static final Codec<List<ChannelData>> LIST_CODEC =
             ComponentCodecs.lenient(CODEC, ChannelData::new).listOf();
+    public static final StreamCodec<RegistryFriendlyByteBuf, ChannelData> STREAM_CODEC =
+            ByteBufCodecs.fromCodecWithRegistries(CODEC);
 
     private boolean enabled;
     private ChannelMode mode = ChannelMode.IMPORT;
@@ -88,14 +91,6 @@ public class ChannelData {
     public ChannelData(boolean enabled) {
         this.enabled = enabled;
         Arrays.fill(filterItems, ItemStack.EMPTY);
-    }
-
-    public CompoundTag save(HolderLookup.Provider provider) {
-        return (CompoundTag) ComponentCodecs.encode(CODEC, provider, this);
-    }
-
-    public void load(CompoundTag tag, HolderLookup.Provider provider) {
-        ComponentCodecs.parse(CODEC, provider, tag).ifPresent(this::copyFrom);
     }
 
     private static ChannelData of(ChannelState settings, List<SlotStack> filters) {
@@ -343,5 +338,17 @@ public class ChannelData {
         for (int i = 0; i < FILTER_SIZE; i++) {
             this.filterItems[i] = source.filterItems[i].isEmpty() ? ItemStack.EMPTY : source.filterItems[i].copy();
         }
+    }
+
+    public boolean sameSettings(ChannelData other) {
+        if (!settings().equals(other.settings())) {
+            return false;
+        }
+        for (int slot = 0; slot < FILTER_SIZE; slot++) {
+            if (!ItemStack.matches(filterItems[slot], other.filterItems[slot])) {
+                return false;
+            }
+        }
+        return true;
     }
 }

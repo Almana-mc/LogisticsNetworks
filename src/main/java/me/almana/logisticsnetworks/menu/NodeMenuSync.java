@@ -3,9 +3,7 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -18,8 +16,7 @@ public final class NodeMenuSync {
     private NodeMenuSync() {
     }
 
-    public static void write(FriendlyByteBuf buf, LogisticsNodeEntity node, HolderLookup.Provider provider,
-            int selectedChannel) {
+    public static void write(RegistryFriendlyByteBuf buf, LogisticsNodeEntity node, int selectedChannel) {
         buf.writeVarInt(node.getId());
         buf.writeUUID(node.getUUID());
         buf.writeIdentifier(node.level().dimension().identifier());
@@ -35,16 +32,14 @@ public final class NodeMenuSync {
         buf.writeBoolean(node.isRenderVisible());
 
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-            buf.writeNbt(node.getChannel(i).save(provider));
+            ChannelData.STREAM_CODEC.encode(buf, node.getChannel(i));
         }
         for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-            CompoundTag entry = new CompoundTag();
-            entry.store("Item", ItemStack.OPTIONAL_CODEC, node.getUpgradeItem(i));
-            buf.writeNbt(entry);
+            ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, node.getUpgradeItem(i));
         }
     }
 
-    public static ClientNodeState read(FriendlyByteBuf buf, Player player) {
+    public static ClientNodeState read(RegistryFriendlyByteBuf buf, Player player) {
         int entityId = buf.readVarInt();
         UUID nodeId = buf.readUUID();
         Identifier dimension = buf.readIdentifier();
@@ -57,18 +52,11 @@ public final class NodeMenuSync {
         node.setNodeLabel(buf.readUtf());
         node.setRenderVisible(buf.readBoolean());
 
-        HolderLookup.Provider provider = player.level().registryAccess();
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-            CompoundTag tag = buf.readNbt();
-            if (tag != null) {
-                node.getChannel(i).load(tag, provider);
-            }
+            node.getChannel(i).copyFrom(ChannelData.STREAM_CODEC.decode(buf));
         }
         for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-            CompoundTag tag = buf.readNbt();
-            if (tag != null) {
-                node.setUpgradeItem(i, tag.read("Item", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY));
-            }
+            node.setUpgradeItem(i, ItemStack.OPTIONAL_STREAM_CODEC.decode(buf));
         }
 
         return new ClientNodeState(entityId, selectedChannel, node);
