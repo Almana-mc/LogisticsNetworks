@@ -11,8 +11,6 @@ public final class DurabilityFilterData {
     private static final String ROOT_KEY = "ln_durability_filter";
     private static final String KEY_VALUE = "value";
     private static final String KEY_OPERATOR = "operator";
-    private static final String KEY_IS_BLACKLIST = "blacklist";
-    private static final String KEY_TARGET_TYPE = "target";
 
     private static final int DEFAULT_VALUE = 0;
     private static final int MIN_VALUE = 0;
@@ -40,14 +38,6 @@ public final class DurabilityFilterData {
             return symbol;
         }
 
-        public Operator next() {
-            return switch (this) {
-                case LESS_OR_EQUAL -> EQUAL;
-                case EQUAL -> GREATER_OR_EQUAL;
-                case GREATER_OR_EQUAL -> LESS_OR_EQUAL;
-            };
-        }
-
         public static Operator fromId(@Nullable String id) {
             if (id == null)
                 return DEFAULT_OPERATOR;
@@ -66,48 +56,6 @@ public final class DurabilityFilterData {
         return false;
     }
 
-    public static boolean isBlacklist(ItemStack stack) {
-        if (!isDurabilityFilterItem(stack))
-            return false;
-        return getRootTag(stack).getBooleanOr(KEY_IS_BLACKLIST, false);
-    }
-
-    public static void setBlacklist(ItemStack stack, boolean isBlacklist) {
-        if (!isDurabilityFilterItem(stack))
-            return;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (isBlacklist) {
-                root.putBoolean(KEY_IS_BLACKLIST, true);
-            } else {
-                root.remove(KEY_IS_BLACKLIST);
-            }
-            writeRoot(customTag, root);
-        });
-    }
-
-    public static FilterTargetType getTargetType(ItemStack stack) {
-        if (!isDurabilityFilterItem(stack))
-            return FilterTargetType.ITEMS;
-        CompoundTag root = getRootTag(stack);
-        return FilterTargetType.fromOrdinal(root.getIntOr(KEY_TARGET_TYPE, FilterTargetType.ITEMS.ordinal()));
-    }
-
-    public static void setTargetType(ItemStack stack, FilterTargetType type) {
-        if (!isDurabilityFilterItem(stack))
-            return;
-        FilterTargetType target = type == null ? FilterTargetType.ITEMS : type;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (target == FilterTargetType.ITEMS) {
-                root.remove(KEY_TARGET_TYPE);
-            } else {
-                root.putInt(KEY_TARGET_TYPE, target.ordinal());
-            }
-            writeRoot(customTag, root);
-        });
-    }
-
     public static int getValue(ItemStack stack) {
         if (!isDurabilityFilterItem(stack))
             return DEFAULT_VALUE;
@@ -119,22 +67,6 @@ public final class DurabilityFilterData {
         return clamp(root.getIntOr(KEY_VALUE, DEFAULT_VALUE));
     }
 
-    public static void setValue(ItemStack stack, int value) {
-        if (!isDurabilityFilterItem(stack))
-            return;
-
-        int clamped = clamp(value);
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (clamped == DEFAULT_VALUE) {
-                root.remove(KEY_VALUE);
-            } else {
-                root.putInt(KEY_VALUE, clamped);
-            }
-            writeRoot(customTag, root);
-        });
-    }
-
     public static Operator getOperator(ItemStack stack) {
         if (!isDurabilityFilterItem(stack))
             return DEFAULT_OPERATOR;
@@ -144,30 +76,6 @@ public final class DurabilityFilterData {
             return DEFAULT_OPERATOR;
 
         return Operator.fromId(root.getStringOr(KEY_OPERATOR, DEFAULT_OPERATOR.id()));
-    }
-
-    public static void setOperator(ItemStack stack, @Nullable Operator operator) {
-        if (!isDurabilityFilterItem(stack))
-            return;
-
-        Operator normalized = operator == null ? DEFAULT_OPERATOR : operator;
-        CustomData.update(DataComponents.CUSTOM_DATA, stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            if (normalized == DEFAULT_OPERATOR) {
-                root.remove(KEY_OPERATOR);
-            } else {
-                root.putString(KEY_OPERATOR, normalized.id());
-            }
-            writeRoot(customTag, root);
-        });
-    }
-
-    public static int minValue() {
-        return MIN_VALUE;
-    }
-
-    public static int maxValue() {
-        return MAX_VALUE;
     }
 
     public static boolean matches(ItemStack filterStack, ItemStack candidate) {
@@ -199,13 +107,5 @@ public final class DurabilityFilterData {
             return customTag.getCompound(ROOT_KEY).map(CompoundTag::copy).orElseGet(CompoundTag::new);
         }
         return new CompoundTag();
-    }
-
-    private static void writeRoot(CompoundTag customTag, CompoundTag root) {
-        if (root.isEmpty()) {
-            customTag.remove(ROOT_KEY);
-        } else {
-            customTag.put(ROOT_KEY, root);
-        }
     }
 }

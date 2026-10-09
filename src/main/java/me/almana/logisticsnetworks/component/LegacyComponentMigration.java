@@ -1,8 +1,11 @@
 package me.almana.logisticsnetworks.component;
 
+import me.almana.logisticsnetworks.client.ClientRegistries;
+import me.almana.logisticsnetworks.filter.DurabilityFilterData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import net.minecraft.core.HolderLookup;
@@ -12,6 +15,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.Level;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -21,8 +25,11 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Locale;
@@ -39,20 +46,28 @@ public final class LegacyComponentMigration {
     private static final String DURABILITY_ROOT = "ln_durability_filter";
     private static final String NBT_ROOT = "ln_nbt_filter";
     private static final String SLOT_ROOT = "ln_slot_filter";
+    private static final List<String> ENTRY_FIELDS = List.of("item", "fluid", "chemical", "tag", "amount", "batch",
+            "stock", "slot_map", "slot_map_expr", "enchanted", "nbt_rules", "nbt_match_any", "nbt_strict", "nbt_raw",
+            "dur_op", "dur_val", "nbt_path", "nbt_val", "nbt_op");
 
     private LegacyComponentMigration() {
     }
 
     public static boolean migrateWrench(ItemStack stack, @Nullable HolderLookup.Provider provider) {
-        StorageLink currentLink = stack.get(LogisticsDataComponents.WRENCH_STORAGE_LINK);
         GlobalPos componentLink = stack.get(LogisticsDataComponents.WRENCH_AE2_LINK);
-        if (currentLink == null && componentLink != null) {
-            stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK,
-                    new StorageLink(StorageBackend.AE2, componentLink));
+        if (componentLink != null) {
+            if (!stack.has(LogisticsDataComponents.WRENCH_STORAGE_LINK)) {
+                stack.set(LogisticsDataComponents.WRENCH_STORAGE_LINK,
+                        new StorageLink(StorageBackend.AE2, componentLink));
+            }
+            stack.remove(LogisticsDataComponents.WRENCH_AE2_LINK);
         }
-        stack.remove(LogisticsDataComponents.WRENCH_AE2_LINK);
 
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+        if (data == null || !data.contains("ln_wrench")) {
+            return true;
+        }
+        CompoundTag custom = data.copyTag();
         if (!(custom.get("ln_wrench") instanceof CompoundTag root)) {
             return true;
         }
@@ -103,7 +118,7 @@ public final class LegacyComponentMigration {
         if (!stack.has(LogisticsDataComponents.WRENCH_CLIPBOARD)) {
             Tag tag = root.get("clipboard");
             if (tag instanceof CompoundTag clipboard) {
-                if (!NodeClipboardConfig.canDecodeItems(clipboard, provider)) return false;
+                if (provider == null && !NodeClipboardConfig.canDecodeItems(clipboard, null)) return false;
                 NodeClipboardConfig config = NodeClipboardConfig.load(clipboard, provider);
                 stack.set(LogisticsDataComponents.WRENCH_CLIPBOARD, config == null
                         ? WrenchClipboard.invalid() : WrenchClipboard.valid(config.toComponentSnapshot(provider)));
@@ -213,63 +228,123 @@ public final class LegacyComponentMigration {
     }
 
     public static boolean migrateGeneralFilter(ItemStack stack, @Nullable HolderLookup.Provider provider) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (!(custom.get(GENERAL_ROOT) instanceof CompoundTag root)) {
+        CompoundTag root = legacyRoot(stack, GENERAL_ROOT);
+        if (root == null) {
             return true;
         }
-        GeneralFilterConfig current = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
-        GeneralFilterBridge.ReadResult result = GeneralFilterBridge.read(root, provider, current);
-        if (!result.complete()) {
-            return false;
+        if (!stack.has(LogisticsDataComponents.FILTER_ENTRIES)) {
+            GeneralFilterConfig config = readGeneralFilter(root, provider != null ? provider : currentRegistries());
+            if (config == null) {
+                return false;
+            }
+            if (!config.entries().isEmpty()) {
+                stack.set(LogisticsDataComponents.FILTER_ENTRIES, config);
+            }
         }
         migrateSettings(stack, root, null);
-        if (current == null && !result.config().entries().isEmpty()) {
-            stack.set(LogisticsDataComponents.FILTER_ENTRIES, result.config());
-        }
-        removeRoot(stack, custom, GENERAL_ROOT);
+        removeRoot(stack, GENERAL_ROOT);
         return true;
     }
 
-    public static CompoundTag getGeneralFilterRoot(ItemStack stack, @Nullable HolderLookup.Provider provider) {
-        boolean migrated = migrateGeneralFilter(stack, provider);
-        GeneralFilterConfig config = stack.get(LogisticsDataComponents.FILTER_ENTRIES);
-        CompoundTag root = migrated
-                ? GeneralFilterBridge.write(config == null ? new GeneralFilterConfig(List.of()) : config, provider)
-                : getLegacyRoot(stack, GENERAL_ROOT);
-        if (!migrated && config != null) {
-            CompoundTag typed = GeneralFilterBridge.write(config, provider);
-            root.remove("items");
-            if (typed.contains("items")) root.put("items", typed.get("items"));
+    @Nullable
+    private static HolderLookup.Provider currentRegistries() {
+        // Client stacks need client holders
+        HolderLookup.Provider client = FMLEnvironment.getDist().isClient() ? ClientRegistries.onClientThread() : null;
+        if (client != null) {
+            return client;
         }
-        if (migrated || stack.has(LogisticsDataComponents.FILTER_SETTINGS)) {
-            writeSettings(root, FilterSettingsData.get(stack));
-        }
-        return root;
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        return server == null ? null : server.registryAccess();
     }
 
-    public static void updateGeneralFilterRoot(ItemStack stack, @Nullable HolderLookup.Provider provider,
-            Consumer<CompoundTag> modifier) {
-        boolean hasLegacy = hasLegacyRoot(stack, GENERAL_ROOT);
-        boolean migrated = migrateGeneralFilter(stack, provider);
-        if (!hasLegacy || migrated || stack.has(LogisticsDataComponents.FILTER_ENTRIES)) {
-            GeneralFilterConfig current = stack.getOrDefault(LogisticsDataComponents.FILTER_ENTRIES,
-                    new GeneralFilterConfig(List.of()));
-            CompoundTag root = getGeneralFilterRoot(stack, provider);
-            modifier.accept(root);
-            GeneralFilterBridge.ReadResult result = GeneralFilterBridge.read(root, provider, current);
-            if (!result.complete()) {
-                updateLegacyRoot(stack, GENERAL_ROOT, pending -> pending.merge(root));
-                return;
+    @Nullable
+    static GeneralFilterConfig readGeneralFilter(CompoundTag root, @Nullable HolderLookup.Provider provider) {
+        List<GeneralFilterEntry> entries = new ArrayList<>();
+        for (Tag tag : root.getListOrEmpty("items")) {
+            if (!(tag instanceof CompoundTag entry)) {
+                continue;
             }
-            migrateSettingsFromWorkingRoot(stack, root, !migrated);
-            if (migrated && result.config().entries().isEmpty()) {
-                stack.remove(LogisticsDataComponents.FILTER_ENTRIES);
-            } else {
-                stack.set(LogisticsDataComponents.FILTER_ENTRIES, result.config());
+            StackSnapshot item = null;
+            if (entry.get("item") instanceof CompoundTag itemTag) {
+                item = readItem(itemTag, provider);
+                if (item == null && provider == null) {
+                    // Retry once registries exist
+                    return null;
+                }
+                if (item == null) {
+                    continue;
+                }
             }
-            return;
+            GeneralFilterEntry read = readEntry(entry, item);
+            if (!read.isEmpty()) {
+                entries.add(read);
+            }
         }
-        updateLegacyRoot(stack, GENERAL_ROOT, modifier);
+        return new GeneralFilterConfig(entries);
+    }
+
+    @Nullable
+    private static StackSnapshot readItem(CompoundTag tag, @Nullable HolderLookup.Provider provider) {
+        ItemStack stack = provider == null
+                ? ItemStack.CODEC.parse(NbtOps.INSTANCE, tag).result().orElse(ItemStack.EMPTY)
+                : ComponentCodecs.QUIET_STACK.parse(provider.createSerializationContext(NbtOps.INSTANCE), tag)
+                        .result().orElse(ItemStack.EMPTY);
+        if (stack.isEmpty()) {
+            return null;
+        }
+        FilterComponentData.migrate(stack, provider);
+        return StackSnapshot.of(stack.copyWithCount(1));
+    }
+
+    private static GeneralFilterEntry readEntry(CompoundTag entry, @Nullable StackSnapshot item) {
+        GeneralFilterEntry.EntryCounts counts = new GeneralFilterEntry.EntryCounts(
+                entry.getIntOr("amount", 0), entry.getIntOr("batch", 0), entry.getIntOr("stock", 0));
+        GeneralFilterEntry.SlotMapping mapping = new GeneralFilterEntry.SlotMapping(
+                Arrays.stream(entry.getIntArray("slot_map").orElse(new int[0])).boxed().toList(),
+                entry.getStringOr("slot_map_expr", ""));
+        Boolean enchanted = entry.contains("enchanted") ? entry.getBooleanOr("enchanted", false) : null;
+        GeneralFilterEntry.NbtConstraints nbt = new GeneralFilterEntry.NbtConstraints(readRules(entry),
+                entry.getBooleanOr("nbt_match_any", false),
+                entry.contains("nbt_strict")
+                        ? Optional.of(entry.getBooleanOr("nbt_strict", false))
+                        : Optional.empty(),
+                entry.getStringOr("nbt_raw", ""));
+        GeneralFilterEntry.DurabilityConstraint durability = entry.contains("dur_op")
+                ? new GeneralFilterEntry.DurabilityConstraint(
+                        DurabilityFilterData.Operator.fromId(entry.getStringOr("dur_op", "")),
+                        entry.getIntOr("dur_val", 0))
+                : null;
+        return new GeneralFilterEntry(entry.getIntOr("slot", 0), item, readString(entry, "fluid"),
+                readString(entry, "chemical"), readString(entry, "tag"), counts, mapping, enchanted, nbt, durability);
+    }
+
+    private static List<NbtCriterion> readRules(CompoundTag entry) {
+        List<NbtCriterion> rules = new ArrayList<>();
+        for (Tag tag : entry.getListOrEmpty("nbt_rules")) {
+            if (tag instanceof CompoundTag rule) {
+                NbtCriterion criterion = readRule(rule.getStringOr("p", ""), rule.getStringOr("o", ""), rule.get("v"));
+                if (criterion != null) {
+                    rules.add(criterion);
+                }
+            }
+        }
+        if (!rules.isEmpty()) {
+            return rules;
+        }
+        NbtCriterion single = readRule(entry.getStringOr("nbt_path", ""), entry.getStringOr("nbt_op", ""),
+                entry.get("nbt_val"));
+        return single == null ? List.of() : List.of(single);
+    }
+
+    @Nullable
+    private static NbtCriterion readRule(String path, String operator, @Nullable Tag value) {
+        NbtPath parsed = NbtPath.parseLenient(path);
+        return parsed.isEmpty() || value == null ? null : new NbtCriterion(parsed, operator, value);
+    }
+
+    @Nullable
+    private static String readString(CompoundTag tag, String key) {
+        return tag.contains(key) ? tag.getStringOr(key, "") : null;
     }
 
     public static void migrateModFilter(ItemStack stack) {
@@ -332,8 +407,8 @@ public final class LegacyComponentMigration {
             }
             DurabilityFilterConfig config = new DurabilityFilterConfig(
                     root.getIntOr("value", 0),
-                    me.almana.logisticsnetworks.filter.DurabilityFilterData.Operator.fromId(root.getStringOr("operator", "")));
-            if (config.value() != 0 || config.operator() != me.almana.logisticsnetworks.filter.DurabilityFilterData.Operator.GREATER_OR_EQUAL) {
+                    DurabilityFilterData.Operator.fromId(root.getStringOr("operator", "")));
+            if (config.value() != 0 || config.operator() != DurabilityFilterData.Operator.GREATER_OR_EQUAL) {
                 stack.set(LogisticsDataComponents.DURABILITY_FILTER, config);
             }
         });
@@ -342,7 +417,9 @@ public final class LegacyComponentMigration {
     public static void migrateNbtFilter(ItemStack stack) {
         migrate(stack, NBT_ROOT, root -> {
             List<NbtFilterConfig.Rule> rules = readNbtRules(root);
-            String inferredPath = rules.isEmpty() ? root.getStringOr("path", "") : rules.getFirst().path();
+            NbtPath inferredPath = rules.isEmpty()
+                    ? NbtPath.parseLenient(root.getStringOr("path", ""))
+                    : rules.getFirst().path();
             FilterTargetType inferred = NbtFilterData.isFluidPath(inferredPath)
                     ? FilterTargetType.FLUIDS
                     : FilterTargetType.ITEMS;
@@ -380,7 +457,7 @@ public final class LegacyComponentMigration {
             if (!(tag instanceof CompoundTag rule)) {
                 continue;
             }
-            String path = rule.getStringOr("path", "").trim();
+            NbtPath path = NbtPath.parseLenient(rule.getStringOr("path", "").trim());
             Tag value = rule.get("value");
             if (path.isEmpty() || value == null) {
                 continue;
@@ -394,7 +471,7 @@ public final class LegacyComponentMigration {
         if (!rules.isEmpty()) {
             return rules;
         }
-        String path = root.getStringOr("path", "").trim();
+        NbtPath path = NbtPath.parseLenient(root.getStringOr("path", "").trim());
         Tag value = root.get("value");
         return path.isEmpty() || value == null
                 ? List.of()
@@ -414,35 +491,18 @@ public final class LegacyComponentMigration {
         }
     }
 
-    private static void migrateSettingsFromWorkingRoot(ItemStack stack, CompoundTag root, boolean pending) {
-        FilterSettings settings = new FilterSettings(
-                FilterTargetType.fromOrdinal(root.getIntOr("target", 0)), root.getBooleanOr("blacklist", false));
-        if (pending) {
-            stack.set(LogisticsDataComponents.FILTER_SETTINGS, settings);
-        } else {
-            FilterSettingsData.set(stack, settings);
+    @Nullable
+    private static CompoundTag legacyRoot(ItemStack stack, String rootKey) {
+        CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
+        if (custom == null || !custom.contains(rootKey)) {
+            return null;
         }
-    }
-
-    private static void writeSettings(CompoundTag root, FilterSettings settings) {
-        root.remove("target");
-        root.remove("blacklist");
-        if (settings.target() != FilterTargetType.ITEMS) {
-            root.putInt("target", settings.target().ordinal());
-        }
-        if (settings.blacklist()) {
-            root.putBoolean("blacklist", true);
-        }
-    }
-
-    private static boolean hasLegacyRoot(ItemStack stack, String rootKey) {
-        return stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
-                .get(rootKey) instanceof CompoundTag;
+        return custom.copyTag().get(rootKey) instanceof CompoundTag root ? root : null;
     }
 
     private static CompoundTag getLegacyRoot(ItemStack stack, String rootKey) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.get(rootKey) instanceof CompoundTag root ? root.copy() : new CompoundTag();
+        CompoundTag root = legacyRoot(stack, rootKey);
+        return root == null ? new CompoundTag() : root;
     }
 
     private static void updateLegacyRoot(ItemStack stack, String rootKey, Consumer<CompoundTag> modifier) {
@@ -462,15 +522,16 @@ public final class LegacyComponentMigration {
     }
 
     private static void migrate(ItemStack stack, String rootKey, Consumer<CompoundTag> migration) {
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (!(custom.get(rootKey) instanceof CompoundTag root)) {
+        CompoundTag root = legacyRoot(stack, rootKey);
+        if (root == null) {
             return;
         }
-        migration.accept(root.copy());
-        removeRoot(stack, custom, rootKey);
+        migration.accept(root);
+        removeRoot(stack, rootKey);
     }
 
-    private static void removeRoot(ItemStack stack, CompoundTag custom, String rootKey) {
+    private static void removeRoot(ItemStack stack, String rootKey) {
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         CompoundTag remaining = custom.getCompoundOrEmpty(rootKey).copy();
         remaining.remove("target");
         remaining.remove("blacklist");
@@ -514,7 +575,7 @@ public final class LegacyComponentMigration {
                     if (!unknown.isEmpty()) rules.add(unknown);
                 }
             }
-            GeneralFilterBridge.ENTRY_FIELDS.forEach(extra::remove);
+            ENTRY_FIELDS.forEach(extra::remove);
             if (!rules.isEmpty()) extra.put("nbt_rules", rules);
             if (extra.size() > (extra.contains("slot") ? 1 : 0)) entries.add(extra);
         }

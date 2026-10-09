@@ -4,7 +4,6 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -39,8 +38,7 @@ public final class AttachedStorageFilterScanner {
         }
 
         return switch (target) {
-            case ITEMS -> scanItems(node.capabilities().findItemHandler(channel.getIoDirection()), filter,
-                    level.registryAccess());
+            case ITEMS -> scanItems(node.capabilities().findItemHandler(channel.getIoDirection()), filter);
             case FLUIDS -> scanFluids(node.capabilities().findFluidHandler(channel.getIoDirection()), filter);
             case CHEMICALS -> {
                 // Enable when 26.1.2 is supported.
@@ -52,8 +50,7 @@ public final class AttachedStorageFilterScanner {
         };
     }
 
-    static Result scanItems(ResourceHandler<ItemResource> handler, ItemStack filter,
-            HolderLookup.Provider provider) {
+    static Result scanItems(ResourceHandler<ItemResource> handler, ItemStack filter) {
         if (handler == null) {
             return new Result(0, false, false);
         }
@@ -64,10 +61,10 @@ public final class AttachedStorageFilterScanner {
                 continue;
             }
             ItemStack stack = resource.toStack();
-            if (FilterItemData.containsItem(filter, stack, provider)) {
+            if (FilterItemData.containsItem(filter, stack)) {
                 continue;
             }
-            if (FilterItemData.addItem(filter, stack, provider)) {
+            if (FilterItemData.addItem(filter, stack)) {
                 added++;
             } else if (!FilterItemData.hasAvailableEntrySlot(filter)) {
                 return new Result(added, true, true);

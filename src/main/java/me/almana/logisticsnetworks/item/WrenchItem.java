@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.component.LegacyComponentMigration;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.WrenchClipboard;
+import me.almana.logisticsnetworks.component.WrenchFlow;
 import me.almana.logisticsnetworks.component.WrenchMassPlacement;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -816,7 +817,7 @@ public class WrenchItem extends Item {
                 public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
                     return new NodeMenu(containerId, playerInv, node, preferredStorageLink);
                 }
-            }, buf -> NodeMenuSync.write(buf, node, player.registryAccess(), 0));
+            }, buf -> NodeMenuSync.write(buf, node, 0));
 
             if (serverPlayer.containerMenu instanceof NodeMenu menu) {
                 menu.sendNetworkListToClient(serverPlayer);
@@ -970,6 +971,18 @@ public class WrenchItem extends Item {
         } else {
             stack.set(DataComponents.CUSTOM_MODEL_DATA,
                     new CustomModelData(old.floats(), old.flags(), old.strings(), List.of()));
+        }
+    }
+
+    public static WrenchFlow getFlow(ItemStack stack) {
+        return stack.getOrDefault(LogisticsDataComponents.WRENCH_FLOW, WrenchFlow.DEFAULT);
+    }
+
+    public static void setFlow(ItemStack stack, WrenchFlow flow) {
+        if (flow.equals(WrenchFlow.DEFAULT)) {
+            stack.remove(LogisticsDataComponents.WRENCH_FLOW);
+        } else {
+            stack.set(LogisticsDataComponents.WRENCH_FLOW, flow);
         }
     }
 

@@ -2,7 +2,6 @@ package me.almana.logisticsnetworks.client.flow;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import me.almana.logisticsnetworks.data.ChannelType;
 import net.minecraft.world.phys.Vec3;
 
 final class FlowLines {
@@ -13,7 +12,7 @@ final class FlowLines {
         for (FlowRenderState.Route route : frame.routes()) {
             for (FlowSegment segment : route.segments()) {
                 double visible = FlowAnimation.revealed(segment.length(), segment.revealDistance(), route.travelled());
-                if (visible > 1.0E-8) line(base, pose, frame.camera(), segment, 0, visible, color(route.type()),
+                if (visible > 1.0E-8) line(base, pose, frame.camera(), segment, 0, visible, frame.color(route.type()),
                         frame.opacity(), frame.opacity(), frame.width());
             }
         }
@@ -23,7 +22,7 @@ final class FlowLines {
         for (FlowRenderState.Route route : frame.routes()) {
             for (FlowSegment segment : route.segments()) {
                 double visible = FlowAnimation.revealed(segment.length(), segment.revealDistance(), route.travelled());
-                pulses(pulse, pose, frame, segment, visible, route.travelled(), brighten(color(route.type())));
+                pulses(pulse, pose, frame, segment, visible, route.travelled(), brighten(frame.color(route.type())));
             }
         }
     }
@@ -63,15 +62,5 @@ final class FlowLines {
         int green = (color >> 8 & 255) + (255 - (color >> 8 & 255)) / 2;
         int blue = (color & 255) + (255 - (color & 255)) / 2;
         return red << 16 | green << 8 | blue;
-    }
-
-    private static int color(ChannelType type) {
-        return switch (type) {
-            case ITEM -> 0xB87D1F;
-            case FLUID -> 0x1C94AC;
-            case ENERGY -> 0xB43D3D;
-            case CHEMICAL -> 0x2E944F;
-            case SOURCE -> 0x7D49B8;
-        };
     }
 }

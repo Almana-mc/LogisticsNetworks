@@ -1,16 +1,19 @@
 package me.almana.logisticsnetworks.data;
 
+import com.mojang.datafixers.util.Either;
 import com.mojang.logging.LogUtils;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.Dynamic;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.NodeAccessMode;
+import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -18,31 +21,39 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.world.level.storage.SavedDataStorage;
-import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import org.slf4j.Logger;
 
 import java.util.*;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import org.jetbrains.annotations.Nullable;
 
 public class NetworkRegistry extends SavedData {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String DATA_NAME = "logistics_networks";
-    private static final String KEY_NETWORKS = "Networks";
+    private static final String KEY_NETWORKS = "networks";
+    private static final String LEGACY_KEY_NETWORKS = "Networks";
+    // Undecodable networks stay raw
+    private static final Codec<NetworkRegistry> CODEC = Codec.of(
+            Codec.either(LogisticsNetwork.CODEC, ComponentCodecs.TAG).listOf().fieldOf(KEY_NETWORKS).codec()
+                    .comap(NetworkRegistry::entries),
+            Codec.PASSTHROUGH.map(NetworkRegistry::load));
     private static final SavedDataType<NetworkRegistry> DATA_TYPE = new SavedDataType<>(
             Identifier.fromNamespaceAndPath("logisticsnetworks", DATA_NAME),
             NetworkRegistry::new,
-            CompoundTag.CODEC.xmap(NetworkRegistry::load, NetworkRegistry::saveTag));
+            CODEC);
 
     // Limits & Warnings for beta
     private static final int WARNING_NODE_COUNT = 200;
 
     private final Map<UUID, LogisticsNetwork> networks = new HashMap<>();
+    private final List<Tag> undecodableNetworks = new ArrayList<>();
     private final NetworkDispatcher dispatcher = new NetworkDispatcher();
     private long reloadVersion = AsyncTransferRuntime.reloadVersion();
     private final TelemetryManager telemetryManager = new TelemetryManager();
+    private final ServerRackLinks rackLinks = new ServerRackLinks();
 
     public NetworkRegistry() {
     }
@@ -126,6 +137,13 @@ public class NetworkRegistry extends SavedData {
         }
     }
 
+    public void stampCreatedAt(UUID networkId) {
+        LogisticsNetwork network = networks.get(networkId);
+        if (network != null && network.stampCreatedAtIfMissing()) {
+            setDirty();
+        }
+    }
+
     public LogisticsNetwork getNetwork(UUID id) {
         return networks.get(id);
     }
@@ -138,14 +156,36 @@ public class NetworkRegistry extends SavedData {
         return telemetryManager;
     }
 
+    public ServerRackLinks getRackLinks() {
+        return rackLinks;
+    }
+
+    public void putRack(GlobalPos pos, ServerRackConfig config) {
+        rackLinks.put(pos, config).forEach(this::invalidateNetwork);
+    }
+
+    public void removeRack(GlobalPos pos) {
+        rackLinks.remove(pos).forEach(this::invalidateNetwork);
+    }
+
+    // Rack peers share wakeups
+    private void markDirty(UUID networkId) {
+        dispatcher.markDirty(networkId);
+        for (ServerRackLinks.Link link : rackLinks.linksFor(networkId)) {
+            if (networks.containsKey(link.peer())) {
+                dispatcher.markDirty(link.peer());
+            }
+        }
+    }
+
     public void wakeNetwork(UUID networkId) {
-        if (networks.containsKey(networkId)) dispatcher.markDirty(networkId);
+        if (networks.containsKey(networkId)) markDirty(networkId);
     }
 
     public void invalidateNetwork(UUID networkId) {
         LogisticsNetwork network = networks.get(networkId);
         if (network != null) {
-            dispatcher.markDirty(networkId);
+            markDirty(networkId);
             network.markCacheDirty();
         }
     }
@@ -158,7 +198,7 @@ public class NetworkRegistry extends SavedData {
                 if (Config.debugMode) LOGGER.warn("Network {} has exceeded {} nodes (Count: {}). Performance may degrade.",
                         networkId, WARNING_NODE_COUNT, network.getNodeUuids().size());
             }
-            dispatcher.markDirty(networkId);
+            markDirty(networkId);
             setDirty();
         }
     }
@@ -167,7 +207,7 @@ public class NetworkRegistry extends SavedData {
         LogisticsNetwork network = networks.get(networkId);
         if (network != null) {
             network.removeNode(nodeId);
-            dispatcher.markDirty(networkId);
+            markDirty(networkId);
 
             if (network.getNodeUuids().isEmpty()) {
                 if (Config.debugMode) LOGGER.info("Network {} is empty, deleting.", networkId);
@@ -177,47 +217,29 @@ public class NetworkRegistry extends SavedData {
         }
     }
 
-    public CompoundTag saveTag() {
-        CompoundTag compoundTag = new CompoundTag();
-        ListTag list = new ListTag();
-        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-        HolderLookup.Provider provider = server == null ? null : server.registryAccess();
-        for (LogisticsNetwork network : networks.values()) {
-            list.add(network.save(provider));
-        }
-        compoundTag.put(KEY_NETWORKS, list);
-        return compoundTag;
+    private List<Either<LogisticsNetwork, Tag>> entries() {
+        List<Either<LogisticsNetwork, Tag>> entries = new ArrayList<>();
+        networks.values().forEach(network -> entries.add(Either.left(network)));
+        undecodableNetworks.forEach(tag -> entries.add(Either.right(tag)));
+        return entries;
     }
 
-    public static NetworkRegistry load(CompoundTag compoundTag) {
+    private static NetworkRegistry load(Dynamic<?> data) {
         NetworkRegistry registry = new NetworkRegistry();
-        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-        HolderLookup.Provider provider = server == null ? null : server.registryAccess();
-        boolean assignedDefaultColor = false;
-        if (compoundTag.contains(KEY_NETWORKS)) {
-            ListTag list = compoundTag.getListOrEmpty(KEY_NETWORKS);
-            for (Tag t : list) {
-                if (t instanceof CompoundTag ct) {
-                    try {
-                        if (!ct.contains("Color")) {
-                            assignedDefaultColor = true;
-                        }
-                        LogisticsNetwork network = LogisticsNetwork.load(ct, provider);
-                        registry.networks.put(network.getId(), network);
-                    } catch (Exception e) {
-                        if (Config.debugMode) LOGGER.error("Skipping malformed network: {}", e.getMessage());
-                    }
-                }
-            }
+        String key = data.get(KEY_NETWORKS).result().isPresent() ? KEY_NETWORKS : LEGACY_KEY_NETWORKS;
+        for (Dynamic<?> entry : data.get(key).asList(Function.identity())) {
+            ComponentCodecs.parse(LogisticsNetwork.CODEC, entry).ifPresentOrElse(
+                    network -> registry.networks.put(network.getId(), network),
+                    () -> registry.undecodableNetworks.add(entry.convert(NbtOps.INSTANCE).getValue()));
         }
         if (!registry.networks.isEmpty()) {
             registry.networks.keySet().forEach(registry.dispatcher::markDirty);
             if (Config.debugMode) LOGGER.info("Loaded {} networks.", registry.networks.size());
         }
-        if (assignedDefaultColor) {
+        // Persist legacy-format random colours
+        if (data.get(LEGACY_KEY_NETWORKS).result().isPresent()) {
             registry.setDirty();
         }
-
         return registry;
     }
 }

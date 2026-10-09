@@ -49,30 +49,6 @@ public class ClientConfig {
             .comment("Use the classic green terminal look for the network computer instead of the selected GUI theme.")
             .define("computerClassicTheme", true);
 
-    public static final ModConfigSpec.BooleanValue flowLinesEnabledSpec = builder
-            .define("flowLinesEnabled", true);
-
-    public static final ModConfigSpec.DoubleValue flowLineThicknessSpec = builder
-            .defineInRange("flowLineThickness", 6.0, 1.0, 20.0);
-
-    public static final ModConfigSpec.DoubleValue flowLineSpeedSpec = builder
-            .defineInRange("flowLineSpeed", 3.0, 0.1, 60.0);
-
-    public static final ModConfigSpec.DoubleValue flowLineOpacitySpec = builder
-            .defineInRange("flowLineOpacity", 0.95, 0.05, 1.0);
-
-    public static final ModConfigSpec.BooleanValue flowLinePulsesSpec = builder
-            .define("flowLinePulses", true);
-
-    public static final ModConfigSpec.DoubleValue flowLinePulseSpacingSpec = builder
-            .defineInRange("flowLinePulseSpacing", 3.0, 0.5, 32.0);
-
-    public static final ModConfigSpec.DoubleValue flowLinePulseLengthSpec = builder
-            .defineInRange("flowLinePulseLength", 0.6, 0.1, 8.0);
-
-    public static final ModConfigSpec.BooleanValue flowLinesThroughBlocksSpec = builder
-            .define("flowLinesThroughBlocks", true);
-
     public static final ModConfigSpec SPEC = builder.build();
 
     public static boolean defaultNodeVisibility = true;
@@ -81,14 +57,6 @@ public class ClientConfig {
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
     public static boolean connectedNodeTextures = true;
-    public static boolean flowLinesEnabled = true;
-    public static double flowLineThickness = 6.0;
-    public static double flowLineSpeed = 3.0;
-    public static double flowLineOpacity = 0.95;
-    public static boolean flowLinePulses = true;
-    public static double flowLinePulseSpacing = 3.0;
-    public static double flowLinePulseLength = 0.6;
-    public static boolean flowLinesThroughBlocks = true;
     public static boolean computerClassicTheme = true;
 
     @SubscribeEvent
@@ -104,14 +72,6 @@ public class ClientConfig {
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
         connectedNodeTextures = connectedNodeTexturesSpec.get();
-        flowLinesEnabled = flowLinesEnabledSpec.get();
-        flowLineThickness = flowLineThicknessSpec.get();
-        flowLineSpeed = flowLineSpeedSpec.get();
-        flowLineOpacity = flowLineOpacitySpec.get();
-        flowLinePulses = flowLinePulsesSpec.get();
-        flowLinePulseSpacing = flowLinePulseSpacingSpec.get();
-        flowLinePulseLength = flowLinePulseLengthSpec.get();
-        flowLinesThroughBlocks = flowLinesThroughBlocksSpec.get();
         computerClassicTheme = computerClassicThemeSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());
     }

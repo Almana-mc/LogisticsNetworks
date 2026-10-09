@@ -59,7 +59,6 @@ public class ModConfigScreen extends Screen {
     private static final Component[] TAB_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.tab.common"),
         Component.translatable("gui.logisticsnetworks.config.tab.client"),
-        Component.translatable("gui.logisticsnetworks.config.client.flowLines"),
         Component.translatable("gui.logisticsnetworks.config.tab.upgrades")
     };
 
@@ -101,7 +100,7 @@ public class ModConfigScreen extends Screen {
 
     private static final Component TEXT_NO_PERMISSION = Component.translatable("gui.logisticsnetworks.config.no_permission");
 
-    private enum Tab { COMMON, CLIENT, FLOW_LINES, UPGRADES }
+    private enum Tab { COMMON, CLIENT, UPGRADES }
 
     private final Screen parent;
     private int x0, y0;
@@ -129,8 +128,6 @@ public class ModConfigScreen extends Screen {
     private EditBox maxVisibleNodesBox;
     private String pendingTheme;
     private boolean pendingComputerClassic;
-    private FlowConfigPage flowOptions;
-    private Button doneButton;
 
     private TierLimits[] pendingTiers;
     private int expandedTier = -1;
@@ -172,7 +169,6 @@ public class ModConfigScreen extends Screen {
         pendingConnectedNodeTextures = ClientConfig.connectedNodeTexturesSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
         pendingComputerClassic = ClientConfig.computerClassicThemeSpec.get();
-        if (flowOptions == null) flowOptions = new FlowConfigPage();
         pendingTiers = UpgradeLimitsConfig.getAll();
 
         buildTab();
@@ -192,7 +188,7 @@ public class ModConfigScreen extends Screen {
         int btnY = y0 + GUI_HEIGHT - 24;
         int btnStartX = x0 + (GUI_WIDTH - totalW) / 2;
 
-        doneButton = addRenderableWidget(Button.builder(TEXT_DONE, b -> save())
+        addRenderableWidget(Button.builder(TEXT_DONE, b -> save())
                 .bounds(btnStartX, btnY, doneW, 18).build());
         addRenderableWidget(Button.builder(TEXT_CANCEL, b -> cancel())
                 .bounds(btnStartX + doneW + gap, btnY, cancelW, 18).build());
@@ -204,7 +200,6 @@ public class ModConfigScreen extends Screen {
         switch (currentTab) {
             case COMMON -> buildCommonTab(contentX, contentY, contentW);
             case CLIENT -> buildClientTab(contentX, contentY, contentW);
-            case FLOW_LINES -> buildFlowTab(contentX, contentY, contentW);
             case UPGRADES -> buildUpgradesTab(contentX, contentY, contentW);
         }
     }
@@ -244,10 +239,6 @@ public class ModConfigScreen extends Screen {
         addWidget(maxVisibleNodesBox);
     }
 
-    private void buildFlowTab(int cx, int cy, int cw) {
-        flowOptions.build(font, cx, cy, cw).forEach(this::addWidget);
-    }
-
     private void buildUpgradesTab(int cx, int cy, int cw) {
         upgradeBoxes = new EditBox[6];
 
@@ -276,7 +267,6 @@ public class ModConfigScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
-        doneButton.active = flowOptions.valid();
         g.fill(x0 + 4, y0 + 4, x0 + GUI_WIDTH + 4, y0 + GUI_HEIGHT + 4, COL_SHADOW);
         g.fill(x0 + 3, y0 + 3, x0 + GUI_WIDTH + 3, y0 + GUI_HEIGHT + 3, COL_SHADOW_SOFT);
 
@@ -305,7 +295,6 @@ public class ModConfigScreen extends Screen {
         switch (currentTab) {
             case COMMON -> renderCommonTab(g, contentX, contentY, contentW, mouseX, mouseY);
             case CLIENT -> renderClientTab(g, contentX, contentY, contentW, mouseX, mouseY);
-            case FLOW_LINES -> flowOptions.render(this, g, font, contentX, contentY, contentW, mouseX, mouseY);
             case UPGRADES -> renderUpgradesTab(g, contentX, contentY, contentW, mouseX, mouseY);
         }
 
@@ -317,8 +306,6 @@ public class ModConfigScreen extends Screen {
         for (EditBox box : upgradeBoxes) {
             renderEditBox(g, box);
         }
-
-        if (currentTab == Tab.FLOW_LINES) flowOptions.renderTooltips(g, font, mouseX, mouseY);
 
         if (!canEditServerConfig && (currentTab == Tab.COMMON || currentTab == Tab.UPGRADES)) {
             int tipH = GUI_HEIGHT - 60;
@@ -580,7 +567,7 @@ public class ModConfigScreen extends Screen {
             switch (currentTab) {
                 case COMMON -> { if (handleCommonClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
                 case UPGRADES -> { if (handleUpgradesClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
-                case CLIENT, FLOW_LINES -> { }
+                case CLIENT -> { }
             }
         }
 
@@ -681,7 +668,6 @@ public class ModConfigScreen extends Screen {
                     pendingMaxVisibleNodes = parseIntClamped(maxVisibleNodesBox.getValue(), 0, Integer.MAX_VALUE, pendingMaxVisibleNodes);
                 }
             }
-            case FLOW_LINES -> { }
             case UPGRADES -> stashExpandedTier();
         }
     }
@@ -701,7 +687,7 @@ public class ModConfigScreen extends Screen {
     }
 
     private void saveChanges() {
-        if (saved || !flowOptions.valid()) return;
+        if (saved) return;
         saved = true;
         stashCurrentTab();
 
@@ -742,7 +728,6 @@ public class ModConfigScreen extends Screen {
         ClientConfig.confirmNetworkCreationSpec.set(pendingConfirmNetworkCreation);
         ClientConfig.themeSpec.set(pendingTheme);
         ClientConfig.computerClassicThemeSpec.set(pendingComputerClassic);
-        flowOptions.save();
         ClientConfig.refresh();
         DefaultNodeVisibilitySync.send();
         ThemeState.setTheme(Themes.byId(pendingTheme));
@@ -750,7 +735,6 @@ public class ModConfigScreen extends Screen {
     }
 
     private void save() {
-        if (!flowOptions.valid()) return;
         saveChanges();
 
         minecraft.setScreen(parent);
@@ -833,7 +817,6 @@ public class ModConfigScreen extends Screen {
     }
 
     private EditBox findFocusedEditBox() {
-        if (currentTab == Tab.FLOW_LINES && flowOptions.focused() != null) return flowOptions.focused();
         if (backoffMaxTicksBox != null && backoffMaxTicksBox.isFocused()) return backoffMaxTicksBox;
         if (maxRenderedNodesBox != null && maxRenderedNodesBox.isFocused()) return maxRenderedNodesBox;
         if (maxVisibleNodesBox != null && maxVisibleNodesBox.isFocused()) return maxVisibleNodesBox;
@@ -844,7 +827,6 @@ public class ModConfigScreen extends Screen {
     }
 
     private void unfocusEditBoxes() {
-        flowOptions.unfocus();
         if (backoffMaxTicksBox != null) backoffMaxTicksBox.setFocused(false);
         if (maxRenderedNodesBox != null) maxRenderedNodesBox.setFocused(false);
         if (maxVisibleNodesBox != null) maxVisibleNodesBox.setFocused(false);

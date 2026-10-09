@@ -19,6 +19,7 @@ import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.GraphMenuContext;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
+import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -48,7 +49,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -227,25 +228,10 @@ public class ServerPayloadHandler {
                 return;
             }
 
-            if (oldNetworkId != null) {
-                registry.removeNodeFromNetwork(oldNetworkId, node.getUUID());
-            }
-
             if (targetNetwork.getOwnerUuid() == null) {
                 targetNetwork.setOwnerUuid(player.getUUID());
             }
-
-            node.setNetworkId(targetNetwork.getId());
-            node.setNetworkName(targetNetwork.getName());
-            node.setNetworkColor(targetNetwork.getColor());
-            registry.addNodeToNetwork(targetNetwork.getId(), node.getUUID());
-
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                ChannelData ch = node.getChannel(i);
-                if (ch != null) {
-                    ch.setName(targetNetwork.getChannelName(i));
-                }
-            }
+            NodeClipboardConfig.joinNetwork(node, registry, targetNetwork);
 
             if (NodeUpgradeData.needsDimensionalUpgradeWarning(node, targetNetwork, player.level().getServer())) {
                 player.sendSystemMessage(Component.translatable("gui.logisticsnetworks.dimensional_upgrade_warning"));
@@ -423,6 +409,7 @@ public class ServerPayloadHandler {
                 }
             }
 
+            GraphPayloadHandler.broadcast(player.level().getServer(), network.getId());
             if (player.containerMenu instanceof NodeMenu menu) {
                 menu.sendNetworkListToClient(player);
             }
@@ -450,12 +437,42 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleUpdateServerRack(UpdateServerRackPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.containerMenu instanceof ServerRackMenu menu
+                    && menu.getRackPos().equals(payload.rackPos())) {
+                menu.update(player, payload.config());
+            }
+        });
+    }
+
     public static void handleToggleVisibility(ToggleNodeVisibilityPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            if (node != null)
-                node.setRenderVisible(!node.isRenderVisible());
+            if (node == null)
+                return;
+            node.setRenderVisible(!node.isRenderVisible());
+            propagateVisibilityToLabelGroup(node);
         });
+    }
+
+    private static void propagateVisibilityToLabelGroup(LogisticsNodeEntity sourceNode) {
+        String label = sourceNode.getNodeLabel();
+        if (label.isEmpty() || sourceNode.getNetworkId() == null
+                || !(sourceNode.level() instanceof ServerLevel level))
+            return;
+        LogisticsNetwork network = NetworkRegistry.get(level).getNetwork(sourceNode.getNetworkId());
+        if (network == null)
+            return;
+        for (UUID otherId : network.getNodeUuids()) {
+            for (ServerLevel sl : level.getServer().getAllLevels()) {
+                if (sl.getEntity(otherId) instanceof LogisticsNodeEntity other) {
+                    if (label.equals(other.getNodeLabel())) other.setRenderVisible(sourceNode.isRenderVisible());
+                    break;
+                }
+            }
+        }
     }
 
     public static void handleSetDefaultNodeVisibility(SetDefaultNodeVisibilityPayload payload,
@@ -556,6 +573,25 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleSetWrenchFlow(SetWrenchFlowPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+
+            InteractionHand hand = payload.handOrdinal() == InteractionHand.OFF_HAND.ordinal()
+                    ? InteractionHand.OFF_HAND
+                    : InteractionHand.MAIN_HAND;
+            ItemStack heldStack = player.getItemInHand(hand);
+            if (!(heldStack.getItem() instanceof WrenchItem)) {
+                return;
+            }
+
+            WrenchItem.setFlow(heldStack, payload.flow());
+            player.getInventory().setChanged();
+        });
+    }
+
     public static void handleMassSelectConnected(MassSelectConnectedPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)) {
@@ -588,20 +624,6 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleSetFilter(SetFilterPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            if (node == null)
-                return;
-            ChannelData channel = node.getChannel(payload.channelIndex());
-            if (channel != null) {
-                channel.setFilterItem(payload.filterSlot(), payload.filterItem().copyWithCount(1));
-                propagateToLabelGroup(node, payload.channelIndex());
-                markNetworkDirty(node);
-            }
-        });
-    }
-
     public static void handleSetChannelFilterItem(SetChannelFilterItemPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
@@ -611,30 +633,9 @@ public class ServerPayloadHandler {
             if (channel == null)
                 return;
 
-            channel.setFilterItem(payload.filterSlot(),
-                    payload.filterItem().is(ModTags.FILTERS) ? payload.filterItem().copyWithCount(1) : ItemStack.EMPTY);
+            channel.setFilterItem(payload.filterSlot(), ItemStack.EMPTY);
             propagateToLabelGroup(node, payload.channelIndex());
             markNetworkDirty(node);
-        });
-    }
-
-    public static void handleSetNodeUpgradeItem(SetNodeUpgradeItemPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            if (node == null)
-                return;
-
-            List<ItemStack> original = LabelUpgradeSync.snapshotUpgrades(node);
-            node.setUpgradeItem(payload.upgradeSlot(), payload.upgradeItem());
-
-            if (context.player() instanceof ServerPlayer player) {
-                StorageLink link = player.containerMenu instanceof NodeMenu menu
-                        ? menu.getAccessibleStorageLink(player)
-                        : null;
-                LabelUpgradeSync.synchronizeMenuClose(player, node, original, link);
-            } else {
-                markNetworkDirty(node);
-            }
         });
     }
 
@@ -676,7 +677,7 @@ public class ServerPayloadHandler {
                 filter = filter.copy();
             }
 
-            if (!FilterItemData.addItem(filter, item, node.level().registryAccess())) {
+            if (!FilterItemData.addItem(filter, item)) {
                 return;
             }
             channel.setFilterItem(fs, filter);
@@ -813,8 +814,6 @@ public class ServerPayloadHandler {
             boolean isSpecial = type.isSpecial();
             int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
             ItemStack openedStack = stack.copyWithCount(1);
-            CompoundTag stackTag = new CompoundTag();
-            stackTag.store("Item", ItemStack.OPTIONAL_CODEC, openedStack);
 
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> {
@@ -831,7 +830,7 @@ public class ServerPayloadHandler {
                         if (graphContext != null) graphContext.write(buf);
                         buf.writeVarInt(ch);
                         buf.writeVarInt(fs);
-                        buf.writeNbt(stackTag);
+                        ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, openedStack);
                         buf.writeVarInt(slotCount);
                         buf.writeBoolean(false);
                         buf.writeBoolean(false);
@@ -899,7 +898,7 @@ public class ServerPayloadHandler {
                     return menu;
                 }
             }, buf -> {
-                NodeMenuSync.write(buf, node, player.level().registryAccess(), selectedChannel);
+                NodeMenuSync.write(buf, node, selectedChannel);
             });
 
             if (player.containerMenu instanceof NodeMenu menu) {
@@ -1110,8 +1109,7 @@ public class ServerPayloadHandler {
     public static void handleApplyPattern(ApplyPatternPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof PatternSetterMenu menu) {
-                menu.applyPattern(payload.useOutputs(), payload.multiplier(),
-                        context.player().level().registryAccess(), context.player().level());
+                menu.applyPattern(payload.useOutputs(), payload.multiplier(), context.player().level());
             }
         });
     }
@@ -1185,28 +1183,31 @@ public class ServerPayloadHandler {
                 return;
             }
 
-            List<SyncNetworkNodesPayload.NodeInfo> nodeInfos = new ArrayList<>();
-            for (UUID nodeId : network.getNodeUuids()) {
-                for (ServerLevel level : player.level().getServer().getAllLevels()) {
-                    Entity entity = level.getEntity(nodeId);
-                    if (entity instanceof LogisticsNodeEntity node) {
-                        BlockPos attachedPos = node.getAttachedPos();
-                        String blockName = "unknown";
-                        if (level.isLoaded(attachedPos)) {
-                            BlockState state = level.getBlockState(attachedPos);
-                            blockName = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-                        }
-                        nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
-                                nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
-                                level.dimension().identifier(), node.isRenderVisible(), node.isHighlighted()));
-                        break;
+            PacketDistributor.sendToPlayer(player,
+                    new SyncNetworkNodesPayload(payload.networkId(), nodeInfos(network, player.level().getServer())));
+        });
+    }
+
+    public static List<SyncNetworkNodesPayload.NodeInfo> nodeInfos(LogisticsNetwork network, MinecraftServer server) {
+        List<SyncNetworkNodesPayload.NodeInfo> nodeInfos = new ArrayList<>();
+        for (UUID nodeId : network.getNodeUuids()) {
+            for (ServerLevel level : server.getAllLevels()) {
+                Entity entity = level.getEntity(nodeId);
+                if (entity instanceof LogisticsNodeEntity node) {
+                    BlockPos attachedPos = node.getAttachedPos();
+                    String blockName = "unknown";
+                    if (level.isLoaded(attachedPos)) {
+                        BlockState state = level.getBlockState(attachedPos);
+                        blockName = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                     }
+                    nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
+                            nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
+                            level.dimension().identifier(), node.isRenderVisible(), node.isHighlighted()));
+                    break;
                 }
             }
-
-            PacketDistributor.sendToPlayer(player,
-                    new SyncNetworkNodesPayload(payload.networkId(), nodeInfos));
-        });
+        }
+        return nodeInfos;
     }
 
     public static void handleRequestNetworkExport(RequestNetworkExportPayload payload, IPayloadContext context) {
@@ -1401,23 +1402,45 @@ public class ServerPayloadHandler {
             if (network == null || !canAccessNetwork(player, network))
                 return;
 
-            Set<String> labels = new LinkedHashSet<>(network.getLabelNames());
-            for (UUID nodeId : network.getNodeUuids()) {
-                for (ServerLevel level : player.level().getServer().getAllLevels()) {
-                    Entity entity = level.getEntity(nodeId);
-                    if (entity instanceof LogisticsNodeEntity node) {
-                        String label = node.getNodeLabel();
-                        if (!label.isEmpty()) {
-                            labels.add(label);
-                        }
-                        break;
-                    }
-                }
-            }
-
-            PacketDistributor.sendToPlayer(player,
-                    new SyncNetworkLabelsPayload(new ArrayList<>(labels)));
+            sendNetworkLabels(player, network);
         });
+    }
+
+    public static void handleDeleteNetworkLabel(DeleteNetworkLabelPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.level());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network))
+                return;
+
+            String label = payload.label();
+            List<LogisticsNodeEntity> nodes = network.getNodeUuids().stream()
+                    .map(id -> findNode(player, id))
+                    .filter(node -> node != null && label.equals(node.getNodeLabel()))
+                    .toList();
+            if (nodes.isEmpty()
+                    || LabelUpgradeSync.synchronizeLabels(player, network, nodes, player.getUUID(), "", null)) {
+                network.removeLabel(label);
+                registry.setDirty();
+                GraphPayloadHandler.broadcast(player.level().getServer(), network.getId());
+            }
+            sendNetworkLabels(player, network);
+        });
+    }
+
+    private static void sendNetworkLabels(ServerPlayer player, LogisticsNetwork network) {
+        Map<String, Integer> labels = new LinkedHashMap<>();
+        network.getLabelNames().forEach(label -> labels.put(label, 0));
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(player, nodeId);
+            if (node != null && !node.getNodeLabel().isEmpty()) {
+                labels.merge(node.getNodeLabel(), 1, Integer::sum);
+            }
+        }
+        PacketDistributor.sendToPlayer(player, new SyncNetworkLabelsPayload(labels));
     }
 
     public static void propagateToLabelGroup(LogisticsNodeEntity sourceNode, int channelIndex) {
@@ -1483,8 +1506,7 @@ public class ServerPayloadHandler {
                 LogisticsNetwork network = registry.getNetwork(payload.networkId());
                 if (network == null || !canAccessNetwork(player, network))
                     return;
-                telemetry.subscribe(payload.networkId(), payload.channelIndex(),
-                        player, registry, player.level().getServer());
+                telemetry.subscribe(payload.networkId(), player, registry, player.level().getServer());
             } else {
                 telemetry.unsubscribe(player);
             }
@@ -1501,6 +1523,7 @@ public class ServerPayloadHandler {
                 player.sendSystemMessage(Component.translatable("message.logisticsnetworks.lnet.invalid_clipboard"), true);
                 return;
             }
+            config.stripUpgradeComponents();
 
             if (player.containerMenu instanceof ClipboardMenu clipboardMenu) {
                 if (!clipboardMenu.replaceClipboard(config, player)) {
@@ -1531,39 +1554,46 @@ public class ServerPayloadHandler {
             if (network == null || !canAccessNetwork(player, network))
                 return;
 
-            int[] nodeCounts = new int[LogisticsNodeEntity.CHANNEL_COUNT];
-            int[] typeOrdinals = new int[LogisticsNodeEntity.CHANNEL_COUNT];
-            boolean[] found = new boolean[LogisticsNodeEntity.CHANNEL_COUNT];
-
-            for (UUID nodeId : network.getNodeUuids()) {
-                LogisticsNodeEntity node = findNode(player, nodeId);
-                if (node == null) continue;
-
-                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                    ChannelData channel = node.getChannel(i);
-                    if (channel == null) continue;
-                    if (channel.isEnabled()) {
-                        nodeCounts[i]++;
-                        if (!found[i]) {
-                            typeOrdinals[i] = channel.getType().ordinal();
-                            found[i] = true;
-                        }
-                    }
-                }
-            }
-
-            List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
             List<String> channelNames = new ArrayList<>(LogisticsNodeEntity.CHANNEL_COUNT);
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 channelNames.add(network.getChannelName(i));
-                if (nodeCounts[i] > 0) {
-                    entries.add(new SyncChannelListPayload.ChannelEntry(i, typeOrdinals[i], nodeCounts[i]));
-                }
             }
 
-            PacketDistributor.sendToPlayer(player,
-                    new SyncChannelListPayload(payload.networkId(), entries, channelNames));
+            PacketDistributor.sendToPlayer(player, new SyncChannelListPayload(payload.networkId(),
+                    channelEntries(network, player.level().getServer()), channelNames));
         });
+    }
+
+    public static List<SyncChannelListPayload.ChannelEntry> channelEntries(LogisticsNetwork network,
+            MinecraftServer server) {
+        int[] nodeCounts = new int[LogisticsNodeEntity.CHANNEL_COUNT];
+        int[] typeOrdinals = new int[LogisticsNodeEntity.CHANNEL_COUNT];
+        boolean[] found = new boolean[LogisticsNodeEntity.CHANNEL_COUNT];
+
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(server, nodeId);
+            if (node == null) continue;
+
+            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                ChannelData channel = node.getChannel(i);
+                if (channel == null) continue;
+                if (channel.isEnabled()) {
+                    nodeCounts[i]++;
+                    if (!found[i]) {
+                        typeOrdinals[i] = channel.getType().ordinal();
+                        found[i] = true;
+                    }
+                }
+            }
+        }
+
+        List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
+        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+            if (nodeCounts[i] > 0) {
+                entries.add(new SyncChannelListPayload.ChannelEntry(i, typeOrdinals[i], nodeCounts[i]));
+            }
+        }
+        return entries;
     }
 
     private static boolean canAccessNetwork(ServerPlayer player, LogisticsNetwork network) {
@@ -1571,7 +1601,11 @@ public class ServerPayloadHandler {
     }
 
     private static LogisticsNodeEntity findNode(ServerPlayer player, UUID nodeId) {
-        for (ServerLevel level : player.level().getServer().getAllLevels()) {
+        return findNode(player.level().getServer(), nodeId);
+    }
+
+    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
+        for (ServerLevel level : server.getAllLevels()) {
             Entity entity = level.getEntity(nodeId);
             if (entity instanceof LogisticsNodeEntity node) {
                 return node;
@@ -1583,13 +1617,27 @@ public class ServerPayloadHandler {
     public static void sendChannelSyncToViewers(LogisticsNodeEntity node, int channelIndex, ChannelData channel) {
         if (!(node.level() instanceof ServerLevel level))
             return;
-        CompoundTag tag = channel.save(level.registryAccess());
+        // Netty encodes later; snapshot now
+        ChannelData snapshot = new ChannelData();
+        snapshot.copyFrom(channel);
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
             if (player.containerMenu instanceof NodeMenu menu
                     && menu.getNode() != null
                     && menu.getNode().getUUID().equals(node.getUUID())) {
                 PacketDistributor.sendToPlayer(player,
-                        new SyncChannelDataPayload(node.getId(), channelIndex, tag));
+                        new SyncChannelDataPayload(node.getId(), channelIndex, snapshot));
+            }
+        }
+    }
+
+    public static void refreshNodeViewers(MinecraftServer server, UUID networkId) {
+        LogisticsNetwork network = NetworkRegistry.get(server.overworld()).getNetwork(networkId);
+        if (network == null) return;
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.containerMenu instanceof NodeMenu menu && menu.getNode() != null
+                    && networkId.equals(menu.getNode().getNetworkId()) && canAccessNetwork(player, network)) {
+                sendNetworkLabels(player, network);
+                NodeMenu.sendAvailableNetworkListToClient(player);
             }
         }
     }

@@ -76,6 +76,14 @@ Regex filters match resource display names with restricted, case-insensitive reg
 - Matching searches the full name, so `Iron` already matches `Iron Ingot`; `.*Iron.*` is unnecessary and rejected.
 - Unsafe or malformed patterns remain visible for repair but match nothing.
 
+For items, the scope button picks what is searched:
+
+- **Name**: the item name only.
+- **Tooltip**: the tooltip lines below the name (enchantments, lore, mod info).
+- **Both**: the name and the tooltip lines.
+
+Fluids always match by name. On a dedicated server the tooltip text comes from the server, in English, so lines that a mod adds only on the client are not seen. If a mod's tooltip code fails on the server, the filter uses whatever lines it could still read.
+
 Common examples:
 
 | Pattern | Matches |
@@ -109,6 +117,8 @@ Every slot in a Normal Filter's main grid is more than a single-item check. Open
 - **Slots**: restrict this entry to specific attached-inventory slot indices.
 
 Leave Batch or Stock at `0` to fall back to the channel settings or disable the threshold.
+
+Batch and Stock also take simple math such as `64*7`. The result appears when you press Enter.
 
 ## Copy & Paste a Filter
 

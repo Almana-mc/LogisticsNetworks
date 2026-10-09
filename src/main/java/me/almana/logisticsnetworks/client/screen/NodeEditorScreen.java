@@ -37,6 +37,7 @@ import me.almana.logisticsnetworks.network.RequestStorageUpgradeCatalogPayload;
 import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
 import me.almana.logisticsnetworks.network.SetNetworkColorPayload;
+import me.almana.logisticsnetworks.network.DeleteNetworkLabelPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
 import me.almana.logisticsnetworks.network.SetChannelNamePayload;
@@ -68,23 +69,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     private enum Page {
         NETWORK_SELECT, CHANNEL_CONFIG
-    }
-
-    private enum SortMode {
-        NAME_ASC, NAME_DESC, OLD_NEW, NEW_OLD;
-
-        SortMode next() {
-            return values()[(ordinal() + 1) % values().length];
-        }
-
-        String labelKey() {
-            return switch (this) {
-                case NAME_ASC -> "gui.logisticsnetworks.node.sort.az";
-                case NAME_DESC -> "gui.logisticsnetworks.node.sort.za";
-                case OLD_NEW -> "gui.logisticsnetworks.node.sort.old_new";
-                case NEW_OLD -> "gui.logisticsnetworks.node.sort.new_old";
-            };
-        }
     }
 
     // Constants
@@ -131,10 +115,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private List<SyncNetworkListPayload.NetworkEntry> networkList = new ArrayList<>();
     private String lastNetworkFilter = "";
     private int networkScrollOffset = 0;
-    private SortMode sortMode = SortMode.NAME_ASC;
+    private NetworkSortMode sortMode = NetworkSortMode.NEW_OLD;
 
     private NetworkEditor networkEditor;
-    private NetworkCreationConfirmation networkCreationConfirmation;
+    private ConfirmationDialog confirmation;
 
     // Settings scroll state
     private int settingsScrollOffset = 0;
@@ -162,6 +146,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private boolean labelPickerOpen = false;
     private EditBox labelEditBox = null;
     private List<String> networkLabels = new ArrayList<>();
+    private Map<String, Integer> labelNodeCounts = Map.of();
     private int labelScrollOffset = 0;
     private static final int LABEL_PICKER_ENTRY_H = 14;
     private static final int LABEL_PICKER_MAX_VISIBLE = 5;
@@ -172,7 +157,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             maxW = Math.max(maxW, font.width(labelEditBox.getValue()) + 24);
         }
         for (String lbl : networkLabels) {
-            maxW = Math.max(maxW, font.width(lbl) + 24);
+            maxW = Math.max(maxW, font.width(lbl) + 28);
         }
         if (labelEditBox != null && labelEditBox.getValue().length() > 40) {
             maxW = Math.max(maxW, 90);
@@ -212,7 +197,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     protected void rebuildPageLayout() {
         stopNumericEdit(false);
         networkEditor = null;
-        networkCreationConfirmation = null;
+        confirmation = null;
         clearWidgets();
         getMenu().setNodeSlotsVisible(currentPage == Page.CHANNEL_CONFIG);
         if (currentPage == Page.NETWORK_SELECT) {
@@ -252,13 +237,13 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        boolean backgroundInteractive = networkEditor == null && networkCreationConfirmation == null
+        boolean backgroundInteractive = networkEditor == null && confirmation == null
                 && !storageUpgradePicker.isOpen();
         int backgroundMouseX = backgroundInteractive ? mx : Integer.MIN_VALUE;
         int backgroundMouseY = backgroundInteractive ? my : Integer.MIN_VALUE;
         super.render(g, backgroundMouseX, backgroundMouseY, pt);
         if (labelPickerOpen && currentPage == Page.CHANNEL_CONFIG) {
-            renderLabelPicker(g, mx, my, pt);
+            renderLabelPicker(g, backgroundMouseX, backgroundMouseY, pt);
         }
         if (filterPickerOpen && currentPage == Page.CHANNEL_CONFIG) {
             renderFilterPicker(g, mx, my);
@@ -269,8 +254,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         if (tweaksOpen) {
             renderTweaksPanel(g, mx, my);
         }
-        if (networkCreationConfirmation != null) {
-            networkCreationConfirmation.render(g, mx, my, theme());
+        if (confirmation != null) {
+            confirmation.render(g, mx, my, theme());
             return;
         }
         if (networkEditor != null) {
@@ -551,12 +536,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         ThemePaint.button(g, font, x, y, w, h, label, hovered, theme());
     }
 
-    private static final int SORT_ICON_W = 5;
-    private static final int SORT_ICON_GAP = 4;
-
     private int[] sortButtonBounds() {
         String label = tr(sortMode.labelKey());
-        int w = font.width(label) + 12 + SORT_ICON_W + SORT_ICON_GAP;
+        int w = ThemePaint.sortButtonWidth(font, label);
         int h = 13;
         int x = leftPos + GUI_WIDTH - 14 - w;
         int y = topPos + 79;
@@ -564,26 +546,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     }
 
     private void drawSortButton(GuiGraphics g, int mx, int my) {
-        String label = tr(sortMode.labelKey());
         int[] b = sortButtonBounds();
         boolean hovered = mx >= b[0] && mx <= b[0] + b[2] && my >= b[1] && my <= b[1] + b[3];
-        int fg = hovered ? ((cBorderStrong() == cText()) ? theme().bg() : cText()) : cMuted();
-        g.fill(b[0], b[1], b[0] + b[2], b[1] + b[3], hovered ? cBorderStrong() : cPanel());
-        g.renderOutline(b[0], b[1], b[2], b[3], hovered ? cAccent() : cBorder());
-
-        int iconX = b[0] + 5;
-        int iconY = b[1] + 3;
-        drawSortIcon(g, iconX, iconY, fg);
-        g.drawString(font, label, iconX + SORT_ICON_W + SORT_ICON_GAP, b[1] + 3, fg, false);
-    }
-
-    private void drawSortIcon(GuiGraphics g, int x, int y, int color) {
-        g.fill(x + 2, y, x + 3, y + 1, color);
-        g.fill(x + 1, y + 1, x + 4, y + 2, color);
-        g.fill(x, y + 2, x + 5, y + 3, color);
-        g.fill(x, y + 4, x + 5, y + 5, color);
-        g.fill(x + 1, y + 5, x + 4, y + 6, color);
-        g.fill(x + 2, y + 6, x + 3, y + 7, color);
+        ThemePaint.sortButton(g, font, b[0], b[1], tr(sortMode.labelKey()), hovered, theme());
     }
 
     private void drawNetworkListEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, int x, int y, int w,
@@ -739,9 +704,11 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
                         entryY + LABEL_PICKER_ENTRY_H, cHover());
             }
             String display = label;
-            if (font.width(display) > pickerW - 8) {
-                display = font.plainSubstrByWidth(display, pickerW - 13) + "...";
+            if (font.width(display) > pickerW - 28) {
+                display = font.plainSubstrByWidth(display, pickerW - 37) + "...";
             }
+            ThemePaint.labelDeleteIcon(g, pickerX + 4, entryY + 3,
+                    isOverLabelDelete(pickerX, entryY, mx, my), theme());
             ThemePaint.drawCentered(g, font, display, pickerX + pickerW / 2, entryY + 3, cInfo());
         }
 
@@ -941,7 +908,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private Theme.Variant getDistributionVariant(DistributionMode mode) {
         return switch (mode) {
             case PRIORITY -> Theme.Variant.INFO;
-            case ROUND_ROBIN -> Theme.Variant.ACCENT;
+            case ROUND_ROBIN, PRIORITY_ROBIN -> Theme.Variant.ACCENT;
             case NEAREST_FIRST -> Theme.Variant.WARN;
             case FARTHEST_FIRST -> Theme.Variant.WARN;
         };
@@ -1063,7 +1030,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         } else {
             filter = filter.copy();
         }
-        if (!FilterItemData.addItem(filter, item, minecraft.level.registryAccess())) {
+        if (!FilterItemData.addItem(filter, item)) {
             return;
         }
         ch.setFilterItem(slot, filter);
@@ -1248,8 +1215,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
         int action = ClientControls.resolveMouseAction(mx, my, btn);
-        if (networkCreationConfirmation != null) {
-            networkCreationConfirmation.mouseClicked(mx, my, action);
+        if (confirmation != null) {
+            confirmation.mouseClicked(mx, my, action);
             return true;
         }
         if (networkEditor != null) {
@@ -1271,8 +1238,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         if (action != 0 && action != 1)
             return false;
 
-        if (networkCreationConfirmation != null) {
-            networkCreationConfirmation.mouseClicked(mx, my, action);
+        if (confirmation != null) {
+            confirmation.mouseClicked(mx, my, action);
             return true;
         }
         if (networkEditor != null) {
@@ -1335,12 +1302,12 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     }
 
     protected boolean hasEditorOverlay() {
-        return networkCreationConfirmation != null || networkEditor != null || tweaksOpen || labelPickerOpen || filterPickerOpen
+        return confirmation != null || networkEditor != null || tweaksOpen || labelPickerOpen || filterPickerOpen
                 || channelNameEditing || editingRow != -1 || storageUpgradePicker.isOpen();
     }
 
     protected EditBox editorTextField() {
-        if (networkCreationConfirmation != null || networkEditor != null || tweaksOpen || filterPickerOpen || storageUpgradePicker.isOpen()) return null;
+        if (confirmation != null || networkEditor != null || tweaksOpen || filterPickerOpen || storageUpgradePicker.isOpen()) return null;
         if (labelPickerOpen) return labelEditBox;
         if (channelNameEditing) return channelNameEditBox;
         return editingRow != -1 ? numericEditBox : null;
@@ -1374,9 +1341,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             String value = networkNameField.getValue().trim();
             String name = value.isEmpty() ? tr("gui.logisticsnetworks.node.network.unnamed") : value;
             networkNameField.setFocused(false);
-            networkCreationConfirmation = NetworkCreationConfirmation.open(ClientConfig.confirmNetworkCreation,
+            confirmation = ConfirmationDialog.networkCreation(ClientConfig.confirmNetworkCreation,
                     font, width, height, name, () -> sendNetworkAssign(Optional.empty(), name),
-                    () -> networkCreationConfirmation = null);
+                    () -> confirmation = null);
             return true;
         }
 
@@ -1481,7 +1448,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             int entryY = listY + i * LABEL_PICKER_ENTRY_H;
             if (mx >= pickerX + 2 && mx < pickerX + pickerW - 2
                     && my >= entryY && my < entryY + LABEL_PICKER_ENTRY_H) {
-                commitLabelChange(networkLabels.get(idx));
+                if (isOverLabelDelete(pickerX, entryY, mx, my)) requestLabelDeletion(node, networkLabels.get(idx));
+                else commitLabelChange(networkLabels.get(idx));
                 return true;
             }
         }
@@ -1499,9 +1467,25 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         return true; // Absorb click inside picker
     }
 
-    public void receiveNetworkLabels(List<String> labels) {
-        this.networkLabels = new ArrayList<>(labels);
-        this.labelScrollOffset = 0;
+    private boolean isOverLabelDelete(int pickerX, int entryY, double mx, double my) {
+        return mx >= pickerX + 2 && mx < pickerX + 14 && my >= entryY && my < entryY + LABEL_PICKER_ENTRY_H;
+    }
+
+    private void requestLabelDeletion(LogisticsNodeEntity node, String label) {
+        UUID networkId = node.getNetworkId();
+        confirmation = ConfirmationDialog.labelDeletion(font, width, height, label,
+                labelNodeCounts.getOrDefault(label, 0), () -> deleteLabel(networkId, label),
+                () -> confirmation = null);
+    }
+
+    private void deleteLabel(UUID networkId, String label) {
+        ClientPacketDistributor.sendToServer(new DeleteNetworkLabelPayload(networkId, label));
+        if (labelEditBox != null && label.equals(labelEditBox.getValue())) labelEditBox.setValue("");
+    }
+
+    public void receiveNetworkLabels(Map<String, Integer> labels) {
+        this.networkLabels = new ArrayList<>(labels.keySet());
+        this.labelNodeCounts = labels;
     }
 
     private boolean handleChannelPageClick(double mx, double my, int action) {
@@ -1724,7 +1708,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         };
 
         numericEditBox = new FlatEditBox(font, x, y, 70, 11, Component.empty());
-        numericEditBox.setMaxLength(10);
+        numericEditBox.setMaxLength(32);
         numericEditBox.setValue(val);
         numericEditBox.setTextColor(cText());
         numericEditBox.setFocused(true);
@@ -1738,7 +1722,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
         if (commit) {
             try {
-                int val = Integer.parseInt(numericEditBox.getValue().trim());
+                int val = ArithmeticExpression.evaluate(numericEditBox.getValue().trim());
                 LogisticsNodeEntity node = getMenu().getNode();
                 ChannelData ch = node.getChannel(selectedChannel);
                 if (ch != null) {
@@ -1894,7 +1878,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
-        if (networkCreationConfirmation != null) return true;
+        if (confirmation != null) return true;
         if (networkEditor != null) {
             networkEditor.mouseDragged(mx, my, button);
             return true;
@@ -1905,7 +1889,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     @Override
     public boolean mouseReleased(double mx, double my, int button) {
-        if (networkCreationConfirmation != null) return true;
+        if (confirmation != null) return true;
         if (networkEditor != null) {
             networkEditor.mouseReleased(mx, my, button);
             return true;
@@ -1932,8 +1916,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
-        if (networkCreationConfirmation != null) {
-            networkCreationConfirmation.keyPressed(key, scan, modifiers);
+        if (confirmation != null) {
+            confirmation.keyPressed(key, scan, modifiers);
             return true;
         }
         if (networkEditor != null) {
@@ -2018,7 +2002,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     @Override
     public boolean charTyped(char ch, int modifiers) {
-        if (networkCreationConfirmation != null) return true;
+        if (confirmation != null) return true;
         if (networkEditor != null) {
             return networkEditor.charTyped(ch);
         }
@@ -2030,7 +2014,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             return labelEditBox.charTyped(ClientInput.character(ch));
         }
         if (editingRow != -1 && numericEditBox != null) {
-            if (Character.isDigit(ch) || ch == '-')
+            if (ArithmeticExpression.accepts(ch))
                 return numericEditBox.charTyped(ClientInput.character(ch));
             return true;
         }
@@ -2042,7 +2026,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
-        if (networkCreationConfirmation != null || networkEditor != null) {
+        if (confirmation != null || networkEditor != null) {
             return true;
         }
         if (storageUpgradePicker.isOpen()) {
@@ -2110,21 +2094,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             if (filter.isEmpty() || entry.name().toLowerCase().contains(filter))
                 filtered.add(entry);
         }
-        sortNetworks(filtered);
+        filtered.sort(sortMode.comparator());
         return filtered;
-    }
-
-    private void sortNetworks(List<SyncNetworkListPayload.NetworkEntry> list) {
-        Comparator<SyncNetworkListPayload.NetworkEntry> byName =
-                Comparator.comparing(e -> e.name().toLowerCase());
-        switch (sortMode) {
-            case NAME_ASC -> list.sort(byName);
-            case NAME_DESC -> list.sort(byName.reversed());
-            case OLD_NEW -> list.sort(Comparator.comparingLong(
-                    SyncNetworkListPayload.NetworkEntry::createdAt).thenComparing(byName));
-            case NEW_OLD -> list.sort(Comparator.comparingLong(
-                    SyncNetworkListPayload.NetworkEntry::createdAt).reversed().thenComparing(byName));
-        }
     }
 
     private String tr(String key, Object... args) {

@@ -1,6 +1,6 @@
 // Enable when 26.1.2 is supported.
 /*
-Source owners: LogisticsNodeRenderer, NodeHighlightQueue, NodeHighlightRenderer
+Source owners: LogisticsNodeRenderer, NodeHighlightQueue, NodeHighlightRenderer, WrenchFlowRenderer
 
 private static final Map<NodeAttachmentKey, LogisticsNodeEntity> nodesByAttachment = new HashMap<>();
 
@@ -50,4 +50,23 @@ Vec3 offset = request.position().subtract(cameraPosition);
 poseStack.translate(offset.x, offset.y, offset.z);
 poseStack.mulPose(request.rotation());
 renderBox(poseStack.last().pose(), bufferSource, request);
+
+protected AABB getBoundingBoxForCulling(LogisticsNodeEntity entity) {
+    if (entity.isMountedOnCreate()) {
+        return AABB.ofSize(entity.position(), 2.5, 2.5, 2.5);
+    }
+    return new AABB(entity.getX() - 0.5, entity.getY(), entity.getZ() - 0.5,
+            entity.getX() + 0.5, entity.getY() + 1.0, entity.getZ() + 0.5);
+}
+
+NodeRenderContext context = CreateCompat.getRenderContext(node, partialTick);
+if (context != null && context.position().distanceToSqr(camera) <= OFFSCREEN_RANGE_SQR) {
+    nodes.add(new FlowTopology.Node(node.getUUID(), node.getNetworkId(), node.getRouteChannels()));
+    anchors.put(node.getUUID(), fromContext(context));
+}
+
+static FlowAnchor fromContext(NodeRenderContext context) {
+    Vector3f up = context.rotation().transform(new Vector3f(0, 0.5F, 0));
+    return new FlowAnchor(context.position().add(up.x, up.y, up.z), new Quaternionf(context.rotation()).normalize());
+}
 */

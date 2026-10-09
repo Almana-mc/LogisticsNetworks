@@ -69,7 +69,7 @@ Use Primary Interaction on the channel number buttons at the top of the screen t
 
 ### AE2 and Refined Storage Interfaces
 
-Nodes on Applied Energistics 2 and Refined Storage Interfaces transfer items and fluids directly through the connected storage network. The Interface's configured export resources decide what a Sender may pull, including its native fuzzy setting, but the configured quantity does not limit the Logistics batch. Receivers may insert any resource accepted by their Logistics channel filters.
+Nodes with a [Network Upgrade](upgrades-special.md) on Applied Energistics 2 and Refined Storage Interfaces transfer items and fluids directly through the connected storage network. Without the upgrade, the Interface is treated like any other inventory: the node only sees the items and tanks stocked in the Interface itself. The Interface's configured export resources decide what a Sender may pull, including its native fuzzy setting, but the configured quantity does not limit the Logistics batch. Receivers may insert any resource accepted by their Logistics channel filters.
 
 For item Senders, the direct path pulls from the storage network first, then uses items stocked in that Interface to fill any remaining batch. Buffer-only items stay available to later transfers, allowing the Interface to empty. Direct fluid transfers still ignore exposed tanks. Adding an explicit Logistics slot mapping switches that item channel back to the exposed Interface inventory. A disconnected or inactive storage network waits without using the Interface buffer, and direct transfers never request autocrafting.
 
@@ -118,7 +118,7 @@ Redstone gating applies to both Senders and Receivers.
 
 ![Distribution: Farthest First](images/channel-distribution-farthest-first.png)
 
-![Distribution: Round Robin](images/channel-distribution-round-robin.png)
+![Distribution: Equal Distribution](images/channel-distribution-round-robin.png)
 
 **What it is:** how a Sender picks between multiple matching Receivers on the same channel number.
 
@@ -127,11 +127,14 @@ Redstone gating applies to both Senders and Receivers.
 - **Priority** — sort by each Receiver's **Priority** value. Higher numbers are served first. Ties are broken in no particular order.
 - **Nearest First** — serve the Receivers closest to the Sender first (by straight-line distance).
 - **Farthest First** — opposite of Nearest First: serve the furthest Receiver first.
-- **Round Robin** — distribute each operation's item batch as evenly as possible across matching Receivers. For example, a batch of 8 ordinary items sent to two empty Receivers is split 4 and 4.
+- **Equal Distribution** — split each operation's item batch as evenly as possible across matching Receivers. For example, a batch of 8 ordinary items sent to two empty Receivers is split 4 and 4.
+- **Priority Robin** — each operation goes to one Receiver, then the next. Receivers are visited from highest to lowest **Priority**, then the cycle repeats. A full Receiver is skipped.
 
 **How to change it:** use Primary Interaction to cycle to the next mode.
 
-**Gotcha:** Round Robin does not keep a rotation pointer. Available items are divided during the same operation, and unused shares flow to Receivers with storage space.
+**Gotcha:** Equal Distribution does not keep a rotation pointer, and unused shares flow to Receivers with space. It only splits item batches; on fluid and energy channels it behaves like **Priority**.
+
+**Gotcha:** Priority Robin's position resets to the highest-priority Receiver when the world or the Sender's chunk reloads. If the chosen Receiver accepts only part of a batch, the rest waits for the next operation. It works on every channel type.
 
 **Disabled on Receivers:** this row is greyed out when Mode is Receiver. Distribution only makes sense on the Sender side.
 
@@ -141,11 +144,11 @@ Redstone gating applies to both Senders and Receivers.
 
 **What it is:** a small integer attached to this channel. Range: **–99 to +99**.
 
-**What it does:** used by a Sender that has Distribution set to **Priority**. The Sender sorts its target Receivers by this number, highest first, and serves them in that order. Items are read from source slots in order, so a batch spread across source slots can fill the first Receiver with the earlier slots before moving the remainder to the next Receiver.
+**What it does:** the Sender sorts its target Receivers by this number, highest first. Under **Priority**, higher-priority Receivers get resources before lower-priority ones. Items are read from source slots in order, so a batch spread across source slots can fill the first Receiver with the earlier slots before moving the remainder to the next Receiver. Under **Priority Robin**, it sets the order Receivers take turns in.
 
 **How to change it:** use Primary Interaction on the number field to open a text box, type a number between –99 and 99, and press Enter.
 
-**Gotcha:** Priority is only consulted when Distribution = Priority. Under Nearest/Farthest/Round Robin it is ignored — the sorter never reads it. Set Priority on the **Receivers** you want served first, not on the Sender.
+**Gotcha:** Priority sets the serving order under Priority, Priority Robin, and Equal Distribution on non-item channels. Under Nearest/Farthest it is ignored — the sorter never reads it. Set Priority on the **Receivers** you want served first, not on the Sender.
 
 ## Batch
 
@@ -159,7 +162,7 @@ Redstone gating applies to both Senders and Receivers.
 - **Fluid** — millibuckets (e.g. Batch 1000 = up to 1 bucket per operation).
 - **Energy** — Forge Energy / RF per operation.
 
-**How to change it:** use Primary Interaction on the number field to open a text box, type the new value, and press Enter. Minimum is 1.
+**How to change it:** use Primary Interaction on the number field to open a text box, type the new value, and press Enter. Minimum is 1. The box also takes simple math with `+ - * /` and parentheses, so `64*7` saves as 448. Priority and Delay work the same way.
 
 **Gotcha:** Batch is capped by the upgrades installed on the node. You can type 10,000 but if your upgrade tier only allows 500, the engine uses 500. Install higher-tier upgrades to raise the ceiling — see [Performance Upgrades](upgrades-performance.md).
 

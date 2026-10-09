@@ -41,6 +41,9 @@ config = "${mod_id}.mixins.json"
 [[mixins]]
 config = "${mod_id}.client.mixins.json"
 
+[[mixins]]
+config = "${mod_id}.buildinggadgets.mixins.json"
+
 # Enable when 26.1.2 is supported.
 #[[mixins]]
 #config = "${mod_id}.create.mixins.json"
@@ -142,6 +145,20 @@ side = "BOTH"
 modId = "refinedstorage"
 type = "optional"
 versionRange = "[${refined_storage_version},)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "buildinggadgets2"
+type = "optional"
+versionRange = "[1.4.6,1.5)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "computercraft"
+type = "optional"
+versionRange = "[1.120.0,)"
 ordering = "AFTER"
 side = "BOTH"
 

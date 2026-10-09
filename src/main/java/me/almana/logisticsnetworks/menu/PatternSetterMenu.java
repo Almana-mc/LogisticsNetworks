@@ -4,7 +4,6 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.InteractionHand;
@@ -73,7 +72,7 @@ public class PatternSetterMenu extends AbstractContainerMenu {
         }
     }
 
-    public void applyPattern(boolean useOutputs, int multiplier, HolderLookup.Provider provider, Level level) {
+    public void applyPattern(boolean useOutputs, int multiplier, Level level) {
         ItemStack pattern = container.getItem(SLOT_PATTERN);
         ItemStack filter = container.getItem(SLOT_FILTER);
 
@@ -91,14 +90,14 @@ public class PatternSetterMenu extends AbstractContainerMenu {
 
         // Clear existing entries
         for (int i = 0; i < capacity; i++) {
-            FilterItemData.setEntry(filter, i, ItemStack.EMPTY, provider);
+            FilterItemData.setEntry(filter, i, ItemStack.EMPTY);
         }
 
         // Write new entries with multiplier applied
         int count = Math.min(entries.size(), capacity);
         for (int i = 0; i < count; i++) {
             LinkedStorage.PatternEntry entry = entries.get(i);
-            FilterItemData.setEntry(filter, i, entry.item(), provider);
+            FilterItemData.setEntry(filter, i, entry.item());
             FilterItemData.setEntryAmount(filter, i, entry.amount() * mult);
         }
 

@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.filter.TooltipLines;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -13,6 +14,7 @@ public class NetworkScheduler {
 
     @SubscribeEvent
     public static void onServerTickPre(ServerTickEvent.Pre event) {
+        TooltipLines.drainPending();
         NetworkRegistry registry = NetworkRegistry.get(event.getServer().overworld());
         if (registry.refreshAsyncPlanning()) registry.dispatchDirty(event.getServer());
     }

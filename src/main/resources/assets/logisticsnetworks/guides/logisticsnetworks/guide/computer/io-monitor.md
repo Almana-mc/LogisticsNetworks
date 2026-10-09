@@ -7,43 +7,44 @@ navigation:
 
 # I/O Monitor
 
-The live telemetry view for a mounted network. Shows every active channel across the whole network — aggregated by channel index — and lets you drill into each one for a throughput graph.
+The live telemetry view for a mounted network. One page shows every channel, a live throughput chart for the channel you pick, and exactly which items and fluids are moving on it.
 
-Open it from the mounted network's subsystem buttons. Hit **EXIT** in the top-left corner to return to the directory.
+Open it from the mounted network's subsystem buttons. Use **Back** in the top-left corner to return to the directory. The page follows your selected UI theme.
 
-## Channel List
+## Channel Rail
 
-![I/O Monitor channel list — shows CH0 (Items) and CH1 (Fluids)](../computer/images/io-monitor-channels.png)
+The left column lists all nine channels (**CH0** to **CH8**). Each row shows:
 
-Each row shows one channel index that has at least one node on this network running something:
+- The channel's name, or **Channel N** if it has none.
+- The channel number and its live rate for the last second, coloured by type: items, fluids or energy.
 
-- **CH0** / **CH1** / ... — the channel index (0 through 8). Matches the channel-slot numbers on the node screen.
-- **Type** — what the channel is moving: **Items**, **Fluids**, or **Energy**. Colored to match the type.
-- **Node count** — how many nodes on this network have this channel enabled.
+Channels with no enabled nodes on this network are dimmed and can't be selected. Use **Primary Interaction (default: Left Click)** on any other row to switch the chart to it instantly.
 
-The left edge of each row has a **colored bar** matching the channel type — green for items, blue for fluids, and so on. Handy for spotting the type at a glance without reading the right-hand text.
+Rates are aggregated **per channel index** across every node on the network.
 
-Aggregation is **per channel index**, not per node. If you have 10 nodes all running an Item transfer on CH0, the list shows one `CH0 Items 10 nodes` row, not 10 rows. Use **Primary Interaction (default: Left Click)** on the row to drill into the graph.
+## Throughput Chart
 
-## Throughput Graph
+- One bar per second, newest on the right. Pick the window with **30s / 1m / 2m**.
+- The header shows the channel's current rate in its unit: items per second, `mB/s` for fluids and `RF/s` for energy.
+- Hover a bar to see its exact value and how many seconds ago it was.
+- History starts when you open the page and covers up to the last two minutes.
 
-![I/O Monitor throughput graph — live bars for CH0 peaking around 200K/s](../computer/images/io-monitor-graph.png)
+## Resource Breakdown
 
-Using Primary Interaction on a channel row opens its graph. The graph shows a **live timeline of transfer throughput** for that channel:
+Item and fluid channels list what is moving under the chart:
 
-- **120 data points** total. Each bar is one sample; the rightmost bar is the newest.
-- Updates roughly once per second as telemetry streams in.
-- The scale adapts to the peak — the header shows the peak value (e.g. `200.0K /s`) with the unit appropriate for the type:
-  - **Items** — items per second.
-  - **Fluids** — millibuckets per second (`mB/s`).
-  - **Energy** — Forge Energy / RF per second.
-- The **LIVE** indicator in the bottom-left lights up when new data is coming in.
+- Icon, name, rate per second and share of the channel's total over the selected window.
+- Items are told apart exactly: different potions, enchanted books or named items get their own rows.
+- Hover a row for the full item tooltip plus how much moved in the window.
+- Use Primary Interaction on a row to show only that resource in the chart and header. Use it again, or the **✕** next to its name, to go back to the total.
+- **Other** collects anything outside the 16 busiest resources each second.
+- Scroll the list when there are more than three rows.
 
-## Reading The Graph
+Energy channels carry a single resource, so they show **Average**, **Peak** and **Moved** cards instead of a list.
 
-- Steady tall bars = constant throughput. Setup working hard.
-- Empty graph = channel exists but no transfers are happening. Check filters, status, and whether the source block actually has the resource.
-- Spiky pattern = bursty transfers. Usually delayed channels (high Delay) or intermittent producers.
-- Sudden drop to zero = the channel stopped (source drained, Redstone turned it off, network unmounted from the node, etc.).
+## Reading The Chart
 
-Hit **EXIT** on the graph page to return to the channel list.
+- Steady tall bars mean constant throughput.
+- An empty chart means the channel exists but nothing is moving. Check filters, redstone mode and whether the source actually has the resource.
+- A spiky pattern means bursty transfers, usually high Delay or an intermittent producer.
+- A sudden drop to zero means the channel stopped: source drained, redstone turned it off, or the node left the network.

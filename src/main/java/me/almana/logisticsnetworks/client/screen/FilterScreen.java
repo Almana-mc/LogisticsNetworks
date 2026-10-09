@@ -11,19 +11,20 @@ import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
+import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.filter.NameMatchScope;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.util.Mth;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.tags.TagKey;
 
 import me.almana.logisticsnetworks.menu.FilterMenu;
@@ -48,6 +49,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.transfer.fluid.FluidUtil;
 
@@ -112,6 +114,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private int nbtEditSlot = -1;
     private List<String> cachedSlotTags = new ArrayList<>();
     private List<NbtFilterData.NbtEntry> cachedSlotNbtEntries = new ArrayList<>();
+    private List<String> cachedSlotNbtPathLabels = List.of();
     private int subModeScrollOffset = 0;
     private boolean subModeDropdownOpen = false;
     private String nbtPendingOperator = "=";
@@ -135,9 +138,11 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private int detailNbtScrollOffset = 0;
     private int detailNbtSelectedIdx = -1;
     private String detailNbtOp = "=";
-    private Map<String, String> detailNbtActiveOps = new HashMap<>();
+    private Map<NbtPath, String> detailNbtActiveOps = new HashMap<>();
     private int nbtTableEditingRow = -1;
     private List<ItemStack> nbtOnlyCycleItems;
+    private List<Fluid> anyCycleFluids;
+    private List<String> anyCycleChemicals;
     private EditBox detailNbtValueBox;
     private EditBox detailIdInputBox;
     private EditBox detailBatchInputBox;
@@ -189,7 +194,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             String rawNbt,
             boolean strictNbt,
             boolean nbtMatchAny,
-            List<FilterItemData.SlotNbtRule> nbtRules) {
+            List<NbtCriterion> nbtRules) {
     }
     private List<NbtRow> nbtRows = new ArrayList<>();
     private Set<String> nbtCollapsedGroups = new HashSet<>();
@@ -257,13 +262,13 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailIdInputBox.setHint(Component.literal("Item or #tag"));
 
         detailBatchInputBox = new EditBox(font, leftPos + 12, topPos + 50, 50, 14, Component.empty());
-        detailBatchInputBox.setMaxLength(10);
+        detailBatchInputBox.setMaxLength(32);
         detailBatchInputBox.setVisible(false);
         detailBatchInputBox.setBordered(true);
         detailBatchInputBox.setTextColor(cText());
 
         detailStockInputBox = new EditBox(font, leftPos + 12, topPos + 66, 50, 14, Component.empty());
-        detailStockInputBox.setMaxLength(10);
+        detailStockInputBox.setMaxLength(32);
         detailStockInputBox.setVisible(false);
         detailStockInputBox.setBordered(true);
         detailStockInputBox.setTextColor(cText());
@@ -422,9 +427,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (menu.isModMode())
             renderModTooltip(g, mx, my);
-        else if (menu.getTargetType() == FilterTargetType.FLUIDS || menu.getTargetType() == FilterTargetType.CHEMICALS) {
-            renderFluidTooltip(g, mx, my);
-        }
 
         if (!menu.isTagMode() && !menu.isModMode()
                 && tagEditSlot < 0 && nbtEditSlot < 0 && detailEditSlot < 0
@@ -545,17 +547,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     || isAnyItemSlot(i)) {
                 drawSlot(g, sx, sy);
                 g.renderOutline(sx, sy, 18, 18, cAccent());
-                if (nbtOnlyCycleItems == null) {
-                    nbtOnlyCycleItems = BuiltInRegistries.ITEM.stream()
-                            .map(ItemStack::new)
-                            .filter(s -> !s.isEmpty())
-                            .toList();
-                }
-                if (!nbtOnlyCycleItems.isEmpty()) {
-                    long tick = (System.currentTimeMillis() / 1000);
-                    int idx = (int) (tick % nbtOnlyCycleItems.size());
-                    g.renderItem(nbtOnlyCycleItems.get(idx), sx + 1, sy + 1);
-                }
+                renderAnyResource(g, sx + 1, sy + 1);
             } else {
                 drawSlot(g, sx, sy);
             }
@@ -936,6 +928,43 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         Identifier fallback = BuiltInRegistries.FLUID.getKey(stack.getFluid());
         TextureAtlasSprite sprite = Minecraft.getInstance().getAtlasManager().get(new SpriteId(TextureAtlas.LOCATION_BLOCKS, fallback));
         g.blit(x, y, 0, 16, 16, sprite);
+    }
+
+    private void renderAnyResource(GuiGraphics g, int x, int y) {
+        long tick = System.currentTimeMillis() / 1000;
+        switch (menu.getTargetType()) {
+            case FLUIDS -> {
+                if (anyCycleFluids == null) {
+                    anyCycleFluids = BuiltInRegistries.FLUID.stream()
+                            .filter(f -> f != Fluids.EMPTY && f.isSource(f.defaultFluidState()))
+                            .toList();
+                }
+                if (!anyCycleFluids.isEmpty()) {
+                    Fluid fluid = anyCycleFluids.get((int) (tick % anyCycleFluids.size()));
+                    renderFluidStack(g, new FluidStack(fluid, 1000), x, y);
+                }
+            }
+            case CHEMICALS -> {
+                if (anyCycleChemicals == null) {
+                    anyCycleChemicals = MekanismCompat.getAllChemicalIds();
+                }
+                if (!anyCycleChemicals.isEmpty()) {
+                    String id = anyCycleChemicals.get((int) (tick % anyCycleChemicals.size()));
+                    renderChemicalStack(g, id, x, y);
+                }
+            }
+            default -> {
+                if (nbtOnlyCycleItems == null) {
+                    nbtOnlyCycleItems = BuiltInRegistries.ITEM.stream()
+                            .map(ItemStack::new)
+                            .filter(s -> !s.isEmpty())
+                            .toList();
+                }
+                if (!nbtOnlyCycleItems.isEmpty()) {
+                    g.renderItem(nbtOnlyCycleItems.get((int) (tick % nbtOnlyCycleItems.size())), x, y);
+                }
+            }
+        }
     }
 
     private void renderChemicalGhostItems(GuiGraphics g) {
@@ -1408,6 +1437,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 : tr("gui.logisticsnetworks.filter.mode.whitelist");
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
         drawButton(g, modeBtnX, btnY, modeBtnW, btnH, modeLabel, mx, my, true);
+
+        String scopeLabel = tr("gui.logisticsnetworks.filter.name.scope." + menu.getNameMatchScope().serializedName());
+        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
+        drawButton(g, modeBtnX + modeBtnW + 4, btnY, scopeBtnW, btnH, scopeLabel, mx, my, true);
     }
 
     private boolean handleNameClick(double mx, double my, int btn) {
@@ -1464,6 +1497,15 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (isHovering(modeBtnX, btnY, modeBtnW, btnH, (int) mx, (int) my)) {
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
+            }
+            return true;
+        }
+
+        String scopeLabel = tr("gui.logisticsnetworks.filter.name.scope." + menu.getNameMatchScope().serializedName());
+        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
+        if (isHovering(modeBtnX + modeBtnW + 4, btnY, scopeBtnW, btnH, (int) mx, (int) my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
             }
             return true;
         }
@@ -1773,7 +1815,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private boolean hasEntryInSlot(int slot) {
-        if (menu.isTagSlot(slot))
+        ItemStack openedStack = menu.getOpenedStack();
+        if (menu.isTagSlot(slot) || FilterItemData.isNbtOnlySlot(openedStack, slot))
             return true;
         if (menu.getTargetType() == FilterTargetType.FLUIDS) {
             return !menu.getFluidFilter(slot).isEmpty();
@@ -1783,9 +1826,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         }
         if (slot < menu.slots.size() && !menu.slots.get(slot).getItem().isEmpty())
             return true;
-        ItemStack openedStack = menu.getOpenedStack();
-        return FilterItemData.isNbtOnlySlot(openedStack, slot)
-                || FilterItemData.hasEntrySlotMapping(openedStack, slot);
+        return FilterItemData.hasEntrySlotMapping(openedStack, slot);
     }
 
     private int computeScrollDelta(double scrollDirection, FilterTargetType targetType) {
@@ -1853,32 +1894,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (extractor != null && menu.getExtractorItem().isEmpty()
                 && isHovering(extractor[0], extractor[1], 18, 18, mx, my)) {
             g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.selector_hint"), mx, my);
-        }
-    }
-
-    private void renderFluidTooltip(GuiGraphics g, int mx, int my) {
-        for (int i = 0; i < menu.getFilterSlots(); i++) {
-            var slot = menu.slots.get(i);
-            int x = leftPos + slot.x;
-            int y = topPos + slot.y;
-            if (isHovering(x, y, 18, 18, mx, my)) {
-                FluidStack fs = menu.getFluidFilter(i);
-                if (!fs.isEmpty()) {
-                    g.renderTooltip(font, fs.getHoverName(), mx, my);
-                    break;
-                }
-                String chemId = menu.getChemicalFilter(i);
-                if (chemId != null) {
-                    Component name = MekanismCompat.getChemicalTextComponent(chemId);
-                    if (name != null) {
-                        g.renderTooltip(font, name, mx, my);
-                    } else {
-                        g.renderTooltip(font, Component.literal(chemId), mx, my);
-                    }
-                    break;
-                }
-                break;
-            }
         }
     }
 
@@ -2005,16 +2020,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int durabilityValue = FilterItemData.getEntryDurabilityValue(opened, slot);
         Boolean enchanted = FilterItemData.getEntryEnchanted(opened, slot);
         String rawNbt = FilterItemData.getEntryNbtRaw(opened, slot);
-        List<FilterItemData.SlotNbtRule> rules = new ArrayList<>();
-
-        for (FilterItemData.SlotNbtRule rule : menu.getSlotNbtRules(slot)) {
-            Tag value = rule.value() == null ? null : rule.value().copy();
-            rules.add(new FilterItemData.SlotNbtRule(rule.path(), rule.operator(), value));
-        }
 
         return new FilterEntrySnapshot(item, fluid, chemicalId, tag, menu.getEntryBatch(slot), menu.getEntryStock(slot),
                 slotExpression, durabilityOp, durabilityValue, enchanted, rawNbt, menu.isEntryNbtStrict(slot),
-                menu.isSlotNbtMatchAny(slot), rules);
+                menu.isSlotNbtMatchAny(slot), menu.getSlotNbtRules(slot));
     }
 
     private boolean pasteOpenFilter() {
@@ -2149,14 +2158,20 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         }
 
         if (entry.rawNbt() != null && !entry.rawNbt().isBlank()) {
-            menu.setEntryNbtRaw(minecraft.player, slot, "", entry.rawNbt());
+            menu.setEntryNbtRaw(minecraft.player, slot, NbtPath.EMPTY, entry.rawNbt());
             ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setRaw(slot, entry.rawNbt()));
         }
 
-        for (FilterItemData.SlotNbtRule rule : entry.nbtRules()) {
-            String value = rule.value() == null ? "" : rule.value().toString();
+        for (NbtCriterion rule : entry.nbtRules()) {
+            String value = rule.value().toString();
             menu.addSlotNbtRule(minecraft.player, slot, rule.path(), rule.operator(), value);
             ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(slot, rule.path(), rule.operator(), value));
+            // Add prefers the ghost value
+            int ruleIdx = FilterItemData.indexOfRule(menu.getSlotNbtRules(slot), rule);
+            if (ruleIdx >= 0) {
+                ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setValue(slot, ruleIdx, value));
+                menu.setSlotNbtRuleValue(slot, ruleIdx, value);
+            }
         }
 
         if (entry.nbtMatchAny() != menu.isSlotNbtMatchAny(slot)) {
@@ -2182,9 +2197,11 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private void syncNameScope(NameMatchScope scope) {
-        int guard = 0;
-        while (menu.getNameMatchScope() != scope && guard++ < NameMatchScope.values().length
-                && minecraft != null && minecraft.gameMode != null) {
+        if (minecraft == null || minecraft.gameMode == null)
+            return;
+        int count = NameMatchScope.values().length;
+        int presses = ((scope.ordinal() - menu.getNameMatchScope().ordinal()) % count + count) % count;
+        for (int i = 0; i < presses; i++) {
             minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
         }
     }
@@ -2361,16 +2378,16 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 }
             }
         }
+        cachedSlotNbtPathLabels = cachedSlotNbtEntries.stream()
+                .map(entry -> FilterScreenText.formatNbtPath(entry.path().toString()))
+                .toList();
     }
 
     private ItemStack getSlotItemForSubMode(int slot) {
         if (menu.isTagSlot(slot)) {
             return ItemStack.EMPTY;
         }
-        if (minecraft != null && minecraft.player != null) {
-            return FilterItemData.getEntry(menu.getOpenedStack(), slot, minecraft.player.level().registryAccess());
-        }
-        return ItemStack.EMPTY;
+        return FilterItemData.getEntry(menu.getOpenedStack(), slot);
     }
 
     private int getTagSubModeVisibleRows() {
@@ -2619,7 +2636,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         drawButton(g, clearX, clearY, clearW, 10, tr("gui.logisticsnetworks.filter.nbt.clear"), mx, my, true);
 
         // NBT entries list
-        List<FilterItemData.SlotNbtRule> activeRules = menu.getSlotNbtRules(nbtEditSlot);
+        List<NbtCriterion> activeRules = menu.getSlotNbtRules(nbtEditSlot);
         int listX = panelX + 4;
         int listY = panelY + 16;
         int listW = panelW - 8;
@@ -2647,7 +2664,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private void renderNbtEntryList(GuiGraphics g, int listX, int listY, int listW, int listH,
-            List<FilterItemData.SlotNbtRule> activeRules, int mx, int my) {
+            List<NbtCriterion> activeRules, int mx, int my) {
         int totalEntries = cachedSlotNbtEntries.size();
         int maxRows = Math.max(1, listH / LIST_ROW_H);
         int maxScroll = Math.max(0, totalEntries - maxRows);
@@ -2684,7 +2701,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 g.renderOutline(dotX, dotY, 5, 5, cMuted());
             }
 
-            FilterItemData.SlotNbtRule activeRule = active ? activeRules.get(ruleIdx) : null;
+            NbtCriterion activeRule = active ? activeRules.get(ruleIdx) : null;
             String op = active ? activeRule.operator() : "=";
 
             // Layout: [indicator] [path col] [op col] [value col]
@@ -2693,7 +2710,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             int valX = opX + NBT_OP_BTN_W + 1;
 
             // Path column
-            String displayPath = FilterScreenText.formatNbtPath(entry.path());
+            String displayPath = cachedSlotNbtPathLabels.get(i);
             g.fill(pathX, rowY, pathX + colW, rowY + LIST_ROW_H, theme().slotBg());
             g.renderOutline(pathX, rowY, colW, LIST_ROW_H, active ? cBtnBorder() : cBorder());
             g.drawString(font, font.plainSubstrByWidth(displayPath, colW - 4),
@@ -2784,7 +2801,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         }
 
         // NBT entries list
-        List<FilterItemData.SlotNbtRule> activeRules = menu.getSlotNbtRules(nbtEditSlot);
+        List<NbtCriterion> activeRules = menu.getSlotNbtRules(nbtEditSlot);
         int listX = panelX + 4;
         int listY = panelY + 16;
         int listW = panelW - 8;
@@ -2812,7 +2829,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private boolean handleNbtEntryListClick(int listX, int listY, int listW, int listH,
-            List<FilterItemData.SlotNbtRule> activeRules, double mx, double my, int btn) {
+            List<NbtCriterion> activeRules, double mx, double my, int btn) {
         int totalEntries = cachedSlotNbtEntries.size();
         int maxRows = Math.max(1, listH / LIST_ROW_H);
         int drawH = maxRows * LIST_ROW_H;
@@ -2842,7 +2859,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 continue;
 
             NbtFilterData.NbtEntry entry = cachedSlotNbtEntries.get(i);
-            String path = entry.path();
+            NbtPath path = entry.path();
             int ruleIdx = findActiveRuleIndex(activeRules, path);
             boolean active = ruleIdx >= 0;
 
@@ -2862,7 +2879,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 if (minecraft != null && minecraft.player != null) {
                     menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, newOp);
                 }
-                List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
+                List<NbtCriterion> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
                 int newIdx = findActiveRuleIndex(updatedRules, path);
                 if (newIdx >= 0) {
                     ClientPacketDistributor.sendToServer(
@@ -2925,7 +2942,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 if (minecraft != null && minecraft.player != null) {
                     menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, newOp);
                 }
-                List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
+                List<NbtCriterion> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
                 int newIdx = findActiveRuleIndex(updatedRules, path);
                 if (newIdx >= 0) {
                     ClientPacketDistributor.sendToServer(
@@ -2942,15 +2959,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return true;
     }
 
-    private FilterItemData.SlotNbtRule findActiveRule(List<FilterItemData.SlotNbtRule> rules, String path) {
-        for (FilterItemData.SlotNbtRule rule : rules) {
-            if (rule.path().equals(path))
-                return rule;
-        }
-        return null;
-    }
-
-    private int findActiveRuleIndex(List<FilterItemData.SlotNbtRule> rules, String path) {
+    private int findActiveRuleIndex(List<NbtCriterion> rules, NbtPath path) {
         for (int i = 0; i < rules.size(); i++) {
             if (rules.get(i).path().equals(path))
                 return i;
@@ -2992,6 +3001,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         nbtEditSlot = -1;
         subModeDropdownOpen = false;
         cachedSlotNbtEntries.clear();
+        cachedSlotNbtPathLabels = List.of();
         nbtPendingOperator = "=";
         nbtListScrollOffset = 0;
     }
@@ -3196,9 +3206,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 detailCachedNbtEntries.addAll(NbtFilterData.extractEntries(
                         slotItem, minecraft.player.level().registryAccess()));
             } else {
-                List<FilterItemData.SlotNbtRule> stored = menu.getSlotNbtRules(slot);
-                for (FilterItemData.SlotNbtRule r : stored) {
-                    String display = r.value() != null ? r.value().toString() : "?";
+                List<NbtCriterion> stored = menu.getSlotNbtRules(slot);
+                for (NbtCriterion r : stored) {
+                    String display = r.value().toString();
                     detailCachedNbtEntries.add(new NbtFilterData.NbtEntry(r.path(), display));
                 }
                 for (NbtFilterData.NbtEntry entry : NbtFilterData.getDefaultEntries()) {
@@ -3211,8 +3221,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             buildNbtRows();
 
             detailNbtActiveOps.clear();
-            List<FilterItemData.SlotNbtRule> existingRules = menu.getSlotNbtRules(slot);
-            for (FilterItemData.SlotNbtRule r : existingRules) {
+            List<NbtCriterion> existingRules = menu.getSlotNbtRules(slot);
+            for (NbtCriterion r : existingRules) {
                 detailNbtActiveOps.put(r.path(), r.operator());
             }
             detailNbtOp = "=";
@@ -3355,15 +3365,17 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         String batchStr = detailBatchInputBox.getValue().trim();
         int batchVal = 0;
         if (!batchStr.isEmpty()) {
-            try { batchVal = Integer.parseInt(batchStr); } catch (NumberFormatException ignored) {}
+            try { batchVal = ArithmeticExpression.evaluate(batchStr); } catch (NumberFormatException ignored) {}
         }
         String stockStr = detailStockInputBox.getValue().trim();
         int stockVal = 0;
         if (!stockStr.isEmpty()) {
-            try { stockVal = Integer.parseInt(stockStr); } catch (NumberFormatException ignored) {}
+            try { stockVal = ArithmeticExpression.evaluate(stockStr); } catch (NumberFormatException ignored) {}
         }
         batchVal = Math.max(0, batchVal);
         stockVal = Math.max(0, stockVal);
+        detailBatchInputBox.setValue(batchVal > 0 ? String.valueOf(batchVal) : "");
+        detailStockInputBox.setValue(stockVal > 0 ? String.valueOf(stockVal) : "");
         if (batchVal != menu.getEntryBatch(slot) || stockVal != menu.getEntryStock(slot)) {
             menu.setEntryBatch(minecraft.player, slot, batchVal);
             menu.setEntryStock(minecraft.player, slot, stockVal);
@@ -3496,7 +3508,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     }
                 }
             }
-        } else if (!isFluidOrChemical && FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
+        } else if (isFluidOrChemical && FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
+            g.renderOutline(slotX, slotY, 18, 18, cAccent());
+            renderAnyResource(g, slotX + 1, slotY + 1);
+        } else if (FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
             boolean hasNbt = FilterItemData.hasEntryNbt(openedStack, detailEditSlot);
             int ic = hasNbt ? cWarn() : cInfo();
             String il = hasNbt ? "N" : "D";
@@ -3619,11 +3634,11 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 g.renderTooltip(font,
                         Component.translatable("gui.logisticsnetworks.filter.detail.nbt.edit.disabled"), mx, my);
             } else if (isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
-                List<FilterItemData.SlotNbtRule> hoverRules = menu.getSlotNbtRules(detailEditSlot);
+                List<NbtCriterion> hoverRules = menu.getSlotNbtRules(detailEditSlot);
                 if (!hoverRules.isEmpty()) {
                     List<Component> tipLines = new ArrayList<>();
-                    for (FilterItemData.SlotNbtRule r : hoverRules) {
-                        tipLines.add(Component.literal(FilterScreenText.abbreviateNbtPath(r.path()) + " " + r.operator() + " " + r.value()));
+                    for (NbtCriterion r : hoverRules) {
+                        tipLines.add(Component.literal(FilterScreenText.abbreviateNbtPath(r.path().toString()) + " " + r.operator() + " " + r.value()));
                     }
                     g.renderTooltip(font, tipLines, mx, my);
                 } else {
@@ -3733,9 +3748,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     private void buildNbtRows() {
         nbtRows.clear();
+        List<String> pathTexts = detailCachedNbtEntries.stream()
+                .map(entry -> entry.path().toString())
+                .toList();
         Map<String, List<Integer>> groupedEntries = new HashMap<>();
-        for (int i = 0; i < detailCachedNbtEntries.size(); i++) {
-            String category = nbtCategory(detailCachedNbtEntries.get(i).path());
+        for (int i = 0; i < pathTexts.size(); i++) {
+            String category = nbtCategory(pathTexts.get(i));
             groupedEntries.computeIfAbsent(category, ignored -> new ArrayList<>()).add(i);
         }
 
@@ -3743,11 +3761,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         categories.sort(FilterScreen::compareNbtCategories);
         for (String category : categories) {
             List<Integer> entries = groupedEntries.get(category);
-            entries.sort(Comparator.comparing(index -> detailCachedNbtEntries.get(index).path()));
+            entries.sort(Comparator.comparing(pathTexts::get));
             nbtRows.add(new NbtRow(true, category, -1, category));
             for (int entryIdx : entries) {
-                String path = detailCachedNbtEntries.get(entryIdx).path();
-                nbtRows.add(new NbtRow(false, nbtDisplayPath(path, category), entryIdx, category));
+                nbtRows.add(new NbtRow(false, nbtDisplayPath(pathTexts.get(entryIdx), category), entryIdx, category));
             }
         }
     }
@@ -3818,7 +3835,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     }
 
     private void renderNbtTable(GuiGraphics g, int mx, int my, int tableX, int tableY, int tableW, int tableH) {
-        Set<String> activePaths = detailNbtActiveOps.keySet();
+        Set<NbtPath> activePaths = detailNbtActiveOps.keySet();
         if (nbtTableEditingRow < 0) detailNbtValueBox.setVisible(false);
 
         List<NbtRow> visible = getVisibleNbtRows();
@@ -4207,7 +4224,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     private boolean handleNbtTableClick(double mx, double my, int btn,
                                          int tableX, int tableY, int tableW, int tableH) {
-        Set<String> activePaths = detailNbtActiveOps.keySet();
+        Set<NbtPath> activePaths = detailNbtActiveOps.keySet();
         List<NbtRow> visible = getVisibleNbtRows();
         int totalRows = visible.size();
         boolean scrollable = totalRows * NBT_ROW_H > tableH;
@@ -4299,7 +4316,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return true;
     }
 
-    private void cycleDetailNbtOp(String path) {
+    private void cycleDetailNbtOp(NbtPath path) {
         String currentOp = detailNbtActiveOps.getOrDefault(path, "=");
         String nextOp = FilterItemData.nextNbtOperator(currentOp);
         detailNbtActiveOps.put(path, nextOp);
@@ -4312,7 +4329,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             menu.removeSlotNbtRule(detailEditSlot, ruleIdx);
             ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.add(detailEditSlot, path, nextOp, savedVal));
             menu.addSlotNbtRule(minecraft.player, detailEditSlot, path, nextOp, savedVal);
-            List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(detailEditSlot);
+            List<NbtCriterion> updatedRules = menu.getSlotNbtRules(detailEditSlot);
             int newIdx = findActiveRuleIndex(updatedRules, path);
             if (newIdx >= 0) {
                 ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setValue(detailEditSlot, newIdx, savedVal));
@@ -4339,7 +4356,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         menu.addSlotNbtRule(minecraft.player, detailEditSlot, entry.path(), opSymbol, fallbackValue);
 
         if (!valueOverride.isEmpty() && !valueOverride.equals(entry.valueDisplay())) {
-            List<FilterItemData.SlotNbtRule> rules = menu.getSlotNbtRules(detailEditSlot);
+            List<NbtCriterion> rules = menu.getSlotNbtRules(detailEditSlot);
             int ruleIdx = findActiveRuleIndex(rules, entry.path());
             if (ruleIdx >= 0) {
                 ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setValue(detailEditSlot, ruleIdx, valueOverride));
@@ -4400,7 +4417,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, false));
                     menu.setEntryNbtStrict(detailEditSlot, false);
                 }
-                menu.setEntryNbtRaw(minecraft.player, detailEditSlot, "", nbtVal);
+                menu.setEntryNbtRaw(minecraft.player, detailEditSlot, NbtPath.EMPTY, nbtVal);
                 ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.setRaw(detailEditSlot, nbtVal));
             } else if (nbtVal.isEmpty() && existingRaw != null) {
                 ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(detailEditSlot));
@@ -4534,7 +4551,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             String str = detailBatchInputBox.getValue().trim();
             int current = 0;
             if (!str.isEmpty()) {
-                try { current = Integer.parseInt(str); } catch (NumberFormatException ignored) {}
+                try { current = ArithmeticExpression.evaluate(str); } catch (NumberFormatException ignored) {}
             }
             int scrollDelta = computeScrollDelta(delta, menu.getTargetType());
             int next = Math.max(0, current + scrollDelta);
@@ -4545,7 +4562,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             String str = detailStockInputBox.getValue().trim();
             int current = 0;
             if (!str.isEmpty()) {
-                try { current = Integer.parseInt(str); } catch (NumberFormatException ignored) {}
+                try { current = ArithmeticExpression.evaluate(str); } catch (NumberFormatException ignored) {}
             }
             int scrollDelta = computeScrollDelta(delta, menu.getTargetType());
             int next = Math.max(0, current + scrollDelta);
@@ -4598,6 +4615,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         String tag = menu.getEntryTag(slot);
         ItemStack slotItem = slot < menu.slots.size() ? menu.slots.get(slot).getItem() : ItemStack.EMPTY;
+        FluidStack fluid = menu.getFluidFilter(slot);
+        String chemId = menu.getChemicalFilter(slot);
         boolean isNbtOnly = FilterItemData.isNbtOnlySlot(filterStack, slot);
 
         int batch = menu.getEntryBatch(slot);
@@ -4608,9 +4627,18 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         } else if (!slotItem.isEmpty()) {
             Identifier itemId = BuiltInRegistries.ITEM.getKey(slotItem.getItem());
             lines.add(Component.literal(itemId.toString()).withStyle(ChatFormatting.WHITE));
-        } else if (isNbtOnly || batch > 0 || stock > 0
-                || FilterItemData.hasEntrySlotMapping(filterStack, slot)) {
-            lines.add(Component.literal("Any Item").withStyle(ChatFormatting.AQUA));
+        } else if (!fluid.isEmpty()) {
+            lines.add(fluid.getHoverName().copy().withStyle(ChatFormatting.WHITE));
+        } else if (chemId != null) {
+            Component name = MekanismCompat.getChemicalTextComponent(chemId);
+            lines.add((name != null ? name.copy() : Component.literal(chemId)).withStyle(ChatFormatting.WHITE));
+        } else if (isNbtOnly || FilterItemData.hasEntrySlotMapping(filterStack, slot)) {
+            String any = switch (menu.getTargetType()) {
+                case FLUIDS -> "Any Fluid";
+                case CHEMICALS -> "Any Chemical";
+                default -> "Any Item";
+            };
+            lines.add(Component.literal(any).withStyle(ChatFormatting.AQUA));
         } else {
             return lines;
         }
@@ -4618,9 +4646,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             lines.add(Component.literal("Batch " + batch + " | Stock " + stock).withStyle(ChatFormatting.GRAY));
         }
 
-        List<FilterItemData.SlotNbtRule> nbtRules = menu.getSlotNbtRules(slot);
+        List<NbtCriterion> nbtRules = menu.getSlotNbtRules(slot);
         if (!nbtRules.isEmpty()) {
-            for (FilterItemData.SlotNbtRule r : nbtRules) {
+            for (NbtCriterion r : nbtRules) {
                 String display = r.path() + " " + r.operator() + " " + r.value();
                 lines.add(Component.literal("NBT: " + display).withStyle(ChatFormatting.GOLD));
             }
@@ -4630,18 +4658,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 String preview = nbtRaw.length() > 50 ? nbtRaw.substring(0, 50) + "..." : nbtRaw;
                 lines.add(Component.literal("NBT: " + preview).withStyle(ChatFormatting.GOLD));
             }
-        }
-
-        Boolean enchanted = FilterItemData.getEntryEnchanted(filterStack, slot);
-        if (enchanted != null) {
-            String enchStr = enchanted ? "Enchanted: Yes" : "Enchanted: No";
-            lines.add(Component.literal(enchStr).withStyle(ChatFormatting.LIGHT_PURPLE));
-        }
-
-        String durOp = FilterItemData.getEntryDurabilityOp(filterStack, slot);
-        if (durOp != null) {
-            int durVal = FilterItemData.getEntryDurabilityValue(filterStack, slot);
-            lines.add(Component.literal("Durability: " + durOp + " " + durVal).withStyle(ChatFormatting.BLUE));
         }
 
         String slotExpr = menu.getEntrySlotMappingExpression(slot);

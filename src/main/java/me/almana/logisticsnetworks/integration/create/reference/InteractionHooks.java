@@ -80,4 +80,12 @@ BlockState state = CreateCompat.getAttachedBlockState(node);
 String blockName = state.isAir()
         ? "unknown"
         : BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+
+Source owner: BuildingGadgetsCompat
+
+for (LogisticsNodeEntity node : player.serverLevel().getEntitiesOfClass(LogisticsNodeEntity.class, area,
+        node -> node.isActive() && !node.isMountedOnCreate() && node.isOwnedBy(player))) {
+
+List<LogisticsNodeEntity> nodes = level.getEntitiesOfClass(LogisticsNodeEntity.class,
+        new AABB(pos).inflate(0.1), node -> !node.isMountedOnCreate() && node.getAttachedPos().equals(pos));
 */

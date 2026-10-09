@@ -33,7 +33,7 @@ public final class NbtRuleMatcher {
         return OPS[0];
     }
 
-    static boolean matchesValue(@Nullable String operator, Tag expected, @Nullable Tag actual) {
+    public static boolean matchesValue(@Nullable String operator, Tag expected, @Nullable Tag actual) {
         if (actual == null) {
             return OP_NOT_EQUALS.equals(operator);
         }
@@ -82,15 +82,11 @@ public final class NbtRuleMatcher {
         if (tag instanceof NumericTag numeric) {
             return numeric.doubleValue();
         }
-        if (tag instanceof StringTag string) {
-            try {
-                return Double.parseDouble(string.value());
-            } catch (Exception e) {
-                return Double.NaN;
-            }
+        if (!(tag instanceof StringTag string)) {
+            return Double.NaN;
         }
         try {
-            return Double.parseDouble(tag.toString());
+            return Double.parseDouble(string.value());
         } catch (Exception e) {
             return Double.NaN;
         }

@@ -4,7 +4,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.network.SyncNetworkGraphPayload;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -25,7 +25,7 @@ public class NodeGraphMenu extends NodeMenu {
         setNodeSlotsVisible(node != null);
     }
 
-    public NodeGraphMenu(int containerId, Inventory inventory, FriendlyByteBuf buf) {
+    public NodeGraphMenu(int containerId, Inventory inventory, RegistryFriendlyByteBuf buf) {
         this(containerId, inventory, GraphMenuContext.read(buf), readSelection(buf, inventory));
     }
 
@@ -34,7 +34,7 @@ public class NodeGraphMenu extends NodeMenu {
         this(containerId, inventory, context, state.node(), state.selectedChannel());
     }
 
-    private static NodeMenuSync.ClientNodeState readSelection(FriendlyByteBuf buf, Inventory inventory) {
+    private static NodeMenuSync.ClientNodeState readSelection(RegistryFriendlyByteBuf buf, Inventory inventory) {
         return buf.readBoolean() ? NodeMenuSync.read(buf, inventory.player)
                 : new NodeMenuSync.ClientNodeState(-1, 0, null);
     }

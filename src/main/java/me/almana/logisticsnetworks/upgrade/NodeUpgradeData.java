@@ -122,6 +122,15 @@ public final class NodeUpgradeData {
         return false;
     }
 
+    public static boolean hasNetworkUpgrade(LogisticsNodeEntity node) {
+        for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
+            if (node.getUpgradeItem(i).is(Registration.NETWORK_UPGRADE.get())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean needsDimensionalUpgradeWarning(LogisticsNodeEntity node, LogisticsNetwork network,
             MinecraftServer server) {
         if (network == null || server == null || hasDimensionalUpgrade(node))

@@ -1,11 +1,17 @@
 package me.almana.logisticsnetworks.client.theme;
 
+import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.data.ChannelType;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 public final class ThemePaint {
+
+    private static final Identifier LABEL_DELETE_ICON = Identifier.fromNamespaceAndPath(
+            LogisticsNetworks.MOD_ID, "textures/gui/label_delete.png");
 
     public static void drawCentered(GuiGraphics graphics, Font font, String text, int centerX, int y, int color) {
         int width = font.width(text);
@@ -188,6 +194,11 @@ public final class ThemePaint {
         drawCentered(graphics, font, label, x + width / 2, y + (height - 7) / 2, fg);
     }
 
+    public static void labelDeleteIcon(GuiGraphics g, int x, int y, boolean hovered, Theme t) {
+        int color = (hovered ? t.danger() : t.textMuted()) | 0xFF000000;
+        g.raw().blit(RenderPipelines.GUI_TEXTURED, LABEL_DELETE_ICON, x, y, 0, 0, 8, 8, 512, 512, 512, 512, color);
+    }
+
     public static void ghostButton(GuiGraphics graphics, Font font, int x, int y, int width, int height,
             String label, boolean hovered, Theme theme) {
         int fg = hovered ? theme.text() : theme.textMuted();
@@ -201,6 +212,39 @@ public final class ThemePaint {
         int height = 12;
         roundRect(graphics, x, y, width, height, 3, theme.accentSoft(), theme.sharpCorners());
         graphics.drawString(font, text, x + 6, y + (height - 7) / 2, theme.accent(), false);
+    }
+
+    public static void searchBox(GuiGraphics g, Font font, int x, int y, int w, int h,
+                                  String placeholder, boolean focused, Theme t) {
+        int bg = t.surface2();
+        int border = focused ? t.accent() : t.border();
+        roundRect(g, x, y, w, h, 2, bg, t.sharpCorners());
+        roundOutline(g, x, y, w, h, 2, border, t.sharpCorners());
+        int gx = x + 3;
+        int gy = y + h / 2 - 2;
+        g.renderOutline(gx, gy, 4, 4, t.textSubtle());
+        g.fill(gx + 3, gy + 3, gx + 5, gy + 5, t.textSubtle());
+        g.drawString(font, placeholder, x + 10, y + (h - 7) / 2, t.textSubtle(), false);
+    }
+
+    public static int sortButtonWidth(Font font, String label) {
+        return font.width(label) + 21;
+    }
+
+    public static void sortButton(GuiGraphics g, Font font, int x, int y, String label, boolean hovered, Theme t) {
+        int w = sortButtonWidth(font, label);
+        int fg = hovered ? (t.borderStrong() == t.text() ? t.bg() : t.text()) : t.textMuted();
+        g.fill(x, y, x + w, y + 13, hovered ? t.borderStrong() : t.surface2());
+        g.renderOutline(x, y, w, 13, hovered ? t.accent() : t.border());
+        int ix = x + 5;
+        int iy = y + 3;
+        g.fill(ix + 2, iy, ix + 3, iy + 1, fg);
+        g.fill(ix + 1, iy + 1, ix + 4, iy + 2, fg);
+        g.fill(ix, iy + 2, ix + 5, iy + 3, fg);
+        g.fill(ix, iy + 4, ix + 5, iy + 5, fg);
+        g.fill(ix + 1, iy + 5, ix + 4, iy + 6, fg);
+        g.fill(ix + 2, iy + 6, ix + 3, iy + 7, fg);
+        g.drawString(font, label, ix + 9, y + 3, fg, false);
     }
 
     public static void setLabelBtn(GuiGraphics graphics, Font font, int x, int y, int width, int height,
@@ -220,6 +264,33 @@ public final class ThemePaint {
         graphics.fill(px, py + 2, px + 2, py + 3, fg);
         graphics.fill(px, py + 3, px + 1, py + 4, fg);
         graphics.drawString(font, label, x + 10, y + (height - 7) / 2, fg, false);
+    }
+
+    public static void segmented(GuiGraphics graphics, Font font, int x, int y, int height, String[] labels,
+            int activeIdx, Theme theme) {
+        int[] widths = new int[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            widths[i] = font.width(labels[i]) + 10;
+        }
+        int totalWidth = segmentedWidth(font, labels);
+        roundRect(graphics, x, y, totalWidth, height, 2, theme.surfaceSunken(), theme.sharpCorners());
+        roundOutline(graphics, x, y, totalWidth, height, 2, theme.border(), theme.sharpCorners());
+        int cx = x + 2;
+        for (int i = 0; i < labels.length; i++) {
+            int fg = theme.textMuted();
+            if (i == activeIdx) {
+                roundRect(graphics, cx, y + 1, widths[i], height - 2, 2, theme.surface(), theme.sharpCorners());
+                fg = theme.text();
+            }
+            drawCentered(graphics, font, labels[i], cx + widths[i] / 2, y + (height - 7) / 2, fg);
+            cx += widths[i];
+        }
+    }
+
+    public static int segmentedWidth(Font font, String[] labels) {
+        int totalWidth = 4;
+        for (String label : labels) totalWidth += font.width(label) + 10;
+        return totalWidth;
     }
 
     public static void modalVeil(GuiGraphics graphics, int x, int y, int width, int height, Theme theme) {

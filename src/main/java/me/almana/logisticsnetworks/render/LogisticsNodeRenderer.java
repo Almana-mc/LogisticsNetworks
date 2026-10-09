@@ -86,6 +86,8 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         state.debugNodeId = "";
         state.debugChannels = "";
         updateRenderBounds(entity, state);
+        String nodeLabel = entity.getNodeLabel();
+        state.scoreText = state.nameTag != null && !nodeLabel.isEmpty() ? Component.literal(nodeLabel) : null;
 
         if (state.wrenchVisible && state.debugMode) {
             state.debugNodeId = "Node: " + entity.getUUID().toString().substring(0, 8);
@@ -127,6 +129,12 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         String networkName = entity.getNetworkName();
         String label = networkName == null || networkName.isBlank() ? "No Network" : networkName;
         return Component.literal(label);
+    }
+
+    @Override
+    protected AABB getBoundingBoxForCulling(LogisticsNodeEntity entity) {
+        return new AABB(entity.getX() - 0.5, entity.getY(), entity.getZ() - 0.5,
+                entity.getX() + 0.5, entity.getY() + 1.0, entity.getZ() + 0.5);
     }
 
     @Override

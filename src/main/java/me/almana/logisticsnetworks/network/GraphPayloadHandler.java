@@ -88,7 +88,7 @@ public final class GraphPayloadHandler {
                 Component.translatable("gui.logisticsnetworks.graph.title"), preserveCursor), buf -> {
                     context.write(buf);
                     buf.writeBoolean(node != null);
-                    if (node != null) NodeMenuSync.write(buf, node, player.registryAccess(), selectedChannel);
+                    if (node != null) NodeMenuSync.write(buf, node, selectedChannel);
                 });
         if (player.containerMenu instanceof NodeGraphMenu menu) menu.sendNetworkListToClient(player);
         sendSnapshot(player);
@@ -338,7 +338,7 @@ public final class GraphPayloadHandler {
             menu.setReturnContext(context);
             return menu;
         }, Component.translatable("gui.logisticsnetworks.node_config"), true), buf -> {
-            NodeMenuSync.write(buf, node, player.registryAccess(), selectedChannel);
+            NodeMenuSync.write(buf, node, selectedChannel);
             buf.writeBoolean(true);
             context.write(buf);
         });
@@ -398,6 +398,7 @@ public final class GraphPayloadHandler {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (player.containerMenu instanceof NodeGraphMenu && authorized(player, networkId)) sendSnapshot(player);
         }
+        ServerPayloadHandler.refreshNodeViewers(server, networkId);
     }
 
     public static void refreshTable(ServerPlayer player, UUID networkId) {
@@ -430,8 +431,10 @@ public final class GraphPayloadHandler {
                 new LinkedHashMap<>(network.getGraphPositions())));
         if (menu.getNode() != null) {
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                PacketDistributor.sendToPlayer(player, new SyncChannelDataPayload(menu.getNodeId(), i,
-                        menu.getNode().getChannel(i).save(player.registryAccess())));
+                // Netty encodes later; snapshot now
+                ChannelData snapshot = new ChannelData();
+                snapshot.copyFrom(menu.getNode().getChannel(i));
+                PacketDistributor.sendToPlayer(player, new SyncChannelDataPayload(menu.getNodeId(), i, snapshot));
             }
         }
     }
@@ -448,7 +451,7 @@ public final class GraphPayloadHandler {
         NetworkRegistry.get(player.level()).setDirty();
     }
 
-    private static List<GraphNode> loadedNodes(MinecraftServer server, LogisticsNetwork network) {
+    public static List<GraphNode> loadedNodes(MinecraftServer server, LogisticsNetwork network) {
         List<GraphNode> nodes = new ArrayList<>();
         for (UUID nodeId : network.getNodeUuids()) {
             LogisticsNodeEntity node = findNode(server, nodeId);

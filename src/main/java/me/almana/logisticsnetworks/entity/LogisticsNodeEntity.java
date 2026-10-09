@@ -6,8 +6,10 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import me.almana.logisticsnetworks.data.NodeRouteChannels;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.data.SlotStack;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -16,11 +18,15 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerEntity;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.portal.TeleportTransition;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
@@ -29,6 +35,7 @@ import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import org.slf4j.Logger;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,22 +45,6 @@ public class LogisticsNodeEntity extends Entity {
 
     public static final int UPGRADE_SLOT_COUNT = 4;
     public static final int CHANNEL_COUNT = 9;
-
-    private static final String KEY_ATTACHED_POS = "AttachedPos";
-    private static final String KEY_VALID = "Valid";
-    private static final String KEY_NETWORK_ID = "NetworkId";
-    private static final String KEY_NETWORK_NAME = "NetworkName";
-    private static final String KEY_VISIBLE = "RenderVisible";
-    private static final String KEY_CHANNELS = "Channels";
-    private static final String KEY_UPGRADES = "Upgrades";
-    private static final String KEY_LABEL_REVISION = "LabelRevision";
-    private static final String KEY_CHANNEL_PREFIX = "Channel";
-    private static final String KEY_SLOT = "Slot";
-    private static final String KEY_ITEM = "Item";
-    private static final String KEY_OWNER_UUID = "OwnerUUID";
-    private static final String KEY_NODE_LABEL = "NodeLabel";
-    private static final String KEY_HIGHLIGHTED = "Highlighted";
-    private static final String KEY_NETWORK_COLOR = "NetworkColor";
 
     private static final EntityDataAccessor<BlockPos> ATTACHED_POS = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -120,78 +111,49 @@ public class LogisticsNodeEntity extends Entity {
 
     @Override
     protected void readAdditionalSaveData(ValueInput input) {
-        if (input.getLong(KEY_ATTACHED_POS).isPresent()) {
-            setAttachedPos(BlockPos.of(input.getLongOr(KEY_ATTACHED_POS, BlockPos.ZERO.asLong())));
-        }
-        setValid(input.getBooleanOr(KEY_VALID, false));
-        setNetworkId(parseOptionalUuid(input.getStringOr(KEY_NETWORK_ID, "")));
-        setNetworkName(input.getStringOr(KEY_NETWORK_NAME, ""));
-        setRenderVisible(input.getBooleanOr(KEY_VISIBLE, true));
-        setOwnerUUID(parseOptionalUuid(input.getStringOr(KEY_OWNER_UUID, "")));
-        setNodeLabel(input.getStringOr(KEY_NODE_LABEL, ""));
-        labelRevision = Math.max(0, input.getLongOr(KEY_LABEL_REVISION, 0));
-        setHighlighted(input.getBooleanOr(KEY_HIGHLIGHTED, false));
-        setNetworkColor(input.getIntOr(KEY_NETWORK_COLOR, me.almana.logisticsnetworks.data.NetworkColors.DEFAULT));
-
-        ValueInput channelsInput = input.childOrEmpty(KEY_CHANNELS);
-        for (int i = 0; i < CHANNEL_COUNT; i++) {
-            channels[i].load(channelsInput.childOrEmpty(KEY_CHANNEL_PREFIX + i));
-        }
-
-        Arrays.fill(upgradeItems, ItemStack.EMPTY);
-        for (ValueInput entry : input.childrenListOrEmpty(KEY_UPGRADES)) {
-            int slot = entry.getIntOr(KEY_SLOT, -1);
-            if (slot < 0 || slot >= UPGRADE_SLOT_COUNT) {
-                continue;
-            }
-            upgradeItems[slot] = entry.read(KEY_ITEM, ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
-        }
-        refreshRouteChannels();
+        input.read(NodeState.MAP_CODEC).ifPresent(this::applyState);
     }
 
     @Override
     protected void addAdditionalSaveData(ValueOutput output) {
-        output.putLong(KEY_ATTACHED_POS, getAttachedPos().asLong());
-        output.putBoolean(KEY_VALID, isValid());
+        output.store(NodeState.MAP_CODEC, captureState());
+    }
 
-        UUID netId = getNetworkId();
-        if (netId != null) {
-            output.putString(KEY_NETWORK_ID, netId.toString());
-        }
-        String networkName = getNetworkName();
-        if (!networkName.isBlank()) {
-            output.putString(KEY_NETWORK_NAME, networkName);
-        }
-        output.putBoolean(KEY_VISIBLE, isRenderVisible());
+    NodeState captureState() {
+        return new NodeState(getAttachedPos(), isValid(), Optional.ofNullable(getNetworkId()), getNetworkName(),
+                getNetworkColor(), isRenderVisible(), Optional.ofNullable(getOwnerUUID()), getNodeLabel(),
+                labelRevision, isHighlighted(), Optional.empty(), BlockPos.ZERO,
+                List.of(channels), SlotStack.nonEmpty(Arrays.asList(upgradeItems)));
+    }
 
-        UUID owner = getOwnerUUID();
-        if (owner != null) {
-            output.putString(KEY_OWNER_UUID, owner.toString());
+    void applyState(NodeState state) {
+        setAttachedPos(state.attachedPos());
+        setValid(state.valid());
+        state.networkId().ifPresent(this::setNetworkId);
+        setNetworkName(state.networkName());
+        setNetworkColor(state.networkColor());
+        setRenderVisible(state.renderVisible());
+        state.owner().ifPresent(this::setOwnerUUID);
+        // Label resets revision; keep order
+        setNodeLabel(state.nodeLabel());
+        setLabelRevision(state.labelRevision());
+        setHighlighted(state.highlighted());
+        for (int i = 0; i < Math.min(CHANNEL_COUNT, state.channels().size()); i++) {
+            channels[i].copyFrom(state.channels().get(i));
         }
-        String label = getNodeLabel();
-        if (!label.isEmpty()) {
-            output.putString(KEY_NODE_LABEL, label);
-        }
-        if (labelRevision > 0) {
-            output.putLong(KEY_LABEL_REVISION, labelRevision);
-        }
-        output.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
-        output.putInt(KEY_NETWORK_COLOR, getNetworkColor());
+        System.arraycopy(SlotStack.toSlots(state.upgrades(), UPGRADE_SLOT_COUNT), 0, upgradeItems, 0,
+                UPGRADE_SLOT_COUNT);
+        refreshRouteChannels();
+    }
 
-        ValueOutput channelsOutput = output.child(KEY_CHANNELS);
-        for (int i = 0; i < CHANNEL_COUNT; i++) {
-            channels[i].save(channelsOutput.child(KEY_CHANNEL_PREFIX + i));
-        }
+    public CompoundTag saveNodeState() {
+        TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, registryAccess());
+        addAdditionalSaveData(output);
+        return output.buildResult();
+    }
 
-        var upgradesOutput = output.childrenList(KEY_UPGRADES);
-        for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
-            if (upgradeItems[i].isEmpty()) {
-                continue;
-            }
-            ValueOutput entry = upgradesOutput.addChild();
-            entry.putInt(KEY_SLOT, i);
-            entry.store(KEY_ITEM, ItemStack.OPTIONAL_CODEC, upgradeItems[i]);
-        }
+    public void loadNodeState(CompoundTag tag) {
+        readAdditionalSaveData(TagValueInput.create(ProblemReporter.DISCARDING, registryAccess(), tag));
     }
 
     @Override
@@ -265,6 +227,16 @@ public class LogisticsNodeEntity extends Entity {
     @Override
     public boolean hurtServer(ServerLevel level, DamageSource damageSource, float amount) {
         return false;
+    }
+
+    @Override
+    public void teleportTo(double x, double y, double z) {
+    }
+
+    @Nullable
+    @Override
+    public Entity teleport(TeleportTransition transition) {
+        return null;
     }
 
     @Override

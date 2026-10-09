@@ -23,10 +23,12 @@ The drive bay slot is only interactable on the Network Directory page. If you sw
 Once you pick a network from the directory, you can jump into either of the two subsystems. Covered in their own chapters:
 
 - [Network Directory](network-directory.md) — the list of networks on the left; search, pinning, mounting a network.
-- [I/O Monitor](io-monitor.md) — aggregated channel throughput with live graphs (120 data points per channel).
+- [I/O Monitor](io-monitor.md) — live throughput for all nine channels, plus exactly which items and fluids are moving.
 - [Node Table](node-table.md) — every node on the mounted network, grouped by label, with per-row actions.
 
 See [Saving & Loading Networks](save-load.md) to back up node configurations or load them onto the Computer's wrench.
+
+With CC: Tweaked installed, see [ComputerCraft](../integrations/computercraft.md) to read the same data from Lua scripts and monitors.
 
 Until a network is mounted, the right-hand pane just says **No Network Mounted**. Pick one from the directory and the subsystem buttons unlock.
 

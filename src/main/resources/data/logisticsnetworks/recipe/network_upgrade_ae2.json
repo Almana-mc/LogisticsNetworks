@@ -1,0 +1,37 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "logisticsnetworks"
+        },
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "ae2"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "KCK",
+        "SIS",
+        "KCK"
+    ],
+    "key": {
+        "K": "minecraft:clay",
+        "C": {
+            "neoforge:ingredient_type": "neoforge:compound",
+            "children": [
+                "#ae2:glass_cable",
+                "#ae2:covered_cable",
+                "#ae2:smart_cable",
+                "#ae2:covered_dense_cable",
+                "#ae2:smart_dense_cable"
+            ]
+        },
+        "S": "ae2:speed_card",
+        "I": "#ae2:interface"
+    },
+    "result": {
+        "id": "logisticsnetworks:network_upgrade"
+    }
+}

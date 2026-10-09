@@ -12,6 +12,7 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import me.almana.logisticsnetworks.network.ClientPayloadHandler;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
+import me.almana.logisticsnetworks.network.DeleteNetworkLabelPayload;
 import me.almana.logisticsnetworks.network.DeleteNetworkPayload;
 import me.almana.logisticsnetworks.network.ModifyFilterModPayload;
 import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
@@ -42,9 +43,8 @@ import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
-import me.almana.logisticsnetworks.network.SetFilterPayload;
-import me.almana.logisticsnetworks.network.SetNodeUpgradeItemPayload;
 import me.almana.logisticsnetworks.network.SetWrenchColorsPayload;
+import me.almana.logisticsnetworks.network.SetWrenchFlowPayload;
 import me.almana.logisticsnetworks.network.SetWrenchModePayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelsPayload;
 import me.almana.logisticsnetworks.network.MoveGraphVerticesPayload;
@@ -72,6 +72,7 @@ import me.almana.logisticsnetworks.network.SyncStorageUpgradeCatalogPayload;
 import me.almana.logisticsnetworks.network.SyncQueuedNodePlacementPayload;
 import me.almana.logisticsnetworks.network.SyncFilterScanResultPayload;
 import me.almana.logisticsnetworks.network.SyncChannelListPayload;
+import me.almana.logisticsnetworks.network.SyncServerRackPayload;
 import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkExportPayload;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
@@ -83,13 +84,17 @@ import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
+import me.almana.logisticsnetworks.network.UpdateServerRackPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.datagen.ModDataGenerators;
+import me.almana.logisticsnetworks.integration.computercraft.ComputerPeripheral;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.filter.TooltipLines;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
@@ -109,6 +114,9 @@ public class LogisticsNetworks {
                 modBus.addListener(ModDataGenerators::gatherServer);
                 modBus.addListener(this::registerPayloads);
                 modBus.addListener(this::commonSetup);
+                if (ModList.get().isLoaded("computercraft")) {
+                        modBus.addListener(ComputerPeripheral::register);
+                }
                 if (FMLEnvironment.getDist() == Dist.CLIENT) {
                         modBus.addListener(LogisticsClientEvents::registerRenderers);
                         modBus.addListener(LogisticsClientEvents::registerScreens);
@@ -149,11 +157,12 @@ public class LogisticsNetworks {
                 NetworkRegistry.get(event.getServer().overworld()).stopAsyncPlanning();
                 LinkedStorage.stopCraftingRequests();
                 ServerPayloadHandler.clearModifierKeys();
+                TooltipLines.clear();
                 ThreadGuard.clearServerThread();
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("9");
+                final var registrar = event.registrar(MOD_ID).versioned("10");
 
                 // Client -> Server
                 registrar.playToServer(RequestOpenGraphPayload.TYPE, RequestOpenGraphPayload.STREAM_CODEC,
@@ -170,14 +179,10 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleUpdateChannel);
                 registrar.playToServer(AssignNetworkPayload.TYPE, AssignNetworkPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleAssignNetwork);
-                registrar.playToServer(SetFilterPayload.TYPE, SetFilterPayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleSetFilter);
                 registrar.playToServer(SetChannelFilterItemPayload.TYPE, SetChannelFilterItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetChannelFilterItem);
                 registrar.playToServer(AddNodeFilterItemPayload.TYPE, AddNodeFilterItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleAddNodeFilterItem);
-                registrar.playToServer(SetNodeUpgradeItemPayload.TYPE, SetNodeUpgradeItemPayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleSetNodeUpgradeItem);
                 registrar.playToServer(SelectNodeChannelPayload.TYPE, SelectNodeChannelPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSelectNodeChannel);
                 registrar.playToServer(ModifyFilterModPayload.TYPE, ModifyFilterModPayload.STREAM_CODEC,
@@ -225,6 +230,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleCycleWrenchMode);
                 registrar.playToServer(SetWrenchColorsPayload.TYPE, SetWrenchColorsPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetWrenchColors);
+                registrar.playToServer(SetWrenchFlowPayload.TYPE, SetWrenchFlowPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetWrenchFlow);
                 registrar.playToServer(SetWrenchModePayload.TYPE, SetWrenchModePayload.STREAM_CODEC,
                                 SetWrenchModePayload::handle);
                 registrar.playToServer(MoveGraphVerticesPayload.TYPE, MoveGraphVerticesPayload.STREAM_CODEC,
@@ -253,6 +260,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetNodeLabel);
                 registrar.playToServer(RequestNetworkLabelsPayload.TYPE, RequestNetworkLabelsPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleRequestNetworkLabels);
+                registrar.playToServer(DeleteNetworkLabelPayload.TYPE, DeleteNetworkLabelPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleDeleteNetworkLabel);
                 registrar.playToServer(SetNetworkNodesVisibilityPayload.TYPE,
                                 SetNetworkNodesVisibilityPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetNetworkNodesVisibility);
@@ -274,6 +283,8 @@ public class LogisticsNetworks {
                 registrar.playToServer(ToggleComputerPinnedNetworkPayload.TYPE,
                                 ToggleComputerPinnedNetworkPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleToggleComputerPinnedNetwork);
+                registrar.playToServer(UpdateServerRackPayload.TYPE, UpdateServerRackPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleUpdateServerRack);
                 registrar.playToServer(RequestNetworkExportPayload.TYPE,
                                 RequestNetworkExportPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleRequestNetworkExport);
@@ -312,6 +323,8 @@ public class LogisticsNetworks {
                                 ClientPayloadHandler::handleSyncTelemetry);
                 registrar.playToClient(SyncChannelListPayload.TYPE, SyncChannelListPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncChannelList);
+                registrar.playToClient(SyncServerRackPayload.TYPE, SyncServerRackPayload.STREAM_CODEC,
+                                ClientPayloadHandler::handleSyncServerRack);
                 registrar.playToClient(SyncNetworkExportPayload.TYPE, SyncNetworkExportPayload.STREAM_CODEC,
                                 ClientPayloadHandler::handleSyncNetworkExport);
                 registrar.playToClient(SyncStorageUpgradeCatalogPayload.TYPE,

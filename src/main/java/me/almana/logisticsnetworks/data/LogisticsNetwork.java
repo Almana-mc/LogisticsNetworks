@@ -1,23 +1,13 @@
 package me.almana.logisticsnetworks.data;
 
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.data.graph.GraphPosition;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.core.HolderLookup;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.UUID;
-
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -25,24 +15,62 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
 public class LogisticsNetwork {
 
-    private static final String KEY_ID = "Id";
-    private static final String KEY_NAME = "Name";
-    private static final String KEY_SLEEPING = "Sleeping";
-    private static final String KEY_NODES = "Nodes";
-    private static final String KEY_NODE_UUID = "Node";
-    private static final String KEY_OWNER_UUID = "OwnerUUID";
-    private static final String KEY_CHANNEL_NAMES = "ChannelNames";
-    private static final String KEY_CREATED = "CreatedAt";
-    private static final String KEY_COLOR = "Color";
-    private static final String KEY_GRAPH_POSITIONS = "GraphPositions";
-    private static final String KEY_GRAPH_X = "X";
-    private static final String KEY_GRAPH_Y = "Y";
-    private static final String KEY_LABEL_TEMPLATES = "LabelTemplates";
-    private static final String KEY_LABEL = "Label";
-    private static final String KEY_TEMPLATE = "Template";
     private static final float MAX_GRAPH_COORDINATE = 1_000_000.0F;
+    private static final GraphPosition INVALID_POSITION = new GraphPosition(Float.NaN, Float.NaN);
+
+    static final Codec<LogisticsNetwork> CURRENT_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.CODEC.fieldOf("id").forGetter(LogisticsNetwork::getId),
+            Codec.STRING.lenientOptionalFieldOf("name").forGetter(network -> Optional.of(network.name)),
+            Codec.BOOL.lenientOptionalFieldOf("sleeping", true).forGetter(LogisticsNetwork::isSleeping),
+            Codec.INT.lenientOptionalFieldOf("color").forGetter(network -> Optional.of(network.color)),
+            Codec.LONG.lenientOptionalFieldOf("created_at", 0L).forGetter(LogisticsNetwork::getCreatedAt),
+            UUIDUtil.CODEC.optionalFieldOf("owner")
+                    .forGetter(network -> Optional.ofNullable(network.ownerUuid)),
+            ComponentCodecs.lenientList(UUIDUtil.CODEC).lenientOptionalFieldOf("nodes", List.of())
+                    .forGetter(network -> List.copyOf(network.nodeUuids)),
+            Codec.STRING.orElse("").listOf().lenientOptionalFieldOf("channel_names", List.of())
+                    .forGetter(network -> List.of(network.channelNames)),
+            Codec.unboundedMap(Codec.STRING, graphPosition("x", "y"))
+                    .lenientOptionalFieldOf("graph_positions", Map.of())
+                    .forGetter(network -> network.graphPositions),
+            ComponentCodecs.lenientList(labelTemplate("label", "template"))
+                    .lenientOptionalFieldOf("label_templates", List.of())
+                    .forGetter(LogisticsNetwork::templateEntries)
+    ).apply(instance, LogisticsNetwork::decoded));
+    static final Codec<LogisticsNetwork> LEGACY_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.LENIENT_CODEC.fieldOf("Id").forGetter(LogisticsNetwork::getId),
+            Codec.STRING.lenientOptionalFieldOf("Name").forGetter(network -> Optional.of(network.name)),
+            Codec.BOOL.lenientOptionalFieldOf("Sleeping", true).forGetter(LogisticsNetwork::isSleeping),
+            Codec.INT.lenientOptionalFieldOf("Color").forGetter(network -> Optional.of(network.color)),
+            Codec.LONG.lenientOptionalFieldOf("CreatedAt", 0L).forGetter(LogisticsNetwork::getCreatedAt),
+            UUIDUtil.LENIENT_CODEC.optionalFieldOf("OwnerUUID")
+                    .forGetter(network -> Optional.ofNullable(network.ownerUuid)),
+            ComponentCodecs.lenientList(UUIDUtil.LENIENT_CODEC.fieldOf("Node").codec())
+                    .lenientOptionalFieldOf("Nodes", List.of())
+                    .forGetter(network -> List.copyOf(network.nodeUuids)),
+            Codec.STRING.lenientOptionalFieldOf("Name", "").codec().orElse("").listOf()
+                    .lenientOptionalFieldOf("ChannelNames", List.of())
+                    .forGetter(network -> List.of(network.channelNames)),
+            Codec.unboundedMap(Codec.STRING, graphPosition("X", "Y"))
+                    .lenientOptionalFieldOf("GraphPositions", Map.of())
+                    .forGetter(network -> network.graphPositions),
+            ComponentCodecs.lenientList(labelTemplate("Label", "Template"))
+                    .lenientOptionalFieldOf("LabelTemplates", List.of())
+                    .forGetter(LogisticsNetwork::templateEntries)
+    ).apply(instance, LogisticsNetwork::decoded));
+    public static final Codec<LogisticsNetwork> CODEC = Codec.withAlternative(CURRENT_CODEC, LEGACY_CODEC);
 
     private final UUID id;
     private String name;
@@ -106,114 +134,46 @@ public class LogisticsNetwork {
         rebuildViews();
     }
 
-    public CompoundTag save(@org.jetbrains.annotations.Nullable HolderLookup.Provider provider) {
-        CompoundTag tag = new CompoundTag();
-        tag.putString(KEY_ID, id.toString());
-        tag.putString(KEY_NAME, name);
-        tag.putBoolean(KEY_SLEEPING, sleeping);
-        tag.putLong(KEY_CREATED, createdAt);
-        tag.putInt(KEY_COLOR, color);
-        if (ownerUuid != null) {
-            tag.putString(KEY_OWNER_UUID, ownerUuid.toString());
+    private static LogisticsNetwork decoded(UUID id, Optional<String> name, boolean sleeping,
+            Optional<Integer> color, long createdAt, Optional<UUID> owner, List<UUID> nodes,
+            List<String> channelNames, Map<String, GraphPosition> graphPositions,
+            List<Pair<String, LabelUpgradeTemplate>> templates) {
+        LogisticsNetwork network = new LogisticsNetwork(id);
+        name.ifPresent(network::setName);
+        network.sleeping = sleeping;
+        color.ifPresent(network::setColor);
+        network.createdAt = createdAt;
+        network.ownerUuid = owner.orElse(null);
+        nodes.forEach(network::addNode);
+        for (int i = 0; i < Math.min(channelNames.size(), 9); i++) {
+            network.channelNames[i] = channelNames.get(i);
         }
-
-        ListTag nodesTag = new ListTag();
-        for (UUID uuid : nodeUuids) {
-            CompoundTag uuidTag = new CompoundTag();
-            uuidTag.putString(KEY_NODE_UUID, uuid.toString());
-            nodesTag.add(uuidTag);
-        }
-        tag.put(KEY_NODES, nodesTag);
-
-        ListTag channelNamesTag = new ListTag();
-        for (int i = 0; i < 9; i++) {
-            CompoundTag entry = new CompoundTag();
-            entry.putString("Name", channelNames[i]);
-            channelNamesTag.add(entry);
-        }
-        tag.put(KEY_CHANNEL_NAMES, channelNamesTag);
-
-        if (!graphPositions.isEmpty()) {
-            CompoundTag positionsTag = new CompoundTag();
-            for (Map.Entry<String, GraphPosition> entry : new TreeMap<>(graphPositions).entrySet()) {
-                CompoundTag positionTag = new CompoundTag();
-                positionTag.putFloat(KEY_GRAPH_X, entry.getValue().x());
-                positionTag.putFloat(KEY_GRAPH_Y, entry.getValue().y());
-                positionsTag.put(entry.getKey(), positionTag);
+        graphPositions.forEach((key, position) -> {
+            if (validGraphKey(key) && validGraphPosition(position)) {
+                network.graphPositions.put(key, position);
             }
-            tag.put(KEY_GRAPH_POSITIONS, positionsTag);
-        }
-
-        if (!labelTemplates.isEmpty()) {
-            ListTag templatesTag = new ListTag();
-            for (Map.Entry<String, LabelUpgradeTemplate> entry : new TreeMap<>(labelTemplates).entrySet()) {
-                CompoundTag templateTag = new CompoundTag();
-                templateTag.putString(KEY_LABEL, entry.getKey());
-                templateTag.put(KEY_TEMPLATE, entry.getValue().save(provider));
-                templatesTag.add(templateTag);
-            }
-            tag.put(KEY_LABEL_TEMPLATES, templatesTag);
-        }
-
-        return tag;
+        });
+        templates.forEach(entry -> network.setLabelTemplate(entry.getFirst(), entry.getSecond()));
+        return network;
     }
 
-    public static LogisticsNetwork load(CompoundTag tag,
-                                        @org.jetbrains.annotations.Nullable HolderLookup.Provider provider) {
-        UUID id = parseRequiredUuid(tag.getStringOr(KEY_ID, null));
-        LogisticsNetwork network = new LogisticsNetwork(id);
+    private static Codec<GraphPosition> graphPosition(String x, String y) {
+        Codec<GraphPosition> codec = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.FLOAT.lenientOptionalFieldOf(x, Float.NaN).forGetter(GraphPosition::x),
+                Codec.FLOAT.lenientOptionalFieldOf(y, Float.NaN).forGetter(GraphPosition::y)
+        ).apply(instance, GraphPosition::new));
+        return ComponentCodecs.lenient(codec, () -> INVALID_POSITION);
+    }
 
-        if (tag.contains(KEY_NAME)) {
-            network.name = tag.getStringOr(KEY_NAME, network.name);
-        }
-        if (tag.contains(KEY_SLEEPING)) {
-            network.sleeping = tag.getBooleanOr(KEY_SLEEPING, network.sleeping);
-        }
-        if (tag.contains(KEY_OWNER_UUID)) {
-            network.ownerUuid = parseOptionalUuid(tag.getStringOr(KEY_OWNER_UUID, null));
-        }
-        network.createdAt = tag.getLongOr(KEY_CREATED, 0L);
-        if (tag.contains(KEY_COLOR)) {
-            network.color = NetworkColors.mask(tag.getIntOr(KEY_COLOR, network.color));
-        }
+    private static Codec<Pair<String, LabelUpgradeTemplate>> labelTemplate(String label, String template) {
+        return Codec.mapPair(Codec.STRING.fieldOf(label), LabelUpgradeTemplate.CODEC.fieldOf(template)).codec();
+    }
 
-        if (tag.contains(KEY_NODES)) {
-            ListTag nodesTag = tag.getListOrEmpty(KEY_NODES);
-            for (Tag t : nodesTag) {
-                if (t instanceof CompoundTag ct && ct.contains(KEY_NODE_UUID)) {
-                    UUID nodeId = parseOptionalUuid(ct.getStringOr(KEY_NODE_UUID, null));
-                    if (nodeId != null) {
-                        network.addNode(nodeId);
-                    }
-                }
-            }
-        }
-        if (tag.contains(KEY_CHANNEL_NAMES)) {
-            ListTag namesTag = tag.getListOrEmpty(KEY_CHANNEL_NAMES);
-            for (int i = 0; i < Math.min(namesTag.size(), 9); i++) {
-                if (namesTag.get(i) instanceof CompoundTag ct) {
-                    network.channelNames[i] = ct.getStringOr("Name", "");
-                }
-            }
-        }
-        if (tag.get(KEY_LABEL_TEMPLATES) instanceof ListTag templatesTag) {
-            for (Tag value : templatesTag) {
-                if (!(value instanceof CompoundTag templateTag)) continue;
-                String label = templateTag.getStringOr(KEY_LABEL, "");
-                LabelUpgradeTemplate template = LabelUpgradeTemplate.load(
-                        templateTag.getCompoundOrEmpty(KEY_TEMPLATE), provider);
-                if (!label.isBlank() && template != null) network.labelTemplates.put(label, template);
-            }
-        }
-
-        CompoundTag positionsTag = tag.getCompoundOrEmpty(KEY_GRAPH_POSITIONS);
-        for (String key : positionsTag.keySet()) {
-            if (!(positionsTag.get(key) instanceof CompoundTag positionTag)) continue;
-            GraphPosition position = new GraphPosition(positionTag.getFloatOr(KEY_GRAPH_X, Float.NaN),
-                    positionTag.getFloatOr(KEY_GRAPH_Y, Float.NaN));
-            if (validGraphKey(key) && validGraphPosition(position)) network.graphPositions.put(key, position);
-        }
-        return network;
+    private List<Pair<String, LabelUpgradeTemplate>> templateEntries() {
+        return labelTemplates.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> Pair.of(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     public void addNode(UUID nodeUuid) {
@@ -260,6 +220,12 @@ public class LogisticsNetwork {
 
     public long getCreatedAt() {
         return createdAt;
+    }
+
+    public boolean stampCreatedAtIfMissing() {
+        if (createdAt != 0L) return false;
+        createdAt = System.currentTimeMillis();
+        return true;
     }
 
     public String getName() {
@@ -311,6 +277,11 @@ public class LogisticsNetwork {
 
     public void setLabelTemplate(String label, LabelUpgradeTemplate template) {
         if (!label.isBlank()) labelTemplates.put(label, template);
+    }
+
+    public void removeLabel(String label) {
+        labelTemplates.remove(label);
+        graphPositions.remove("label:" + label);
     }
 
     public boolean isSleeping() {
@@ -537,22 +508,6 @@ public class LogisticsNetwork {
                     }
                 }
             }
-        }
-    }
-
-    private static UUID parseRequiredUuid(String value) {
-        UUID parsed = parseOptionalUuid(value);
-        return parsed != null ? parsed : UUID.randomUUID();
-    }
-
-    private static UUID parseOptionalUuid(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(value);
-        } catch (IllegalArgumentException ignored) {
-            return null;
         }
     }
 }

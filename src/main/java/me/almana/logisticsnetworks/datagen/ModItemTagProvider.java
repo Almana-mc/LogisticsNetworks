@@ -29,7 +29,8 @@ public class ModItemTagProvider extends ItemTagsProvider {
                 Registration.NETHERITE_UPGRADE.get(),
                 Registration.DIMENSIONAL_UPGRADE.get(),
                 Registration.MEKANISM_CHEMICAL_UPGRADE.get(),
-                Registration.ARS_SOURCE_UPGRADE.get());
+                Registration.ARS_SOURCE_UPGRADE.get(),
+                Registration.NETWORK_UPGRADE.get());
 
         tag(ModTags.RESOURCE_BLACKLIST_ITEMS);
     }

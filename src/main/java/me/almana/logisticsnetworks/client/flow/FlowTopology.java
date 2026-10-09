@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.flow;
 
+import me.almana.logisticsnetworks.component.WrenchFlow;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.NodeRouteChannels;
@@ -19,11 +20,14 @@ final class FlowTopology {
     private FlowTopology() {
     }
 
-    static List<Bundle> build(List<Node> nodes) {
+    static List<Bundle> build(List<Node> nodes, WrenchFlow flow) {
         Map<Key, Ends> groups = new TreeMap<>(ORDER);
         for (Node node : nodes) {
+            if (!flow.showsNetwork(node.network())) continue;
             for (int channel = 0; channel < 9; channel++) {
+                if (!flow.showsChannel(channel)) continue;
                 for (ChannelType type : TYPES) {
+                    if (!flow.showsType(type)) continue;
                     boolean source = NodeRouteChannels.matches(node.channels(), channel, type, ChannelMode.EXPORT);
                     boolean target = NodeRouteChannels.matches(node.channels(), channel, type, ChannelMode.IMPORT);
                     if (!source && !target) continue;

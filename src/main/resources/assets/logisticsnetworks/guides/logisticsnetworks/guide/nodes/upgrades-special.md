@@ -1,5 +1,5 @@
 ---
-item_ids: [logisticsnetworks:dimensional_upgrade, logisticsnetworks:mekanism_chemical_upgrade, logisticsnetworks:ars_source_upgrade]
+item_ids: [logisticsnetworks:dimensional_upgrade, logisticsnetworks:mekanism_chemical_upgrade, logisticsnetworks:ars_source_upgrade, logisticsnetworks:network_upgrade]
 navigation:
   title: Special Upgrades
   parent: nodes/index.md
@@ -9,7 +9,7 @@ navigation:
 
 # Special Upgrades
 
-Special upgrades do not change a node's throughput caps. The Dimensional Upgrade unlocks cross-dimension transfers and can be combined with a [performance upgrade](upgrades-performance.md) on the same node. The Chemical and Source upgrade items are retained for future compatibility but are currently inactive.
+Special upgrades do not change a node's throughput caps. The Dimensional Upgrade unlocks cross-dimension transfers and the Network Upgrade unlocks storage network access; both can be combined with a [performance upgrade](upgrades-performance.md) on the same node. The Chemical and Source upgrade items are retained for future compatibility but are currently inactive.
 
 Upgrade slots are on the [Filters & Upgrades](filters-upgrades.md) panel. Duplicates are rejected, but different active upgrades can share the four slots.
 
@@ -34,3 +34,15 @@ This item is retained for future compatibility. It does not currently unlock Che
 This item is retained for future compatibility. It does not currently unlock Source channels or transfers. Its recipe appears only when Ars Nouveau is loaded.
 
 <RecipeFor id="logisticsnetworks:ars_source_upgrade" fallbackText="Install Ars Nouveau to unlock this recipe." />
+
+## Network Upgrade
+
+**Unlocks direct storage network access.** A node with this upgrade on an Applied Energistics 2 or Refined Storage Interface moves items and fluids straight through the whole connected storage network, as described in [Channel Settings](channel-settings.md). Without it, the Interface is just another inventory and the node only sees what is stocked in the Interface itself.
+
+Each node on an Interface that should reach the network needs its own Network Upgrade. Nodes on other blocks do not need it.
+
+There are two recipes, one per storage mod. Each one only appears when that mod is loaded.
+
+<Recipe id="logisticsnetworks:network_upgrade_ae2" fallbackText="Install Applied Energistics 2 to unlock this recipe." />
+
+<Recipe id="logisticsnetworks:network_upgrade_refinedstorage" fallbackText="Install Refined Storage to unlock this recipe." />

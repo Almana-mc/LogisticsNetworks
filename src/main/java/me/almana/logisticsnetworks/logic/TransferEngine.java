@@ -2,27 +2,24 @@ package me.almana.logisticsnetworks.logic;
 
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
-import me.almana.logisticsnetworks.logic.async.SnapshotItemHandler;
 import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeRef;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.CandidateComponents;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
-import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -49,6 +46,9 @@ import org.slf4j.Logger;
 
 import java.util.*;
 import java.util.function.BooleanSupplier;
+import java.util.function.IntConsumer;
+import java.util.function.ObjIntConsumer;
+import java.util.function.ObjLongConsumer;
 
 public class TransferEngine {
 
@@ -56,6 +56,8 @@ public class TransferEngine {
     private static final float BACKOFF_MULTIPLIER = 1.3f;
     private static final float BACKOFF_DECAY_DIVISOR = 3f;
     private static final float BACKOFF_MAX_TICKS_ENERGY = 5f;
+    private static final byte SLOT_REJECTED = 1;
+    private static final byte SLOT_PASSED = 2;
 
     public record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
     }
@@ -84,13 +86,6 @@ public class TransferEngine {
         Map<UUID, Boolean> dimensionalCache = context.dimensionalCache();
         Map<UUID, Integer> tierCache = context.tierCache();
         Map<UUID, Integer> signalCache = context.signalCache();
-        Map<UUID, LogisticsNodeEntity> nodeCache = new HashMap<>(sortedNodes.size());
-        for (LogisticsNodeEntity node : sortedNodes) nodeCache.put(node.getUUID(), node);
-        List<ImportTarget>[] itemImports = context.itemImports();
-        List<ImportTarget>[] fluidImports = resolveCache(network.getFluidImports(), nodeCache, signalCache);
-        List<ImportTarget>[] energyImports = resolveCache(network.getEnergyImports(), nodeCache, signalCache);
-        List<ImportTarget>[] chemicalImports = resolveCache(network.getChemicalImports(), nodeCache, signalCache);
-        List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache, signalCache);
         NetworkRegistry registry = NetworkRegistry.get(server.overworld());
 
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
@@ -98,8 +93,9 @@ public class TransferEngine {
         try (var operation = TransferCapabilityCache.storageOperation(true)) {
             long minWakeDelta = Long.MAX_VALUE;
             for (LogisticsNodeEntity sourceNode : sortedNodes) {
-                long delta = processNode(sourceNode, itemImports, fluidImports, energyImports, chemicalImports,
-                        sourceImports, signalCache, dimensionalCache, tierCache, telemetryActive, includeItems);
+                long delta = processNode(sourceNode, context.itemImports(), context.fluidImports(),
+                        context.energyImports(), context.chemicalImports(), context.sourceImports(),
+                        signalCache, dimensionalCache, tierCache, telemetryActive, includeItems);
                 if (delta < minWakeDelta) minWakeDelta = delta;
             }
             return minWakeDelta;
@@ -107,7 +103,10 @@ public class TransferEngine {
     }
 
     public record NetworkContext(List<LogisticsNodeEntity> sortedNodes, Map<UUID, Integer> signalCache,
-            List<ImportTarget>[] itemImports, Map<UUID, Boolean> dimensionalCache, Map<UUID, Integer> tierCache) {
+            List<ImportTarget>[] itemImports, List<ImportTarget>[] fluidImports,
+            List<ImportTarget>[] energyImports, List<ImportTarget>[] chemicalImports,
+            List<ImportTarget>[] sourceImports, Map<UUID, Boolean> dimensionalCache,
+            Map<UUID, Integer> tierCache) {
     }
 
     public record ResolvedItemTargets(List<ItemTransferTarget> targets, List<ImportTarget> refs, int status) {
@@ -153,12 +152,22 @@ public class TransferEngine {
             return null;
         }
 
-        return new NetworkContext(
-                sortedNodes,
-                signalCache,
+        @SuppressWarnings("unchecked")
+        List<ImportTarget>[][] imports = new List[][] {
                 resolveCache(network.getItemImports(), nodeCache, signalCache),
-                network.getDimensionalCache(),
-                network.getTierCache());
+                resolveCache(network.getFluidImports(), nodeCache, signalCache),
+                resolveCache(network.getEnergyImports(), nodeCache, signalCache),
+                resolveCache(network.getChemicalImports(), nodeCache, signalCache),
+                resolveCache(network.getSourceImports(), nodeCache, signalCache) };
+        Map<UUID, Boolean> dimensionalCache = network.getDimensionalCache();
+        List<ServerRackLinks.Link> links = registry.getRackLinks().linksFor(network.getId());
+        if (!links.isEmpty()) {
+            dimensionalCache = new HashMap<>(dimensionalCache);
+            BridgedImports.merge(links, registry, server, imports, dimensionalCache);
+        }
+
+        return new NetworkContext(sortedNodes, signalCache, imports[0], imports[1], imports[2], imports[3],
+                imports[4], dimensionalCache, network.getTierCache());
     }
 
     private static Map<UUID, Integer> buildSignalCache(List<LogisticsNodeEntity> nodes) {
@@ -295,15 +304,18 @@ public class TransferEngine {
 
             int result = switch (channel.getType()) {
                 case FLUID ->
-                    transferFluids(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
+                    transferFluids(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache,
+                            telemetryActive);
                 case ENERGY ->
                     transferEnergy(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
                 case CHEMICAL ->
-                    transferChemicals(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
+                    transferChemicals(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache,
+                            telemetryActive);
                 case SOURCE ->
                     transferSource(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache);
                 default ->
-                    transferItems(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache);
+                    transferItems(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache,
+                            telemetryActive);
             };
 
             minWakeDelta = Math.min(minWakeDelta, finishChannelAttempt(
@@ -362,12 +374,12 @@ public class TransferEngine {
         }
     }
 
-    private static List<ImportTarget> orderTargets(List<ImportTarget> targets, DistributionMode mode,
+    private static List<ImportTarget> orderTargets(List<ImportTarget> targets, ChannelData exportChannel,
             LogisticsNodeEntity sourceNode) {
         if (targets.size() <= 1)
             return targets;
 
-        switch (mode) {
+        switch (exportChannel.getDistributionMode()) {
             case PRIORITY -> {
                 return targets;
             }
@@ -387,15 +399,23 @@ public class TransferEngine {
             case ROUND_ROBIN -> {
                 return targets;
             }
+            case PRIORITY_ROBIN -> {
+                return PriorityRobin.rotate(targets, exportChannel.getRobinCursor(),
+                        t -> t.channel().getPriority(), t -> t.node().getUUID());
+            }
             default -> {
                 return targets;
             }
         }
     }
 
+    public static void markServed(ChannelData exportChannel, ImportTarget target) {
+        exportChannel.setRobinCursor(new PriorityRobin.Cursor(target.channel().getPriority(), target.node().getUUID()));
+    }
+
     private static int transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, int channelIndex, List<ImportTarget> targets, int batchLimit,
-            Map<UUID, Boolean> dimensionalCache) {
+            Map<UUID, Boolean> dimensionalCache, boolean telemetryActive) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
@@ -406,26 +426,40 @@ public class TransferEngine {
         ResourceHandler<ItemResource> sourceHandler = sourceNode.capabilities().findItemExportHandler(
                 exportChannel.getIoDirection(), directSource);
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
         ResolvedItemTargets resolved = resolveItemTargets(sourceNode, sourceLevel, exportChannel, targets,
                 sourceHandler, dimensionalCache, filterReadCache);
         if (resolved.status() != ResolvedItemTargets.OK) return resolved.status();
         if (resolved.targets().isEmpty()) return 0;
+        DistributionMode distribution = exportChannel.getDistributionMode();
+        MoveRecorder served = distribution == DistributionMode.PRIORITY_ROBIN
+                ? (slot, index, moved, mask) -> markServed(exportChannel, resolved.refs().get(index))
+                : null;
+        MoveRecorder recorder = telemetryActive ? withTelemetry(served, exportChannel.getTelemetry()) : served;
         ItemResourceOrder.Result result = executeItemOperation(sourceHandler, resolved.targets(), batchLimit,
                 exportFilters, exportChannel.getFilterMode(), null,
-                sourceLevel.registryAccess(), exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN,
-                filterReadCache, null, Map.of(), null, null,
+                sourceLevel.registryAccess(), distribution,
+                filterReadCache, recorder, Map.of(), null, null,
                 exportChannel.canRotateResources(), exportChannel.getItemResourceCursor(), null);
         if (result.cursor() != null) exportChannel.setItemResourceCursor(result.cursor());
         return result.moved();
+    }
+
+    public static MoveRecorder withTelemetry(@Nullable MoveRecorder next, ChannelTelemetry telemetry) {
+        return (slot, index, moved, mask) -> {
+            telemetry.recordResource(new FlowResource.Item(moved), moved.getCount());
+            if (next != null) {
+                next.record(slot, index, moved, mask);
+            }
+        };
     }
 
     public static ResolvedItemTargets resolveItemTargets(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, ResourceHandler<ItemResource> sourceHandler,
             Map<UUID, Boolean> dimensionalCache, FilterItemData.ReadCache filterReadCache) {
         BlockPos sourcePos = sourceNode.getAttachedPos();
-        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
+        targets = orderTargets(targets, exportChannel, sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         boolean anyReachable = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
@@ -474,7 +508,7 @@ public class TransferEngine {
 
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimitMb,
-            Map<UUID, Boolean> dimensionalCache) {
+            Map<UUID, Boolean> dimensionalCache, boolean telemetryActive) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
@@ -482,11 +516,12 @@ public class TransferEngine {
         ResourceHandler<FluidResource> sourceHandler = sourceNode.capabilities().findFluidExportHandler(
                 exportChannel.getIoDirection(), true);
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
-        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
+        targets = orderTargets(targets, exportChannel, sourceNode);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         List<FluidTransferTarget> resolved = new ArrayList<>();
+        List<ImportTarget> refs = new ArrayList<>();
         boolean anyReachable = false;
         FilterItemData.ReadCache filterReadCache = exportChannel.getReadCache();
 
@@ -510,13 +545,20 @@ public class TransferEngine {
 
             resolved.add(new FluidTransferTarget(targetHandler, target.channel.getFilterItems(),
                     target.channel.getFilterMode()));
+            refs.add(target);
         }
 
         if (!anyReachable)
             return -1;
+        IntConsumer served = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
+                ? index -> markServed(exportChannel, refs.get(index)) : null;
+        ObjIntConsumer<FluidStack> onMoved = telemetryActive
+                ? (stack, amount) -> exportChannel.getTelemetry().recordResource(new FlowResource.Fluid(stack), amount)
+                : null;
         FluidResourceOrder.Result result = executeFluidOperation(sourceHandler, resolved, batchLimitMb,
                 exportChannel.getFilterItems(), exportChannel.getFilterMode(), sourceLevel.registryAccess(),
-                filterReadCache, exportChannel.canRotateResources(), exportChannel.getFluidResourceCursor());
+                filterReadCache, exportChannel.canRotateResources(), exportChannel.getFluidResourceCursor(), served,
+                onMoved);
         if (result.cursor() != null) exportChannel.setFluidResourceCursor(result.cursor());
         return result.moved();
     }
@@ -530,9 +572,10 @@ public class TransferEngine {
             return -1;
         EnergyHandler sourceHandler = sourceNode.capabilities().findEnergyHandler(exportChannel.getIoDirection());
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
-        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
+        targets = orderTargets(targets, exportChannel, sourceNode);
+        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitRF;
         boolean anyReachable = false;
@@ -558,8 +601,13 @@ public class TransferEngine {
                 continue;
 
             int moved = executeEnergyMove(sourceHandler, targetHandler, remaining);
-            if (moved > 0)
+            if (moved > 0) {
                 remaining -= moved;
+                if (robin) {
+                    markServed(exportChannel, target);
+                    break;
+                }
+            }
         }
 
         if (!anyReachable)
@@ -569,7 +617,7 @@ public class TransferEngine {
 
     private static int transferChemicals(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimit,
-            Map<UUID, Boolean> dimensionalCache) {
+            Map<UUID, Boolean> dimensionalCache, boolean telemetryActive) {
 
         if (!MekanismCompat.isLoaded()) {
             if (Config.debugMode)
@@ -587,10 +635,14 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
-        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
+        targets = orderTargets(targets, exportChannel, sourceNode);
+        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
+        ObjLongConsumer<String> onMoved = telemetryActive
+                ? (id, amount) -> exportChannel.getTelemetry().recordResource(new FlowResource.Chemical(id), amount)
+                : null;
 
         for (ImportTarget target : targets) {
             if (remaining <= 0)
@@ -613,12 +665,17 @@ public class TransferEngine {
                     targetLevel, targetPos, target.channel().getIoDirection(),
                     remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
-                    target.channel().getFilterItems(), target.channel().getFilterMode());
+                    target.channel().getFilterItems(), target.channel().getFilterMode(), onMoved);
             if (Config.debugMode)
                 LOGGER.debug("[Chemical] Transfer {} -> {}: moved={}, batch={}",
                         sourcePos, targetPos, moved, remaining);
-            if (moved > 0)
+            if (moved > 0) {
                 remaining -= (int) moved;
+                if (robin) {
+                    markServed(exportChannel, target);
+                    break;
+                }
+            }
         }
 
         if (Config.debugMode && !anyReachable)
@@ -648,7 +705,8 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
-        targets = orderTargets(targets, exportChannel.getDistributionMode(), sourceNode);
+        targets = orderTargets(targets, exportChannel, sourceNode);
+        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
@@ -674,8 +732,13 @@ public class TransferEngine {
             if (Config.debugMode)
                 LOGGER.debug("[Source] Transfer {} -> {}: moved={}, batch={}",
                         sourcePos, targetPos, moved, batchLimit);
-            if (moved > 0)
+            if (moved > 0) {
                 remaining -= moved;
+                if (robin) {
+                    markServed(exportChannel, target);
+                    break;
+                }
+            }
         }
 
         if (!anyReachable)
@@ -743,12 +806,26 @@ public class TransferEngine {
 
     public static ItemResourceOrder.Result executeItemOperation(ResourceHandler<ItemResource> source,
             List<ItemTransferTarget> targets, int limit, ItemStack[] exportFilters, FilterMode exportFilterMode,
-            boolean[] sourceAllowedSlots, HolderLookup.Provider provider, boolean roundRobin,
+            boolean[] sourceAllowedSlots, HolderLookup.Provider provider, DistributionMode distribution,
             FilterItemData.ReadCache filterReadCache, @Nullable MoveRecorder recorder,
             Map<Item, Integer> priorBatchMoved,
             @Nullable Map<ResourceHandler<ItemResource>, Map<Item, Integer>> priorTargetBatchMoved,
             @Nullable BooleanSupplier isCurrent, boolean rotate,
             @Nullable ItemResourceOrder.Cursor cursor, @Nullable ItemResource required) {
+        if (distribution == DistributionMode.PRIORITY_ROBIN) {
+            // Receiver-outer avoids resource lockstep
+            for (int i = 0; i < targets.size(); i++) {
+                int index = i;
+                MoveRecorder single = (slot, ignored, moved, mask) -> recorder.record(slot, index, moved, mask);
+                ItemResourceOrder.Result result = executeItemOperation(source, List.of(targets.get(i)), limit,
+                        exportFilters, exportFilterMode, sourceAllowedSlots, provider, DistributionMode.PRIORITY,
+                        filterReadCache, single, priorBatchMoved, priorTargetBatchMoved, isCurrent,
+                        rotate, cursor, required);
+                if (result.moved() > 0) return result;
+            }
+            return ItemResourceOrder.EMPTY;
+        }
+        boolean roundRobin = distribution == DistributionMode.ROUND_ROBIN;
         if (!rotate) {
             return new ItemResourceOrder.Result(null, executeMove(source, targets, limit, exportFilters,
                     exportFilterMode, sourceAllowedSlots, provider, roundRobin, filterReadCache, recorder,
@@ -768,7 +845,7 @@ public class TransferEngine {
             @Nullable BooleanSupplier isCurrent, @Nullable int[] sourceSlots, @Nullable ItemResource required) {
         int remaining = limit;
         int slotCount = sourceSlots == null ? source.size() : sourceSlots.length;
-        BulkInsertRejectionCache bulkRejections = new BulkInsertRejectionCache();
+        BulkInsertRejectionCache insertRejections = new BulkInsertRejectionCache();
         boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, filterReadCache);
         boolean hasAnyImportNbtFilter = false;
         for (ItemTransferTarget target : targets) {
@@ -829,6 +906,9 @@ public class TransferEngine {
         boolean[] openTargets = new boolean[targets.size()];
         Arrays.fill(openTargets, true);
         int openTargetCount = targets.size();
+        // Memo components per source slot
+        CandidateComponents[] slotComponents = hasNbtFilter ? new CandidateComponents[slotCount] : null;
+        byte[] slotVerdicts = new byte[slotCount];
 
         boolean flushDirect = DirectStorageHandlers.isDirect(source);
         for (ItemTransferTarget target : targets) {
@@ -858,23 +938,35 @@ public class TransferEngine {
                             continue;
                         }
 
-                        ItemStack inSlot = ItemUtil.getStack(source, slot);
-                        if (inSlot.isEmpty() || inSlot.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
+                        if (slotVerdicts[entry] == SLOT_REJECTED) {
                             continue;
                         }
-                        if (required != null && !required.matches(inSlot)) continue;
+
+                        ItemStack inSlot = ItemUtil.getStack(source, slot);
+                        boolean sourcePassed = slotVerdicts[entry] == SLOT_PASSED;
+                        if (inSlot.isEmpty() || !sourcePassed && (inSlot.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
+                                || required != null && !required.matches(inSlot))) {
+                            slotVerdicts[entry] = SLOT_REJECTED;
+                            continue;
+                        }
                         ItemStack extracted = inSlot.copyWithCount(Math.min(targetRemaining, inSlot.getCount()));
 
-                        CompoundTag candidateComponents = (provider != null && hasNbtFilter)
-                                ? NbtFilterData.getSerializedComponents(extracted, provider)
-                                : null;
+                        CandidateComponents candidateComponents = null;
+                        if (provider != null && hasNbtFilter) {
+                            if (slotComponents[entry] == null) {
+                                slotComponents[entry] = new CandidateComponents(extracted, provider);
+                            }
+                            candidateComponents = slotComponents[entry];
+                        }
 
-                        if (provider != null) {
+                        if (provider != null && !sourcePassed) {
                             if (!FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode, extracted, provider,
                                     candidateComponents, filterReadCache, slot)) {
+                                slotVerdicts[entry] = SLOT_REJECTED;
                                 continue;
                             }
                         }
+                        slotVerdicts[entry] = SLOT_PASSED;
 
                         boolean[] importAllowedSlots = target.allowedSlots();
                         if (provider != null) {
@@ -934,16 +1026,14 @@ public class TransferEngine {
                             extractable = extractItem(source, slot, allowed, check).getCount();
                         }
                         if (extractable <= 0) {
+                            slotVerdicts[entry] = SLOT_REJECTED;
                             continue;
                         }
 
                         ItemStack toMove = extracted.copyWithCount(Math.min(allowed, extractable));
                         ItemResource candidate = ItemResource.of(toMove);
-                        boolean bulk = importAllowedSlots == null && (target.handler() instanceof SnapshotItemHandler snapshot
-                                ? snapshot.supportsBulkInsertion()
-                                : DirectStorageHandlers.isDirect(target.handler())
-                                || SophisticatedCoreCompat.isBulkHandler(target.handler()));
-                        if (bulk && bulkRejections.isRejected(target.handler(), candidate, toMove.getCount())) {
+                        if (importAllowedSlots == null
+                                && insertRejections.isRejected(target.handler(), candidate, toMove.getCount())) {
                             continue;
                         }
 
@@ -954,8 +1044,8 @@ public class TransferEngine {
                                     importAllowedSlots);
                             int targetAccepted = toMove.getCount() - uninserted.getCount();
                             if (targetAccepted <= 0) {
-                                if (bulk) {
-                                    bulkRejections.reject(target.handler(), candidate, toMove.getCount());
+                                if (importAllowedSlots == null) {
+                                    insertRejections.reject(target.handler(), candidate, toMove.getCount());
                                 }
                                 continue;
                             }
@@ -976,7 +1066,12 @@ public class TransferEngine {
                             if (recorder != null) {
                                 recorder.record(slot, targetIndex, candidate.toStack(movedCount), importAllowedSlots);
                             }
-                            bulkRejections.clear();
+                            insertRejections.clear();
+                            // Source changed, recheck slots
+                            Arrays.fill(slotVerdicts, (byte) 0);
+                            if (slotComponents != null) {
+                                Arrays.fill(slotComponents, null);
+                            }
                             movedAny = true;
                             movedForTarget = true;
                             remaining -= movedCount;
@@ -1100,7 +1195,7 @@ public class TransferEngine {
 
     public static boolean[] computeImportAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack[] importFilters,
             FilterMode importFilterMode, ItemStack candidate, HolderLookup.Provider provider,
-            @Nullable CompoundTag candidateComponents, @Nullable FilterItemData.ReadCache filterReadCache) {
+            @Nullable CandidateComponents candidateComponents, @Nullable FilterItemData.ReadCache filterReadCache) {
         int size = handler.size();
         boolean[] mask = new boolean[size];
         boolean any = false;
@@ -1165,13 +1260,26 @@ public class TransferEngine {
     public static FluidResourceOrder.Result executeFluidOperation(ResourceHandler<FluidResource> source,
             List<FluidTransferTarget> targets, int limit, ItemStack[] filters, FilterMode mode,
             HolderLookup.Provider provider, FilterItemData.ReadCache cache, boolean rotate,
-            @Nullable FluidResourceOrder.Cursor cursor) {
+            @Nullable FluidResourceOrder.Cursor cursor, @Nullable IntConsumer served,
+            @Nullable ObjIntConsumer<FluidStack> onMoved) {
+        if (served != null) {
+            // Receiver-outer avoids resource lockstep
+            for (int i = 0; i < targets.size(); i++) {
+                FluidResourceOrder.Result result = executeFluidOperation(source, List.of(targets.get(i)), limit,
+                        filters, mode, provider, cache, rotate, cursor, null, onMoved);
+                if (result.moved() > 0) {
+                    served.accept(i);
+                    return result;
+                }
+            }
+            return new FluidResourceOrder.Result(FluidStack.EMPTY, 0);
+        }
         java.util.function.ToIntFunction<FluidStack> transfer = resource -> {
             int remaining = limit;
             for (FluidTransferTarget target : targets) {
                 if (remaining <= 0) break;
                 remaining -= executeFluidMove(source, target.handler(), remaining, filters, mode,
-                        target.filters(), target.mode(), provider, cache, resource);
+                        target.filters(), target.mode(), provider, cache, resource, onMoved);
             }
             return limit - remaining;
         };
@@ -1182,7 +1290,8 @@ public class TransferEngine {
     private static int executeFluidMove(ResourceHandler<FluidResource> source, ResourceHandler<FluidResource> target, int limitMb,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache, FluidStack required) {
+            HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache, FluidStack required,
+            @Nullable ObjIntConsumer<FluidStack> onMoved) {
 
         int remaining = limitMb;
         TransferAmountRules.Constraints amountConstraints = TransferAmountRules.collect(exportFilters, importFilters, filterReadCache);
@@ -1246,6 +1355,9 @@ public class TransferEngine {
                         tx = Transaction.openRoot();
                     }
                     remaining -= filled;
+                    if (onMoved != null) {
+                        onMoved.accept(drained, filled);
+                    }
                 }
             }
 
@@ -1260,7 +1372,7 @@ public class TransferEngine {
         return EnergyHandlerUtil.move(source, target, limitRF, null);
     }
 
-    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,
+    public static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,
             @Nullable ResourceKey<Level> cachedDim) {
         if (cachedDim != null) {
             ServerLevel level = server.getLevel(cachedDim);

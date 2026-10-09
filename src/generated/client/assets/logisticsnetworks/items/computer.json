@@ -1,6 +1,6 @@
 {
   "model": {
     "type": "minecraft:model",
-    "model": "logisticsnetworks:block/laptop"
+    "model": "logisticsnetworks:item/computer"
   }
 }

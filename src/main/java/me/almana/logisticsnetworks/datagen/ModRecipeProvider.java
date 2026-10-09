@@ -55,6 +55,17 @@ public class ModRecipeProvider extends RecipeProvider {
                 .unlockedBy("has_comparator", has(Items.COMPARATOR))
                 .save(output);
 
+        shaped(RecipeCategory.MISC, Registration.SERVER_RACK_ITEM.get())
+                .pattern("ECE").pattern("OPO").pattern("NSN")
+                .define('E', Items.ECHO_SHARD)
+                .define('C', Items.CRAFTER)
+                .define('O', Items.CRYING_OBSIDIAN)
+                .define('P', Registration.COMPUTER_ITEM.get())
+                .define('N', Items.NETHERITE_INGOT)
+                .define('S', Items.NETHER_STAR)
+                .unlockedBy("has_computer", has(Registration.COMPUTER_ITEM.get()))
+                .save(output);
+
         shaped(RecipeCategory.MISC, Registration.WRENCH.get())
                 .pattern("T T").pattern("BGB").pattern("PPP")
                 .define('T', Items.REDSTONE_TORCH)

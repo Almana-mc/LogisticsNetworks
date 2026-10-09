@@ -145,6 +145,7 @@ public final class LabelUpgradeSync {
                 GraphPayloadHandler.preserveLabelPosition(target, label);
                 target.setNodeLabel(label);
                 applyTemplate(target, appliedTemplate);
+                if (labelAuthority != null) target.setRenderVisible(labelAuthority.isRenderVisible());
                 target.setLabelRevision(appliedTemplate.revision());
                 returnItems(player, changes.get(target.getUUID()).returned(), null);
             }
@@ -495,11 +496,9 @@ public final class LabelUpgradeSync {
     }
 
     private static boolean sameChannels(LogisticsNodeEntity node, List<ChannelData> expected) {
-        if (!(node.level() instanceof ServerLevel level)) return false;
         for (int index = 0; index < LogisticsNodeEntity.CHANNEL_COUNT; index++) {
             ChannelData actual = node.getChannel(index);
-            if (actual == null || index >= expected.size()
-                    || !actual.save(level.registryAccess()).equals(expected.get(index).save(level.registryAccess()))) {
+            if (actual == null || index >= expected.size() || !actual.sameSettings(expected.get(index))) {
                 return false;
             }
         }

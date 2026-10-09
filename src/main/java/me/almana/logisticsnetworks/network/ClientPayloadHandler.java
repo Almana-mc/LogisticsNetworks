@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeEditorScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
+import me.almana.logisticsnetworks.client.screen.ServerRackScreen;
 import me.almana.logisticsnetworks.client.QueuedNodePlacementRenderer;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeGraphMenu;
@@ -40,8 +41,18 @@ public class ClientPayloadHandler {
                 computerScreen.receiveNetworkList(payload.networks());
             } else if (screen instanceof ClipboardScreen clipboardScreen) {
                 clipboardScreen.receiveNetworkList(payload.networks());
+            } else if (screen instanceof ServerRackScreen rackScreen) {
+                rackScreen.receiveNetworkList(payload.networks());
             } else {
                 if (Config.debugMode) LOGGER.debug("Screen is not NodeEditorScreen or ComputerScreen, ignoring");
+            }
+        });
+    }
+
+    public static void handleSyncServerRack(SyncServerRackPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (Minecraft.getInstance().screen instanceof ServerRackScreen screen) {
+                screen.receiveState(payload);
             }
         });
     }
@@ -87,7 +98,7 @@ public class ClientPayloadHandler {
         context.enqueueWork(() -> {
             var screen = Minecraft.getInstance().screen;
             if (screen instanceof ComputerScreen computerScreen) {
-                computerScreen.receiveChannelList(payload.networkId(), payload.channels());
+                computerScreen.receiveChannelList(payload);
             } else if (screen instanceof ClipboardScreen clipboardScreen) {
                 clipboardScreen.receiveChannelList(payload.networkId(), payload.channelNames());
             }
@@ -141,12 +152,12 @@ public class ClientPayloadHandler {
     public static void handleSyncChannelData(SyncChannelDataPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             var player = Minecraft.getInstance().player;
-            if (player == null || payload.channelData() == null)
+            if (player == null)
                 return;
             if (player.containerMenu instanceof NodeMenu menu && menu.getNodeId() == payload.entityId()) {
                 ChannelData channel = menu.getNode().getChannel(payload.channelIndex());
                 if (channel != null) {
-                    channel.load(payload.channelData(), player.level().registryAccess());
+                    channel.copyFrom(payload.channelData());
                 }
             }
         });

@@ -3,7 +3,6 @@ package me.almana.logisticsnetworks.logic.async;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
-import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
@@ -113,7 +112,17 @@ public final class Snapshots {
                 itemWakeDelta = itemWakeDelta(itemWakeDelta, targets, cooldown);
                 continue;
             }
-            NetworkSnapshot.ChannelUnit unit = captureChannel(node, channel, index, tier, context, endpoints, occupiedSlots);
+            if (!level.isLoaded(node.getAttachedPos())) continue;
+            boolean directSource = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), channel.getReadCache());
+            ResourceHandler<ItemResource> sourceHandler = node.capabilities().findItemExportHandler(
+                    channel.getIoDirection(), directSource);
+            if (sourceHandler == null) {
+                itemWakeDelta = itemWakeDelta(itemWakeDelta, targets,
+                        TransferEngine.finishChannelAttempt(node, channel, index, 0, gameTime, tier, false));
+                continue;
+            }
+            NetworkSnapshot.ChannelUnit unit = captureChannel(
+                    node, channel, index, tier, sourceHandler, context, endpoints, occupiedSlots);
             if (unit != null) units.add(unit);
         }
         return itemWakeDelta;
@@ -121,15 +130,10 @@ public final class Snapshots {
 
     @Nullable
     private static NetworkSnapshot.ChannelUnit captureChannel(LogisticsNodeEntity node, ChannelData channel,
-            int index, int tier, TransferEngine.NetworkContext context, ItemEndpointTable endpoints,
-            OccupiedSlotBudget occupiedSlots) {
+            int index, int tier, ResourceHandler<ItemResource> sourceHandler, TransferEngine.NetworkContext context,
+            ItemEndpointTable endpoints, OccupiedSlotBudget occupiedSlots) {
         ServerLevel level = (ServerLevel) node.level();
-        if (!level.isLoaded(node.getAttachedPos())) return null;
         FilterItemData.ReadCache readCache = channel.getReadCache();
-        boolean directSource = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), readCache);
-        ResourceHandler<ItemResource> sourceHandler = node.capabilities().findItemExportHandler(
-                channel.getIoDirection(), directSource);
-        if (sourceHandler == null) return null;
         TransferEngine.ResolvedItemTargets resolved = TransferEngine.resolveItemTargets(
                 node, level, channel, context.itemImports()[index], sourceHandler, context.dimensionalCache(), readCache);
         if (resolved.status() != TransferEngine.ResolvedItemTargets.OK) return null;
@@ -138,7 +142,6 @@ public final class Snapshots {
         int sourceEndpoint = endpoints.capture(node, channel.getIoDirection(), sourceHandler, occupiedSlots);
         return new NetworkSnapshot.ChannelUnit(node.getUUID(), index, batchLimit,
                 channel.getFilterItems(), channel.getFilterMode(), sourceEndpoint,
-                channel.getDistributionMode() == DistributionMode.ROUND_ROBIN,
                 channel.canRotateResources(), channel.getItemResourceCursor(),
                 captureTargets(resolved, endpoints, occupiedSlots, sourceEndpoint, readCache),
                 binding(node, channel), channel.getDistributionMode());
