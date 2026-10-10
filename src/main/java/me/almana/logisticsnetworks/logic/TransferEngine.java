@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic;
 
+import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
 
 import com.mojang.logging.LogUtils;
@@ -23,6 +24,7 @@ import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -859,6 +861,7 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
+        SourceTransferHelper.SourceEnd from = sourceEnd(sourceNode, exportChannel.getIoDirection());
         targets = orderTargets(targets, exportChannel, sourceNode);
         boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
@@ -878,11 +881,13 @@ public class TransferEngine {
             anyReachable = true;
             ServerLevel targetLevel = (ServerLevel) target.node().level();
             BlockPos targetPos = target.node().getAttachedPos();
-            if (!targetLevel.isLoaded(targetPos))
+            if (from == null || !targetLevel.isLoaded(targetPos))
+                continue;
+            SourceTransferHelper.SourceEnd to = sourceEnd(target.node(), target.channel().getIoDirection());
+            if (to == null)
                 continue;
 
-            int moved = SourceTransferHelper.transferBetween(
-                    sourceLevel, sourcePos, targetLevel, targetPos, remaining);
+            int moved = SourceTransferHelper.transfer(from, to, remaining);
             if (Config.debugMode)
                 LOGGER.debug("[Source] Transfer {} -> {}: moved={}, batch={}",
                         sourcePos, targetPos, moved, batchLimit);
@@ -898,6 +903,11 @@ public class TransferEngine {
         if (!anyReachable)
             return -1;
         return batchLimit - remaining;
+    }
+
+    @Nullable
+    static SourceTransferHelper.SourceEnd sourceEnd(LogisticsNodeEntity node, Direction direction) {
+        return SourceTransferHelper.resolve((ServerLevel) node.level(), node.getAttachedPos(), direction);
     }
 
     private static boolean canReach(LogisticsNodeEntity source, LogisticsNodeEntity target, boolean sourceDim,
