@@ -35,7 +35,7 @@ Requires the **Mekanism** mod to be installed to both craft and use. The recipe 
 
 ## Ars Source Upgrade
 
-**Unlocks the Source channel type.** Same pattern as the Mekanism Chemical Upgrade, but for Ars Nouveau source. Installed, the node can set a channel's Type to Source and move source between Ars Nouveau source jars and any other source-compatible block.
+**Unlocks the Source channel type.** Same pattern as the Mekanism Chemical Upgrade, but for Ars Nouveau source. Installed, the node can set a channel's Type to Source and move source between Ars Nouveau source jars and any other source-compatible block. With Ars Énergistique installed, a node on an ME Source Jar reaches all the source stored in the AE2 network.
 
 Each node that moves source (Sender or Receiver) needs its own Ars Source Upgrade.
 
@@ -45,7 +45,7 @@ Requires the **Ars Nouveau** mod to be installed to both craft and use. The reci
 
 ## Network Upgrade
 
-**Unlocks direct storage network access.** A node with this upgrade on an Applied Energistics 2 or Refined Storage Interface moves items and fluids straight through the whole connected storage network, as described in [Channel Settings](channel-settings.md). Without it, the Interface is just another inventory and the node only sees what is stocked in the Interface itself.
+**Unlocks direct storage network access.** A node with this upgrade on an Applied Energistics 2 or Refined Storage Interface moves items and fluids straight through the whole connected storage network, as described in [Channel Settings](channel-settings.md). With Ars Énergistique installed, the same works for source on an AE2 Interface, but the node only exports source when Source is set in the Interface config. Without the upgrade, the Interface is just another inventory and the node only sees what is stocked in the Interface itself.
 
 Each node on an Interface that should reach the network needs its own Network Upgrade. Nodes on other blocks do not need it.
 
