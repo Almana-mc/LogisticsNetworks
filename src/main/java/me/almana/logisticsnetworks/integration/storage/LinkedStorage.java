@@ -108,6 +108,15 @@ public final class LinkedStorage {
         return InterfaceStorageResolution.unsupported();
     }
 
+    @Nullable
+    public static Object networkIdentity(ServerLevel level, BlockPos pos) {
+        for (StorageAdapter adapter : ADAPTERS.values()) {
+            Object identity = adapter.networkIdentity(level, pos);
+            if (identity != null) return identity;
+        }
+        return null;
+    }
+
     public static boolean isAccessible(ServerLevel level, StorageLink link) {
         return resolve(level, link) != null;
     }

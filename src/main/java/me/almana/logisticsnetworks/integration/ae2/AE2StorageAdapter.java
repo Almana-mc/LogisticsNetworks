@@ -62,6 +62,13 @@ public final class AE2StorageAdapter implements StorageAdapter {
         return InterfaceStorageResolution.available(new AE2InterfaceEndpoint(host, actionHost, node));
     }
 
+    @Nullable
+    @Override
+    public Object networkIdentity(ServerLevel level, BlockPos pos) {
+        IGridNode node = AE2StorageAccess.findNode(level.getBlockEntity(pos));
+        return node != null && node.isActive() ? node.getGrid() : null;
+    }
+
     @Override
     public boolean isPattern(ItemStack stack, Level level) {
         return AE2PatternReader.isPattern(stack);
