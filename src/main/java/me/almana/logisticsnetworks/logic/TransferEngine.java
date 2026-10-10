@@ -907,6 +907,11 @@ public class TransferEngine {
 
     @Nullable
     static SourceTransferHelper.SourceEnd sourceEnd(LogisticsNodeEntity node, Direction direction) {
+        InterfaceStorageResolution resolution = TransferCapabilityCache.resolveInterface(node, direction);
+        if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE)
+            return SourceTransferHelper.grid(resolution.endpoint());
+        if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE)
+            return null;
         return SourceTransferHelper.resolve((ServerLevel) node.level(), node.getAttachedPos(), direction);
     }
 
