@@ -24,6 +24,7 @@ val parchment_minecraft_version: String by project
 val parchment_mappings_version: String by project
 val mekanism_version: String by project
 val ars_nouveau_version: String by project
+val arseng_version: String by project
 val ae2_version: String by project
 val refined_storage_version: String by project
 val ftb_teams_version: String by project
@@ -152,6 +153,7 @@ dependencies {
     compileOnly("mekanism:Mekanism:${mekanism_version}")
 
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
+    compileOnly("maven.modrinth:ars-energistique:${arseng_version}")
 
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
     if (ae2Runtime.get()) {
