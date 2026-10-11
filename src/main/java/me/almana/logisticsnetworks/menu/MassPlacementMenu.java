@@ -335,7 +335,10 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             }
             placed.add(node);
         }
-        if (clipboard != null) WrenchItem.setClipboard(wrenchStack, clipboard, player.registryAccess());
+        if (clipboard != null) {
+            NodeClipboardConfig.syncPastedLabel((ServerPlayer) player, placed, getStorageLink());
+            WrenchItem.setClipboard(wrenchStack, clipboard, player.registryAccess());
+        }
         WrenchItem.clearMassSelections(wrenchStack);
         player.getInventory().setChanged();
         player.displayClientMessage(

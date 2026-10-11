@@ -17,6 +17,7 @@ import me.almana.logisticsnetworks.integration.storage.StorageAccess;
 import me.almana.logisticsnetworks.integration.storage.StorageAction;
 import me.almana.logisticsnetworks.integration.storage.StorageInventory;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -840,6 +841,7 @@ public final class NodeClipboardConfig {
             player.drop(leftover, false);
         }
         inventory.setChanged();
+        syncPastedLabel(player, List.of(node), storageLink);
 
         return new PasteOutcome(PasteResult.SUCCESS);
     }
@@ -863,6 +865,17 @@ public final class NodeClipboardConfig {
         applyToNode(node);
         applyNetworkToNode(node, player);
         return PasteResult.SUCCESS;
+    }
+
+    public static void syncPastedLabel(ServerPlayer player, List<LogisticsNodeEntity> nodes,
+                                       @Nullable StorageLink storageLink) {
+        LogisticsNodeEntity first = nodes.get(0);
+        String label = first.getNodeLabel();
+        if (label.isEmpty() || first.getNetworkId() == null) return;
+        LogisticsNetwork network = NetworkRegistry.get(player.serverLevel()).getNetwork(first.getNetworkId());
+        if (network == null) return;
+        nodes.forEach(node -> node.setLabelRevision(0));
+        LabelUpgradeSync.synchronizeLabels(player, network, nodes, first.getUUID(), label, storageLink);
     }
 
     private boolean hasCompatibleStructure(LogisticsNodeEntity node) {
