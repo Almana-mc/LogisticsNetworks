@@ -727,5 +727,7 @@
   "message.logisticsnetworks.admin.disabled": "Admin mode disabled",
   "message.logisticsnetworks.admin.enabled_other": "Enabled admin mode for %s",
   "message.logisticsnetworks.admin.disabled_other": "Disabled admin mode for %s",
-  "message.logisticsnetworks.admin.enable_denied": "Only operators can enable admin mode"
+  "message.logisticsnetworks.admin.enable_denied": "Only operators can enable admin mode",
+  "pack.logisticsnetworks.original_textures": "Original Textures",
+  "pack.logisticsnetworks.original_textures.description": "Pre-1.17.1 upgrade and wrench textures"
 }
