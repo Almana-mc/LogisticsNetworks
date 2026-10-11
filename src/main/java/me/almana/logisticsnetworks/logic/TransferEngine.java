@@ -1076,6 +1076,8 @@ public class TransferEngine {
         // Memo components per source slot
         CandidateComponents[] slotComponents = hasNbtFilter ? new CandidateComponents[source.getSlots()] : null;
         byte[] slotVerdicts = new byte[sourceSlots == null ? source.getSlots() : sourceSlots.length];
+        // Simulated extracts shared across targets
+        ItemStack[] slotStacks = new ItemStack[slotVerdicts.length];
 
         while (remaining > 0 && openTargetCount > 0) {
             movedAny = false;
@@ -1104,7 +1106,13 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack extracted = source.extractItem(slot, Math.min(remaining, targetRemaining), true);
+                    ItemStack available = slotStacks[entry];
+                    if (available == null) {
+                        available = source.extractItem(slot, remaining, true);
+                        slotStacks[entry] = available;
+                    }
+                    int request = Math.min(remaining, targetRemaining);
+                    ItemStack extracted = available.getCount() > request ? available.copyWithCount(request) : available;
                     boolean sourcePassed = slotVerdicts[entry] == SLOT_PASSED;
                     if (extracted.isEmpty() || !sourcePassed && (extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
                             || resource != null && !resource.equals(new ItemResource(extracted)))) {
@@ -1186,8 +1194,7 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack simulatedInsert = allowed == extracted.getCount() ? extracted
-                            : extracted.copyWithCount(allowed);
+                    ItemStack simulatedInsert = extracted.copyWithCount(allowed);
                     StackedInsertion insertion = prepareStackedInsertion(
                             target.handler(), bulkHandler, importAllowedSlots);
                     ItemStack simRemainder;
@@ -1245,6 +1252,7 @@ public class TransferEngine {
                     }
                     // Source changed, recheck slots
                     slotVerdicts = new byte[Math.max(slotVerdicts.length, source.getSlots())];
+                    slotStacks = new ItemStack[slotVerdicts.length];
                     if (slotComponents != null) {
                         slotComponents = new CandidateComponents[Math.max(slotComponents.length, source.getSlots())];
                     }
