@@ -1444,6 +1444,8 @@ public class ServerPayloadHandler {
                 }
             }
         }
+        LabelUpgradeSync.refreshTemplateChannel(network, sourceNode, channelIndex);
+        registry.setDirty();
         if (Config.debugMode) LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated);
     }
 

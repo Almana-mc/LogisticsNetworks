@@ -62,6 +62,17 @@ public final class LabelUpgradeSync {
         NetworkRegistry.get(player.serverLevel()).setDirty();
     }
 
+    public static void refreshTemplateChannel(LogisticsNetwork network, LogisticsNodeEntity source, int index) {
+        String label = source.getNodeLabel();
+        LabelUpgradeTemplate template = network.getLabelTemplate(label);
+        if (template == null) return;
+        List<ChannelData> channels = template.channels();
+        if (index >= channels.size()) return;
+        channels.get(index).copyFrom(source.getChannel(index));
+        network.setLabelTemplate(label, new LabelUpgradeTemplate(template.revision(), template.playerId(),
+                template.storageLink(), template.upgrades(), channels));
+    }
+
     public static void synchronizeMenuClose(ServerPlayer player, LogisticsNodeEntity source,
                                             List<ItemStack> original, @Nullable StorageLink storageLink) {
         synchronizeLoaded(player, source, original, storageLink, false);
