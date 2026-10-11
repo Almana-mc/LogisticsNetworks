@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.ToIntBiFunction;
 import java.util.function.ToIntFunction;
 
 public final class ItemResourceOrder {
@@ -40,6 +41,15 @@ public final class ItemResourceOrder {
                     resources.get((index + 1) % resources.size()), groups.get(resource).getInt(0)));
         }
         return EMPTY;
+    }
+
+    public static int moveEach(IItemHandler source, int limit, ToIntBiFunction<int[], Integer> transfer) {
+        int moved = 0;
+        for (IntArrayList slots : groups(source).values()) {
+            if (moved >= limit) break;
+            moved += transfer.applyAsInt(slots.toIntArray(), limit - moved);
+        }
+        return moved;
     }
 
     @Nullable

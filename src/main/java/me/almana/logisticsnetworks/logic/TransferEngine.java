@@ -990,6 +990,13 @@ public class TransferEngine {
             return ItemResourceOrder.EMPTY;
         }
         boolean roundRobin = distribution == DistributionMode.ROUND_ROBIN;
+        if (!rotate && roundRobin) {
+            // Split each resource on its own
+            return new ItemResourceOrder.Result(null, ItemResourceOrder.moveEach(source, limit, (slots, left) ->
+                    executeMove(source, targets, left, exportFilters, exportFilterMode, sourceAllowedSlots, provider,
+                            sourceLevel, sourcePos, filterReadCache, true, recorder, priorBatchMoved,
+                            priorTargetBatches, slots, new ItemResource(source.getStackInSlot(slots[0])))));
+        }
         if (!rotate) {
             return new ItemResourceOrder.Result(null, executeMove(source, targets, limit, exportFilters,
                     exportFilterMode, sourceAllowedSlots, provider, sourceLevel, sourcePos, filterReadCache,
@@ -1078,10 +1085,15 @@ public class TransferEngine {
         byte[] slotVerdicts = new byte[sourceSlots == null ? source.getSlots() : sourceSlots.length];
         // Simulated extracts shared across targets
         ItemStack[] slotStacks = new ItemStack[slotVerdicts.length];
+        if (roundRobin) {
+            remaining = exportableStock(source, sourceSlots, sourceAllowedSlots, exportFilters, exportFilterMode,
+                    provider, filterReadCache, resource, sourceItemCounts, limit, slotVerdicts, slotStacks);
+        }
+        int budget = remaining;
 
         while (remaining > 0 && openTargetCount > 0) {
             movedAny = false;
-            int targetsLeft = openTargetCount;
+            int share = (int) EvenSplit.share(remaining, openTargetCount);
 
             for (int targetIndex = 0; targetIndex < targets.size() && remaining > 0; targetIndex++) {
                 if (!openTargets[targetIndex]) {
@@ -1091,8 +1103,7 @@ public class TransferEngine {
                 ItemTransferTarget target = targets.get(targetIndex);
                 IItemHandler bulkHandler = target.bulkHandler();
                 boolean movedForTarget = false;
-                int targetRemaining = roundRobin ? Math.ceilDiv(remaining, targetsLeft) : remaining;
-                targetsLeft--;
+                int targetRemaining = roundRobin ? share : remaining;
 
                 int slotCount = sourceSlots == null ? source.getSlots() : sourceSlots.length;
                 for (int entry = 0; entry < slotCount && remaining > 0 && targetRemaining > 0; entry++) {
@@ -1288,7 +1299,7 @@ public class TransferEngine {
                     }
                 }
 
-                if (!movedForTarget) {
+                if (!movedForTarget || roundRobin && targetRemaining > 0) {
                     openTargets[targetIndex] = false;
                     openTargetCount--;
                 }
@@ -1298,7 +1309,45 @@ public class TransferEngine {
                 break;
             }
         }
-        return limit - remaining;
+        return budget - remaining;
+    }
+
+    private static int exportableStock(IItemHandler source, @Nullable int[] sourceSlots,
+            @Nullable boolean[] sourceAllowedSlots, ItemStack[] exportFilters, FilterMode exportFilterMode,
+            @Nullable HolderLookup.Provider provider, FilterItemData.ReadCache filterReadCache,
+            @Nullable ItemResource resource, @Nullable Map<Item, Integer> sourceItemCounts, int limit,
+            byte[] slotVerdicts, ItemStack[] slotStacks) {
+        Map<Item, Integer> keepCaps = new HashMap<>();
+        long stock = 0;
+        for (int entry = 0; entry < slotVerdicts.length && stock < limit; entry++) {
+            int slot = sourceSlots == null ? entry : sourceSlots[entry];
+            if (sourceAllowedSlots != null && (slot >= sourceAllowedSlots.length || !sourceAllowedSlots[slot])) {
+                continue;
+            }
+            ItemStack available = source.extractItem(slot, limit, true);
+            slotStacks[entry] = available;
+            if (available.isEmpty() || available.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
+                    || resource != null && !resource.equals(new ItemResource(available))
+                    || provider != null && !FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode,
+                            available, provider, null, filterReadCache, slot)) {
+                slotVerdicts[entry] = SLOT_REJECTED;
+                continue;
+            }
+            slotVerdicts[entry] = SLOT_PASSED;
+            int count = available.getCount();
+            if (sourceItemCounts != null && provider != null) {
+                // Export keep amounts per item
+                int cap = keepCaps.computeIfAbsent(available.getItem(), item -> TransferAmountRules.perEntryItemAmount(
+                        available, exportFilters, null, source, slot, null, null, sourceItemCounts, null, provider,
+                        null, filterReadCache));
+                if (cap >= 0) {
+                    count = Math.min(count, cap);
+                    keepCaps.put(available.getItem(), cap - count);
+                }
+            }
+            stock += count;
+        }
+        return (int) Math.min(stock, limit);
     }
 
     public static int commitSingleMove(IItemHandler source, IItemHandler target,
