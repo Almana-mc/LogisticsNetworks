@@ -545,7 +545,7 @@
   "gui.logisticsnetworks.node.tip.distribution.priority": "Fill highest priority first",
   "gui.logisticsnetworks.node.tip.distribution.nearest_first": "Fill closest target first",
   "gui.logisticsnetworks.node.tip.distribution.farthest_first": "Fill furthest target first",
-  "gui.logisticsnetworks.node.tip.distribution.round_robin": "Split each batch evenly across targets",
+  "gui.logisticsnetworks.node.tip.distribution.round_robin": "Split what's available evenly across targets",
   "gui.logisticsnetworks.node.tip.distribution.priority_robin": "Cycle targets each batch, highest priority first",
   "gui.logisticsnetworks.node.tip.distribution.random": "Pick a random target each tick",
   "gui.logisticsnetworks.node.tip.priority": "Higher priority channels run first",
