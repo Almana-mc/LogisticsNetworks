@@ -62,8 +62,10 @@ extensions.configure<UserDevExtension>("minecraft") {
 
     val runsContainer = runs as org.gradle.api.NamedDomainObjectContainer<RunConfig>
     runsContainer.configureEach {
-        workingDirectory(project.file("run"))
+        workingDirectory(project.file("run/1.20.1"))
         property("forge.logging.markers", "REGISTRIES")
+        property("mixin.env.remapRefMap", "true")
+        property("mixin.env.refMapRemappingFile", file("build/createSrgToMcp/output.srg").absolutePath)
         property("forge.logging.console.level", "debug")
 
         val modsContainer = mods as org.gradle.api.NamedDomainObjectContainer<ModConfig>
@@ -74,6 +76,7 @@ extensions.configure<UserDevExtension>("minecraft") {
         property("forge.enabledGameTestNamespaces", modId)
     }
     runsContainer.maybeCreate("server").apply {
+        workingDirectory(project.file("run/1.20.1-server"))
         property("forge.enabledGameTestNamespaces", modId)
         args("--nogui")
     }
@@ -106,20 +109,21 @@ repositories {
 
 val localRuntime: Configuration by configurations.creating
 configurations.runtimeClasspath { extendsFrom(localRuntime) }
+val fg = extensions.getByType<net.minecraftforge.gradle.userdev.DependencyManagementExtension>()
 
 dependencies {
     add("minecraft", "net.minecraftforge:forge:${minecraftVersion}-${forgeVersion}")
 
     compileOnly("mezz.jei:jei-${minecraftVersion}-common-api:${jeiVersion}")
     compileOnly("mezz.jei:jei-${minecraftVersion}-forge-api:${jeiVersion}")
-    localRuntime("mezz.jei:jei-${minecraftVersion}-forge:${jeiVersion}")
+    localRuntime(fg.deobf("mezz.jei:jei-${minecraftVersion}-forge:${jeiVersion}"))
 
     compileOnly("mekanism:Mekanism:${mekanismVersion}")
     compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraftVersion}:${arsNouveauVersion}")
     compileOnly("maven.modrinth:jade:${jadeVersion}")
     compileOnly("appeng:appliedenergistics2-forge:${ae2Version}")
     compileOnly("org.appliedenergistics:guideme:${guidemeVersion}:api")
-    localRuntime("org.appliedenergistics:guideme:${guidemeVersion}")
+    localRuntime(fg.deobf("org.appliedenergistics:guideme:${guidemeVersion}"))
     compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
 }
 
