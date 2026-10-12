@@ -146,7 +146,7 @@ final class RecipeSetMover implements RecipeSets.SetMove {
         if (pulled.isEmpty()) return 0;
         ItemStack rest = insert(target, pulled, false);
         int moved = pulled.getCount() - rest.getCount();
-        ItemStack stuck = giveBack(slot, rest);
+        ItemStack stuck = rest.isEmpty() ? rest : giveBack(slot, rest);
         // Last resort, like executeMove
         if (!stuck.isEmpty()) moved += stuck.getCount() - insert(target, stuck, false).getCount();
         if (moved > 0) done.add(new Moved(slot, pulled.copyWithCount(moved)));
@@ -161,9 +161,10 @@ final class RecipeSetMover implements RecipeSets.SetMove {
                 if (!ItemStack.isSameItemSameComponents(handler.getStackInSlot(slot), moved.stack())) continue;
                 ItemStack back = handler.extractItem(slot, left, false);
                 left -= back.getCount();
-                ItemStack stuck = giveBack(moved.sourceSlot(), back);
+                ItemStack stuck = back.isEmpty() ? back : giveBack(moved.sourceSlot(), back);
                 // Source full, keep in receiver
-                if (!stuck.isEmpty()) handler.insertItem(slot, stuck, false);
+                if (!stuck.isEmpty()) stuck = handler.insertItem(slot, stuck, false);
+                if (!stuck.isEmpty()) insert(target, stuck, false);
             }
         }
     }
