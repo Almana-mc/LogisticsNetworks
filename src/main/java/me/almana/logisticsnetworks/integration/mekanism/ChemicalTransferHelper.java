@@ -26,7 +26,9 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class ChemicalTransferHelper {
 
@@ -348,14 +350,14 @@ public final class ChemicalTransferHelper {
             return 0;
         }
         return transferBetween(source, target, limit, exportFilters, exportFilterMode, importFilters,
-                importFilterMode, filterReadCache);
+                importFilterMode, filterReadCache, null);
     }
 
     @SuppressWarnings("rawtypes")
     public static long transferBetween(IChemicalHandler source, IChemicalHandler target, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
+            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable String requiredId) {
         if (source == null || target == null) {
             return 0;
         }
@@ -364,14 +366,39 @@ public final class ChemicalTransferHelper {
                     limit, source.getTanks(), target.getTanks());
         }
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode, importFilters,
-                importFilterMode, filterReadCache);
+                importFilterMode, filterReadCache, requiredId);
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public static Map<String, Long> exportableAmounts(IChemicalHandler source, ItemStack[] exportFilters,
+            FilterMode exportFilterMode, @Nullable FilterItemData.ReadCache filterReadCache) {
+        Map<String, Long> byChemical = new LinkedHashMap<>();
+        for (int tank = 0; tank < source.getTanks(); tank++) {
+            ChemicalStack<?> stack = (ChemicalStack<?>) source.getChemicalInTank(tank);
+            if (stack.isEmpty() || isBlacklistedChemical(stack)) {
+                continue;
+            }
+            String chemId = getChemicalId(stack);
+            if (chemId == null
+                    || !FilterLogic.matchesChemical(exportFilters, exportFilterMode, chemId, filterReadCache)) {
+                continue;
+            }
+            byChemical.merge(chemId,
+                    ((ChemicalStack<?>) source.extractChemical(tank, stack.getAmount(), Action.SIMULATE)).getAmount(),
+                    Long::sum);
+        }
+        byChemical.replaceAll((chemId, amount) -> {
+            long keepCap = getPerEntryChemicalAmountLimit(chemId, exportFilters, null, source, null, filterReadCache);
+            return keepCap >= 0 ? Math.min(amount, keepCap) : amount;
+        });
+        return byChemical;
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private static long executeChemicalMove(IChemicalHandler source, IChemicalHandler target, long limitAmount,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
+            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable String requiredId) {
         long remaining = limitAmount;
 
         for (int tank = 0; tank < source.getTanks(); tank++) {
@@ -385,6 +412,9 @@ public final class ChemicalTransferHelper {
             }
 
             String chemId = getChemicalId(tankChemical);
+            if (requiredId != null && !requiredId.equals(chemId)) {
+                continue;
+            }
             if (chemId != null) {
                 if (!FilterLogic.matchesChemical(exportFilters, exportFilterMode, chemId, filterReadCache)) {
                     continue;

@@ -29,6 +29,11 @@ public final class SourceTransferHelper {
         return getSourceTile(level, pos) != null;
     }
 
+    public static int exportable(ServerLevel level, BlockPos pos) {
+        ISourceTile source = getSourceTile(level, pos);
+        return source == null ? 0 : Math.max(0, Math.min(source.getSource(), source.getTransferRate()));
+    }
+
     public static int transferBetween(ServerLevel sourceLevel, BlockPos sourcePos,
             ServerLevel targetLevel, BlockPos targetPos, int limit) {
         ISourceTile source = getSourceTile(sourceLevel, sourcePos);
