@@ -30,7 +30,9 @@ public final class RecipeSets {
             if (!RecipeCardItem.is(filter)) continue;
             RecipeCardData card = RecipeCardData.of(filter);
             cards.add(card);
-            blockers.addAll(card.ingredients());
+            for (RecipeCardData.Ingredient ingredient : card.ingredients()) {
+                if (!blockers.contains(ingredient)) blockers.add(ingredient);
+            }
         }
         int moved = 0;
         for (RecipeCardData card : cards) {
