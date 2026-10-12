@@ -826,7 +826,8 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
             if (equalTargets != null) {
-                equalTargets.add(target);
+                if (SourceTransferHelper.hasSourceTile(targetLevel, targetPos))
+                    equalTargets.add(target);
                 continue;
             }
 
