@@ -1,6 +1,16 @@
 package me.almana.logisticsnetworks.logic;
 
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.DistributionMode;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.items.IItemHandler;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public final class RecipeSets {
 
@@ -9,6 +19,35 @@ public final class RecipeSets {
     }
 
     private RecipeSets() {
+    }
+
+    public static int transfer(IItemHandler source, List<TransferEngine.ItemTransferTarget> targets,
+            ItemStack[] filters, int batch, DistributionMode mode, @Nullable TransferEngine.MoveRecorder recorder,
+            HolderLookup.Provider provider, FilterItemData.ReadCache cache) {
+        List<RecipeCardData> cards = new ArrayList<>();
+        List<RecipeCardData.Ingredient> blockers = new ArrayList<>();
+        for (ItemStack filter : filters) {
+            if (!RecipeCardItem.is(filter)) continue;
+            RecipeCardData card = RecipeCardData.of(filter);
+            cards.add(card);
+            blockers.addAll(card.ingredients());
+        }
+        int moved = 0;
+        for (RecipeCardData card : cards) {
+            if (moved >= batch) break;
+            RecipeSetMover mover = new RecipeSetMover(source, card, blockers, targets, recorder, provider, cache);
+            int sets = sets(mover.available(), batch - moved, card.setSize(), moved == 0);
+            if (sets > 0) moved += deal(mode, targets.size(), sets, mover) * card.setSize();
+        }
+        return moved;
+    }
+
+    public static ItemStack[] withoutCards(ItemStack[] filters) {
+        ItemStack[] copy = filters.clone();
+        for (int i = 0; i < copy.length; i++) {
+            if (RecipeCardItem.is(copy[i])) copy[i] = ItemStack.EMPTY;
+        }
+        return copy;
     }
 
     static int sets(int available, int budget, int setSize, boolean first) {

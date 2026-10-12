@@ -1484,7 +1484,7 @@ public class TransferEngine {
         return any ? mask : null;
     }
 
-    private static ItemStack insertItemWithAllowedSlots(IItemHandler handler, @Nullable IItemHandler bulkHandler,
+    static ItemStack insertItemWithAllowedSlots(IItemHandler handler, @Nullable IItemHandler bulkHandler,
             ItemStack stack, boolean simulate, boolean[] allowedSlots) {
         if (stack.isEmpty()) {
             return ItemStack.EMPTY;
