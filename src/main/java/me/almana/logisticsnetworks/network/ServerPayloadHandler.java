@@ -656,7 +656,11 @@ public class ServerPayloadHandler {
                 if (!RecipeCardItem.is(card) || data.equals(RecipeCardData.of(card)))
                     return;
                 card = card.copy();
-                card.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
+                if (data.ingredients().isEmpty()) {
+                    card.remove(LogisticsDataComponents.RECIPE_CARD.get());
+                } else {
+                    card.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
+                }
                 channel.setFilterItem(menu.slot(), card);
                 sendChannelSyncToViewers(node, menu.channel(), channel);
                 propagateToLabelGroup(node, menu.channel());
