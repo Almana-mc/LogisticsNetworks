@@ -454,9 +454,10 @@ public class TransferEngine {
                 return targets;
             }
             case PRIORITY_ROBIN -> {
-                targets.sort(Comparator.comparingInt((ImportTarget t) -> t.channel.getPriority()).reversed()
+                List<ImportTarget> sorted = new ArrayList<>(targets);
+                sorted.sort(Comparator.comparingInt((ImportTarget t) -> t.channel.getPriority()).reversed()
                         .thenComparing(t -> t.node.getUUID()));
-                return PriorityRobin.rotate(targets, exportChannel.getRobinCursor(),
+                return PriorityRobin.rotate(sorted, exportChannel.getRobinCursor(),
                         t -> t.channel.getPriority(), t -> t.node.getUUID());
             }
             default -> {
