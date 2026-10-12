@@ -494,7 +494,7 @@ public class TransferEngine {
             recipeMoved = RecipeSets.transfer(sourceHandler, resolved.targets(), exportFilters, batchLimit,
                     distribution, recorder, sourceLevel.registryAccess(), filterReadCache);
             exportFilters = RecipeSets.withoutCards(exportFilters);
-            // Card-only channels skip loose items
+            // Budget spent or card-only
             if (recipeMoved >= batchLimit || !FilterLogic.hasConfiguredItemFilter(exportFilters, filterReadCache)) {
                 return new ItemResourceOrder.Result(null, recipeMoved);
             }
@@ -552,7 +552,8 @@ public class TransferEngine {
         if (channel == null || !channel.isEnabled()
                 || channel.getMode() != ChannelMode.EXPORT || channel.getType() != ChannelType.ITEM
                 || !canRunChannel(sourceNode, channel) || !CreateCompat.isResolved(sourceNode)
-                || !isRedstoneActive(channel.getRedstoneMode(), signal)) {
+                || !isRedstoneActive(channel.getRedstoneMode(), signal)
+                || RecipeCardItem.anyIn(channel.getFilterItems())) {
             return ItemResourceOrder.EMPTY;
         }
 
