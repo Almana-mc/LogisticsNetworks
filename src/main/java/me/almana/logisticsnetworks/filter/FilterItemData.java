@@ -215,6 +215,13 @@ public final class FilterItemData {
         return getItemFilterView(stack, readCache).hasFluidEntries();
     }
 
+    public static boolean hasItemRules(ItemStack stack, @Nullable ReadCache readCache) {
+        if (!isFilterItem(stack))
+            return false;
+        ItemFilterView view = getItemFilterView(stack, readCache);
+        return view.hasItemEntries() || view.hasTagEntries() || view.hasSlotOnlyEntries();
+    }
+
     public static int getEntryCount(ItemStack stack) {
         return entries(stack).size();
     }
