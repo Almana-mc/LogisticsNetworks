@@ -47,7 +47,7 @@ final class RecipeSetMover implements RecipeSets.SetMove {
     }
 
     // Indexes matching slots once
-    int available() {
+    int available(int cap) {
         List<RecipeCardData.Ingredient> ingredients = card.ingredients();
         if (ingredients.isEmpty()) return 0;
         IntArrayList[] found = new IntArrayList[ingredients.size()];
@@ -73,9 +73,10 @@ final class RecipeSetMover implements RecipeSets.SetMove {
             sets = Math.min(sets, stock[i] / ingredients.get(i).count());
         }
         order = IntStream.range(0, ingredients.size()).boxed()
-                .sorted(Comparator.comparing(i -> ingredients.get(i).tag().isPresent()))
+                .sorted(Comparator.comparing((Integer i) -> ingredients.get(i).tag().isPresent())
+                        .thenComparingInt(i -> matching[i].length))
                 .mapToInt(Integer::intValue).toArray();
-        return affordable((int) sets);
+        return affordable((int) Math.min(sets, cap));
     }
 
     private int affordable(int sets) {

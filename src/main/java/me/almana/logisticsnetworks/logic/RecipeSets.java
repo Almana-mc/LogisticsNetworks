@@ -38,7 +38,8 @@ public final class RecipeSets {
         for (RecipeCardData card : cards) {
             if (moved >= batch) break;
             RecipeSetMover mover = new RecipeSetMover(source, card, blockers, targets, recorder, provider, cache);
-            int sets = sets(mover.available(), batch - moved, card.setSize(), moved == 0);
+            int cap = Math.max(1, (batch - moved) / Math.max(1, card.setSize()));
+            int sets = sets(mover.available(cap), batch - moved, card.setSize(), moved == 0);
             if (sets > 0) moved += deal(mode, targets.size(), sets, mover) * card.setSize();
         }
         return moved;
