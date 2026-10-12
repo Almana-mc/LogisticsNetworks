@@ -328,20 +328,6 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleSetFilter(SetFilterPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            if (node == null)
-                return;
-            ChannelData channel = node.getChannel(payload.channelIndex());
-            if (channel != null) {
-                channel.setFilterItem(payload.filterSlot(), ItemStackCompat.copyWithCount(payload.filterItem(), 1));
-                propagateToLabelGroup(node, payload.channelIndex());
-                markNetworkDirty(node);
-            }
-        });
-    }
-
     public static void handleSetChannelFilterItem(SetChannelFilterItemPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
@@ -351,26 +337,8 @@ public class ServerPayloadHandler {
             if (channel == null)
                 return;
 
-            channel.setFilterItem(payload.filterSlot(),
-                    payload.filterItem().is(ModTags.FILTERS) ? ItemStackCompat.copyWithCount(payload.filterItem(), 1) : ItemStack.EMPTY);
+            channel.setFilterItem(payload.filterSlot(), ItemStack.EMPTY);
             propagateToLabelGroup(node, payload.channelIndex());
-            markNetworkDirty(node);
-        });
-    }
-
-    public static void handleSetNodeUpgradeItem(SetNodeUpgradeItemPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            if (node == null)
-                return;
-
-            node.setUpgradeItem(payload.upgradeSlot(), payload.upgradeItem());
-
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                ChannelData channel = node.getChannel(i);
-                if (channel != null)
-                    setChannelToUpgradeMax(node, channel);
-            }
             markNetworkDirty(node);
         });
     }
@@ -731,11 +699,6 @@ public class ServerPayloadHandler {
         }
 
         return ItemStack.EMPTY;
-    }
-
-    private static void setChannelToUpgradeMax(LogisticsNodeEntity node, ChannelData channel) {
-        channel.setBatchSize(getMaxBatch(node, channel.getType()));
-        channel.setTickDelay(channel.getType() == ChannelType.ENERGY ? 1 : NodeUpgradeData.getMinTickDelay(node));
     }
 
     private static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {

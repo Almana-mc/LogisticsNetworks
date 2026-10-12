@@ -34,9 +34,7 @@ public final class NetworkHandler {
     public static void register() {
         registerServer(UpdateChannelPayload.class, UpdateChannelPayload.STREAM_CODEC, ServerPayloadHandler::handleUpdateChannel);
         registerServer(AssignNetworkPayload.class, AssignNetworkPayload.STREAM_CODEC, ServerPayloadHandler::handleAssignNetwork);
-        registerServer(SetFilterPayload.class, SetFilterPayload.STREAM_CODEC, ServerPayloadHandler::handleSetFilter);
         registerServer(SetChannelFilterItemPayload.class, SetChannelFilterItemPayload.STREAM_CODEC, ServerPayloadHandler::handleSetChannelFilterItem);
-        registerServer(SetNodeUpgradeItemPayload.class, SetNodeUpgradeItemPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNodeUpgradeItem);
         registerServer(SelectNodeChannelPayload.class, SelectNodeChannelPayload.STREAM_CODEC, ServerPayloadHandler::handleSelectNodeChannel);
         registerServer(ModifyFilterTagPayload.class, ModifyFilterTagPayload.STREAM_CODEC, ServerPayloadHandler::handleModifyFilterTag);
         registerServer(ModifyFilterModPayload.class, ModifyFilterModPayload.STREAM_CODEC, ServerPayloadHandler::handleModifyFilterMod);
