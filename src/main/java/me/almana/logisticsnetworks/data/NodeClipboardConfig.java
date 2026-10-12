@@ -720,6 +720,7 @@ public final class NodeClipboardConfig {
             return null;
         }
         config.sanitizeText();
+        config.sanitizeCards();
         return config.isStructurallyValid() ? config : null;
     }
 
@@ -742,6 +743,14 @@ public final class NodeClipboardConfig {
         return version == VERSION
                 ? DataResult.success(version)
                 : DataResult.error(() -> "Not a version " + VERSION + " clipboard");
+    }
+
+    private void sanitizeCards() {
+        for (ItemStack[] slots : filterItems) {
+            for (int slot = 0; slot < slots.length; slot++) {
+                if (slots[slot] != null && RecipeCardItem.is(slots[slot])) slots[slot] = RecipeCardItem.stamp(slots[slot]);
+            }
+        }
     }
 
     private void sanitizeText() {

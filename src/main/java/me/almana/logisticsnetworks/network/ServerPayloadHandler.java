@@ -682,11 +682,9 @@ public class ServerPayloadHandler {
                     || slot < 0 || slot >= ChannelData.FILTER_SIZE)
                 return;
             ItemStack carried = context.player().containerMenu.getCarried();
-            RecipeCardData data = RecipeCardData.of(carried).sanitized();
-            if (!RecipeCardItem.is(carried) || data.ingredients().isEmpty())
+            ItemStack card = RecipeCardItem.is(carried) ? RecipeCardItem.stamp(carried) : ItemStack.EMPTY;
+            if (card.isEmpty() || RecipeCardData.of(card).ingredients().isEmpty())
                 return;
-            ItemStack card = new ItemStack(carried.getItem());
-            card.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
             channel.setFilterItem(slot, card);
             sendChannelSyncToViewers(node, payload.channel(), channel);
             propagateToLabelGroup(node, payload.channel());

@@ -993,7 +993,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     public void addItemToFilterSlot(int slot, ItemStack item) {
         LogisticsNodeEntity node = getMenu().getNode();
-        if (node == null || item.isEmpty() || item.is(ModTags.FILTERS)) {
+        if (node == null || item.isEmpty() || item.is(ModTags.FILTERS) || RecipeCardItem.is(item)) {
             return;
         }
         ChannelData ch = node.getChannel(selectedChannel);
@@ -1019,10 +1019,13 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     }
 
     private void stampCard(LogisticsNodeEntity node, ChannelData channel, int slot, ItemStack card) {
-        if (channel.getType() != ChannelType.ITEM || RecipeCardData.of(card).ingredients().isEmpty()) {
+        ItemStack current = channel.getFilterItem(slot);
+        ItemStack stamped = RecipeCardItem.stamp(card);
+        if (channel.getType() != ChannelType.ITEM || RecipeCardData.of(stamped).ingredients().isEmpty()
+                || !isFilterButtonEmpty(current) && !RecipeCardItem.is(current)) {
             return;
         }
-        channel.setFilterItem(slot, card.copyWithCount(1));
+        channel.setFilterItem(slot, stamped);
         PacketDistributor.sendToServer(new StampRecipeCardPayload(node.getId(), selectedChannel, slot));
     }
 

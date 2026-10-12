@@ -585,6 +585,8 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                 g.renderTooltip(font, List.of(Component.translatable("tooltip.logisticsnetworks.filter.mod",
                                 String.join(", ", ModFilterData.getModFilters(filter)))),
                         java.util.Optional.empty(), filter, mouseX, mouseY);
+            } else if (RecipeCardItem.is(filter)) {
+                g.renderTooltip(font, filter, mouseX, mouseY);
             }
             return;
         }
@@ -992,7 +994,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     }
 
     public void addItemToFilterSlot(int slot, ItemStack item) {
-        if (!isFilterSlotItemAddable(slot) || item.isEmpty() || item.is(ModTags.FILTERS)) return;
+        if (!isFilterSlotItemAddable(slot) || item.isEmpty() || item.is(ModTags.FILTERS) || RecipeCardItem.is(item)) return;
         ItemStack filter = config().getFilterItem(selectedChannel, slot);
         if (filter.isEmpty()) {
             filter = VirtualFilterType.SMALL.createStack();
@@ -1007,9 +1009,12 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     }
 
     private void stampCard(int slot, ItemStack card) {
+        ItemStack current = config().getFilterItem(selectedChannel, slot);
+        ItemStack stamped = RecipeCardItem.stamp(card);
         if (config().getChannelType(selectedChannel) != ChannelType.ITEM
-                || RecipeCardData.of(card).ingredients().isEmpty()) return;
-        config().setFilterItem(selectedChannel, slot, card.copyWithCount(1));
+                || RecipeCardData.of(stamped).ingredients().isEmpty()
+                || !isFilterButtonEmpty(current) && !RecipeCardItem.is(current)) return;
+        config().setFilterItem(selectedChannel, slot, stamped);
         commit();
     }
 

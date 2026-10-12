@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.item;
 
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import net.minecraft.ChatFormatting;
@@ -23,6 +24,13 @@ public class RecipeCardItem extends Item {
 
     public static boolean is(ItemStack stack) {
         return stack.getItem() instanceof RecipeCardItem;
+    }
+
+    public static ItemStack stamp(ItemStack card) {
+        ItemStack clean = new ItemStack(card.getItem());
+        RecipeCardData data = RecipeCardData.of(card).sanitized();
+        if (!data.ingredients().isEmpty()) clean.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
+        return clean;
     }
 
     public static boolean anyIn(ItemStack[] filters) {
