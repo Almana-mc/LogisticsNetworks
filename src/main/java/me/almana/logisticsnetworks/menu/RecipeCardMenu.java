@@ -13,6 +13,7 @@ import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -32,6 +33,7 @@ public class RecipeCardMenu extends AbstractContainerMenu {
     private final int entityId;
     private final int channel;
     private final int slot;
+    private final int locked;
     private RecipeCardData data;
 
     private RecipeCardMenu(int containerId, Inventory inventory, @Nullable InteractionHand hand,
@@ -43,7 +45,7 @@ public class RecipeCardMenu extends AbstractContainerMenu {
         this.channel = channel;
         this.slot = slot;
         this.data = data;
-        int locked = hand == InteractionHand.MAIN_HAND ? inventory.selected : -1;
+        this.locked = hand == InteractionHand.MAIN_HAND ? inventory.selected : -1;
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 addSlot(new Slot(inventory, col + row * 9 + 9, INV_X + col * 18, INV_Y + row * 18));
@@ -126,7 +128,16 @@ public class RecipeCardMenu extends AbstractContainerMenu {
     @Override
     public boolean stillValid(Player player) {
         if (hand != null) return RecipeCardItem.is(player.getItemInHand(hand));
-        return node == null || node.isAlive();
+        return node == null || node.isAlive() && RecipeCardItem.is(node.getChannel(channel).getFilterItem(slot));
+    }
+
+    @Override
+    public void clicked(int slotId, int button, ClickType clickType, Player player) {
+        // Hotkeys can't move edited card
+        if (clickType == ClickType.SWAP && (button == locked || hand == InteractionHand.OFF_HAND && button == 40)) {
+            return;
+        }
+        super.clicked(slotId, button, clickType, player);
     }
 
     @Override

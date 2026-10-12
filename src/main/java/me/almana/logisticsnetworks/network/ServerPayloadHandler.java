@@ -653,7 +653,7 @@ public class ServerPayloadHandler {
                 if (channel == null || channel.getType() != ChannelType.ITEM)
                     return;
                 ItemStack card = channel.getFilterItem(menu.slot());
-                if (!RecipeCardItem.is(card))
+                if (!RecipeCardItem.is(card) || data.equals(RecipeCardData.of(card)))
                     return;
                 card = card.copy();
                 card.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
@@ -663,7 +663,7 @@ public class ServerPayloadHandler {
                 invalidateNetwork(node);
             } else {
                 ItemStack held = player.getItemInHand(menu.hand());
-                if (data.equals(RecipeCardData.EMPTY)) {
+                if (data.ingredients().isEmpty()) {
                     held.remove(LogisticsDataComponents.RECIPE_CARD.get());
                 } else {
                     held.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
@@ -682,9 +682,12 @@ public class ServerPayloadHandler {
                     || slot < 0 || slot >= ChannelData.FILTER_SIZE)
                 return;
             ItemStack carried = context.player().containerMenu.getCarried();
-            if (!RecipeCardItem.is(carried) || RecipeCardData.of(carried).ingredients().isEmpty())
+            RecipeCardData data = RecipeCardData.of(carried).sanitized();
+            if (!RecipeCardItem.is(carried) || data.ingredients().isEmpty())
                 return;
-            channel.setFilterItem(slot, carried.copyWithCount(1));
+            ItemStack card = new ItemStack(carried.getItem());
+            card.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
+            channel.setFilterItem(slot, card);
             sendChannelSyncToViewers(node, payload.channel(), channel);
             propagateToLabelGroup(node, payload.channel());
             invalidateNetwork(node);
@@ -845,7 +848,10 @@ public class ServerPayloadHandler {
             ItemStack stack = channel.getFilterItem(fs);
             VirtualFilterType requested = payload.requestedType();
             if (requested == VirtualFilterType.EXISTING && RecipeCardItem.is(stack)) {
-                RecipeCardMenu.openNode(serverPlayer, node, ch, fs);
+                // No card editing from graph
+                if (GraphPayloadHandler.getContext(serverPlayer.containerMenu) == null) {
+                    RecipeCardMenu.openNode(serverPlayer, node, ch, fs);
+                }
                 return;
             }
             boolean needFresh = requested != VirtualFilterType.EXISTING
