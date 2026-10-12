@@ -12,11 +12,13 @@ A Recipe Card makes an item channel send whole recipe sets instead of loose item
 
 ## Writing a recipe
 
-Right-click a card to open it. With JEI or EMI, open any recipe and press **+** to copy its ingredients onto the card. You can also click a cell while holding an item, type the amount, and press **#** to switch between the exact item and its tags. Right-click a cell to remove it.
+Craft paper, redstone and an iron nugget for two blank cards. Right-click a card to open it. With JEI or EMI, open any recipe and press **+** to copy its ingredients onto the card. You can also click a cell while holding an item, type the amount, and press **#** to switch between the exact item and its tags. Right-click a cell to remove it. A card holds up to 12 different ingredients.
+
+Craft a written card on its own to wipe it, or together with blank cards to copy it onto them.
 
 ## Using it on a node
 
-Hold the card and click an empty filter slot on an item channel, or one that already holds a card. The slot gets a copy and you keep the card. Click the slot to edit that copy, right-click it to clear it. Cards also work in the wrench clipboard and copy with labels.
+Hold the card and click an empty filter slot on an item channel, or one that already holds a card. The slot gets a copy and you keep the card. Click the slot to edit that copy, right-click it to clear it. Cards also work in the wrench clipboard (stamp or clear only) and copy with labels.
 
 Each operation sends as many whole sets as the batch size allows (at least one set). The distribution mode decides who gets them:
 
@@ -24,7 +26,7 @@ Each operation sends as many whole sets as the batch size allows (at least one s
 - **Priority Robin**: one receiver per operation, rotating.
 - **Equal Distribution**: sets are split evenly; leftovers go to the first receivers.
 
-If a receiver can't fit a whole set, it gets nothing.
+If a receiver can't fit a whole set, it gets nothing. Every ingredient has to go in through the one side the receiving node is on, so machines that take their second input on a different side can't be fed a multi-ingredient card from one node.
 
 ## Blocking
 
