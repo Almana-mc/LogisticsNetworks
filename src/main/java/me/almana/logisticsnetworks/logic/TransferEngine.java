@@ -342,7 +342,7 @@ public class TransferEngine {
                 continue;
             }
 
-            targets = orderTargets(targets, channel.getDistributionMode(), sourceNode, i);
+            targets = orderTargets(targets, channel.getDistributionMode(), sourceNode);
 
             int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
             int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
@@ -367,7 +367,7 @@ public class TransferEngine {
                 channel.getTelemetry().record(result);
             }
 
-            updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier, targets.size());
+            updateBackoff(sourceNode, channel, i, result > 0, gameTime, sourceTier);
 
             if (result > 0) {
                 minWakeDelta = 0;
@@ -405,7 +405,7 @@ public class TransferEngine {
     }
 
     private static void updateBackoff(LogisticsNodeEntity node, ChannelData channel, int index, boolean success,
-            long gameTime, int tier, int targetCount) {
+            long gameTime, int tier) {
         node.setLastExecution(index, gameTime);
         boolean isInstantType = channel.getType() == ChannelType.ENERGY;
         int configuredDelay = isInstantType ? 1
@@ -415,9 +415,6 @@ public class TransferEngine {
             float curBackoff = node.getBackoffTicks(index);
             if (curBackoff > configuredDelay) {
                 node.setBackoffTicks(index, Math.max(configuredDelay, curBackoff / BACKOFF_DECAY_DIVISOR));
-            }
-            if (channel.getDistributionMode() == DistributionMode.ROUND_ROBIN) {
-                node.advanceRoundRobin(index, targetCount);
             }
         } else if (Config.backoffEnabled[channel.getType().ordinal()]) {
             float maxBackoff = isInstantType ? BACKOFF_MAX_TICKS_ENERGY : (float) Config.backoffMaxTicks;
@@ -432,12 +429,12 @@ public class TransferEngine {
     }
 
     private static List<ImportTarget> orderTargets(List<ImportTarget> targets, DistributionMode mode,
-            LogisticsNodeEntity sourceNode, int channelIndex) {
+            LogisticsNodeEntity sourceNode) {
         if (targets.size() <= 1)
             return targets;
 
         switch (mode) {
-            case PRIORITY -> {
+            case PRIORITY, ROUND_ROBIN -> {
                 targets.sort((a, b) -> Integer.compare(b.channel.getPriority(), a.channel.getPriority()));
                 return targets;
             }
@@ -451,16 +448,6 @@ public class TransferEngine {
                 targets.sort(
                         (a, b) -> Double.compare(b.node.distanceToSqr(sx, sy, sz), a.node.distanceToSqr(sx, sy, sz)));
                 return targets;
-            }
-            case ROUND_ROBIN -> {
-                int startIdx = sourceNode.getRoundRobinIndex(channelIndex) % targets.size();
-                if (startIdx == 0)
-                    return targets;
-                List<ImportTarget> rotated = new ArrayList<>(targets.size());
-                for (int i = 0; i < targets.size(); i++) {
-                    rotated.add(targets.get((startIdx + i) % targets.size()));
-                }
-                return rotated;
             }
             default -> {
                 return targets;
