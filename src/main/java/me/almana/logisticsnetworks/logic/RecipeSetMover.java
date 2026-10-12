@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic;
 
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.filter.FilterItemData;
@@ -11,9 +12,11 @@ import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 final class RecipeSetMover implements RecipeSets.SetMove {
 
@@ -29,6 +32,7 @@ final class RecipeSetMover implements RecipeSets.SetMove {
     private final HolderLookup.Provider provider;
     private final FilterItemData.ReadCache cache;
     private int[][] matching = new int[0][];
+    private int[] order = new int[0];
 
     RecipeSetMover(IItemHandler source, RecipeCardData card, List<RecipeCardData.Ingredient> blockers,
             List<TransferEngine.ItemTransferTarget> targets, @Nullable TransferEngine.MoveRecorder recorder,
@@ -68,16 +72,50 @@ final class RecipeSetMover implements RecipeSets.SetMove {
             matching[i] = found[i].toIntArray();
             sets = Math.min(sets, stock[i] / ingredients.get(i).count());
         }
-        return (int) sets;
+        order = IntStream.range(0, ingredients.size()).boxed()
+                .sorted(Comparator.comparing(i -> ingredients.get(i).tag().isPresent()))
+                .mapToInt(Integer::intValue).toArray();
+        return affordable((int) sets);
+    }
+
+    private int affordable(int sets) {
+        int low = 0;
+        int high = sets;
+        while (low < high) {
+            int mid = (low + high + 1) >>> 1;
+            if (covers(mid)) low = mid;
+            else high = mid - 1;
+        }
+        return low;
+    }
+
+    // Shared slots counted once
+    private boolean covers(int sets) {
+        Int2IntOpenHashMap left = new Int2IntOpenHashMap();
+        for (int i : order) {
+            int need = sets * card.ingredients().get(i).count();
+            for (int slot : matching[i]) {
+                if (need <= 0) break;
+                ItemStack stack = source.getStackInSlot(slot);
+                if (!usable(stack, i)) continue;
+                int have = left.containsKey(slot) ? left.get(slot)
+                        : source.extractItem(slot, stack.getCount(), true).getCount();
+                int take = Math.min(have, need);
+                left.put(slot, have - take);
+                need -= take;
+            }
+            if (need > 0) return false;
+        }
+        return true;
     }
 
     @Override
     public int apply(int targetIndex, int sets) {
         TransferEngine.ItemTransferTarget target = targets.get(targetIndex);
-        int count = fit(target, sets);
+        int count = fit(target, affordable(sets));
         if (count == 0) return 0;
         List<Moved> done = new ArrayList<>();
-        for (int i = 0; i < matching.length; i++) {
+        for (int i : order) {
             int amount = count * card.ingredients().get(i).count();
             if (move(target, i, amount, done) < amount) {
                 rollback(target, done);
