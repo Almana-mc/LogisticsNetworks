@@ -1,0 +1,35 @@
+---
+item_ids: [logisticsnetworks:recipe_card]
+navigation:
+  title: Recipe Card
+  parent: filters/index.md
+  position: 1
+---
+
+# Recipe Card
+
+A Recipe Card makes an item channel send whole recipe sets instead of loose items. With a card for 3 iron + 2 sticks, receivers only ever get 3 iron and 2 sticks together, never 3 iron on their own.
+
+## Writing a recipe
+
+Right-click a card to open it. With JEI or EMI, open any recipe and press **+** to copy its ingredients onto the card. You can also click a cell while holding an item, type the amount, and press **#** to switch between the exact item and its tags. Right-click a cell to remove it.
+
+## Using it on a node
+
+Hold the card and click an empty filter slot on an item channel, or one that already holds a card. The slot gets a copy and you keep the card. Click the slot to edit that copy, right-click it to clear it. Cards also work in the wrench clipboard and copy with labels.
+
+Each operation sends as many whole sets as the batch size allows (at least one set). The distribution mode decides who gets them:
+
+- **Priority / Nearest / Farthest**: fill the first receiver, then the next.
+- **Priority Robin**: one receiver per operation, rotating.
+- **Equal Distribution**: sets are split evenly; leftovers go to the first receivers.
+
+If a receiver can't fit a whole set, it gets nothing.
+
+## Blocking
+
+Turn on **Blocking** to send only to receivers that hold none of this channel's recipe ingredients. Machines that take several recipes then never get two recipes mixed.
+
+## Mixing with normal filters
+
+A channel can hold cards and normal filters together. Recipe sets go first, then the normal filters move loose items with the rest of the batch. A channel with only cards sends nothing else.
