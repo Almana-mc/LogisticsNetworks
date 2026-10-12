@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.data;
 
 import me.almana.logisticsnetworks.logic.ChannelTelemetry;
+import me.almana.logisticsnetworks.logic.PriorityRobin;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import net.minecraft.core.Direction;
@@ -42,6 +43,7 @@ public class ChannelData {
     private String name = "";
 
     private final transient ChannelTelemetry telemetry = new ChannelTelemetry();
+    private transient PriorityRobin.Cursor robinCursor;
     private final ItemStack[] filterItems = new ItemStack[FILTER_SIZE];
 
     public ChannelData() {
@@ -227,6 +229,15 @@ public class ChannelData {
         return priority;
     }
 
+    @Nullable
+    public PriorityRobin.Cursor getRobinCursor() {
+        return robinCursor;
+    }
+
+    public void setRobinCursor(PriorityRobin.Cursor cursor) {
+        robinCursor = cursor;
+    }
+
     public void setPriority(int priority) {
         this.priority = Math.max(-99, Math.min(99, priority));
     }
@@ -260,6 +271,7 @@ public class ChannelData {
     }
 
     public void copyFrom(ChannelData source) {
+        robinCursor = null;
         this.enabled = source.enabled;
         this.mode = source.mode;
         this.type = source.type;

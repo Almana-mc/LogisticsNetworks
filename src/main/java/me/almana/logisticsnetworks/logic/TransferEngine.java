@@ -346,7 +346,7 @@ public class TransferEngine {
                 continue;
             }
 
-            targets = orderTargets(targets, channel.getDistributionMode(), sourceNode);
+            targets = orderTargets(targets, channel, sourceNode);
 
             int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
             int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
@@ -432,12 +432,12 @@ public class TransferEngine {
         }
     }
 
-    private static List<ImportTarget> orderTargets(List<ImportTarget> targets, DistributionMode mode,
+    private static List<ImportTarget> orderTargets(List<ImportTarget> targets, ChannelData exportChannel,
             LogisticsNodeEntity sourceNode) {
         if (targets.size() <= 1)
             return targets;
 
-        switch (mode) {
+        switch (exportChannel.getDistributionMode()) {
             case PRIORITY, ROUND_ROBIN -> {
                 targets.sort((a, b) -> Integer.compare(b.channel.getPriority(), a.channel.getPriority()));
                 return targets;
@@ -453,10 +453,20 @@ public class TransferEngine {
                         (a, b) -> Double.compare(b.node.distanceToSqr(sx, sy, sz), a.node.distanceToSqr(sx, sy, sz)));
                 return targets;
             }
+            case PRIORITY_ROBIN -> {
+                targets.sort(Comparator.comparingInt((ImportTarget t) -> t.channel.getPriority()).reversed()
+                        .thenComparing(t -> t.node.getUUID()));
+                return PriorityRobin.rotate(targets, exportChannel.getRobinCursor(),
+                        t -> t.channel.getPriority(), t -> t.node.getUUID());
+            }
             default -> {
                 return targets;
             }
         }
+    }
+
+    private static void markServed(ChannelData exportChannel, ImportTarget target) {
+        exportChannel.setRobinCursor(new PriorityRobin.Cursor(target.channel.getPriority(), target.node.getUUID()));
     }
 
     private static int transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -473,6 +483,7 @@ public class TransferEngine {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         boolean anyReachable = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
+        List<ImportTarget> reachableRefs = new ArrayList<>(targets.size());
         ItemStack[] exportFilters = exportChannel.getFilterItems();
         boolean[] sourceAllowedSlots = buildSlotAccessMask(sourceHandler, exportFilters);
 
@@ -507,6 +518,7 @@ public class TransferEngine {
                     collectAmountConstraints(exportFilters, importFilters),
                     FilterLogic.hasConfiguredItemNbtFilter(importFilters),
                     targetAllowedSlots));
+            reachableRefs.add(target);
         }
         if (!anyReachable)
             return -1;
@@ -521,6 +533,10 @@ public class TransferEngine {
             return dealItems(sourceHandler, reachableTargets, batchLimit, exportFilters,
                     exportChannel.getFilterMode(), sourceAllowedSlots, sourceLevel, sourcePos, filterReadCache,
                     sourceItemCounts);
+        }
+        if (exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN) {
+            return robinItems(sourceHandler, reachableTargets, reachableRefs, exportChannel, batchLimit,
+                    sourceAllowedSlots, sourceLevel, sourcePos, filterReadCache, sourceItemCounts);
         }
 
         return executeMove(sourceHandler, reachableTargets, batchLimit,
@@ -565,6 +581,25 @@ public class TransferEngine {
         return moved;
     }
 
+    private static int robinItems(IItemHandler source, List<ItemTransferTarget> targets, List<ImportTarget> refs,
+            ChannelData exportChannel, int batchLimit, boolean[] sourceAllowedSlots, ServerLevel sourceLevel,
+            BlockPos sourcePos, FilterItemData.ReadCache filterReadCache,
+            @Nullable Map<Item, Integer> sourceItemCounts) {
+        // Receiver-outer avoids resource lockstep
+        for (int i = 0; i < targets.size(); i++) {
+            List<ItemTransferTarget> one = List.of(targets.get(i));
+            int moved = executeMove(source, one, batchLimit, exportChannel.getFilterItems(),
+                    exportChannel.getFilterMode(), sourceAllowedSlots, sourceLevel.registryAccess(), sourceLevel,
+                    sourcePos, filterReadCache, sourceItemCounts,
+                    sourceItemCounts == null ? null : buildTargetItemCounts(one), false, null, null);
+            if (moved > 0) {
+                markServed(exportChannel, refs.get(i));
+                return moved;
+            }
+        }
+        return 0;
+    }
+
     private static boolean hasAmountConstraints(List<ItemTransferTarget> targets) {
         for (ItemTransferTarget t : targets) {
             if (t.constraints().hasExportThreshold || t.constraints().hasImportThreshold
@@ -602,6 +637,7 @@ public class TransferEngine {
         List<IFluidHandler> equalHandlers = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
                 ? new ArrayList<>() : null;
         List<ChannelData> equalChannels = equalHandlers == null ? null : new ArrayList<>();
+        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
 
         for (ImportTarget target : targets) {
             if (remaining <= 0)
@@ -632,8 +668,13 @@ public class TransferEngine {
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel.getFilterItems(), target.channel.getFilterMode(),
                     sourceLevel.registryAccess(), filterReadCache, FluidStack.EMPTY);
-            if (filled > 0)
+            if (filled > 0) {
                 remaining -= filled;
+                if (robin) {
+                    markServed(exportChannel, target);
+                    break;
+                }
+            }
         }
 
         if (!anyReachable)
@@ -696,6 +737,7 @@ public class TransferEngine {
         boolean anyReachable = false;
         List<IEnergyStorage> equalTargets = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
                 ? new ArrayList<>() : null;
+        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
 
         for (ImportTarget target : targets) {
             if (remaining <= 0)
@@ -722,8 +764,13 @@ public class TransferEngine {
             }
 
             int moved = executeEnergyMove(sourceHandler, targetHandler, remaining);
-            if (moved > 0)
+            if (moved > 0) {
                 remaining -= moved;
+                if (robin) {
+                    markServed(exportChannel, target);
+                    break;
+                }
+            }
         }
 
         if (!anyReachable)
@@ -770,6 +817,7 @@ public class TransferEngine {
         List<IChemicalHandler> equalHandlers = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
                 ? new ArrayList<>() : null;
         List<ChannelData> equalChannels = equalHandlers == null ? null : new ArrayList<>();
+        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
 
         for (ImportTarget target : targets) {
             if (remaining <= 0)
@@ -806,8 +854,13 @@ public class TransferEngine {
             if (Config.debugMode)
                 LOGGER.debug("[Chemical] Transfer {} -> {}: moved={}, batch={}",
                         sourcePos, targetPos, moved, remaining);
-            if (moved > 0)
+            if (moved > 0) {
                 remaining -= (int) moved;
+                if (robin) {
+                    markServed(exportChannel, target);
+                    break;
+                }
+            }
         }
 
         if (Config.debugMode && !anyReachable)
@@ -863,6 +916,7 @@ public class TransferEngine {
         boolean anyReachable = false;
         List<ImportTarget> equalTargets = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
                 ? new ArrayList<>() : null;
+        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
 
         for (ImportTarget target : targets) {
             if (remaining <= 0)
@@ -890,8 +944,13 @@ public class TransferEngine {
             if (Config.debugMode)
                 LOGGER.debug("[Source] Transfer {} -> {}: moved={}, batch={}",
                         sourcePos, targetPos, moved, batchLimit);
-            if (moved > 0)
+            if (moved > 0) {
                 remaining -= moved;
+                if (robin) {
+                    markServed(exportChannel, target);
+                    break;
+                }
+            }
         }
 
         if (!anyReachable)
