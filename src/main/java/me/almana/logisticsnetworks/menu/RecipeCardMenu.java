@@ -100,7 +100,9 @@ public class RecipeCardMenu extends AbstractContainerMenu {
 
     // Client side only
     public void edit(UnaryOperator<RecipeCardData> change) {
-        data = change.apply(data).sanitized();
+        RecipeCardData next = change.apply(data).sanitized();
+        if (next.equals(data)) return;
+        data = next;
         PacketDistributor.sendToServer(new SetRecipeCardPayload(data));
     }
 

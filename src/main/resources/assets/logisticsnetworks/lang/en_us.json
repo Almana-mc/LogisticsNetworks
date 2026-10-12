@@ -477,7 +477,7 @@
   "tooltip.logisticsnetworks.recipe_card.blocking_off": "Blocking: off",
   "gui.logisticsnetworks.recipe_card.title": "Recipe Card",
   "gui.logisticsnetworks.recipe_card.output": "Output",
-  "gui.logisticsnetworks.recipe_card.blocking": "Blocking",
+  "gui.logisticsnetworks.recipe_card.remove_hint": "Right-click to remove",
   "gui.logisticsnetworks.recipe_card.blocking.tooltip": "Only send to receivers that hold none of this channel's recipe ingredients, so recipes never mix in one machine",
   "gui.logisticsnetworks.recipe_card.tag_toggle": "Switch between the exact item and its tags",
   "gui.logisticsnetworks.pattern_setter.input": "Input",
