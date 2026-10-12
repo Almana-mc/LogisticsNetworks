@@ -32,6 +32,11 @@ final class RecipeCardEmiHandler implements EmiRecipeHandler<RecipeCardMenu> {
     }
 
     @Override
+    public boolean alwaysDisplaySupport(EmiRecipe recipe) {
+        return false;
+    }
+
+    @Override
     public boolean canCraft(EmiRecipe recipe, EmiCraftContext<RecipeCardMenu> context) {
         return true;
     }
@@ -43,6 +48,7 @@ final class RecipeCardEmiHandler implements EmiRecipeHandler<RecipeCardMenu> {
             RecipeCardData.Ingredient ingredient = ingredient(input);
             if (ingredient != null) ingredients.add(ingredient);
         }
+        if (ingredients.isEmpty()) return false;
         Optional<StackSnapshot> output = recipe.getOutputs().stream().map(EmiStack::getItemStack)
                 .filter(stack -> !stack.isEmpty()).findFirst().map(StackSnapshot::of);
         context.getScreenHandler().edit(data -> new RecipeCardData(ingredients, output, data.blocking()));

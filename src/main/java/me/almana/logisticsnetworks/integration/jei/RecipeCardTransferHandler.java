@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import me.almana.logisticsnetworks.registration.Registration;
 import mezz.jei.api.gui.ingredient.IRecipeSlotView;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
+import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IUniversalRecipeTransferHandler;
@@ -38,18 +39,25 @@ public class RecipeCardTransferHandler implements IUniversalRecipeTransferHandle
         if (!doTransfer) return null;
         List<RecipeCardData.Ingredient> ingredients = new ArrayList<>();
         for (IRecipeSlotView slot : slots.getSlotViews(RecipeIngredientRole.INPUT)) {
-            slot.getDisplayedItemStack().ifPresent(stack -> ingredients.add(ingredient(slot, stack)));
+            firstItem(slot).ifPresent(stack -> ingredients.add(ingredient(slot, stack)));
         }
+        if (ingredients.isEmpty()) return null;
         Optional<StackSnapshot> output = slots.getSlotViews(RecipeIngredientRole.OUTPUT).stream()
-                .flatMap(slot -> slot.getDisplayedItemStack().stream())
+                .flatMap(slot -> firstItem(slot).stream())
                 .findFirst().map(StackSnapshot::of);
         menu.edit(data -> new RecipeCardData(ingredients, output, data.blocking()));
         return null;
     }
 
+    // Stable pick, ignores cycling
+    private static Optional<ItemStack> firstItem(IRecipeSlotView slot) {
+        return slot.getDisplayedIngredients().map(ITypedIngredient::getItemStack)
+                .flatMap(Optional::stream).findFirst();
+    }
+
     private static RecipeCardData.Ingredient ingredient(IRecipeSlotView slot, ItemStack shown) {
         Optional<TagKey<?>> tag = slot.getTagKey();
-        if (tag.isPresent() && tag.get().isFor(Registries.ITEM)) {
+        if (tag.isPresent() && tag.get().isFor(Registries.ITEM) && slot.getItemStacks().limit(2).count() > 1) {
             return RecipeCardData.Ingredient.ofTag(tag.get().location(), shown.getCount());
         }
         return RecipeCardData.Ingredient.ofItem(shown, shown.getCount());

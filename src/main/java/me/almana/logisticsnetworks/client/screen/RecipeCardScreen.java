@@ -42,6 +42,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     private static final int BLOCK_W = 72;
 
     private final EditBox[] counts = new EditBox[CELLS];
+    private RecipeCardData known;
 
     public RecipeCardScreen(RecipeCardMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -73,6 +74,11 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     }
 
     private void reconcile() {
+        // External change, drop stale focus
+        if (menu.data() != known) {
+            known = menu.data();
+            setFocused(null);
+        }
         List<RecipeCardData.Ingredient> list = menu.data().ingredients();
         for (int i = 0; i < CELLS; i++) {
             counts[i].visible = i < list.size();
@@ -98,8 +104,9 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         commitCount();
         int action = ClientControls.resolveMouseAction(button);
-        if (action != -1 && clickCard((int) mouseX - leftPos, (int) mouseY - topPos, action)) return true;
-        return super.mouseClicked(mouseX, mouseY, button);
+        boolean handled = action != -1 && clickCard((int) mouseX - leftPos, (int) mouseY - topPos, action);
+        known = menu.data();
+        return handled || super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
