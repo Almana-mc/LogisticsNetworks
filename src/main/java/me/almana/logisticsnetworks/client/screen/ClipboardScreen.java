@@ -1,6 +1,8 @@
 package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
@@ -441,7 +443,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             ThemePaint.button(g, font, buttonX - 1, buttonY - 1, 18, 18,
                     filterable ? filterButtonText(filter) : "", hovered, theme());
             if (hovered && !menu.getCarried().isEmpty() && !menu.getCarried().is(ModTags.FILTERS)
-                    && isFilterSlotItemAddable(slot)) filterAddHover = true;
+                    && !RecipeCardItem.is(menu.getCarried()) && isFilterSlotItemAddable(slot)) filterAddHover = true;
         }
         if (!filterable) {
             g.fill(x - 2, gridY - 2, x + 58, gridY + 38, 0x99202020);
@@ -715,11 +717,22 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                 if (!isInside(filterButtonX(slot) - 1, filterButtonY(slot) - 1, 18, 18, mouseX, mouseY)) continue;
                 ItemStack carried = menu.getCarried();
+                if (RecipeCardItem.is(carried)) {
+                    stampCard(slot, carried);
+                    return true;
+                }
                 if (!carried.isEmpty() && !carried.is(ModTags.FILTERS)) {
                     addItemToFilterSlot(slot, carried);
                     return true;
                 }
                 ItemStack filter = config().getFilterItem(selectedChannel, slot);
+                if (RecipeCardItem.is(filter)) {
+                    if (action == 1) {
+                        config().setFilterItem(selectedChannel, slot, ItemStack.EMPTY);
+                        commit();
+                    }
+                    return true;
+                }
                 if (isFilterButtonEmpty(filter)) {
                     if (action == 0) openFilterPicker(slot);
                 } else if (action == 1) {
@@ -993,6 +1006,13 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         filterAddedToastUntil = System.currentTimeMillis() + 1500;
     }
 
+    private void stampCard(int slot, ItemStack card) {
+        if (config().getChannelType(selectedChannel) != ChannelType.ITEM
+                || RecipeCardData.of(card).ingredients().isEmpty()) return;
+        config().setFilterItem(selectedChannel, slot, card.copyWithCount(1));
+        commit();
+    }
+
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
         networkList = new ArrayList<>(networks);
         UUID current = config().getNetworkId();
@@ -1216,6 +1236,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     }
 
     private String filterButtonText(ItemStack stack) {
+        if (RecipeCardItem.is(stack)) return "Rc";
         if (isFilterButtonEmpty(stack)) return "+";
         return switch (VirtualFilterType.fromStack(stack)) {
             case MOD -> "Mo";
@@ -1226,6 +1247,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
 
     private boolean isFilterButtonEmpty(ItemStack stack) {
         if (stack.isEmpty()) return true;
+        if (RecipeCardItem.is(stack)) return false;
         return switch (VirtualFilterType.fromStack(stack)) {
             case EXISTING -> false;
             case SMALL, MEDIUM, BIG -> !FilterItemData.hasAnyEntries(stack);

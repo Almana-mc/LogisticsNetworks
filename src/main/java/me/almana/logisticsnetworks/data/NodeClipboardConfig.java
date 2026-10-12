@@ -17,6 +17,7 @@ import me.almana.logisticsnetworks.integration.storage.StorageAccess;
 import me.almana.logisticsnetworks.integration.storage.StorageAction;
 import me.almana.logisticsnetworks.integration.storage.StorageInventory;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
@@ -600,7 +601,7 @@ public final class NodeClipboardConfig {
 
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                 ItemStack stack = filterItems[channel][slot];
-                if (stack != null && !stack.isEmpty() && !stack.is(ModTags.FILTERS)) {
+                if (stack != null && !stack.isEmpty() && !stack.is(ModTags.FILTERS) && !RecipeCardItem.is(stack)) {
                     return false;
                 }
             }

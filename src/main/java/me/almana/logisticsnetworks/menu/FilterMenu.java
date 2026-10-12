@@ -255,6 +255,7 @@ public class FilterMenu extends AbstractContainerMenu {
         if (target == null) return false;
 
         ItemStack stack = clipboard.getFilterItem(channelIndex, filterSlot);
+        if (requestedType == VirtualFilterType.EXISTING && RecipeCardItem.is(stack)) return false;
         boolean fresh = requestedType != VirtualFilterType.EXISTING || stack.isEmpty()
                 || !stack.is(ModTags.FILTERS) || currentTarget(stack) != target;
         if (fresh) {
