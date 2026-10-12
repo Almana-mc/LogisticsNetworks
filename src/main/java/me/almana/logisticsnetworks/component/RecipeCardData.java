@@ -29,7 +29,8 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
     public static final RecipeCardData EMPTY = new RecipeCardData(List.of(), Optional.empty(), false);
 
     public static final Codec<RecipeCardData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Ingredient.CODEC.listOf().optionalFieldOf("ingredients", List.of()).forGetter(RecipeCardData::ingredients),
+            Ingredient.CODEC.listOf(0, MAX_INGREDIENTS).optionalFieldOf("ingredients", List.of())
+                    .forGetter(RecipeCardData::ingredients),
             StackSnapshot.CODEC.optionalFieldOf("output").forGetter(RecipeCardData::output),
             Codec.BOOL.optionalFieldOf("blocking", false).forGetter(RecipeCardData::blocking)
     ).apply(instance, RecipeCardData::new));
@@ -104,11 +105,11 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         return -1;
     }
 
-    public record Ingredient(Optional<StackSnapshot> item, Optional<String> tag, int count) {
+    public record Ingredient(Optional<StackSnapshot> item, Optional<TagKey<Item>> tag, int count) {
 
         public static final Codec<Ingredient> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 StackSnapshot.CODEC.optionalFieldOf("item").forGetter(Ingredient::item),
-                Codec.STRING.optionalFieldOf("tag").forGetter(Ingredient::tag),
+                TagKey.codec(Registries.ITEM).optionalFieldOf("tag").forGetter(Ingredient::tag),
                 Codec.intRange(1, MAX_COUNT).fieldOf("count").forGetter(Ingredient::count)
         ).apply(instance, Ingredient::new));
 
@@ -117,42 +118,38 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         }
 
         public static Ingredient ofTag(ResourceLocation tag, int count) {
-            return new Ingredient(Optional.empty(), Optional.of(tag.toString()), count);
+            return new Ingredient(Optional.empty(), Optional.of(TagKey.create(Registries.ITEM, tag)), count);
         }
 
         public boolean matches(ItemStack stack) {
             if (stack.isEmpty()) return false;
-            if (tag.isPresent()) return tagKey().map(stack::is).orElse(false);
+            if (tag.isPresent()) return stack.is(tag.get());
             return item.isPresent() && stack.is(item.get().item());
-        }
-
-        public Optional<TagKey<Item>> tagKey() {
-            return tag.map(ResourceLocation::tryParse).map(id -> TagKey.create(Registries.ITEM, id));
         }
 
         public ItemStack icon() {
             if (item.isPresent()) return item.get().toStack();
-            return tagKey().flatMap(BuiltInRegistries.ITEM::getTag)
+            return tag.flatMap(BuiltInRegistries.ITEM::getTag)
                     .flatMap(set -> set.stream().findFirst())
                     .map(ItemStack::new)
                     .orElse(new ItemStack(Items.BARRIER));
         }
 
         public Component label() {
-            if (item.isPresent()) return item.get().toStack().getHoverName();
-            MutableComponent text = Component.literal("#" + tag.orElse(""));
-            boolean known = tagKey().flatMap(BuiltInRegistries.ITEM::getTag).isPresent();
-            return known ? text : text.withStyle(ChatFormatting.RED);
+            if (tag.isEmpty()) return icon().getHoverName();
+            MutableComponent text = Component.literal("#" + tag.get().location());
+            return BuiltInRegistries.ITEM.getTag(tag.get()).isPresent() ? text : text.withStyle(ChatFormatting.RED);
         }
 
-        // Exact item, then each tag
+        // Anchored item, then its tags
         public Ingredient nextTag() {
             ItemStack base = icon();
-            List<ResourceLocation> tags = base.getTags().map(TagKey::location)
-                    .sorted(Comparator.comparing(ResourceLocation::toString)).toList();
-            int at = tag.map(ResourceLocation::tryParse).map(tags::indexOf).orElse(-1);
-            if (at + 1 < tags.size()) return ofTag(tags.get(at + 1), count);
-            return ofItem(base, count);
+            List<TagKey<Item>> tags = base.getTags()
+                    .sorted(Comparator.comparing(key -> key.location().toString())).toList();
+            if (tags.isEmpty()) return this;
+            int at = tag.map(tags::indexOf).orElse(-1);
+            Optional<StackSnapshot> anchor = Optional.of(StackSnapshot.of(base.copyWithCount(1)));
+            return new Ingredient(anchor, at + 1 < tags.size() ? Optional.of(tags.get(at + 1)) : Optional.empty(), count);
         }
 
         public Ingredient withCount(int value) {
@@ -160,21 +157,19 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         }
 
         boolean valid() {
-            if (item.isPresent() == tag.isPresent()) return false;
-            if (tag.isPresent()) return tagKey().isPresent();
-            return item.get().item().value() != Items.AIR;
+            if (tag.isPresent()) return true;
+            return item.isPresent() && item.get().item().value() != Items.AIR;
         }
 
         Ingredient stripped() {
-            Ingredient clean = item.map(snapshot -> new Ingredient(
-                    Optional.of(new StackSnapshot(snapshot.item(), 1, DataComponentPatch.EMPTY)), Optional.empty(), count))
-                    .orElse(this);
-            return clean.withCount(count);
+            Optional<StackSnapshot> clean = item.map(snapshot ->
+                    new StackSnapshot(snapshot.item(), 1, DataComponentPatch.EMPTY));
+            return new Ingredient(clean, tag, count).withCount(count);
         }
 
         boolean sameKey(Ingredient other) {
-            return tag.equals(other.tag)
-                    && item.map(StackSnapshot::item).equals(other.item.map(StackSnapshot::item));
+            if (tag.isPresent() || other.tag.isPresent()) return tag.equals(other.tag);
+            return item.map(StackSnapshot::item).equals(other.item.map(StackSnapshot::item));
         }
     }
 }
