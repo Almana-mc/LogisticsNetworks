@@ -127,7 +127,7 @@ public class EventHandler {
         for (ChannelData ch : channels) {
             if (ch.isEnabled()) {
                 RedstoneMode mode = ch.getRedstoneMode();
-                if (mode == RedstoneMode.HIGH || mode == RedstoneMode.LOW) {
+                if (mode != RedstoneMode.IGNORED) {
                     return true;
                 }
             }

@@ -811,8 +811,7 @@ public class NodeScreen extends AbstractContainerScreen<NodeMenu> {
 
     private Theme.Variant getRedstoneVariant(RedstoneMode mode) {
         return switch (mode) {
-            case ALWAYS_ON -> Theme.Variant.DANGER;
-            case ALWAYS_OFF -> Theme.Variant.NEUTRAL;
+            case IGNORED -> Theme.Variant.NEUTRAL;
             case HIGH -> Theme.Variant.ACCENT;
             case LOW -> Theme.Variant.WARN;
         };

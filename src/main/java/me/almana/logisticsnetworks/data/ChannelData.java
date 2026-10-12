@@ -35,7 +35,7 @@ public class ChannelData {
     private int batchSize = 8;
     private int tickDelay = 20;
     private @Nullable Direction ioDirection = Direction.UP;
-    private RedstoneMode redstoneMode = RedstoneMode.ALWAYS_ON;
+    private RedstoneMode redstoneMode = RedstoneMode.IGNORED;
     private DistributionMode distributionMode = DistributionMode.PRIORITY;
     private FilterMode filterMode = FilterMode.MATCH_ANY;
     private int priority = 0;
@@ -91,7 +91,10 @@ public class ChannelData {
 
         mode = getEnum(tag, KEY_MODE, ChannelMode.class, ChannelMode.IMPORT);
         type = getEnum(tag, KEY_TYPE, ChannelType.class, ChannelType.ITEM);
-        redstoneMode = getEnum(tag, KEY_REDSTONE, RedstoneMode.class, RedstoneMode.ALWAYS_ON);
+        String redstone = tag.getString(KEY_REDSTONE);
+        redstoneMode = RedstoneMode.fromSerialized(redstone);
+        if (RedstoneMode.disablesChannel(redstone))
+            enabled = false;
         distributionMode = getEnum(tag, KEY_DISTRIB, DistributionMode.class, DistributionMode.PRIORITY);
         filterMode = getEnum(tag, KEY_FILTER_MODE, FilterMode.class, FilterMode.MATCH_ANY);
 

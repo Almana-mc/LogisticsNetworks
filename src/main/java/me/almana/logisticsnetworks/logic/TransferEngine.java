@@ -1212,8 +1212,7 @@ public class TransferEngine {
 
     private static boolean isRedstoneActive(RedstoneMode mode, int signalStrength) {
         return switch (mode) {
-            case ALWAYS_ON -> true;
-            case ALWAYS_OFF -> false;
+            case IGNORED -> true;
             case HIGH -> signalStrength > 0;
             case LOW -> signalStrength == 0;
         };

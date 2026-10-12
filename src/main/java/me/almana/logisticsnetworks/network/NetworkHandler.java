@@ -19,7 +19,7 @@ import java.util.function.BiConsumer;
 
 public final class NetworkHandler {
 
-    private static final String PROTOCOL_VERSION = "1";
+    private static final String PROTOCOL_VERSION = "2";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "main"),
             () -> PROTOCOL_VERSION,
