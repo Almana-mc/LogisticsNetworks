@@ -703,8 +703,8 @@ public class TransferEngine {
                 : null;
         FluidResourceOrder.Result result = executeFluidOperation(sourceHandler, resolved, batchLimitMb,
                 exportChannel.getFilterItems(), exportChannel.getFilterMode(), sourceLevel.registryAccess(),
-                filterReadCache, exportChannel.canRotateResources(), exportChannel.getFluidResourceCursor(), served,
-                onMoved);
+                filterReadCache, exportChannel.canRotateResources(), exportChannel.getFluidResourceCursor(),
+                exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN, served, onMoved);
         if (result.cursor() != null) exportChannel.setFluidResourceCursor(result.cursor());
         return result.moved();
     }
@@ -722,6 +722,8 @@ public class TransferEngine {
 
         targets = orderTargets(targets, exportChannel, sourceNode);
         boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
+        List<IEnergyStorage> equalTargets = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
+                ? new ArrayList<>() : null;
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitRF;
         boolean anyReachable = false;
@@ -745,6 +747,10 @@ public class TransferEngine {
             IEnergyStorage targetHandler = capCache.findEnergyHandler(targetLevel, targetPos, target.channel.getIoDirection());
             if (targetHandler == null || !targetHandler.canReceive())
                 continue;
+            if (equalTargets != null) {
+                equalTargets.add(targetHandler);
+                continue;
+            }
 
             int moved = executeEnergyMove(sourceHandler, targetHandler, remaining);
             if (moved > 0) {
@@ -758,6 +764,11 @@ public class TransferEngine {
 
         if (!anyReachable)
             return -1;
+        if (equalTargets != null) {
+            // Stored, not per-call extract
+            return (int) EvenSplit.deal(equalTargets.size(), Math.min(remaining, sourceHandler.getEnergyStored()),
+                    (i, share) -> executeEnergyMove(sourceHandler, equalTargets.get(i), (int) share));
+        }
         return batchLimitRF - remaining;
     }
 
@@ -788,6 +799,9 @@ public class TransferEngine {
 
         targets = orderTargets(targets, exportChannel, sourceNode);
         boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
+        List<IChemicalHandler> equalHandlers = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
+                ? new ArrayList<>() : null;
+        List<ChannelData> equalChannels = equalHandlers == null ? null : new ArrayList<>();
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
@@ -816,12 +830,17 @@ public class TransferEngine {
                     target.channel().getIoDirection());
             if (targetHandler == null)
                 continue;
+            if (equalHandlers != null) {
+                equalHandlers.add(targetHandler);
+                equalChannels.add(target.channel());
+                continue;
+            }
 
             long moved = ChemicalTransferHelper.transferBetween(
                     sourceHandler, targetHandler, remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel().getFilterItems(), target.channel().getFilterMode(),
-                    filterReadCache, onMoved);
+                    filterReadCache, onMoved, null);
             if (Config.debugMode)
                 LOGGER.debug("[Chemical] Transfer {} -> {}: moved={}, batch={}",
                         sourcePos, targetPos, moved, remaining);
@@ -838,6 +857,21 @@ public class TransferEngine {
             LOGGER.debug("[Chemical] No reachable targets for {}", sourcePos);
         if (!anyReachable)
             return -1;
+        if (equalHandlers != null) {
+            ItemStack[] exportFilters = exportChannel.getFilterItems();
+            long moved = 0;
+            // Split each chemical on its own
+            for (Map.Entry<String, Long> stock : ChemicalTransferHelper.exportableAmounts(sourceHandler,
+                    exportFilters, exportChannel.getFilterMode(), filterReadCache).entrySet()) {
+                if (moved >= remaining) break;
+                moved += EvenSplit.deal(equalHandlers.size(), Math.min(stock.getValue(), remaining - moved),
+                        (i, share) -> ChemicalTransferHelper.transferBetween(sourceHandler, equalHandlers.get(i),
+                                share, exportFilters, exportChannel.getFilterMode(),
+                                equalChannels.get(i).getFilterItems(), equalChannels.get(i).getFilterMode(),
+                                filterReadCache, onMoved, stock.getKey()));
+            }
+            return (int) moved;
+        }
         return batchLimit - remaining;
     }
 
@@ -864,6 +898,8 @@ public class TransferEngine {
         SourceTransferHelper.SourceEnd from = sourceEnd(sourceNode, exportChannel.getIoDirection());
         targets = orderTargets(targets, exportChannel, sourceNode);
         boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
+        List<SourceTransferHelper.SourceEnd> equalTargets =
+                exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN ? new ArrayList<>() : null;
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
@@ -886,6 +922,10 @@ public class TransferEngine {
             SourceTransferHelper.SourceEnd to = sourceEnd(target.node(), target.channel().getIoDirection());
             if (to == null)
                 continue;
+            if (equalTargets != null) {
+                equalTargets.add(to);
+                continue;
+            }
 
             int moved = SourceTransferHelper.transfer(from, to, remaining);
             if (Config.debugMode)
@@ -902,6 +942,10 @@ public class TransferEngine {
 
         if (!anyReachable)
             return -1;
+        if (equalTargets != null) {
+            return equalTargets.isEmpty() ? 0 : (int) EvenSplit.deal(equalTargets.size(), from.extract(remaining, true),
+                    (i, share) -> SourceTransferHelper.transfer(from, equalTargets.get(i), (int) share));
+        }
         return batchLimit - remaining;
     }
 
@@ -990,6 +1034,13 @@ public class TransferEngine {
             return ItemResourceOrder.EMPTY;
         }
         boolean roundRobin = distribution == DistributionMode.ROUND_ROBIN;
+        if (!rotate && roundRobin) {
+            // Split each resource on its own
+            return new ItemResourceOrder.Result(null, ItemResourceOrder.moveEach(source, limit, (slots, left) ->
+                    executeMove(source, targets, left, exportFilters, exportFilterMode, sourceAllowedSlots, provider,
+                            sourceLevel, sourcePos, filterReadCache, true, recorder, priorBatchMoved,
+                            priorTargetBatches, slots, new ItemResource(source.getStackInSlot(slots[0])))));
+        }
         if (!rotate) {
             return new ItemResourceOrder.Result(null, executeMove(source, targets, limit, exportFilters,
                     exportFilterMode, sourceAllowedSlots, provider, sourceLevel, sourcePos, filterReadCache,
@@ -1076,10 +1127,17 @@ public class TransferEngine {
         // Memo components per source slot
         CandidateComponents[] slotComponents = hasNbtFilter ? new CandidateComponents[source.getSlots()] : null;
         byte[] slotVerdicts = new byte[sourceSlots == null ? source.getSlots() : sourceSlots.length];
+        // Simulated extracts shared across targets
+        ItemStack[] slotStacks = new ItemStack[slotVerdicts.length];
+        if (roundRobin) {
+            remaining = exportableStock(source, sourceSlots, sourceAllowedSlots, exportFilters, exportFilterMode,
+                    provider, filterReadCache, resource, sourceItemCounts, limit, slotVerdicts, slotStacks);
+        }
+        int budget = remaining;
 
         while (remaining > 0 && openTargetCount > 0) {
             movedAny = false;
-            int targetsLeft = openTargetCount;
+            int share = (int) EvenSplit.share(remaining, openTargetCount);
 
             for (int targetIndex = 0; targetIndex < targets.size() && remaining > 0; targetIndex++) {
                 if (!openTargets[targetIndex]) {
@@ -1089,8 +1147,7 @@ public class TransferEngine {
                 ItemTransferTarget target = targets.get(targetIndex);
                 IItemHandler bulkHandler = target.bulkHandler();
                 boolean movedForTarget = false;
-                int targetRemaining = roundRobin ? Math.ceilDiv(remaining, targetsLeft) : remaining;
-                targetsLeft--;
+                int targetRemaining = roundRobin ? share : remaining;
 
                 int slotCount = sourceSlots == null ? source.getSlots() : sourceSlots.length;
                 for (int entry = 0; entry < slotCount && remaining > 0 && targetRemaining > 0; entry++) {
@@ -1104,7 +1161,13 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack extracted = source.extractItem(slot, Math.min(remaining, targetRemaining), true);
+                    ItemStack available = slotStacks[entry];
+                    if (available == null) {
+                        available = source.extractItem(slot, remaining, true);
+                        slotStacks[entry] = available;
+                    }
+                    int request = Math.min(remaining, targetRemaining);
+                    ItemStack extracted = available.getCount() > request ? available.copyWithCount(request) : available;
                     boolean sourcePassed = slotVerdicts[entry] == SLOT_PASSED;
                     if (extracted.isEmpty() || !sourcePassed && (extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
                             || resource != null && !resource.equals(new ItemResource(extracted)))) {
@@ -1186,8 +1249,7 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack simulatedInsert = allowed == extracted.getCount() ? extracted
-                            : extracted.copyWithCount(allowed);
+                    ItemStack simulatedInsert = extracted.copyWithCount(allowed);
                     StackedInsertion insertion = prepareStackedInsertion(
                             target.handler(), bulkHandler, importAllowedSlots);
                     ItemStack simRemainder;
@@ -1245,6 +1307,7 @@ public class TransferEngine {
                     }
                     // Source changed, recheck slots
                     slotVerdicts = new byte[Math.max(slotVerdicts.length, source.getSlots())];
+                    slotStacks = new ItemStack[slotVerdicts.length];
                     if (slotComponents != null) {
                         slotComponents = new CandidateComponents[Math.max(slotComponents.length, source.getSlots())];
                     }
@@ -1280,7 +1343,7 @@ public class TransferEngine {
                     }
                 }
 
-                if (!movedForTarget) {
+                if (!movedForTarget || roundRobin && targetRemaining > 0) {
                     openTargets[targetIndex] = false;
                     openTargetCount--;
                 }
@@ -1290,7 +1353,45 @@ public class TransferEngine {
                 break;
             }
         }
-        return limit - remaining;
+        return budget - remaining;
+    }
+
+    private static int exportableStock(IItemHandler source, @Nullable int[] sourceSlots,
+            @Nullable boolean[] sourceAllowedSlots, ItemStack[] exportFilters, FilterMode exportFilterMode,
+            @Nullable HolderLookup.Provider provider, FilterItemData.ReadCache filterReadCache,
+            @Nullable ItemResource resource, @Nullable Map<Item, Integer> sourceItemCounts, int limit,
+            byte[] slotVerdicts, ItemStack[] slotStacks) {
+        Map<Item, Integer> keepCaps = new HashMap<>();
+        long stock = 0;
+        for (int entry = 0; entry < slotVerdicts.length && stock < limit; entry++) {
+            int slot = sourceSlots == null ? entry : sourceSlots[entry];
+            if (sourceAllowedSlots != null && (slot >= sourceAllowedSlots.length || !sourceAllowedSlots[slot])) {
+                continue;
+            }
+            ItemStack available = source.extractItem(slot, limit, true);
+            slotStacks[entry] = available;
+            if (available.isEmpty() || available.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
+                    || resource != null && !resource.equals(new ItemResource(available))
+                    || provider != null && !FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode,
+                            available, provider, null, filterReadCache, slot)) {
+                slotVerdicts[entry] = SLOT_REJECTED;
+                continue;
+            }
+            slotVerdicts[entry] = SLOT_PASSED;
+            int count = available.getCount();
+            if (sourceItemCounts != null && provider != null) {
+                // Export keep amounts per item
+                int cap = keepCaps.computeIfAbsent(available.getItem(), item -> TransferAmountRules.perEntryItemAmount(
+                        available, exportFilters, null, source, slot, null, null, sourceItemCounts, null, provider,
+                        null, filterReadCache));
+                if (cap >= 0) {
+                    count = Math.min(count, cap);
+                    keepCaps.put(available.getItem(), cap - count);
+                }
+            }
+            stock += count;
+        }
+        return (int) Math.min(stock, limit);
     }
 
     public static int commitSingleMove(IItemHandler source, IItemHandler target,
@@ -1528,13 +1629,13 @@ public class TransferEngine {
     public static FluidResourceOrder.Result executeFluidOperation(IFluidHandler source,
             List<FluidTransferTarget> targets, int limit, ItemStack[] filters, FilterMode mode,
             HolderLookup.Provider provider, FilterItemData.ReadCache cache, boolean rotate,
-            @Nullable FluidResourceOrder.Cursor cursor, @Nullable IntConsumer served,
+            @Nullable FluidResourceOrder.Cursor cursor, boolean equal, @Nullable IntConsumer served,
             @Nullable ObjIntConsumer<FluidStack> onMoved) {
         if (served != null) {
             // Receiver-outer avoids resource lockstep
             for (int i = 0; i < targets.size(); i++) {
                 FluidResourceOrder.Result result = executeFluidOperation(source, List.of(targets.get(i)), limit,
-                        filters, mode, provider, cache, rotate, cursor, null, onMoved);
+                        filters, mode, provider, cache, rotate, cursor, false, null, onMoved);
                 if (result.moved() > 0) {
                     served.accept(i);
                     return result;
@@ -1542,17 +1643,40 @@ public class TransferEngine {
             }
             return new FluidResourceOrder.Result(FluidStack.EMPTY, 0);
         }
-        java.util.function.ToIntFunction<FluidStack> transfer = resource -> {
-            int remaining = limit;
-            for (FluidTransferTarget target : targets) {
-                if (remaining <= 0) break;
-                remaining -= executeFluidMove(source, target.handler(), remaining, filters, mode,
-                        target.filters(), target.mode(), provider, cache, resource, onMoved);
-            }
-            return limit - remaining;
-        };
+        java.util.function.ToIntBiFunction<FluidStack, Integer> equalMove = (resource, budget) -> (int) EvenSplit.deal(
+                targets.size(), fluidStock(source, budget, filters, mode, provider, cache, resource),
+                (i, share) -> executeFluidMove(source, targets.get(i).handler(), (int) share, filters, mode,
+                        targets.get(i).filters(), targets.get(i).mode(), provider, cache, resource, onMoved));
+        if (equal && !rotate) {
+            // Split each fluid on its own
+            return new FluidResourceOrder.Result(FluidStack.EMPTY, FluidResourceOrder.moveEach(source, limit, equalMove));
+        }
+        java.util.function.ToIntFunction<FluidStack> transfer = equal
+                ? resource -> equalMove.applyAsInt(resource, limit)
+                : resource -> {
+                    int remaining = limit;
+                    for (FluidTransferTarget target : targets) {
+                        if (remaining <= 0) break;
+                        remaining -= executeFluidMove(source, target.handler(), remaining, filters, mode,
+                                target.filters(), target.mode(), provider, cache, resource, onMoved);
+                    }
+                    return limit - remaining;
+                };
         return rotate ? FluidResourceOrder.move(source, cursor, transfer)
                 : new FluidResourceOrder.Result(FluidStack.EMPTY, transfer.applyAsInt(FluidStack.EMPTY));
+    }
+
+    private static int fluidStock(IFluidHandler source, int limit, ItemStack[] filters, FilterMode mode,
+            @Nullable HolderLookup.Provider provider, FilterItemData.ReadCache cache, FluidStack resource) {
+        if (resource.getFluid().builtInRegistryHolder().is(ModTags.RESOURCE_BLACKLIST_FLUIDS))
+            return 0;
+        // Drains every tank of fluid
+        FluidStack drainable = source.drain(resource.copyWithAmount(limit), IFluidHandler.FluidAction.SIMULATE);
+        if (drainable.isEmpty()
+                || provider != null && !FilterLogic.matchesFluid(filters, mode, drainable, provider, cache))
+            return 0;
+        int keepCap = TransferAmountRules.perEntryFluidAmount(drainable, filters, null, source, null, cache);
+        return keepCap >= 0 ? Math.min(drainable.getAmount(), keepCap) : drainable.getAmount();
     }
 
     private static int executeFluidMove(IFluidHandler source, IFluidHandler target, int limitMb,

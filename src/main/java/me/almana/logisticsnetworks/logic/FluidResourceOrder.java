@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.ToIntBiFunction;
 import java.util.function.ToIntFunction;
 
 public final class FluidResourceOrder {
@@ -43,6 +44,20 @@ public final class FluidResourceOrder {
                     new Cursor(key, resources.get((index + 1) % resources.size()), tanks.get(key)));
         }
         return new Result(FluidStack.EMPTY, 0);
+    }
+
+    public static int moveEach(IFluidHandler source, int limit, ToIntBiFunction<FluidStack, Integer> transfer) {
+        Map<Key, FluidStack> groups = new LinkedHashMap<>();
+        for (int tank = 0; tank < source.getTanks(); tank++) {
+            FluidStack stack = source.getFluidInTank(tank);
+            if (!stack.isEmpty()) groups.putIfAbsent(key(stack), stack.copyWithAmount(1));
+        }
+        int moved = 0;
+        for (FluidStack resource : groups.values()) {
+            if (moved >= limit) break;
+            moved += transfer.applyAsInt(resource, limit - moved);
+        }
+        return moved;
     }
 
     private static Key key(FluidStack stack) {

@@ -22,8 +22,10 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.ObjLongConsumer;
@@ -245,13 +247,14 @@ public final class ChemicalTransferHelper {
             LOGGER.debug("[Chemical] Transferring {} -> {}, limit={}, srcTanks={}, tgtTanks={}",
                     sourcePos, targetPos, limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
-                importFilters, importFilterMode, filterReadCache, null);
+                importFilters, importFilterMode, filterReadCache, null, null);
     }
 
     public static long transferBetween(IChemicalHandler source, IChemicalHandler target, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable ObjLongConsumer<String> onMoved) {
+            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable ObjLongConsumer<String> onMoved,
+            @Nullable String requiredId) {
         if (source == null || target == null) {
             return 0;
         }
@@ -259,13 +262,34 @@ public final class ChemicalTransferHelper {
             LOGGER.debug("[Chemical] Transferring limit={}, srcTanks={}, tgtTanks={}",
                     limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
-                importFilters, importFilterMode, filterReadCache, onMoved);
+                importFilters, importFilterMode, filterReadCache, onMoved, requiredId);
+    }
+
+    public static Map<String, Long> exportableAmounts(IChemicalHandler source, ItemStack[] exportFilters,
+            FilterMode exportFilterMode, @Nullable FilterItemData.ReadCache filterReadCache) {
+        Map<String, Long> byChemical = new LinkedHashMap<>();
+        for (int tank = 0; tank < source.getChemicalTanks(); tank++) {
+            ChemicalStack stack = source.getChemicalInTank(tank);
+            if (stack.isEmpty() || stack.is(RESOURCE_BLACKLIST_CHEMICALS))
+                continue;
+            String chemId = getChemicalId(stack);
+            if (chemId == null || !FilterLogic.matchesChemical(exportFilters, exportFilterMode, chemId, filterReadCache))
+                continue;
+            byChemical.merge(chemId, source.extractChemical(tank, stack.getAmount(), Action.SIMULATE).getAmount(),
+                    Long::sum);
+        }
+        byChemical.replaceAll((chemId, amount) -> {
+            long keepCap = getPerEntryChemicalAmountLimit(chemId, exportFilters, null, source, null, filterReadCache);
+            return keepCap >= 0 ? Math.min(amount, keepCap) : amount;
+        });
+        return byChemical;
     }
 
     private static long executeChemicalMove(IChemicalHandler source, IChemicalHandler target, long limitAmount,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable ObjLongConsumer<String> onMoved) {
+            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable ObjLongConsumer<String> onMoved,
+            @Nullable String requiredId) {
         long remaining = limitAmount;
 
         for (int tank = 0; tank < source.getChemicalTanks(); tank++) {
@@ -279,6 +303,8 @@ public final class ChemicalTransferHelper {
                 continue;
 
             String chemId = getChemicalId(tankChemical);
+            if (requiredId != null && !requiredId.equals(chemId))
+                continue;
             if (chemId != null) {
                 if (!FilterLogic.matchesChemical(exportFilters, exportFilterMode, chemId, filterReadCache))
                     continue;

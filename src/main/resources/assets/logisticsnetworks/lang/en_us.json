@@ -545,7 +545,7 @@
   "gui.logisticsnetworks.node.tip.distribution.priority": "Fill highest priority first",
   "gui.logisticsnetworks.node.tip.distribution.nearest_first": "Fill closest target first",
   "gui.logisticsnetworks.node.tip.distribution.farthest_first": "Fill furthest target first",
-  "gui.logisticsnetworks.node.tip.distribution.round_robin": "Split each batch evenly across targets",
+  "gui.logisticsnetworks.node.tip.distribution.round_robin": "Split what's available evenly across targets",
   "gui.logisticsnetworks.node.tip.distribution.priority_robin": "Cycle targets each batch, highest priority first",
   "gui.logisticsnetworks.node.tip.distribution.random": "Pick a random target each tick",
   "gui.logisticsnetworks.node.tip.priority": "Higher priority channels run first",
@@ -727,5 +727,7 @@
   "message.logisticsnetworks.admin.disabled": "Admin mode disabled",
   "message.logisticsnetworks.admin.enabled_other": "Enabled admin mode for %s",
   "message.logisticsnetworks.admin.disabled_other": "Disabled admin mode for %s",
-  "message.logisticsnetworks.admin.enable_denied": "Only operators can enable admin mode"
+  "message.logisticsnetworks.admin.enable_denied": "Only operators can enable admin mode",
+  "pack.logisticsnetworks.original_textures": "Original Textures",
+  "pack.logisticsnetworks.original_textures.description": "Pre-1.17.1 upgrade and wrench textures"
 }

@@ -62,6 +62,26 @@ public final class LabelUpgradeSync {
         NetworkRegistry.get(player.serverLevel()).setDirty();
     }
 
+    public static void refreshTemplateChannel(LogisticsNetwork network, LogisticsNodeEntity source, int index,
+                                              List<LogisticsNodeEntity> updated) {
+        String label = source.getNodeLabel();
+        LabelUpgradeTemplate template = network.getLabelTemplate(label);
+        if (template == null) return;
+        List<ChannelData> channels = template.channels();
+        List<ChannelData> current = snapshotChannels(source);
+        if (index >= channels.size() || channels.get(index).sameSettings(current.get(index))) return;
+        long previous = template.revision();
+        if (source.getLabelRevision() == previous && sameUpgrades(source, template.upgrades())) channels = current;
+        else channels.get(index).copyFrom(current.get(index));
+        long revision = previous + 1;
+        network.setLabelTemplate(label, new LabelUpgradeTemplate(revision, template.playerId(),
+                template.storageLink(), template.upgrades(), channels));
+        if (source.getLabelRevision() == previous) source.setLabelRevision(revision);
+        for (LogisticsNodeEntity node : updated) {
+            if (node.getLabelRevision() == previous) node.setLabelRevision(revision);
+        }
+    }
+
     public static void synchronizeMenuClose(ServerPlayer player, LogisticsNodeEntity source,
                                             List<ItemStack> original, @Nullable StorageLink storageLink) {
         synchronizeLoaded(player, source, original, storageLink, false);
@@ -232,13 +252,18 @@ public final class LabelUpgradeSync {
         if (network == null) return;
         LabelUpgradeTemplate template = network.getLabelTemplate(node.getNodeLabel());
         if (template == null || node.getLabelRevision() >= template.revision()) return;
+        UpgradeChanges changes = getUpgradeChanges(node, template.upgrades());
         ServerPlayer player = level.getServer().getPlayerList().getPlayer(template.playerId());
-        if (player == null) return;
+        if (player == null) {
+            if (changes.required().isEmpty() && changes.returned().isEmpty()) {
+                applyLoadedTemplate(null, node, template, List.of());
+            }
+            return;
+        }
         UUID expectedNetworkId = node.getNetworkId();
         String expectedLabel = node.getNodeLabel();
 
         List<ItemStack> current = snapshotUpgrades(node);
-        UpgradeChanges changes = getUpgradeChanges(node, template.upgrades());
         List<LinkedStorage.ItemRequirement> requirements = toRequirements(changes.required());
         PENDING_NODES.add(node.getUUID());
         Runnable release = () -> PENDING_NODES.remove(node.getUUID());
@@ -419,16 +444,17 @@ public final class LabelUpgradeSync {
                 && node.getLabelRevision() < template.revision() && sameUpgrades(node, current);
     }
 
-    private static void applyLoadedTemplate(ServerPlayer player, LogisticsNodeEntity node,
+    private static void applyLoadedTemplate(@Nullable ServerPlayer player, LogisticsNodeEntity node,
                                             LabelUpgradeTemplate template, List<ItemStack> returned) {
         applyTemplate(node, template);
         node.setLabelRevision(template.revision());
-        returnItems(player, returned, null);
         if (node.level() instanceof ServerLevel level && node.getNetworkId() != null) {
             NetworkRegistry registry = NetworkRegistry.get(level);
             registry.setDirty();
             registry.invalidateNetwork(node.getNetworkId());
         }
+        if (player == null) return;
+        returnItems(player, returned, null);
         player.displayClientMessage(Component.translatable(
                 "message.logisticsnetworks.label.loaded_synced", node.getNodeLabel()), true);
     }

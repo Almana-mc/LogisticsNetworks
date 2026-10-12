@@ -209,13 +209,6 @@ public final class FilterItemData {
         return !entries(stack).isEmpty();
     }
 
-    public static boolean hasAnyItemMatchEntries(ItemStack stack, @Nullable ReadCache readCache) {
-        if (!isFilterItem(stack))
-            return false;
-        ItemFilterView view = getItemFilterView(stack, readCache);
-        return view.hasItemEntries() || view.hasTagEntries() || view.hasSlotOnlyEntries();
-    }
-
     public static boolean hasAnyFluidEntries(ItemStack stack, @Nullable ReadCache readCache) {
         if (!isFilterItem(stack))
             return false;
@@ -613,49 +606,33 @@ public final class FilterItemData {
 
     // ── Full matching methods (tag + NBT + durability aware) ──
 
-    public static boolean containsItemFull(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider,
-            @Nullable CandidateComponents candidateComponents, @Nullable ReadCache readCache) {
-        if (!isFilterItem(filter) || candidate.isEmpty())
-            return false;
+    public enum ItemVerdict {
+        NONE, WHITELIST_HIT, WHITELIST_MISS, BLACKLIST_HIT, BLACKLIST_MISS;
 
-        ItemFilterView view = getItemFilterView(filter, readCache);
-        CandidateComponents components = candidateComponents != null ? candidateComponents
-                : new CandidateComponents(candidate, provider);
-        for (ItemFilterSlot entry : view.entriesBySlot()) {
-            if (entry == null)
-                continue;
-
-            if (entry.slotOnly())
-                return true;
-
-            String tag = entry.tag();
-            if (tag != null) {
-                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
-                        && entryConstraintsMatch(entry, candidate, components))
-                    return true;
-                continue;
-            }
-
-            if (entry.nbtOnly()) {
-                if (entryConstraintsMatch(entry, candidate, components))
-                    return true;
-                continue;
-            }
-
-            Item itemEntry = entry.item();
-            if (itemEntry != null && itemEntry == candidate.getItem()
-                    && itemEntryConstraintsMatch(entry, candidate, components))
-                return true;
+        public boolean matched() {
+            return this == WHITELIST_HIT || this == BLACKLIST_HIT;
         }
-        return false;
+
+        public boolean blacklist() {
+            return this == BLACKLIST_HIT || this == BLACKLIST_MISS;
+        }
     }
 
-    public static boolean containsItemFullInSlot(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider,
+    public static ItemVerdict checkItem(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider,
             @Nullable CandidateComponents candidateComponents, @Nullable ReadCache readCache, int inventorySlot) {
-        if (!isFilterItem(filter) || candidate.isEmpty())
-            return false;
-
+        if (!isFilterItem(filter))
+            return ItemVerdict.NONE;
         ItemFilterView view = getItemFilterView(filter, readCache);
+        if (!view.hasItemEntries() && !view.hasTagEntries() && !view.hasSlotOnlyEntries())
+            return ItemVerdict.NONE;
+        boolean matched = matchesView(view, candidate, provider, candidateComponents, inventorySlot);
+        if (view.blacklist())
+            return matched ? ItemVerdict.BLACKLIST_HIT : ItemVerdict.BLACKLIST_MISS;
+        return matched ? ItemVerdict.WHITELIST_HIT : ItemVerdict.WHITELIST_MISS;
+    }
+
+    private static boolean matchesView(ItemFilterView view, ItemStack candidate, HolderLookup.Provider provider,
+            @Nullable CandidateComponents candidateComponents, int inventorySlot) {
         CandidateComponents components = candidateComponents != null ? candidateComponents
                 : new CandidateComponents(candidate, provider);
         for (ItemFilterSlot entry : view.entriesBySlot()) {

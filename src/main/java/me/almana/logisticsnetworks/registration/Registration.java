@@ -23,6 +23,7 @@ import me.almana.logisticsnetworks.item.SlotFilterItem;
 import me.almana.logisticsnetworks.item.TagFilterItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
+import me.almana.logisticsnetworks.recipe.WrenchResetRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
@@ -195,6 +196,9 @@ public class Registration {
         public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
                                         () -> new SimpleCraftingRecipeSerializer<>(FilterCopyClearRecipe::new));
+        public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<WrenchResetRecipe>> WRENCH_RESET_RECIPE = RECIPE_SERIALIZERS
+                        .register("wrench_reset",
+                                        () -> new SimpleCraftingRecipeSerializer<>(WrenchResetRecipe::new));
 
         public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = CREATIVE_TABS.register(
                         "logistics_tab",

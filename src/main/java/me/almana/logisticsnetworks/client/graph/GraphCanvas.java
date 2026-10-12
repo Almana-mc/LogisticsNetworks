@@ -773,10 +773,13 @@ public final class GraphCanvas {
         if (y + boxHeight > camera.y() + camera.height() - 4) {
             y = Math.max(camera.y() + 4, camera.y() + camera.height() - boxHeight - 4);
         }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 400);
         ThemePaint.window(graphics, x, y, boxWidth, boxHeight, theme);
         for (int i = 0; i < lines.size(); i++) {
             graphics.drawString(font, lines.get(i), x + 4, y + 4 + i * 10, theme.text(), false);
         }
+        graphics.pose().popPose();
     }
 
     private NetworkGraph.Vertex vertex(String key) {

@@ -1421,7 +1421,7 @@ public class ServerPayloadHandler {
                     channelIndex, sourceNode.getUUID(), label, network.getNodeUuids().size());
         }
 
-        int updated = 0;
+        List<LogisticsNodeEntity> updated = new ArrayList<>();
         for (UUID otherId : network.getNodeUuids()) {
             if (otherId.equals(sourceNode.getUUID()))
                 continue;
@@ -1433,7 +1433,7 @@ public class ServerPayloadHandler {
                     if (dst != null) {
                         dst.copyFrom(sourceChannel);
                         clampChannelToUpgradeLimits(other, dst);
-                        updated++;
+                        updated.add(other);
                         if (Config.debugMode) {
                             LOGGER.debug("[LabelSync] Updated node {} (label='{}')", otherId, other.getNodeLabel());
                         }
@@ -1444,7 +1444,9 @@ public class ServerPayloadHandler {
                 }
             }
         }
-        if (Config.debugMode) LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated);
+        LabelUpgradeSync.refreshTemplateChannel(network, sourceNode, channelIndex, updated);
+        registry.setDirty();
+        if (Config.debugMode) LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated.size());
     }
 
     public static void handleSubscribeTelemetry(SubscribeTelemetryPayload payload, IPayloadContext context) {

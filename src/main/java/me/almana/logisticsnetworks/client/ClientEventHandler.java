@@ -16,11 +16,17 @@ import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.client.tooltip.ClientFilterPreviewTooltip;
 import me.almana.logisticsnetworks.client.tooltip.FilterPreviewTooltip;
 import me.almana.logisticsnetworks.registration.Registration;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackSource;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.event.AddPackFindersEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent;
@@ -49,6 +55,15 @@ public class ClientEventHandler {
     @SubscribeEvent
     public static void registerTooltips(RegisterClientTooltipComponentFactoriesEvent event) {
         event.register(FilterPreviewTooltip.class, ClientFilterPreviewTooltip::new);
+    }
+
+    @SubscribeEvent
+    public static void addPacks(AddPackFindersEvent event) {
+        event.addPackFinders(
+                ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "resourcepacks/original_textures"),
+                PackType.CLIENT_RESOURCES,
+                Component.translatable("pack.logisticsnetworks.original_textures"),
+                PackSource.BUILT_IN, false, Pack.Position.TOP);
     }
 
     @SubscribeEvent
