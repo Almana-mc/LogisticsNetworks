@@ -50,6 +50,10 @@ public final class LogisticsDataComponents {
             REGISTRAR.registerComponentType("wrench_flow",
                     builder -> builder.persistent(WrenchFlow.CODEC).networkSynchronized(WrenchFlow.STREAM_CODEC));
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<RecipeCardData>> RECIPE_CARD =
+            REGISTRAR.registerComponentType("recipe_card",
+                    builder -> builder.persistent(RecipeCardData.CODEC).networkSynchronized(RecipeCardData.STREAM_CODEC));
+
     private LogisticsDataComponents() {
     }
 }
