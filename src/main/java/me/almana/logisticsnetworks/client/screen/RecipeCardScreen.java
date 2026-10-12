@@ -128,6 +128,12 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         super.onClose();
     }
 
+    @Override
+    public void removed() {
+        commitCount();
+        super.removed();
+    }
+
     private boolean clickCard(int x, int y, int action) {
         ItemStack carried = menu.getCarried();
         if (inside(x, y, OUTPUT_X, OUTPUT_Y, 16, 16)) {
@@ -166,6 +172,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     }
 
     public void dropIngredient(int index, ItemStack stack) {
+        commitCount();
         int at = Math.min(index, menu.data().ingredients().size());
         menu.edit(data -> data.withIngredient(at, RecipeCardData.Ingredient.ofItem(stack, stack.getCount())));
     }
