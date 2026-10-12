@@ -2,6 +2,8 @@ package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
@@ -20,6 +22,7 @@ import me.almana.logisticsnetworks.menu.GraphMenuContext;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
+import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -638,6 +641,56 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleSetRecipeCard(SetRecipeCardPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            Player player = context.player();
+            if (!(player.containerMenu instanceof RecipeCardMenu menu) || !menu.stillValid(player))
+                return;
+            RecipeCardData data = payload.data().sanitized();
+            if (menu.isNodeTarget()) {
+                LogisticsNodeEntity node = getAuthorizedNode(context, menu.entityId());
+                ChannelData channel = node == null ? null : node.getChannel(menu.channel());
+                if (channel == null || channel.getType() != ChannelType.ITEM)
+                    return;
+                ItemStack card = channel.getFilterItem(menu.slot());
+                if (!RecipeCardItem.is(card))
+                    return;
+                card = card.copy();
+                card.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
+                channel.setFilterItem(menu.slot(), card);
+                sendChannelSyncToViewers(node, menu.channel(), channel);
+                propagateToLabelGroup(node, menu.channel());
+                invalidateNetwork(node);
+            } else {
+                ItemStack held = player.getItemInHand(menu.hand());
+                if (data.equals(RecipeCardData.EMPTY)) {
+                    held.remove(LogisticsDataComponents.RECIPE_CARD.get());
+                } else {
+                    held.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
+                }
+            }
+            menu.setData(data);
+        });
+    }
+
+    public static void handleStampRecipeCard(StampRecipeCardPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            ChannelData channel = node == null ? null : node.getChannel(payload.channel());
+            int slot = payload.slot();
+            if (channel == null || channel.getType() != ChannelType.ITEM
+                    || slot < 0 || slot >= ChannelData.FILTER_SIZE)
+                return;
+            ItemStack carried = context.player().containerMenu.getCarried();
+            if (!RecipeCardItem.is(carried) || RecipeCardData.of(carried).ingredients().isEmpty())
+                return;
+            channel.setFilterItem(slot, carried.copyWithCount(1));
+            sendChannelSyncToViewers(node, payload.channel(), channel);
+            propagateToLabelGroup(node, payload.channel());
+            invalidateNetwork(node);
+        });
+    }
+
     public static void handleSelectNodeChannel(SelectNodeChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof NodeMenu menu
@@ -660,7 +713,7 @@ public class ServerPayloadHandler {
             if (fs < 0 || fs >= ChannelData.FILTER_SIZE)
                 return;
             ItemStack item = payload.item();
-            if (item.isEmpty() || item.is(ModTags.FILTERS))
+            if (item.isEmpty() || item.is(ModTags.FILTERS) || RecipeCardItem.is(item))
                 return;
             FilterTargetType desired = FilterTargetType.forChannel(channel.getType());
             if (desired == null)
@@ -791,6 +844,10 @@ public class ServerPayloadHandler {
 
             ItemStack stack = channel.getFilterItem(fs);
             VirtualFilterType requested = payload.requestedType();
+            if (requested == VirtualFilterType.EXISTING && RecipeCardItem.is(stack)) {
+                RecipeCardMenu.openNode(serverPlayer, node, ch, fs);
+                return;
+            }
             boolean needFresh = requested != VirtualFilterType.EXISTING
                     || stack.isEmpty() || !stack.is(ModTags.FILTERS)
                     || currentTarget(stack) != desired;

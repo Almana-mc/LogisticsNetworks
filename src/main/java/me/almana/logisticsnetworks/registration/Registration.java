@@ -34,6 +34,7 @@ import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
+import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -197,6 +198,10 @@ public class Registration {
         public static final DeferredHolder<MenuType<?>, MenuType<ServerRackMenu>> SERVER_RACK_MENU = MENUS.register(
                         "server_rack_menu",
                         () -> IMenuTypeExtension.create(ServerRackMenu::new));
+
+        public static final DeferredHolder<MenuType<?>, MenuType<RecipeCardMenu>> RECIPE_CARD_MENU = MENUS.register(
+                        "recipe_card_menu",
+                        () -> IMenuTypeExtension.create(RecipeCardMenu::new));
 
         public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
