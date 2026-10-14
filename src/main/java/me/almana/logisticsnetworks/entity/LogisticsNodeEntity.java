@@ -458,6 +458,7 @@ public class LogisticsNodeEntity extends Entity {
             return;
         for (int index = 0; index < channels.length; index++) {
             NodeUpgradeData.applyTierChange(channels[index], previousTier, tier);
+            channels[index].resetResourceRotation();
             ServerPayloadHandler.sendChannelSyncToViewers(this, index, channels[index]);
         }
     }

@@ -720,7 +720,7 @@ public class TransferEngine {
         return pushFluids(sourceHandler, resolved, exportChannel, batchLimitMb, FluidStack.EMPTY, provider, cache);
     }
 
-    // False when no target is reachable
+    // False if none reachable
     private static boolean resolveFluidTargets(LogisticsNodeEntity sourceNode, List<ImportTarget> targets,
             Map<UUID, Boolean> dimensionalCache, CapCache capCache, List<FluidTarget> out) {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
