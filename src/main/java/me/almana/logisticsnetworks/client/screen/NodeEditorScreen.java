@@ -1662,7 +1662,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 ch.getRedstoneMode().ordinal(),
                 ch.getDistributionMode().ordinal(),
                 ch.getFilterMode().ordinal(),
-                ch.getPriority()));
+                ch.getPriority(), ch.isResourceRoundRobin()));
     }
 
     private void sendNetworkAssign(Optional<UUID> id, String name) {

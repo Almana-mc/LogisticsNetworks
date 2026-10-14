@@ -556,6 +556,10 @@ public class TransferEngine {
         Map<Item, Integer> sourceItemCounts = hasAmountConstraints(reachableTargets)
                 ? buildItemCountCache(sourceHandler)
                 : null;
+        if (exportChannel.canRotateResources()) {
+            return rotateItems(sourceHandler, reachableTargets, reachableRefs, exportChannel, batchLimit,
+                    sourceAllowedSlots, sourceLevel, sourcePos, filterReadCache, sourceItemCounts);
+        }
         if (exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN) {
             return dealItems(sourceHandler, reachableTargets, batchLimit, exportFilters,
                     exportChannel.getFilterMode(), sourceAllowedSlots, sourceLevel, sourcePos, filterReadCache,
@@ -627,6 +631,50 @@ public class TransferEngine {
         return 0;
     }
 
+    private static int rotateItems(IItemHandler source, List<ItemTransferTarget> targets, List<ImportTarget> refs,
+            ChannelData exportChannel, int batchLimit, boolean[] sourceAllowedSlots, ServerLevel sourceLevel,
+            BlockPos sourcePos, FilterItemData.ReadCache filterReadCache,
+            @Nullable Map<Item, Integer> sourceItemCounts) {
+        DistributionMode mode = exportChannel.getDistributionMode();
+        if (mode != DistributionMode.PRIORITY_ROBIN) {
+            return rotateItemsOnce(source, targets, exportChannel, batchLimit, mode == DistributionMode.ROUND_ROBIN,
+                    sourceAllowedSlots, sourceLevel, sourcePos, filterReadCache, sourceItemCounts);
+        }
+        // Receiver-outer avoids resource lockstep
+        for (int i = 0; i < targets.size(); i++) {
+            int moved = rotateItemsOnce(source, List.of(targets.get(i)), exportChannel, batchLimit, false,
+                    sourceAllowedSlots, sourceLevel, sourcePos, filterReadCache, sourceItemCounts);
+            if (moved > 0) {
+                markServed(exportChannel, refs.get(i));
+                return moved;
+            }
+        }
+        return 0;
+    }
+
+    private static int rotateItemsOnce(IItemHandler source, List<ItemTransferTarget> targets,
+            ChannelData exportChannel, int batchLimit, boolean equal, boolean[] sourceAllowedSlots,
+            ServerLevel sourceLevel, BlockPos sourcePos, FilterItemData.ReadCache filterReadCache,
+            @Nullable Map<Item, Integer> sourceItemCounts) {
+        HolderLookup.Provider provider = sourceLevel.registryAccess();
+        ItemStack[] filters = exportChannel.getFilterItems();
+        FilterMode filterMode = exportChannel.getFilterMode();
+        boolean nbtFilter = FilterLogic.hasConfiguredItemNbtFilter(filters, filterReadCache);
+        List<Map<Item, Integer>> targetCounts = sourceItemCounts == null ? null : buildTargetItemCounts(targets);
+        ItemResourceOrder.Result result = ItemResourceOrder.move(source, exportChannel.getItemResourceCursor(),
+                slots -> {
+                    ItemStack resource = source.getStackInSlot(slots[0]).copy();
+                    int budget = equal ? exportableStock(source, slots, sourceAllowedSlots, filters, filterMode,
+                            provider, filterReadCache, resource, sourceItemCounts, batchLimit, nbtFilter) : batchLimit;
+                    return budget <= 0 ? 0 : executeMove(source, targets, budget, filters, filterMode,
+                            sourceAllowedSlots, provider, sourceLevel, sourcePos, filterReadCache, sourceItemCounts,
+                            targetCounts, equal, slots, resource);
+                });
+        if (result.cursor() != null)
+            exportChannel.setItemResourceCursor(result.cursor());
+        return result.moved();
+    }
+
     private static boolean hasAmountConstraints(List<ItemTransferTarget> targets) {
         for (ItemTransferTarget t : targets) {
             if (t.constraints().hasExportThreshold || t.constraints().hasImportThreshold
@@ -646,6 +694,9 @@ public class TransferEngine {
         return counts;
     }
 
+    private record FluidTarget(IFluidHandler handler, ImportTarget ref) {
+    }
+
     private static int transferFluids(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
             ChannelData exportChannel, List<ImportTarget> targets, int batchLimitMb,
             Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
@@ -657,83 +708,109 @@ public class TransferEngine {
         if (sourceHandler == null)
             return 0;
 
+        List<FluidTarget> resolved = new ArrayList<>(targets.size());
+        if (!resolveFluidTargets(sourceNode, targets, dimensionalCache, capCache, resolved))
+            return -1;
+        FilterItemData.ReadCache cache = FilterItemData.createReadCache();
+        HolderLookup.Provider provider = sourceLevel.registryAccess();
+        if (exportChannel.canRotateResources())
+            return rotateFluids(sourceHandler, resolved, exportChannel, batchLimitMb, provider, cache);
+        if (exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN)
+            return dealFluids(sourceHandler, resolved, batchLimitMb, exportChannel, provider, cache);
+        return pushFluids(sourceHandler, resolved, exportChannel, batchLimitMb, FluidStack.EMPTY, provider, cache);
+    }
+
+    // False when no target is reachable
+    private static boolean resolveFluidTargets(LogisticsNodeEntity sourceNode, List<ImportTarget> targets,
+            Map<UUID, Boolean> dimensionalCache, CapCache capCache, List<FluidTarget> out) {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
-        int remaining = batchLimitMb;
         boolean anyReachable = false;
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
-        List<IFluidHandler> equalHandlers = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
-                ? new ArrayList<>() : null;
-        List<ChannelData> equalChannels = equalHandlers == null ? null : new ArrayList<>();
-        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
-
         for (ImportTarget target : targets) {
-            if (remaining <= 0)
-                break;
-            if (target.node.getUUID().equals(sourceNode.getUUID()))
+            if (target.node.getUUID().equals(sourceNode.getUUID()) || !target.node.isValidNode()
+                    || !canReach(sourceNode, target.node, sourceDimensional, dimensionalCache))
                 continue;
-            if (!target.node.isValidNode())
-                continue;
-            if (!canReach(sourceNode, target.node, sourceDimensional, dimensionalCache))
-                continue;
-
             anyReachable = true;
             ServerLevel targetLevel = (ServerLevel) target.node.level();
             BlockPos targetPos = target.node.getAttachedPos();
             if (!targetLevel.isLoaded(targetPos))
                 continue;
-
-            IFluidHandler targetHandler = capCache.findFluidHandler(targetLevel, targetPos, target.channel.getIoDirection());
-            if (targetHandler == null)
-                continue;
-            if (equalHandlers != null) {
-                equalHandlers.add(targetHandler);
-                equalChannels.add(target.channel);
-                continue;
-            }
-
-            int filled = executeFluidMove(sourceHandler, targetHandler, remaining,
-                    exportChannel.getFilterItems(), exportChannel.getFilterMode(),
-                    target.channel.getFilterItems(), target.channel.getFilterMode(),
-                    sourceLevel.registryAccess(), filterReadCache, FluidStack.EMPTY);
-            if (filled > 0) {
-                remaining -= filled;
-                if (robin) {
-                    markServed(exportChannel, target);
-                    break;
-                }
-            }
+            IFluidHandler handler = capCache.findFluidHandler(targetLevel, targetPos, target.channel.getIoDirection());
+            if (handler != null)
+                out.add(new FluidTarget(handler, target));
         }
-
-        if (!anyReachable)
-            return -1;
-        if (equalHandlers != null)
-            return dealFluids(sourceHandler, equalHandlers, equalChannels, batchLimitMb, exportChannel,
-                    sourceLevel.registryAccess(), filterReadCache);
-        return batchLimitMb - remaining;
+        return anyReachable;
     }
 
-    private static int dealFluids(IFluidHandler source, List<IFluidHandler> targets, List<ChannelData> channels,
-            int limit, ChannelData exportChannel, HolderLookup.Provider provider, FilterItemData.ReadCache cache) {
+    private static int pushFluids(IFluidHandler source, List<FluidTarget> targets, ChannelData exportChannel,
+            int limit, FluidStack resource, HolderLookup.Provider provider, FilterItemData.ReadCache cache) {
+        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
+        int remaining = limit;
+        for (FluidTarget target : targets) {
+            if (remaining <= 0)
+                break;
+            int filled = executeFluidMove(source, target.handler(), remaining, exportChannel.getFilterItems(),
+                    exportChannel.getFilterMode(), target.ref().channel.getFilterItems(),
+                    target.ref().channel.getFilterMode(), provider, cache, resource);
+            remaining -= filled;
+            if (filled > 0 && robin) {
+                markServed(exportChannel, target.ref());
+                break;
+            }
+        }
+        return limit - remaining;
+    }
+
+    private static int rotateFluids(IFluidHandler source, List<FluidTarget> targets, ChannelData exportChannel,
+            int limit, HolderLookup.Provider provider, FilterItemData.ReadCache cache) {
+        if (exportChannel.getDistributionMode() != DistributionMode.PRIORITY_ROBIN)
+            return rotateFluidsOnce(source, targets, exportChannel, limit, provider, cache);
+        // Receiver-outer avoids resource lockstep
+        for (FluidTarget target : targets) {
+            int moved = rotateFluidsOnce(source, List.of(target), exportChannel, limit, provider, cache);
+            if (moved > 0)
+                return moved;
+        }
+        return 0;
+    }
+
+    private static int rotateFluidsOnce(IFluidHandler source, List<FluidTarget> targets, ChannelData exportChannel,
+            int limit, HolderLookup.Provider provider, FilterItemData.ReadCache cache) {
+        boolean equal = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN;
+        FluidResourceOrder.Result result = FluidResourceOrder.move(source, exportChannel.getFluidResourceCursor(),
+                resource -> equal
+                        ? dealFluid(source, targets, exportChannel, limit, resource, provider, cache)
+                        : pushFluids(source, targets, exportChannel, limit, resource, provider, cache));
+        if (result.cursor() != null)
+            exportChannel.setFluidResourceCursor(result.cursor());
+        return result.moved();
+    }
+
+    private static int dealFluids(IFluidHandler source, List<FluidTarget> targets, int limit,
+            ChannelData exportChannel, HolderLookup.Provider provider, FilterItemData.ReadCache cache) {
         List<FluidStack> resources = new ArrayList<>();
         for (int tank = 0; tank < source.getTanks(); tank++) {
             FluidStack stack = source.getFluidInTank(tank);
             if (!stack.isEmpty() && resources.stream().noneMatch(stack::isFluidEqual))
                 resources.add(copyFluidWithAmount(stack, 1));
         }
-        ItemStack[] filters = exportChannel.getFilterItems();
-        FilterMode mode = exportChannel.getFilterMode();
         int moved = 0;
         // Split per fluid type
         for (FluidStack resource : resources) {
             if (moved >= limit)
                 break;
-            moved += (int) EvenSplit.deal(targets.size(),
-                    fluidStock(source, limit - moved, filters, mode, provider, cache, resource),
-                    (i, share) -> executeFluidMove(source, targets.get(i), (int) share, filters, mode,
-                            channels.get(i).getFilterItems(), channels.get(i).getFilterMode(), provider, cache,
-                            resource));
+            moved += dealFluid(source, targets, exportChannel, limit - moved, resource, provider, cache);
         }
         return moved;
+    }
+
+    private static int dealFluid(IFluidHandler source, List<FluidTarget> targets, ChannelData exportChannel,
+            int limit, FluidStack resource, HolderLookup.Provider provider, FilterItemData.ReadCache cache) {
+        ItemStack[] filters = exportChannel.getFilterItems();
+        FilterMode mode = exportChannel.getFilterMode();
+        return (int) EvenSplit.deal(targets.size(), fluidStock(source, limit, filters, mode, provider, cache, resource),
+                (i, share) -> executeFluidMove(source, targets.get(i).handler(), (int) share, filters, mode,
+                        targets.get(i).ref().channel.getFilterItems(), targets.get(i).ref().channel.getFilterMode(),
+                        provider, cache, resource));
     }
 
     private static int fluidStock(IFluidHandler source, int limit, ItemStack[] filters, FilterMode mode,

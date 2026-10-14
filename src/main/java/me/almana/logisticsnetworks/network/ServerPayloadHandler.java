@@ -101,6 +101,7 @@ public class ServerPayloadHandler {
             channel.setFilterMode(FilterMode.values()[payload.filterModeOrdinal()]);
 
         channel.setPriority(payload.priority());
+        channel.setResourceRoundRobin(payload.resourceRoundRobin());
     }
 
     private static <T extends Enum<T>> boolean isValidEnum(int ordinal, T[] values) {
@@ -675,6 +676,7 @@ public class ServerPayloadHandler {
     }
 
     public static void invalidateNetwork(LogisticsNodeEntity node) {
+        for (ChannelData channel : node.getChannels()) channel.resetResourceRotation();
         if (node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
             NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
             GraphPayloadHandler.broadcast(level.getServer(), node.getNetworkId());

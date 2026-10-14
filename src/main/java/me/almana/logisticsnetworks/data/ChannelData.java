@@ -1,6 +1,8 @@
 package me.almana.logisticsnetworks.data;
 
 import me.almana.logisticsnetworks.logic.ChannelTelemetry;
+import me.almana.logisticsnetworks.logic.FluidResourceOrder;
+import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import me.almana.logisticsnetworks.logic.PriorityRobin;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
@@ -32,6 +34,7 @@ public class ChannelData {
     private static final String KEY_PRIORITY = "Priority";
     private static final String KEY_FILTERS = "Filters";
     private static final String KEY_NAME = "Name";
+    private static final String KEY_RESOURCE_ROUND_ROBIN = "ResourceRoundRobin";
 
     private boolean enabled;
     private ChannelMode mode = ChannelMode.IMPORT;
@@ -44,6 +47,9 @@ public class ChannelData {
     private FilterMode filterMode = FilterMode.MATCH_ANY;
     private int priority = 0;
     private String name = "";
+    private boolean resourceRoundRobin;
+    private transient ItemResourceOrder.Cursor itemResourceCursor;
+    private transient FluidResourceOrder.Cursor fluidResourceCursor;
 
     private final transient ChannelTelemetry telemetry = new ChannelTelemetry();
     private transient PriorityRobin.Cursor robinCursor;
@@ -73,6 +79,8 @@ public class ChannelData {
         tag.putInt(KEY_PRIORITY, priority);
         if (!name.isEmpty())
             tag.putString(KEY_NAME, name);
+        if (resourceRoundRobin)
+            tag.putBoolean(KEY_RESOURCE_ROUND_ROBIN, true);
 
         if (provider != null) {
             ListTag list = new ListTag();
@@ -125,6 +133,8 @@ public class ChannelData {
         }
 
         name = tag.contains(KEY_NAME) ? tag.getString(KEY_NAME) : "";
+        resourceRoundRobin = tag.getBoolean(KEY_RESOURCE_ROUND_ROBIN);
+        resetResourceRotation();
 
         Arrays.fill(filterItems, ItemStack.EMPTY);
         ejectedFilters.clear();
@@ -272,6 +282,44 @@ public class ChannelData {
         return priority;
     }
 
+    public boolean isResourceRoundRobin() {
+        return resourceRoundRobin;
+    }
+
+    public void setResourceRoundRobin(boolean value) {
+        if (resourceRoundRobin != value) resetResourceRotation();
+        resourceRoundRobin = value;
+    }
+
+    public boolean canRotateResources() {
+        return resourceRoundRobin && mode == ChannelMode.EXPORT
+                && (type == ChannelType.ITEM || type == ChannelType.FLUID)
+                && Arrays.stream(filterItems).anyMatch(stack -> !stack.isEmpty());
+    }
+
+    @Nullable
+    public ItemResourceOrder.Cursor getItemResourceCursor() {
+        return itemResourceCursor;
+    }
+
+    public void setItemResourceCursor(ItemResourceOrder.Cursor cursor) {
+        itemResourceCursor = cursor;
+    }
+
+    @Nullable
+    public FluidResourceOrder.Cursor getFluidResourceCursor() {
+        return fluidResourceCursor;
+    }
+
+    public void setFluidResourceCursor(FluidResourceOrder.Cursor cursor) {
+        fluidResourceCursor = cursor;
+    }
+
+    public void resetResourceRotation() {
+        itemResourceCursor = null;
+        fluidResourceCursor = null;
+    }
+
     @Nullable
     public PriorityRobin.Cursor getRobinCursor() {
         return robinCursor;
@@ -314,6 +362,8 @@ public class ChannelData {
     }
 
     public void copyFrom(ChannelData source) {
+        resourceRoundRobin = source.resourceRoundRobin;
+        resetResourceRotation();
         robinCursor = null;
         this.enabled = source.enabled;
         this.mode = source.mode;
@@ -336,7 +386,8 @@ public class ChannelData {
                 || batchSize != other.batchSize || tickDelay != other.tickDelay
                 || ioDirection != other.ioDirection || redstoneMode != other.redstoneMode
                 || distributionMode != other.distributionMode || filterMode != other.filterMode
-                || priority != other.priority || !name.equals(other.name)) {
+                || priority != other.priority || !name.equals(other.name)
+                || resourceRoundRobin != other.resourceRoundRobin) {
             return false;
         }
         for (int slot = 0; slot < FILTER_SIZE; slot++) {
