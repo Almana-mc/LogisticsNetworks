@@ -16,9 +16,11 @@ Craft paper, redstone and an iron nugget for a blank card. Right-click a card to
 
 Craft a written card on its own to wipe it, or together with blank cards to copy it onto them.
 
-## Using it on a node
+## Using it in a filter
 
-Hold the card and click an empty filter slot on an item channel, or one that already holds a card. The slot gets a copy and you keep the card. Click the slot to edit that copy, right-click it to clear it. Cards also work in the wrench clipboard (stamp or clear only) and copy with labels.
+A card is an entry in an item filter, like any other item. Hold it and click a cell in the filter, or click a node's filter slot to add it to that slot's filter. The filter gets a copy and you keep the card. The cell cycles through the card's ingredients, and its name shows what the recipe makes.
+
+Hold **Modifier Key 2** (Ctrl by default) and click the cell to edit that copy. Close the editor to go back to the filter. Click the cell with an empty hand to clear it. Cards work in whitelist and blacklist filters, in the wrench clipboard, and they copy with labels. A card in an import channel's filter does nothing. Cards can't be edited from the computer graph.
 
 Each operation sends as many whole sets as the batch size allows (at least one set). The distribution mode decides who gets them:
 
@@ -34,4 +36,4 @@ Turn on **Blocking** to send only to receivers that hold none of this channel's 
 
 ## Mixing with normal filters
 
-A channel can hold cards and normal filters together. Recipe sets go first, then the normal filters move loose items with the rest of the batch. A channel with only cards sends nothing else.
+A filter can hold cards and normal entries together. Recipe sets go first, then the normal entries move loose items with the rest of the batch. A channel whose filters hold only cards sends nothing else.
