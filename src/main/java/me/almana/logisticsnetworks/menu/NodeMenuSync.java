@@ -18,7 +18,7 @@ import java.util.function.Consumer;
 
 public final class NodeMenuSync {
 
-    // Forge rejects open buffers over 32600
+    // Forge caps open buffers
     private static final int OPEN_BUFFER_BUDGET = 30_000;
 
     private NodeMenuSync() {
