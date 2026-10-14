@@ -23,10 +23,12 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.RelativeMovement;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.util.ITeleporter;
 import net.minecraftforge.network.NetworkHooks;
 import com.mojang.logging.LogUtils;
 import org.jetbrains.annotations.Nullable;
@@ -34,6 +36,7 @@ import org.slf4j.Logger;
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public class LogisticsNodeEntity extends Entity {
@@ -261,10 +264,32 @@ public class LogisticsNodeEntity extends Entity {
         return false;
     }
 
+    // Hides nodes from minimap radars
+    @Override
+    public boolean isInvisible() {
+        return true;
+    }
+
     @Override
     public void kill() {
         LOGGER.warn(
                 "Attempt to kill LogisticsNodeEntity ignored. Please use '/logisticsnetworks removeInvalidNodes' for invalid nodes or '/logisticsnetworks removeNodes' to safely remove all nodes.");
+    }
+
+    @Override
+    public boolean teleportTo(ServerLevel level, double x, double y, double z, Set<RelativeMovement> relativeMovements,
+            float yRot, float xRot) {
+        return false;
+    }
+
+    @Override
+    public void teleportTo(double x, double y, double z) {
+    }
+
+    @Nullable
+    @Override
+    public Entity changeDimension(ServerLevel destination, ITeleporter teleporter) {
+        return null;
     }
 
     @Override
