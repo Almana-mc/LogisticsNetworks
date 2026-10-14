@@ -8,7 +8,6 @@ import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
 import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.BlockHitResult;
@@ -30,7 +29,7 @@ public class WrenchInputHandler {
             return;
         }
 
-        if (!player.isShiftKeyDown()) {
+        if (!ClientControls.modifier1Down()) {
             return;
         }
 
@@ -50,7 +49,7 @@ public class WrenchInputHandler {
 
     @SubscribeEvent
     public static void onInteractionKeyMappingTriggered(InputEvent.InteractionKeyMappingTriggered event) {
-        if (!event.isUseItem() || !Screen.hasControlDown()) {
+        if (!event.isUseItem() || !ClientControls.modifier2Down()) {
             return;
         }
 
