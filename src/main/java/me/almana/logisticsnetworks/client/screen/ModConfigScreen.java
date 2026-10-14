@@ -2,6 +2,8 @@ package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.ClientConfig;
+import me.almana.logisticsnetworks.NodeAccessMode;
+import me.almana.logisticsnetworks.client.DefaultNodeVisibilitySync;
 import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
@@ -65,9 +67,11 @@ public class ModConfigScreen extends Screen {
     private static final Component TEXT_BACKOFF_ENERGY = Component.translatable("gui.logisticsnetworks.config.common.backoffEnergy");
     private static final Component TEXT_BACKOFF_CHEMICAL = Component.translatable("gui.logisticsnetworks.config.common.backoffChemical");
     private static final Component TEXT_BACKOFF_SOURCE = Component.translatable("gui.logisticsnetworks.config.common.backoffSource");
+    private static final Component TEXT_NODE_ACCESS = Component.translatable("gui.logisticsnetworks.config.common.nodeAccessMode");
 
     private static final Component TEXT_MAX_RENDERED = Component.translatable("gui.logisticsnetworks.config.client.maxRenderedNodes");
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
+    private static final Component TEXT_DEFAULT_NODE_VISIBILITY = Component.translatable("gui.logisticsnetworks.config.client.defaultNodeVisibility");
     private static final Component TEXT_INVERT_COPY_PASTE = Component.translatable("gui.logisticsnetworks.config.client.invertCopyPasteControls");
 
     private static final Component[] TIER_LABELS = {
@@ -101,8 +105,10 @@ public class ModConfigScreen extends Screen {
     private boolean pendingBackoffChemical;
     private boolean pendingBackoffSource;
     private int pendingBackoffMaxTicks;
+    private NodeAccessMode pendingNodeAccessMode;
     private EditBox backoffMaxTicksBox;
 
+    private boolean pendingDefaultNodeVisibility;
     private int pendingMaxRenderedNodes;
     private int pendingMaxVisibleNodes;
     private EditBox maxRenderedNodesBox;
@@ -140,6 +146,8 @@ public class ModConfigScreen extends Screen {
         pendingBackoffChemical = Config.backoffChemicalSpec.get();
         pendingBackoffSource = Config.backoffSourceSpec.get();
         pendingBackoffMaxTicks = Config.backoffMaxTicksSpec.get();
+        pendingNodeAccessMode = NodeAccessMode.fromSerializedName(Config.nodeAccessModeSpec.get());
+        pendingDefaultNodeVisibility = ClientConfig.defaultNodeVisibilitySpec.get();
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
         pendingInvertCopyPasteControls = ClientConfig.invertCopyPasteControlsSpec.get();
@@ -180,8 +188,16 @@ public class ModConfigScreen extends Screen {
     }
 
     private void buildCommonTab(int cx, int cy, int cw) {
+        Button accessModeButton = Button.builder(nodeAccessModeText(pendingNodeAccessMode), button -> {
+            NodeAccessMode[] modes = NodeAccessMode.values();
+            pendingNodeAccessMode = modes[(pendingNodeAccessMode.ordinal() + 1) % modes.length];
+            button.setMessage(nodeAccessModeText(pendingNodeAccessMode));
+        }).bounds(cx + cw - 104, cy, 100, 16).build();
+        accessModeButton.active = canEditServerConfig;
+        addRenderableWidget(accessModeButton);
+
         if (canEditServerConfig) {
-            backoffMaxTicksBox = new EditBox(font, cx + 130, cy + 42, 60, 14, Component.empty());
+            backoffMaxTicksBox = new EditBox(font, cx + 130, cy + 64, 60, 14, Component.empty());
             backoffMaxTicksBox.setMaxLength(4);
             backoffMaxTicksBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
             backoffMaxTicksBox.setValue(String.valueOf(pendingBackoffMaxTicks));
@@ -191,14 +207,14 @@ public class ModConfigScreen extends Screen {
     }
 
     private void buildClientTab(int cx, int cy, int cw) {
-        maxRenderedNodesBox = new EditBox(font, cx + 150, cy + 4, 80, 14, Component.empty());
+        maxRenderedNodesBox = new EditBox(font, cx + 150, cy + 18, 80, 14, Component.empty());
         maxRenderedNodesBox.setMaxLength(10);
         maxRenderedNodesBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
         maxRenderedNodesBox.setValue(String.valueOf(pendingMaxRenderedNodes));
         maxRenderedNodesBox.setBordered(false);
         addWidget(maxRenderedNodesBox);
 
-        maxVisibleNodesBox = new EditBox(font, cx + 150, cy + 24, 80, 14, Component.empty());
+        maxVisibleNodesBox = new EditBox(font, cx + 150, cy + 36, 80, 14, Component.empty());
         maxVisibleNodesBox.setMaxLength(10);
         maxVisibleNodesBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
         maxVisibleNodesBox.setValue(String.valueOf(pendingMaxVisibleNodes));
@@ -362,20 +378,21 @@ public class ModConfigScreen extends Screen {
 
     private void renderCommonTab(GuiGraphics g, int cx, int cy, int cw, int mx, int my) {
         boolean locked = !canEditServerConfig;
-        int y = cy;
+        int y = cy + 20;
 
+        g.drawString(font, TEXT_NODE_ACCESS, cx, cy + 4, locked ? COL_INK_LOCKED : COL_INK, false);
         y = renderCheckbox(g, cx, y, cw, TEXT_DROP_NODE, pendingDropNodeItem, mx, my, locked);
         y = renderCheckbox(g, cx, y, cw, TEXT_DEBUG, pendingDebugMode, mx, my, locked);
 
         int labelColor = locked ? COL_INK_LOCKED : COL_INK;
-        g.drawString(font, TEXT_BACKOFF_TICKS, cx, cy + 46, labelColor, false);
+        g.drawString(font, TEXT_BACKOFF_TICKS, cx, cy + 68, labelColor, false);
         if (locked) {
-            g.drawString(font, String.valueOf(pendingBackoffMaxTicks), cx + 130, cy + 45, COL_INK_LOCKED, false);
+            g.drawString(font, String.valueOf(pendingBackoffMaxTicks), cx + 130, cy + 67, COL_INK_LOCKED, false);
         } else {
-            renderUnderline(g, cx + 130, cy + 42 + 14, 60);
+            renderUnderline(g, cx + 130, cy + 64 + 14, 60);
         }
 
-        y = cy + 62;
+        y = cy + 84;
         y = renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_ITEM, pendingBackoffItem, mx, my, locked);
         y = renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_FLUID, pendingBackoffFluid, mx, my, locked);
         y = renderCheckbox(g, cx, y, cw, TEXT_BACKOFF_ENERGY, pendingBackoffEnergy, mx, my, locked);
@@ -384,15 +401,17 @@ public class ModConfigScreen extends Screen {
     }
 
     private void renderClientTab(GuiGraphics g, int cx, int cy, int cw, int mx, int my) {
-        g.drawString(font, TEXT_MAX_RENDERED, cx, cy + 7, COL_INK, false);
-        renderUnderline(g, cx + 150, cy + 4 + 14, 80);
+        renderCheckbox(g, cx, cy, cw, TEXT_DEFAULT_NODE_VISIBILITY, pendingDefaultNodeVisibility, mx, my, false);
 
-        g.drawString(font, TEXT_MAX_VISIBLE, cx, cy + 27, COL_INK, false);
-        renderUnderline(g, cx + 150, cy + 24 + 14, 80);
+        g.drawString(font, TEXT_MAX_RENDERED, cx, cy + 21, COL_INK, false);
+        renderUnderline(g, cx + 150, cy + 18 + 14, 80);
 
-        renderCheckbox(g, cx, cy + 44, cw, TEXT_INVERT_COPY_PASTE, pendingInvertCopyPasteControls, mx, my, false);
+        g.drawString(font, TEXT_MAX_VISIBLE, cx, cy + 39, COL_INK, false);
+        renderUnderline(g, cx + 150, cy + 36 + 14, 80);
 
-        int themeY = cy + 66;
+        renderCheckbox(g, cx, cy + 72, cw, TEXT_INVERT_COPY_PASTE, pendingInvertCopyPasteControls, mx, my, false);
+
+        int themeY = cy + 90;
         g.drawString(font, Component.translatable("gui.logisticsnetworks.config.client.theme"), cx, themeY, COL_INK, false);
 
         int cols = 4;
@@ -420,12 +439,16 @@ public class ModConfigScreen extends Screen {
     }
 
     private boolean handleClientClick(double mx, double my, int cx, int cy, int cw) {
-        if (inBox(mx, my, cx + cw - 14, cy + 46, 9)) {
+        if (inBox(mx, my, cx + cw - 14, cy + 2, 9)) {
+            pendingDefaultNodeVisibility = !pendingDefaultNodeVisibility;
+            return true;
+        }
+        if (inBox(mx, my, cx + cw - 14, cy + 74, 9)) {
             pendingInvertCopyPasteControls = !pendingInvertCopyPasteControls;
             return true;
         }
 
-        int themeY = cy + 66;
+        int themeY = cy + 90;
         int cols = 4;
         int swatchGap = 4;
         int swatchW = (cw - (cols - 1) * swatchGap) / cols;
@@ -583,12 +606,12 @@ public class ModConfigScreen extends Screen {
         int boxX = cx + cw - 14;
         int boxSize = 9;
 
-        int y = cy;
+        int y = cy + 20;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingDropNodeItem = !pendingDropNodeItem; return true; }
         y += 18;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingDebugMode = !pendingDebugMode; return true; }
 
-        y = cy + 62;
+        y = cy + 84;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingBackoffItem = !pendingBackoffItem; return true; }
         y += 18;
         if (inBox(mx, my, boxX, y + 2, boxSize)) { pendingBackoffFluid = !pendingBackoffFluid; return true; }
@@ -668,6 +691,7 @@ public class ModConfigScreen extends Screen {
             Config.backoffChemicalSpec.set(pendingBackoffChemical);
             Config.backoffSourceSpec.set(pendingBackoffSource);
             Config.backoffMaxTicksSpec.set(pendingBackoffMaxTicks);
+            Config.nodeAccessModeSpec.set(pendingNodeAccessMode.serializedName());
             Config.refresh();
 
             for (int i = 0; i < 5; i++) {
@@ -686,17 +710,27 @@ public class ModConfigScreen extends Screen {
         }
 
         ClientConfig.invertCopyPasteControlsSpec.set(pendingInvertCopyPasteControls);
+        ClientConfig.defaultNodeVisibilitySpec.set(pendingDefaultNodeVisibility);
         ClientConfig.maxRenderedNodesSpec.set(pendingMaxRenderedNodes);
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
         ClientConfig.themeSpec.set(pendingTheme);
         ClientConfig.refresh();
         ThemeState.setTheme(Themes.byId(pendingTheme));
+        DefaultNodeVisibilitySync.send();
 
         minecraft.setScreen(parent);
     }
 
     private void cancel() {
         minecraft.setScreen(parent);
+    }
+
+    private Component nodeAccessModeText(NodeAccessMode mode) {
+        return switch (mode) {
+            case TEAMS -> Component.translatable("gui.logisticsnetworks.config.common.nodeAccessMode.teams");
+            case ALL -> Component.translatable("gui.logisticsnetworks.config.common.nodeAccessMode.all");
+            case ALLIES -> Component.translatable("gui.logisticsnetworks.config.common.nodeAccessMode.allies");
+        };
     }
 
     private int parseIntOr(String s, int fallback) {
