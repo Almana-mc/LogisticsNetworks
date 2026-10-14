@@ -3,7 +3,9 @@ package me.almana.logisticsnetworks.client.screen;
 import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
+import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.menu.RecipeCardMenu;
+import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -13,6 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -133,7 +136,14 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     @Override
     public void onClose() {
         commitCount();
-        super.onClose();
+        if (menu.isNodeTarget()) {
+            PacketDistributor.sendToServer(new OpenNodeFilterPayload(menu.entityId(), menu.channel(),
+                    menu.filterSlot(), VirtualFilterType.EXISTING));
+        } else if (menu.isEntryTarget()) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, RecipeCardMenu.ID_BACK);
+        } else {
+            super.onClose();
+        }
     }
 
     @Override
