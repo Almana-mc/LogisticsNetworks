@@ -782,7 +782,8 @@ public final class NodeClipboardConfig {
 
     public PasteOutcome applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack,
                                    @Nullable GlobalPos ae2Link) {
-        if (player == null || node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT) {
+        if (player == null || node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT
+                || player.hasDisconnected() || !player.isAlive()) {
             return new PasteOutcome(PasteResult.CLIPBOARD_INVALID);
         }
 
@@ -810,10 +811,7 @@ public final class NodeClipboardConfig {
         }
         applyToNode(node);
         applyNetworkToNode(node, player);
-        // Absent player: inventory already saved
-        boolean absent = !player.isAlive() || player.hasDisconnected();
-        List<ItemStack> leftovers = absent ? returnedItems
-                : returnItemsToInventory(inventory, returnedItems, protectedSlot);
+        List<ItemStack> leftovers = returnItemsToInventory(inventory, returnedItems, protectedSlot);
         for (ItemStack leftover : leftovers) {
             player.drop(leftover, false);
         }

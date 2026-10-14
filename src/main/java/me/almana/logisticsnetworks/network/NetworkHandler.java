@@ -140,7 +140,12 @@ public final class NetworkHandler {
 
         @Override
         public void enqueueWork(Runnable work) {
-            context.enqueueWork(work);
+            context.enqueueWork(() -> {
+                // Inventory already saved on disconnect
+                ServerPlayer sender = context.getSender();
+                if (sender != null && sender.hasDisconnected()) return;
+                work.run();
+            });
         }
     }
 }
