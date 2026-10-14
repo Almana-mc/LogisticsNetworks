@@ -60,7 +60,7 @@ public class EventHandler {
             LogisticsNetwork network = registry.getNetwork(networkId);
             if (network != null) {
                 node.setNetworkName(network.getName());
-                registry.markNetworkDirty(networkId);
+                registry.invalidateNetwork(networkId);
             } else {
                 node.setNetworkName("Network-" + networkId.toString().substring(0, 6));
             }
@@ -115,9 +115,9 @@ public class EventHandler {
                 continue;
 
             if (node.getAttachedPos().equals(event.getPos())) {
-                registry.markNetworkDirty(node.getNetworkId());
+                registry.wakeNetwork(node.getNetworkId());
             } else if (hasRedstoneSensitiveChannel(node)) {
-                registry.markNetworkDirty(node.getNetworkId());
+                registry.wakeNetwork(node.getNetworkId());
             }
         }
     }
@@ -264,7 +264,7 @@ public class EventHandler {
                     new AABB(containerPos).inflate(0.1));
             for (LogisticsNodeEntity node : nodes) {
                 if (node.isActive() && node.getNetworkId() != null && node.getAttachedPos().equals(containerPos)) {
-                    NetworkRegistry.get(level).markNetworkDirty(node.getNetworkId());
+                    NetworkRegistry.get(level).wakeNetwork(node.getNetworkId());
                 }
             }
         }

@@ -1186,7 +1186,7 @@ public class FilterMenu extends AbstractContainerMenu {
             if (player.level() instanceof ServerLevel level) {
                 ServerPayloadHandler.propagateToLabelGroup(nodeSource, nodeChannel);
                 if (nodeSource.getNetworkId() != null) {
-                    NetworkRegistry.get(level).markNetworkDirty(nodeSource.getNetworkId());
+                    NetworkRegistry.get(level).invalidateNetwork(nodeSource.getNetworkId());
                 }
             }
         }

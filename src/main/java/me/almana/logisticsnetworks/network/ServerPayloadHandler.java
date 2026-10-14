@@ -71,7 +71,7 @@ public class ServerPayloadHandler {
             clampChannelToUpgradeLimits(node, channel);
             sendChannelSyncToViewers(node, payload.channelIndex(), channel);
             propagateToLabelGroup(node, payload.channelIndex());
-            markNetworkDirty(node);
+            invalidateNetwork(node);
         });
     }
 
@@ -340,7 +340,7 @@ public class ServerPayloadHandler {
 
             channel.setFilterItem(payload.filterSlot(), ItemStack.EMPTY);
             propagateToLabelGroup(node, payload.channelIndex());
-            markNetworkDirty(node);
+            invalidateNetwork(node);
         });
     }
 
@@ -566,9 +566,9 @@ public class ServerPayloadHandler {
         return node.isOwnedBy(context.player()) ? node : null;
     }
 
-    private static void markNetworkDirty(LogisticsNodeEntity node) {
+    private static void invalidateNetwork(LogisticsNodeEntity node) {
         if (node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
-            NetworkRegistry.get(level).markNetworkDirty(node.getNetworkId());
+            NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
         }
     }
 
@@ -796,7 +796,7 @@ public class ServerPayloadHandler {
                                         sendChannelSyncToViewers(node, i, dst);
                                     }
                                 }
-                                markNetworkDirty(node);
+                                invalidateNetwork(node);
                                 return;
                             }
                         }
@@ -848,7 +848,7 @@ public class ServerPayloadHandler {
                 channel.setName(name);
             }
 
-            markNetworkDirty(node);
+            invalidateNetwork(node);
         });
     }
 
