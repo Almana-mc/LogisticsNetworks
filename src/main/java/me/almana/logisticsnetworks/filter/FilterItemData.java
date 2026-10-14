@@ -257,7 +257,7 @@ public final class FilterItemData {
                 .filter(FilterItemData::isRecipeCard)
                 .filter(entry -> entry.slot() >= 0 && entry.slot() < getCapacity(filter))
                 .sorted(Comparator.comparingInt(GeneralFilterEntry::slot))
-                .map(entry -> RecipeCardData.of(entry.item().toStack()))
+                .map(entry -> RecipeCardData.of(entry.item().toStack()).sanitized())
                 .toList();
     }
 
