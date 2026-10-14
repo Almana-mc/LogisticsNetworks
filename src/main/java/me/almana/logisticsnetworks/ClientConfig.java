@@ -18,6 +18,10 @@ public class ClientConfig {
             .comment("Invert the wrench copy/paste controls so right-click pastes and modifier 1 + right-click copies.")
             .define("invertCopyPasteControls", false);
 
+    public static final ForgeConfigSpec.BooleanValue confirmNetworkCreationSpec = builder
+            .comment("Ask for confirmation before creating a network.")
+            .define("confirmNetworkCreation", true);
+
     public static final ForgeConfigSpec.IntValue maxRenderedNodesSpec = builder
             .comment("Maximum number of nodes rendered when holding a wrench. Nearest nodes are prioritized.")
             .defineInRange("maxRenderedNodes", 200, 1, Integer.MAX_VALUE);
@@ -40,6 +44,7 @@ public class ClientConfig {
     static final ForgeConfigSpec SPEC = builder.build();
 
     public static boolean invertCopyPasteControls = false;
+    public static boolean confirmNetworkCreation = true;
     public static boolean defaultNodeVisibility = true;
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
@@ -52,6 +57,7 @@ public class ClientConfig {
 
     public static void refresh() {
         invertCopyPasteControls = invertCopyPasteControlsSpec.get();
+        confirmNetworkCreation = confirmNetworkCreationSpec.get();
         defaultNodeVisibility = defaultNodeVisibilitySpec.get();
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();

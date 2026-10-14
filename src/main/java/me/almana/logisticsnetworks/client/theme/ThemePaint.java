@@ -1,10 +1,17 @@
 package me.almana.logisticsnetworks.client.theme;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.data.ChannelType;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 
 public final class ThemePaint {
+
+    private static final ResourceLocation LABEL_DELETE_ICON = ResourceLocation.fromNamespaceAndPath(
+            Logisticsnetworks.MOD_ID, "textures/gui/label_delete.png");
 
     public static void drawCentered(GuiGraphics g, Font font, String text, int cx, int y, int color) {
         int w = font.width(text);
@@ -108,11 +115,26 @@ public final class ThemePaint {
         return font.width(text) + 6 + 8 + 2;
     }
 
-    public static void tab(GuiGraphics g, Font font, int x, int y, int w, int h,
-                            String label, boolean active, boolean hasDot, boolean hovered, Theme t) {
-        int bg = active ? t.tabActiveBg() : t.surface2();
-        int fg = active ? t.tabActiveFg() : (hovered ? t.text() : t.textMuted());
-        int border = active ? t.tabActiveBg() : t.border();
+    public static void channelTab(GuiGraphics g, Font font, int x, int y, int w, int h,
+                                  String label, ChannelType type, boolean active, boolean hasDot,
+                                  boolean hovered, Theme t) {
+        int bg;
+        int fg;
+        int border;
+        if (type == null) {
+            bg = active ? t.tabActiveBg() : t.surface2();
+            fg = active ? t.tabActiveFg() : (hovered ? t.text() : t.textMuted());
+            border = active ? t.tabActiveBg() : t.border();
+        } else if (active) {
+            bg = ChannelTint.selectedBg(type, t);
+            fg = ChannelTint.selectedFg(type, t);
+            border = bg;
+        } else {
+            bg = ChannelTint.tabBg(type, t);
+            if (hovered) bg = brighten(bg, 0x10);
+            fg = ChannelTint.digit(type, t);
+            border = ChannelTint.border(type, t);
+        }
         if (t.hardShadow() && active) {
             g.fill(x + 2, y + 2, x + w + 2, y + h + 2, 0xFF000000);
         }
@@ -194,6 +216,26 @@ public final class ThemePaint {
         g.drawString(font, placeholder, x + 10, y + (h - 7) / 2, t.textSubtle(), false);
     }
 
+    public static int sortButtonWidth(Font font, String label) {
+        return font.width(label) + 21;
+    }
+
+    public static void sortButton(GuiGraphics g, Font font, int x, int y, String label, boolean hovered, Theme t) {
+        int w = sortButtonWidth(font, label);
+        int fg = hovered ? (t.borderStrong() == t.text() ? t.bg() : t.text()) : t.textMuted();
+        g.fill(x, y, x + w, y + 13, hovered ? t.borderStrong() : t.surface2());
+        g.renderOutline(x, y, w, 13, hovered ? t.accent() : t.border());
+        int ix = x + 5;
+        int iy = y + 3;
+        g.fill(ix + 2, iy, ix + 3, iy + 1, fg);
+        g.fill(ix + 1, iy + 1, ix + 4, iy + 2, fg);
+        g.fill(ix, iy + 2, ix + 5, iy + 3, fg);
+        g.fill(ix, iy + 4, ix + 5, iy + 5, fg);
+        g.fill(ix + 1, iy + 5, ix + 4, iy + 6, fg);
+        g.fill(ix + 2, iy + 6, ix + 3, iy + 7, fg);
+        g.drawString(font, label, ix + 9, y + 3, fg, false);
+    }
+
     public static void compass(GuiGraphics g, int x, int y, int dirDeg, Theme t) {
         int size = 8;
         roundRect(g, x, y, size, size, size / 2, t.surface(), t.sharpCorners());
@@ -227,6 +269,16 @@ public final class ThemePaint {
         g.fill(px, py + 2, px + 2, py + 3, fg);
         g.fill(px, py + 3, px + 1, py + 4, fg);
         g.drawString(font, label, x + 10, y + (h - 7) / 2, fg, false);
+    }
+
+    public static void labelDeleteIcon(GuiGraphics g, int x, int y, boolean hovered, Theme t) {
+        int color = hovered ? t.danger() : t.textMuted();
+        RenderSystem.enableBlend();
+        RenderSystem.setShaderColor((color >> 16 & 0xFF) / 255f, (color >> 8 & 0xFF) / 255f,
+                (color & 0xFF) / 255f, 1f);
+        g.blit(LABEL_DELETE_ICON, x, y, 8, 8, 0, 0, 512, 512, 512, 512);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        RenderSystem.disableBlend();
     }
 
     public static void stepper(GuiGraphics g, Font font, int x, int y, int w, int h,

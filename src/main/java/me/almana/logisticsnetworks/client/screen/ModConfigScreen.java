@@ -73,6 +73,7 @@ public class ModConfigScreen extends Screen {
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
     private static final Component TEXT_DEFAULT_NODE_VISIBILITY = Component.translatable("gui.logisticsnetworks.config.client.defaultNodeVisibility");
     private static final Component TEXT_INVERT_COPY_PASTE = Component.translatable("gui.logisticsnetworks.config.client.invertCopyPasteControls");
+    private static final Component TEXT_CONFIRM_NETWORK_CREATION = Component.translatable("gui.logisticsnetworks.config.client.confirmNetworkCreation");
 
     private static final Component[] TIER_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.upgrades.tier.none"),
@@ -114,6 +115,7 @@ public class ModConfigScreen extends Screen {
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
     private boolean pendingInvertCopyPasteControls;
+    private boolean pendingConfirmNetworkCreation;
 
     private String pendingTheme;
 
@@ -151,6 +153,7 @@ public class ModConfigScreen extends Screen {
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
         pendingInvertCopyPasteControls = ClientConfig.invertCopyPasteControlsSpec.get();
+        pendingConfirmNetworkCreation = ClientConfig.confirmNetworkCreationSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
         pendingTiers = UpgradeLimitsConfig.getAll();
 
@@ -409,7 +412,10 @@ public class ModConfigScreen extends Screen {
         g.drawString(font, TEXT_MAX_VISIBLE, cx, cy + 39, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 36 + 14, 80);
 
-        renderCheckbox(g, cx, cy + 72, cw, TEXT_INVERT_COPY_PASTE, pendingInvertCopyPasteControls, mx, my, false);
+        int halfWidth = (cw - 8) / 2;
+        renderCheckbox(g, cx, cy + 72, halfWidth, TEXT_INVERT_COPY_PASTE, pendingInvertCopyPasteControls, mx, my, false);
+        renderCheckbox(g, cx + halfWidth + 8, cy + 72, halfWidth, TEXT_CONFIRM_NETWORK_CREATION,
+                pendingConfirmNetworkCreation, mx, my, false);
 
         int themeY = cy + 90;
         g.drawString(font, Component.translatable("gui.logisticsnetworks.config.client.theme"), cx, themeY, COL_INK, false);
@@ -443,8 +449,13 @@ public class ModConfigScreen extends Screen {
             pendingDefaultNodeVisibility = !pendingDefaultNodeVisibility;
             return true;
         }
-        if (inBox(mx, my, cx + cw - 14, cy + 74, 9)) {
+        int halfWidth = (cw - 8) / 2;
+        if (inBox(mx, my, cx + halfWidth - 14, cy + 74, 9)) {
             pendingInvertCopyPasteControls = !pendingInvertCopyPasteControls;
+            return true;
+        }
+        if (inBox(mx, my, cx + cw - 14, cy + 74, 9)) {
+            pendingConfirmNetworkCreation = !pendingConfirmNetworkCreation;
             return true;
         }
 
@@ -710,6 +721,7 @@ public class ModConfigScreen extends Screen {
         }
 
         ClientConfig.invertCopyPasteControlsSpec.set(pendingInvertCopyPasteControls);
+        ClientConfig.confirmNetworkCreationSpec.set(pendingConfirmNetworkCreation);
         ClientConfig.defaultNodeVisibilitySpec.set(pendingDefaultNodeVisibility);
         ClientConfig.maxRenderedNodesSpec.set(pendingMaxRenderedNodes);
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
