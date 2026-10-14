@@ -94,7 +94,7 @@ public final class NodeMenuSync {
         return new ClientNodeState(entityId, selectedChannel, node);
     }
 
-    private static LogisticsNodeEntity findOrCreateClientNode(Player player, int entityId, UUID nodeId,
+    public static LogisticsNodeEntity findOrCreateClientNode(Player player, int entityId, UUID nodeId,
             ResourceLocation dimension) {
         Entity entity = player.level().getEntity(entityId);
         if (player.level().dimension().location().equals(dimension)

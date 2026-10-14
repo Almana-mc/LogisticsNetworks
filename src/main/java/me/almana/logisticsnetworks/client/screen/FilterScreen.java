@@ -1,63 +1,79 @@
 package me.almana.logisticsnetworks.client.screen;
 
-import me.almana.logisticsnetworks.network.NetworkHandler;
-
-import me.almana.logisticsnetworks.util.ItemStackCompat;
-
-import com.mojang.blaze3d.systems.RenderSystem;
-
-import me.almana.logisticsnetworks.filter.DurabilityFilterData;
+import com.mojang.blaze3d.platform.InputConstants;
+import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.client.ClientControls;
+import me.almana.logisticsnetworks.client.FilterClickHandler;
+import me.almana.logisticsnetworks.client.FilterResourceRenderer;
+import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.filter.NameMatchScope;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
-import me.almana.logisticsnetworks.filter.SlotFilterData;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.components.MultiLineEditBox;
-import net.minecraft.util.Mth;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.tags.TagKey;
-
-import me.almana.logisticsnetworks.menu.FilterMenu;
+import me.almana.logisticsnetworks.filter.NbtPath;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
-import me.almana.logisticsnetworks.network.*;
-
-import net.minecraft.client.Minecraft;
+import me.almana.logisticsnetworks.menu.FilterMenu;
+import me.almana.logisticsnetworks.network.ModifyFilterModPayload;
+import me.almana.logisticsnetworks.network.NetworkHandler;
+import me.almana.logisticsnetworks.network.OpenNodeMenuPayload;
+import me.almana.logisticsnetworks.network.ScanAttachedStoragePayload;
+import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryAmountPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryDurabilityPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryEnchantedPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryNbtPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntrySlotMappingPayload;
+import me.almana.logisticsnetworks.network.SetFilterEntryTagPayload;
+import me.almana.logisticsnetworks.network.SetFilterFluidEntryPayload;
+import me.almana.logisticsnetworks.network.SetFilterItemEntryPayload;
+import me.almana.logisticsnetworks.network.SetNameFilterPayload;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.ChatFormatting;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.InventoryMenu;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
-import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidUtil;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     // Layout Constants
     private static final int GUI_WIDTH = 176;
     private static final int FILTER_SLOT_SIZE = 18;
+    private static final int BACK_BUTTON_W = 18;
+    private static final int BACK_BUTTON_H = 12;
 
     // Control Constants
-    private static final int LIST_ROW_H = 12;
+    private static final int LIST_ROW_H = 10;
     private static final int DROPDOWN_ROWS = 6;
     private static final int SUBMODE_SCROLLBAR_W = 6;
     private static final int SUBMODE_SCROLLBAR_GAP = 2;
@@ -74,18 +90,69 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private static final int COL_BTN_HOVER = 0xFF3A3A3A;
     private static final int COL_BTN_BORDER = 0xFF4A4A4A;
 
-    // State
+    private static final ResourceLocation COPY_ICON = ResourceLocation.fromNamespaceAndPath(
+            Logisticsnetworks.MOD_ID, "textures/gui/filter_copy.png");
+    private static final ResourceLocation PASTE_ICON = ResourceLocation.fromNamespaceAndPath(
+            Logisticsnetworks.MOD_ID, "textures/gui/filter_paste.png");
+    private static final ResourceLocation SCAN_STORAGE_ICON = ResourceLocation.fromNamespaceAndPath(
+            Logisticsnetworks.MOD_ID, "textures/gui/filter_scan_storage.png");
+    private static final ResourceLocation RESOURCE_ROTATION_ICON = ResourceLocation.fromNamespaceAndPath(
+            Logisticsnetworks.MOD_ID, "textures/gui/filter_resource_rotation.png");
+    private static final int CLIPBOARD_BUTTON_SIZE = 12;
+    private static final int CLIPBOARD_BUTTON_GAP = 2;
+    private static FilterClipboardSnapshot copiedFilter;
+
+    private record FilterClipboardSnapshot(
+            boolean modMode,
+            boolean nameMode,
+            boolean blacklist,
+            FilterTargetType targetType,
+            String selectedMod,
+            String nameFilter,
+            NameMatchScope nameScope,
+            List<FilterEntrySnapshot> entries,
+            int sourceSlots) {
+    }
+
+    private record FilterEntrySnapshot(
+            ItemStack item,
+            FluidStack fluid,
+            String chemicalId,
+            String tag,
+            int batch,
+            int stock,
+            String slotExpression,
+            String durabilityOp,
+            int durabilityValue,
+            Boolean enchanted,
+            String rawNbt,
+            boolean strictNbt,
+            boolean nbtMatchAny,
+            List<NbtCriterion> nbtRules) {
+    }
+
     private EditBox manualInputBox;
     private boolean isDropdownOpen = false;
     private int listScrollOffset = 0;
-    private boolean slotInfoOpen = false;
-    private int slotInfoPage = 0;
     private boolean amountInfoOpen = false;
     private int amountInfoPage = 0;
-    private boolean flushedTextOnClose = false;
+    private boolean flushedEditorsOnExit = false;
     private boolean wasManualInputFocused = false;
 
-    // Detail page state
+    private int tagEditSlot = -1;
+    private int nbtEditSlot = -1;
+    private List<String> cachedSlotTags = new ArrayList<>();
+    private List<NbtFilterData.NbtEntry> cachedSlotNbtEntries = new ArrayList<>();
+    private List<String> cachedSlotNbtPathLabels = List.of();
+    private int subModeScrollOffset = 0;
+    private boolean subModeDropdownOpen = false;
+    private String nbtPendingOperator = "=";
+    private EditBox tagInputBox;
+
+    private int nbtListScrollOffset = 0;
+    private int nbtEditingRuleIndex = -1;
+    private EditBox nbtValueEditBox;
+
     private int detailEditSlot = -1;
     private List<String> detailCachedTags = new ArrayList<>();
     private List<String> detailAllTags = new ArrayList<>();
@@ -96,25 +163,21 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private int detailTagScrollOffset = 0;
     private boolean detailNbtRawMode = false;
     private boolean detailNbtPageOpen = false;
+    private FilterTagPicker detailTagPicker;
     private int detailNbtScrollOffset = 0;
     private int detailNbtSelectedIdx = -1;
     private String detailNbtOp = "=";
-    private Map<String, String> detailNbtActiveOps = new HashMap<>();
+    private Map<NbtPath, String> detailNbtActiveOps = new HashMap<>();
     private int nbtTableEditingRow = -1;
-    private boolean detailItemEnchanted = false;
-    private boolean detailEnchantedEnabled = false;
     private List<ItemStack> nbtOnlyCycleItems;
-    private int detailItemDurability = -1;
-    private int detailItemMaxDurability = -1;
-    private int detailItemStackSize = 1;
+    private List<Fluid> anyCycleFluids;
+    private List<String> anyCycleChemicals;
     private EditBox detailNbtValueBox;
     private EditBox detailIdInputBox;
     private EditBox detailBatchInputBox;
     private EditBox detailStockInputBox;
     private EditBox detailSlotMappingInputBox;
-    private EditBox detailDurabilityValueBox;
     private MultiLineEditBox detailNbtInputBox;
-    private String detailDurabilityOp = null;
     private int savedImageHeight = -1;
     private int savedTopPos = -1;
     private int savedImageWidth = -1;
@@ -130,50 +193,22 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private static final int NBT_COL_VAL = 140;
     private static final int NBT_COL_OP_GAP = 24;
     private static final int NBT_ROW_H = 14;
-    private static final int NBT_BUILTIN_ROWS = 3;
-    private static final int NBT_EDIT_DURABILITY = -10;
-    private static final int NBT_EDIT_ENCHANTED = -11;
-    private static final int NBT_EDIT_STACK_SIZE = -12;
-    private static final int NBT_MIN_GROUP_PREFIX = 10;
     private static final int NBT_HEADING_COLOR = 0xFF88AACC;
+    private static final int DETAIL_SECTION_H = 22;
+    private static final int DETAIL_TAG_COLOR = 0xFF44BB44;
+    private static final int DETAIL_NBT_COLOR = 0xFFFFAA00;
+    private static final int DETAIL_DUR_COLOR = 0xFF55BBFF;
+    private static final int DETAIL_SLOT_COLOR = 0xFFBB88FF;
 
     private record NbtRow(boolean heading, String display, int entryIdx, String group) {}
     private List<NbtRow> nbtRows = new ArrayList<>();
     private Set<String> nbtCollapsedGroups = new HashSet<>();
 
-    private static final int NBT_INDICATOR_W = 8;
-    private static final int NBT_OP_BTN_W = 18;
-
-    private static final Map<String, String> PATH_ABBREV = Map.of(
-            "enchantments", "ench",
-            "stored_enchantments", "stored",
-            "potion_contents", "potion",
-            "custom_data", "data",
-            "attribute_modifiers", "attr"
-    );
-
-    // Legacy sub-mode compat
-    private int tagEditSlot = -1;
-    private int nbtEditSlot = -1;
-    private List<String> cachedSlotTags = new ArrayList<>();
-    private List<NbtFilterData.NbtEntry> cachedSlotNbtEntries = new ArrayList<>();
-    private int subModeScrollOffset = 0;
-    private boolean subModeDropdownOpen = false;
-    private String nbtPendingOperator = "=";
-    private EditBox tagInputBox;
-
-    // NBT sub-mode state
-    private int nbtListScrollOffset = 0;
-    private int nbtEditingRuleIndex = -1;
-    private EditBox nbtValueEditBox;
-
-    // Cached Data
     private List<String> cachedTags = new ArrayList<>();
     private List<String> cachedMods = new ArrayList<>();
     private ItemStack lastExtractorItem = ItemStack.EMPTY;
     private FilterTargetType lastTargetType = null;
 
-    // Animation
     private int textTick = 0;
     private String currentSlotExpr;
     private Component selectorGhostChemicalName = null;
@@ -193,6 +228,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         this.leftPos = (this.width - GUI_WIDTH) / 2;
         this.topPos = (this.height - imageHeight) / 2;
 
+        if (detailTagPicker != null) {
+            addRenderableWidget(manualInputBox);
+            if (savedImageWidth > 0) savedLeftPos = (width - savedImageWidth) / 2;
+            if (savedImageHeight > 0) savedTopPos = (height - savedImageHeight) / 2;
+            return;
+        }
         setupInputBox();
         refreshFilterData();
     }
@@ -227,13 +268,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailIdInputBox.setHint(Component.literal("Item or #tag"));
 
         detailBatchInputBox = new EditBox(font, leftPos + 12, topPos + 50, 50, 14, Component.empty());
-        detailBatchInputBox.setMaxLength(10);
+        detailBatchInputBox.setMaxLength(32);
         detailBatchInputBox.setVisible(false);
         detailBatchInputBox.setBordered(true);
         detailBatchInputBox.setTextColor(COL_WHITE);
 
         detailStockInputBox = new EditBox(font, leftPos + 12, topPos + 66, 50, 14, Component.empty());
-        detailStockInputBox.setMaxLength(10);
+        detailStockInputBox.setMaxLength(32);
         detailStockInputBox.setVisible(false);
         detailStockInputBox.setBordered(true);
         detailStockInputBox.setTextColor(COL_WHITE);
@@ -243,12 +284,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailSlotMappingInputBox.setVisible(false);
         detailSlotMappingInputBox.setBordered(true);
         detailSlotMappingInputBox.setTextColor(COL_WHITE);
-
-        detailDurabilityValueBox = new EditBox(font, leftPos + 12, topPos + 50, 40, 14, Component.empty());
-        detailDurabilityValueBox.setMaxLength(5);
-        detailDurabilityValueBox.setVisible(false);
-        detailDurabilityValueBox.setBordered(true);
-        detailDurabilityValueBox.setTextColor(COL_WHITE);
 
         detailNbtValueBox = new EditBox(font, leftPos + 12, topPos + 50, 80, 14, Component.empty());
         detailNbtValueBox.setMaxLength(256);
@@ -271,26 +306,24 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         refreshFilterData();
 
-        if (menu.isTagMode() || menu.isModMode()) {
+        if (menu.isModMode()) {
+            manualInputBox.setMaxLength(256);
             manualInputBox.setVisible(true);
-            manualInputBox.setHint(Component.translatable(menu.isTagMode()
-                    ? "gui.logisticsnetworks.filter.tag.input_full_hint"
-                    : "gui.logisticsnetworks.filter.mod.input_full_hint"));
             manualInputBox.setX(getSelectorInputX());
             manualInputBox.setY(getSelectorInputY());
             manualInputBox.setWidth(getSelectorInputWidth());
+            manualInputBox.setHint(fitHint(
+                    Component.translatable("gui.logisticsnetworks.filter.mod.input_full_hint"),
+                    getSelectorInputWidth()));
             if (!manualInputBox.isFocused() && !manualInputBox.getValue().equals(getCurrentTargetValue())) {
                 manualInputBox.setValue(getCurrentTargetValue());
             }
         } else if (menu.isNameMode()) {
+            manualInputBox.setMaxLength(NameFilterData.MAX_EXPRESSION_LENGTH);
             manualInputBox.setVisible(true);
-            manualInputBox.setHint(Component.translatable("gui.logisticsnetworks.filter.name.input_hint"));
-            if (!manualInputBox.isFocused() && !manualInputBox.getValue().equals(getCurrentTargetValue())) {
-                manualInputBox.setValue(getCurrentTargetValue());
-            }
-        } else if (menu.isSlotMode()) {
-            manualInputBox.setVisible(true);
-            manualInputBox.setHint(Component.translatable("gui.logisticsnetworks.filter.slot.input_hint"));
+            manualInputBox.setHint(fitHint(
+                    Component.translatable("gui.logisticsnetworks.filter.name.input_hint"),
+                    imageWidth - 16));
             if (!manualInputBox.isFocused() && !manualInputBox.getValue().equals(getCurrentTargetValue())) {
                 manualInputBox.setValue(getCurrentTargetValue());
             }
@@ -301,14 +334,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
         }
 
-        if (!menu.isSlotMode()) {
-            slotInfoOpen = false;
-            slotInfoPage = 0;
-        }
-        if (!menu.isAmountMode()) {
-            amountInfoOpen = false;
-            amountInfoPage = 0;
-        }
+        amountInfoOpen = false;
+        amountInfoPage = 0;
 
         if (detailEditSlot >= 0 && detailIdInputBox != null) {
             String currentFilter = detailIdInputBox.getValue().trim().toLowerCase();
@@ -320,7 +347,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (manualInputBox != null) {
             if (wasManualInputFocused && !manualInputBox.isFocused()) {
-                commitManualInput();
+                if (!commitManualInput()) {
+                    manualInputBox.setFocused(true);
+                    setFocused(manualInputBox);
+                }
             }
             wasManualInputFocused = manualInputBox.isFocused();
         }
@@ -333,8 +363,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return Objects.requireNonNullElse(menu.getSelectedMod(), "");
         if (menu.isNameMode())
             return Objects.requireNonNullElse(menu.getNameFilter(), "");
-        if (menu.isSlotMode())
-            return Objects.requireNonNullElse(menu.getSlotExpression(), "");
         return "";
     }
 
@@ -366,7 +394,14 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                             cachedTags.addAll(chemTags);
                         }
                     } else {
-                        extractor.getTags().forEach(t -> cachedTags.add(t.location().toString()));
+                        var item = extractor.getItem();
+                        BuiltInRegistries.ITEM.getTagNames().forEach(tagKey -> {
+                            var holders = BuiltInRegistries.ITEM.getTag(tagKey);
+                            if (holders.isPresent()
+                                    && holders.get().stream().anyMatch(h -> h.value() == item)) {
+                                cachedTags.add(tagKey.location().toString());
+                            }
+                        });
                     }
                 } else if (selectorGhostChemicalTags != null) {
                     cachedTags.addAll(selectorGhostChemicalTags);
@@ -404,29 +439,41 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
+        if (detailTagPicker != null) {
+            renderBackground(g);
+            detailTagPicker.render(g, mx, my, pt, width, height);
+            return;
+        }
         if (detailEditSlot >= 0) {
             this.renderBackground(g);
             this.renderBg(g, pt, mx, my);
             renderDetailPage(g, mx, my);
             return;
         } else if (tagEditSlot >= 0 || nbtEditSlot >= 0) {
+            renderBackground(g);
             super.render(g, -1, -1, pt);
         } else {
+            renderBackground(g);
             super.render(g, mx, my, pt);
         }
 
         renderEntryIndicatorOverlays(g);
 
+        if (tagEditSlot >= 0) {
+            renderTagSubMode(g, mx, my);
+        } else if (nbtEditSlot >= 0) {
+            renderNbtSubMode(g, mx, my);
+        }
+
         boolean hoverSpecialFilter = (menu.isTagMode() || menu.isModMode())
                 && this.hoveredSlot != null && this.hoveredSlot.index < menu.getFilterSlots();
 
-        if (menu.isTagMode())
-            renderTagTooltip(g, mx, my);
-        else if (menu.isModMode())
-            renderModTooltip(g, mx, my);
-        else if (menu.getTargetType() == FilterTargetType.FLUIDS || menu.getTargetType() == FilterTargetType.CHEMICALS) {
-            renderFluidTooltip(g, mx, my);
+        if (renderClipboardTooltip(g, mx, my)) {
+            return;
         }
+
+        if (menu.isModMode())
+            renderModTooltip(g, mx, my);
 
         if (!menu.isTagMode() && !menu.isModMode()
                 && tagEditSlot < 0 && nbtEditSlot < 0 && detailEditSlot < 0
@@ -435,7 +482,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             ItemStack openedStack = menu.getOpenedStack();
             List<Component> lines = buildFilterEntryTooltip(idx, openedStack);
             if (!lines.isEmpty()) {
-                g.renderComponentTooltip(font, lines, mx, my);
+                g.renderTooltip(font, lines, Optional.empty(), mx, my);
                 hoverSpecialFilter = true;
             }
         }
@@ -449,14 +496,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     protected void renderBg(GuiGraphics g, float pt, int mx, int my) {
         renderPanel(g, leftPos, topPos, imageWidth, imageHeight);
 
-        g.drawString(font, title, leftPos + 8, topPos + 6, COL_ACCENT, false);
+        int titleX = leftPos + 8;
+        if (menu.isBoundFilter()) {
+            drawButton(g, backButtonX(), backButtonY(), BACK_BUTTON_W, BACK_BUTTON_H, "<", mx, my, true);
+            titleX += BACK_BUTTON_W + 4;
+        }
+        g.drawString(font, filterTitle(), titleX, topPos + 6, COL_ACCENT, false);
+        renderClipboardButtons(g, mx, my);
 
-        if (menu.isTagMode())
-            renderTagMode(g, mx, my);
-        else if (menu.isModMode())
+        if (menu.isModMode())
             renderModMode(g, mx, my);
-        else if (menu.isSlotMode())
-            renderSlotMode(g, mx, my);
         else if (menu.isAmountMode())
             renderAmountMode(g, mx, my);
         else if (menu.isDurabilityMode())
@@ -468,20 +517,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         int playerInvY = menu.getPlayerInventoryY();
         int sepY = topPos + playerInvY - 12;
-
-        if (!menu.isTagMode() && !menu.isModMode() && !menu.isSlotMode() && !menu.isAmountMode()
-                && !menu.isDurabilityMode() && !menu.isNameMode()
-                && detailEditSlot < 0 && tagEditSlot < 0 && nbtEditSlot < 0) {
-            Component hint = Component.translatable("gui.logisticsnetworks.filter.hint.ctrl_click");
-            float scale = 0.75f;
-            int hintW = (int)(font.width(hint) * scale);
-            g.pose().pushPose();
-            g.pose().translate(leftPos + (imageWidth - hintW) / 2f, sepY - 10, 0);
-            g.pose().scale(scale, scale, 1f);
-            g.drawString(font, hint, 0, 0, 0xFF666666, false);
-            g.pose().popPose();
-        }
-
         g.fill(leftPos + 8, sepY, leftPos + imageWidth - 8, sepY + 1, COL_BORDER);
         g.drawString(font, playerInventoryTitle, leftPos + 8, topPos + playerInvY - 10, COL_GRAY, false);
 
@@ -493,9 +528,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void renderStandardFilterGrid(GuiGraphics g, int mx, int my) {
-        if (detailEditSlot >= 0) {
-            return;
-        }
+        if (detailEditSlot >= 0) return;
 
         for (int i = 0; i < menu.getFilterSlots() && i < menu.slots.size(); i++) {
             var slot = menu.slots.get(i);
@@ -513,7 +546,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                         FilterTargetType targetType = menu.getTargetType();
                         if (targetType == FilterTargetType.FLUIDS) {
                             TagKey<Fluid> fluidTagKey = TagKey.create(Registries.FLUID, tagId);
-                            var list = new java.util.ArrayList<Fluid>();
+                            var list = new ArrayList<Fluid>();
                             for (Fluid fluid : BuiltInRegistries.FLUID) {
                                 if (fluid.builtInRegistryHolder().is(fluidTagKey)) {
                                     list.add(fluid);
@@ -522,7 +555,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                             if (!list.isEmpty()) {
                                 long tick = (System.currentTimeMillis() / 1000);
                                 int idx = (int) (tick % list.size());
-                                renderFluidStack(g, new FluidStack(list.get(idx), 1000), sx + 1, sy + 1);
+                                FilterResourceRenderer.renderFluid(g,
+                                        new FluidStack(list.get(idx), 1000), sx + 1, sy + 1);
                             }
                         } else if (targetType == FilterTargetType.CHEMICALS) {
                             g.drawString(font, "#", sx + 5, sy + 5, 0xFF44BB44, true);
@@ -545,21 +579,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     || isAnyItemSlot(i)) {
                 drawSlot(g, sx, sy);
                 g.renderOutline(sx, sy, 18, 18, 0xFF44BB44);
-                if (nbtOnlyCycleItems == null) {
-                    nbtOnlyCycleItems = BuiltInRegistries.ITEM.stream()
-                            .map(ItemStack::new)
-                            .filter(s -> !s.isEmpty())
-                            .toList();
-                }
-                if (!nbtOnlyCycleItems.isEmpty()) {
-                    long tick = (System.currentTimeMillis() / 1000);
-                    int idx = (int) (tick % nbtOnlyCycleItems.size());
-                    g.renderItem(nbtOnlyCycleItems.get(idx), sx + 1, sy + 1);
-                }
+                renderAnyResource(g, sx + 1, sy + 1);
             } else {
                 drawSlot(g, sx, sy);
             }
-
         }
 
         if (menu.getTargetType() == FilterTargetType.FLUIDS) {
@@ -568,13 +591,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             renderChemicalGhostItems(g);
         }
 
-        renderModeControls(g, mx, my, true);
-
-        if (tagEditSlot >= 0) {
-            renderTagSubMode(g, mx, my);
-        } else if (nbtEditSlot >= 0) {
-            renderNbtSubMode(g, mx, my);
-        }
+        renderModeControls(g, mx, my, !menu.isBoundFilter());
     }
 
     private void renderEntryIndicatorOverlays(GuiGraphics g) {
@@ -613,6 +630,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 g.drawString(font, "E", bx, by, 0xFFDD88FF, true);
                 g.pose().popPose();
             }
+
+            if (FilterItemData.hasEntrySlotMapping(openedStack, i)) {
+                g.pose().pushPose();
+                g.pose().translate(0, 0, 300);
+                g.pose().scale(0.5f, 0.5f, 1.0f);
+                int bx = (int) ((sx + 12) / 0.5f);
+                int by = (int) ((sy + 12) / 0.5f);
+                g.drawString(font, "S", bx, by, 0xFFAA88FF, true);
+                g.pose().popPose();
+            }
         }
     }
 
@@ -623,12 +650,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return amount + "mB";
     }
 
-    private void renderTagMode(GuiGraphics g, int mx, int my) {
-        renderModeControls(g, mx, my, true);
-        renderDropdownMode(g, mx, my, cachedTags,
-                menu.getSelectedTag(),
-                Component.translatable("gui.logisticsnetworks.filter.tag.input_full_hint"));
-    }
 
     private void renderModMode(GuiGraphics g, int mx, int my) {
         renderModeControls(g, mx, my, false);
@@ -649,7 +670,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         g.drawString(font, Component.translatable("gui.logisticsnetworks.filter.selector.selected", displayValue),
                 leftPos + 8, topPos + 22, COL_GRAY, false);
 
-        manualInputBox.setHint(hint);
+        manualInputBox.setHint(fitHint(hint, w));
 
         boolean hoveringDropdown = isHovering(x, y, w, 14, mx, my);
         g.renderOutline(x, y, w, 14, (hoveringDropdown || isDropdownOpen) ? COL_WHITE : COL_BORDER);
@@ -669,9 +690,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int visibleRows = Math.min(items.size(), DROPDOWN_ROWS);
         int listH = visibleRows * LIST_ROW_H;
 
+        // Clamp scroll offset
         int maxScroll = Math.max(0, items.size() - DROPDOWN_ROWS);
         listScrollOffset = Math.max(0, Math.min(listScrollOffset, maxScroll));
 
+        // Background
         g.pose().pushPose();
         g.pose().translate(0, 0, 200);
         g.fill(x, y, x + w, y + listH, COL_BG);
@@ -697,137 +720,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         g.pose().popPose();
     }
 
-    private void renderSlotMode(GuiGraphics g, int mx, int my) {
-        int contentX = leftPos + 8;
-        int contentW = imageWidth - 16;
-        int inputY = topPos + 34;
-        int activeY = topPos + 52;
-        int hintY = topPos + 62;
-        int infoBtnX = leftPos + imageWidth - 8 - 12;
-        int infoBtnY = topPos + 6;
-        int infoBtnSize = 12;
-
-        drawButton(g, infoBtnX, infoBtnY, infoBtnSize, infoBtnSize,
-                Component.translatable("gui.logisticsnetworks.filter.info.icon").getString(), mx, my, true);
-
-        renderModeControls(g, mx, my, false);
-
-        manualInputBox.setX(contentX);
-        manualInputBox.setY(inputY);
-        manualInputBox.setWidth(contentW);
-
-        String value = menu.getSlotExpression();
-        String display = value.isEmpty()
-                ? Component.translatable("gui.logisticsnetworks.filter.slot.none").getString()
-                : value;
-        String activeLine = Component.translatable("gui.logisticsnetworks.filter.slot.active", display).getString();
-        g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, COL_ACCENT, false);
-
-        String hintLine = Component
-                .translatable("gui.logisticsnetworks.filter.slot.hint", SlotFilterData.MIN_SLOT,
-                        SlotFilterData.MAX_SLOT)
-                .getString();
-        g.drawString(font, font.plainSubstrByWidth(hintLine, contentW), contentX, hintY, COL_GRAY, false);
-
-        if (slotInfoOpen) {
-            renderSlotInfoOverlay(g, mx, my);
-        }
-    }
-
-    private void renderSlotInfoOverlay(GuiGraphics g, int mx, int my) {
-        int x = leftPos + 8;
-        int y = topPos + 16;
-        int w = imageWidth - 16;
-        int maxBottom = topPos + menu.getPlayerInventoryY() - 14;
-        int h = Math.max(68, maxBottom - y);
-        if (y + h > maxBottom) {
-            h = Math.max(40, maxBottom - y);
-        }
-        int pad = 4;
-
-        g.fill(x, y, x + w, y + h, 0xF0101010);
-        g.renderOutline(x, y, w, h, COL_BORDER);
-
-        String titleKey = slotInfoPage == 0
-                ? "gui.logisticsnetworks.filter.slot.info.export.title"
-                : "gui.logisticsnetworks.filter.slot.info.import.title";
-        g.drawString(font, Component.translatable(titleKey), x + pad, y + pad, COL_WHITE, false);
-
-        Component line1 = Component.translatable(slotInfoPage == 0
-                ? "gui.logisticsnetworks.filter.slot.info.export.p1"
-                : "gui.logisticsnetworks.filter.slot.info.import.p1");
-        Component line2 = Component.translatable(slotInfoPage == 0
-                ? "gui.logisticsnetworks.filter.slot.info.export.p2"
-                : "gui.logisticsnetworks.filter.slot.info.import.p2");
-
-        int navY = y + h - 16;
-        int textY = y + pad + 11;
-        int textW = w - pad * 2;
-        int maxTextBottom = navY - 2;
-        for (var part : font.split(line1, textW)) {
-            if (textY + 8 > maxTextBottom) {
-                break;
-            }
-            g.drawString(font, part, x + pad, textY, COL_GRAY, false);
-            textY += 9;
-        }
-        for (var part : font.split(line2, textW)) {
-            if (textY + 8 > maxTextBottom) {
-                break;
-            }
-            g.drawString(font, part, x + pad, textY, COL_GRAY, false);
-            textY += 9;
-        }
-
-        int prevX = x + w - 40;
-        int nextX = x + w - 22;
-        drawButton(g, prevX, navY, 14, 12, "<", mx, my, slotInfoPage > 0);
-        drawButton(g, nextX, navY, 14, 12, ">", mx, my, slotInfoPage < 1);
-    }
-
     private void renderAmountMode(GuiGraphics g, int mx, int my) {
-        int cx = leftPos + GUI_WIDTH / 2;
-        int cy = topPos + 50;
-        int infoBtnX = leftPos + imageWidth - 8 - 12;
-        int infoBtnY = topPos + 6;
-        int infoBtnSize = 12;
-        boolean isFluid = menu.getTargetType() == FilterTargetType.FLUIDS;
-        boolean isChemical = menu.getTargetType() == FilterTargetType.CHEMICALS;
-        boolean isMb = isFluid || isChemical;
-
-        drawButton(g, infoBtnX, infoBtnY, infoBtnSize, infoBtnSize,
-                Component.translatable("gui.logisticsnetworks.filter.info.icon").getString(), mx, my, true);
-
-        renderModeControls(g, mx, my, true);
-
-        g.drawCenteredString(font, Component.translatable("gui.logisticsnetworks.filter.amount.threshold"), cx,
-                topPos + 34, COL_WHITE);
-
-        String valueText = isMb ? menu.getAmount() + " mB" : String.valueOf(menu.getAmount());
-        g.fill(cx - 35, cy - 2, cx + 35, cy + 10, COL_BTN_BG);
-        g.renderOutline(cx - 35, cy - 2, 70, 12, COL_BORDER);
-        g.drawCenteredString(font, valueText, cx, cy, COL_ACCENT);
-
-        int btnY = cy + 15;
-        if (isMb) {
-            String[] negLabels = { "-1000", "-500", "-100" };
-            String[] posLabels = { "+1000", "+500", "+100" };
-            int[] negCenters = rowBtnCenters(negLabels);
-            int[] posCenters = rowBtnCenters(posLabels);
-            for (int i = 0; i < 3; i++)
-                drawAmountButton(g, negCenters[i], btnY, negLabels[i], mx, my);
-            for (int i = 0; i < 3; i++)
-                drawAmountButton(g, posCenters[i], btnY + 18, posLabels[i], mx, my);
-        } else {
-            String[] labels = { "-64", "-10", "-1", "+1", "+10", "+64" };
-            int[] centers = amountBtnCenters(labels);
-            for (int i = 0; i < 6; i++)
-                drawAmountButton(g, centers[i], btnY, labels[i], mx, my);
-        }
-
-        if (amountInfoOpen) {
-            renderAmountInfoOverlay(g, mx, my);
-        }
     }
 
     private void renderAmountInfoOverlay(GuiGraphics g, int mx, int my) {
@@ -841,6 +734,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
         int pad = 4;
 
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 300);
         g.fill(x, y, x + w, y + h, 0xF0101010);
         g.renderOutline(x, y, w, h, COL_BORDER);
 
@@ -871,6 +766,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int nextX = x + w - 22;
         drawButton(g, prevX, navY, 14, 12, "<", mx, my, amountInfoPage > 0);
         drawButton(g, nextX, navY, 14, 12, ">", mx, my, amountInfoPage < 1);
+
+        g.pose().popPose();
     }
 
     private int drawWrappedInfoLine(GuiGraphics g, Component line, int x, int y, int width, int maxBottom) {
@@ -886,25 +783,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void renderDurabilityMode(GuiGraphics g, int mx, int my) {
-        int cx = leftPos + GUI_WIDTH / 2;
-        int cy = topPos + 40;
-
-        renderModeControls(g, mx, my, true);
-
-        g.drawCenteredString(font, Component.translatable("gui.logisticsnetworks.filter.durability.limit"), cx,
-                topPos + 20, COL_WHITE);
-
-        DurabilityFilterData.Operator op = menu.getDurabilityOperator();
-        drawButton(g, cx - 50, cy, 20, 12, op.symbol(), mx, my, true);
-        g.drawString(font, String.valueOf(menu.getDurabilityValue()), cx - 20, cy + 2, COL_ACCENT, false);
-
-        int btnY = cy + 20;
-        drawAmountButton(g, cx - 70, btnY, "-64", mx, my);
-        drawAmountButton(g, cx - 44, btnY, "-10", mx, my);
-        drawAmountButton(g, cx - 18, btnY, "-1", mx, my);
-        drawAmountButton(g, cx + 18, btnY, "+1", mx, my);
-        drawAmountButton(g, cx + 44, btnY, "+10", mx, my);
-        drawAmountButton(g, cx + 70, btnY, "+64", mx, my);
     }
 
     private int[] amountBtnCenters(String[] labels) {
@@ -1014,30 +892,46 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 var slot = menu.slots.get(i);
                 int x = leftPos + slot.x;
                 int y = topPos + slot.y;
-                renderFluidStack(g, fs, x, y);
+                FilterResourceRenderer.renderFluid(g, fs, x, y);
             }
         }
     }
 
-    private void renderFluidStack(GuiGraphics g, FluidStack stack, int x, int y) {
-        IClientFluidTypeExtensions clientFluid = IClientFluidTypeExtensions.of(stack.getFluid());
-        ResourceLocation stillTex = clientFluid.getStillTexture(stack);
-        if (stillTex == null)
-            return;
-
-        TextureAtlasSprite sprite = Minecraft.getInstance().getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(stillTex);
-        int color = clientFluid.getTintColor(stack);
-
-        float r = ((color >> 16) & 0xFF) / 255f;
-        float gr = ((color >> 8) & 0xFF) / 255f;
-        float b = (color & 0xFF) / 255f;
-
-        RenderSystem.setShaderTexture(0, InventoryMenu.BLOCK_ATLAS);
-        RenderSystem.enableBlend();
-        RenderSystem.setShaderColor(r, gr, b, 1.0f);
-        g.blit(x, y, 0, 16, 16, sprite);
-        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-        RenderSystem.disableBlend();
+    private void renderAnyResource(GuiGraphics g, int x, int y) {
+        long tick = System.currentTimeMillis() / 1000;
+        switch (menu.getTargetType()) {
+            case FLUIDS -> {
+                if (anyCycleFluids == null) {
+                    anyCycleFluids = BuiltInRegistries.FLUID.stream()
+                            .filter(f -> f != Fluids.EMPTY && f.isSource(f.defaultFluidState()))
+                            .toList();
+                }
+                if (!anyCycleFluids.isEmpty()) {
+                    Fluid fluid = anyCycleFluids.get((int) (tick % anyCycleFluids.size()));
+                    FilterResourceRenderer.renderFluid(g, new FluidStack(fluid, 1000), x, y);
+                }
+            }
+            case CHEMICALS -> {
+                if (anyCycleChemicals == null) {
+                    anyCycleChemicals = MekanismCompat.getAllChemicalIds();
+                }
+                if (!anyCycleChemicals.isEmpty()) {
+                    String id = anyCycleChemicals.get((int) (tick % anyCycleChemicals.size()));
+                    FilterResourceRenderer.renderChemical(g, id, x, y);
+                }
+            }
+            default -> {
+                if (nbtOnlyCycleItems == null) {
+                    nbtOnlyCycleItems = BuiltInRegistries.ITEM.stream()
+                            .map(ItemStack::new)
+                            .filter(s -> !s.isEmpty())
+                            .toList();
+                }
+                if (!nbtOnlyCycleItems.isEmpty()) {
+                    g.renderItem(nbtOnlyCycleItems.get((int) (tick % nbtOnlyCycleItems.size())), x, y);
+                }
+            }
+        }
     }
 
     private void renderChemicalGhostItems(GuiGraphics g) {
@@ -1047,29 +941,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 var slot = menu.slots.get(i);
                 int x = leftPos + slot.x;
                 int y = topPos + slot.y;
-                renderChemicalStack(g, chemId, x, y);
+                FilterResourceRenderer.renderChemical(g, chemId, x, y);
             }
         }
-    }
-
-    private void renderChemicalStack(GuiGraphics g, String chemId, int x, int y) {
-        ResourceLocation iconPath = MekanismCompat.getChemicalIcon(chemId);
-        if (iconPath == null)
-            return;
-
-        TextureAtlasSprite sprite = Minecraft.getInstance().getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(iconPath);
-        int color = MekanismCompat.getChemicalTint(chemId);
-
-        float r = ((color >> 16) & 0xFF) / 255f;
-        float gr = ((color >> 8) & 0xFF) / 255f;
-        float b = (color & 0xFF) / 255f;
-
-        RenderSystem.setShaderTexture(0, InventoryMenu.BLOCK_ATLAS);
-        RenderSystem.enableBlend();
-        RenderSystem.setShaderColor(r, gr, b, 1.0f);
-        g.blit(x, y, 0, 16, 16, sprite);
-        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-        RenderSystem.disableBlend();
     }
 
     private String scrollText(String text, int width, int offset) {
@@ -1086,69 +960,594 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return mx >= x && mx < x + w && my >= y && my < y + h;
     }
 
+    private void renderClipboardButtons(GuiGraphics g, int mx, int my) {
+        if (menu.canSetResourceRoundRobin()) {
+            drawIconButton(g, resourceRotationButtonX(), clipboardButtonY(), RESOURCE_ROTATION_ICON, mx, my,
+                    true, menu.isResourceRoundRobin());
+        }
+        drawIconButton(g, scanStorageButtonX(), clipboardButtonY(), SCAN_STORAGE_ICON, mx, my,
+                menu.canScanAttachedStorage(), false);
+        drawIconButton(g, copyButtonX(), clipboardButtonY(), COPY_ICON, mx, my, true, false);
+        drawIconButton(g, pasteButtonX(), clipboardButtonY(), PASTE_ICON, mx, my, copiedFilter != null, false);
+    }
+
+    private void drawIconButton(GuiGraphics g, int x, int y, ResourceLocation icon, int mx, int my,
+            boolean active, boolean selected) {
+        boolean hovered = active && isHovering(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my);
+        g.fill(x, y, x + CLIPBOARD_BUTTON_SIZE, y + CLIPBOARD_BUTTON_SIZE,
+                selected ? COL_SELECTED : hovered ? COL_BTN_HOVER : COL_BTN_BG);
+        g.renderOutline(x, y, CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
+                selected ? COL_ACCENT : hovered ? COL_WHITE : COL_BTN_BORDER);
+        g.blit(icon, x + 2, y + 2, 0, 0, 8, 8, 8, 8);
+    }
+
+    private int copyButtonX() {
+        return pasteButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
+    }
+
+    private int scanStorageButtonX() {
+        return copyButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
+    }
+
+    private int resourceRotationButtonX() {
+        return scanStorageButtonX() - CLIPBOARD_BUTTON_SIZE - CLIPBOARD_BUTTON_GAP;
+    }
+
+    private int pasteButtonX() {
+        return clipboardRightEdge() - CLIPBOARD_BUTTON_SIZE;
+    }
+
+    private int clipboardButtonY() {
+        return topPos + 6;
+    }
+
+    private int clipboardRightEdge() {
+        if (menu.isSpecialMode()) {
+            return leftPos + imageWidth - 8;
+        }
+
+        int rightEdge = leftPos + imageWidth - 8;
+        String modeLabel = menu.isBlacklistMode()
+                ? tr("gui.logisticsnetworks.filter.mode.blacklist")
+                : tr("gui.logisticsnetworks.filter.mode.whitelist");
+        int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
+        int left = rightEdge - modeBtnW;
+
+        if (!menu.isBoundFilter()) {
+            String typeLabel = menu.getTargetType() == FilterTargetType.CHEMICALS
+                    ? tr("gui.logisticsnetworks.filter.target.chemicals")
+                    : menu.getTargetType() == FilterTargetType.FLUIDS
+                            ? tr("gui.logisticsnetworks.filter.target.fluids")
+                            : tr("gui.logisticsnetworks.filter.target.items");
+            left -= Math.max(40, font.width(typeLabel) + 8) + 4;
+        }
+
+        return left - CLIPBOARD_BUTTON_GAP;
+    }
+
+    private boolean renderClipboardTooltip(GuiGraphics g, int mx, int my) {
+        if (menu.canSetResourceRoundRobin()
+                && isHovering(resourceRotationButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE,
+                        CLIPBOARD_BUTTON_SIZE, mx, my)) {
+            g.renderComponentTooltip(font, List.of(
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint"),
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint.operation"),
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint.blocked"),
+                    Component.translatable("gui.logisticsnetworks.node.resource_rotation.hint.settings")), mx, my);
+            return true;
+        }
+        if (isHovering(scanStorageButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
+                mx, my)) {
+            String key = menu.canScanAttachedStorage()
+                    ? "gui.logisticsnetworks.filter.scan_storage"
+                    : "gui.logisticsnetworks.filter.scan_storage.unavailable";
+            g.renderTooltip(font, Component.translatable(key), mx, my);
+            return true;
+        }
+        if (isHovering(copyButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my)) {
+            g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.copy"), mx, my);
+            return true;
+        }
+        if (isHovering(pasteButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE, mx, my)) {
+            String key = copiedFilter == null
+                    ? "gui.logisticsnetworks.filter.paste.empty"
+                    : "gui.logisticsnetworks.filter.paste";
+            g.renderTooltip(font, Component.translatable(key), mx, my);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleClipboardButtonClick(double mx, double my, int action) {
+        if (action != 0) {
+            return false;
+        }
+        if (menu.canSetResourceRoundRobin()
+                && isHovering(resourceRotationButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE,
+                        CLIPBOARD_BUTTON_SIZE, (int) mx, (int) my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 10);
+            }
+            return true;
+        }
+        if (isHovering(scanStorageButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
+                (int) mx, (int) my)) {
+            return scanAttachedStorage();
+        }
+        if (isHovering(copyButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
+                (int) mx, (int) my)) {
+            return copyOpenFilter();
+        }
+        if (isHovering(pasteButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
+                (int) mx, (int) my)) {
+            return pasteOpenFilter();
+        }
+        return false;
+    }
+
+    private boolean scanAttachedStorage() {
+        if (!menu.canScanAttachedStorage()) {
+            return true;
+        }
+        flushOpenEditors();
+        NetworkHandler.sendToServer(ScanAttachedStoragePayload.INSTANCE);
+        return true;
+    }
+
+    public void showScanResult(int added, boolean storageFound, boolean filterFull) {
+        if (!storageFound) {
+            showFilterMessage("message.logisticsnetworks.filter.scan_storage.unavailable");
+        } else if (filterFull) {
+            showFilterMessage("message.logisticsnetworks.filter.scan_storage.full", added);
+        } else if (added == 0) {
+            showFilterMessage("message.logisticsnetworks.filter.scan_storage.no_new_entries");
+        } else {
+            showFilterMessage("message.logisticsnetworks.filter.scan_storage.success", added);
+        }
+    }
+
+    private boolean handleClipboardShortcut(int key) {
+        if (!hasControlDown() || isTextInputFocused()) {
+            return false;
+        }
+        if (key == InputConstants.KEY_C) {
+            return copyOpenFilter();
+        }
+        if (key == InputConstants.KEY_V) {
+            return pasteOpenFilter();
+        }
+        return false;
+    }
+
+    private boolean isTextInputFocused() {
+        return manualInputBox != null && manualInputBox.isFocused()
+                || tagInputBox != null && tagInputBox.isFocused()
+                || nbtValueEditBox != null && nbtValueEditBox.isFocused()
+                || detailIdInputBox != null && detailIdInputBox.isFocused()
+                || detailBatchInputBox != null && detailBatchInputBox.isFocused()
+                || detailStockInputBox != null && detailStockInputBox.isFocused()
+                || detailSlotMappingInputBox != null && detailSlotMappingInputBox.isFocused()
+                || detailNbtValueBox != null && detailNbtValueBox.isFocused()
+                || detailNbtInputBox != null && detailNbtInputBox.isFocused();
+    }
+
+    private void flushOpenEditors() {
+        if (detailEditSlot >= 0) {
+            flushDetailPageInputs();
+        }
+        if (detailNbtPageOpen) {
+            flushNbtSubPage();
+        }
+        if (tagInputBox != null && tagInputBox.isFocused()) {
+            commitTagInput();
+        }
+        if (nbtValueEditBox != null && nbtValueEditBox.isFocused()) {
+            commitNbtValueEdit();
+        }
+        commitManualInput();
+    }
+
+    private void showFilterMessage(String key, Object... args) {
+        if (minecraft != null && minecraft.gui != null) {
+            minecraft.gui.setOverlayMessage(Component.translatable(key, args), false);
+        }
+    }
+
+    private boolean copyOpenFilter() {
+        flushOpenEditors();
+
+        if (menu.isModMode()) {
+            copiedFilter = new FilterClipboardSnapshot(true, false, menu.isBlacklistMode(), menu.getTargetType(),
+                    menu.getSelectedMod(), "", NameMatchScope.NAME, List.of(), 0);
+            showFilterMessage("message.logisticsnetworks.filter.copy.success");
+            return true;
+        }
+
+        if (menu.isNameMode()) {
+            copiedFilter = new FilterClipboardSnapshot(false, true, menu.isBlacklistMode(), menu.getTargetType(),
+                    null, menu.getNameFilter(), menu.getNameMatchScope(), List.of(), 0);
+            showFilterMessage("message.logisticsnetworks.filter.copy.success");
+            return true;
+        }
+
+        List<FilterEntrySnapshot> entries = new ArrayList<>();
+        ItemStack opened = menu.getOpenedStack();
+        for (int slot = 0; slot < menu.getFilterSlots(); slot++) {
+            entries.add(copyEntry(opened, slot));
+        }
+
+        if (entries.isEmpty()) {
+            showFilterMessage("message.logisticsnetworks.filter.copy.empty");
+            return true;
+        }
+
+        copiedFilter = new FilterClipboardSnapshot(false, false, menu.isBlacklistMode(), menu.getTargetType(),
+                null, "", NameMatchScope.NAME, entries, menu.getFilterSlots());
+        showFilterMessage("message.logisticsnetworks.filter.copy.success");
+        return true;
+    }
+
+    private FilterEntrySnapshot copyEntry(ItemStack opened, int slot) {
+        ItemStack item = slot < menu.slots.size() ? menu.slots.get(slot).getItem().copy() : ItemStack.EMPTY;
+        FluidStack fluid = menu.getFluidFilter(slot).copy();
+        String chemicalId = menu.getChemicalFilter(slot);
+        String tag = menu.getEntryTag(slot);
+        String slotExpression = menu.getEntrySlotMappingExpression(slot);
+        String durabilityOp = FilterItemData.getEntryDurabilityOp(opened, slot);
+        int durabilityValue = FilterItemData.getEntryDurabilityValue(opened, slot);
+        Boolean enchanted = FilterItemData.getEntryEnchanted(opened, slot);
+        String rawNbt = FilterItemData.getEntryNbtRaw(opened, slot);
+
+        return new FilterEntrySnapshot(item, fluid, chemicalId, tag, menu.getEntryBatch(slot), menu.getEntryStock(slot),
+                slotExpression, durabilityOp, durabilityValue, enchanted, rawNbt, menu.isEntryNbtStrict(slot),
+                menu.isSlotNbtMatchAny(slot), menu.getSlotNbtRules(slot));
+    }
+
+    private boolean pasteOpenFilter() {
+        flushOpenEditors();
+
+        if (copiedFilter == null) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.empty");
+            return true;
+        }
+        if (menu.isBoundFilter() && copiedFilter.targetType() != menu.getTargetType()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
+
+        if (menu.isModMode()) {
+            return pasteModFilter();
+        }
+
+        if (menu.isNameMode()) {
+            return pasteNameFilter();
+        }
+
+        if (copiedFilter.modMode() || copiedFilter.nameMode()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
+
+        pasteStandardFilter();
+        return true;
+    }
+
+    private boolean pasteModFilter() {
+        if (!copiedFilter.modMode()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
+        syncHeaderModes(copiedFilter.blacklist(), copiedFilter.targetType());
+        String current = menu.getSelectedMod();
+        if (current != null && !current.isBlank()) {
+            sendModRemove(current);
+        }
+        if (copiedFilter.selectedMod() != null && !copiedFilter.selectedMod().isBlank()) {
+            sendModUpdate(copiedFilter.selectedMod());
+            manualInputBox.setValue(copiedFilter.selectedMod());
+        } else {
+            manualInputBox.setValue("");
+        }
+        showFilterMessage("message.logisticsnetworks.filter.paste.success");
+        return true;
+    }
+
+    private boolean pasteNameFilter() {
+        if (!copiedFilter.nameMode()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
+            return true;
+        }
+        syncHeaderModes(copiedFilter.blacklist(), copiedFilter.targetType());
+        sendNameUpdate(copiedFilter.nameFilter());
+        menu.setNameFilter(copiedFilter.nameFilter());
+        manualInputBox.setValue(copiedFilter.nameFilter());
+        syncNameScope(copiedFilter.nameScope());
+        showFilterMessage("message.logisticsnetworks.filter.paste.success");
+        return true;
+    }
+
+    private void pasteStandardFilter() {
+        syncHeaderModes(copiedFilter.blacklist(), copiedFilter.targetType());
+
+        int copied = Math.min(menu.getFilterSlots(), copiedFilter.entries().size());
+        for (int slot = 0; slot < menu.getFilterSlots(); slot++) {
+            clearFilterEntry(slot);
+            NetworkHandler.sendToServer(new SetFilterEntryTagPayload(slot, ""));
+            NetworkHandler.sendToServer(SetFilterEntryNbtPayload.clear(slot));
+            NetworkHandler.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
+            NetworkHandler.sendToServer(new SetFilterEntryEnchantedPayload(slot, false, false));
+            NetworkHandler.sendToServer(new SetFilterEntrySlotMappingPayload(slot, ""));
+            NetworkHandler.sendToServer(new SetFilterEntryAmountPayload(slot, 0, 0));
+        }
+
+        for (int slot = 0; slot < copied; slot++) {
+            pasteEntry(slot, copiedFilter.entries().get(slot));
+        }
+
+        if (copied < copiedFilter.sourceSlots()) {
+            showFilterMessage("message.logisticsnetworks.filter.paste.partial", copied, copiedFilter.sourceSlots());
+        } else {
+            showFilterMessage("message.logisticsnetworks.filter.paste.success");
+        }
+    }
+
+    private void pasteEntry(int slot, FilterEntrySnapshot entry) {
+        if (entry.tag() != null) {
+            NetworkHandler.sendToServer(new SetFilterEntryTagPayload(slot, entry.tag()));
+            menu.setEntryTag(minecraft.player, slot, entry.tag());
+        } else if (!entry.fluid().isEmpty()) {
+            setFluidFilterEntry(minecraft.player, slot, entry.fluid());
+        } else if (entry.chemicalId() != null && !entry.chemicalId().isBlank()) {
+            setChemicalFilterEntry(minecraft.player, slot, entry.chemicalId());
+        } else if (!entry.item().isEmpty()) {
+            setItemFilterEntry(minecraft.player, slot, entry.item());
+        }
+
+        if (entry.batch() > 0 || entry.stock() > 0) {
+            menu.setEntryBatch(minecraft.player, slot, entry.batch());
+            menu.setEntryStock(minecraft.player, slot, entry.stock());
+            NetworkHandler.sendToServer(new SetFilterEntryAmountPayload(slot, entry.batch(), entry.stock()));
+        }
+
+        if (entry.slotExpression() != null && !entry.slotExpression().isBlank()) {
+            menu.setEntrySlotMapping(minecraft.player, slot, entry.slotExpression());
+            NetworkHandler.sendToServer(new SetFilterEntrySlotMappingPayload(slot, entry.slotExpression()));
+        }
+
+        if (entry.enchanted() != null) {
+            menu.setEntryEnchanted(minecraft.player, slot, entry.enchanted());
+            NetworkHandler.sendToServer(new SetFilterEntryEnchantedPayload(slot, true, entry.enchanted()));
+        }
+
+        if (entry.durabilityOp() != null && !entry.durabilityOp().isBlank()) {
+            menu.setEntryDurability(minecraft.player, slot, entry.durabilityOp(), entry.durabilityValue());
+            NetworkHandler.sendToServer(new SetFilterEntryDurabilityPayload(slot, entry.durabilityOp(),
+                    entry.durabilityValue()));
+        }
+
+        pasteNbt(slot, entry);
+    }
+
+    private void pasteNbt(int slot, FilterEntrySnapshot entry) {
+        if (entry.strictNbt()) {
+            menu.setEntryNbtStrict(slot, true);
+            NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setStrict(slot, true));
+        }
+
+        if (entry.rawNbt() != null && !entry.rawNbt().isBlank()) {
+            menu.setEntryNbtRaw(minecraft.player, slot, NbtPath.EMPTY, entry.rawNbt());
+            NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setRaw(slot, entry.rawNbt()));
+        }
+
+        for (NbtCriterion rule : entry.nbtRules()) {
+            String value = rule.value().toString();
+            menu.addSlotNbtRule(minecraft.player, slot, rule.path(), rule.operator(), value);
+            NetworkHandler.sendToServer(SetFilterEntryNbtPayload.add(slot, rule.path(), rule.operator(), value));
+            // Add prefers the ghost value
+            int ruleIdx = FilterItemData.indexOfRule(menu.getSlotNbtRules(slot), rule);
+            if (ruleIdx >= 0) {
+                NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setValue(slot, ruleIdx, value));
+                menu.setSlotNbtRuleValue(slot, ruleIdx, value);
+            }
+        }
+
+        if (entry.nbtMatchAny() != menu.isSlotNbtMatchAny(slot)) {
+            menu.toggleSlotNbtMatchMode(slot);
+            NetworkHandler.sendToServer(SetFilterEntryNbtPayload.toggleMatch(slot));
+        }
+    }
+
+    private void syncHeaderModes(boolean blacklist, FilterTargetType targetType) {
+        if (minecraft == null || minecraft.gameMode == null) {
+            return;
+        }
+        if (menu.isBlacklistMode() != blacklist) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
+        }
+        if (menu.isBoundFilter()) return;
+        FilterTargetType[] types = FilterTargetType.values();
+        int presses = ((targetType.ordinal() - menu.getTargetType().ordinal()) % types.length + types.length)
+                % types.length;
+        for (int i = 0; i < presses; i++) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
+        }
+    }
+
+    private void syncNameScope(NameMatchScope scope) {
+        if (minecraft == null || minecraft.gameMode == null)
+            return;
+        int count = NameMatchScope.values().length;
+        int presses = ((scope.ordinal() - menu.getNameMatchScope().ordinal()) % count + count) % count;
+        for (int i = 0; i < presses; i++) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
+        }
+    }
+
+    private Component filterTitle() {
+        return menu.isSpecialMode() ? title : Component.translatable("gui.logisticsnetworks.filter.title");
+    }
+
+    private int backButtonX() {
+        return leftPos + 8;
+    }
+
+    private int backButtonY() {
+        return topPos + 5;
+    }
+
+    private boolean isHoveringBackButton(double mx, double my) {
+        return menu.isBoundFilter()
+                && isHovering(backButtonX(), backButtonY(), BACK_BUTTON_W, BACK_BUTTON_H, (int) mx, (int) my);
+    }
+
+    private boolean returnToNodeScreen() {
+        if (!menu.isBoundFilter()) {
+            return false;
+        }
+        flushEditorsBeforeExit();
+        if (menu.isClipboardFilter()) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, FilterMenu.ID_RETURN_TO_CLIPBOARD);
+            }
+            return true;
+        }
+        NetworkHandler.sendToServer(new OpenNodeMenuPayload(
+                menu.getNodeSource().getId(), menu.getNodeChannel()));
+        return true;
+    }
+
+    private Component fitHint(Component hint, int boxWidth) {
+        int inner = Math.max(0, boxWidth - 8);
+        String s = hint.getString();
+        if (font.width(s) <= inner) {
+            return hint;
+        }
+        int ellipsis = font.width("...");
+        return Component.literal(font.plainSubstrByWidth(s, Math.max(0, inner - ellipsis)) + "...");
+    }
+
+    private boolean blurManualInputIfNeeded(double mx, double my) {
+        if (manualInputBox == null || !manualInputBox.isVisible() || !manualInputBox.isFocused()) {
+            return false;
+        }
+        if (isHoveringManualInput(mx, my)) {
+            return false;
+        }
+        return !saveManualInputAndClearFocus();
+    }
+
+    private boolean isHoveringManualInput(double mx, double my) {
+        if (menu.isModMode()) {
+            return isHovering(getSelectorInputX(), getSelectorInputY(), getSelectorInputWidth(), 14, (int) mx, (int) my);
+        }
+        if (menu.isNameMode()) {
+            return isHovering(leftPos + 8, topPos + 38, imageWidth - 16, 14, (int) mx, (int) my);
+        }
+        return false;
+    }
+
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
-        boolean handled = false;
+        int action = ClientControls.resolveMouseAction(btn);
+        if (detailTagPicker != null) {
+            detailTagPicker.mouseClicked(mx, my, action < 0 ? btn : action,
+                    InputConstants.isKeyDown(minecraft.getWindow().getWindow(), InputConstants.KEY_LCONTROL));
+            return true;
+        }
+        if (action != -1 && handleInteraction(mx, my, action))
+            return true;
+        return super.mouseClicked(mx, my, btn);
+    }
+
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (detailTagPicker != null) {
+            detailTagPicker.mouseDragged(my);
+            return true;
+        }
+        return super.mouseDragged(mx, my, button, dx, dy);
+    }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
+        if (detailTagPicker != null) {
+            detailTagPicker.mouseReleased();
+            return true;
+        }
+        return super.mouseReleased(mx, my, button);
+    }
+
+    private boolean handleInteraction(double mx, double my, int action) {
+        if (action != 0 && action != 1)
+            return false;
+
+        if (blurManualInputIfNeeded(mx, my))
+            return true;
+        if (action == 0 && isHoveringBackButton(mx, my)) {
+            return returnToNodeScreen();
+        }
+        if (detailEditSlot < 0 && handleClipboardButtonClick(mx, my, action)) {
+            return true;
+        }
+
         if (menu.isTagMode())
-            handled = handleTagClick(mx, my, btn);
-        else if (menu.isModMode())
-            handled = handleModClick(mx, my, btn);
-        else if (menu.isSlotMode())
-            handled = handleSlotClick(mx, my, btn);
-        else if (menu.isAmountMode())
-            handled = handleAmountClick(mx, my, btn);
-        else if (menu.isDurabilityMode())
-            handled = handleDurabilityClick(mx, my, btn);
-        else if (menu.isNameMode())
-            handled = handleNameClick(mx, my, btn);
-        else {
-            if (detailEditSlot >= 0) {
-                handled = handleDetailPageClick(mx, my, btn);
-                if (!handled) {
-                    closeDetailPage();
-                    return true;
-                }
+            return finishInteraction(handleTagClick(mx, my, action), mx, my);
+        if (menu.isModMode())
+            return finishInteraction(handleModClick(mx, my, action), mx, my);
+        if (menu.isAmountMode())
+            return finishInteraction(handleAmountClick(mx, my, action), mx, my);
+        if (menu.isDurabilityMode())
+            return finishInteraction(handleDurabilityClick(mx, my, action), mx, my);
+        if (menu.isNameMode())
+            return finishInteraction(handleNameClick(mx, my, action), mx, my);
+        return handleDefaultModeInteraction(mx, my, action);
+    }
+
+    private boolean handleDefaultModeInteraction(double mx, double my, int action) {
+        if (detailEditSlot >= 0)
+            return handleDetailPageInteraction(mx, my, action);
+        if (tagEditSlot >= 0)
+            return handleTagPageInteraction(mx, my, action);
+        if (nbtEditSlot >= 0)
+            return handleNbtPageInteraction(mx, my, action);
+
+        if (action == 0 && ClientControls.modifier2Down()) {
+            int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
+            if (hoveredSlot >= 0) {
+                enterDetailPage(hoveredSlot);
                 return true;
             }
-
-            if (tagEditSlot >= 0) {
-                handled = handleTagSubModeClick(mx, my, btn);
-                if (!handled) {
-                    closeTagSubMode();
-                    return true;
-                }
-                return true;
-            }
-            if (nbtEditSlot >= 0) {
-                handled = handleNbtSubModeClick(mx, my, btn);
-                if (!handled) {
-                    closeNbtSubMode();
-                    return true;
-                }
-                return true;
-            }
-
-            if (hasControlDown()) {
-                int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
-                if (hoveredSlot >= 0) {
-                    if (btn == 0) {
-                        enterDetailPage(hoveredSlot);
-                        return true;
-                    }
-                }
-            }
-
-            handled = handleModeControlClick(mx, my, true);
         }
 
-        if (!handled) {
-            if (isDropdownOpen && !isHoveringDropdown(mx, my)) {
-                isDropdownOpen = false;
-                return true;
-            }
-            return super.mouseClicked(mx, my, btn);
-        }
+        return finishInteraction(handleModeControlClick(mx, my, !menu.isBoundFilter()), mx, my);
+    }
+
+    private boolean handleDetailPageInteraction(double mx, double my, int action) {
+        if (!handleDetailPageClick(mx, my, action))
+            closeDetailPage();
         return true;
+    }
+
+    private boolean handleTagPageInteraction(double mx, double my, int action) {
+        if (!handleTagSubModeClick(mx, my, action))
+            closeTagSubMode();
+        return true;
+    }
+
+    private boolean handleNbtPageInteraction(double mx, double my, int action) {
+        if (!handleNbtSubModeClick(mx, my, action))
+            closeNbtSubMode();
+        return true;
+    }
+
+    private boolean finishInteraction(boolean handled, double mx, double my) {
+        if (handled)
+            return true;
+        if (isDropdownOpen && !isHoveringDropdown(mx, my)) {
+            isDropdownOpen = false;
+            return true;
+        }
+        return false;
     }
 
     private boolean handleModeControlClick(double mx, double my, boolean hasTargetType) {
@@ -1199,43 +1598,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private boolean handleTagClick(double mx, double my, int btn) {
-        int x = getSelectorInputX();
-        int y = getSelectorInputY();
-        int w = getSelectorInputWidth();
-        int arrowX = getSelectorArrowX();
-
-        if (handleModeControlClick(mx, my, true))
-            return true;
-
-        if (isHovering(arrowX, y, 12, 14, (int) mx, (int) my)) {
-            isDropdownOpen = !isDropdownOpen;
-            listScrollOffset = 0;
-            return true;
-        }
-
-        if (isDropdownOpen) {
-            if (isHovering(x, y + 16, w, DROPDOWN_ROWS * LIST_ROW_H, (int) mx, (int) my)) {
-                int row = ((int) my - (y + 16)) / LIST_ROW_H;
-                int idx = listScrollOffset + row;
-                if (idx >= 0 && idx < cachedTags.size()) {
-                    String tag = cachedTags.get(idx);
-                    menu.setSelectedTag(tag);
-                    manualInputBox.setValue(tag);
-                    isDropdownOpen = false;
-                    return true;
-                }
-            }
-        }
-        if (btn == 1 && isHovering(x, y, w, 14, (int) mx, (int) my)) {
-            menu.setSelectedTag(null);
-            manualInputBox.setValue("");
-            return true;
-        }
-
         return false;
     }
 
-    private boolean handleModClick(double mx, double my, int btn) {
+    private boolean handleModClick(double mx, double my, int action) {
         int x = getSelectorInputX();
         int y = getSelectorInputY();
         int w = getSelectorInputWidth();
@@ -1264,7 +1630,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 }
             }
         }
-        if (btn == 1 && isHovering(x, y, w, 14, (int) mx, (int) my)) {
+        if (action == 1 && isHovering(x, y, w, 14, (int) mx, (int) my)) {
             String toRemove = menu.getSelectedMod();
             menu.setSelectedMod(null);
             sendModRemove(toRemove);
@@ -1275,161 +1641,19 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private boolean handleAmountClick(double mx, double my, int btn) {
-        int cx = leftPos + GUI_WIDTH / 2;
-        int infoBtnX = leftPos + imageWidth - 8 - 12;
-        int infoBtnY = topPos + 6;
-        int infoBtnSize = 12;
-
-        if (isHovering(infoBtnX, infoBtnY, infoBtnSize, infoBtnSize, (int) mx, (int) my)) {
-            amountInfoOpen = !amountInfoOpen;
-            return true;
-        }
-
-        if (handleModeControlClick(mx, my, true))
-            return true;
-
-        if (amountInfoOpen) {
-            int x = leftPos + 8;
-            int y = topPos + 16;
-            int w = imageWidth - 16;
-            int maxBottom = topPos + menu.getPlayerInventoryY() - 14;
-            int h = Math.max(68, maxBottom - y);
-            if (y + h > maxBottom) {
-                h = Math.max(40, maxBottom - y);
-            }
-            int navY = y + h - 16;
-            int prevX = x + w - 40;
-            int nextX = x + w - 22;
-
-            if (isHovering(prevX, navY, 14, 12, (int) mx, (int) my) && amountInfoPage > 0) {
-                amountInfoPage--;
-                return true;
-            }
-            if (isHovering(nextX, navY, 14, 12, (int) mx, (int) my) && amountInfoPage < 1) {
-                amountInfoPage++;
-                return true;
-            }
-
-            if (isHovering(x, y, w, h, (int) mx, (int) my)) {
-                return true;
-            }
-
-            amountInfoOpen = false;
-            return true;
-        }
-
-        boolean isMb = menu.getTargetType() == FilterTargetType.FLUIDS
-                || menu.getTargetType() == FilterTargetType.CHEMICALS;
-        int cy = topPos + 50 + 15;
-        if (isMb) {
-            String[] negLabels = { "-1000", "-500", "-100" };
-            String[] posLabels = { "+1000", "+500", "+100" };
-            int[] negDeltas = { -1000, -500, -100 };
-            int[] posDeltas = { 1000, 500, 100 };
-            int[] negCenters = rowBtnCenters(negLabels);
-            int[] posCenters = rowBtnCenters(posLabels);
-            for (int i = 0; i < 3; i++)
-                if (checkAmountBtn(mx, my, negCenters[i], cy, negDeltas[i], negLabels[i]))
-                    return true;
-            for (int i = 0; i < 3; i++)
-                if (checkAmountBtn(mx, my, posCenters[i], cy + 18, posDeltas[i], posLabels[i]))
-                    return true;
-        } else {
-            String[] labels = { "-64", "-10", "-1", "+1", "+10", "+64" };
-            int[] deltas = { -64, -10, -1, 1, 10, 64 };
-            int[] centers = amountBtnCenters(labels);
-            for (int i = 0; i < 6; i++)
-                if (checkAmountBtn(mx, my, centers[i], cy, deltas[i], labels[i]))
-                    return true;
-        }
-
-        return false;
-    }
-
-    private boolean handleSlotClick(double mx, double my, int btn) {
-        int contentX = leftPos + 8;
-        int inputY = topPos + 34;
-        int contentW = imageWidth - 16;
-        int infoBtnX = leftPos + imageWidth - 8 - 12;
-        int infoBtnY = topPos + 6;
-        int infoBtnSize = 12;
-
-        if (isHovering(infoBtnX, infoBtnY, infoBtnSize, infoBtnSize, (int) mx, (int) my)) {
-            slotInfoOpen = !slotInfoOpen;
-            return true;
-        }
-
-        if (handleModeControlClick(mx, my, false))
-            return true;
-
-        if (slotInfoOpen) {
-            int x = leftPos + 8;
-            int y = topPos + 16;
-            int w = imageWidth - 16;
-            int maxBottom = topPos + menu.getPlayerInventoryY() - 14;
-            int h = Math.max(68, maxBottom - y);
-            if (y + h > maxBottom) {
-                h = Math.max(40, maxBottom - y);
-            }
-            int navY = y + h - 16;
-            int prevX = x + w - 40;
-            int nextX = x + w - 22;
-
-            if (isHovering(prevX, navY, 14, 12, (int) mx, (int) my) && slotInfoPage > 0) {
-                slotInfoPage--;
-                return true;
-            }
-            if (isHovering(nextX, navY, 14, 12, (int) mx, (int) my) && slotInfoPage < 1) {
-                slotInfoPage++;
-                return true;
-            }
-
-            if (isHovering(x, y, w, h, (int) mx, (int) my)) {
-                return true;
-            }
-
-            slotInfoOpen = false;
-            return true;
-        }
-
-        if (btn == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
-            manualInputBox.setValue("");
-            return true;
-        }
-
         return false;
     }
 
     private boolean handleDurabilityClick(double mx, double my, int btn) {
-        int cx = leftPos + GUI_WIDTH / 2;
-        int cy = topPos + 40;
-
-        if (handleModeControlClick(mx, my, true))
-            return true;
-
-        if (isHovering(cx - 50, cy, 20, 12, (int) mx, (int) my)) {
-            return true;
-        }
-
-        int btnY = cy + 20;
-        String[] lbls = { "-64", "-10", "-1", "+1", "+10", "+64" };
-        int[] durs = { -64, -10, -1, 1, 10, 64 };
-        int[] durCenters = amountBtnCenters(lbls);
-        for (int i = 0; i < 6; i++) {
-            if (checkAmountBtn(mx, my, durCenters[i], btnY, durs[i], lbls[i]))
-                return true;
-        }
-
         return false;
     }
 
     private boolean checkAmountBtn(double mx, double my, int cx, int y, int delta, String label) {
         int w = Math.max(24, font.width(label) + 10);
-        if (isHovering(cx - w / 2, y, w, 14, (int) mx, (int) my)) {
-            return true;
-        }
-        return false;
+        return isHovering(cx - w / 2, y, w, 14, (int) mx, (int) my);
     }
+
+
 
     private void sendModUpdate(String mod) {
         menu.setSelectedMod(mod == null || mod.isBlank() ? null : mod.trim());
@@ -1441,8 +1665,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         NetworkHandler.sendToServer(new ModifyFilterModPayload(mod == null ? "" : mod, true));
     }
 
+
+
+
     private void sendNameUpdate(String name) {
-        NetworkHandler.sendToServer(new SetNameFilterPayload(name == null ? "" : name));
+        String expression = name == null ? "" : name;
+        if (expression.length() <= NameFilterData.MAX_EXPRESSION_LENGTH)
+            NetworkHandler.sendToServer(new SetNameFilterPayload(expression));
     }
 
     private void renderNameMode(GuiGraphics g, int mx, int my) {
@@ -1460,14 +1689,25 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         manualInputBox.setWidth(contentW);
 
         String value = menu.getNameFilter();
+        NameFilterData.ValidationResult validation = NameFilterData.validateRegex(value);
+        boolean validRegex = value.isEmpty() || validation.accepted();
         String display = value.isEmpty()
                 ? Component.translatable("gui.logisticsnetworks.filter.name.none").getString()
                 : value;
-        String activeLine = Component.translatable("gui.logisticsnetworks.filter.name.active", display).getString();
-        g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, COL_ACCENT, false);
+        String activeKey = validRegex
+                ? "gui.logisticsnetworks.filter.name.active"
+                : "gui.logisticsnetworks.filter.name.pattern";
+        int activeColor = validRegex ? COL_ACCENT : COL_GRAY;
+        String activeLine = Component.translatable(activeKey, display).getString();
+        g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, activeColor, false);
 
-        if (!value.isEmpty() && !NameFilterData.validateRegex(value).accepted()) {
-            String warning = Component.translatable("gui.logisticsnetworks.filter.name.invalid_regex").getString();
+        if (!value.isEmpty() && !validRegex) {
+            String warningKey = switch (validation.error()) {
+                case TOO_LONG -> "gui.logisticsnetworks.filter.name.too_long";
+                case UNSUPPORTED -> "gui.logisticsnetworks.filter.name.unsafe_regex";
+                default -> "gui.logisticsnetworks.filter.name.invalid_regex";
+            };
+            String warning = Component.translatable(warningKey).getString();
             g.drawString(font, warning, contentX, hintY, 0xFFFF5555, false);
         } else {
             String hintLine = Component.translatable("gui.logisticsnetworks.filter.name.input_hint").getString();
@@ -1478,40 +1718,35 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private void renderNameButtons(GuiGraphics g, int mx, int my, int btnY) {
         int btnH = 12;
         int leftEdge = leftPos + 8;
+        boolean node = menu.isBoundFilter();
 
-        NameMatchScope scope = menu.getNameMatchScope();
-        String scopeLabel;
-        if (scope == NameMatchScope.TOOLTIP) {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.tooltip");
-        } else if (scope == NameMatchScope.BOTH) {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.both");
-        } else {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.name");
+        int modeBtnX = leftEdge;
+        if (!node) {
+            String typeLabel;
+            if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
+            } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
+            } else {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.items");
+            }
+            int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
+            drawButton(g, leftEdge, btnY, typeBtnW, btnH, typeLabel, mx, my, true);
+            modeBtnX = leftEdge + typeBtnW + 4;
         }
-        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
-        drawButton(g, leftEdge, btnY, scopeBtnW, btnH, scopeLabel, mx, my, true);
-
-        String typeLabel;
-        if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
-        } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
-        } else {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.items");
-        }
-        int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-        int typeBtnX = leftEdge + scopeBtnW + 4;
-        drawButton(g, typeBtnX, btnY, typeBtnW, btnH, typeLabel, mx, my, true);
 
         String modeLabel = menu.isBlacklistMode()
                 ? tr("gui.logisticsnetworks.filter.mode.blacklist")
                 : tr("gui.logisticsnetworks.filter.mode.whitelist");
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
-        int modeBtnX = typeBtnX + typeBtnW + 4;
         drawButton(g, modeBtnX, btnY, modeBtnW, btnH, modeLabel, mx, my, true);
+
+        String scopeLabel = tr("gui.logisticsnetworks.filter.name.scope." + menu.getNameMatchScope().serializedName());
+        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
+        drawButton(g, modeBtnX + modeBtnW + 4, btnY, scopeBtnW, btnH, scopeLabel, mx, my, true);
     }
 
-    private boolean handleNameClick(double mx, double my, int btn) {
+    private boolean handleNameClick(double mx, double my, int action) {
         int contentX = leftPos + 8;
         int inputY = topPos + 38;
         int contentW = imageWidth - 16;
@@ -1519,7 +1754,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (handleNameButtonsClick(mx, my))
             return true;
 
-        if (btn == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
+        if (action == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
             manualInputBox.setValue("");
             sendNameUpdate("");
             return true;
@@ -1532,48 +1767,32 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int btnH = 12;
         int btnY = topPos + 20;
         int leftEdge = leftPos + 8;
+        boolean node = menu.isBoundFilter();
 
-        NameMatchScope scope = menu.getNameMatchScope();
-        String scopeLabel;
-        if (scope == NameMatchScope.TOOLTIP) {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.tooltip");
-        } else if (scope == NameMatchScope.BOTH) {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.both");
-        } else {
-            scopeLabel = tr("gui.logisticsnetworks.filter.name.scope.name");
-        }
-        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
-
-        if (isHovering(leftEdge, btnY, scopeBtnW, btnH, (int) mx, (int) my)) {
-            if (minecraft != null && minecraft.gameMode != null) {
-                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
+        int modeBtnX = leftEdge;
+        if (!node) {
+            String typeLabel;
+            if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
+            } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
+            } else {
+                typeLabel = tr("gui.logisticsnetworks.filter.target.items");
             }
-            return true;
-        }
-
-        String typeLabel;
-        if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
-        } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
-        } else {
-            typeLabel = tr("gui.logisticsnetworks.filter.target.items");
-        }
-        int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-        int typeBtnX = leftEdge + scopeBtnW + 4;
-
-        if (isHovering(typeBtnX, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
-            if (minecraft != null && minecraft.gameMode != null) {
-                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
+            int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
+            if (isHovering(leftEdge, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
+                if (minecraft != null && minecraft.gameMode != null) {
+                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
+                }
+                return true;
             }
-            return true;
+            modeBtnX = leftEdge + typeBtnW + 4;
         }
 
         String modeLabel = menu.isBlacklistMode()
                 ? tr("gui.logisticsnetworks.filter.mode.blacklist")
                 : tr("gui.logisticsnetworks.filter.mode.whitelist");
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
-        int modeBtnX = typeBtnX + typeBtnW + 4;
 
         if (isHovering(modeBtnX, btnY, modeBtnW, btnH, (int) mx, (int) my)) {
             if (minecraft != null && minecraft.gameMode != null) {
@@ -1582,20 +1801,40 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return true;
         }
 
+        String scopeLabel = tr("gui.logisticsnetworks.filter.name.scope." + menu.getNameMatchScope().serializedName());
+        int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
+        if (isHovering(modeBtnX + modeBtnW + 4, btnY, scopeBtnW, btnH, (int) mx, (int) my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
+            }
+            return true;
+        }
+
         return false;
     }
 
-    private void flushManualInputToServer() {
-        if (flushedTextOnClose || manualInputBox == null || !manualInputBox.isVisible()) {
+    private void flushEditorsBeforeExit() {
+        if (flushedEditorsOnExit) {
             return;
         }
-        flushedTextOnClose = true;
-        commitManualInput();
+        flushedEditorsOnExit = true;
+        flushOpenEditors();
     }
 
-    private void commitManualInput() {
+    private boolean saveManualInputAndClearFocus() {
         if (manualInputBox == null || !manualInputBox.isVisible()) {
-            return;
+            return false;
+        }
+        if (!commitManualInput())
+            return false;
+        manualInputBox.setFocused(false);
+        wasManualInputFocused = false;
+        return true;
+    }
+
+    private boolean commitManualInput() {
+        if (manualInputBox == null || !manualInputBox.isVisible()) {
+            return false;
         }
 
         String val = manualInputBox.getValue() == null ? "" : manualInputBox.getValue().trim();
@@ -1605,25 +1844,55 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             } else {
                 sendModUpdate(val);
             }
+            return true;
         } else if (menu.isNameMode()) {
+            NameFilterData.ValidationResult validation = NameFilterData.validateRegex(val);
+            if (!val.isEmpty() && !validation.accepted()) {
+                showRegexChatMessage(validation.error());
+                return false;
+            }
+            menu.setNameFilter(val);
             sendNameUpdate(val);
+            return true;
         }
+        return false;
+    }
+
+    private void showRegexChatMessage(NameFilterData.ValidationError error) {
+        if (minecraft == null || minecraft.player == null)
+            return;
+        String key = switch (error) {
+            case TOO_LONG -> "message.logisticsnetworks.filter.regex.too_long";
+            case UNSUPPORTED -> "message.logisticsnetworks.filter.regex.unsupported";
+            default -> "message.logisticsnetworks.filter.regex.invalid";
+        };
+        minecraft.player.sendSystemMessage(Component.translatable(key));
     }
 
     @Override
     public void onClose() {
-        flushManualInputToServer();
+        flushEditorsBeforeExit();
         super.onClose();
     }
 
     @Override
     public void removed() {
-        flushManualInputToServer();
+        flushEditorsBeforeExit();
         super.removed();
     }
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
+        if (detailTagPicker != null) {
+            int action = ClientControls.resolveKeyAction(key, scan);
+            if (key != InputConstants.KEY_ESCAPE && action == 0 && !detailTagPicker.isSearchFocused()) {
+                detailTagPicker.mouseClicked(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action,
+                        InputConstants.isKeyDown(minecraft.getWindow().getWindow(), InputConstants.KEY_LCONTROL));
+            } else {
+                detailTagPicker.keyPressed(key, scan, modifiers);
+            }
+            return true;
+        }
         if (minecraft.options.keyInventory.matches(key, scan)) {
             return true;
         }
@@ -1648,11 +1917,18 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 closeNbtSubMode();
                 return true;
             }
+            if (returnToNodeScreen()) {
+                return true;
+            }
             return super.keyPressed(key, scan, modifiers);
         }
 
-        if (detailEditSlot >= 0) {
-            return handleDetailPageKey(key, scan, modifiers);
+        if (handleClipboardShortcut(key)) {
+            return true;
+        }
+
+        if (detailEditSlot >= 0 && handleDetailPageKey(key, scan, modifiers)) {
+            return true;
         }
 
         if (nbtValueEditBox != null && nbtValueEditBox.isFocused()) {
@@ -1675,11 +1951,18 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (manualInputBox.isFocused()) {
             if (key == 257) {
-                commitManualInput();
-                manualInputBox.setFocused(false);
+                saveManualInputAndClearFocus();
                 return true;
             }
-            manualInputBox.keyPressed(key, scan, modifiers);
+            return manualInputBox.keyPressed(key, scan, modifiers);
+        }
+
+        int action = ClientControls.resolveKeyAction(key, scan);
+        if (action != -1) {
+            if (action == 1 && FilterClickHandler.openHoveredFilter(this)) {
+                return true;
+            }
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
             return true;
         }
         return true;
@@ -1687,6 +1970,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     @Override
     public boolean charTyped(char c, int modifiers) {
+        if (detailTagPicker != null) {
+            detailTagPicker.charTyped(c, modifiers);
+            return true;
+        }
         if (detailEditSlot >= 0) {
             if (detailIdInputBox != null && detailIdInputBox.isFocused())
                 return detailIdInputBox.charTyped(c, modifiers);
@@ -1715,37 +2002,62 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double delta) {
+    public boolean mouseScrolled(double mx, double my, double sy) {
+        if (detailTagPicker != null) {
+            detailTagPicker.mouseScrolled(mx, my, sy);
+            return true;
+        }
         if (detailEditSlot >= 0) {
-            return handleDetailPageScroll(mx, my, delta);
+            return handleDetailPageScroll(mx, my, sy);
         }
 
         if (nbtEditSlot >= 0) {
             int maxScroll = getNbtSubModeMaxScroll();
-            if (delta > 0 && nbtListScrollOffset > 0)
+            if (sy > 0 && nbtListScrollOffset > 0)
                 nbtListScrollOffset--;
-            else if (delta < 0 && nbtListScrollOffset < maxScroll)
+            else if (sy < 0 && nbtListScrollOffset < maxScroll)
                 nbtListScrollOffset++;
             return true;
         }
 
         if (subModeDropdownOpen) {
-            if (delta > 0 && subModeScrollOffset > 0)
+            if (sy > 0 && subModeScrollOffset > 0)
                 subModeScrollOffset--;
-            else if (delta < 0)
+            else if (sy < 0)
                 subModeScrollOffset++;
             return true;
         }
 
         if (isDropdownOpen) {
-            if (delta > 0 && listScrollOffset > 0)
+            if (sy > 0 && listScrollOffset > 0)
                 listScrollOffset--;
-            else if (delta < 0)
+            else if (sy < 0)
                 listScrollOffset++;
             return true;
         }
 
-        return super.mouseScrolled(mx, my, delta);
+        if (!menu.isAmountMode() && !menu.isTagMode() && !menu.isModMode()
+                && !menu.isDurabilityMode() && !menu.isNameMode()) {
+            int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
+            if (hoveredSlot >= 0 && hasEntryInSlot(hoveredSlot)) {
+                int current = menu.getEntryAmount(hoveredSlot);
+                int next;
+                if (ClientControls.modifier3Down()) {
+                    next = sy > 0 ? getMaxAmountForType(menu.getTargetType()) : (current > 0 ? 1 : 0);
+                } else {
+                    int delta = computeScrollDelta(sy, menu.getTargetType());
+                    next = Math.max(0, current + delta);
+                }
+                if (next != current) {
+                    menu.setEntryAmount(minecraft.player, hoveredSlot, next);
+                    int currentStock = menu.getEntryStock(hoveredSlot);
+                    NetworkHandler.sendToServer(new SetFilterEntryAmountPayload(hoveredSlot, next, currentStock));
+                }
+                return true;
+            }
+        }
+
+        return super.mouseScrolled(mx, my, sy);
     }
 
     private int getHoveredFilterSlot(int mx, int my) {
@@ -1761,7 +2073,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private boolean hasEntryInSlot(int slot) {
-        if (menu.isTagSlot(slot))
+        ItemStack openedStack = menu.getOpenedStack();
+        if (menu.isTagSlot(slot) || FilterItemData.isNbtOnlySlot(openedStack, slot))
             return true;
         if (menu.getTargetType() == FilterTargetType.FLUIDS) {
             return !menu.getFluidFilter(slot).isEmpty();
@@ -1771,24 +2084,21 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
         if (slot < menu.slots.size() && !menu.slots.get(slot).getItem().isEmpty())
             return true;
-        ItemStack openedStack = menu.getOpenedStack();
-        return FilterItemData.hasEntryNbt(openedStack, slot)
-                || FilterItemData.hasEntryDurability(openedStack, slot)
-                || FilterItemData.hasEntryEnchanted(openedStack, slot);
+        return FilterItemData.hasEntrySlotMapping(openedStack, slot);
     }
 
     private int computeScrollDelta(double scrollDirection, FilterTargetType targetType) {
         int sign = scrollDirection > 0 ? 1 : -1;
         if (targetType == FilterTargetType.FLUIDS || targetType == FilterTargetType.CHEMICALS) {
-            if (hasControlDown())
+            if (ClientControls.modifier2Down())
                 return sign * 1000;
-            if (hasShiftDown())
+            if (ClientControls.modifier1Down())
                 return sign * 500;
             return sign * 50;
         }
-        if (hasControlDown())
+        if (ClientControls.modifier2Down())
             return sign * 64;
-        if (hasShiftDown())
+        if (ClientControls.modifier1Down())
             return sign * 8;
         return sign;
     }
@@ -1800,75 +2110,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return 1024;
     }
 
-    private List<Component> buildFilterEntryTooltip(int slot, ItemStack filterStack) {
-        List<Component> lines = new ArrayList<>();
-
-        String tag = menu.getEntryTag(slot);
-        ItemStack slotItem = slot < menu.slots.size() ? menu.slots.get(slot).getItem() : ItemStack.EMPTY;
-        boolean isNbtOnly = FilterItemData.isNbtOnlySlot(filterStack, slot);
-
-        int batch = menu.getEntryBatch(slot);
-        int stock = menu.getEntryStock(slot);
-
-        if (tag != null) {
-            lines.add(Component.literal("#" + tag).withStyle(ChatFormatting.GOLD));
-        } else if (!slotItem.isEmpty()) {
-            ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(slotItem.getItem());
-            lines.add(Component.literal(itemId.toString()).withStyle(ChatFormatting.WHITE));
-        } else if (isNbtOnly || batch > 0 || stock > 0) {
-            lines.add(Component.literal("Any Item").withStyle(ChatFormatting.AQUA));
-        } else {
-            return lines;
-        }
-        if (batch > 0 || stock > 0) {
-            lines.add(Component.literal("Batch | Stock: " + batch + " | " + stock).withStyle(ChatFormatting.GRAY));
-        }
-
-        List<FilterMenu.SlotNbtRule> nbtRules = FilterItemData.getSlotNbtRules(filterStack, slot).stream()
-                .map(FilterMenu.SlotNbtRule::of).toList();
-        if (!nbtRules.isEmpty()) {
-            for (FilterMenu.SlotNbtRule r : nbtRules) {
-                lines.add(Component.literal("NBT: " + r.displayText()).withStyle(ChatFormatting.GOLD));
-            }
-        } else {
-            String nbtRaw = FilterItemData.getEntryNbtRaw(filterStack, slot);
-            if (nbtRaw != null) {
-                String preview = nbtRaw.length() > 50 ? nbtRaw.substring(0, 50) + "..." : nbtRaw;
-                lines.add(Component.literal("NBT: " + preview).withStyle(ChatFormatting.GOLD));
-            }
-        }
-
-        Boolean enchanted = FilterItemData.getEntryEnchanted(filterStack, slot);
-        if (enchanted != null) {
-            String enchStr = enchanted ? "Enchanted: Yes" : "Enchanted: No";
-            lines.add(Component.literal(enchStr).withStyle(ChatFormatting.LIGHT_PURPLE));
-        }
-
-        String durOp = FilterItemData.getEntryDurabilityOp(filterStack, slot);
-        if (durOp != null) {
-            int durVal = FilterItemData.getEntryDurabilityValue(filterStack, slot);
-            lines.add(Component.literal("Durability: " + durOp + " " + durVal).withStyle(ChatFormatting.BLUE));
-        }
-
-        String slotExpr = menu.getEntrySlotMappingExpression(slot);
-        if (slotExpr != null && !slotExpr.isEmpty()) {
-            lines.add(Component.literal("Slots: " + slotExpr).withStyle(ChatFormatting.LIGHT_PURPLE));
-        }
-
-        return lines;
-    }
-
-    private void renderTagTooltip(GuiGraphics g, int mx, int my) {
-        if (isHovering(getSelectorArrowX(), getSelectorInputY(), 12, 14, mx, my)) {
-            g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.tag.select_from_item"), mx, my);
-            return;
-        }
-        var extractor = getExtractorRect();
-        if (extractor != null && menu.getExtractorItem().isEmpty()
-                && isHovering(extractor[0], extractor[1], 18, 18, mx, my)) {
-            g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.selector_hint"), mx, my);
-        }
-    }
 
     private void renderModTooltip(GuiGraphics g, int mx, int my) {
         if (isHovering(getSelectorArrowX(), getSelectorInputY(), 12, 14, mx, my)) {
@@ -1879,32 +2120,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (extractor != null && menu.getExtractorItem().isEmpty()
                 && isHovering(extractor[0], extractor[1], 18, 18, mx, my)) {
             g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.selector_hint"), mx, my);
-        }
-    }
-
-    private void renderFluidTooltip(GuiGraphics g, int mx, int my) {
-        for (int i = 0; i < menu.getFilterSlots(); i++) {
-            var slot = menu.slots.get(i);
-            int x = leftPos + slot.x;
-            int y = topPos + slot.y;
-            if (isHovering(x, y, 18, 18, mx, my)) {
-                FluidStack fs = menu.getFluidFilter(i);
-                if (!fs.isEmpty()) {
-                    g.renderTooltip(font, fs.getDisplayName(), mx, my);
-                    break;
-                }
-                String chemId = menu.getChemicalFilter(i);
-                if (chemId != null) {
-                    Component name = MekanismCompat.getChemicalTextComponent(chemId);
-                    if (name != null) {
-                        g.renderTooltip(font, name, mx, my);
-                    } else {
-                        g.renderTooltip(font, Component.literal(chemId), mx, my);
-                    }
-                    break;
-                }
-                break;
-            }
         }
     }
 
@@ -1927,8 +2142,18 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     public void setItemFilterEntry(Player player, int slot, ItemStack stack) {
         if (stack.isEmpty())
             return;
-        NetworkHandler.sendToServer(new SetFilterItemEntryPayload(slot, stack));
+        NetworkHandler.sendToServer(SetFilterItemEntryPayload.set(slot, stack));
         menu.setItemFilterEntry(player, slot, stack);
+    }
+
+    private void clearItemFilterEntry(int slot) {
+        menu.clearFilterEntryItem(minecraft.player, slot);
+        NetworkHandler.sendToServer(SetFilterItemEntryPayload.clearItem(slot));
+    }
+
+    private void clearFilterEntry(int slot) {
+        menu.clearFilterEntry(slot);
+        NetworkHandler.sendToServer(SetFilterItemEntryPayload.clearEntry(slot));
     }
 
     public boolean acceptsFluidSelectorGhostIngredient() {
@@ -1942,7 +2167,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     public boolean supportsGhostIngredientTargets() {
         if (detailEditSlot >= 0) return false;
         return !menu.isTagMode() && !menu.isModMode() && !menu.isAmountMode()
-                && !menu.isDurabilityMode() && !menu.isSlotMode() && !menu.isNameMode();
+                && !menu.isDurabilityMode() && !menu.isNameMode();
     }
 
     public int getGhostFilterSlotCount() {
@@ -1955,28 +2180,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
         var slot = menu.slots.get(slotIndex);
         return new Rect2i(leftPos + slot.x, topPos + slot.y, 16, 16);
-    }
-
-    public List<Rect2i> getExtraGuiAreas() {
-        List<Rect2i> areas = new ArrayList<>();
-        if (detailEditSlot >= 0) {
-            areas.add(new Rect2i(leftPos, topPos, imageWidth, imageHeight));
-        }
-        if (nbtEditSlot >= 0) {
-            int panelW = getNbtPanelW();
-            int panelX = getNbtPanelX();
-            int panelY = topPos + 20;
-            int panelH = menu.getPlayerInventoryY() - 24;
-            areas.add(new Rect2i(panelX, panelY, panelW, panelH));
-        }
-        if (tagEditSlot >= 0) {
-            int panelX = leftPos + 4;
-            int panelY = topPos + 20;
-            int panelW = imageWidth - 8;
-            int panelH = menu.getPlayerInventoryY() - 24;
-            areas.add(new Rect2i(panelX, panelY, panelW, panelH));
-        }
-        return areas;
     }
 
     public Rect2i getSelectorGhostArea() {
@@ -2001,7 +2204,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     public boolean isDetailPageOpen() {
-        return detailEditSlot >= 0 && !detailNbtPageOpen;
+        return detailEditSlot >= 0 && !detailNbtPageOpen && detailTagPicker == null;
     }
 
     public Rect2i getDetailSlotArea() {
@@ -2013,12 +2216,26 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     public void setDetailGhostItem(ItemStack stack) {
-        if (detailEditSlot < 0 || stack.isEmpty()) return;
+        if (!isDetailPageOpen() || stack.isEmpty() || !FilterItemData.fitsEntry(stack)) return;
         ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
         menu.clearEntryTag(detailEditSlot);
-        NetworkHandler.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, stack));
+        NetworkHandler.sendToServer(SetFilterItemEntryPayload.set(detailEditSlot, stack));
         menu.setItemFilterEntry(minecraft.player, detailEditSlot, stack);
         detailIdInputBox.setValue(itemId.toString());
+    }
+
+    public void setDetailGhostFluid(FluidStack stack) {
+        if (!isDetailPageOpen() || stack.isEmpty()) return;
+        menu.clearEntryTag(detailEditSlot);
+        setGhostFluidFilterEntry(detailEditSlot, stack);
+        detailIdInputBox.setValue(BuiltInRegistries.FLUID.getKey(stack.getFluid()).toString());
+    }
+
+    public void setDetailGhostChemical(String chemicalId) {
+        if (!isDetailPageOpen() || chemicalId == null || chemicalId.isBlank()) return;
+        menu.clearEntryTag(detailEditSlot);
+        setGhostChemicalFilterEntry(detailEditSlot, chemicalId);
+        detailIdInputBox.setValue(chemicalId);
     }
 
     public void setSelectorGhostFluid(FluidStack stack) {
@@ -2029,7 +2246,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     public void setSelectorGhostItem(ItemStack stack) {
         if (menu.getExtractorSlotIndex() >= 0) {
-            menu.slots.get(menu.getExtractorSlotIndex()).set(ItemStackCompat.copyWithCount(stack, 1));
+            menu.slots.get(menu.getExtractorSlotIndex()).set(stack.copyWithCount(1));
             this.selectorGhostChemicalId = null;
             this.selectorGhostChemicalTags = null;
             this.selectorGhostChemicalName = null;
@@ -2106,7 +2323,14 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         ItemStack slotItem = getSlotItemForSubMode(slot);
         if (!slotItem.isEmpty()) {
-            slotItem.getTags().forEach(t -> cachedSlotTags.add(t.location().toString()));
+            var item = slotItem.getItem();
+            BuiltInRegistries.ITEM.getTagNames().forEach(tagKey -> {
+                var holders = BuiltInRegistries.ITEM.getTag(tagKey);
+                if (holders.isPresent()
+                        && holders.get().stream().anyMatch(h -> h.value() == item)) {
+                    cachedSlotTags.add(tagKey.location().toString());
+                }
+            });
         }
         Collections.sort(cachedSlotTags);
 
@@ -2146,16 +2370,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 }
             }
         }
+        cachedSlotNbtPathLabels = cachedSlotNbtEntries.stream()
+                .map(entry -> formatNbtPath(entry.path().toString()))
+                .toList();
     }
 
     private ItemStack getSlotItemForSubMode(int slot) {
         if (menu.isTagSlot(slot)) {
             return ItemStack.EMPTY;
         }
-        if (slot < menu.slots.size()) {
-            return menu.slots.get(slot).getItem();
-        }
-        return ItemStack.EMPTY;
+        return FilterItemData.getEntry(menu.getOpenedStack(), slot);
     }
 
     private int getTagSubModeVisibleRows() {
@@ -2274,7 +2498,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         g.pose().popPose();
     }
 
-    private boolean handleTagSubModeClick(double mx, double my, int btn) {
+    private boolean handleTagSubModeClick(double mx, double my, int action) {
         int panelX = leftPos + 4;
         int panelY = topPos + 20;
         int panelW = imageWidth - 8;
@@ -2305,7 +2529,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (tagInputBox != null && tagInputBox.isVisible()) {
             int inputW = panelW - 60;
             if (isHovering(panelX + 4, inputY, inputW, 14, (int) mx, (int) my)) {
-                tagInputBox.mouseClicked(mx, my, btn);
+                tagInputBox.mouseClicked(mx, my, action);
                 return true;
             }
         }
@@ -2343,7 +2567,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     && my >= rowY && my < rowY + LIST_ROW_H) {
                 String tag = cachedSlotTags.get(i);
                 NetworkHandler.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, tag));
-                menu.setEntryTag(null, tagEditSlot, tag);
+                menu.setEntryTag(minecraft.player, tagEditSlot, tag);
                 closeTagSubMode();
                 return true;
             }
@@ -2359,7 +2583,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         String normalizedTag = FilterTagUtil.normalizeTag(rawValue);
         if (normalizedTag != null) {
             NetworkHandler.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, normalizedTag));
-            menu.setEntryTag(null, tagEditSlot, normalizedTag);
+            menu.setEntryTag(minecraft.player, tagEditSlot, normalizedTag);
         }
         closeTagSubMode();
     }
@@ -2374,103 +2598,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private int getNbtPanelX() {
-        return (width - getNbtPanelW()) / 2;
+        int panelW = getNbtPanelW();
+        return (width - panelW) / 2;
     }
 
     private int getNbtPanelW() {
         return imageWidth + 50;
-    }
-
-    private int getNbtColW(int rowW) {
-        return (rowW - NBT_INDICATOR_W - NBT_OP_BTN_W - 4) / 2;
-    }
-
-    private boolean isBooleanValue(String displayVal) {
-        return "true".equals(displayVal) || "false".equals(displayVal);
-    }
-
-    private static String stripNamespace(String s) {
-        int colon = s.indexOf(':');
-        return colon >= 0 ? s.substring(colon + 1) : s;
-    }
-
-    private String formatNbtPath(String path) {
-        String[] segments = path.split("\\.");
-        String last = null;
-        String parent = null;
-        for (String seg : segments) {
-            if (seg.equals("levels")) continue;
-            String clean = stripNamespace(seg);
-            parent = last;
-            last = clean;
-        }
-        if (parent != null && last != null) {
-            String abbr = PATH_ABBREV.getOrDefault(parent, parent);
-            return abbr + " > " + last;
-        }
-        return last != null ? last : path;
-    }
-
-    private String formatNbtValue(String raw) {
-        if (raw.length() >= 2 && raw.startsWith("\"") && raw.endsWith("\"")) {
-            String inner = raw.substring(1, raw.length() - 1);
-            return stripNamespace(inner);
-        }
-        if (raw.endsWith("b") || raw.endsWith("s") || raw.endsWith("L")
-                || raw.endsWith("f") || raw.endsWith("d")) {
-            String num = raw.substring(0, raw.length() - 1);
-            if (raw.endsWith("b")) {
-                if ("0".equals(num)) return "false";
-                if ("1".equals(num)) return "true";
-            }
-            return num;
-        }
-        return raw;
-    }
-
-    private FilterMenu.SlotNbtRule findActiveRule(List<FilterMenu.SlotNbtRule> rules, String path) {
-        for (FilterMenu.SlotNbtRule rule : rules) {
-            if (rule.path().equals(path))
-                return rule;
-        }
-        return null;
-    }
-
-    private int findActiveRuleIndex(List<FilterMenu.SlotNbtRule> rules, String path) {
-        for (int i = 0; i < rules.size(); i++) {
-            if (rules.get(i).path().equals(path))
-                return i;
-        }
-        return -1;
-    }
-
-    private int getNbtSubModeMaxScroll() {
-        int panelH = menu.getPlayerInventoryY() - 24;
-        int listH = panelH - 34;
-        int maxRows = Math.max(1, listH / LIST_ROW_H);
-        return Math.max(0, cachedSlotNbtEntries.size() - maxRows);
-    }
-
-    private void commitNbtValueEdit() {
-        if (nbtEditingRuleIndex < 0 || nbtEditSlot < 0) return;
-        String val = nbtValueEditBox.getValue().trim();
-        if (!val.isEmpty()) {
-            NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setValue(nbtEditSlot, nbtEditingRuleIndex, val));
-            menu.setSlotNbtRuleValue(nbtEditSlot, nbtEditingRuleIndex, val);
-        }
-        nbtEditingRuleIndex = -1;
-        nbtValueEditBox.setVisible(false);
-        nbtValueEditBox.setFocused(false);
-    }
-
-    private void commitNbtValueEditIfActive() {
-        if (nbtEditingRuleIndex >= 0) commitNbtValueEdit();
-    }
-
-    private void cancelNbtValueEdit() {
-        nbtEditingRuleIndex = -1;
-        nbtValueEditBox.setVisible(false);
-        nbtValueEditBox.setFocused(false);
     }
 
     private void renderNbtSubMode(GuiGraphics g, int mx, int my) {
@@ -2488,18 +2621,21 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         g.drawString(font, tr("gui.logisticsnetworks.filter.nbt.slot_title", nbtEditSlot + 1),
                 panelX + 4, panelY + 4, COL_WHITE, false);
 
+        // Clear button
         int clearW = 30;
         int clearX = panelX + panelW - clearW - 4;
         int clearY = panelY + 4;
         drawButton(g, clearX, clearY, clearW, 10, tr("gui.logisticsnetworks.filter.nbt.clear"), mx, my, true);
 
-        List<FilterMenu.SlotNbtRule> activeRules = menu.getSlotNbtRules(nbtEditSlot);
+        // NBT entries list
+        List<NbtCriterion> activeRules = menu.getSlotNbtRules(nbtEditSlot);
         int listX = panelX + 4;
         int listY = panelY + 16;
         int listW = panelW - 8;
         int listH = panelH - 34;
         renderNbtEntryList(g, listX, listY, listW, listH, activeRules, mx, my);
 
+        // Match mode button
         boolean matchAny = menu.isSlotNbtMatchAny(nbtEditSlot);
         String matchLabel = matchAny
                 ? tr("gui.logisticsnetworks.filter.nbt.match_any")
@@ -2512,8 +2648,19 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         g.pose().popPose();
     }
 
+    private static final int NBT_INDICATOR_W = 8;
+    private static final int NBT_OP_BTN_W = 18;
+
+    private int getNbtColW(int rowW) {
+        return (rowW - NBT_INDICATOR_W - NBT_OP_BTN_W - 4) / 2;
+    }
+
+    private boolean isBooleanValue(String displayVal) {
+        return "true".equals(displayVal) || "false".equals(displayVal);
+    }
+
     private void renderNbtEntryList(GuiGraphics g, int listX, int listY, int listW, int listH,
-            List<FilterMenu.SlotNbtRule> activeRules, int mx, int my) {
+            List<NbtCriterion> activeRules, int mx, int my) {
         int totalEntries = cachedSlotNbtEntries.size();
         int maxRows = Math.max(1, listH / LIST_ROW_H);
         int maxScroll = Math.max(0, totalEntries - maxRows);
@@ -2549,14 +2696,14 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 g.renderOutline(dotX, dotY, 5, 5, COL_GRAY);
             }
 
-            FilterMenu.SlotNbtRule activeRule = active ? activeRules.get(ruleIdx) : null;
+            NbtCriterion activeRule = active ? activeRules.get(ruleIdx) : null;
             String op = active ? activeRule.operator() : "=";
 
             int pathX = listX + NBT_INDICATOR_W;
             int opX = pathX + colW + 1;
             int valX = opX + NBT_OP_BTN_W + 1;
 
-            String displayPath = formatNbtPath(entry.path());
+            String displayPath = cachedSlotNbtPathLabels.get(i);
             g.fill(pathX, rowY, pathX + colW, rowY + LIST_ROW_H, 0xFF080808);
             g.renderOutline(pathX, rowY, colW, LIST_ROW_H, active ? COL_BTN_BORDER : 0xFF222222);
             g.drawString(font, font.plainSubstrByWidth(displayPath, colW - 4),
@@ -2596,6 +2743,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
         }
 
+        // Hide edit box if editing row scrolled out of view
         if (nbtEditingRuleIndex >= 0) {
             boolean visible = false;
             for (int i = nbtListScrollOffset; i < endIdx; i++) {
@@ -2623,7 +2771,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
     }
 
-    private boolean handleNbtSubModeClick(double mx, double my, int btn) {
+    private boolean handleNbtSubModeClick(double mx, double my, int action) {
         int panelW = getNbtPanelW();
         int panelX = getNbtPanelX();
         int panelY = topPos + 20;
@@ -2632,6 +2780,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (!isHovering(panelX, panelY, panelW, panelH, (int) mx, (int) my))
             return false;
 
+        // Clear button
         int clearW = 30;
         int clearX = panelX + panelW - clearW - 4;
         int clearY = panelY + 4;
@@ -2642,14 +2791,16 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return true;
         }
 
-        List<FilterMenu.SlotNbtRule> activeRules = menu.getSlotNbtRules(nbtEditSlot);
+        // NBT entries list
+        List<NbtCriterion> activeRules = menu.getSlotNbtRules(nbtEditSlot);
         int listX = panelX + 4;
         int listY = panelY + 16;
         int listW = panelW - 8;
         int listH = panelH - 34;
-        if (handleNbtEntryListClick(listX, listY, listW, listH, activeRules, mx, my, btn))
+        if (handleNbtEntryListClick(listX, listY, listW, listH, activeRules, mx, my, action))
             return true;
 
+        // Match mode button
         boolean matchAny = menu.isSlotNbtMatchAny(nbtEditSlot);
         String matchLabel = matchAny
                 ? tr("gui.logisticsnetworks.filter.nbt.match_any")
@@ -2669,7 +2820,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private boolean handleNbtEntryListClick(int listX, int listY, int listW, int listH,
-            List<FilterMenu.SlotNbtRule> activeRules, double mx, double my, int btn) {
+            List<NbtCriterion> activeRules, double mx, double my, int action) {
         int totalEntries = cachedSlotNbtEntries.size();
         int maxRows = Math.max(1, listH / LIST_ROW_H);
         int drawH = maxRows * LIST_ROW_H;
@@ -2699,7 +2850,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 continue;
 
             NbtFilterData.NbtEntry entry = cachedSlotNbtEntries.get(i);
-            String path = entry.path();
+            NbtPath path = entry.path();
             int ruleIdx = findActiveRuleIndex(activeRules, path);
             boolean active = ruleIdx >= 0;
 
@@ -2707,6 +2858,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int opX = pathX + colW + 1;
             int valX = opX + NBT_OP_BTN_W + 1;
 
+            // Click operator button = cycle operator
             if (active && isHovering(opX, rowY, NBT_OP_BTN_W, LIST_ROW_H, (int) mx, (int) my)) {
                 commitNbtValueEditIfActive();
                 String savedVal = formatNbtValue(activeRules.get(ruleIdx).value().toString());
@@ -2714,11 +2866,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 String newOp = FilterItemData.nextNbtOperator(currentOp);
                 NetworkHandler.sendToServer(SetFilterEntryNbtPayload.remove(nbtEditSlot, ruleIdx));
                 menu.removeSlotNbtRule(nbtEditSlot, ruleIdx);
-                NetworkHandler.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, path, newOp, ""));
+                NetworkHandler.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, entry.path(), newOp, ""));
                 if (minecraft != null && minecraft.player != null) {
-                    menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, newOp);
+                    menu.addSlotNbtRule(minecraft.player, nbtEditSlot, entry.path(), newOp);
                 }
-                List<FilterMenu.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
+                List<NbtCriterion> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
                 int newIdx = findActiveRuleIndex(updatedRules, path);
                 if (newIdx >= 0) {
                     NetworkHandler.sendToServer(
@@ -2728,9 +2880,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 return true;
             }
 
-            if (active && btn == 0 && mx >= valX) {
+            // Click value area of active rule
+            if (active && action == 0 && mx >= valX) {
                 String displayVal = formatNbtValue(activeRules.get(ruleIdx).value().toString());
 
+                // Boolean toggle
                 if (isBooleanValue(displayVal)) {
                     commitNbtValueEditIfActive();
                     String toggled = "true".equals(displayVal) ? "false" : "true";
@@ -2740,8 +2894,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     return true;
                 }
 
+                // Edit value
                 if (nbtEditingRuleIndex == ruleIdx) {
-                    nbtValueEditBox.mouseClicked(mx, my, btn);
+                    nbtValueEditBox.mouseClicked(mx, my, action);
                     return true;
                 }
                 commitNbtValueEditIfActive();
@@ -2752,32 +2907,34 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 return true;
             }
 
-            if (btn == 0 && mx < opX) {
+            // Click toggle indicator or path area = toggle rule
+            if (action == 0 && mx < opX) {
                 commitNbtValueEditIfActive();
                 if (active) {
                     NetworkHandler.sendToServer(SetFilterEntryNbtPayload.remove(nbtEditSlot, ruleIdx));
                     menu.removeSlotNbtRule(nbtEditSlot, ruleIdx);
                 } else {
-                    NetworkHandler.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, path, "=", ""));
+                    NetworkHandler.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, entry.path(), "=", ""));
                     if (minecraft != null && minecraft.player != null) {
-                        menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, "=");
+                        menu.addSlotNbtRule(minecraft.player, nbtEditSlot, entry.path(), "=");
                     }
                 }
                 return true;
             }
 
-            if (active && btn == 1) {
+            // Right-click = cycle operator (if active)
+            if (active && action == 1) {
                 commitNbtValueEditIfActive();
                 String savedVal = formatNbtValue(activeRules.get(ruleIdx).value().toString());
                 String currentOp = activeRules.get(ruleIdx).operator();
                 String newOp = FilterItemData.nextNbtOperator(currentOp);
                 NetworkHandler.sendToServer(SetFilterEntryNbtPayload.remove(nbtEditSlot, ruleIdx));
                 menu.removeSlotNbtRule(nbtEditSlot, ruleIdx);
-                NetworkHandler.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, path, newOp, ""));
+                NetworkHandler.sendToServer(SetFilterEntryNbtPayload.add(nbtEditSlot, entry.path(), newOp, ""));
                 if (minecraft != null && minecraft.player != null) {
-                    menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, newOp);
+                    menu.addSlotNbtRule(minecraft.player, nbtEditSlot, entry.path(), newOp);
                 }
-                List<FilterMenu.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
+                List<NbtCriterion> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
                 int newIdx = findActiveRuleIndex(updatedRules, path);
                 if (newIdx >= 0) {
                     NetworkHandler.sendToServer(
@@ -2794,22 +2951,125 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return true;
     }
 
+    private int findActiveRuleIndex(List<NbtCriterion> rules, NbtPath path) {
+        for (int i = 0; i < rules.size(); i++) {
+            if (rules.get(i).path().equals(path))
+                return i;
+        }
+        return -1;
+    }
+
+    private static final Map<String, String> PATH_ABBREV = Map.of(
+            "enchantments", "ench",
+            "stored_enchantments", "stored",
+            "potion_contents", "potion",
+            "custom_data", "data",
+            "attribute_modifiers", "attr"
+    );
+
+    private static String stripNamespace(String s) {
+        int colon = s.indexOf(':');
+        return colon >= 0 ? s.substring(colon + 1) : s;
+    }
+
+    private String formatNbtPath(String path) {
+        String[] segments = path.split("\\.");
+        String last = null;
+        String parent = null;
+        for (String seg : segments) {
+            if (seg.equals("levels")) continue;
+            String clean = stripNamespace(seg);
+            parent = last;
+            last = clean;
+        }
+        if (parent != null && last != null) {
+            String abbr = PATH_ABBREV.getOrDefault(parent, parent);
+            return abbr + " > " + last;
+        }
+        return last != null ? last : path;
+    }
+
+    private String formatNbtValue(String raw) {
+        if (raw.length() >= 2 && raw.startsWith("\"") && raw.endsWith("\"")) {
+            String inner = raw.substring(1, raw.length() - 1);
+            inner = stripNamespace(inner);
+            return inner;
+        }
+        if (raw.endsWith("b") || raw.endsWith("s") || raw.endsWith("L")
+                || raw.endsWith("f") || raw.endsWith("d")) {
+            String num = raw.substring(0, raw.length() - 1);
+            if (raw.endsWith("b")) {
+                if ("0".equals(num)) return "false";
+                if ("1".equals(num)) return "true";
+            }
+            return num;
+        }
+        return raw;
+    }
+
+    private int getNbtSubModeMaxScroll() {
+        int panelH = menu.getPlayerInventoryY() - 24;
+        int listH = panelH - 34;
+        int maxRows = Math.max(1, listH / LIST_ROW_H);
+        return Math.max(0, cachedSlotNbtEntries.size() - maxRows);
+    }
+
+    private void commitNbtValueEdit() {
+        if (nbtEditingRuleIndex < 0 || nbtEditSlot < 0) return;
+        String val = nbtValueEditBox.getValue().trim();
+        if (!val.isEmpty()) {
+            NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setValue(nbtEditSlot, nbtEditingRuleIndex, val));
+            menu.setSlotNbtRuleValue(nbtEditSlot, nbtEditingRuleIndex, val);
+        }
+        nbtEditingRuleIndex = -1;
+        nbtValueEditBox.setVisible(false);
+        nbtValueEditBox.setFocused(false);
+    }
+
+    private void commitNbtValueEditIfActive() {
+        if (nbtEditingRuleIndex >= 0) commitNbtValueEdit();
+    }
+
+    private void cancelNbtValueEdit() {
+        nbtEditingRuleIndex = -1;
+        nbtValueEditBox.setVisible(false);
+        nbtValueEditBox.setFocused(false);
+    }
+
     private void closeNbtSubMode() {
         commitNbtValueEditIfActive();
         nbtEditSlot = -1;
         subModeDropdownOpen = false;
         cachedSlotNbtEntries.clear();
+        cachedSlotNbtPathLabels = List.of();
         nbtPendingOperator = "=";
         nbtListScrollOffset = 0;
     }
 
-    // ── Detail Page ──
-
-    private static final int DETAIL_SECTION_H = 22;
-    private static final int DETAIL_TAG_COLOR = 0xFF44BB44;
-    private static final int DETAIL_NBT_COLOR = 0xFFFFAA00;
-    private static final int DETAIL_DUR_COLOR = 0xFF55BBFF;
-    private static final int DETAIL_SLOT_COLOR = 0xFFBB88FF;
+    public List<Rect2i> getExtraAreas() {
+        if (detailTagPicker != null) {
+            return List.of(new Rect2i(0, 0, width, height));
+        }
+        List<Rect2i> areas = new ArrayList<>();
+        if (detailEditSlot >= 0) {
+            areas.add(new Rect2i(leftPos, topPos, imageWidth, imageHeight));
+        }
+        if (nbtEditSlot >= 0) {
+            int panelW = getNbtPanelW();
+            int panelX = getNbtPanelX();
+            int panelY = topPos + 20;
+            int panelH = menu.getPlayerInventoryY() - 24;
+            areas.add(new Rect2i(panelX, panelY, panelW, panelH));
+        }
+        if (tagEditSlot >= 0) {
+            int panelX = leftPos + 4;
+            int panelY = topPos + 20;
+            int panelW = imageWidth - 8;
+            int panelH = menu.getPlayerInventoryY() - 24;
+            areas.add(new Rect2i(panelX, panelY, panelW, panelH));
+        }
+        return areas;
+    }
 
     private void enterDetailPage(int slot) {
         detailEditSlot = slot;
@@ -2889,7 +3149,14 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         } else {
             ItemStack slotItem = getSlotItemForSubMode(slot);
             if (!slotItem.isEmpty()) {
-                slotItem.getTags().forEach(t -> detailCachedTags.add(t.location().toString()));
+                var item = slotItem.getItem();
+                BuiltInRegistries.ITEM.getTagNames().forEach(tagKey -> {
+                    var holders = BuiltInRegistries.ITEM.getTag(tagKey);
+                    if (holders.isPresent()
+                            && holders.get().stream().anyMatch(h -> h.value() == item)) {
+                        detailCachedTags.add(tagKey.location().toString());
+                    }
+                });
             }
             Collections.sort(detailCachedTags);
 
@@ -2936,8 +3203,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (isFluidOrChemical) {
             detailSlotMappingInputBox.setValue("");
             detailSlotMappingInputBox.setVisible(false);
-            detailDurabilityOp = null;
-            detailDurabilityValueBox.setVisible(false);
             detailNbtInputBox.setValue("");
             detailNbtInputBox.active = false;
             detailNbtInputBox.setFocused(false);
@@ -2948,25 +3213,15 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailNbtValueBox.setValue("");
             detailNbtValueBox.setVisible(false);
             nbtTableEditingRow = -1;
-            detailItemEnchanted = false;
-            detailEnchantedEnabled = false;
-            detailItemDurability = -1;
-            detailItemMaxDurability = 0;
-            detailItemStackSize = 1;
         } else {
             String slotMapping = menu.getEntrySlotMappingExpression(slot);
             detailSlotMappingInputBox.setValue(slotMapping);
             detailSlotMappingInputBox.setVisible(true);
             detailSlotMappingInputBox.setFocused(false);
 
-            String durOp = FilterItemData.getEntryDurabilityOp(menu.getOpenedStack(), slot);
-            int durVal = FilterItemData.getEntryDurabilityValue(menu.getOpenedStack(), slot);
-            detailDurabilityOp = durOp;
-            detailDurabilityValueBox.setVisible(false);
-            detailDurabilityValueBox.setFocused(false);
-
+            ItemStack openedStack = menu.getOpenedStack();
             ItemStack slotItem = getSlotItemForSubMode(slot);
-            String existingNbtRaw = FilterItemData.getEntryNbtRaw(menu.getOpenedStack(), slot);
+            String existingNbtRaw = FilterItemData.getEntryNbtRaw(openedStack, slot);
             if (existingNbtRaw != null) {
                 detailNbtInputBox.setValue(existingNbtRaw);
             } else {
@@ -2986,18 +3241,23 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 detailCachedNbtEntries.addAll(NbtFilterData.extractEntries(
                         slotItem, minecraft.player.level().registryAccess()));
             } else {
-                List<FilterMenu.SlotNbtRule> stored = menu.getSlotNbtRules(slot);
-                for (FilterMenu.SlotNbtRule r : stored) {
-                    String display = r.value() != null ? r.value().getAsString() : "?";
+                List<NbtCriterion> stored = menu.getSlotNbtRules(slot);
+                for (NbtCriterion r : stored) {
+                    String display = r.value().getAsString();
                     detailCachedNbtEntries.add(new NbtFilterData.NbtEntry(r.path(), display));
+                }
+                for (NbtFilterData.NbtEntry entry : NbtFilterData.getDefaultEntries()) {
+                    if (detailCachedNbtEntries.stream().noneMatch(existing -> existing.path().equals(entry.path()))) {
+                        detailCachedNbtEntries.add(entry);
+                    }
                 }
             }
             nbtCollapsedGroups.clear();
             buildNbtRows();
 
             detailNbtActiveOps.clear();
-            List<FilterMenu.SlotNbtRule> existingRules = menu.getSlotNbtRules(slot);
-            for (FilterMenu.SlotNbtRule r : existingRules) {
+            List<NbtCriterion> existingRules = menu.getSlotNbtRules(slot);
+            for (NbtCriterion r : existingRules) {
                 detailNbtActiveOps.put(r.path(), r.operator());
             }
             detailNbtOp = "=";
@@ -3006,22 +3266,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailNbtValueBox.setVisible(false);
             detailNbtValueBox.setFocused(false);
             nbtTableEditingRow = -1;
-
-            Boolean savedEnchanted = FilterItemData.getEntryEnchanted(menu.getOpenedStack(), slot);
-            if (!slotItem.isEmpty()) {
-                detailItemEnchanted = savedEnchanted != null ? savedEnchanted : slotItem.isEnchanted();
-                detailEnchantedEnabled = savedEnchanted != null;
-                detailItemMaxDurability = slotItem.getMaxDamage();
-                detailItemDurability = detailItemMaxDurability > 0
-                        ? detailItemMaxDurability - slotItem.getDamageValue() : -1;
-                detailItemStackSize = slotItem.getCount();
-            } else {
-                detailItemEnchanted = savedEnchanted != null ? savedEnchanted : false;
-                detailEnchantedEnabled = savedEnchanted != null;
-                detailItemDurability = 0;
-                detailItemMaxDurability = 0;
-                detailItemStackSize = 1;
-            }
         }
     }
 
@@ -3037,9 +3281,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 detailTagFilteredList.addAll(detailAllTags);
             } else {
                 for (String tag : detailAllTags) {
-                    if (tag.toLowerCase().contains(filter)) {
+                    if (tag.toLowerCase().contains(filter))
                         detailTagFilteredList.add(tag);
-                    }
                 }
             }
         } else if (!raw.isEmpty()) {
@@ -3059,6 +3302,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         flushDetailPageInputs();
         detailEditSlot = -1;
         detailNbtPageOpen = false;
+        detailTagPicker = null;
         nbtSavedImageWidth = -1;
 
         if (savedImageHeight > 0) {
@@ -3080,8 +3324,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailStockInputBox.setFocused(false);
         detailSlotMappingInputBox.setVisible(false);
         detailSlotMappingInputBox.setFocused(false);
-        detailDurabilityValueBox.setVisible(false);
-        detailDurabilityValueBox.setFocused(false);
         detailNbtInputBox.active = false;
         detailNbtInputBox.setFocused(false);
     }
@@ -3102,7 +3344,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     menu.clearEntryTag(slot);
                 } else {
                     NetworkHandler.sendToServer(new SetFilterEntryTagPayload(slot, normalizedTag));
-                    menu.setEntryTag(null, slot, normalizedTag);
+                    menu.setEntryTag(minecraft.player, slot, normalizedTag);
                 }
             }
         } else if (!idVal.isEmpty()) {
@@ -3112,44 +3354,44 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     if (menu.getEntryTag(slot) != null) {
                         menu.clearEntryTag(slot);
                     }
-                    NetworkHandler.sendToServer(new SetFilterFluidEntryPayload(slot, fluidId.toString()));
-                    menu.setFluidFilterEntry(minecraft.player, slot, new FluidStack(BuiltInRegistries.FLUID.get(fluidId), 1000));
+                    setFluidFilterEntry(minecraft.player, slot, new FluidStack(BuiltInRegistries.FLUID.get(fluidId), 1000));
                 }
             } else if (targetType == FilterTargetType.CHEMICALS) {
                 if (MekanismCompat.isValidChemicalId(idVal)) {
                     if (menu.getEntryTag(slot) != null) {
                         menu.clearEntryTag(slot);
                     }
-                    NetworkHandler.sendToServer(new SetFilterChemicalEntryPayload(slot, idVal));
-                    menu.setChemicalFilterEntry(minecraft.player, slot, idVal);
+                    setChemicalFilterEntry(minecraft.player, slot, idVal);
                 }
             } else {
                 ResourceLocation itemId = ResourceLocation.tryParse(idVal);
                 if (itemId != null && BuiltInRegistries.ITEM.containsKey(itemId)) {
                     Item item = BuiltInRegistries.ITEM.get(itemId);
                     if (item != Items.AIR) {
-                        ItemStack stack = new ItemStack(item);
-                        if (menu.getEntryTag(slot) != null) {
-                            menu.clearEntryTag(slot);
+                        ItemStack currentSlotItem = getSlotItemForSubMode(slot);
+                        if (currentSlotItem.isEmpty() || !currentSlotItem.is(item)) {
+                            ItemStack stack = new ItemStack(item);
+                            if (menu.getEntryTag(slot) != null) {
+                                menu.clearEntryTag(slot);
+                            }
+                            NetworkHandler.sendToServer(SetFilterItemEntryPayload.set(slot, stack));
+                            menu.setItemFilterEntry(minecraft.player, slot, stack);
                         }
-                        NetworkHandler.sendToServer(new SetFilterItemEntryPayload(slot, stack));
-                        menu.setItemFilterEntry(minecraft.player, slot, stack);
                     }
                 }
             }
         } else if (hasEntryInSlot(slot)) {
             if (isFluidOrChemical) {
-                menu.clearFilterEntry(slot);
+                clearFilterEntry(slot);
             } else {
                 ItemStack opened = menu.getOpenedStack();
                 boolean hasConfig = FilterItemData.hasEntryNbt(opened, slot)
                         || FilterItemData.hasEntryDurability(opened, slot)
                         || FilterItemData.hasEntryEnchanted(opened, slot);
                 if (hasConfig) {
-                    menu.clearFilterEntryItem(slot);
-                    NetworkHandler.sendToServer(new SetFilterItemEntryPayload(slot, ItemStack.EMPTY));
+                    clearItemFilterEntry(slot);
                 } else {
-                    menu.clearFilterEntry(slot);
+                    clearFilterEntry(slot);
                 }
             }
         }
@@ -3157,18 +3399,20 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         String batchStr = detailBatchInputBox.getValue().trim();
         int batchVal = 0;
         if (!batchStr.isEmpty()) {
-            try { batchVal = Integer.parseInt(batchStr); } catch (NumberFormatException ignored) {}
+            try { batchVal = ArithmeticExpression.evaluate(batchStr); } catch (NumberFormatException ignored) {}
         }
         String stockStr = detailStockInputBox.getValue().trim();
         int stockVal = 0;
         if (!stockStr.isEmpty()) {
-            try { stockVal = Integer.parseInt(stockStr); } catch (NumberFormatException ignored) {}
+            try { stockVal = ArithmeticExpression.evaluate(stockStr); } catch (NumberFormatException ignored) {}
         }
         batchVal = Math.max(0, batchVal);
         stockVal = Math.max(0, stockVal);
+        detailBatchInputBox.setValue(batchVal > 0 ? String.valueOf(batchVal) : "");
+        detailStockInputBox.setValue(stockVal > 0 ? String.valueOf(stockVal) : "");
         if (batchVal != menu.getEntryBatch(slot) || stockVal != menu.getEntryStock(slot)) {
-            menu.setEntryBatch(null, slot, batchVal);
-            menu.setEntryStock(null, slot, stockVal);
+            menu.setEntryBatch(minecraft.player, slot, batchVal);
+            menu.setEntryStock(minecraft.player, slot, stockVal);
             NetworkHandler.sendToServer(new SetFilterEntryAmountPayload(slot, batchVal, stockVal));
         }
 
@@ -3177,19 +3421,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             String currentSlotMap = menu.getEntrySlotMappingExpression(slot);
             if (!slotMapStr.equals(currentSlotMap)) {
                 NetworkHandler.sendToServer(new SetFilterEntrySlotMappingPayload(slot, slotMapStr));
-                menu.setEntrySlotMapping(null, slot, slotMapStr);
-            }
-
-            if (detailDurabilityOp != null && detailItemDurability >= 0) {
-                menu.setEntryDurability(null, slot, detailDurabilityOp, detailItemDurability);
-                NetworkHandler.sendToServer(new SetFilterEntryDurabilityPayload(
-                        slot, detailDurabilityOp, detailItemDurability));
-            } else {
-                String existingOp = FilterItemData.getEntryDurabilityOp(menu.getOpenedStack(), slot);
-                if (existingOp != null) {
-                    menu.clearEntryDurability(null, slot);
-                    NetworkHandler.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
-                }
+                menu.setEntrySlotMapping(minecraft.player, slot, slotMapStr);
             }
 
             if (detailNbtPageOpen) {
@@ -3220,8 +3452,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 panelX + backW + 8, panelY + 6, COL_WHITE, false);
 
         int clearW = 40;
-        int clearX = panelX + panelW - clearW - 4;
-        drawButton(g, clearX, panelY + 4, clearW, 12, tr("gui.logisticsnetworks.filter.detail.clear"), mx, my, true);
+        int clearXPos = panelX + panelW - clearW - 4;
+        drawButton(g, clearXPos, panelY + 4, clearW, 12, tr("gui.logisticsnetworks.filter.detail.clear"), mx, my, true);
 
         int y = panelY + 20;
 
@@ -3240,7 +3472,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 g.renderOutline(slotX, slotY, 18, 18, DETAIL_TAG_COLOR);
                 if (detailTargetType == FilterTargetType.FLUIDS) {
                     TagKey<Fluid> fluidTagKey = TagKey.create(Registries.FLUID, tagId);
-                    var list = new java.util.ArrayList<Fluid>();
+                    var list = new ArrayList<Fluid>();
                     for (Fluid fluid : BuiltInRegistries.FLUID) {
                         if (fluid.builtInRegistryHolder().is(fluidTagKey)) {
                             list.add(fluid);
@@ -3248,7 +3480,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     }
                     if (!list.isEmpty()) {
                         int idx = (int) ((System.currentTimeMillis() / 1000) % list.size());
-                        renderFluidStack(g, new FluidStack(list.get(idx), 1000), slotX + 1, slotY + 1);
+                        FilterResourceRenderer.renderFluid(g,
+                                new FluidStack(list.get(idx), 1000), slotX + 1, slotY + 1);
                     }
                 } else if (detailTargetType == FilterTargetType.CHEMICALS) {
                     g.drawString(font, "#", slotX + 5, slotY + 5, DETAIL_TAG_COLOR, true);
@@ -3272,7 +3505,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (detailTargetType == FilterTargetType.FLUIDS) {
                 ResourceLocation fluidId = ResourceLocation.tryParse(idVal);
                 if (fluidId != null && BuiltInRegistries.FLUID.containsKey(fluidId)) {
-                    renderFluidStack(g, new FluidStack(BuiltInRegistries.FLUID.get(fluidId), 1000), slotX + 1, slotY + 1);
+                    FilterResourceRenderer.renderFluid(g,
+                            new FluidStack(BuiltInRegistries.FLUID.get(fluidId), 1000), slotX + 1, slotY + 1);
                 } else {
                     g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
                     int qx = slotX + (18 - font.width("?")) / 2;
@@ -3280,7 +3514,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 }
             } else if (detailTargetType == FilterTargetType.CHEMICALS) {
                 if (MekanismCompat.isValidChemicalId(idVal)) {
-                    renderChemicalStack(g, idVal, slotX + 1, slotY + 1);
+                    FilterResourceRenderer.renderChemical(g, idVal, slotX + 1, slotY + 1);
                 } else {
                     g.renderOutline(slotX, slotY, 18, 18, COL_ACCENT);
                     int qx = slotX + (18 - font.width("?")) / 2;
@@ -3308,7 +3542,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     }
                 }
             }
-        } else if (!isFluidOrChemical && FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
+        } else if (isFluidOrChemical && FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
+            g.renderOutline(slotX, slotY, 18, 18, 0xFF44BB44);
+            renderAnyResource(g, slotX + 1, slotY + 1);
+        } else if (FilterItemData.isNbtOnlySlot(openedStack, detailEditSlot)) {
             boolean hasNbt = FilterItemData.hasEntryNbt(openedStack, detailEditSlot);
             int ic = hasNbt ? DETAIL_NBT_COLOR : DETAIL_DUR_COLOR;
             String il = hasNbt ? "N" : "D";
@@ -3321,19 +3558,20 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             g.drawString(font, "?", qx, slotY + 5, COL_ACCENT, true);
         }
 
-        // ID field next to item slot
         int idFieldX = slotX + 22;
-        int idFieldW = contentW - 22;
+        int idFieldW = contentW - 40;
         detailIdInputBox.setX(idFieldX);
         detailIdInputBox.setY(slotY + 2);
         detailIdInputBox.setWidth(idFieldW);
         detailIdInputBox.render(g, mx, my, 0);
+        Rect2i tagButton = detailTagButtonArea();
+        drawButton(g, tagButton.getX(), tagButton.getY(), tagButton.getWidth(), tagButton.getHeight(),
+                "T", mx, my, true);
 
         y = slotY + 22;
 
-        // Autocomplete dropdown
-        boolean isTagMode = idVal.startsWith("#");
-        List<String> dropdownList = isTagMode ? detailTagFilteredList : detailItemFilteredList;
+        boolean isTagInput = idVal.startsWith("#");
+        List<String> dropdownList = isTagInput ? detailTagFilteredList : detailItemFilteredList;
         int labelW = 52;
         if (detailIdInputBox.isFocused() && !dropdownList.isEmpty()) {
             int dropRows = Math.min(DROPDOWN_ROWS, dropdownList.size());
@@ -3355,7 +3593,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             for (int i = startIdx; i < endIdx; i++) {
                 int rowY = y + (i - startIdx) * LIST_ROW_H;
                 String entry = dropdownList.get(i);
-                boolean selected = isTagMode && Objects.equals(entry, currentTag);
+                boolean selected = isTagInput && Objects.equals(entry, currentTag);
                 boolean hovered = mx >= dropX && mx < dropX + rowW
                         && my >= rowY && my < rowY + LIST_ROW_H;
 
@@ -3364,7 +3602,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 else if (hovered)
                     g.fill(dropX + 1, rowY, dropX + rowW - 1, rowY + LIST_ROW_H, COL_HOVER);
 
-                String displayText = isTagMode ? "#" + entry : entry;
+                String displayText = isTagInput ? "#" + entry : entry;
                 String text = font.plainSubstrByWidth(displayText, rowW - 6);
                 g.drawString(font, text, dropX + 3, rowY + 2,
                         selected ? COL_ACCENT : COL_WHITE, false);
@@ -3383,7 +3621,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             y += dropH + 2;
         }
 
-        // Batch section
         g.drawString(font, tr("gui.logisticsnetworks.filter.detail.batch"), contentX, y + 3, COL_WHITE, false);
         int batchInputX = contentX + labelW;
         detailBatchInputBox.setX(batchInputX);
@@ -3395,7 +3632,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
         y += DETAIL_SECTION_H;
 
-        // Stock section
         g.drawString(font, tr("gui.logisticsnetworks.filter.detail.stock"), contentX, y + 3, COL_WHITE, false);
         int stockInputX = contentX + labelW;
         detailStockInputBox.setX(stockInputX);
@@ -3408,21 +3644,37 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         y += DETAIL_SECTION_H;
 
         if (!isFluidOrChemical) {
-            // NBT button
             g.drawString(font, tr("gui.logisticsnetworks.filter.detail.nbt"), contentX, y + 3, DETAIL_NBT_COLOR, false);
-            int nbtBtnX = contentX + labelW;
-            String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
-            int nbtBtnW = Math.max(70, font.width(nbtBtnLabel) + 8);
-            drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, true);
+            boolean strictNbt = menu.isEntryNbtStrict(detailEditSlot);
+            int strictToggleX = contentX + labelW;
+            String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
+            int strictToggleW = 14 + font.width(strictLabel);
+            drawToggle(g, strictToggleX, y + 2, strictNbt);
+            g.drawString(font, strictLabel, strictToggleX + 14, y + 3,
+                    strictNbt ? COL_ACCENT : COL_GRAY, false);
 
-            if (isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
-                List<FilterMenu.SlotNbtRule> hoverRules = menu.getSlotNbtRules(detailEditSlot);
+            int nbtBtnX = strictToggleX + strictToggleW + 8;
+            String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
+            int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
+            drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, !strictNbt);
+
+            if (isHovering(strictToggleX, y, strictToggleW, 14, mx, my)) {
+                g.renderTooltip(font, Component.translatable(strictNbt
+                        ? "gui.logisticsnetworks.filter.detail.nbt.strict.on"
+                        : "gui.logisticsnetworks.filter.detail.nbt.strict.off"), mx, my);
+            }
+
+            if (strictNbt && isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
+                g.renderTooltip(font,
+                        Component.translatable("gui.logisticsnetworks.filter.detail.nbt.edit.disabled"), mx, my);
+            } else if (isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
+                List<NbtCriterion> hoverRules = menu.getSlotNbtRules(detailEditSlot);
                 if (!hoverRules.isEmpty()) {
                     List<Component> tipLines = new ArrayList<>();
-                    for (FilterMenu.SlotNbtRule r : hoverRules) {
-                        tipLines.add(Component.literal(abbreviateNbtPath(r.path()) + " " + r.operator() + " " + r.value()));
+                    for (NbtCriterion r : hoverRules) {
+                        tipLines.add(Component.literal(abbreviateNbtPath(r.path().toString()) + " " + r.operator() + " " + r.value()));
                     }
-                    g.renderComponentTooltip(font, tipLines, mx, my);
+                    g.renderTooltip(font, tipLines, Optional.empty(), mx, my);
                 } else {
                     String nbtRaw = FilterItemData.getEntryNbtRaw(openedStack, detailEditSlot);
                     if (nbtRaw != null) {
@@ -3433,7 +3685,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
             y += DETAIL_SECTION_H;
 
-            // Slot mapping section
             g.drawString(font, tr("gui.logisticsnetworks.filter.detail.slots"), contentX, y + 3, DETAIL_SLOT_COLOR, false);
             int slotInputX = contentX + labelW;
             int slotInputW = contentW - labelW;
@@ -3443,6 +3694,33 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailSlotMappingInputBox.setHint(Component.empty());
             detailSlotMappingInputBox.render(g, mx, my, 0);
         }
+        if (tagButton.contains(mx, my)) {
+            g.renderTooltip(font, Component.translatable("gui.logisticsnetworks.filter.tag_picker.open"), mx, my);
+        }
+    }
+
+    private Rect2i detailTagButtonArea() {
+        return new Rect2i(leftPos + imageWidth - 22, topPos + 42, 14, 14);
+    }
+
+    private void openDetailTagPicker() {
+        flushDetailPageInputs();
+        detailIdInputBox.setFocused(false);
+        detailBatchInputBox.setFocused(false);
+        detailStockInputBox.setFocused(false);
+        detailSlotMappingInputBox.setFocused(false);
+        String value = detailIdInputBox.getValue().trim();
+        ResourceLocation current = value.isEmpty() || value.startsWith("#") ? null : ResourceLocation.tryParse(value);
+        detailTagPicker = new FilterTagPicker(font, menu.getTargetType(), current, menu.getEntryTag(detailEditSlot),
+                this::applyDetailTag, () -> detailTagPicker = null, width, height);
+    }
+
+    private void applyDetailTag(String tag) {
+        NetworkHandler.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, tag));
+        menu.setEntryTag(minecraft.player, detailEditSlot, tag);
+        detailIdInputBox.setValue("#" + tag);
+        rebuildIdFilteredList();
+        detailTagPicker = null;
     }
 
     private void renderNbtSubPage(GuiGraphics g, int mx, int my) {
@@ -3507,62 +3785,85 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private void buildNbtRows() {
         nbtRows.clear();
-        int n = detailCachedNbtEntries.size();
-        if (n == 0) return;
+        List<String> pathTexts = detailCachedNbtEntries.stream()
+                .map(entry -> entry.path().toString())
+                .toList();
+        Map<String, List<Integer>> groupedEntries = new HashMap<>();
+        for (int i = 0; i < pathTexts.size(); i++) {
+            String category = nbtCategory(pathTexts.get(i));
+            groupedEntries.computeIfAbsent(category, ignored -> new ArrayList<>()).add(i);
+        }
 
-        Integer[] order = new Integer[n];
-        for (int i = 0; i < n; i++) order[i] = i;
-        Arrays.sort(order, Comparator.comparing(idx -> detailCachedNbtEntries.get(idx).path()));
-
-        int i = 0;
-        while (i < n) {
-            String pi = detailCachedNbtEntries.get(order[i]).path();
-            String groupPrefix = "";
-
-            if (i + 1 < n) {
-                String pj = detailCachedNbtEntries.get(order[i + 1]).path();
-                String lcp = nbtCommonPrefix(pi, pj);
-                int sep = -1;
-                for (int k = lcp.length() - 1; k >= 0; k--) {
-                    char c = lcp.charAt(k);
-                    if (c == '.' || c == ':' || c == '/') { sep = k; break; }
-                }
-                if (sep >= NBT_MIN_GROUP_PREFIX) {
-                    groupPrefix = lcp.substring(0, sep);
-                    int j = i + 1;
-                    while (j < n) {
-                        String pk = detailCachedNbtEntries.get(order[j]).path();
-                        if (pk.startsWith(groupPrefix) && pk.length() > groupPrefix.length()) {
-                            j++;
-                        } else break;
-                    }
-                    if (j - i >= 2) {
-                        nbtRows.add(new NbtRow(true, groupPrefix, -1, groupPrefix));
-                        for (int k = i; k < j; k++) {
-                            String full = detailCachedNbtEntries.get(order[k]).path();
-                            String suffix = full.substring(groupPrefix.length());
-                            if (!suffix.isEmpty()) {
-                                char fc = suffix.charAt(0);
-                                if (fc == '.' || fc == ':' || fc == '/') suffix = suffix.substring(1);
-                            }
-                            nbtRows.add(new NbtRow(false, suffix, order[k], groupPrefix));
-                        }
-                        i = j;
-                        continue;
-                    }
-                }
+        List<String> categories = new ArrayList<>(groupedEntries.keySet());
+        categories.sort(FilterScreen::compareNbtCategories);
+        for (String category : categories) {
+            List<Integer> entries = groupedEntries.get(category);
+            entries.sort(Comparator.comparing(pathTexts::get));
+            nbtRows.add(new NbtRow(true, category, -1, category));
+            for (int entryIdx : entries) {
+                nbtRows.add(new NbtRow(false, nbtDisplayPath(pathTexts.get(entryIdx), category), entryIdx, category));
             }
-
-            nbtRows.add(new NbtRow(false, pi, order[i], ""));
-            i++;
         }
     }
 
-    private String nbtCommonPrefix(String a, String b) {
-        int len = Math.min(a.length(), b.length());
-        int i = 0;
-        while (i < len && a.charAt(i) == b.charAt(i)) i++;
-        return a.substring(0, i);
+    // Item data lives under tag
+    private static final Set<String> VANILLA_TAG_KEYS = Set.of("Damage", "display", "RepairCost", "Unbreakable",
+            "HideFlags", "CustomModelData", "AttributeModifiers");
+
+    private static String nbtCategory(String path) {
+        String componentPath = nbtComponentPath(path);
+        if (componentPath.equals("minecraft:enchanted") || isNbtUnder(componentPath, "tag.Enchantments")
+                || isNbtUnder(componentPath, "tag.StoredEnchantments")) {
+            return "Enchantments";
+        }
+        if (componentPath.startsWith("minecraft:")) return "Minecraft";
+        if (componentPath.startsWith("tag.") && VANILLA_TAG_KEYS.contains(nbtTopKey(componentPath.substring(4)))) {
+            return "Minecraft";
+        }
+        return "Other";
+    }
+
+    private static boolean isNbtUnder(String path, String root) {
+        return path.equals(root) || path.startsWith(root + "[") || path.startsWith(root + ".");
+    }
+
+    private static String nbtTopKey(String path) {
+        int end = 0;
+        while (end < path.length() && path.charAt(end) != '.' && path.charAt(end) != '[') end++;
+        return path.substring(0, end);
+    }
+
+    private static int compareNbtCategories(String left, String right) {
+        if (left.equals(right)) return 0;
+        if (left.equals("Enchantments")) return -1;
+        if (right.equals("Enchantments")) return 1;
+        if (left.equals("Minecraft")) return -1;
+        if (right.equals("Minecraft")) return 1;
+        if (left.equals("Other")) return 1;
+        if (right.equals("Other")) return -1;
+        return left.compareTo(right);
+    }
+
+    private static String nbtDisplayPath(String path, String category) {
+        String componentPath = nbtComponentPath(path);
+        if (category.equals("Enchantments")) {
+            if (componentPath.equals("minecraft:enchanted")) return "enchanted";
+            if (isNbtUnder(componentPath, "tag.StoredEnchantments")) {
+                String suffix = componentPath.substring("tag.StoredEnchantments".length());
+                return suffix.isEmpty() ? "stored" : "stored > " + suffix;
+            }
+            String suffix = componentPath.substring("tag.Enchantments".length());
+            return suffix.isEmpty() ? "enchantments" : suffix;
+        }
+        if (componentPath.startsWith("tag.")) return componentPath.substring(4);
+
+        int separator = componentPath.indexOf(':');
+        return separator >= 0 ? componentPath.substring(separator + 1) : componentPath;
+    }
+
+    private static String nbtComponentPath(String path) {
+        String prefix = "fluid.components.";
+        return path.startsWith(prefix) ? path.substring(prefix.length()) : path;
     }
 
     private List<NbtRow> getVisibleNbtRows() {
@@ -3577,22 +3878,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return visible;
     }
 
-    private void renderBuiltinEditBox(GuiGraphics g, int mx, int my, int colValX, int rowY) {
-        detailNbtValueBox.setX(colValX);
-        detailNbtValueBox.setY(rowY);
-        detailNbtValueBox.setWidth(NBT_COL_VAL);
-        detailNbtValueBox.setHeight(NBT_ROW_H);
-        detailNbtValueBox.setVisible(true);
-        detailNbtValueBox.render(g, mx, my, 0);
-    }
-
     private void renderNbtTable(GuiGraphics g, int mx, int my, int tableX, int tableY, int tableW, int tableH) {
-        Set<String> activePaths = detailNbtActiveOps.keySet();
-        boolean durEnabled = detailDurabilityOp != null;
+        Set<NbtPath> activePaths = detailNbtActiveOps.keySet();
         if (nbtTableEditingRow < 0) detailNbtValueBox.setVisible(false);
 
         List<NbtRow> visible = getVisibleNbtRows();
-        int totalRows = NBT_BUILTIN_ROWS + visible.size();
+        int totalRows = visible.size();
         boolean scrollable = totalRows * NBT_ROW_H > tableH;
         int scrollW = scrollable ? SUBMODE_SCROLLBAR_W + SUBMODE_SCROLLBAR_GAP : 0;
         int rowW = tableW - scrollW;
@@ -3619,106 +3910,64 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             boolean hovered = mx >= tableX && mx < tableX + rowW
                     && my >= rowY && my < rowY + NBT_ROW_H;
 
-            if (vi < NBT_BUILTIN_ROWS) {
-                if (hovered)
-                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
-                g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
+            NbtRow row = visible.get(vi);
 
-                switch (vi) {
-                    case 0 -> {
-                        drawToggle(g, colToggleX, rowY + 1, durEnabled);
-                        g.drawString(font, "Durability", colPathX, rowY + 3, DETAIL_DUR_COLOR, false);
-                        String opStr = detailDurabilityOp != null ? detailDurabilityOp : "=";
-                        g.drawString(font, opStr, colOpX + 4, rowY + 3, COL_WHITE, false);
-                        if (nbtTableEditingRow == NBT_EDIT_DURABILITY) {
-                            renderBuiltinEditBox(g, mx, my, colValX, rowY);
-                        } else {
-                            String durVal = detailItemMaxDurability > 0
-                                    ? detailItemDurability + "/" + detailItemMaxDurability
-                                    : String.valueOf(detailItemDurability);
-                            String truncVal = font.plainSubstrByWidth(durVal, NBT_COL_VAL - 4);
-                            g.drawString(font, truncVal, colValX + 2, rowY + 3,
-                                    durEnabled ? COL_WHITE : COL_GRAY, false);
-                        }
-                    }
-                    case 1 -> {
-                        drawToggle(g, colToggleX, rowY + 1, detailEnchantedEnabled);
-                        g.drawString(font, "Enchanted", colPathX, rowY + 3, 0xFFDD88FF, false);
-                        int enchColor = detailItemEnchanted ? COL_ACCENT : 0xFFFF5555;
-                        String enchStr = detailItemEnchanted ? "true" : "false";
-                        g.drawString(font, enchStr, colValX + 2, rowY + 3,
-                                detailEnchantedEnabled ? enchColor : COL_GRAY, false);
-                    }
-                    case 2 -> {
-                        drawToggle(g, colToggleX, rowY + 1, false);
-                        g.drawString(font, "Stack Size", colPathX, rowY + 3, 0xFFFFCC44, false);
-                        if (nbtTableEditingRow == NBT_EDIT_STACK_SIZE) {
-                            renderBuiltinEditBox(g, mx, my, colValX, rowY);
-                        } else {
-                            g.drawString(font, String.valueOf(detailItemStackSize), colValX + 2, rowY + 3, COL_GRAY, false);
-                        }
-                    }
+            if (row.heading()) {
+                boolean collapsed = nbtCollapsedGroups.contains(row.group());
+                g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x18FFFFFF);
+                g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
+                if (hovered)
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x10FFFFFF);
+
+                String arrow = collapsed ? ">" : "v";
+                g.drawString(font, arrow, colToggleX + 2, rowY + 3, NBT_HEADING_COLOR, false);
+                String headText = font.plainSubstrByWidth(row.display(), rowW - 20);
+                g.drawString(font, headText, colToggleX + 12, rowY + 3, NBT_HEADING_COLOR, false);
+                if (hovered && headText.length() < row.display().length()) {
+                    hoveredFullText = row.display();
                 }
             } else {
-                NbtRow row = visible.get(vi - NBT_BUILTIN_ROWS);
+                int entryIdx = row.entryIdx();
+                NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
+                boolean active = activePaths.contains(entry.path());
+                boolean indented = !row.group().isEmpty();
 
-                if (row.heading()) {
-                    boolean collapsed = nbtCollapsedGroups.contains(row.group());
-                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x18FFFFFF);
-                    g.fill(tableX + 1, rowY + NBT_ROW_H - 1, tableX + rowW - 1, rowY + NBT_ROW_H, 0x20FFFFFF);
-                    if (hovered)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, 0x10FFFFFF);
+                if (active)
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, COL_SELECTED);
+                else if (hovered)
+                    g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, COL_HOVER);
 
-                    String arrow = collapsed ? ">" : "v";
-                    g.drawString(font, arrow, colToggleX + 2, rowY + 3, NBT_HEADING_COLOR, false);
-                    String headText = font.plainSubstrByWidth(row.display(), rowW - 20);
-                    g.drawString(font, headText, colToggleX + 12, rowY + 3, NBT_HEADING_COLOR, false);
-                    if (hovered && headText.length() < row.display().length()) {
-                        hoveredFullText = row.display();
-                    }
+                drawToggle(g, colToggleX, rowY + 1, active);
+
+                int entryPathX = indented ? colPathX + 6 : colPathX;
+                int entryPathW = indented ? pathW - 6 : pathW;
+                String pathDisplay = row.display();
+                String truncPath = font.plainSubstrByWidth(pathDisplay, entryPathW - 4);
+                g.drawString(font, truncPath, entryPathX, rowY + 3,
+                        active ? COL_ACCENT : COL_WHITE, false);
+
+                if (hovered && truncPath.length() < pathDisplay.length()) {
+                    hoveredFullText = entry.path() + " = " + entry.valueDisplay();
+                }
+
+                String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path(), "=") : "=";
+                int opColor = active ? COL_WHITE : COL_GRAY;
+                g.drawString(font, opStr, colOpX + 4, rowY + 3, opColor, false);
+
+                if (nbtTableEditingRow == entryIdx) {
+                    detailNbtValueBox.setX(colValX);
+                    detailNbtValueBox.setY(rowY);
+                    detailNbtValueBox.setWidth(NBT_COL_VAL);
+                    detailNbtValueBox.setHeight(NBT_ROW_H);
+                    detailNbtValueBox.setVisible(true);
+                    detailNbtValueBox.render(g, mx, my, 0);
                 } else {
-                    int entryIdx = row.entryIdx();
-                    NbtFilterData.NbtEntry entry = detailCachedNbtEntries.get(entryIdx);
-                    boolean active = activePaths.contains(entry.path());
-                    boolean indented = !row.group().isEmpty();
-
-                    if (active)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, COL_SELECTED);
-                    else if (hovered)
-                        g.fill(tableX + 1, rowY, tableX + rowW - 1, rowY + NBT_ROW_H, COL_HOVER);
-
-                    drawToggle(g, colToggleX, rowY + 1, active);
-
-                    int entryPathX = indented ? colPathX + 6 : colPathX;
-                    int entryPathW = indented ? pathW - 6 : pathW;
-                    String pathDisplay = row.display();
-                    String truncPath = font.plainSubstrByWidth(pathDisplay, entryPathW - 4);
-                    g.drawString(font, truncPath, entryPathX, rowY + 3,
-                            active ? COL_ACCENT : COL_WHITE, false);
-
-                    if (hovered && truncPath.length() < pathDisplay.length()) {
+                    String valDisplay = entry.valueDisplay();
+                    String truncVal = font.plainSubstrByWidth(valDisplay, NBT_COL_VAL - 4);
+                    g.drawString(font, truncVal, colValX + 2, rowY + 3,
+                            active ? COL_ACCENT : COL_GRAY, false);
+                    if (hovered && truncVal.length() < valDisplay.length() && hoveredFullText == null) {
                         hoveredFullText = entry.path() + " = " + entry.valueDisplay();
-                    }
-
-                    String opStr = active ? detailNbtActiveOps.getOrDefault(entry.path(), "=") : "=";
-                    int opColor = active ? COL_WHITE : COL_GRAY;
-                    g.drawString(font, opStr, colOpX + 4, rowY + 3, opColor, false);
-
-                    if (nbtTableEditingRow == entryIdx) {
-                        detailNbtValueBox.setX(colValX);
-                        detailNbtValueBox.setY(rowY);
-                        detailNbtValueBox.setWidth(NBT_COL_VAL);
-                        detailNbtValueBox.setHeight(NBT_ROW_H);
-                        detailNbtValueBox.setVisible(true);
-                        detailNbtValueBox.render(g, mx, my, 0);
-                    } else {
-                        String valDisplay = entry.valueDisplay();
-                        String truncVal = font.plainSubstrByWidth(valDisplay, NBT_COL_VAL - 4);
-                        g.drawString(font, truncVal, colValX + 2, rowY + 3,
-                                active ? COL_ACCENT : COL_GRAY, false);
-                        if (hovered && truncVal.length() < valDisplay.length() && hoveredFullText == null) {
-                            hoveredFullText = entry.path() + " = " + valDisplay;
-                        }
                     }
                 }
             }
@@ -3752,9 +4001,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
     }
 
-    private boolean handleDetailPageClick(double mx, double my, int btn) {
+    private boolean handleDetailPageClick(double mx, double my, int action) {
         if (detailNbtPageOpen) {
-            return handleNbtSubPageClick(mx, my, btn);
+            return handleNbtSubPageClick(mx, my, action);
+        }
+        if (action == 0 && detailTagButtonArea().contains((int) mx, (int) my)) {
+            openDetailTagPicker();
+            return true;
         }
 
         FilterTargetType targetType = menu.getTargetType();
@@ -3787,23 +4040,22 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int slotX = contentX;
         int itemSlotY = panelY + 20;
         int idFieldX = slotX + 22;
-        int idFieldW = contentW - 22;
+        int idFieldW = contentW - 40;
 
         if (isHovering(slotX, itemSlotY, 18, 18, (int) mx, (int) my)) {
             String currentId = detailIdInputBox.getValue().trim();
             if (!currentId.isEmpty() && !currentId.startsWith("#")) {
                 if (isFluidOrChemical) {
-                    menu.clearFilterEntry(detailEditSlot);
+                    clearFilterEntry(detailEditSlot);
                 } else {
                     ItemStack openedStack = menu.getOpenedStack();
                     boolean hasConfig = FilterItemData.hasEntryNbt(openedStack, detailEditSlot)
                             || FilterItemData.hasEntryDurability(openedStack, detailEditSlot)
                             || FilterItemData.hasEntryEnchanted(openedStack, detailEditSlot);
                     if (hasConfig) {
-                        menu.clearFilterEntryItem(detailEditSlot);
-                        NetworkHandler.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, ItemStack.EMPTY));
+                        clearItemFilterEntry(detailEditSlot);
                     } else {
-                        menu.clearFilterEntry(detailEditSlot);
+                        clearFilterEntry(detailEditSlot);
                     }
                 }
                 detailIdInputBox.setValue("");
@@ -3811,11 +4063,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
         }
 
-        // Dropdown clicks
         int dropY = itemSlotY + 22;
         String idVal = detailIdInputBox.getValue().trim();
-        boolean isTagMode = idVal.startsWith("#");
-        List<String> dropdownList = isTagMode ? detailTagFilteredList : detailItemFilteredList;
+        boolean isTagInput = idVal.startsWith("#");
+        List<String> dropdownList = isTagInput ? detailTagFilteredList : detailItemFilteredList;
         if (detailIdInputBox.isFocused() && !dropdownList.isEmpty()) {
             int dropRows = Math.min(DROPDOWN_ROWS, dropdownList.size());
             int dropH = dropRows * LIST_ROW_H;
@@ -3831,23 +4082,21 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     if (mx >= idFieldX && mx < idFieldX + rowW
                             && my >= rowY && my < rowY + LIST_ROW_H) {
                         String selected = dropdownList.get(i);
-                        if (isTagMode) {
+                        if (isTagInput) {
                             NetworkHandler.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, selected));
-                            menu.setEntryTag(null, detailEditSlot, selected);
+                            menu.setEntryTag(minecraft.player, detailEditSlot, selected);
                             detailIdInputBox.setValue("#" + selected);
                         } else if (targetType == FilterTargetType.FLUIDS) {
                             ResourceLocation fluidId = ResourceLocation.tryParse(selected);
                             if (fluidId != null && BuiltInRegistries.FLUID.containsKey(fluidId)) {
                                 menu.clearEntryTag(detailEditSlot);
-                                NetworkHandler.sendToServer(new SetFilterFluidEntryPayload(detailEditSlot, fluidId.toString()));
-                                menu.setFluidFilterEntry(minecraft.player, detailEditSlot, new FluidStack(BuiltInRegistries.FLUID.get(fluidId), 1000));
+                                setFluidFilterEntry(minecraft.player, detailEditSlot, new FluidStack(BuiltInRegistries.FLUID.get(fluidId), 1000));
                                 detailIdInputBox.setValue(selected);
                             }
                         } else if (targetType == FilterTargetType.CHEMICALS) {
                             if (MekanismCompat.isValidChemicalId(selected)) {
                                 menu.clearEntryTag(detailEditSlot);
-                                NetworkHandler.sendToServer(new SetFilterChemicalEntryPayload(detailEditSlot, selected));
-                                menu.setChemicalFilterEntry(minecraft.player, detailEditSlot, selected);
+                                setChemicalFilterEntry(minecraft.player, detailEditSlot, selected);
                                 detailIdInputBox.setValue(selected);
                             }
                         } else {
@@ -3857,7 +4106,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                                 if (item != Items.AIR) {
                                     ItemStack stack = new ItemStack(item);
                                     menu.clearEntryTag(detailEditSlot);
-                                    NetworkHandler.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, stack));
+                                    NetworkHandler.sendToServer(SetFilterItemEntryPayload.set(detailEditSlot, stack));
                                     menu.setItemFilterEntry(minecraft.player, detailEditSlot, stack);
                                     detailIdInputBox.setValue(selected);
                                 }
@@ -3872,7 +4121,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             dropY += dropH + 2;
         }
 
-        // Compute section Y positions after dropdown
         int labelW = 52;
         int batchY = dropY;
         int stockY = batchY + DETAIL_SECTION_H;
@@ -3880,11 +4128,21 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (!isFluidOrChemical) {
             int nbtY = stockY + DETAIL_SECTION_H;
 
-            // NBT configure button
-            int nbtBtnX = contentX + labelW;
+            int strictToggleX = contentX + labelW;
+            String strictLabel = tr("gui.logisticsnetworks.filter.detail.nbt.strict");
+            int strictToggleW = 14 + font.width(strictLabel);
+            boolean strictNbt = menu.isEntryNbtStrict(detailEditSlot);
+            if (isHovering(strictToggleX, nbtY, strictToggleW, 14, (int) mx, (int) my)) {
+                boolean next = !strictNbt;
+                NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, next));
+                menu.setEntryNbtStrict(detailEditSlot, next);
+                return true;
+            }
+
+            int nbtBtnX = strictToggleX + strictToggleW + 8;
             String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
-            int nbtBtnW = Math.max(70, font.width(nbtBtnLabel) + 8);
-            if (isHovering(nbtBtnX, nbtY, nbtBtnW, 14, (int) mx, (int) my)) {
+            int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
+            if (!strictNbt && isHovering(nbtBtnX, nbtY, nbtBtnW, 14, (int) mx, (int) my)) {
                 detailNbtPageOpen = true;
                 detailNbtScrollOffset = 0;
                 detailNbtInputBox.active = true;
@@ -3903,28 +4161,28 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (detailIdInputBox.isMouseOver(mx, my)) {
             detailIdInputBox.setFocused(true);
-            detailIdInputBox.mouseClicked(mx, my, btn);
+            detailIdInputBox.mouseClicked(mx, my, action);
             return true;
         }
         if (detailBatchInputBox.isMouseOver(mx, my)) {
             detailBatchInputBox.setFocused(true);
-            detailBatchInputBox.mouseClicked(mx, my, btn);
+            detailBatchInputBox.mouseClicked(mx, my, action);
             return true;
         }
         if (detailStockInputBox.isMouseOver(mx, my)) {
             detailStockInputBox.setFocused(true);
-            detailStockInputBox.mouseClicked(mx, my, btn);
+            detailStockInputBox.mouseClicked(mx, my, action);
             return true;
         }
         if (!isFluidOrChemical && detailSlotMappingInputBox.isMouseOver(mx, my)) {
             detailSlotMappingInputBox.setFocused(true);
-            detailSlotMappingInputBox.mouseClicked(mx, my, btn);
+            detailSlotMappingInputBox.mouseClicked(mx, my, action);
             return true;
         }
         return true;
     }
 
-    private boolean handleNbtSubPageClick(double mx, double my, int btn) {
+    private boolean handleNbtSubPageClick(double mx, double my, int action) {
         int panelX = leftPos + 4;
         int panelY = topPos + 20;
         int panelW = imageWidth - 8;
@@ -3934,6 +4192,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (!isHovering(panelX, panelY, panelW, panelH, (int) mx, (int) my)) {
             return false;
+        }
+
+        if (detailNbtRawMode && detailNbtInputBox.isFocused()
+                && !detailNbtInputBox.isMouseOver(mx, my)) {
+            flushNbtSubPage();
+            detailNbtInputBox.setFocused(false);
         }
 
         int backW = 50;
@@ -3981,8 +4245,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         y += 16;
 
         if (detailNbtRawMode) {
-            if (detailNbtInputBox.active) {
-                detailNbtInputBox.mouseClicked(mx, my, btn);
+            if (detailNbtInputBox.active && detailNbtInputBox.isMouseOver(mx, my)) {
+                if (action == 0) {
+                    detailNbtInputBox.setFocused(true);
+                }
+                detailNbtInputBox.mouseClicked(mx, my, action);
+                return true;
             }
 
             int nbtH = panelY + panelH - y - 20;
@@ -3994,17 +4262,17 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 return true;
             }
         } else {
-            return handleNbtTableClick(mx, my, btn, contentX, y, contentW, panelY + panelH - y - 4);
+            return handleNbtTableClick(mx, my, action, contentX, y, contentW, panelY + panelH - y - 4);
         }
 
         return true;
     }
 
-    private boolean handleNbtTableClick(double mx, double my, int btn,
+    private boolean handleNbtTableClick(double mx, double my, int action,
                                          int tableX, int tableY, int tableW, int tableH) {
-        Set<String> activePaths = detailNbtActiveOps.keySet();
+        Set<NbtPath> activePaths = detailNbtActiveOps.keySet();
         List<NbtRow> visible = getVisibleNbtRows();
-        int totalRows = NBT_BUILTIN_ROWS + visible.size();
+        int totalRows = visible.size();
         boolean scrollable = totalRows * NBT_ROW_H > tableH;
         int scrollW = scrollable ? SUBMODE_SCROLLBAR_W + SUBMODE_SCROLLBAR_GAP : 0;
         int rowW = tableW - scrollW;
@@ -4023,48 +4291,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (mx < tableX || mx >= tableX + rowW || my < rowY || my >= rowY + NBT_ROW_H)
                 continue;
 
-            if (vi < NBT_BUILTIN_ROWS) {
-                int builtinEditId = vi == 0 ? NBT_EDIT_DURABILITY
-                        : vi == 1 ? NBT_EDIT_ENCHANTED : NBT_EDIT_STACK_SIZE;
-
-                if (vi == 1) {
-                    if (mx < colToggleX + NBT_COL_TOGGLE + 4) {
-                        detailEnchantedEnabled = !detailEnchantedEnabled;
-                    } else {
-                        detailItemEnchanted = !detailItemEnchanted;
-                        if (!detailEnchantedEnabled) detailEnchantedEnabled = true;
-                    }
-                    NetworkHandler.sendToServer(new SetFilterEntryEnchantedPayload(
-                            detailEditSlot, detailEnchantedEnabled, detailItemEnchanted));
-                    menu.setEntryEnchanted(null, detailEditSlot,
-                            detailEnchantedEnabled ? detailItemEnchanted : null);
-                    return true;
-                }
-
-                if (mx < colToggleX + NBT_COL_TOGGLE + 4) {
-                    if (vi == 0) {
-                        detailDurabilityOp = detailDurabilityOp != null ? null : ">=";
-                        sendDetailDurabilityPacket();
-                    }
-                } else if (mx >= colOpX && mx < colOpX + NBT_COL_OP) {
-                    if (vi == 0) {
-                        cycleDurabilityOp();
-                        sendDetailDurabilityPacket();
-                    }
-                } else if (mx >= colValX) {
-                    if (nbtTableEditingRow != builtinEditId) {
-                        commitDetailBuiltinEdit();
-                        nbtTableEditingRow = builtinEditId;
-                        detailNbtValueBox.setValue(getBuiltinDefault(builtinEditId));
-                    }
-                    detailNbtValueBox.setFocused(true);
-                    detailNbtValueBox.mouseClicked(mx, my, btn);
-                    return true;
-                }
-                return true;
-            }
-
-            NbtRow row = visible.get(vi - NBT_BUILTIN_ROWS);
+            NbtRow row = visible.get(vi);
 
             if (row.heading()) {
                 if (nbtCollapsedGroups.contains(row.group())) {
@@ -4122,7 +4349,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 }
                 nbtTableEditingRow = entryIdx;
                 detailNbtValueBox.setFocused(true);
-                detailNbtValueBox.mouseClicked(mx, my, btn);
+                detailNbtValueBox.mouseClicked(mx, my, action);
                 return true;
             }
 
@@ -4131,13 +4358,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (nbtTableEditingRow >= 0) {
             commitDetailNbtValueEdit();
-        } else if (nbtTableEditingRow <= NBT_EDIT_DURABILITY) {
-            commitDetailBuiltinEdit();
         }
         return true;
     }
 
-    private void cycleDetailNbtOp(String path) {
+    private void cycleDetailNbtOp(NbtPath path) {
         String currentOp = detailNbtActiveOps.getOrDefault(path, "=");
         String nextOp = FilterItemData.nextNbtOperator(currentOp);
         detailNbtActiveOps.put(path, nextOp);
@@ -4150,7 +4375,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             menu.removeSlotNbtRule(detailEditSlot, ruleIdx);
             NetworkHandler.sendToServer(SetFilterEntryNbtPayload.add(detailEditSlot, path, nextOp, savedVal));
             menu.addSlotNbtRule(minecraft.player, detailEditSlot, path, nextOp, savedVal);
-            List<FilterMenu.SlotNbtRule> updatedRules = menu.getSlotNbtRules(detailEditSlot);
+            List<NbtCriterion> updatedRules = menu.getSlotNbtRules(detailEditSlot);
             int newIdx = findActiveRuleIndex(updatedRules, path);
             if (newIdx >= 0) {
                 NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setValue(detailEditSlot, newIdx, savedVal));
@@ -4169,11 +4394,15 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         String valueOverride = detailNbtValueBox.getValue().trim();
         String fallbackValue = valueOverride.isEmpty() ? entry.valueDisplay() : valueOverride;
+        if (menu.isEntryNbtStrict(detailEditSlot)) {
+            NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, false));
+            menu.setEntryNbtStrict(detailEditSlot, false);
+        }
         NetworkHandler.sendToServer(SetFilterEntryNbtPayload.add(detailEditSlot, entry.path(), opSymbol, fallbackValue));
         menu.addSlotNbtRule(minecraft.player, detailEditSlot, entry.path(), opSymbol, fallbackValue);
 
         if (!valueOverride.isEmpty() && !valueOverride.equals(entry.valueDisplay())) {
-            List<FilterMenu.SlotNbtRule> rules = menu.getSlotNbtRules(detailEditSlot);
+            List<NbtCriterion> rules = menu.getSlotNbtRules(detailEditSlot);
             int ruleIdx = findActiveRuleIndex(rules, entry.path());
             if (ruleIdx >= 0) {
                 NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setValue(detailEditSlot, ruleIdx, valueOverride));
@@ -4184,45 +4413,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             buildNbtRows();
         }
         detailNbtActiveOps.put(entry.path(), opSymbol);
-    }
-
-    private String getBuiltinDefault(int builtinId) {
-        return switch (builtinId) {
-            case NBT_EDIT_DURABILITY -> String.valueOf(detailItemDurability);
-            case NBT_EDIT_ENCHANTED -> detailItemEnchanted ? "true" : "false";
-            case NBT_EDIT_STACK_SIZE -> String.valueOf(detailItemStackSize);
-            default -> "";
-        };
-    }
-
-    private void commitDetailBuiltinEdit() {
-        if (nbtTableEditingRow >= 0 || nbtTableEditingRow == -1) return;
-        String val = detailNbtValueBox.getValue().trim();
-        if (val.isEmpty()) val = getBuiltinDefault(nbtTableEditingRow);
-
-        switch (nbtTableEditingRow) {
-            case NBT_EDIT_DURABILITY -> {
-                try {
-                    int durVal = Integer.parseInt(val);
-                    detailItemDurability = durVal;
-                    if (detailDurabilityOp == null) detailDurabilityOp = ">=";
-                    menu.setEntryDurability(null, detailEditSlot, detailDurabilityOp, durVal);
-                    NetworkHandler.sendToServer(new SetFilterEntryDurabilityPayload(
-                            detailEditSlot, detailDurabilityOp, durVal));
-                } catch (NumberFormatException ignored) {}
-            }
-            case NBT_EDIT_ENCHANTED -> {
-                detailItemEnchanted = "true".equalsIgnoreCase(val);
-            }
-            case NBT_EDIT_STACK_SIZE -> {
-                try {
-                    detailItemStackSize = Integer.parseInt(val);
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-        nbtTableEditingRow = -1;
-        detailNbtValueBox.setVisible(false);
-        detailNbtValueBox.setFocused(false);
     }
 
     private void commitDetailNbtValueEdit() {
@@ -4245,7 +4435,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             String normalized = FilterTagUtil.normalizeTag(val);
             if (normalized != null) {
                 NetworkHandler.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, normalized));
-                menu.setEntryTag(null, detailEditSlot, normalized);
+                menu.setEntryTag(minecraft.player, detailEditSlot, normalized);
                 detailIdInputBox.setValue("#" + normalized);
             }
         } else {
@@ -4255,7 +4445,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 if (item != Items.AIR) {
                     ItemStack stack = new ItemStack(item);
                     menu.clearEntryTag(detailEditSlot);
-                    NetworkHandler.sendToServer(new SetFilterItemEntryPayload(detailEditSlot, stack));
+                    NetworkHandler.sendToServer(SetFilterItemEntryPayload.set(detailEditSlot, stack));
                     menu.setItemFilterEntry(minecraft.player, detailEditSlot, stack);
                     detailIdInputBox.setValue(itemId.toString());
                 }
@@ -4269,10 +4459,15 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             String nbtVal = detailNbtInputBox.getValue().replace("\n", " ").trim();
             String existingRaw = FilterItemData.getEntryNbtRaw(menu.getOpenedStack(), detailEditSlot);
             if (!nbtVal.isEmpty() && !nbtVal.equals(existingRaw)) {
+                if (menu.isEntryNbtStrict(detailEditSlot)) {
+                    NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, false));
+                    menu.setEntryNbtStrict(detailEditSlot, false);
+                }
+                menu.setEntryNbtRaw(minecraft.player, detailEditSlot, NbtPath.EMPTY, nbtVal);
                 NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setRaw(detailEditSlot, nbtVal));
             } else if (nbtVal.isEmpty() && existingRaw != null) {
                 NetworkHandler.sendToServer(SetFilterEntryNbtPayload.clear(detailEditSlot));
-                menu.clearSlotNbtRules(detailEditSlot);
+                menu.clearEntryNbt(minecraft.player, detailEditSlot);
             }
         }
     }
@@ -4310,22 +4505,23 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private boolean handleDetailPageKey(int key, int scan, int modifiers) {
         if (detailNbtPageOpen) {
             if (detailNbtInputBox.isFocused()) {
+                if (key == InputConstants.KEY_RETURN || key == InputConstants.KEY_NUMPADENTER) {
+                    flushNbtSubPage();
+                    detailNbtInputBox.setFocused(false);
+                    return true;
+                }
                 detailNbtInputBox.keyPressed(key, scan, modifiers);
                 return true;
             }
             if (detailNbtValueBox.isFocused()) {
                 if (key == 257 || key == 256) {
-                    if (nbtTableEditingRow <= NBT_EDIT_DURABILITY) {
-                        commitDetailBuiltinEdit();
-                    } else {
-                        commitDetailNbtValueEdit();
-                    }
+                    commitDetailNbtValueEdit();
                     return true;
                 }
                 detailNbtValueBox.keyPressed(key, scan, modifiers);
                 return true;
             }
-            return true;
+            return false;
         }
 
         if (key == 257) {
@@ -4368,7 +4564,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return true;
         }
 
-        return true;
+        return false;
     }
 
     private boolean handleDetailPageScroll(double mx, double my, double delta) {
@@ -4380,14 +4576,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int panelH = imageHeight - 24;
             int y = panelY + 36;
             int listH = panelY + panelH - y - 4;
-            int totalRows = NBT_BUILTIN_ROWS + getVisibleNbtRows().size();
+            int totalRows = getVisibleNbtRows().size();
             int visibleRows = Math.max(1, listH / NBT_ROW_H);
             int maxScroll = Math.max(0, totalRows - visibleRows);
             detailNbtScrollOffset = Mth.clamp(detailNbtScrollOffset - (int) delta, 0, maxScroll);
             return true;
         }
 
-        // Dropdown scroll
         if (detailIdInputBox.isFocused()) {
             String idVal = detailIdInputBox.getValue().trim();
             List<String> activeList = idVal.startsWith("#") ? detailTagFilteredList : detailItemFilteredList;
@@ -4402,7 +4597,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             String str = detailBatchInputBox.getValue().trim();
             int current = 0;
             if (!str.isEmpty()) {
-                try { current = Integer.parseInt(str); } catch (NumberFormatException ignored) {}
+                try { current = ArithmeticExpression.evaluate(str); } catch (NumberFormatException ignored) {}
             }
             int scrollDelta = computeScrollDelta(delta, menu.getTargetType());
             int next = Math.max(0, current + scrollDelta);
@@ -4413,7 +4608,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             String str = detailStockInputBox.getValue().trim();
             int current = 0;
             if (!str.isEmpty()) {
-                try { current = Integer.parseInt(str); } catch (NumberFormatException ignored) {}
+                try { current = ArithmeticExpression.evaluate(str); } catch (NumberFormatException ignored) {}
             }
             int scrollDelta = computeScrollDelta(delta, menu.getTargetType());
             int next = Math.max(0, current + scrollDelta);
@@ -4429,30 +4624,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (!menu.slots.get(slot).getItem().isEmpty()) return false;
         if (menu.isTagSlot(slot)) return false;
         return menu.getEntryBatch(slot) > 0 || menu.getEntryStock(slot) > 0;
-    }
-
-    private void cycleDurabilityOp() {
-        if (detailDurabilityOp == null) {
-            detailDurabilityOp = "=";
-        } else if (detailDurabilityOp.equals("=")) {
-            detailDurabilityOp = ">=";
-        } else if (detailDurabilityOp.equals(">=")) {
-            detailDurabilityOp = "<=";
-        } else {
-            detailDurabilityOp = "=";
-        }
-    }
-
-    private void sendDetailDurabilityPacket() {
-        if (detailDurabilityOp != null) {
-            menu.setEntryDurability(null, detailEditSlot, detailDurabilityOp, detailItemDurability);
-            NetworkHandler.sendToServer(new SetFilterEntryDurabilityPayload(
-                    detailEditSlot, detailDurabilityOp, detailItemDurability));
-        } else {
-            menu.setEntryDurability(null, detailEditSlot, null, 0);
-            NetworkHandler.sendToServer(new SetFilterEntryDurabilityPayload(
-                    detailEditSlot, "", 0));
-        }
     }
 
     private static String abbreviateNbtPath(String path) {
@@ -4481,10 +4652,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 || FilterItemData.hasEntryEnchanted(openedStack, slot);
 
         if (hasNbtConfig) {
-            menu.clearFilterEntryItem(slot);
-            NetworkHandler.sendToServer(new SetFilterItemEntryPayload(slot, ItemStack.EMPTY));
+            clearItemFilterEntry(slot);
         } else {
-            menu.clearFilterEntry(slot);
+            clearFilterEntry(slot);
         }
 
         detailIdInputBox.setValue("");
@@ -4492,8 +4662,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailStockInputBox.setValue("");
         detailSlotMappingInputBox.setValue("");
         if (!hasNbtConfig) {
-            detailDurabilityValueBox.setValue("");
-            detailDurabilityOp = null;
             detailNbtInputBox.setValue("");
             detailNbtValueBox.setValue("");
             detailNbtSelectedIdx = -1;
@@ -4501,6 +4669,67 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             detailNbtActiveOps.clear();
             nbtTableEditingRow = -1;
         }
+    }
+
+    private List<Component> buildFilterEntryTooltip(int slot, ItemStack filterStack) {
+        List<Component> lines = new ArrayList<>();
+
+        String tag = menu.getEntryTag(slot);
+        ItemStack slotItem = slot < menu.slots.size() ? menu.slots.get(slot).getItem() : ItemStack.EMPTY;
+        FluidStack fluid = menu.getFluidFilter(slot);
+        String chemId = menu.getChemicalFilter(slot);
+        boolean isNbtOnly = FilterItemData.isNbtOnlySlot(filterStack, slot);
+
+        int batch = menu.getEntryBatch(slot);
+        int stock = menu.getEntryStock(slot);
+
+        if (tag != null) {
+            lines.add(Component.literal("#" + tag).withStyle(ChatFormatting.GOLD));
+        } else if (!slotItem.isEmpty()) {
+            ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(slotItem.getItem());
+            lines.add(Component.literal(itemId.toString()).withStyle(ChatFormatting.WHITE));
+        } else if (!fluid.isEmpty()) {
+            lines.add(fluid.getDisplayName().copy().withStyle(ChatFormatting.WHITE));
+        } else if (chemId != null) {
+            Component name = MekanismCompat.getChemicalTextComponent(chemId);
+            lines.add((name != null ? name.copy() : Component.literal(chemId)).withStyle(ChatFormatting.WHITE));
+        } else if (isNbtOnly || FilterItemData.hasEntrySlotMapping(filterStack, slot)) {
+            String any = switch (menu.getTargetType()) {
+                case FLUIDS -> "Any Fluid";
+                case CHEMICALS -> "Any Chemical";
+                default -> "Any Item";
+            };
+            lines.add(Component.literal(any).withStyle(ChatFormatting.AQUA));
+        } else {
+            return lines;
+        }
+        if (batch > 0 || stock > 0) {
+            lines.add(Component.literal("Batch | Stock: " + batch + " | " + stock).withStyle(ChatFormatting.GRAY));
+        }
+
+        List<NbtCriterion> nbtRules = menu.getSlotNbtRules(slot);
+        if (!nbtRules.isEmpty()) {
+            for (NbtCriterion r : nbtRules) {
+                String display = r.path() + " " + r.operator() + " " + r.value();
+                lines.add(Component.literal("NBT: " + display).withStyle(ChatFormatting.GOLD));
+            }
+        } else {
+            String nbtRaw = FilterItemData.getEntryNbtRaw(filterStack, slot);
+            if (nbtRaw != null) {
+                String preview = nbtRaw.length() > 50 ? nbtRaw.substring(0, 50) + "..." : nbtRaw;
+                lines.add(Component.literal("NBT: " + preview).withStyle(ChatFormatting.GOLD));
+            }
+        }
+
+        String slotExpr = menu.getEntrySlotMappingExpression(slot);
+        if (slotExpr != null && !slotExpr.isEmpty()) {
+            lines.add(Component.literal("Slots: " + slotExpr).withStyle(ChatFormatting.LIGHT_PURPLE));
+        }
+
+        lines.add(1, Component.translatable("gui.logisticsnetworks.filter.advanced_settings_hint",
+                ClientControls.MODIFIER_2.getTranslatedKeyMessage()).withStyle(ChatFormatting.GREEN));
+        lines.add(2, Component.literal("-----").withStyle(ChatFormatting.DARK_GRAY));
+        return lines;
     }
 
     private static class ThemedMultiLineEditBox extends MultiLineEditBox {

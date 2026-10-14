@@ -542,10 +542,7 @@ public class WrenchItem extends Item {
         if (isSecondaryUse(player)) {
             sendClipboardPreview(serverPlayer, stack);
         } else {
-            NetworkHooks.openScreen(serverPlayer, new SimpleMenuProvider(
-                    (id, inventory, p) -> new ClipboardMenu(id, inventory, hand),
-                    Component.translatable("gui.logisticsnetworks.clipboard")),
-                    buf -> buf.writeVarInt(hand.ordinal()));
+            ClipboardMenu.open(serverPlayer, hand, 0);
         }
 
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());

@@ -50,7 +50,7 @@ public class FilterClickHandler {
             event.setCanceled(true);
     }
 
-    private static boolean openHoveredFilter(AbstractContainerScreen<?> screen) {
+    public static boolean openHoveredFilter(AbstractContainerScreen<?> screen) {
         Slot hoveredSlot = screen.getSlotUnderMouse();
         if (hoveredSlot == null || !hoveredSlot.hasItem())
             return false;

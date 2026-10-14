@@ -54,7 +54,7 @@ public class TransferEngine {
         return packed;
     }
 
-    private static class CapCache {
+    static final class CapCache {
         private final Map<Long, Object> items = new HashMap<>();
         private final Map<Long, Object> fluids = new HashMap<>();
         private final Map<Long, Object> energy = new HashMap<>();

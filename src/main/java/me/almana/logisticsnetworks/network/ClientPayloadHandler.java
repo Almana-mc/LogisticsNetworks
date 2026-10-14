@@ -1,8 +1,10 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
+import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.NodeEditorScreen;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
@@ -76,6 +78,28 @@ public class ClientPayloadHandler {
                 if (channel != null) {
                     channel.load(payload.channelTag(), player.level().registryAccess());
                 }
+            }
+        });
+    }
+
+    public static void handleSyncFilterScanResult(SyncFilterScanResultPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var minecraft = Minecraft.getInstance();
+            if (minecraft.player != null
+                    && minecraft.player.containerMenu instanceof FilterMenu menu
+                    && minecraft.screen instanceof FilterScreen screen
+                    && menu.canScanAttachedStorage()) {
+                menu.applySyncedFilter(payload.filter());
+                screen.showScanResult(payload.added(), payload.storageFound(), payload.filterFull());
+            }
+        });
+    }
+
+    public static void handleSyncOpenFilter(SyncOpenFilterPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var player = Minecraft.getInstance().player;
+            if (player != null && player.containerMenu instanceof FilterMenu menu && menu.isBoundFilter()) {
+                menu.applySyncedFilter(payload.filter());
             }
         });
     }

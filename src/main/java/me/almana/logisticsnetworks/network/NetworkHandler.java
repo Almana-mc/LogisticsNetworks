@@ -81,6 +81,9 @@ public final class NetworkHandler {
         registerServer(DeleteNetworkLabelPayload.class, DeleteNetworkLabelPayload.STREAM_CODEC, ServerPayloadHandler::handleDeleteNetworkLabel);
         registerServer(AddNodeFilterItemPayload.class, AddNodeFilterItemPayload.STREAM_CODEC, ServerPayloadHandler::handleAddNodeFilterItem);
         registerServer(OpenNodeMenuPayload.class, OpenNodeMenuPayload.STREAM_CODEC, ServerPayloadHandler::handleOpenNodeMenu);
+        registerServer(ScanAttachedStoragePayload.class, ScanAttachedStoragePayload.STREAM_CODEC, ServerPayloadHandler::handleScanAttachedStorage);
+        registerClient(SyncFilterScanResultPayload.class, SyncFilterScanResultPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncFilterScanResult);
+        registerClient(SyncOpenFilterPayload.class, SyncOpenFilterPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncOpenFilter);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {

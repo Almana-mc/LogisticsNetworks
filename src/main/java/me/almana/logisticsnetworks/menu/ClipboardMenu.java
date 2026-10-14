@@ -14,8 +14,11 @@ import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -24,6 +27,7 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.network.NetworkHooks;
 
 public class ClipboardMenu extends AbstractContainerMenu {
 
@@ -102,6 +106,13 @@ public class ClipboardMenu extends AbstractContainerMenu {
 
         layoutSlots(playerInventory);
         addDataSlots(data);
+    }
+
+    public static void open(ServerPlayer player, InteractionHand hand, int selectedChannel) {
+        NetworkHooks.openScreen(player, new SimpleMenuProvider(
+                (id, inventory, p) -> new ClipboardMenu(id, inventory, hand),
+                Component.translatable("gui.logisticsnetworks.clipboard")),
+                buf -> buf.writeVarInt(hand.ordinal()));
     }
 
     private void layoutSlots(Inventory inventory) {

@@ -5,6 +5,10 @@ public enum NameMatchScope {
     TOOLTIP,
     BOTH;
 
+    public String serializedName() {
+        return name().toLowerCase(java.util.Locale.ROOT);
+    }
+
     public NameMatchScope next() {
         NameMatchScope[] values = values();
         return values[(ordinal() + 1) % values.length];
