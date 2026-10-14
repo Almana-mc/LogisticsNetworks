@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Options;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
@@ -80,6 +81,11 @@ public final class ClientControls {
         if (modifier3Down()) mask |= 4;
         if (ClientConfig.invertCopyPasteControls) mask |= 8;
         return mask;
+    }
+
+    public static boolean usesVanillaUseInput(Options options) {
+        return SECONDARY_INTERACTION.getKey().equals(options.keyUse.getKey())
+                && SECONDARY_INTERACTION.getKeyModifier() == options.keyUse.getKeyModifier();
     }
 
     public static double cursorX(Minecraft minecraft) {

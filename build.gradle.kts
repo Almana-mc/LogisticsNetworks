@@ -59,6 +59,7 @@ val mainSourceSet = the<SourceSetContainer>().named("main").get()
 extensions.configure<UserDevExtension>("minecraft") {
     mappings(mappingChannelProp, mappingVersionProp)
     copyIdeResources.set(true)
+    accessTransformer(file("src/main/resources/META-INF/accesstransformer.cfg"))
 
     val runsContainer = runs as org.gradle.api.NamedDomainObjectContainer<RunConfig>
     runsContainer.configureEach {
