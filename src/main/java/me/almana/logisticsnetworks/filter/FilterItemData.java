@@ -110,6 +110,9 @@ public final class FilterItemData {
             ItemFilterSlot[] entriesBySlot) {
     }
 
+    public record ItemStock(int amount, @Nullable int[] slots) {
+    }
+
     private FilterItemData() {
     }
 
@@ -1388,81 +1391,39 @@ public final class FilterItemData {
 
     // ── Full amount threshold methods (tag-aware + constraint-aware) ──
 
-    public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider) {
-        return getItemAmountThresholdFull(filter, candidate, provider, null);
-    }
-
-    public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents) {
-        return getItemAmountThresholdFull(filter, candidate, provider, candidateComponents, null);
-    }
-
-    public static int getItemAmountThresholdFull(ItemStack filter, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
-            @Nullable ReadCache readCache) {
+    public static List<ItemStock> getItemStocksFull(ItemStack filter, ItemStack candidate,
+            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents, @Nullable ReadCache readCache,
+            int inventorySlot) {
         if (!isFilterItem(filter) || candidate.isEmpty())
-            return 0;
+            return List.of();
         ItemFilterView view = getItemFilterView(filter, readCache);
-        CompoundTag resolvedCandidateComponents = candidateComponents;
-        boolean candidateComponentsResolved = candidateComponents != null;
+        CompoundTag components = candidateComponents;
+        List<ItemStock> stocks = new ArrayList<>();
         for (ItemFilterSlot entry : view.entriesBySlot()) {
-            if (entry == null)
+            if (entry == null || !coversSlot(entry, inventorySlot) || !itemEntryMatches(entry, candidate))
                 continue;
-
-            String tag = entry.tag();
-            if (tag != null) {
-                if (!candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals))
-                    continue;
-                if (entry.hasNbt()) {
-                    if (!candidateComponentsResolved) {
-                        resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                        candidateComponentsResolved = true;
-                    }
-                    if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                        continue;
-                }
-                if (!checkDurabilityConstraint(entry, candidate))
-                    continue;
-                if (!checkEnchantedConstraint(entry, candidate))
-                    continue;
-                return entry.stock();
-            }
-
-            if (entry.nbtOnly()) {
-                if (entry.hasNbt()) {
-                    if (!candidateComponentsResolved) {
-                        resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                        candidateComponentsResolved = true;
-                    }
-                    if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                        continue;
-                }
-                if (!checkDurabilityConstraint(entry, candidate))
-                    continue;
-                if (!checkEnchantedConstraint(entry, candidate))
-                    continue;
-                return entry.stock();
-            }
-
-            Item itemEntry = entry.item();
-            if (itemEntry != null && itemEntry == candidate.getItem()) {
-                if (entry.hasNbt()) {
-                    if (!candidateComponentsResolved) {
-                        resolvedCandidateComponents = NbtFilterData.getSerializedComponents(candidate, provider);
-                        candidateComponentsResolved = true;
-                    }
-                    if (!checkNbtConstraint(entry, resolvedCandidateComponents))
-                        continue;
-                }
-                if (!checkDurabilityConstraint(entry, candidate))
-                    continue;
-                if (!checkEnchantedConstraint(entry, candidate))
-                    continue;
-                return entry.stock();
-            }
+            if (entry.hasNbt() && components == null)
+                components = NbtFilterData.getSerializedComponents(candidate, provider);
+            if (checkNbtConstraint(entry, components) && checkDurabilityConstraint(entry, candidate)
+                    && checkEnchantedConstraint(entry, candidate))
+                stocks.add(new ItemStock(entry.stock(), entry.slotMapping()));
         }
-        return 0;
+        return stocks;
+    }
+
+    private static boolean itemEntryMatches(ItemFilterSlot entry, ItemStack candidate) {
+        String tag = entry.tag();
+        if (tag != null)
+            return candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals);
+        return entry.nbtOnly() || entry.item() == candidate.getItem();
+    }
+
+    private static boolean coversSlot(ItemFilterSlot entry, int inventorySlot) {
+        if (inventorySlot < 0 || entry.slotMapping() == null) return true;
+        for (int s : entry.slotMapping()) {
+            if (s == inventorySlot) return true;
+        }
+        return false;
     }
 
     public static int getItemExportCapFull(ItemStack filter, ItemStack candidate,

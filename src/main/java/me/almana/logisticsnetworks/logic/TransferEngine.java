@@ -164,7 +164,7 @@ public class TransferEngine {
 
     private record ItemTransferTarget(IItemHandler handler, ItemStack[] importFilters,
             FilterMode importFilterMode, AmountConstraints constraints, boolean hasItemNbtFilter,
-            boolean[] allowedSlots) {
+            boolean[] allowedSlots, boolean hasImportSlotMapping) {
     }
 
     private record ItemKey(Item item, @Nullable CompoundTag tag) {
@@ -487,6 +487,7 @@ public class TransferEngine {
         List<ImportTarget> reachableRefs = new ArrayList<>(targets.size());
         ItemStack[] exportFilters = exportChannel.getFilterItems();
         boolean[] sourceAllowedSlots = buildSlotAccessMask(sourceHandler, exportFilters);
+        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
 
         for (ImportTarget target : targets) {
             if (target.node.getUUID().equals(sourceNode.getUUID()))
@@ -518,7 +519,8 @@ public class TransferEngine {
                     target.channel.getFilterMode(),
                     collectAmountConstraints(exportFilters, importFilters),
                     FilterLogic.hasConfiguredItemNbtFilter(importFilters),
-                    targetAllowedSlots));
+                    targetAllowedSlots,
+                    FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache)));
             reachableRefs.add(target);
         }
         if (!anyReachable)
@@ -526,7 +528,6 @@ public class TransferEngine {
         if (reachableTargets.isEmpty())
             return 0;
 
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
         Map<Item, Integer> sourceItemCounts = hasAmountConstraints(reachableTargets)
                 ? buildItemCountCache(sourceHandler)
                 : null;
@@ -1049,9 +1050,18 @@ public class TransferEngine {
                         }
                     }
 
-                    if (provider != null && !FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(),
-                            extracted, provider, candidateComponents, filterReadCache, -1)) {
-                        continue;
+                    boolean[] importAllowedSlots = target.allowedSlots();
+                    if (provider != null) {
+                        if (target.hasImportSlotMapping()) {
+                            importAllowedSlots = computeImportAllowedSlots(target, extracted, provider,
+                                    candidateComponents, filterReadCache);
+                            if (importAllowedSlots == null) {
+                                continue;
+                            }
+                        } else if (!FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(),
+                                extracted, provider, candidateComponents, filterReadCache, -1)) {
+                            continue;
+                        }
                     }
 
                     int allowedByAmount;
@@ -1064,8 +1074,8 @@ public class TransferEngine {
                                 sourceItemCounts, targetItemCounts.get(targetIndex));
                         if (target.constraints().hasPerEntryAmounts && provider != null) {
                             int perEntry = getPerEntryItemAmountLimit(extracted, exportFilters,
-                                    target.importFilters(), sourceItemCounts,
-                                    targetItemCounts.get(targetIndex), provider, candidateComponents,
+                                    target.importFilters(), source, slot, target.handler(), importAllowedSlots,
+                                    sourceItemCounts, targetItemCounts.get(targetIndex), provider, candidateComponents,
                                     filterReadCache);
                             if (perEntry >= 0) {
                                 allowedByAmount = Math.min(allowedByAmount, perEntry);
@@ -1095,7 +1105,7 @@ public class TransferEngine {
 
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
                     ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), simulatedInsert, true,
-                            target.allowedSlots());
+                            importAllowedSlots);
                     int acceptableCount = allowed - simRemainder.getCount();
                     if (acceptableCount <= 0) {
                         rememberRejectedInsert(rejectedInserts, targetIndex, extracted);
@@ -1108,7 +1118,7 @@ public class TransferEngine {
                     }
 
                     ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, false,
-                            target.allowedSlots());
+                            importAllowedSlots);
                     int targetAccepted = toMove.getCount() - uninserted.getCount();
                     int droppedToWorld = 0;
 
@@ -1120,7 +1130,7 @@ public class TransferEngine {
                             }
                             if (!stillLeft.isEmpty()) {
                                 ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(), stillLeft,
-                                        false, target.allowedSlots());
+                                        false, importAllowedSlots);
                                 int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
                                 targetAccepted += forcedIn;
                                 if (!forcedRemainder.isEmpty()) {
@@ -1204,8 +1214,8 @@ public class TransferEngine {
             if (sourceItemCounts != null) {
                 // Export keep amounts per item
                 int cap = keepCaps.computeIfAbsent(available.getItem(), item -> getPerEntryItemAmountLimit(
-                        available, exportFilters, null, sourceItemCounts, null, provider, components,
-                        filterReadCache));
+                        available, exportFilters, null, source, slot, null, null, sourceItemCounts, null, provider,
+                        components, filterReadCache));
                 if (cap >= 0) {
                     count = Math.min(count, cap);
                     keepCaps.put(available.getItem(), cap - count);
@@ -1235,6 +1245,25 @@ public class TransferEngine {
             rejectedInserts.set(targetIndex, rejected);
         }
         rejected.add(stack.copyWithCount(1));
+    }
+
+    private static boolean[] computeImportAllowedSlots(ItemTransferTarget target, ItemStack candidate,
+            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        boolean[] slotFilter = target.allowedSlots();
+        int size = target.handler().getSlots();
+        boolean[] mask = new boolean[size];
+        boolean any = false;
+        for (int ds = 0; ds < size; ds++) {
+            if (slotFilter != null && (ds >= slotFilter.length || !slotFilter[ds]))
+                continue;
+            if (FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(), candidate, provider,
+                    candidateComponents, filterReadCache, ds)) {
+                mask[ds] = true;
+                any = true;
+            }
+        }
+        return any ? mask : null;
     }
 
     private static ItemStack insertItemWithAllowedSlots(IItemHandler handler, ItemStack stack, boolean simulate,
@@ -1578,40 +1607,83 @@ public class TransferEngine {
     }
 
     private static int getPerEntryItemAmountLimit(ItemStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts,
+            ItemStack[] importFilters, IItemHandler source, int sourceSlot,
+            @Nullable IItemHandler target, @Nullable boolean[] importMask,
+            Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts,
             HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         int allowed = Integer.MAX_VALUE;
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                int threshold = FilterItemData.getItemAmountThresholdFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache);
-                if (threshold > 0) {
-                    int sourceCount = sourceCounts != null ? sourceCounts.getOrDefault(candidate.getItem(), 0) : 0;
-                    int exportCap = sourceCount - threshold;
-                    if (exportCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, exportCap);
-                }
+                List<FilterItemData.ItemStock> stocks = FilterItemData.getItemStocksFull(filter, candidate, provider,
+                        candidateComponents, filterReadCache, sourceSlot);
+                if (stocks.isEmpty() || stocks.get(0).amount() <= 0)
+                    continue;
+                FilterItemData.ItemStock stock = stocks.get(0);
+                int sourceCount = stockedCount(source, stock.slots(), sourceCounts, candidate.getItem());
+                int exportCap = sourceCount - stock.amount();
+                if (exportCap <= 0)
+                    return 0;
+                allowed = Math.min(allowed, exportCap);
             }
         }
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                int threshold = FilterItemData.getItemAmountThresholdFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache);
-                if (threshold > 0) {
-                    int targetCount = targetCounts != null ? targetCounts.getOrDefault(candidate.getItem(), 0) : 0;
-                    int importCap = threshold - targetCount;
-                    if (importCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, importCap);
-                }
+                int importCap = importCap(FilterItemData.getItemStocksFull(filter, candidate, provider,
+                        candidateComponents, filterReadCache, -1), target, importMask, targetCounts,
+                        candidate.getItem());
+                if (importCap <= 0)
+                    return 0;
+                allowed = Math.min(allowed, importCap);
             }
         }
 
         return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
+    }
+
+    private static int importCap(List<FilterItemData.ItemStock> stocks, IItemHandler target,
+            @Nullable boolean[] importMask, @Nullable Map<Item, Integer> targetCounts, Item item) {
+        int cap = Integer.MAX_VALUE;
+        boolean wholeSeen = false;
+        for (FilterItemData.ItemStock stock : stocks) {
+            if (stock.slots() == null) {
+                if (wholeSeen)
+                    continue;
+                wholeSeen = true;
+            }
+            if (stock.amount() <= 0)
+                continue;
+            int room = stock.amount() - stockedCount(target, stock.slots(), targetCounts, item);
+            if (room > 0) {
+                cap = Math.min(cap, room);
+            } else if (stock.slots() == null) {
+                return 0;
+            } else if (importMask != null) {
+                // full bucket, block its slots
+                for (int slot : stock.slots()) {
+                    if (slot < importMask.length)
+                        importMask[slot] = false;
+                }
+            }
+        }
+        return cap;
+    }
+
+    private static int stockedCount(IItemHandler handler, @Nullable int[] slots,
+            @Nullable Map<Item, Integer> counts, Item item) {
+        if (slots == null)
+            return counts != null ? counts.getOrDefault(item, 0) : 0;
+        long count = 0;
+        for (int slot : slots) {
+            if (slot < handler.getSlots()) {
+                ItemStack stack = handler.getStackInSlot(slot);
+                if (stack.getItem() == item)
+                    count += stack.getCount();
+            }
+        }
+        return (int) Math.min(count, Integer.MAX_VALUE);
     }
 
     private static int getPerEntryBatchLimit(ItemStack candidate, ItemStack[] exportFilters,
