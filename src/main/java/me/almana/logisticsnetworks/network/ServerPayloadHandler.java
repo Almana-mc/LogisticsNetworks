@@ -3,7 +3,7 @@ package me.almana.logisticsnetworks.network;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.data.*;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.filter.*;
@@ -216,11 +216,7 @@ public class ServerPayloadHandler {
             LogisticsNetwork network = registry.getNetwork(payload.networkId().get());
             if (network == null)
                 return null;
-            if (network.getOwnerUuid() != null
-                    && !network.getOwnerUuid().equals(player.getUUID())
-                    && !(FTBTeamsCompat.isLoaded()
-                            && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
-                    && !player.hasPermissions(2)) {
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
                 return null;
             }
             return network;
@@ -244,11 +240,7 @@ public class ServerPayloadHandler {
             if (network == null)
                 return;
 
-            if (network.getOwnerUuid() != null
-                    && !network.getOwnerUuid().equals(player.getUUID())
-                    && !(FTBTeamsCompat.isLoaded()
-                            && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
-                    && !player.hasPermissions(2)) {
+            if (!NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
                 return;
             }
 
@@ -1162,11 +1154,7 @@ public class ServerPayloadHandler {
     }
 
     private static boolean canAccessNetwork(ServerPlayer player, LogisticsNetwork network) {
-        return network.getOwnerUuid() == null
-                || network.getOwnerUuid().equals(player.getUUID())
-                || (FTBTeamsCompat.isLoaded()
-                        && FTBTeamsCompat.arePlayersInSameTeam(network.getOwnerUuid(), player.getUUID()))
-                || player.hasPermissions(2);
+        return NodeAccessPolicy.canAccess(network.getOwnerUuid(), player);
     }
 
     private static LogisticsNodeEntity findNode(ServerPlayer player, UUID nodeId) {

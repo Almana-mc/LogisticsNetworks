@@ -160,12 +160,7 @@ public class NodeMenu extends AbstractContainerMenu {
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        Collection<LogisticsNetwork> networks;
-        if (player.hasPermissions(2)) {
-            networks = registry.getAllNetworks().values();
-        } else {
-            networks = registry.getNetworksForPlayer(player.getUUID());
-        }
+        Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {

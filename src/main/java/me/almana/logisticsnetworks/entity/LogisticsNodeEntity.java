@@ -5,7 +5,7 @@ import me.almana.logisticsnetworks.util.ItemStackCompat;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -20,7 +20,6 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.RelativeMovement;
@@ -373,12 +372,7 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     public boolean isOwnedBy(Player player) {
-        UUID owner = getOwnerUUID();
-        if (owner == null) return true;
-        if (owner.equals(player.getUUID())) return true;
-        if (FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(owner, player.getUUID())) return true;
-        if (player instanceof ServerPlayer sp && sp.hasPermissions(2)) return true;
-        return false;
+        return NodeAccessPolicy.canAccess(getOwnerUUID(), player);
     }
 
     public String getNodeLabel() {

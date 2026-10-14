@@ -6,6 +6,8 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.common.ForgeConfigSpec;
 
+import java.util.Set;
+
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public class Config {
 
@@ -18,6 +20,12 @@ public class Config {
     public static final ForgeConfigSpec.BooleanValue debugModeSpec = builder
             .comment("Enable debug overlays and diagnostic logging.")
             .define("debugMode", false);
+
+    private static final Set<String> NODE_ACCESS_MODES = Set.of("Teams", "All", "Allies");
+
+    public static final ForgeConfigSpec.ConfigValue<String> nodeAccessModeSpec = builder
+            .comment("Controls who can access nodes and networks. Allowed values: Teams, All, Allies.")
+            .define("nodeAccessMode", "Teams", value -> value instanceof String name && NODE_ACCESS_MODES.contains(name));
 
     public static final ForgeConfigSpec.IntValue backoffMaxTicksSpec;
     public static final ForgeConfigSpec.BooleanValue backoffItemSpec;
@@ -43,6 +51,7 @@ public class Config {
 
     public static boolean dropNodeItem;
     public static boolean debugMode;
+    public static NodeAccessMode nodeAccessMode = NodeAccessMode.TEAMS;
     public static int backoffMaxTicks = 40;
     public static boolean[] backoffEnabled = {true, true, true, true, true};
 
@@ -55,6 +64,7 @@ public class Config {
     public static void refresh() {
         dropNodeItem = dropNodeItemSpec.get();
         debugMode = debugModeSpec.get();
+        nodeAccessMode = NodeAccessMode.fromSerializedName(nodeAccessModeSpec.get());
         backoffMaxTicks = backoffMaxTicksSpec.get();
         backoffEnabled[ChannelType.ITEM.ordinal()] = backoffItemSpec.get();
         backoffEnabled[ChannelType.FLUID.ordinal()] = backoffFluidSpec.get();

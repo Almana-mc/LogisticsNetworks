@@ -259,7 +259,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             }
 
             if (clipboardPresent) {
-                clipboard.applyToNodeWithoutInventory(node);
+                clipboard.applyToNodeWithoutInventory(serverPlayer, node);
             }
 
             placedTargets.add(target);

@@ -6,7 +6,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -31,14 +31,9 @@ public class LogisticsCommand {
         ServerLevel level = source.getLevel();
         NetworkRegistry registry = NetworkRegistry.get(level);
 
-        Collection<LogisticsNetwork> networks;
-        if (source.hasPermission(2)) {
-            networks = registry.getAllNetworks().values();
-        } else if (source.getEntity() instanceof ServerPlayer player) {
-            networks = registry.getNetworksForPlayer(player.getUUID());
-        } else {
-            networks = List.of();
-        }
+        Collection<LogisticsNetwork> networks = source.getEntity() instanceof ServerPlayer player
+                ? registry.getVisibleNetworks(player)
+                : registry.getAllNetworks().values();
 
         List<String> names = new ArrayList<>();
         for (LogisticsNetwork net : networks) {
@@ -137,13 +132,10 @@ public class LogisticsCommand {
             return 0;
         }
 
-        if (!source.hasPermission(2) && source.getEntity() instanceof ServerPlayer player) {
-            if (target.getOwnerUuid() != null
-                    && !target.getOwnerUuid().equals(player.getUUID())
-                    && !(FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(target.getOwnerUuid(), player.getUUID()))) {
-                source.sendFailure(Component.literal("You do not own this network."));
-                return 0;
-            }
+        if (source.getEntity() instanceof ServerPlayer player
+                && !NodeAccessPolicy.canAccess(target.getOwnerUuid(), player)) {
+            source.sendFailure(Component.literal("You do not own this network."));
+            return 0;
         }
 
         int removedNodes = 0;

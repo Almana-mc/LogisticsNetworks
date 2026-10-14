@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.nbt.CompoundTag;
@@ -9,6 +9,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.storage.DimensionDataStorage;
 
@@ -151,17 +152,19 @@ public class NetworkRegistry extends SavedData {
     }
 
     public List<LogisticsNetwork> getNetworksForPlayer(UUID playerUuid) {
-        Set<UUID> teammateIds = FTBTeamsCompat.isLoaded()
-                ? FTBTeamsCompat.getTeammateIds(playerUuid)
-                : Collections.emptySet();
         List<LogisticsNetwork> result = new ArrayList<>();
         for (LogisticsNetwork network : networks.values()) {
-            UUID owner = network.getOwnerUuid();
-            if (owner == null || owner.equals(playerUuid) || teammateIds.contains(owner)) {
+            if (NodeAccessPolicy.canAccess(network.getOwnerUuid(), playerUuid)) {
                 result.add(network);
             }
         }
         return result;
+    }
+
+    public Collection<LogisticsNetwork> getVisibleNetworks(ServerPlayer player) {
+        return NodeAccessPolicy.isAdminMode(player)
+                ? getAllNetworks().values()
+                : getNetworksForPlayer(player.getUUID());
     }
 
     public void wakeNetwork(UUID networkId) {

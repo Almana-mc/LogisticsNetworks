@@ -20,6 +20,7 @@ import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class ComputerMenu extends AbstractContainerMenu {
@@ -94,7 +95,7 @@ public class ComputerMenu extends AbstractContainerMenu {
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        List<LogisticsNetwork> networks = registry.getNetworksForPlayer(player.getUUID());
+        Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
 
         LOGGER.debug("Player {} UUID: {}", player.getName().getString(), player.getUUID());
         LOGGER.debug("Found {} networks for player", networks.size());

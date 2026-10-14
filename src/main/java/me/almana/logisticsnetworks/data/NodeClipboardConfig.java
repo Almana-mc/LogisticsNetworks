@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.registration.ModTags;
 import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
@@ -659,7 +660,7 @@ public final class NodeClipboardConfig {
             return PasteResult.CLIPBOARD_INVALID;
         }
 
-        if (!hasCompatibleStructure(node)) {
+        if (!hasCompatibleStructure(node) || !canAccessTargetNetwork(player, node)) {
             return PasteResult.INCOMPATIBLE_TARGET;
         }
 
@@ -684,7 +685,7 @@ public final class NodeClipboardConfig {
                     protectedSlot, ae2Link, player, requirement.looseMatch());
         }
         applyToNode(node);
-        applyNetworkToNode(node);
+        applyNetworkToNode(node, player);
         List<ItemStack> leftovers = returnItemsToInventory(inventory, returnedItems, protectedSlot);
         for (ItemStack leftover : leftovers) {
             player.drop(leftover, false);
@@ -694,7 +695,7 @@ public final class NodeClipboardConfig {
         return PasteResult.SUCCESS;
     }
 
-    public PasteResult applyToNodeWithoutInventory(LogisticsNodeEntity node) {
+    public PasteResult applyToNodeWithoutInventory(ServerPlayer player, LogisticsNodeEntity node) {
         if (node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT) {
             return PasteResult.CLIPBOARD_INVALID;
         }
@@ -703,13 +704,19 @@ public final class NodeClipboardConfig {
             return PasteResult.CLIPBOARD_INVALID;
         }
 
-        if (!hasCompatibleStructure(node)) {
+        if (!hasCompatibleStructure(node) || !canAccessTargetNetwork(player, node)) {
             return PasteResult.INCOMPATIBLE_TARGET;
         }
 
         applyToNode(node);
-        applyNetworkToNode(node);
+        applyNetworkToNode(node, player);
         return PasteResult.SUCCESS;
+    }
+
+    private boolean canAccessTargetNetwork(ServerPlayer player, LogisticsNodeEntity node) {
+        if (networkId == null || !(node.level() instanceof ServerLevel serverLevel)) return true;
+        LogisticsNetwork network = NetworkRegistry.get(serverLevel).getNetwork(networkId);
+        return network == null || NodeAccessPolicy.canAccess(network.getOwnerUuid(), player);
     }
 
     private boolean hasCompatibleStructure(LogisticsNodeEntity node) {
@@ -760,7 +767,7 @@ public final class NodeClipboardConfig {
         return !ItemStack.isSameItem(expected, current);
     }
 
-    private void applyNetworkToNode(LogisticsNodeEntity node) {
+    private void applyNetworkToNode(LogisticsNodeEntity node, ServerPlayer player) {
         if (!(node.level() instanceof ServerLevel serverLevel)) {
             return;
         }
@@ -777,7 +784,7 @@ public final class NodeClipboardConfig {
             return;
         }
 
-        LogisticsNetwork targetNetwork = resolveTargetNetwork(registry, node.getOwnerUUID());
+        LogisticsNetwork targetNetwork = resolveTargetNetwork(registry, node.getOwnerUUID(), player);
         if (targetNetwork == null) {
             return;
         }
@@ -800,17 +807,18 @@ public final class NodeClipboardConfig {
     }
 
     @Nullable
-    private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry, UUID ownerUuid) {
+    private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry, UUID ownerUuid, ServerPlayer player) {
         if (networkId != null) {
             LogisticsNetwork byId = registry.getNetwork(networkId);
-            if (byId != null) {
+            if (byId != null && NodeAccessPolicy.canAccess(byId.getOwnerUuid(), player)) {
                 return byId;
             }
         }
 
         if (networkName != null && !networkName.isBlank()) {
             for (LogisticsNetwork candidate : registry.getAllNetworks().values()) {
-                if (networkName.equals(candidate.getName())) {
+                if (networkName.equals(candidate.getName())
+                        && NodeAccessPolicy.canAccess(candidate.getOwnerUuid(), player)) {
                     return candidate;
                 }
             }
