@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -78,7 +79,8 @@ public class RecipeCardMenu extends AbstractContainerMenu {
 
     public static boolean openEntry(ServerPlayer player, FilterMenu filter, int entry) {
         ItemStack card = FilterItemData.getEntry(filter.getOpenedStack(), entry);
-        if (!RecipeCardItem.is(card) || !filter.isBoundFilter() || filter.getGraphContext() != null) return false;
+        if (!RecipeCardItem.is(card) || !filter.isBoundFilter() || filter.getGraphContext() != null
+                || FilterItemData.getTargetType(filter.getOpenedStack()) != FilterTargetType.ITEMS) return false;
         LogisticsNodeEntity source = filter.getNodeSource();
         open(player, source == null ? filter.getHand() : null, source, filter.getNodeChannel(),
                 filter.getNodeFilterSlot(), entry, RecipeCardData.of(card));

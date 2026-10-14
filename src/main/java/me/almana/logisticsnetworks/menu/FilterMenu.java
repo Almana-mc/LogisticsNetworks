@@ -1073,6 +1073,7 @@ public class FilterMenu extends AbstractContainerMenu {
             FilterItemData.setEntry(getOpenedStack(), s, stack);
             isFluidSlot[s] = false;
             isChemicalSlot[s] = false;
+            isTagSlot[s] = FilterItemData.getEntryTag(getOpenedStack(), s) != null;
             filterInventory.setItem(s, FilterItemData.getEntry(getOpenedStack(), s));
         });
         return true;
