@@ -662,25 +662,6 @@ public class ServerPayloadHandler {
         });
     }
 
-    public static void handleStampRecipeCard(StampRecipeCardPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            ChannelData channel = node == null ? null : node.getChannel(payload.channel());
-            int slot = payload.slot();
-            if (channel == null || channel.getType() != ChannelType.ITEM
-                    || slot < 0 || slot >= ChannelData.FILTER_SIZE)
-                return;
-            ItemStack carried = context.player().containerMenu.getCarried();
-            ItemStack card = RecipeCardItem.is(carried) ? RecipeCardItem.stamp(carried) : ItemStack.EMPTY;
-            if (card.isEmpty() || RecipeCardData.of(card).ingredients().isEmpty())
-                return;
-            channel.setFilterItem(slot, card);
-            sendChannelSyncToViewers(node, payload.channel(), channel);
-            propagateToLabelGroup(node, payload.channel());
-            invalidateNetwork(node);
-        });
-    }
-
     public static void handleSelectNodeChannel(SelectNodeChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof NodeMenu menu
@@ -703,7 +684,7 @@ public class ServerPayloadHandler {
             if (fs < 0 || fs >= ChannelData.FILTER_SIZE)
                 return;
             ItemStack item = payload.item();
-            if (item.isEmpty() || item.is(ModTags.FILTERS) || RecipeCardItem.is(item))
+            if (item.isEmpty() || item.is(ModTags.FILTERS))
                 return;
             FilterTargetType desired = FilterTargetType.forChannel(channel.getType());
             if (desired == null)

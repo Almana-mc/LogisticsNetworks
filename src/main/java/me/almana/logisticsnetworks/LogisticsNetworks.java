@@ -2,7 +2,6 @@ package me.almana.logisticsnetworks;
 
 import me.almana.logisticsnetworks.network.GraphPayloadHandler;
 import me.almana.logisticsnetworks.network.SetRecipeCardPayload;
-import me.almana.logisticsnetworks.network.StampRecipeCardPayload;
 import me.almana.logisticsnetworks.network.ConfirmGraphLabelsPayload;
 import me.almana.logisticsnetworks.network.GraphLabelPreviewPayload;
 import me.almana.logisticsnetworks.network.PreviewGraphLabelsPayload;
@@ -176,8 +175,6 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleAddNodeFilterItem);
                 registrar.playToServer(SetRecipeCardPayload.TYPE, SetRecipeCardPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSetRecipeCard);
-                registrar.playToServer(StampRecipeCardPayload.TYPE, StampRecipeCardPayload.STREAM_CODEC,
-                                ServerPayloadHandler::handleStampRecipeCard);
                 registrar.playToServer(SelectNodeChannelPayload.TYPE, SelectNodeChannelPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSelectNodeChannel);
                 registrar.playToServer(ModifyFilterModPayload.TYPE, ModifyFilterModPayload.STREAM_CODEC,

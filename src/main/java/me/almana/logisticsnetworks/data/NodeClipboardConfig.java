@@ -17,7 +17,7 @@ import me.almana.logisticsnetworks.integration.storage.StorageAccess;
 import me.almana.logisticsnetworks.integration.storage.StorageAction;
 import me.almana.logisticsnetworks.integration.storage.StorageInventory;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
-import me.almana.logisticsnetworks.item.RecipeCardItem;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
@@ -601,7 +601,7 @@ public final class NodeClipboardConfig {
 
             for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
                 ItemStack stack = filterItems[channel][slot];
-                if (stack != null && !stack.isEmpty() && !stack.is(ModTags.FILTERS) && !RecipeCardItem.is(stack)) {
+                if (stack != null && !stack.isEmpty() && !stack.is(ModTags.FILTERS)) {
                     return false;
                 }
             }
@@ -747,8 +747,8 @@ public final class NodeClipboardConfig {
 
     private void sanitizeCards() {
         for (ItemStack[] slots : filterItems) {
-            for (int slot = 0; slot < slots.length; slot++) {
-                if (slots[slot] != null && RecipeCardItem.is(slots[slot])) slots[slot] = RecipeCardItem.stamp(slots[slot]);
+            for (ItemStack filter : slots) {
+                if (filter != null) FilterItemData.restampRecipeCards(filter);
             }
         }
     }
