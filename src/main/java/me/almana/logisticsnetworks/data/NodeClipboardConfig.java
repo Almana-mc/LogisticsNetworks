@@ -645,6 +645,13 @@ public final class NodeClipboardConfig {
         return root;
     }
 
+    // Fits 32 KB serverbound cap
+    public CompoundTag saveSettings(HolderLookup.Provider provider) {
+        CompoundTag root = save(provider);
+        root.remove(KEY_FILTERS);
+        return root;
+    }
+
     public static NodeClipboardConfig load(CompoundTag root, HolderLookup.Provider provider) {
         if (root == null || root.isEmpty()) {
             return null;

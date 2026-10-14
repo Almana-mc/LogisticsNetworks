@@ -84,6 +84,9 @@ public final class NetworkHandler {
         registerServer(ScanAttachedStoragePayload.class, ScanAttachedStoragePayload.STREAM_CODEC, ServerPayloadHandler::handleScanAttachedStorage);
         registerClient(SyncFilterScanResultPayload.class, SyncFilterScanResultPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncFilterScanResult);
         registerClient(SyncOpenFilterPayload.class, SyncOpenFilterPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncOpenFilter);
+        registerServer(SetClipboardSettingsPayload.class, SetClipboardSettingsPayload.STREAM_CODEC, ServerPayloadHandler::handleSetClipboardSettings);
+        registerServer(AddClipboardFilterItemPayload.class, AddClipboardFilterItemPayload.STREAM_CODEC, ServerPayloadHandler::handleAddClipboardFilterItem);
+        registerClient(SyncClipboardPayload.class, SyncClipboardPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncClipboard);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {

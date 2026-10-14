@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.item.*;
+import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -1303,7 +1304,8 @@ public class ServerPayloadHandler {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player))
                 return;
-            if (!(player.containerMenu instanceof ComputerMenu))
+            if (!(player.containerMenu instanceof ComputerMenu)
+                    && !(player.containerMenu instanceof ClipboardMenu))
                 return;
 
             NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
@@ -1339,8 +1341,37 @@ public class ServerPayloadHandler {
                 }
             }
 
+            List<String> channelNames = new ArrayList<>(LogisticsNodeEntity.CHANNEL_COUNT);
+            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                channelNames.add(network.getChannelName(i));
+            }
             NetworkHandler.sendToPlayer(player,
-                    new SyncChannelListPayload(payload.networkId(), entries));
+                    new SyncChannelListPayload(payload.networkId(), entries, channelNames));
+        });
+    }
+
+    public static void handleSetClipboardSettings(SetClipboardSettingsPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof ClipboardMenu menu))
+                return;
+            NodeClipboardConfig config = NodeClipboardConfig.load(payload.clipboardTag(), player.level().registryAccess());
+            if (config == null) {
+                player.displayClientMessage(Component.translatable("message.logisticsnetworks.clipboard.invalid"), true);
+                return;
+            }
+            config.stripUpgradeComponents();
+            if (!menu.replaceSettings(config, player)) {
+                player.displayClientMessage(Component.translatable("message.logisticsnetworks.clipboard.invalid"), true);
+            }
+        });
+    }
+
+    public static void handleAddClipboardFilterItem(AddClipboardFilterItemPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof ClipboardMenu menu && menu.stillValid(context.player())) {
+                menu.addFilterItem(payload.filterSlot(), payload.item());
+            }
         });
     }
 

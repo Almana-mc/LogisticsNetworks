@@ -1,9 +1,12 @@
 package me.almana.logisticsnetworks.network;
 
+import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.NodeEditorScreen;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
+import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import com.mojang.logging.LogUtils;
@@ -26,6 +29,8 @@ public class ClientPayloadHandler {
             } else if (screen instanceof ComputerScreen computerScreen) {
                 LOGGER.debug("Passing to ComputerScreen");
                 computerScreen.receiveNetworkList(payload.networks());
+            } else if (screen instanceof ClipboardScreen clipboardScreen) {
+                clipboardScreen.receiveNetworkList(payload.networks());
             } else {
                 LOGGER.debug("Screen is not NodeScreen or ComputerScreen, ignoring");
             }
@@ -46,6 +51,8 @@ public class ClientPayloadHandler {
             var screen = Minecraft.getInstance().screen;
             if (screen instanceof NodeEditorScreen<?> nodeScreen) {
                 nodeScreen.receiveNetworkLabels(payload.labels());
+            } else if (screen instanceof ClipboardScreen clipboardScreen) {
+                clipboardScreen.receiveNetworkLabels(payload.labels());
             }
         });
     }
@@ -64,6 +71,8 @@ public class ClientPayloadHandler {
             var screen = Minecraft.getInstance().screen;
             if (screen instanceof ComputerScreen computerScreen) {
                 computerScreen.receiveChannelList(payload.networkId(), payload.channels());
+            } else if (screen instanceof ClipboardScreen clipboardScreen) {
+                clipboardScreen.receiveChannelList(payload.networkId(), payload.channelNames());
             }
         });
     }
@@ -91,6 +100,16 @@ public class ClientPayloadHandler {
                     && menu.canScanAttachedStorage()) {
                 menu.applySyncedFilter(payload.filter());
                 screen.showScanResult(payload.added(), payload.storageFound(), payload.filterFull());
+            }
+        });
+    }
+
+    public static void handleSyncClipboard(SyncClipboardPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var player = Minecraft.getInstance().player;
+            NodeClipboardConfig clipboard = NodeClipboardConfig.load(payload.clipboardTag(), null);
+            if (player != null && clipboard != null && player.containerMenu instanceof ClipboardMenu menu) {
+                menu.setClipboard(clipboard);
             }
         });
     }

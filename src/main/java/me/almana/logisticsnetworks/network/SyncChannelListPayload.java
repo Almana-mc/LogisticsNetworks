@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.network.payload.CustomPacketPayload;
 import net.minecraft.network.FriendlyByteBuf;
@@ -10,7 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public record SyncChannelListPayload(UUID networkId, List<ChannelEntry> channels) implements CustomPacketPayload {
+public record SyncChannelListPayload(UUID networkId, List<ChannelEntry> channels, List<String> channelNames)
+        implements CustomPacketPayload {
 
     public record ChannelEntry(int channelIndex, int mode, int type, int nodeCount) {
     }
@@ -32,7 +34,9 @@ public record SyncChannelListPayload(UUID networkId, List<ChannelEntry> channels
             int nodeCount = buf.readVarInt();
             entries.add(new ChannelEntry(channelIndex, mode, type, nodeCount));
         }
-        return new SyncChannelListPayload(networkId, entries);
+        List<String> names = new ArrayList<>(LogisticsNodeEntity.CHANNEL_COUNT);
+        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) names.add(buf.readUtf(24));
+        return new SyncChannelListPayload(networkId, entries, names);
     }
 
     public static void write(FriendlyByteBuf buf, SyncChannelListPayload payload) {
@@ -44,6 +48,8 @@ public record SyncChannelListPayload(UUID networkId, List<ChannelEntry> channels
             buf.writeVarInt(entry.type);
             buf.writeVarInt(entry.nodeCount);
         }
+        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++)
+            buf.writeUtf(i < payload.channelNames.size() ? payload.channelNames.get(i) : "", 24);
     }
 
     @Override
