@@ -175,30 +175,17 @@ public class ServerPayloadHandler {
             UUID oldNetworkId = node.getNetworkId();
             if (oldNetworkId != null && oldNetworkId.equals(targetNetwork.getId())) {
                 node.setNetworkName(targetNetwork.getName());
+                node.setNetworkColor(targetNetwork.getColor());
                 if (player.containerMenu instanceof NodeMenu menu) {
                     menu.sendNetworkListToClient(player);
                 }
                 return;
             }
 
-            if (oldNetworkId != null) {
-                registry.removeNodeFromNetwork(oldNetworkId, node.getUUID());
-            }
-
             if (targetNetwork.getOwnerUuid() == null) {
                 targetNetwork.setOwnerUuid(player.getUUID());
             }
-
-            node.setNetworkId(targetNetwork.getId());
-            node.setNetworkName(targetNetwork.getName());
-            registry.addNodeToNetwork(targetNetwork.getId(), node.getUUID());
-
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                ChannelData ch = node.getChannel(i);
-                if (ch != null) {
-                    ch.setName(targetNetwork.getChannelName(i));
-                }
-            }
+            NodeClipboardConfig.joinNetwork(node, registry, targetNetwork);
 
             if (NodeUpgradeData.needsDimensionalUpgradeWarning(node, targetNetwork, player.getServer())) {
                 player.sendSystemMessage(Component.translatable("gui.logisticsnetworks.dimensional_upgrade_warning"));

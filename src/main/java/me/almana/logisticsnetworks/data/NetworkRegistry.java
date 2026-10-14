@@ -144,6 +144,13 @@ public class NetworkRegistry extends SavedData {
         return networks.get(id);
     }
 
+    public void stampCreatedAt(UUID networkId) {
+        LogisticsNetwork network = networks.get(networkId);
+        if (network != null && network.stampCreatedAtIfMissing()) {
+            setDirty();
+        }
+    }
+
     public TelemetryManager getTelemetryManager() {
         return telemetryManager;
     }
@@ -223,6 +230,7 @@ public class NetworkRegistry extends SavedData {
 
     public static NetworkRegistry load(CompoundTag compoundTag) {
         NetworkRegistry registry = new NetworkRegistry();
+        boolean assignedDefaultColor = false;
         if (compoundTag.contains(KEY_NETWORKS, Tag.TAG_LIST)) {
             ListTag list = compoundTag.getList(KEY_NETWORKS, Tag.TAG_COMPOUND);
             for (Tag t : list) {
@@ -230,6 +238,7 @@ public class NetworkRegistry extends SavedData {
                     try {
                         LogisticsNetwork network = LogisticsNetwork.load(ct);
                         registry.networks.put(network.getId(), network);
+                        assignedDefaultColor |= !ct.contains("Color");
                     } catch (Exception e) {
                         LOGGER.error("Keeping undecodable network as raw data: {}", e.getMessage());
                         registry.undecodableNetworks.add(ct.copy());
@@ -240,6 +249,10 @@ public class NetworkRegistry extends SavedData {
         if (!registry.networks.isEmpty()) {
             registry.dirtyNetworks.addAll(registry.networks.keySet());
             LOGGER.info("Loaded {} networks.", registry.networks.size());
+        }
+        // Persist rolled legacy colours
+        if (assignedDefaultColor) {
+            registry.setDirty();
         }
 
         return registry;

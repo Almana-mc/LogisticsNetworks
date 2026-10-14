@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.util.ItemStackCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
@@ -785,24 +786,26 @@ public final class NodeClipboardConfig {
         }
 
         LogisticsNetwork targetNetwork = resolveTargetNetwork(registry, node.getOwnerUUID(), player);
-        if (targetNetwork == null) {
-            return;
+        if (targetNetwork != null) {
+            joinNetwork(node, registry, targetNetwork);
         }
+    }
 
-        UUID targetNetworkId = targetNetwork.getId();
-        if (currentNetworkId != null && !currentNetworkId.equals(targetNetworkId)) {
+    public static void joinNetwork(LogisticsNodeEntity node, NetworkRegistry registry, LogisticsNetwork network) {
+        UUID currentNetworkId = node.getNetworkId();
+        if (currentNetworkId != null && !currentNetworkId.equals(network.getId())) {
             registry.removeNodeFromNetwork(currentNetworkId, node.getUUID());
         }
 
-        node.setNetworkId(targetNetworkId);
-        node.setNetworkName(targetNetwork.getName());
-        registry.addNodeToNetwork(targetNetworkId, node.getUUID());
+        node.setNetworkId(network.getId());
+        node.setNetworkName(network.getName());
+        node.setNetworkColor(network.getColor());
+        registry.addNodeToNetwork(network.getId(), node.getUUID());
 
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
             ChannelData ch = node.getChannel(i);
-            if (ch != null) {
-                ch.setName(targetNetwork.getChannelName(i));
-            }
+            ch.setName(network.getChannelName(i));
+            ServerPayloadHandler.sendChannelSyncToViewers(node, i, ch);
         }
     }
 

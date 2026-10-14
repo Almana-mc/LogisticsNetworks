@@ -62,6 +62,7 @@ public class EventHandler {
             LogisticsNetwork network = registry.getNetwork(networkId);
             if (network != null) {
                 node.setNetworkName(network.getName());
+                node.setNetworkColor(network.getColor());
                 registry.invalidateNetwork(networkId);
             } else {
                 node.setNetworkName("Network-" + networkId.toString().substring(0, 6));
