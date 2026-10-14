@@ -1131,6 +1131,9 @@ public class FilterMenu extends AbstractContainerMenu {
                 return;
             }
         }
+        int heldButton = hand == InteractionHand.OFF_HAND ? Inventory.SLOT_OFFHAND : lockedSlot;
+        // Swap would replace held item
+        if (clickType == ClickType.SWAP && dragType == heldButton) return;
         super.clicked(slotId, dragType, clickType, player);
     }
 
