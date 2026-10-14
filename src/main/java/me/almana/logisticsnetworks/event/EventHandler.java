@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.filter.TooltipLines;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
@@ -114,6 +115,7 @@ public class EventHandler {
     public static void onServerStopped(ServerStoppedEvent event) {
         PENDING_LOAD_SYNC.clear();
         PENDING_FILTER_EJECT.clear();
+        TooltipLines.clear();
     }
 
     @SubscribeEvent

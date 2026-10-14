@@ -65,6 +65,7 @@ public final class FilterItemData {
 
     public static final class ReadCache {
         private final IdentityHashMap<ItemStack, ItemFilterView> itemViews = new IdentityHashMap<>();
+        final Map<String, NameFilterData.ValidationResult> namePatterns = new java.util.HashMap<>();
 
         private ReadCache() {
         }

@@ -1466,7 +1466,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         String activeLine = Component.translatable("gui.logisticsnetworks.filter.name.active", display).getString();
         g.drawString(font, font.plainSubstrByWidth(activeLine, contentW), contentX, activeY, COL_ACCENT, false);
 
-        if (!value.isEmpty() && !NameFilterData.isValidRegex(value)) {
+        if (!value.isEmpty() && !NameFilterData.validateRegex(value).accepted()) {
             String warning = Component.translatable("gui.logisticsnetworks.filter.name.invalid_regex").getString();
             g.drawString(font, warning, contentX, hintY, 0xFFFF5555, false);
         } else {
