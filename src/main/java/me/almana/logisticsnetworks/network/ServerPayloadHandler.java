@@ -1,7 +1,5 @@
 package me.almana.logisticsnetworks.network;
 
-import me.almana.logisticsnetworks.util.ItemStackCompat;
-
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
@@ -33,12 +31,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Containers;
 import net.minecraft.world.SimpleMenuProvider;
-import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.fluids.FluidStack;
@@ -1048,31 +1043,7 @@ public class ServerPayloadHandler {
             if (node == null || !node.isOwnedBy(player))
                 return;
 
-            NetworkHooks.openScreen(player, new MenuProvider() {
-                @Override
-                public Component getDisplayName() {
-                    return Component.translatable("gui.logisticsnetworks.node_config");
-                }
-
-                @Override
-                public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
-                    return new NodeMenu(containerId, playerInv, node);
-                }
-            }, buf -> {
-                buf.writeVarInt(node.getId());
-                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                    ChannelData ch = node.getChannel(i);
-                    buf.writeNbt(ch != null ? ch.save(player.level().registryAccess()) : new CompoundTag());
-                }
-                for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-                    buf.writeNbt(ItemStackCompat.saveOptional(node.getUpgradeItem(i), player.level().registryAccess()));
-                }
-            });
-
-            if (player.containerMenu instanceof NodeMenu menu) {
-                menu.setRemoteAccess(true);
-                menu.sendNetworkListToClient(player);
-            }
+            NodeMenu.open(player, node, 0, true);
         });
     }
 

@@ -1,7 +1,6 @@
 package me.almana.logisticsnetworks.item;
 
 import me.almana.logisticsnetworks.util.ItemDataUtil;
-import me.almana.logisticsnetworks.util.ItemStackCompat;
 import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 
@@ -23,7 +22,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -34,12 +32,9 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.MenuProvider;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
@@ -714,21 +709,7 @@ public class WrenchItem extends Item {
 
     private InteractionResult openNodeGui(LogisticsNodeEntity node, Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
-            NetworkHooks.openScreen(serverPlayer, new MenuProvider() {
-                @Override
-                public Component getDisplayName() {
-                    return Component.translatable("gui.logisticsnetworks.node_config");
-                }
-
-                @Override
-                public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player p) {
-                    return new NodeMenu(containerId, playerInv, node);
-                }
-            }, buf -> Util.writeNodeSyncData(buf, node, player.level().registryAccess()));
-
-            if (serverPlayer.containerMenu instanceof NodeMenu menu) {
-                menu.sendNetworkListToClient(serverPlayer);
-            }
+            NodeMenu.open(serverPlayer, node, 0, false);
         }
         return InteractionResult.CONSUME;
     }
@@ -1095,19 +1076,6 @@ public class WrenchItem extends Item {
 
     private static boolean isSecondaryUse(Player player) {
         return ServerPayloadHandler.isModifierDown(player, 0);
-    }
-
-    private static class Util {
-        static void writeNodeSyncData(FriendlyByteBuf buf, LogisticsNodeEntity node,
-                HolderLookup.Provider provider) {
-            buf.writeVarInt(node.getId());
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                buf.writeNbt(node.getChannel(i).save(provider));
-            }
-            for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-                buf.writeNbt(ItemStackCompat.saveOptional(node.getUpgradeItem(i), provider));
-            }
-        }
     }
 }
 

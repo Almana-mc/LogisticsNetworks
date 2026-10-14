@@ -3,11 +3,10 @@ package me.almana.logisticsnetworks.network;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.data.ChannelData;
-import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.menu.NodeMenu;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.entity.Entity;
 import me.almana.logisticsnetworks.network.payload.IPayloadContext;
 
 import java.util.ArrayList;
@@ -74,9 +73,8 @@ public class ClientPayloadHandler {
             var player = Minecraft.getInstance().player;
             if (player == null || payload.channelTag() == null)
                 return;
-            Entity entity = player.level().getEntity(payload.entityId());
-            if (entity instanceof LogisticsNodeEntity node) {
-                ChannelData channel = node.getChannel(payload.channelIndex());
+            if (player.containerMenu instanceof NodeMenu menu && menu.getNodeId() == payload.entityId()) {
+                ChannelData channel = menu.getNode().getChannel(payload.channelIndex());
                 if (channel != null) {
                     channel.load(payload.channelTag(), player.level().registryAccess());
                 }
