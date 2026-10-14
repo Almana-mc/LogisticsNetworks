@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
@@ -47,6 +48,7 @@ public class NodeMenu extends AbstractContainerMenu {
 
     private final Container filterContainer;
     private final Container upgradeContainer;
+    private final List<ItemStack> openingUpgrades;
 
     // Server-side
     public NodeMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node) {
@@ -54,6 +56,7 @@ public class NodeMenu extends AbstractContainerMenu {
         this.node = node;
         this.filterContainer = new FilterItemsContainer();
         this.upgradeContainer = new UpgradeItemsContainer();
+        this.openingUpgrades = LabelUpgradeSync.snapshotUpgrades(node);
 
         layoutNodeSlots();
         layoutPlayerSlots(playerInv);
@@ -68,6 +71,7 @@ public class NodeMenu extends AbstractContainerMenu {
 
         this.filterContainer = new FilterItemsContainer();
         this.upgradeContainer = new UpgradeItemsContainer();
+        this.openingUpgrades = List.of();
 
         if (this.node != null) {
             readInitialData(buf, playerInv.player.level().registryAccess());
@@ -237,6 +241,14 @@ public class NodeMenu extends AbstractContainerMenu {
         }
 
         return copy;
+    }
+
+    @Override
+    public void removed(Player player) {
+        super.removed(player);
+        if (player instanceof ServerPlayer serverPlayer && node != null && node.isAlive()) {
+            LabelUpgradeSync.synchronizeMenuClose(serverPlayer, node, openingUpgrades);
+        }
     }
 
     private class FilterItemsContainer extends AbstractProxyContainer {

@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.network;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.data.*;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
@@ -50,12 +51,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
 
 public class ServerPayloadHandler {
 
-    private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<UUID, Boolean> DEFAULT_NODE_VISIBILITY = new HashMap<>();
     private static final Map<UUID, Integer> MODIFIER_KEYS = new HashMap<>();
 
@@ -376,9 +374,27 @@ public class ServerPayloadHandler {
     public static void handleToggleVisibility(ToggleNodeVisibilityPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            if (node != null)
-                node.setRenderVisible(!node.isRenderVisible());
+            if (node == null)
+                return;
+            node.setRenderVisible(!node.isRenderVisible());
+            propagateVisibilityToLabelGroup(node);
         });
+    }
+
+    private static void propagateVisibilityToLabelGroup(LogisticsNodeEntity sourceNode) {
+        String label = sourceNode.getNodeLabel();
+        if (label.isEmpty() || sourceNode.getNetworkId() == null
+                || !(sourceNode.level() instanceof ServerLevel level))
+            return;
+        LogisticsNetwork network = NetworkRegistry.get(level).getNetwork(sourceNode.getNetworkId());
+        if (network == null)
+            return;
+        for (UUID otherId : network.getNodeUuids()) {
+            LogisticsNodeEntity other = findNode(level.getServer(), otherId);
+            if (other != null && label.equals(other.getNodeLabel())) {
+                other.setRenderVisible(sourceNode.isRenderVisible());
+            }
+        }
     }
 
     public static void handleSetDefaultNodeVisibility(SetDefaultNodeVisibilityPayload payload,
@@ -903,6 +919,7 @@ public class ServerPayloadHandler {
 
     public static void handleSetNodeLabel(SetNodeLabelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) return;
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
             if (node == null)
                 return;
@@ -910,44 +927,38 @@ public class ServerPayloadHandler {
             String label = payload.label().trim();
             if (label.length() > 48)
                 label = label.substring(0, 48);
-
-            LOGGER.debug("[LabelSync] Setting label '{}' on node {} (networkId={})",
-                    label, node.getUUID(), node.getNetworkId());
             node.setNodeLabel(label);
 
             if (!label.isEmpty() && node.getNetworkId() != null
                     && node.level() instanceof ServerLevel level) {
-                NetworkRegistry registry = NetworkRegistry.get(level);
-                LogisticsNetwork network = registry.getNetwork(node.getNetworkId());
+                LogisticsNetwork network = NetworkRegistry.get(level).getNetwork(node.getNetworkId());
                 if (network != null) {
-                    LOGGER.debug("[LabelSync] Searching {} nodes in network for label '{}'",
-                            network.getNodeUuids().size(), label);
+                    LogisticsNodeEntity authority = node;
                     for (UUID otherId : network.getNodeUuids()) {
-                        if (otherId.equals(node.getUUID()))
-                            continue;
-                        for (ServerLevel sl : level.getServer().getAllLevels()) {
-                            Entity entity = sl.getEntity(otherId);
-                            if (entity instanceof LogisticsNodeEntity other
-                                    && label.equals(other.getNodeLabel())) {
-                                LOGGER.debug("[LabelSync] Found matching node {}, copying all channels", otherId);
-                                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                                    ChannelData src = other.getChannel(i);
-                                    ChannelData dst = node.getChannel(i);
-                                    if (src != null && dst != null) {
-                                        dst.copyFrom(src);
-                                        clampChannelToUpgradeLimits(node, dst);
-                                        sendChannelSyncToViewers(node, i, dst);
-                                    }
-                                }
-                                invalidateNetwork(node);
-                                return;
-                            }
+                        if (otherId.equals(node.getUUID())) continue;
+                        LogisticsNodeEntity other = findNode(player, otherId);
+                        if (other != null && label.equals(other.getNodeLabel())) {
+                            authority = other;
+                            copyLabelPeer(other, node);
+                            break;
                         }
                     }
-                    LOGGER.debug("[LabelSync] No matching labeled node found in network");
+                    LabelUpgradeSync.establishLabelTemplate(player, network, authority);
                 }
             }
+            invalidateNetwork(node);
+            LabelUpgradeSync.synchronizeOnLoad(node);
         });
+    }
+
+    private static void copyLabelPeer(LogisticsNodeEntity source, LogisticsNodeEntity node) {
+        node.setRenderVisible(source.isRenderVisible());
+        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+            ChannelData dst = node.getChannel(i);
+            dst.copyFrom(source.getChannel(i));
+            clampChannelToUpgradeLimits(node, dst);
+            sendChannelSyncToViewers(node, i, dst);
+        }
     }
 
     public static void handleSetChannelName(SetChannelNamePayload payload, IPayloadContext context) {
@@ -1166,12 +1177,8 @@ public class ServerPayloadHandler {
 
     public static void propagateToLabelGroup(LogisticsNodeEntity sourceNode, int channelIndex) {
         String label = sourceNode.getNodeLabel();
-        if (label.isEmpty() || sourceNode.getNetworkId() == null) {
-            LOGGER.debug("[LabelSync] Skipping propagation: label='{}', networkId={}", label,
-                    sourceNode.getNetworkId());
-            return;
-        }
-        if (!(sourceNode.level() instanceof ServerLevel level))
+        if (label.isEmpty() || sourceNode.getNetworkId() == null
+                || !(sourceNode.level() instanceof ServerLevel level))
             return;
 
         ChannelData sourceChannel = sourceNode.getChannel(channelIndex);
@@ -1180,35 +1187,24 @@ public class ServerPayloadHandler {
 
         NetworkRegistry registry = NetworkRegistry.get(level);
         LogisticsNetwork network = registry.getNetwork(sourceNode.getNetworkId());
-        if (network == null) {
-            LOGGER.debug("[LabelSync] Network not found for id={}", sourceNode.getNetworkId());
+        if (network == null)
             return;
-        }
 
-        LOGGER.debug("[LabelSync] Propagating channel {} from node {} (label='{}') to {} network nodes",
-                channelIndex, sourceNode.getUUID(), label, network.getNodeUuids().size());
-
-        int updated = 0;
+        List<LogisticsNodeEntity> updated = new ArrayList<>();
         for (UUID otherId : network.getNodeUuids()) {
             if (otherId.equals(sourceNode.getUUID()))
                 continue;
-            for (ServerLevel sl : level.getServer().getAllLevels()) {
-                Entity entity = sl.getEntity(otherId);
-                if (entity instanceof LogisticsNodeEntity other
-                        && label.equals(other.getNodeLabel())) {
-                    ChannelData dst = other.getChannel(channelIndex);
-                    if (dst != null) {
-                        dst.copyFrom(sourceChannel);
-                        clampChannelToUpgradeLimits(other, dst);
-                        updated++;
-                        LOGGER.debug("[LabelSync] Updated node {} (label='{}')", otherId, other.getNodeLabel());
-                        sendChannelSyncToViewers(other, channelIndex, dst);
-                    }
-                    break;
-                }
-            }
+            LogisticsNodeEntity other = findNode(level.getServer(), otherId);
+            if (other == null || !label.equals(other.getNodeLabel()))
+                continue;
+            ChannelData dst = other.getChannel(channelIndex);
+            dst.copyFrom(sourceChannel);
+            clampChannelToUpgradeLimits(other, dst);
+            updated.add(other);
+            sendChannelSyncToViewers(other, channelIndex, dst);
         }
-        LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated);
+        LabelUpgradeSync.refreshTemplateChannel(network, sourceNode, channelIndex, updated);
+        registry.setDirty();
     }
 
     public static void handleSubscribeTelemetry(SubscribeTelemetryPayload payload, IPayloadContext context) {
@@ -1283,7 +1279,11 @@ public class ServerPayloadHandler {
     }
 
     private static LogisticsNodeEntity findNode(ServerPlayer player, UUID nodeId) {
-        for (ServerLevel level : player.getServer().getAllLevels()) {
+        return findNode(player.getServer(), nodeId);
+    }
+
+    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
+        for (ServerLevel level : server.getAllLevels()) {
             Entity entity = level.getEntity(nodeId);
             if (entity instanceof LogisticsNodeEntity node) {
                 return node;

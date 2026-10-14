@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
@@ -35,20 +36,26 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.player.PlayerContainerEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.items.IItemHandler;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID)
 public class EventHandler {
+
+    private static final Set<LogisticsNodeEntity> PENDING_LOAD_SYNC = new LinkedHashSet<>();
 
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
@@ -65,6 +72,7 @@ public class EventHandler {
                 node.setNetworkName(network.getName());
                 node.setNetworkColor(network.getColor());
                 registry.invalidateNetwork(networkId);
+                PENDING_LOAD_SYNC.add(node);
             } else {
                 node.setNetworkName("Network-" + networkId.toString().substring(0, 6));
             }
@@ -72,6 +80,26 @@ public class EventHandler {
             node.setNetworkName("");
         }
 
+    }
+
+    // Join event cannot move items
+    @SubscribeEvent
+    public static void onServerTick(TickEvent.ServerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END || PENDING_LOAD_SYNC.isEmpty())
+            return;
+        List<LogisticsNodeEntity> pending = new ArrayList<>(PENDING_LOAD_SYNC);
+        PENDING_LOAD_SYNC.clear();
+        for (LogisticsNodeEntity node : pending) {
+            if (!node.isRemoved() && node.level() instanceof ServerLevel level
+                    && level.getEntity(node.getUUID()) == node) {
+                LabelUpgradeSync.synchronizeOnLoad(node);
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        PENDING_LOAD_SYNC.clear();
     }
 
     @SubscribeEvent
