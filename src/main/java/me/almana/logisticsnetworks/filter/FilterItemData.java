@@ -154,7 +154,8 @@ public final class FilterItemData {
     public static boolean setEntry(ItemStack stack, int slot, ItemStack value) {
         return edit(stack, slot, entry -> value.isEmpty()
                 ? GeneralFilterEntry.empty(slot)
-                : entry.withItem(StackSnapshot.of(entryCopy(value))));
+                : (RecipeCardItem.is(value) ? GeneralFilterEntry.empty(slot) : entry)
+                        .withItem(StackSnapshot.of(entryCopy(value))));
     }
 
     private static ItemStack entryCopy(ItemStack value) {
@@ -163,7 +164,7 @@ public final class FilterItemData {
 
     public static boolean refusesCard(ItemStack filter, ItemStack item) {
         return RecipeCardItem.is(item) && (getTargetType(filter) != FilterTargetType.ITEMS
-                || RecipeCardData.of(item).ingredients().isEmpty());
+                || RecipeCardData.of(item).sanitized().ingredients().isEmpty());
     }
 
     public static boolean addItem(ItemStack filter, ItemStack item) {
@@ -243,8 +244,9 @@ public final class FilterItemData {
         GeneralFilterConfig config = filter.get(LogisticsDataComponents.FILTER_ENTRIES);
         if (config == null)
             return false;
-        for (GeneralFilterEntry entry : config.entries()) {
-            if (isRecipeCard(entry))
+        List<GeneralFilterEntry> entries = config.entries();
+        for (int i = 0; i < entries.size(); i++) {
+            if (isRecipeCard(entries.get(i)))
                 return true;
         }
         return false;
@@ -253,6 +255,7 @@ public final class FilterItemData {
     public static List<RecipeCardData> recipeCards(ItemStack filter) {
         return entries(filter).stream()
                 .filter(FilterItemData::isRecipeCard)
+                .filter(entry -> entry.slot() >= 0 && entry.slot() < getCapacity(filter))
                 .sorted(Comparator.comparingInt(GeneralFilterEntry::slot))
                 .map(entry -> RecipeCardData.of(entry.item().toStack()))
                 .toList();
