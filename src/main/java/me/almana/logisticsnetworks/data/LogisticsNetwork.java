@@ -355,21 +355,8 @@ public class LogisticsNetwork {
                 continue;
             }
 
-            nodeDimensions.put(nodeId, node.level().dimension());
-            dimensionalCache.put(nodeId, NodeUpgradeData.hasDimensionalUpgrade(node));
-            tierCache.put(nodeId, NodeUpgradeData.getUpgradeTier(node));
-
-            for (int i = 0; i < 9; i++) {
-                if (channelNames[i].isEmpty()) {
-                    ChannelData ch = node.getChannel(i);
-                    if (ch != null && !ch.getName().isEmpty()) {
-                        channelNames[i] = ch.getName();
-                    }
-                }
-            }
-
+            cacheNode(nodeId, node);
             resolved.add(node);
-            classifyNode(node);
         }
 
         sortImportsByPriority();
@@ -383,6 +370,23 @@ public class LogisticsNetwork {
                 }
             }
         }
+    }
+
+    private void cacheNode(UUID nodeId, LogisticsNodeEntity node) {
+        nodeDimensions.put(nodeId, node.level().dimension());
+        dimensionalCache.put(nodeId, NodeUpgradeData.hasDimensionalUpgrade(node));
+        tierCache.put(nodeId, NodeUpgradeData.getUpgradeTier(node));
+
+        for (int i = 0; i < 9; i++) {
+            if (channelNames[i].isEmpty()) {
+                ChannelData ch = node.getChannel(i);
+                if (ch != null && !ch.getName().isEmpty()) {
+                    channelNames[i] = ch.getName();
+                }
+            }
+        }
+
+        classifyNode(node);
     }
 
     private void classifyNode(LogisticsNodeEntity node) {
