@@ -92,6 +92,8 @@ public final class NetworkHandler {
         registerServer(ConfirmGraphLabelsPayload.class, ConfirmGraphLabelsPayload.STREAM_CODEC, GraphPayloadHandler::handleConfirmLabels);
         registerServer(ResetGraphLayoutPayload.class, ResetGraphLayoutPayload.STREAM_CODEC, GraphPayloadHandler::handleReset);
         registerServer(ReturnToComputerPayload.class, ReturnToComputerPayload.STREAM_CODEC, GraphPayloadHandler::handleReturn);
+        registerClient(SyncNetworkGraphPayload.class, SyncNetworkGraphPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkGraph);
+        registerClient(GraphLabelPreviewPayload.class, GraphLabelPreviewPayload.STREAM_CODEC, ClientPayloadHandler::handleGraphLabelPreview);
         registerServer(ScanAttachedStoragePayload.class, ScanAttachedStoragePayload.STREAM_CODEC, ServerPayloadHandler::handleScanAttachedStorage);
         registerClient(SyncFilterScanResultPayload.class, SyncFilterScanResultPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncFilterScanResult);
         registerClient(SyncOpenFilterPayload.class, SyncOpenFilterPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncOpenFilter);

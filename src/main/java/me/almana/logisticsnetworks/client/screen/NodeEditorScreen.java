@@ -1848,6 +1848,11 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         return ClientControls.cursorY(minecraft);
     }
 
+    // Picker arrives in Phase 8
+    protected boolean isStorageUpgradePickerOpen() {
+        return false;
+    }
+
     protected boolean handleScreenKey(int key, int scan, int modifiers) {
         return super.keyPressed(key, scan, modifiers);
     }

@@ -1411,8 +1411,20 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
             return true;
         }
-        NetworkHandler.sendToServer(new OpenNodeMenuPayload(
-                menu.getNodeSource().getId(), menu.getNodeChannel()));
+        if (menu.getGraphContext() != null) {
+            var graph = menu.getGraphContext();
+            if (graph.origin() == me.almana.logisticsnetworks.menu.GraphMenuContext.Origin.TABLE) {
+                NetworkHandler.sendToServer(new OpenNodeMenuPayload(
+                        menu.getNodeSource().getId(), menu.getNodeChannel()));
+            } else {
+                NetworkHandler.sendToServer(new me.almana.logisticsnetworks.network.RequestOpenGraphPayload(
+                        graph.computerPos(), graph.computerDimension(), graph.networkId(),
+                        java.util.Optional.of(menu.getNodeSource().getUUID()), menu.getNodeChannel()));
+            }
+        } else {
+            NetworkHandler.sendToServer(new OpenNodeMenuPayload(
+                    menu.getNodeSource().getId(), menu.getNodeChannel()));
+        }
         return true;
     }
 

@@ -1237,6 +1237,15 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             return true;
         }
 
+        if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
+                && mouseY >= button4Y && mouseY < button4Y + OPTION_BTN_HEIGHT) {
+            NodeGraphSession.begin(selectedNetworkId);
+            NetworkHandler.sendToServer(new me.almana.logisticsnetworks.network.RequestOpenGraphPayload(
+                    menu.getComputerPos(), minecraft.level.dimension().location(), selectedNetworkId,
+                    java.util.Optional.empty(), 0));
+            return true;
+        }
+
         return false;
     }
 
@@ -1569,6 +1578,13 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
+        UUID returningNetwork = NodeGraphSession.takeReturningNetwork();
+        if (returningNetwork != null) {
+            networks.stream().filter(network -> network.id().equals(returningNetwork)).findFirst().ifPresent(network -> {
+                selectedNetworkId = network.id();
+                selectedNetworkName = network.name();
+            });
+        }
         if (Config.debugMode) {
             LOGGER.debug("Received network list with {} entries", networks.size());
             for (SyncNetworkListPayload.NetworkEntry entry : networks) {

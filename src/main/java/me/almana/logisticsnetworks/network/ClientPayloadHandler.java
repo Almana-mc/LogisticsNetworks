@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.NodeEditorScreen;
+import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
@@ -33,6 +34,22 @@ public class ClientPayloadHandler {
                 clipboardScreen.receiveNetworkList(payload.networks());
             } else {
                 LOGGER.debug("Screen is not NodeScreen or ComputerScreen, ignoring");
+            }
+        });
+    }
+
+    public static void handleSyncNetworkGraph(SyncNetworkGraphPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (Minecraft.getInstance().screen instanceof NodeGraphScreen screen) {
+                screen.receiveGraph(payload);
+            }
+        });
+    }
+
+    public static void handleGraphLabelPreview(GraphLabelPreviewPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (Minecraft.getInstance().screen instanceof NodeGraphScreen screen) {
+                screen.receiveLabelPreview(payload);
             }
         });
     }
