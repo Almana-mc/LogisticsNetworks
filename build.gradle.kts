@@ -11,6 +11,7 @@ import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.the
 import org.gradle.kotlin.dsl.withType
+import java.util.Properties
 
 plugins {
     id("eclipse")
@@ -111,6 +112,11 @@ repositories {
 val localRuntime: Configuration by configurations.creating
 configurations.runtimeClasspath { extendsFrom(localRuntime) }
 val fg = extensions.getByType<net.minecraftforge.gradle.userdev.DependencyManagementExtension>()
+val testMods = Properties().apply {
+    val file = project.file("run/1.20.1/testmods.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+fun testMod(name: String) = testMods.getProperty(name, "false").toBoolean()
 
 dependencies {
     add("minecraft", "net.minecraftforge:forge:${minecraftVersion}-${forgeVersion}")
@@ -126,6 +132,22 @@ dependencies {
     compileOnly("org.appliedenergistics:guideme:${guidemeVersion}:api")
     localRuntime(fg.deobf("org.appliedenergistics:guideme:${guidemeVersion}"))
     compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
+
+    // Local test mods (testmods.properties)
+    if (testMod("mek")) localRuntime(fg.deobf("mekanism:Mekanism:${mekanismVersion}"))
+    if (testMod("ars")) {
+        localRuntime(fg.deobf("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraftVersion}:${arsNouveauVersion}"))
+        localRuntime(fg.deobf("maven.modrinth:curios:5.14.1+1.20.1"))
+        localRuntime(fg.deobf("maven.modrinth:geckolib:aC5KMoNg")) // geckolib-forge 4.8.4
+        localRuntime("io.github.llamalad7:mixinextras-forge:0.5.4")
+    }
+    if (testMod("ftbteams")) {
+        localRuntime(fg.deobf("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}", closureOf<ModuleDependency> { isTransitive = false }))
+        localRuntime(fg.deobf("dev.ftb.mods:ftb-library-forge:2001.2.13", closureOf<ModuleDependency> { isTransitive = false }))
+        localRuntime(fg.deobf("maven.modrinth:architectury-api:9.2.14+forge"))
+    }
+    if (testMod("jade")) localRuntime(fg.deobf("maven.modrinth:jade:${jadeVersion}"))
+    if (testMod("xaero")) localRuntime(fg.deobf("maven.modrinth:xaeros-minimap:forge-1.20.1-26.6.0"))
 }
 
 tasks.withType<JavaCompile>().configureEach {
