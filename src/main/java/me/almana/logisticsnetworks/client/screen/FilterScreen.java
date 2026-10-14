@@ -1062,6 +1062,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (menu.canSetResourceRoundRobin()
                 && isHovering(resourceRotationButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE,
                         CLIPBOARD_BUTTON_SIZE, (int) mx, (int) my)) {
+            ClickSound.play();
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 10);
             }
@@ -1073,10 +1074,14 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
         if (isHovering(copyButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
                 (int) mx, (int) my)) {
+            ClickSound.play();
             return copyOpenFilter();
         }
         if (isHovering(pasteButtonX(), clipboardButtonY(), CLIPBOARD_BUTTON_SIZE, CLIPBOARD_BUTTON_SIZE,
                 (int) mx, (int) my)) {
+            if (copiedFilter != null) {
+                ClickSound.play();
+            }
             return pasteOpenFilter();
         }
         return false;
@@ -1086,6 +1091,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (!menu.canScanAttachedStorage()) {
             return true;
         }
+        ClickSound.play();
         flushOpenEditors();
         PacketDistributor.sendToServer(ScanAttachedStoragePayload.INSTANCE);
         return true;
@@ -1493,6 +1499,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (blurManualInputIfNeeded(mx, my))
             return true;
         if (action == 0 && isHoveringBackButton(mx, my)) {
+            ClickSound.play();
             return returnToNodeScreen();
         }
         if (detailEditSlot < 0 && handleClipboardButtonClick(mx, my, action)) {
@@ -1523,6 +1530,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (action == 0 && ClientControls.modifier2Down()) {
             int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
             if (hoveredSlot >= 0) {
+                ClickSound.play();
                 enterDetailPage(hoveredSlot);
                 return true;
             }
@@ -1571,6 +1579,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int modeBtnX = rightEdge - modeBtnW;
 
         if (isHovering(modeBtnX, btnY, modeBtnW, btnH, (int) mx, (int) my)) {
+            ClickSound.play();
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
             }
@@ -1590,6 +1599,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int typeBtnX = modeBtnX - typeBtnW - 4;
 
             if (isHovering(typeBtnX, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
+                ClickSound.play();
                 if (minecraft != null && minecraft.gameMode != null) {
                     minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
                 }
@@ -1620,6 +1630,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return true;
 
         if (isHovering(arrowX, y, 12, 14, (int) mx, (int) my)) {
+            ClickSound.play();
             isDropdownOpen = !isDropdownOpen;
             listScrollOffset = 0;
             return true;
@@ -1630,6 +1641,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 int row = ((int) my - (y + 16)) / LIST_ROW_H;
                 int idx = listScrollOffset + row;
                 if (idx >= 0 && idx < cachedMods.size()) {
+                    ClickSound.play();
                     String mod = cachedMods.get(idx);
                     menu.setSelectedMod(mod);
                     manualInputBox.setValue(mod);
@@ -1790,6 +1802,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
             int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
             if (isHovering(leftEdge, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
+                ClickSound.play();
                 if (minecraft != null && minecraft.gameMode != null) {
                     minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
                 }
@@ -1804,6 +1817,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
 
         if (isHovering(modeBtnX, btnY, modeBtnW, btnH, (int) mx, (int) my)) {
+            ClickSound.play();
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
             }
@@ -1813,6 +1827,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         String scopeLabel = tr("gui.logisticsnetworks.filter.name.scope." + menu.getNameMatchScope().serializedName());
         int scopeBtnW = Math.max(40, font.width(scopeLabel) + 8);
         if (isHovering(modeBtnX + modeBtnW + 4, btnY, scopeBtnW, btnH, (int) mx, (int) my)) {
+            ClickSound.play();
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 9);
             }
@@ -4008,6 +4023,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return handleNbtSubPageClick(mx, my, action);
         }
         if (action == 0 && detailTagButtonArea().contains((int) mx, (int) my)) {
+            ClickSound.play();
             openDetailTagPicker();
             return true;
         }
@@ -4026,6 +4042,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         int backW = 30;
         if (isHovering(panelX + 4, panelY + 4, backW, 12, (int) mx, (int) my)) {
+            ClickSound.play();
             closeDetailPage();
             return true;
         }
@@ -4033,6 +4050,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int clearW = 40;
         int clearXPos = panelX + panelW - clearW - 4;
         if (isHovering(clearXPos, panelY + 4, clearW, 12, (int) mx, (int) my)) {
+            ClickSound.play();
             clearDetailEntry();
             return true;
         }
@@ -4047,6 +4065,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (isHovering(slotX, itemSlotY, 18, 18, (int) mx, (int) my)) {
             String currentId = detailIdInputBox.getValue().trim();
             if (!currentId.isEmpty() && !currentId.startsWith("#")) {
+                ClickSound.play();
                 if (isFluidOrChemical) {
                     clearFilterEntry(detailEditSlot);
                 } else {
@@ -4083,6 +4102,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     int rowY = dropY + (i - startIdx) * LIST_ROW_H;
                     if (mx >= idFieldX && mx < idFieldX + rowW
                             && my >= rowY && my < rowY + LIST_ROW_H) {
+                        ClickSound.play();
                         String selected = dropdownList.get(i);
                         if (isTagInput) {
                             PacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, selected));
@@ -4135,6 +4155,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int strictToggleW = 14 + font.width(strictLabel);
             boolean strictNbt = menu.isEntryNbtStrict(detailEditSlot);
             if (isHovering(strictToggleX, nbtY, strictToggleW, 14, (int) mx, (int) my)) {
+                ClickSound.play();
                 boolean next = !strictNbt;
                 PacketDistributor.sendToServer(SetFilterEntryNbtPayload.setStrict(detailEditSlot, next));
                 menu.setEntryNbtStrict(detailEditSlot, next);
@@ -4145,6 +4166,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             String nbtBtnLabel = tr("gui.logisticsnetworks.filter.detail.nbt.configure");
             int nbtBtnW = Math.max(34, font.width(nbtBtnLabel) + 8);
             if (!strictNbt && isHovering(nbtBtnX, nbtY, nbtBtnW, 14, (int) mx, (int) my)) {
+                ClickSound.play();
                 detailNbtPageOpen = true;
                 detailNbtScrollOffset = 0;
                 detailNbtInputBox.active = true;
@@ -4204,6 +4226,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         int backW = 50;
         if (isHovering(panelX + 4, panelY + 4, backW, 12, (int) mx, (int) my)) {
+            ClickSound.play();
             closeNbtSubPage();
             return true;
         }
@@ -4211,6 +4234,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int clearW = 40;
         int clearXPos = panelX + panelW - clearW - 4;
         if (isHovering(clearXPos, panelY + 4, clearW, 12, (int) mx, (int) my)) {
+            ClickSound.play();
             PacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(detailEditSlot));
             menu.clearSlotNbtRules(detailEditSlot);
             detailNbtSelectedIdx = -1;
@@ -4228,6 +4252,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         String rawLabel = detailNbtRawMode ? "Raw SNBT" : "Table";
         int modeW = Math.max(60, font.width(rawLabel) + 8);
         if (isHovering(contentX, y, modeW, 12, (int) mx, (int) my)) {
+            ClickSound.play();
             detailNbtRawMode = !detailNbtRawMode;
             if (detailNbtRawMode) {
                 int rawY = y + 16;
@@ -4260,6 +4285,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             int doneX = panelX + (panelW - doneW) / 2;
             int doneY = y + Math.max(20, nbtH) + 4;
             if (isHovering(doneX, doneY, doneW, 14, (int) mx, (int) my)) {
+                ClickSound.play();
                 closeNbtSubPage();
                 return true;
             }
@@ -4296,6 +4322,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             NbtRow row = visible.get(vi);
 
             if (row.heading()) {
+                ClickSound.play();
                 if (nbtCollapsedGroups.contains(row.group())) {
                     nbtCollapsedGroups.remove(row.group());
                 } else {
@@ -4309,6 +4336,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             boolean active = activePaths.contains(entry.path());
 
             if (mx < colToggleX + NBT_COL_TOGGLE + 4) {
+                ClickSound.play();
                 if (active) {
                     int ruleIdx = findActiveRuleIndex(menu.getSlotNbtRules(detailEditSlot), entry.path());
                     if (ruleIdx >= 0) {
@@ -4334,6 +4362,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
 
             if (mx >= colOpX && mx < colOpX + NBT_COL_OP) {
+                ClickSound.play();
                 if (!active) {
                     detailNbtSelectedIdx = entryIdx;
                     detailNbtOp = "=";

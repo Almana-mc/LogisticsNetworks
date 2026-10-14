@@ -428,6 +428,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         int closeX = x + TWEAKS_W - 14;
         int closeY = y + 6;
         if (mx >= closeX && mx <= closeX + 10 && my >= closeY && my <= closeY + 10) {
+            ClickSound.play();
             tweaksOpen = false;
             return true;
         }
@@ -442,6 +443,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             int sx = x + 10 + col * (swatchW + 4);
             int sy = startY + row * (swatchH + 4);
             if (mx >= sx && mx <= sx + swatchW && my >= sy && my <= sy + swatchH) {
+                ClickSound.play();
                 ThemeState.setTheme(Themes.ALL.get(i));
                 return true;
             }
@@ -1169,6 +1171,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         for (int r = 0; r < opts.length; r++) {
             int ry = py + r * FILTER_PICKER_ROW_H;
             if (mx >= px && mx < px + FILTER_PICKER_W && my >= ry && my < ry + FILTER_PICKER_ROW_H) {
+                ClickSound.play();
                 VirtualFilterType type = opts[r];
                 channel.setFilterItem(slot, type.createStack());
                 PacketDistributor.sendToServer(new OpenNodeFilterPayload(
@@ -1302,6 +1305,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             return true;
         }
         if (currentPage == Page.CHANNEL_CONFIG && action == 0 && isInDocsFab(mx, my)) {
+            ClickSound.play();
             if (minecraft != null && minecraft.player != null) {
                 GuideMeCompat.openGuide(minecraft.player,
                         ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "guide"));
@@ -1309,6 +1313,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             return true;
         }
         if (currentPage == Page.CHANNEL_CONFIG && action == 0 && isInTweaksFab(mx, my)) {
+            ClickSound.play();
             tweaksOpen = true;
             return true;
         }
@@ -1324,6 +1329,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 && !labelPickerOpen && !filterPickerOpen
                 && menu.hasStorageUpgradeAccess() && menu.getCarried().isEmpty()
                 && menu.getNode().getUpgradeItem(storageSlot).isEmpty()) {
+            ClickSound.play();
             storageUpgradePicker.open(storageSlot);
             PacketDistributor.sendToServer(new RequestStorageUpgradeCatalogPayload(
                     menu.containerId, menu.getNodeId(), storageSlot));
@@ -1348,6 +1354,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         if (action == 0) {
             SyncStorageUpgradeCatalogPayload.Entry entry = storageUpgradePicker.entryAt(mx, my);
             if (entry != null) {
+                ClickSound.play();
                 PacketDistributor.sendToServer(new InstallStorageUpgradePayload(
                         menu.containerId, menu.getNodeId(), storageUpgradePicker.preferredSlot(),
                         BuiltInRegistries.ITEM.getKey(entry.item().getItem())));
@@ -1363,12 +1370,14 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private boolean handleNetworkPageClick(double mx, double my) {
         int[] sb = sortButtonBounds();
         if (isHoveringAbs(sb[0], sb[1], sb[2], sb[3], mx, my)) {
+            ClickSound.play();
             sortMode = sortMode.next();
             networkScrollOffset = 0;
             return true;
         }
 
         if (isHoveringAbs(leftPos + GUI_WIDTH / 2 - 45, topPos + 54, 90, 16, mx, my)) {
+            ClickSound.play();
             String value = networkNameField.getValue().trim();
             String name = value.isEmpty() ? tr("gui.logisticsnetworks.node.network.unnamed") : value;
             networkNameField.setFocused(false);
@@ -1389,11 +1398,13 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             int editBtnX = leftPos + 14 + entryW - editBtnW;
 
             if (isHoveringAbs(editBtnX, y, editBtnW, 17, mx, my)) {
+                ClickSound.play();
                 openNetworkEditor(entry);
                 return true;
             }
 
             if (isHoveringAbs(leftPos + 14, y, entryW, 17, mx, my)) {
+                ClickSound.play();
                 sendNetworkAssign(Optional.of(entry.id()), "");
                 return true;
             }
@@ -1479,6 +1490,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             int entryY = listY + i * LABEL_PICKER_ENTRY_H;
             if (mx >= pickerX + 2 && mx < pickerX + pickerW - 2
                     && my >= entryY && my < entryY + LABEL_PICKER_ENTRY_H) {
+                ClickSound.play();
                 if (isOverLabelDelete(pickerX, entryY, mx, my)) requestLabelDeletion(node, networkLabels.get(idx));
                 else commitLabelChange(networkLabels.get(idx));
                 return true;
@@ -1491,6 +1503,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         int clearW = font.width(clearLabel) + 8;
         int clearX = pickerX + (pickerW - clearW) / 2;
         if (mx >= clearX && mx < clearX + clearW && my >= clearY && my < clearY + 12) {
+            ClickSound.play();
             commitLabelChange("");
             return true;
         }
@@ -1542,12 +1555,14 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
         String visibilityLabel = getVisibilityLabel(node.isRenderVisible());
         if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(visibilityLabel) + 16, 12, mx, my)) {
+            ClickSound.play();
             node.setRenderVisible(!node.isRenderVisible());
             PacketDistributor.sendToServer(new ToggleNodeVisibilityPayload(node.getId()));
             return true;
         }
 
         if (isHoveringAbs(leftPos + GUI_WIDTH - 52, topPos + 4, 44, 12, mx, my)) {
+            ClickSound.play();
             currentPage = Page.NETWORK_SELECT;
             rebuildPageLayout();
             return true;
@@ -1560,6 +1575,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             int labelX = leftPos + 10 + (148 - labelW) / 2;
             int labelY = topPos + 40;
             if (isHoveringAbs(labelX, labelY, labelW, 12, mx, my)) {
+                ClickSound.play();
                 openLabelPicker(node);
                 return true;
             }
@@ -1570,6 +1586,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 if (i == selectedChannel && checkTabDoubleClick(i)) {
                     startChannelNameEdit(node, i);
                 } else {
+                    ClickSound.play();
                     selectedChannel = i;
                     settingsScrollOffset = 0;
                     getMenu().setSelectedChannel(i);
@@ -1588,27 +1605,32 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                     if (isHoveringFilterButton(i, mx, my)) {
                         ItemStack carried = menu.getCarried();
                         if (RecipeCardItem.is(carried)) {
+                            ClickSound.play();
                             stampCard(node, channel, i, carried);
                             return true;
                         }
                         if (!carried.isEmpty() && !carried.is(ModTags.FILTERS)
                                 && isFilterSlotItemAddable(i)) {
+                            ClickSound.play();
                             addItemToFilterSlot(i, carried);
                             return true;
                         }
                         ItemStack current = channel.getFilterItem(i);
                         if (isFilterButtonEmpty(current)) {
                             if (action == 0) {
+                                ClickSound.play();
                                 openFilterPicker(i);
                             }
                             return true;
                         }
                         if (action == 1) {
+                            ClickSound.play();
                             channel.setFilterItem(i, ItemStack.EMPTY);
                             PacketDistributor.sendToServer(new SetChannelFilterItemPayload(
                                     node.getId(), selectedChannel, i, ItemStack.EMPTY));
                             return true;
                         }
+                        ClickSound.play();
                         PacketDistributor.sendToServer(new OpenNodeFilterPayload(
                                 node.getId(), selectedChannel, i, VirtualFilterType.EXISTING));
                         return true;
@@ -1641,6 +1663,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
                 if (row >= 6 && row <= 8) {
                     if (ClientControls.modifier3Down()) {
+                        ClickSound.play();
                         setNumericExtremum(ch, row, action == 0);
                         commitChannelUpdate(node, ch);
                         return true;
@@ -1651,6 +1674,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                     }
                 }
 
+                ClickSound.play();
                 int dir = (action == 0) ? 1 : -1;
                 cycleSetting(ch, row, dir);
                 commitChannelUpdate(node, ch);
@@ -1664,6 +1688,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         int modeBtnW = font.width(modeLabel) + 8;
 
         if (isHoveringAbs(modeBtnX, modeBtnY, modeBtnW, 10, mx, my)) {
+            ClickSound.play();
             ch.setFilterMode(cycleEnum(ch.getFilterMode(), (action == 0) ? 1 : -1));
             commitChannelUpdate(node, ch);
             return true;

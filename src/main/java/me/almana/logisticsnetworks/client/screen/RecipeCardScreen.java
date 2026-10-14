@@ -145,6 +145,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     private boolean clickCard(int x, int y, int action) {
         ItemStack carried = menu.getCarried();
         if (inside(x, y, OUTPUT_X, OUTPUT_Y, 16, 16)) {
+            ClickSound.play();
             if (action == 1) menu.edit(data -> data.withOutput(Optional.empty()));
             else if (!carried.isEmpty()) {
                 menu.edit(data -> data.withOutput(Optional.of(StackSnapshot.of(carried.copyWithCount(1)))));
@@ -152,6 +153,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
             return true;
         }
         if (inside(x, y, BLOCK_X, BLOCK_Y, BLOCK_W, 14)) {
+            ClickSound.play();
             menu.edit(data -> data.withBlocking(!data.blocking()));
             return true;
         }
@@ -159,11 +161,13 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         for (int i = 0; i < droppableCells(); i++) {
             int index = i;
             if (inside(x, y, cellX(i), cellY(i) + 1, 16, 16)) {
+                ClickSound.play();
                 if (action == 1 && index < size) menu.edit(data -> data.withoutIngredient(index));
                 else if (action == 0 && !carried.isEmpty()) dropIngredient(index, carried);
                 return true;
             }
             if (index < size && inside(x, y, cellX(i) + 52, cellY(i) + 2, 14, 14)) {
+                ClickSound.play();
                 menu.edit(data -> data.withIngredient(index, data.ingredients().get(index).nextTag()));
                 return true;
             }

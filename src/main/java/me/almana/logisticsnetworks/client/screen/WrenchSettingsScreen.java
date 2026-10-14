@@ -160,18 +160,23 @@ public class WrenchSettingsScreen extends Screen {
         int top = clickedTab(mouseX, mouseY, TABS.length, y + TOP_Y, TOP_W);
         int inner = tab == 1 ? clickedTab(mouseX, mouseY, FLOW_TABS.length, y + INNER_Y, INNER_W) : -1;
         if (top >= 0) {
+            ClickSound.play();
             tab = top;
             showFields();
         } else if (inner >= 0) {
+            ClickSound.play();
             flowTab = inner;
             showFields();
         } else if (active().mouseClicked(mouseX, mouseY)) {
             return true;
         } else if (onButton(mouseX, mouseY, 0) && enabled(0)) {
+            ClickSound.play();
             active().picker().load(NetworkColors.randomColor());
         } else if (onButton(mouseX, mouseY, 1)) {
+            ClickSound.play();
             active().reset();
         } else if (onButton(mouseX, mouseY, 2) && enabled(2)) {
+            ClickSound.play();
             apply();
         } else if (!ColorPicker.inRect(mouseX, mouseY, x, y, W, H)) {
             onClose();
