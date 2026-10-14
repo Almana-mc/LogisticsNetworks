@@ -7,9 +7,11 @@ import me.almana.logisticsnetworks.component.GeneralFilterEntry;
 import me.almana.logisticsnetworks.component.LegacyComponentMigration;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.NbtCriterion;
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponents;
@@ -29,6 +31,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -151,13 +154,22 @@ public final class FilterItemData {
     public static boolean setEntry(ItemStack stack, int slot, ItemStack value) {
         return edit(stack, slot, entry -> value.isEmpty()
                 ? GeneralFilterEntry.empty(slot)
-                : entry.withItem(StackSnapshot.of(value.copyWithCount(1))));
+                : entry.withItem(StackSnapshot.of(entryCopy(value))));
+    }
+
+    private static ItemStack entryCopy(ItemStack value) {
+        return RecipeCardItem.is(value) ? RecipeCardItem.stamp(value) : value.copyWithCount(1);
+    }
+
+    public static boolean refusesCard(ItemStack filter, ItemStack item) {
+        return RecipeCardItem.is(item) && (getTargetType(filter) != FilterTargetType.ITEMS
+                || RecipeCardData.of(item).ingredients().isEmpty());
     }
 
     public static boolean addItem(ItemStack filter, ItemStack item) {
-        if (!isFilterItem(filter) || item.isEmpty())
+        if (!isFilterItem(filter) || item.isEmpty() || refusesCard(filter, item))
             return false;
-        ItemStack entry = item.copyWithCount(1);
+        ItemStack entry = entryCopy(item);
         int cap = getCapacity(filter);
         for (int i = 0; i < cap; i++) {
             if (ItemStack.isSameItemSameComponents(getEntry(filter, i), entry))
@@ -224,6 +236,37 @@ public final class FilterItemData {
 
     public static int getEntryCount(ItemStack stack) {
         return entries(stack).size();
+    }
+
+    // Legacy filters never hold cards
+    public static boolean hasRecipeCard(ItemStack filter) {
+        GeneralFilterConfig config = filter.get(LogisticsDataComponents.FILTER_ENTRIES);
+        if (config == null)
+            return false;
+        for (GeneralFilterEntry entry : config.entries()) {
+            if (isRecipeCard(entry))
+                return true;
+        }
+        return false;
+    }
+
+    public static List<RecipeCardData> recipeCards(ItemStack filter) {
+        return entries(filter).stream()
+                .filter(FilterItemData::isRecipeCard)
+                .sorted(Comparator.comparingInt(GeneralFilterEntry::slot))
+                .map(entry -> RecipeCardData.of(entry.item().toStack()))
+                .toList();
+    }
+
+    public static void restampRecipeCards(ItemStack filter) {
+        for (GeneralFilterEntry entry : entries(filter)) {
+            if (isRecipeCard(entry))
+                setEntry(filter, entry.slot(), entry.item().toStack());
+        }
+    }
+
+    private static boolean isRecipeCard(GeneralFilterEntry entry) {
+        return entry.item() != null && entry.item().item().value() instanceof RecipeCardItem;
     }
 
     public static boolean containsItem(ItemStack filter, ItemStack candidate) {
@@ -1016,7 +1059,7 @@ public final class FilterItemData {
         if (config != null) {
             for (GeneralFilterEntry entry : config.entries()) {
                 int slot = entry.slot();
-                if (slot >= 0 && slot < cap && entriesBySlot[slot] == null) {
+                if (slot >= 0 && slot < cap && entriesBySlot[slot] == null && !isRecipeCard(entry)) {
                     entriesBySlot[slot] = buildItemFilterSlot(entry);
                 }
             }
