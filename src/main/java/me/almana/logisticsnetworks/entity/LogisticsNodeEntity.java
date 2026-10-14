@@ -27,6 +27,7 @@ import net.minecraft.world.entity.RelativeMovement;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.util.ITeleporter;
 import net.minecraftforge.network.NetworkHooks;
@@ -244,6 +245,11 @@ public class LogisticsNodeEntity extends Entity {
     @Override
     public boolean shouldRenderAtSqrDistance(double distanceSq) {
         return distanceSq < 48.0 * 48.0;
+    }
+
+    @Override
+    public AABB getBoundingBoxForCulling() {
+        return new AABB(getX() - 0.5, getY(), getZ() - 0.5, getX() + 0.5, getY() + 1.0, getZ() + 0.5);
     }
 
     @Override
