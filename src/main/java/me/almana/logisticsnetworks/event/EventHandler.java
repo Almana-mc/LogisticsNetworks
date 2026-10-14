@@ -83,6 +83,7 @@ public class EventHandler {
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         ServerPayloadHandler.clearModifierKeys(event.getEntity());
         NodeAccessPolicy.setAdminMode(event.getEntity(), false);
+        ServerPayloadHandler.clearDefaultNodeVisibility(event.getEntity());
     }
 
     @SubscribeEvent

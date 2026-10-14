@@ -33,9 +33,14 @@ public class ClientConfig {
             .comment("GUI theme for logistics node screens: light, dark, redstone, nebula, glass, terminal, pastel, brutalist")
             .define("theme", "dark", o -> o instanceof String s && THEMES.contains(s));
 
+    public static final ForgeConfigSpec.BooleanValue defaultNodeVisibilitySpec = builder
+            .comment("Whether newly placed nodes should be visible by default.")
+            .define("defaultNodeVisibility", true);
+
     static final ForgeConfigSpec SPEC = builder.build();
 
     public static boolean invertCopyPasteControls = false;
+    public static boolean defaultNodeVisibility = true;
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
 
@@ -47,6 +52,7 @@ public class ClientConfig {
 
     public static void refresh() {
         invertCopyPasteControls = invertCopyPasteControlsSpec.get();
+        defaultNodeVisibility = defaultNodeVisibilitySpec.get();
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());

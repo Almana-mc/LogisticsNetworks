@@ -82,6 +82,7 @@ public final class NetworkHandler {
         registerServer(SyncModifierKeysPayload.class, SyncModifierKeysPayload.STREAM_CODEC, ServerPayloadHandler::handleSyncModifierKeys);
         registerServer(SetNetworkColorPayload.class, SetNetworkColorPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNetworkColor);
         registerServer(DeleteNetworkPayload.class, DeleteNetworkPayload.STREAM_CODEC, ServerPayloadHandler::handleDeleteNetwork);
+        registerServer(SetDefaultNodeVisibilityPayload.class, SetDefaultNodeVisibilityPayload.STREAM_CODEC, ServerPayloadHandler::handleSetDefaultNodeVisibility);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {
