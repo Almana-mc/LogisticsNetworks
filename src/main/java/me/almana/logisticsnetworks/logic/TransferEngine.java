@@ -479,7 +479,7 @@ public class TransferEngine {
             return -1;
         IItemHandler sourceHandler = capCache.findItemHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         boolean anyReachable = false;
@@ -630,7 +630,7 @@ public class TransferEngine {
             return -1;
         IFluidHandler sourceHandler = capCache.findFluidHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitMb;
@@ -680,7 +680,7 @@ public class TransferEngine {
         }
 
         if (!anyReachable)
-            return -1;
+            return 0;
         if (equalHandlers != null)
             return dealFluids(sourceHandler, equalHandlers, equalChannels, batchLimitMb, exportChannel,
                     sourceLevel.registryAccess(), filterReadCache);
@@ -732,7 +732,7 @@ public class TransferEngine {
             return -1;
         IEnergyStorage sourceHandler = capCache.findEnergyHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
         if (sourceHandler == null || !sourceHandler.canExtract())
-            return -1;
+            return 0;
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimitRF;
@@ -832,6 +832,7 @@ public class TransferEngine {
                 continue;
 
             ServerLevel targetLevel = (ServerLevel) target.node().level();
+            anyReachable = true;
             BlockPos targetPos = target.node().getAttachedPos();
             if (!targetLevel.isLoaded(targetPos))
                 continue;
@@ -842,7 +843,6 @@ public class TransferEngine {
             if (targetHandler == null)
                 continue;
 
-            anyReachable = true;
             if (equalHandlers != null) {
                 equalHandlers.add(targetHandler);
                 equalChannels.add(target.channel());
