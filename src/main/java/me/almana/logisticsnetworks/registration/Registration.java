@@ -165,6 +165,15 @@ public class Registration {
                                         .displayItems((params, output) -> {
                                                 ITEMS.getEntries().stream()
                                                                 .map(Supplier::get)
+                                                                .filter(item -> !(item instanceof PatternSetterItem))
+                                                                .filter(item -> !(item instanceof BaseFilterItem))
+                                                                .filter(item -> !(item instanceof ModFilterItem))
+                                                                .filter(item -> !(item instanceof NameFilterItem))
+                                                                .filter(item -> !(item instanceof TagFilterItem))
+                                                                .filter(item -> !(item instanceof AmountFilterItem))
+                                                                .filter(item -> !(item instanceof DurabilityFilterItem))
+                                                                .filter(item -> !(item instanceof NbtFilterItem))
+                                                                .filter(item -> !(item instanceof SlotFilterItem))
                                                                 .forEach(output::accept);
                                         })
                                         .build());
