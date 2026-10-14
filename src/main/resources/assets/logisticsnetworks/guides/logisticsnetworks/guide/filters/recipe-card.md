@@ -20,7 +20,7 @@ Craft a written card on its own to wipe it, or together with blank cards to copy
 
 A card is an entry in an item filter, like any other item. Hold it and click a cell in the filter, or click a node's filter slot to add it to that slot's filter. The filter gets a copy and you keep the card. The cell cycles through the card's ingredients, and its name shows what the recipe makes.
 
-Hold **Modifier Key 2** (Ctrl by default) and click the cell to edit that copy. Close the editor to go back to the filter. Click the cell with an empty hand to clear it. Cards work in whitelist and blacklist filters, in the wrench clipboard, and they copy with labels. A card in an import channel's filter does nothing. Cards can't be edited from the computer graph.
+Hold **Modifier Key 2** (Ctrl by default) and click the cell to edit that copy. Close the editor to go back to the filter. Click the cell with an empty hand to clear it. Cards work in whitelist and blacklist filters, in the wrench clipboard, and they copy with labels. A card in an import channel's filter does nothing. Cards can't be edited from the computer graph or from a filter item held in your hand.
 
 Each operation sends as many whole sets as the batch size allows (at least one set). The distribution mode decides who gets them:
 

@@ -4736,8 +4736,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         ItemStack slotItem = slot < menu.slots.size() ? menu.slots.get(slot).getItem() : ItemStack.EMPTY;
         if (RecipeCardItem.is(slotItem)) {
             lines.addAll(getTooltipFromItem(minecraft, slotItem));
-            lines.add(Component.translatable("tooltip.logisticsnetworks.recipe_card.edit",
-                    ClientControls.MODIFIER_2.getTranslatedKeyMessage()).withStyle(ChatFormatting.DARK_GRAY));
+            if (menu.isBoundFilter() && menu.getGraphContext() == null) {
+                lines.add(Component.translatable("tooltip.logisticsnetworks.recipe_card.edit",
+                        ClientControls.MODIFIER_2.getTranslatedKeyMessage()).withStyle(ChatFormatting.DARK_GRAY));
+            }
             return lines;
         }
         FluidStack fluid = menu.getFluidFilter(slot);
