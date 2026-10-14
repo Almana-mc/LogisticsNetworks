@@ -18,6 +18,7 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +75,9 @@ public final class LabelUpgradeSync {
 
     public static void synchronizeMenuClose(ServerPlayer player, LogisticsNodeEntity source,
                                             List<ItemStack> original) {
-        LogisticsNetwork network = sameUpgrades(source, original) ? null : labelNetwork(source);
+        // Player already saved or dead
+        boolean absent = player.hasDisconnected() || !player.isAlive();
+        LogisticsNetwork network = absent || sameUpgrades(source, original) ? null : labelNetwork(source);
         if (network == null || isTemplateCurrent(network, source)) {
             ServerPayloadHandler.invalidateNetwork(source);
             return;
@@ -143,7 +146,7 @@ public final class LabelUpgradeSync {
     private static boolean applyLabel(ServerPlayer player, LogisticsNetwork network,
                                       List<LogisticsNodeEntity> targets, UUID sourceId, String label,
                                       BooleanSupplier expectationValid) {
-        if (targets.isEmpty()) return false;
+        if (targets.isEmpty() || new HashSet<>(targets).size() != targets.size()) return false;
         if (label.isEmpty()) {
             clearLabels(player, network, targets);
             return true;
@@ -248,9 +251,20 @@ public final class LabelUpgradeSync {
         List<ChannelData> channels = template.channels();
         for (int index = 0; index < Math.min(channels.size(), LogisticsNodeEntity.CHANNEL_COUNT); index++) {
             ChannelData target = node.getChannel(index);
+            dropReplacedFilters(node, target, channels.get(index));
             target.copyFrom(channels.get(index));
             ServerPayloadHandler.clampChannelToUpgradeLimits(node, target);
             ServerPayloadHandler.sendChannelSyncToViewers(node, index, target);
+        }
+    }
+
+    // Physical filters until Phase 4
+    private static void dropReplacedFilters(LogisticsNodeEntity node, ChannelData current, ChannelData next) {
+        for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
+            ItemStack old = current.getFilterItem(slot);
+            if (!old.isEmpty() && !ItemStack.matches(old, next.getFilterItem(slot))) {
+                node.spawnAtLocation(old.copy());
+            }
         }
     }
 

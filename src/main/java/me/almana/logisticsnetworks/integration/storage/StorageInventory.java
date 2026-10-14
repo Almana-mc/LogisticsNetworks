@@ -45,9 +45,11 @@ public final class StorageInventory {
 
     public static void returnToPlayer(ServerPlayer player, List<ItemStack> stacks) {
         Inventory inventory = player.getInventory();
+        // Mirrors AbstractContainerMenu.removed
+        boolean absent = !player.isAlive() || player.hasDisconnected();
         for (ItemStack stack : stacks) {
             ItemStack returned = stack.copy();
-            inventory.add(returned);
+            if (!absent) inventory.add(returned);
             if (!returned.isEmpty()) player.drop(returned, false);
         }
         inventory.setChanged();
