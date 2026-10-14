@@ -183,7 +183,8 @@ public class RecipeCardMenu extends AbstractContainerMenu {
     @Override
     public boolean stillValid(Player player) {
         if (!isEntryTarget()) return RecipeCardItem.is(player.getItemInHand(hand));
-        if (isNodeTarget()) return node == null || node.isAlive() && RecipeCardItem.is(card(player));
+        if (isNodeTarget()) return node == null || node.isAlive() && node.isOwnedBy(player)
+                && RecipeCardItem.is(card(player));
         return player.getItemInHand(hand).getItem() instanceof WrenchItem;
     }
 
