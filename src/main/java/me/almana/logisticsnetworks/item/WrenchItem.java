@@ -2,6 +2,8 @@ package me.almana.logisticsnetworks.item;
 
 import me.almana.logisticsnetworks.util.ItemDataUtil;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
+import me.almana.logisticsnetworks.client.ClientControls;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -146,15 +148,7 @@ public class WrenchItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
-        if (!node.isOwnedBy(player)) {
-            player.displayClientMessage(Component.translatable("message.logisticsnetworks.not_owner"), true);
-            return InteractionResult.FAIL;
-        }
-
-        ItemStack wrenchStack = context.getItemInHand();
-        return isSecondaryUse(player)
-                ? pasteToNode(node, player, wrenchStack)
-                : copyFromNode(node, player, wrenchStack);
+        return interactWithMountedNode(node, player, context.getItemInHand());
     }
 
     private InteractionResult useOnMassPlacementMode(UseOnContext context) {
@@ -515,25 +509,33 @@ public class WrenchItem extends Item {
 
         LogisticsNodeEntity node = findNodeAt(level, clickedPos);
         if (node == null) {
-            if (player.isShiftKeyDown() && AE2Compat.isLoaded() && AE2Compat.isGridHost(level, clickedPos)) {
+            if (isSecondaryUse(player) && AE2Compat.isLoaded() && AE2Compat.isGridHost(level, clickedPos)) {
                 return toggleAE2Link(context.getItemInHand(), player, level, clickedPos);
             }
             return InteractionResult.SUCCESS;
         }
 
+        return interactWithMountedNode(node, player, context.getItemInHand());
+    }
+
+    private InteractionResult interactWithMountedNode(LogisticsNodeEntity node, Player player, ItemStack wrenchStack) {
         if (!node.isOwnedBy(player)) {
             player.displayClientMessage(Component.translatable("message.logisticsnetworks.not_owner"), true);
             return InteractionResult.FAIL;
         }
-
         if (node.getOwnerUUID() == null) {
             node.setOwnerUUID(player.getUUID());
         }
-
-        if (player.isShiftKeyDown()) {
-            return removeNode(level, node, player);
-        }
-        return openNodeGui(node, player);
+        return switch (getMode(wrenchStack)) {
+            case WRENCH -> isSecondaryUse(player)
+                    ? removeNode(node.level(), node, player)
+                    : openNodeGui(node, player);
+            // Bit 3: inverted controls
+            case COPY_PASTE -> isSecondaryUse(player) != ServerPayloadHandler.isModifierDown(player, 3)
+                    ? pasteToNode(node, player, wrenchStack)
+                    : copyFromNode(node, player, wrenchStack);
+            case MASS_PLACEMENT -> InteractionResult.CONSUME;
+        };
     }
 
     @Override
@@ -654,7 +656,7 @@ public class WrenchItem extends Item {
         tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.mode", getModeDisplayName(getMode(stack))));
         GlobalPos ae2Link = getAE2LinkPos(stack);
         if (ae2Link != null) {
-            if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+            if (ClientControls.modifier1Down()) {
                 BlockPos p = ae2Link.pos();
                 String dim = ae2Link.dimension().location().toString();
                 tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_linked_detail",
@@ -1092,7 +1094,7 @@ public class WrenchItem extends Item {
     }
 
     private static boolean isSecondaryUse(Player player) {
-        return player.isSecondaryUseActive() || player.isShiftKeyDown() || player.isCrouching();
+        return ServerPayloadHandler.isModifierDown(player, 0);
     }
 
     private static class Util {
