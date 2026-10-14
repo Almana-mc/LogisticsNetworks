@@ -66,12 +66,10 @@ public class ServerPayloadHandler {
 
             ChannelType oldType = channel.getType();
             updateChannelData(channel, payload, NodeUpgradeData.getUpgradeTier(node));
-            boolean typeChanged = oldType != channel.getType();
-            if (typeChanged)
+            if (oldType != channel.getType())
                 autoDetectSide(node, channel);
             clampChannelToUpgradeLimits(node, channel);
-            if (typeChanged)
-                sendChannelSyncToViewers(node, payload.channelIndex(), channel);
+            sendChannelSyncToViewers(node, payload.channelIndex(), channel);
             propagateToLabelGroup(node, payload.channelIndex());
             markNetworkDirty(node);
         });
@@ -705,15 +703,16 @@ public class ServerPayloadHandler {
     }
 
     private static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
-        int maxBatch = NodeUpgradeData.getOperationCap(channel.getType(), NodeUpgradeData.getUpgradeTier(node));
-
-        channel.setBatchSize(Math.max(1, Math.min(channel.getBatchSize(), maxBatch)));
+        int tier = NodeUpgradeData.getUpgradeTier(node);
+        int maxBatch = NodeUpgradeData.getOperationCap(channel.getType(), tier);
 
         if (channel.getType() == ChannelType.ENERGY) {
-            channel.setTickDelay(1);
+            channel.setBatchSize(maxBatch);
+        } else {
+            channel.setBatchSize(Math.max(1, Math.min(channel.getBatchSize(), maxBatch)));
         }
 
-        int minDelay = NodeUpgradeData.getMinTickDelay(node);
+        int minDelay = NodeUpgradeData.getMinTickDelay(tier);
         if (channel.getTickDelay() < minDelay) {
             channel.setTickDelay(minDelay);
         }
