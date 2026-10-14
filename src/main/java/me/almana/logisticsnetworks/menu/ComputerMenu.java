@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -107,7 +108,11 @@ public class ComputerMenu extends AbstractContainerMenu {
             entries.add(new SyncNetworkListPayload.NetworkEntry(
                     net.getId(),
                     net.getName(),
-                    net.getNodeUuids().size()));
+                    net.getNodeUuids().size(),
+                    false,
+                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
+                    net.getColor(),
+                    net.getCreatedAt()));
         }
 
         LOGGER.debug("Sending {} network entries to client", entries.size());

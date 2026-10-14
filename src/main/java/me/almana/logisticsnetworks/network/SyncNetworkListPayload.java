@@ -13,7 +13,8 @@ import java.util.UUID;
 public record SyncNetworkListPayload(
         List<NetworkEntry> networks) implements CustomPacketPayload {
 
-    public record NetworkEntry(UUID id, String name, int nodeCount) {
+    public record NetworkEntry(UUID id, String name, int nodeCount, boolean pinned, boolean canDelete, int color,
+            long createdAt) {
     }
 
     public static final CustomPacketPayload.Type<SyncNetworkListPayload> TYPE = new CustomPacketPayload.Type<>(
@@ -29,7 +30,11 @@ public record SyncNetworkListPayload(
             UUID id = buf.readUUID();
             String name = buf.readUtf(64);
             int nodeCount = buf.readVarInt();
-            entries.add(new NetworkEntry(id, name, nodeCount));
+            boolean pinned = buf.readBoolean();
+            boolean canDelete = buf.readBoolean();
+            int color = buf.readInt();
+            long createdAt = buf.readLong();
+            entries.add(new NetworkEntry(id, name, nodeCount, pinned, canDelete, color, createdAt));
         }
         return new SyncNetworkListPayload(entries);
     }
@@ -40,6 +45,10 @@ public record SyncNetworkListPayload(
             buf.writeUUID(entry.id);
             buf.writeUtf(entry.name, 64);
             buf.writeVarInt(entry.nodeCount);
+            buf.writeBoolean(entry.pinned);
+            buf.writeBoolean(entry.canDelete);
+            buf.writeInt(entry.color);
+            buf.writeLong(entry.createdAt);
         }
     }
 
