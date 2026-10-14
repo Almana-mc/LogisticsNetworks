@@ -1008,8 +1008,10 @@ public class TransferEngine {
         Arrays.fill(openTargets, true);
         int openTargetCount = targets.size();
         List<List<ItemStack>> rejectedInserts = new ArrayList<>(targets.size());
+        List<Map<ItemKey, boolean[]>> importMasks = new ArrayList<>(targets.size());
         for (int i = 0; i < targets.size(); i++) {
             rejectedInserts.add(null);
+            importMasks.add(targets.get(i).hasImportSlotMapping() ? new HashMap<>() : null);
         }
 
         while (remaining > 0 && openTargetCount > 0) {
@@ -1053,8 +1055,8 @@ public class TransferEngine {
                     boolean[] importAllowedSlots = target.allowedSlots();
                     if (provider != null) {
                         if (target.hasImportSlotMapping()) {
-                            importAllowedSlots = computeImportAllowedSlots(target, extracted, provider,
-                                    candidateComponents, filterReadCache);
+                            importAllowedSlots = importMask(importMasks.get(targetIndex), target, extracted,
+                                    provider, candidateComponents, filterReadCache);
                             if (importAllowedSlots == null) {
                                 continue;
                             }
@@ -1245,6 +1247,18 @@ public class TransferEngine {
             rejectedInserts.set(targetIndex, rejected);
         }
         rejected.add(stack.copyWithCount(1));
+    }
+
+    private static boolean[] importMask(Map<ItemKey, boolean[]> masks, ItemTransferTarget target,
+            ItemStack candidate, HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        ItemKey key = new ItemKey(candidate.getItem(), candidate.getTag());
+        if (!masks.containsKey(key))
+            masks.put(key, computeImportAllowedSlots(target, candidate, provider, candidateComponents,
+                    filterReadCache));
+        boolean[] mask = masks.get(key);
+        // importCap mutates its copy
+        return mask == null ? null : mask.clone();
     }
 
     private static boolean[] computeImportAllowedSlots(ItemTransferTarget target, ItemStack candidate,

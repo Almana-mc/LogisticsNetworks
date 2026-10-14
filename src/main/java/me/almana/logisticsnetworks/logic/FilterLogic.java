@@ -361,7 +361,7 @@ public final class FilterLogic {
         if (filters == null)
             return false;
         for (ItemStack filter : filters) {
-            if (FilterItemData.isFilterItem(filter) && FilterItemData.hasAnySlotMappings(filter, readCache)) {
+            if (FilterItemData.hasAnySlotMappings(filter, readCache)) {
                 return true;
             }
         }
