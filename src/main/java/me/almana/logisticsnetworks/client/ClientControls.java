@@ -11,6 +11,7 @@ import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.client.settings.KeyConflictContext;
+import net.minecraftforge.client.settings.KeyModifier;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
@@ -36,6 +37,9 @@ public final class ClientControls {
             GLFW.GLFW_MOUSE_BUTTON_RIGHT);
     public static final KeyMapping TOGGLE_WRENCH_HUD = new KeyMapping(
             "key.logisticsnetworks.toggle_wrench_hud", InputConstants.KEY_H, CATEGORY);
+    public static final KeyMapping TOGGLE_SLOT_NUMBERS = new KeyMapping(
+            "key.logisticsnetworks.toggle_slot_numbers", KeyConflictContext.UNIVERSAL,
+            KeyModifier.ALT, InputConstants.Type.KEYSYM.getOrCreate(InputConstants.KEY_I), CATEGORY);
 
     private static boolean modifier1Down;
     private static boolean modifier2Down;
@@ -131,6 +135,7 @@ public final class ClientControls {
             event.register(PRIMARY_INTERACTION);
             event.register(SECONDARY_INTERACTION);
             event.register(TOGGLE_WRENCH_HUD);
+            event.register(TOGGLE_SLOT_NUMBERS);
         }
     }
 
