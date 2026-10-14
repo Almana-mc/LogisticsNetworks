@@ -87,12 +87,12 @@ public class FilterMenu extends AbstractContainerMenu {
         this.lockedSlot = inventorySlotIndex;
 
         ItemStack stack = getOpenedStack();
-        this.isTagMode = stack.getItem() instanceof TagFilterItem;
-        this.isAmountMode = stack.getItem() instanceof AmountFilterItem;
-        this.isNbtMode = stack.getItem() instanceof NbtFilterItem;
-        this.isDurabilityMode = stack.getItem() instanceof DurabilityFilterItem;
+        this.isTagMode = false;
+        this.isAmountMode = false;
+        this.isNbtMode = false;
+        this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
         this.isSpecialMode = isTagMode || isAmountMode || isNbtMode || isDurabilityMode || isModMode || isSlotMode
                 || isNameMode;
@@ -117,12 +117,12 @@ public class FilterMenu extends AbstractContainerMenu {
         this.lockedSlot = (hand == InteractionHand.MAIN_HAND) ? playerInv.selected : -1;
 
         ItemStack stack = getOpenedStack();
-        this.isTagMode = stack.getItem() instanceof TagFilterItem;
-        this.isAmountMode = stack.getItem() instanceof AmountFilterItem;
-        this.isNbtMode = stack.getItem() instanceof NbtFilterItem;
-        this.isDurabilityMode = stack.getItem() instanceof DurabilityFilterItem;
+        this.isTagMode = false;
+        this.isAmountMode = false;
+        this.isNbtMode = false;
+        this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
         this.isSpecialMode = isTagMode || isAmountMode || isNbtMode || isDurabilityMode || isModMode || isSlotMode
                 || isNameMode;
@@ -150,12 +150,12 @@ public class FilterMenu extends AbstractContainerMenu {
         this.nodeFilterSlot = filterSlot;
 
         ItemStack stack = getOpenedStack();
-        this.isTagMode = stack.getItem() instanceof TagFilterItem;
-        this.isAmountMode = stack.getItem() instanceof AmountFilterItem;
-        this.isNbtMode = stack.getItem() instanceof NbtFilterItem;
-        this.isDurabilityMode = stack.getItem() instanceof DurabilityFilterItem;
+        this.isTagMode = false;
+        this.isAmountMode = false;
+        this.isNbtMode = false;
+        this.isDurabilityMode = false;
         this.isModMode = stack.getItem() instanceof ModFilterItem;
-        this.isSlotMode = stack.getItem() instanceof SlotFilterItem;
+        this.isSlotMode = false;
         this.isNameMode = stack.getItem() instanceof NameFilterItem;
         this.isSpecialMode = isTagMode || isAmountMode || isNbtMode || isDurabilityMode || isModMode || isSlotMode
                 || isNameMode;

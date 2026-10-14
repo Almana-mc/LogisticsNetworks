@@ -1221,16 +1221,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                     String tag = cachedTags.get(idx);
                     menu.setSelectedTag(tag);
                     manualInputBox.setValue(tag);
-                    sendTagUpdate(tag);
                     isDropdownOpen = false;
                     return true;
                 }
             }
         }
         if (btn == 1 && isHovering(x, y, w, 14, (int) mx, (int) my)) {
-            String toRemove = menu.getSelectedTag();
             menu.setSelectedTag(null);
-            sendTagRemove(toRemove);
             manualInputBox.setValue("");
             return true;
         }
@@ -1397,7 +1394,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         if (btn == 1 && isHovering(contentX, inputY, contentW, 14, (int) mx, (int) my)) {
             manualInputBox.setValue("");
-            sendSlotUpdate("");
             return true;
         }
 
@@ -1430,24 +1426,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private boolean checkAmountBtn(double mx, double my, int cx, int y, int delta, String label) {
         int w = Math.max(24, font.width(label) + 10);
         if (isHovering(cx - w / 2, y, w, 14, (int) mx, (int) my)) {
-            if (menu.isAmountMode()) {
-                sendAmountUpdate(menu.getAmount() + delta);
-            } else {
-                sendDurabilityUpdate(menu.getDurabilityValue() + delta);
-            }
             return true;
         }
         return false;
-    }
-
-    private void sendTagUpdate(String tag) {
-        menu.setSelectedTag(tag == null || tag.isBlank() ? null : tag.trim());
-        NetworkHandler.sendToServer(new ModifyFilterTagPayload(tag == null ? "" : tag, false));
-    }
-
-    private void sendTagRemove(String tag) {
-        menu.setSelectedTag(null);
-        NetworkHandler.sendToServer(new ModifyFilterTagPayload(tag == null ? "" : tag, true));
     }
 
     private void sendModUpdate(String mod) {
@@ -1458,18 +1439,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private void sendModRemove(String mod) {
         menu.setSelectedMod(null);
         NetworkHandler.sendToServer(new ModifyFilterModPayload(mod == null ? "" : mod, true));
-    }
-
-    private void sendAmountUpdate(int amount) {
-        NetworkHandler.sendToServer(new SetAmountFilterValuePayload(amount));
-    }
-
-    private void sendDurabilityUpdate(int val) {
-        NetworkHandler.sendToServer(new SetDurabilityFilterValuePayload(val));
-    }
-
-    private void sendSlotUpdate(String expression) {
-        NetworkHandler.sendToServer(new SetSlotFilterSlotsPayload(expression == null ? "" : expression));
     }
 
     private void sendNameUpdate(String name) {
@@ -1630,13 +1599,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         }
 
         String val = manualInputBox.getValue() == null ? "" : manualInputBox.getValue().trim();
-        if (menu.isTagMode()) {
-            if (val.isEmpty()) {
-                sendTagRemove(menu.getSelectedTag());
-            } else {
-                sendTagUpdate(val);
-            }
-        } else if (menu.isModMode()) {
+        if (menu.isModMode()) {
             if (val.isEmpty()) {
                 sendModRemove(menu.getSelectedMod());
             } else {
@@ -1644,8 +1607,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
         } else if (menu.isNameMode()) {
             sendNameUpdate(val);
-        } else if (menu.isSlotMode()) {
-            sendSlotUpdate(val);
         }
     }
 

@@ -5,10 +5,8 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.filter.AmountFilterData;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
-import me.almana.logisticsnetworks.filter.SlotFilterData;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
@@ -516,7 +514,7 @@ public class TransferEngine {
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
         List<ImportTarget> reachableRefs = new ArrayList<>(targets.size());
         ItemStack[] exportFilters = exportChannel.getFilterItems();
-        boolean[] sourceAllowedSlots = buildSlotAccessMask(sourceHandler, exportFilters);
+        boolean[] sourceAllowedSlots = null;
         FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
 
         for (ImportTarget target : targets) {
@@ -538,10 +536,7 @@ public class TransferEngine {
                 continue;
 
             ItemStack[] importFilters = target.channel.getFilterItems();
-            boolean[] targetAllowedSlots = buildSlotAccessMask(targetHandler, importFilters);
-            if (targetAllowedSlots != null && !hasAnyAllowedSlots(targetAllowedSlots)) {
-                continue;
-            }
+            boolean[] targetAllowedSlots = null;
 
             reachableTargets.add(new ItemTransferTarget(
                     targetHandler,
@@ -1570,10 +1565,6 @@ public class TransferEngine {
 
         if (exportFilters != null) {
             for (ItemStack filter : exportFilters) {
-                if (AmountFilterData.isAmountFilterItem(filter)) {
-                    hasExportThreshold = true;
-                    exportThreshold = Math.max(exportThreshold, AmountFilterData.getAmount(filter));
-                }
                 if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
                     hasPerEntryAmounts = true;
                 }
@@ -1585,10 +1576,6 @@ public class TransferEngine {
 
         if (importFilters != null) {
             for (ItemStack filter : importFilters) {
-                if (AmountFilterData.isAmountFilterItem(filter)) {
-                    hasImportThreshold = true;
-                    importThreshold = Math.min(importThreshold, AmountFilterData.getAmount(filter));
-                }
                 if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
                     hasPerEntryAmounts = true;
                 }
@@ -1818,78 +1805,6 @@ public class TransferEngine {
             }
         }
         return amount;
-    }
-
-    private static boolean[] buildSlotAccessMask(IItemHandler handler, ItemStack[] filters) {
-        if (handler == null || filters == null || filters.length == 0) {
-            return null;
-        }
-
-        int slotCount = handler.getSlots();
-        if (slotCount <= 0) {
-            return null;
-        }
-
-        boolean[] allowed = new boolean[slotCount];
-        boolean[] blacklistMask = new boolean[slotCount];
-
-        boolean hasConfiguredSlotFilter = false;
-        boolean hasWhitelist = false;
-
-        for (ItemStack filter : filters) {
-            if (!SlotFilterData.isSlotFilterItem(filter) || !SlotFilterData.hasAnySlots(filter)) {
-                continue;
-            }
-
-            hasConfiguredSlotFilter = true;
-            List<Integer> slots = SlotFilterData.getSlots(filter);
-            if (slots.isEmpty()) {
-                continue;
-            }
-
-            if (SlotFilterData.isBlacklist(filter)) {
-                for (int slot : slots) {
-                    if (slot >= 0 && slot < slotCount) {
-                        blacklistMask[slot] = true;
-                    }
-                }
-            } else {
-                hasWhitelist = true;
-                for (int slot : slots) {
-                    if (slot >= 0 && slot < slotCount) {
-                        allowed[slot] = true;
-                    }
-                }
-            }
-        }
-
-        if (!hasConfiguredSlotFilter) {
-            return null;
-        }
-
-        if (!hasWhitelist) {
-            Arrays.fill(allowed, true);
-        }
-
-        for (int i = 0; i < slotCount; i++) {
-            if (blacklistMask[i]) {
-                allowed[i] = false;
-            }
-        }
-
-        return allowed;
-    }
-
-    private static boolean hasAnyAllowedSlots(boolean[] allowedSlots) {
-        if (allowedSlots == null) {
-            return true;
-        }
-        for (boolean allowed : allowedSlots) {
-            if (allowed) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static final class CombinedItemHandler implements IItemHandler {
