@@ -50,7 +50,7 @@ public final class TooltipLines {
         if (!QUARANTINED.contains(item)) {
             try {
                 return stack.getTooltipLines(null, TooltipFlag.NORMAL);
-            } catch (Throwable e) {
+            } catch (LinkageError | RuntimeException e) {
                 // Client-only tooltip code
                 QUARANTINED.add(item);
                 LOGGER.warn("Tooltip of {} is not server-safe; regex filter uses fallback lines: {}",
@@ -67,7 +67,7 @@ public final class TooltipLines {
         if ((hidden & ItemStack.TooltipPart.ADDITIONAL.getMask()) == 0) {
             try {
                 stack.getItem().appendHoverText(stack, null, lines, TooltipFlag.NORMAL);
-            } catch (Throwable ignored) {
+            } catch (LinkageError | RuntimeException ignored) {
                 // keeps lines added before throw
             }
         }
