@@ -239,6 +239,14 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     @Override
+    public void onRemovedFromWorld() {
+        super.onRemovedFromWorld();
+        if (this.level() instanceof ServerLevel serverLevel) {
+            NetworkRegistry.get(serverLevel).evictCapabilities(serverLevel, getAttachedPos());
+        }
+    }
+
+    @Override
     public boolean shouldRenderAtSqrDistance(double distanceSq) {
         return distanceSq < 48.0 * 48.0;
     }

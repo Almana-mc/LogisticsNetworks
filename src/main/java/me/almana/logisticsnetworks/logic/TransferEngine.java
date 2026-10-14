@@ -28,7 +28,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
 
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.energy.IEnergyStorage;
@@ -62,14 +61,18 @@ public class TransferEngine {
         private final Map<Long, Object> energy = new HashMap<>();
         private final Map<Long, Object> chemicals = new HashMap<>();
         private static final Object ABSENT = new Object();
+        private final TransferCapabilityCache capabilities;
+
+        CapCache(TransferCapabilityCache capabilities) {
+            this.capabilities = capabilities;
+        }
 
         IItemHandler getItemHandler(ServerLevel level, BlockPos pos, Direction dir) {
             long key = capKey(level, pos, dir);
             Object cached = items.get(key);
             if (cached == ABSENT) return null;
             if (cached != null) return (IItemHandler) cached;
-            BlockEntity be = level.getBlockEntity(pos);
-            IItemHandler handler = be != null ? be.getCapability(ForgeCapabilities.ITEM_HANDLER, dir).orElse(null) : null;
+            IItemHandler handler = capabilities.get(level, pos, dir, ForgeCapabilities.ITEM_HANDLER);
             items.put(key, handler != null ? handler : ABSENT);
             return handler;
         }
@@ -79,8 +82,7 @@ public class TransferEngine {
             Object cached = fluids.get(key);
             if (cached == ABSENT) return null;
             if (cached != null) return (IFluidHandler) cached;
-            BlockEntity be = level.getBlockEntity(pos);
-            IFluidHandler handler = be != null ? be.getCapability(ForgeCapabilities.FLUID_HANDLER, dir).orElse(null) : null;
+            IFluidHandler handler = capabilities.get(level, pos, dir, ForgeCapabilities.FLUID_HANDLER);
             fluids.put(key, handler != null ? handler : ABSENT);
             return handler;
         }
@@ -90,8 +92,7 @@ public class TransferEngine {
             Object cached = energy.get(key);
             if (cached == ABSENT) return null;
             if (cached != null) return (IEnergyStorage) cached;
-            BlockEntity be = level.getBlockEntity(pos);
-            IEnergyStorage handler = be != null ? be.getCapability(ForgeCapabilities.ENERGY, dir).orElse(null) : null;
+            IEnergyStorage handler = capabilities.get(level, pos, dir, ForgeCapabilities.ENERGY);
             energy.put(key, handler != null ? handler : ABSENT);
             return handler;
         }
@@ -198,7 +199,7 @@ public class TransferEngine {
 
         NetworkRegistry registry = NetworkRegistry.get((ServerLevel) server.overworld());
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
-        CapCache capCache = new CapCache();
+        CapCache capCache = new CapCache(registry.getCapabilityCache());
 
         long minWakeDelta = Long.MAX_VALUE;
         for (LogisticsNodeEntity sourceNode : context.sortedNodes()) {

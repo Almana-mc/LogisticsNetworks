@@ -3,7 +3,9 @@ package me.almana.logisticsnetworks.data;
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
+import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -32,6 +34,7 @@ public class NetworkRegistry extends SavedData {
     private final TreeMap<Long, Set<UUID>> wakeBuckets = new TreeMap<>();
     private final Map<UUID, Long> scheduledWake = new HashMap<>();
     private final TelemetryManager telemetryManager = new TelemetryManager();
+    private final TransferCapabilityCache capabilityCache = new TransferCapabilityCache();
 
     public NetworkRegistry() {
     }
@@ -144,6 +147,14 @@ public class NetworkRegistry extends SavedData {
 
     public TelemetryManager getTelemetryManager() {
         return telemetryManager;
+    }
+
+    public TransferCapabilityCache getCapabilityCache() {
+        return capabilityCache;
+    }
+
+    public void evictCapabilities(ServerLevel level, BlockPos attachedPos) {
+        capabilityCache.evict(level.dimension(), attachedPos);
     }
 
     public Map<UUID, LogisticsNetwork> getAllNetworks() {
