@@ -1014,7 +1014,7 @@ public class ServerPayloadHandler {
                         }
                         nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
                                 nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
-                                level.dimension().location().toString(), node.isRenderVisible(), node.isHighlighted()));
+                                level.dimension().location(), node.isRenderVisible(), node.isHighlighted()));
                         break;
                     }
                 }
@@ -1330,8 +1330,7 @@ public class ServerPayloadHandler {
                 LogisticsNetwork network = registry.getNetwork(payload.networkId());
                 if (network == null || !canAccessNetwork(player, network))
                     return;
-                telemetry.subscribe(payload.networkId(), payload.channelIndex(),
-                        player, registry, player.getServer());
+                telemetry.subscribe(payload.networkId(), player, registry, player.getServer());
             } else {
                 telemetry.unsubscribe(player);
             }
@@ -1351,41 +1350,46 @@ public class ServerPayloadHandler {
             if (network == null || !canAccessNetwork(player, network))
                 return;
 
-            int[] nodeCounts = new int[LogisticsNodeEntity.CHANNEL_COUNT];
-            int[] typeOrdinals = new int[LogisticsNodeEntity.CHANNEL_COUNT];
-            boolean[] found = new boolean[LogisticsNodeEntity.CHANNEL_COUNT];
-
-            for (UUID nodeId : network.getNodeUuids()) {
-                LogisticsNodeEntity node = findNode(player, nodeId);
-                if (node == null) continue;
-
-                for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                    ChannelData channel = node.getChannel(i);
-                    if (channel == null) continue;
-                    if (channel.isEnabled()) {
-                        nodeCounts[i]++;
-                        if (!found[i]) {
-                            typeOrdinals[i] = channel.getType().ordinal();
-                            found[i] = true;
-                        }
-                    }
-                }
-            }
-
-            List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                if (nodeCounts[i] > 0) {
-                    entries.add(new SyncChannelListPayload.ChannelEntry(i, 0, typeOrdinals[i], nodeCounts[i]));
-                }
-            }
-
             List<String> channelNames = new ArrayList<>(LogisticsNodeEntity.CHANNEL_COUNT);
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 channelNames.add(network.getChannelName(i));
             }
-            NetworkHandler.sendToPlayer(player,
-                    new SyncChannelListPayload(payload.networkId(), entries, channelNames));
+
+            NetworkHandler.sendToPlayer(player, new SyncChannelListPayload(payload.networkId(),
+                    channelEntries(network, player.getServer()), channelNames));
         });
+    }
+
+    public static List<SyncChannelListPayload.ChannelEntry> channelEntries(LogisticsNetwork network,
+            MinecraftServer server) {
+        int[] nodeCounts = new int[LogisticsNodeEntity.CHANNEL_COUNT];
+        int[] typeOrdinals = new int[LogisticsNodeEntity.CHANNEL_COUNT];
+        boolean[] found = new boolean[LogisticsNodeEntity.CHANNEL_COUNT];
+
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(server, nodeId);
+            if (node == null) continue;
+
+            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+                ChannelData channel = node.getChannel(i);
+                if (channel == null) continue;
+                if (channel.isEnabled()) {
+                    nodeCounts[i]++;
+                    if (!found[i]) {
+                        typeOrdinals[i] = channel.getType().ordinal();
+                        found[i] = true;
+                    }
+                }
+            }
+        }
+
+        List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
+        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+            if (nodeCounts[i] > 0) {
+                entries.add(new SyncChannelListPayload.ChannelEntry(i, typeOrdinals[i], nodeCounts[i]));
+            }
+        }
+        return entries;
     }
 
     public static void handleSetClipboardSettings(SetClipboardSettingsPayload payload, IPayloadContext context) {

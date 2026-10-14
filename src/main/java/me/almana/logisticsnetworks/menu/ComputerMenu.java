@@ -32,7 +32,7 @@ public class ComputerMenu extends AbstractContainerMenu {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final int WRENCH_SLOT_X = 291;
-    private static final int WRENCH_SLOT_Y = 9;
+    private static final int WRENCH_SLOT_Y = 8;
 
     private final BlockPos computerPos;
     private ItemStack wrenchStack = ItemStack.EMPTY;
