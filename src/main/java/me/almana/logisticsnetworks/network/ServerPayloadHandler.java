@@ -979,7 +979,7 @@ public class ServerPayloadHandler {
                 return;
 
             LogisticsNodeEntity node = findNode(player, payload.nodeId());
-            if (node == null)
+            if (node == null || !node.isOwnedBy(player))
                 return;
 
             NetworkHooks.openScreen(player, new MenuProvider() {

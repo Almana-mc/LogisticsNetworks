@@ -253,7 +253,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         List<WrenchItem.MassSelectionTarget> placedTargets = new ArrayList<>();
 
         for (WrenchItem.MassSelectionTarget target : validTargets) {
-            LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, target.pos());
+            LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, target.pos(), serverPlayer.getUUID());
             if (node == null) {
                 continue;
             }
