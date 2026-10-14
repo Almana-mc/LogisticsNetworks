@@ -81,6 +81,7 @@ public final class NetworkHandler {
         // Last keeps earlier IDs stable
         registerServer(SyncModifierKeysPayload.class, SyncModifierKeysPayload.STREAM_CODEC, ServerPayloadHandler::handleSyncModifierKeys);
         registerServer(SetNetworkColorPayload.class, SetNetworkColorPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNetworkColor);
+        registerServer(DeleteNetworkPayload.class, DeleteNetworkPayload.STREAM_CODEC, ServerPayloadHandler::handleDeleteNetwork);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {
