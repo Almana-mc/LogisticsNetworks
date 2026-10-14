@@ -12,7 +12,7 @@ A Recipe Card makes an item channel send whole recipe sets instead of loose item
 
 ## Writing a recipe
 
-Craft paper, redstone and an iron nugget for two blank cards. Right-click a card to open it. With JEI or EMI, open any recipe and press **+** to copy its ingredients onto the card. You can also click a cell while holding an item, type the amount, and press **#** to switch between the exact item and its tags. Right-click a cell to remove it. A card holds up to 12 different ingredients.
+Craft paper, redstone and an iron nugget for a blank card. Right-click a card to open it. With JEI or EMI, open any recipe and press **+** to copy its ingredients onto the card. You can also click a cell while holding an item, type the amount, and press **#** to switch between the exact item and its tags. Right-click a cell to remove it. A card holds up to 12 different ingredients.
 
 Craft a written card on its own to wipe it, or together with blank cards to copy it onto them.
 
