@@ -384,6 +384,12 @@ public class ServerPayloadHandler {
                 return;
             }
 
+            boolean adding = !computer.getStarredNetworks().contains(payload.networkId());
+            if (adding && NetworkRegistry.get(player.serverLevel()).getVisibleNetworks(player).stream()
+                    .noneMatch(net -> net.getId().equals(payload.networkId()))) {
+                return;
+            }
+
             computer.toggleNetworkStar(payload.networkId());
             refreshOpenComputerMenus(player, payload.computerPos());
         });
