@@ -157,6 +157,7 @@ public class NodeMenu extends AbstractContainerMenu {
     @Override
     public boolean stillValid(Player player) {
         if (node == null || !node.isAlive()) return false;
+        if (!player.level().isClientSide() && !node.isOwnedBy(player)) return false;
         return remoteAccess || player.distanceToSqr(node) < 64.0;
     }
 
@@ -246,7 +247,8 @@ public class NodeMenu extends AbstractContainerMenu {
     @Override
     public void removed(Player player) {
         super.removed(player);
-        if (player instanceof ServerPlayer serverPlayer && node != null && node.isAlive()) {
+        if (player instanceof ServerPlayer serverPlayer && node != null && node.isAlive()
+                && node.isOwnedBy(serverPlayer)) {
             LabelUpgradeSync.synchronizeMenuClose(serverPlayer, node, openingUpgrades);
         }
     }
