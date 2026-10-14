@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.data;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -64,7 +65,7 @@ public final class LabelUpgradeTemplate {
         }
         tag.put(KEY_UPGRADES, upgradesTag);
         ListTag channelsTag = new ListTag();
-        for (ChannelData channel : channels) channelsTag.add(channel.save(null));
+        for (ChannelData channel : channels) channelsTag.add(channel.save(RegistryAccess.EMPTY));
         tag.put(KEY_CHANNELS, channelsTag);
         return tag;
     }
@@ -87,7 +88,7 @@ public final class LabelUpgradeTemplate {
         for (Tag value : tag.getList(KEY_CHANNELS, Tag.TAG_COMPOUND)) {
             if (!(value instanceof CompoundTag channelTag)) continue;
             ChannelData channel = new ChannelData();
-            channel.load(channelTag, null);
+            channel.load(channelTag, RegistryAccess.EMPTY);
             channels.add(channel);
         }
         return new LabelUpgradeTemplate(tag.getLong(KEY_REVISION), tag.getUUID(KEY_PLAYER), upgrades, channels);
