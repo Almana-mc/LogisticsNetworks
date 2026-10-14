@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
@@ -55,7 +56,7 @@ public final class AttachedStorageFilterScanner {
             if (stack.isEmpty()) {
                 continue;
             }
-            if (FilterItemData.containsItem(filter, stack)) {
+            if (RecipeCardItem.is(stack) || FilterItemData.containsItem(filter, stack)) {
                 continue;
             }
             if (FilterItemData.addItem(filter, stack)) {

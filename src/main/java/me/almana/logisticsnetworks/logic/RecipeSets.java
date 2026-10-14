@@ -3,7 +3,6 @@ package me.almana.logisticsnetworks.logic;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.item.RecipeCardItem;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -27,11 +26,11 @@ public final class RecipeSets {
         List<RecipeCardData> cards = new ArrayList<>();
         List<RecipeCardData.Ingredient> blockers = new ArrayList<>();
         for (ItemStack filter : filters) {
-            if (!RecipeCardItem.is(filter)) continue;
-            RecipeCardData card = RecipeCardData.of(filter);
-            cards.add(card);
-            for (RecipeCardData.Ingredient ingredient : card.ingredients()) {
-                if (!blockers.contains(ingredient)) blockers.add(ingredient);
+            for (RecipeCardData card : FilterItemData.recipeCards(filter)) {
+                cards.add(card);
+                for (RecipeCardData.Ingredient ingredient : card.ingredients()) {
+                    if (!blockers.contains(ingredient)) blockers.add(ingredient);
+                }
             }
         }
         int moved = 0;
@@ -43,14 +42,6 @@ public final class RecipeSets {
             if (sets > 0) moved += deal(mode, targets.size(), sets, mover) * card.setSize();
         }
         return moved;
-    }
-
-    public static ItemStack[] withoutCards(ItemStack[] filters) {
-        ItemStack[] copy = filters.clone();
-        for (int i = 0; i < copy.length; i++) {
-            if (RecipeCardItem.is(copy[i])) copy[i] = ItemStack.EMPTY;
-        }
-        return copy;
     }
 
     static int sets(int available, int budget, int setSize, boolean first) {

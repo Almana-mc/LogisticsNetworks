@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.item;
 
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -35,7 +36,7 @@ public class RecipeCardItem extends Item {
 
     public static boolean anyIn(ItemStack[] filters) {
         for (ItemStack filter : filters) {
-            if (is(filter)) return true;
+            if (FilterItemData.hasRecipeCard(filter)) return true;
         }
         return false;
     }
