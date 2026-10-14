@@ -1230,7 +1230,8 @@ public class FilterMenu extends AbstractContainerMenu {
                     || FilterItemData.hasEntryEnchanted(stack, i)) {
             } else if (filterInventory.getItem(i).isEmpty()
                     && (FilterItemData.getEntryBatch(stack, i) > 0
-                    || FilterItemData.getEntryStock(stack, i) > 0)) {
+                    || FilterItemData.getEntryStock(stack, i) > 0
+                    || FilterItemData.hasEntrySlotMapping(stack, i))) {
             } else if (isFluidSlot[i]) {
                 FluidStack fluid = FilterItemData.getFluidEntry(stack, i);
                 FilterItemData.setFluidEntry(stack, i, fluid);

@@ -199,19 +199,20 @@ public final class FilterItemData {
             return;
 
         ItemStack item = (value == null || value.isEmpty()) ? ItemStack.EMPTY : ItemStackCompat.copyWithCount(value, 1);
-        int existingBatch = getEntryBatch(stack, slot);
-        int existingStock = getEntryStock(stack, slot);
+        CompoundTag existing = getEntryData(stack, slot);
 
         updateRoot(stack, root -> {
             ListTag list = root.getList(KEY_ITEMS, Tag.TAG_COMPOUND);
             removeFromList(list, slot);
 
             if (!item.isEmpty()) {
-                CompoundTag entry = new CompoundTag();
+                // keep entry settings, swap resource
+                CompoundTag entry = existing == null ? new CompoundTag() : existing.copy();
+                entry.remove(KEY_FLUID_ID);
+                entry.remove(KEY_CHEMICAL_ID);
+                entry.remove(KEY_TAG);
                 entry.putInt(KEY_SLOT, slot);
                 entry.put(KEY_ITEM_TAG, ItemStackCompat.save(item, provider));
-                if (existingBatch > 0) entry.putInt(KEY_BATCH, existingBatch);
-                if (existingStock > 0) entry.putInt(KEY_STOCK, existingStock);
                 list.add(entry);
             }
 
