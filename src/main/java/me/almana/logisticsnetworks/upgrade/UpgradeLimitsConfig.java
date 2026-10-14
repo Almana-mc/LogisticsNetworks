@@ -122,11 +122,11 @@ public final class UpgradeLimitsConfig {
 
     private static TierLimits defaultForTier(int tier) {
         return switch (tier) {
-            case 1 -> new TierLimits(10, 16, 1_000, 10_000, 1_000, 1_000);
-            case 2 -> new TierLimits(5, 32, 5_000, 50_000, 5_000, 5_000);
-            case 3 -> new TierLimits(1, 64, 20_000, 250_000, 20_000, 20_000);
-            case 4 -> new TierLimits(1, 10_000, 1_000_000, Integer.MAX_VALUE, 1_000_000, 1_000_000);
-            default -> new TierLimits(20, 8, 500, 2_000, 500, 500);
+            case 1 -> new TierLimits(10, 32, 10_000, 10_000, 1_000, 1_000);
+            case 2 -> new TierLimits(5, 64, 100_000, 50_000, 5_000, 5_000);
+            case 3 -> new TierLimits(1, 256, 1_000_000, 250_000, 20_000, 20_000);
+            case 4 -> new TierLimits(1, 10_000, 2_100_000_000, Integer.MAX_VALUE, 1_000_000, 1_000_000);
+            default -> new TierLimits(20, 16, 1_000, 2_000, 500, 500);
         };
     }
 
