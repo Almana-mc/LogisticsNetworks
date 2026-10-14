@@ -287,6 +287,22 @@ public class ChannelData {
             this.filterItems[i] = source.filterItems[i].isEmpty() ? ItemStack.EMPTY : source.filterItems[i].copy();
         }
     }
+
+    public boolean sameSettings(ChannelData other) {
+        if (enabled != other.enabled || mode != other.mode || type != other.type
+                || batchSize != other.batchSize || tickDelay != other.tickDelay
+                || ioDirection != other.ioDirection || redstoneMode != other.redstoneMode
+                || distributionMode != other.distributionMode || filterMode != other.filterMode
+                || priority != other.priority || !name.equals(other.name)) {
+            return false;
+        }
+        for (int slot = 0; slot < FILTER_SIZE; slot++) {
+            if (!ItemStack.matches(filterItems[slot], other.filterItems[slot])) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 

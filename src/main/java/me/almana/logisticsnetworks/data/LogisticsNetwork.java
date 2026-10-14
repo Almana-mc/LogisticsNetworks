@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -32,6 +33,9 @@ public class LogisticsNetwork {
     private static final String KEY_CHANNEL_NAMES = "ChannelNames";
     private static final String KEY_COLOR = "Color";
     private static final String KEY_CREATED = "CreatedAt";
+    private static final String KEY_LABEL_TEMPLATES = "LabelTemplates";
+    private static final String KEY_LABEL = "Label";
+    private static final String KEY_TEMPLATE = "Template";
 
     private final UUID id;
     private String name;
@@ -39,6 +43,7 @@ public class LogisticsNetwork {
     private int color = NetworkColors.randomColor();
     private long createdAt = System.currentTimeMillis();
     private final Set<UUID> nodeUuids = new HashSet<>();
+    private final Map<String, LabelUpgradeTemplate> labelTemplates = new HashMap<>();
     private boolean sleeping = true;
 
     // Runtime flags
@@ -117,6 +122,17 @@ public class LogisticsNetwork {
         }
         tag.put(KEY_CHANNEL_NAMES, channelNamesTag);
 
+        if (!labelTemplates.isEmpty()) {
+            ListTag templatesTag = new ListTag();
+            for (Map.Entry<String, LabelUpgradeTemplate> entry : new TreeMap<>(labelTemplates).entrySet()) {
+                CompoundTag templateTag = new CompoundTag();
+                templateTag.putString(KEY_LABEL, entry.getKey());
+                templateTag.put(KEY_TEMPLATE, entry.getValue().save());
+                templatesTag.add(templateTag);
+            }
+            tag.put(KEY_LABEL_TEMPLATES, templatesTag);
+        }
+
         return tag;
     }
 
@@ -153,6 +169,12 @@ public class LogisticsNetwork {
             for (int i = 0; i < Math.min(namesTag.size(), 9); i++) {
                 network.channelNames[i] = namesTag.getCompound(i).getString("Name");
             }
+        }
+        for (Tag value : tag.getList(KEY_LABEL_TEMPLATES, Tag.TAG_COMPOUND)) {
+            if (!(value instanceof CompoundTag templateTag)) continue;
+            String label = templateTag.getString(KEY_LABEL);
+            LabelUpgradeTemplate template = LabelUpgradeTemplate.load(templateTag.getCompound(KEY_TEMPLATE));
+            if (!label.isBlank() && template != null) network.labelTemplates.put(label, template);
         }
 
         return network;
@@ -221,6 +243,22 @@ public class LogisticsNetwork {
 
     public Set<UUID> getNodeUuids() {
         return Collections.unmodifiableSet(nodeUuids);
+    }
+
+    public LabelUpgradeTemplate getLabelTemplate(String label) {
+        return labelTemplates.get(label);
+    }
+
+    public Set<String> getLabelNames() {
+        return Collections.unmodifiableSet(labelTemplates.keySet());
+    }
+
+    public void setLabelTemplate(String label, LabelUpgradeTemplate template) {
+        if (!label.isBlank()) labelTemplates.put(label, template);
+    }
+
+    public void removeLabel(String label) {
+        labelTemplates.remove(label);
     }
 
     public boolean isSleeping() {
