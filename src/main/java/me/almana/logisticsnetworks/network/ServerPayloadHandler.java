@@ -845,7 +845,7 @@ public class ServerPayloadHandler {
         return ItemStack.EMPTY;
     }
 
-    private static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
+    public static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
         int tier = NodeUpgradeData.getUpgradeTier(node);
         int maxBatch = NodeUpgradeData.getOperationCap(channel.getType(), tier);
 
