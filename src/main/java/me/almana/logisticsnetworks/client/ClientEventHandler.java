@@ -9,10 +9,13 @@ import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.PatternSetterScreen;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
+import me.almana.logisticsnetworks.client.tooltip.ClientFilterPreviewTooltip;
+import me.almana.logisticsnetworks.client.tooltip.FilterPreviewTooltip;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
+import net.minecraftforge.client.event.RegisterClientTooltipComponentFactoriesEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -35,6 +38,11 @@ public class ClientEventHandler {
             MenuScreens.register(Registration.PATTERN_SETTER_MENU.get(), PatternSetterScreen::new);
             MenuScreens.register(Registration.COMPUTER_MENU.get(), ComputerScreen::new);
         });
+    }
+
+    @SubscribeEvent
+    public static void registerTooltips(RegisterClientTooltipComponentFactoriesEvent event) {
+        event.register(FilterPreviewTooltip.class, ClientFilterPreviewTooltip::new);
     }
 
     @SubscribeEvent

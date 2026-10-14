@@ -1,8 +1,11 @@
 package me.almana.logisticsnetworks.filter;
 
 import me.almana.logisticsnetworks.data.ChannelType;
+import net.minecraft.util.StringRepresentable;
 
-public enum FilterTargetType {
+import java.util.Locale;
+
+public enum FilterTargetType implements StringRepresentable {
     ITEMS,
     FLUIDS,
     CHEMICALS;
@@ -27,5 +30,10 @@ public enum FilterTargetType {
             return ITEMS;
         }
         return values[ordinal];
+    }
+
+    @Override
+    public String getSerializedName() {
+        return name().toLowerCase(Locale.ROOT);
     }
 }

@@ -1077,6 +1077,10 @@ public final class FilterItemData {
         return value == null || value.isEmpty() ? null : value;
     }
 
+    public static List<GeneralFilterEntry> getEntries(ItemStack stack) {
+        return entries(stack);
+    }
+
     private static List<GeneralFilterEntry> entries(ItemStack stack) {
         if (!isFilterItem(stack))
             return List.of();
