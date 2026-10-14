@@ -3,6 +3,10 @@ package me.almana.logisticsnetworks.data;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.filter.ModFilterData;
+import me.almana.logisticsnetworks.filter.NameFilterData;
+import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
@@ -339,6 +343,30 @@ public final class NodeClipboardConfig {
                 }
             }
         }
+    }
+
+    // Rebuild client filters server-side
+    public void sanitizeFilters() {
+        for (ItemStack[] channel : filterItems) {
+            for (int slot = 0; slot < channel.length; slot++) {
+                channel[slot] = sanitizedFilter(channel[slot]);
+            }
+        }
+    }
+
+    private static ItemStack sanitizedFilter(ItemStack source) {
+        if (source.isEmpty() || !source.is(ModTags.FILTERS))
+            return ItemStack.EMPTY;
+        VirtualFilterType type = VirtualFilterType.fromStack(source);
+        ItemStack clean = type.createStack();
+        if (!source.is(clean.getItem()))
+            return ItemStack.EMPTY;
+        boolean kept = switch (type) {
+            case MOD -> ModFilterData.copySanitized(source, clean);
+            case NAME -> NameFilterData.copySanitized(source, clean);
+            default -> FilterItemData.copySanitized(source, clean);
+        };
+        return kept ? clean : ItemStack.EMPTY;
     }
 
     public void stripUpgradeComponents() {

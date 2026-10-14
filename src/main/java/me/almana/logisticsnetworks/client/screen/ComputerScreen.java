@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.lnet.LnetNetworkFile;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
+import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
 import me.almana.logisticsnetworks.network.DeleteNetworkPayload;
 import me.almana.logisticsnetworks.network.NetworkHandler;
@@ -25,6 +26,7 @@ import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
 import net.minecraft.client.Minecraft;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -1316,10 +1318,14 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             return;
         }
 
-        // Settings only: fits 32 KB
         config.stripUpgradeComponents();
-        NetworkHandler.sendToServer(new SetComputerWrenchClipboardPayload(
-                config.saveSettings(Minecraft.getInstance().level.registryAccess())));
+        CompoundTag tag = config.save(Minecraft.getInstance().level.registryAccess());
+        // Forge caps serverbound at 32 KB
+        if (!NodeMenuSync.fitsOpenBuffer(buf -> buf.writeNbt(tag))) {
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_label_too_large"), COLOR_WARNING);
+            return;
+        }
+        NetworkHandler.sendToServer(new SetComputerWrenchClipboardPayload(tag));
         setLnetStatus(line("gui.logisticsnetworks.computer.lnet_copy_sent", entry.label()), COLOR_TEXT_SECONDARY);
     }
 

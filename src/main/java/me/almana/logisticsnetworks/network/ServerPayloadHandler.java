@@ -1483,19 +1483,20 @@ public class ServerPayloadHandler {
         return errorKey.length() > 256 ? errorKey.substring(0, 256) : errorKey;
     }
 
-    // Server owns clipboard filters
+    // Filters rebuilt server-side
     public static void handleSetComputerWrenchClipboard(SetComputerWrenchClipboardPayload payload,
             IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)
                     || !(player.containerMenu instanceof ComputerMenu menu) || !menu.stillValid(player))
                 return;
-            NodeClipboardConfig config = NodeClipboardConfig.loadSettings(payload.clipboardTag(),
+            NodeClipboardConfig config = NodeClipboardConfig.load(payload.clipboardTag(),
                     player.serverLevel().registryAccess());
             if (config == null || !config.isStructurallyValid()) {
                 player.displayClientMessage(Component.translatable("message.logisticsnetworks.lnet.invalid_clipboard"), true);
                 return;
             }
+            config.sanitizeFilters();
             config.stripUpgradeComponents();
             config.setNetworkTarget(null, config.getNetworkName());
 

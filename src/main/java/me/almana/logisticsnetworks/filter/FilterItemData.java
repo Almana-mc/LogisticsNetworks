@@ -44,6 +44,7 @@ public final class FilterItemData {
     private static final String NBT_OP_EQUALS = "=";
     // Bounds channel sync size
     private static final int MAX_ENTRY_TAG_BYTES = 2048;
+    private static final int MAX_ID_LENGTH = 256;
     private static final String KEY_ROOT = "ln_filter";
     private static final String KEY_VERSION = "v";
     private static final int VERSION = 2;
@@ -1052,6 +1053,68 @@ public final class FilterItemData {
 
     public static List<GeneralFilterEntry> getEntries(ItemStack stack) {
         return entries(stack);
+    }
+
+    // Rebuilds untrusted filter entries
+    public static boolean copySanitized(ItemStack source, ItemStack target) {
+        if (!isFilterItem(source) || !isFilterItem(target))
+            return false;
+        setTargetType(target, getTargetType(source));
+        setBlacklist(target, isBlacklist(source));
+        int cap = getCapacity(target);
+        Set<Integer> used = new HashSet<>();
+        List<GeneralFilterEntry> kept = new ArrayList<>();
+        for (GeneralFilterEntry entry : entries(source)) {
+            GeneralFilterEntry clean = sanitizedEntry(entry);
+            if (clean != null && entry.slot() >= 0 && entry.slot() < cap && used.add(entry.slot()))
+                kept.add(clean);
+        }
+        if (!kept.isEmpty())
+            saveEntries(target, kept);
+        return true;
+    }
+
+    @Nullable
+    private static GeneralFilterEntry sanitizedEntry(GeneralFilterEntry entry) {
+        StackSnapshot item = null;
+        if (entry.item() != null) {
+            ItemStack stack = entry.item().toStack();
+            if (stack.isEmpty() || !fitsEntry(stack))
+                return null;
+            ItemStack clean = new ItemStack(stack.getItem());
+            clean.setTag(stack.getTag());
+            item = StackSnapshot.of(clean);
+        }
+        if (tooLong(entry.fluidId()) || tooLong(entry.chemicalId()) || tooLong(entry.tag())
+                || !isValidNbt(entry.nbt()))
+            return null;
+        GeneralFilterEntry.EntryCounts counts = entry.counts();
+        List<Integer> slots = entry.slotMapping().slots().stream()
+                .filter(s -> s >= SlotExpressionUtil.MIN_SLOT && s <= SlotExpressionUtil.MAX_SLOT)
+                .distinct().toList();
+        String expression = tooLong(entry.slotMapping().expression()) ? "" : entry.slotMapping().expression();
+        return new GeneralFilterEntry(entry.slot(), item, entry.fluidId(), entry.chemicalId(),
+                FilterTagUtil.normalizeTag(entry.tag()),
+                new GeneralFilterEntry.EntryCounts(Math.max(0, counts.amount()), Math.max(0, counts.batch()),
+                        Math.max(0, counts.stock())),
+                slots.isEmpty() ? GeneralFilterEntry.SlotMapping.EMPTY
+                        : new GeneralFilterEntry.SlotMapping(slots, expression),
+                entry.nbt());
+    }
+
+    private static boolean isValidNbt(GeneralFilterEntry.NbtConstraints nbt) {
+        if (nbt.rules().size() > MAX_NBT_RULES_PER_SLOT || nbt.raw().length() > MAX_NBT_RAW_LENGTH)
+            return false;
+        for (NbtCriterion rule : nbt.rules()) {
+            if (rule.path().isEmpty() || rule.path().toString().length() > MAX_NBT_PATH_LENGTH
+                    || isOversizedNbtValue(rule.value()))
+                return false;
+        }
+        return true;
+    }
+
+    private static boolean tooLong(@Nullable String value) {
+        return value != null && value.length() > MAX_ID_LENGTH;
     }
 
     private static List<GeneralFilterEntry> entries(ItemStack stack) {

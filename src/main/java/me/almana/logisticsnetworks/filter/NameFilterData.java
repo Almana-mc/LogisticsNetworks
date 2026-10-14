@@ -137,6 +137,20 @@ public final class NameFilterData {
         return !getNameFilter(stack).isEmpty();
     }
 
+    // Rebuilds untrusted name filter
+    public static boolean copySanitized(ItemStack source, ItemStack target) {
+        if (!isNameFilter(source) || !isNameFilter(target))
+            return false;
+        String name = getNameFilter(source).trim();
+        if (!name.isEmpty() && !validateRegex(name).accepted())
+            return false;
+        setTargetType(target, getTargetType(source));
+        setBlacklist(target, isBlacklist(source));
+        setMatchScope(target, getMatchScope(source));
+        setNameFilter(target, name);
+        return true;
+    }
+
     private static NameFilterView getNameFilterView(ItemStack stack, @Nullable FilterItemData.ReadCache readCache) {
         if (!isNameFilter(stack))
             return new NameFilterView(FilterTargetType.ITEMS, false, "", NameMatchScope.NAME, validateRegex(""));
