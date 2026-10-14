@@ -405,6 +405,7 @@
   "gui.logisticsnetworks.computer.dimension.nether": "NTH",
   "gui.logisticsnetworks.computer.dimension.end": "END",
   "gui.logisticsnetworks.computer.position": "%s %s,%s,%s",
+  "gui.logisticsnetworks.node.back_to_table": "Back to table",
   "gui.logisticsnetworks.computer.search_hint": "Search networks...",
   "gui.logisticsnetworks.computer.total_networks_badge": "%s NETWORKS",
   "gui.logisticsnetworks.computer.open_lnet_files": "SAVE NETWORK",

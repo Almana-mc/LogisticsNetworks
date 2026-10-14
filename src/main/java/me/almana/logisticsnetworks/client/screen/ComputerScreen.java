@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.network.DeleteNetworkPayload;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
+import me.almana.logisticsnetworks.network.SetNodeLabelsPayload;
 import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.RequestChannelListPayload;
 import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
@@ -1175,6 +1176,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     private void openNodeSettings(UUID nodeId) {
+        NodeTableSession.begin(selectedNetworkId, selectedNetworkName, nodeMapScrollOffset, collapsedGroups,
+                selectedNodeIds, labelSettingsSource, nodeLabelBox.getValue());
         NetworkHandler.sendToServer(new RequestOpenNodeSettingsPayload(selectedNetworkId, nodeId));
     }
 
@@ -1188,6 +1191,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         int sourceX = applyX + 44;
         int sameX = sourceX + 82;
         if (isHoveringAbs(applyX, y, 40, 16, mouseX, mouseY)) {
+            applyBulkLabel();
             return true;
         }
         if (isHoveringAbs(sourceX, y, 78, 16, mouseX, mouseY)) {
@@ -1361,6 +1365,16 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         nodeInfoList.stream().filter(node -> block.equals(node.blockName()))
                 .map(SyncNetworkNodesPayload.NodeInfo::nodeId).forEach(selectedNodeIds::add);
         normalizeLabelSource();
+    }
+
+    private void applyBulkLabel() {
+        normalizeLabelSource();
+        if (selectedNetworkId == null || labelSettingsSource == null) return;
+        List<UUID> selected = nodeInfoList.stream().map(SyncNetworkNodesPayload.NodeInfo::nodeId)
+                .filter(selectedNodeIds::contains).toList();
+        if (selected.size() > SetNodeLabelsPayload.MAX_NODES) return;
+        NetworkHandler.sendToServer(new SetNodeLabelsPayload(
+                selectedNetworkId, selected, nodeLabelBox.getValue(), labelSettingsSource));
     }
 
     private void renderHighlightTooltip(GuiGraphics g, int mouseX, int mouseY) {
@@ -1578,6 +1592,20 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     public void receiveNetworkList(List<SyncNetworkListPayload.NetworkEntry> networks) {
+        NodeTableSession.State table = NodeTableSession.take();
+        if (table != null) {
+            currentPage = Page.NODE_MAP;
+            selectedNetworkId = table.networkId();
+            selectedNetworkName = table.networkName();
+            nodeMapScrollOffset = table.scroll();
+            collapsedGroups.clear();
+            collapsedGroups.addAll(table.collapsedGroups());
+            selectedNodeIds.clear();
+            selectedNodeIds.addAll(table.selectedNodes());
+            labelSettingsSource = table.settingsSource();
+            nodeLabelBox.setValue(table.label());
+            NetworkHandler.sendToServer(new RequestNetworkNodesPayload(table.networkId()));
+        }
         UUID returningNetwork = NodeGraphSession.takeReturningNetwork();
         if (returningNetwork != null) {
             networks.stream().filter(network -> network.id().equals(returningNetwork)).findFirst().ifPresent(network -> {
