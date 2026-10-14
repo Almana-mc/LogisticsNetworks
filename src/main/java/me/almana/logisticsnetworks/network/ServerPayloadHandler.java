@@ -1163,6 +1163,31 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleDeleteNetworkLabel(DeleteNetworkLabelPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network))
+                return;
+
+            String label = payload.label();
+            List<LogisticsNodeEntity> nodes = network.getNodeUuids().stream()
+                    .map(id -> findNode(player, id))
+                    .filter(node -> node != null && label.equals(node.getNodeLabel()))
+                    .toList();
+            if (nodes.isEmpty()
+                    || LabelUpgradeSync.synchronizeLabels(player, network, nodes, player.getUUID(), "")) {
+                network.removeLabel(label);
+                registry.setDirty();
+                GraphPayloadHandler.broadcast(player.getServer(), network.getId());
+            }
+            sendNetworkLabels(player, network);
+        });
+    }
+
     private static void sendNetworkLabels(ServerPlayer player, LogisticsNetwork network) {
         Map<String, Integer> labels = new LinkedHashMap<>();
         network.getLabelNames().forEach(label -> labels.put(label, 0));
