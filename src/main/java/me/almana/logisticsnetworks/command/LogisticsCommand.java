@@ -4,13 +4,18 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.menu.ClipboardMenu;
+import me.almana.logisticsnetworks.menu.ComputerMenu;
+import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -53,7 +58,8 @@ public class LogisticsCommand {
                 .then(Commands.literal("cullNetwork")
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .suggests(SUGGEST_NETWORKS)
-                                .executes(context -> cullNetwork(context))));
+                                .executes(context -> cullNetwork(context))))
+                .then(adminCommand());
 
         LiteralArgumentBuilder<CommandSourceStack> lnAlias = Commands.literal("ln")
                 .then(Commands.literal("removeNodes")
@@ -65,10 +71,59 @@ public class LogisticsCommand {
                 .then(Commands.literal("cullNetwork")
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .suggests(SUGGEST_NETWORKS)
-                                .executes(context -> cullNetwork(context))));
+                                .executes(context -> cullNetwork(context))))
+                .then(adminCommand());
 
         dispatcher.register(lnCommand);
         dispatcher.register(lnAlias);
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> adminCommand() {
+        return Commands.literal("admin")
+                .executes(context -> toggleOwnAdminMode(context.getSource()))
+                .then(Commands.literal("mode")
+                        .requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> toggleAdminMode(
+                                        context.getSource(), EntityArgument.getPlayer(context, "player")))));
+    }
+
+    private static int toggleOwnAdminMode(CommandSourceStack source) throws CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        boolean enabled = NodeAccessPolicy.isAdminMode(player);
+        if (!source.hasPermission(2) && !enabled) {
+            source.sendFailure(Component.translatable("message.logisticsnetworks.admin.enable_denied"));
+            return 0;
+        }
+        return toggleAdminMode(source, player);
+    }
+
+    private static int toggleAdminMode(CommandSourceStack source, ServerPlayer player) {
+        boolean enabled = !NodeAccessPolicy.isAdminMode(player);
+        NodeAccessPolicy.setAdminMode(player, enabled);
+        refreshNetworkList(player);
+
+        String stateKey = enabled
+                ? "message.logisticsnetworks.admin.enabled"
+                : "message.logisticsnetworks.admin.disabled";
+        if (source.getEntity() == player) {
+            source.sendSuccess(() -> Component.translatable(stateKey), false);
+        } else {
+            player.sendSystemMessage(Component.translatable(stateKey));
+            String targetKey = enabled
+                    ? "message.logisticsnetworks.admin.enabled_other"
+                    : "message.logisticsnetworks.admin.disabled_other";
+            source.sendSuccess(() -> Component.translatable(targetKey, player.getDisplayName()), true);
+        }
+        return 1;
+    }
+
+    private static void refreshNetworkList(ServerPlayer player) {
+        if (player.containerMenu instanceof ComputerMenu menu) {
+            menu.requestNetworkList(player);
+        } else if (player.containerMenu instanceof NodeMenu || player.containerMenu instanceof ClipboardMenu) {
+            NodeMenu.sendAvailableNetworkListToClient(player);
+        }
     }
 
     private static int removeNodes(CommandSourceStack source) {
