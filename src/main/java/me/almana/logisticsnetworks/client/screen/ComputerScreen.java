@@ -3,22 +3,28 @@ package me.almana.logisticsnetworks.client.screen;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.client.ClientControls;
+import me.almana.logisticsnetworks.client.lnet.LnetNetworkFile;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
+import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
 import me.almana.logisticsnetworks.network.DeleteNetworkPayload;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
+import me.almana.logisticsnetworks.network.SetComputerWrenchClipboardPayload;
 import me.almana.logisticsnetworks.network.SetNodeLabelsPayload;
 import me.almana.logisticsnetworks.network.SetNetworkNodesVisibilityPayload;
 import me.almana.logisticsnetworks.network.RequestChannelListPayload;
 import me.almana.logisticsnetworks.network.SubscribeTelemetryPayload;
 import me.almana.logisticsnetworks.network.SyncChannelListPayload;
+import me.almana.logisticsnetworks.network.SyncNetworkExportPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.network.SyncNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
 import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -34,6 +40,8 @@ import net.minecraft.world.item.Items;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -50,7 +58,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private enum Page {
         NETWORK_LIST,
         IO_MONITOR,
-        NODE_MAP
+        NODE_MAP,
+        LNET_FILES
     }
 
     private static final int GUI_WIDTH = 320;
@@ -157,6 +166,12 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private UUID telemetryNetworkId;
     private FlowMonitorPage flowMonitor;
 
+    private List<Path> lnetFiles = new ArrayList<>();
+    private Path selectedLnetPath;
+    private LnetNetworkFile selectedLnetFile;
+    private int lnetFileScrollOffset;
+    private int lnetLabelScrollOffset;
+    private int selectedLnetLabelIndex = -1;
     private String lnetStatus = "";
     private int lnetStatusColor = COLOR_TEXT_SECONDARY;
 
@@ -217,6 +232,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             case NETWORK_LIST -> renderNetworkListPage(g, mouseX, mouseY);
             case IO_MONITOR -> flowMonitor.render(g, leftPos, topPos, mouseX, mouseY);
             case NODE_MAP -> renderNodeMapPage(g, mouseX, mouseY);
+            case LNET_FILES -> renderLnetFilesPage(g, mouseX, mouseY);
         }
     }
 
@@ -755,6 +771,142 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         }
     }
 
+    private void renderLnetFilesPage(GuiGraphics g, int mouseX, int mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int contentW = imageWidth - 20;
+        int contentH = imageHeight - 44;
+        int panelRight = contentX + contentW - 8;
+
+        renderTerminalPanel(g, contentX, contentY, contentW, contentH, "");
+        renderBackButton(g, mouseX, mouseY);
+        g.drawString(font, trimText(line("gui.logisticsnetworks.computer.lnet_title", selectedNetworkName),
+                        contentW - BACK_BTN_W - 40),
+                contentX + BACK_BTN_W + 18, contentY + 4, COLOR_ACCENT);
+
+        int refreshX = contentX + 8;
+        int buttonY = contentY + LNET_TOOLBAR_Y;
+        renderSmallButton(g, refreshX, buttonY, 58, 14, line("gui.logisticsnetworks.computer.lnet_refresh"),
+                isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY));
+
+        int fileX = contentX + 8;
+        int listY = contentY + LNET_LIST_Y;
+        int fileW = LNET_FILE_W;
+        int labelX = fileX + fileW + LNET_COLUMN_GAP;
+        int labelW = LNET_LABEL_W;
+        int previewX = labelX + labelW + LNET_COLUMN_GAP;
+        int previewW = panelRight - previewX;
+        int headerY = listY - 13;
+
+        g.drawString(font, label("gui.logisticsnetworks.computer.lnet_files"), fileX, headerY, COLOR_TEXT_SECONDARY);
+        g.drawString(font, label("gui.logisticsnetworks.computer.lnet_labels"), labelX, headerY, COLOR_TEXT_SECONDARY);
+        g.drawString(font, label("gui.logisticsnetworks.computer.lnet_preview"), previewX, headerY, COLOR_TEXT_SECONDARY);
+
+        renderLnetFileList(g, fileX, listY, fileW, mouseX, mouseY);
+        renderLnetLabelList(g, labelX, listY, labelW, mouseX, mouseY);
+        renderLnetPreview(g, previewX, listY, previewW, mouseX, mouseY);
+
+        if (!lnetStatus.isEmpty()) {
+            g.drawString(font, trimText(lnetStatus, contentW - 16), contentX + 8, contentY + contentH - 12,
+                    lnetStatusColor);
+        }
+    }
+
+    private void renderLnetFileList(GuiGraphics g, int x, int y, int width, int mouseX, int mouseY) {
+        if (lnetFiles.isEmpty()) {
+            g.drawString(font, label("gui.logisticsnetworks.computer.lnet_no_files"), x, y + 8, COLOR_TEXT_MUTED);
+            return;
+        }
+
+        int maxScroll = Math.max(0, lnetFiles.size() - LNET_FILES_PER_PAGE);
+        lnetFileScrollOffset = Math.max(0, Math.min(lnetFileScrollOffset, maxScroll));
+        for (int i = 0; i < LNET_FILES_PER_PAGE && i + lnetFileScrollOffset < lnetFiles.size(); i++) {
+            int index = i + lnetFileScrollOffset;
+            Path path = lnetFiles.get(index);
+            int rowY = y + i * LNET_ENTRY_HEIGHT;
+            boolean selected = path.equals(selectedLnetPath);
+            boolean hovered = isHoveringAbs(x, rowY, width, LNET_ENTRY_HEIGHT - 2, mouseX, mouseY);
+            renderSimpleRow(g, x, rowY, width, LNET_ENTRY_HEIGHT - 2, selected, hovered);
+            g.drawString(font, trimText(path.getFileName().toString(), width - 8), x + 4, rowY + 5,
+                    selected ? COLOR_ACCENT : COLOR_TEXT);
+        }
+        renderLnetScrollInfo(g, x, y, width, lnetFileScrollOffset, lnetFiles.size(), LNET_FILES_PER_PAGE);
+    }
+
+    private void renderLnetLabelList(GuiGraphics g, int x, int y, int width, int mouseX, int mouseY) {
+        if (selectedLnetFile == null) {
+            g.drawString(font, label("gui.logisticsnetworks.computer.lnet_select_file"), x, y + 8, COLOR_TEXT_MUTED);
+            return;
+        }
+
+        List<LnetNetworkFile.NodeEntry> nodes = selectedLnetFile.nodes();
+        int maxScroll = Math.max(0, nodes.size() - LNET_LABELS_PER_PAGE);
+        lnetLabelScrollOffset = Math.max(0, Math.min(lnetLabelScrollOffset, maxScroll));
+        for (int i = 0; i < LNET_LABELS_PER_PAGE && i + lnetLabelScrollOffset < nodes.size(); i++) {
+            int index = i + lnetLabelScrollOffset;
+            LnetNetworkFile.NodeEntry node = nodes.get(index);
+            int rowY = y + i * LNET_ENTRY_HEIGHT;
+            boolean selected = index == selectedLnetLabelIndex;
+            boolean hovered = isHoveringAbs(x, rowY, width, LNET_ENTRY_HEIGHT - 2, mouseX, mouseY);
+            renderSimpleRow(g, x, rowY, width, LNET_ENTRY_HEIGHT - 2, selected, hovered);
+            g.drawString(font, trimText(node.label(), width - 8), x + 4, rowY + 5,
+                    selected ? COLOR_ACCENT : COLOR_TEXT);
+        }
+        renderLnetScrollInfo(g, x, y, width, lnetLabelScrollOffset, nodes.size(), LNET_LABELS_PER_PAGE);
+    }
+
+    private void renderLnetScrollInfo(GuiGraphics g, int x, int y, int width, int offset, int total, int pageSize) {
+        if (total <= pageSize) {
+            return;
+        }
+        int first = offset + 1;
+        int last = Math.min(offset + pageSize, total);
+        String info = line("gui.logisticsnetworks.node.page_info", first, last, total);
+        g.drawString(font, info, x + width - font.width(info), y + pageSize * LNET_ENTRY_HEIGHT + 4,
+                COLOR_TEXT_MUTED);
+    }
+
+    private void renderLnetPreview(GuiGraphics g, int x, int y, int width, int mouseX, int mouseY) {
+        g.fill(x, y, x + width, y + 112, COLOR_PANEL_ALT);
+        g.renderOutline(x, y, width, 112, COLOR_BORDER);
+
+        LnetNetworkFile.NodeEntry entry = getSelectedLnetNode();
+        if (entry == null) {
+            g.drawString(font, label("gui.logisticsnetworks.computer.lnet_select_label"), x + 6, y + 8,
+                    COLOR_TEXT_MUTED);
+            return;
+        }
+
+        NodeClipboardConfig config = loadClipboardPreview(entry);
+        if (config == null) {
+            g.drawString(font, label("gui.logisticsnetworks.computer.lnet_invalid_label"), x + 6, y + 8,
+                    COLOR_WARNING);
+            return;
+        }
+
+        g.drawString(font, trimText(entry.label(), width - 12), x + 6, y + 8, COLOR_ACCENT);
+        g.drawString(font, line("gui.logisticsnetworks.computer.lnet_preview_channels",
+                config.getEnabledChannelCount()), x + 6, y + 24, COLOR_TEXT_SECONDARY);
+        g.drawString(font, line("gui.logisticsnetworks.computer.lnet_preview_filters",
+                config.getTotalFilterCount()), x + 6, y + 36, COLOR_TEXT_SECONDARY);
+        g.drawString(font, line("gui.logisticsnetworks.computer.lnet_preview_upgrades",
+                config.getTotalUpgradeCount()), x + 6, y + 48, COLOR_TEXT_SECONDARY);
+        g.drawString(font, line("gui.logisticsnetworks.computer.lnet_preview_required",
+                config.getRequiredItemsPreview().size()), x + 6, y + 60, COLOR_TEXT_SECONDARY);
+
+        int buttonY = y + 92;
+        renderSmallButton(g, x + 6, buttonY, width - 12, 14,
+                line("gui.logisticsnetworks.computer.lnet_copy_wrench"),
+                isHoveringAbs(x + 6, buttonY, width - 12, 14, mouseX, mouseY));
+    }
+
+    private void renderSimpleRow(GuiGraphics g, int x, int y, int width, int height, boolean selected, boolean hovered) {
+        int bgColor = selected ? COLOR_ROW_SELECTED : (hovered ? COLOR_ROW_HOVER : COLOR_ROW);
+        int borderColor = selected ? COLOR_BORDER_BRIGHT : (hovered ? COLOR_ACCENT_DARK : COLOR_BORDER);
+        g.fill(x, y, x + width, y + height, bgColor);
+        g.renderOutline(x, y, width, height, borderColor);
+    }
+
     private void renderSmallButton(GuiGraphics g, int x, int y, int width, int height, String label, boolean hovered) {
         int bgColor = hovered ? COLOR_ROW_SELECTED : COLOR_BADGE_BG;
         int borderColor = hovered ? COLOR_BORDER_BRIGHT : COLOR_BORDER;
@@ -947,6 +1099,21 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                     }
                 }
             }
+            case LNET_FILES -> {
+                if (isLnetFileColumn(mouseX, mouseY) && lnetFiles.size() > LNET_FILES_PER_PAGE) {
+                    lnetFileScrollOffset -= (int) scrollY;
+                    int maxScroll = Math.max(0, lnetFiles.size() - LNET_FILES_PER_PAGE);
+                    lnetFileScrollOffset = Math.max(0, Math.min(lnetFileScrollOffset, maxScroll));
+                    return true;
+                }
+                if (isLnetLabelColumn(mouseX, mouseY)
+                        && selectedLnetFile != null && selectedLnetFile.nodes().size() > LNET_LABELS_PER_PAGE) {
+                    lnetLabelScrollOffset -= (int) scrollY;
+                    int maxScroll = Math.max(0, selectedLnetFile.nodes().size() - LNET_LABELS_PER_PAGE);
+                    lnetLabelScrollOffset = Math.max(0, Math.min(lnetLabelScrollOffset, maxScroll));
+                    return true;
+                }
+            }
             default -> {
             }
         }
@@ -973,6 +1140,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             case NETWORK_LIST -> handleNetworkListInteraction(mouseX, mouseY);
             case IO_MONITOR -> flowMonitor.click(leftPos, topPos, mouseX, mouseY);
             case NODE_MAP -> handleNodeMapInteraction(mouseX, mouseY);
+            case LNET_FILES -> handleLnetInteraction(mouseX, mouseY);
         };
     }
 
@@ -986,7 +1154,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         if (selectedNetworkId != null) {
             return handleOptionButtonClick(mouseX, mouseY);
         }
-        return false;
+        return handleLoadButtonClick(mouseX, mouseY);
     }
 
     private boolean handleNodeMapInteraction(double mouseX, double mouseY) {
@@ -1002,6 +1170,14 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             return true;
         }
         return handleNodeMapClick(mouseX, mouseY);
+    }
+
+    private boolean handleLnetInteraction(double mouseX, double mouseY) {
+        if (isBackButtonClicked(mouseX, mouseY)) {
+            currentPage = Page.NETWORK_LIST;
+            return true;
+        }
+        return handleLnetFilesClick(mouseX, mouseY);
     }
 
     private void layoutSearchBox() {
@@ -1038,6 +1214,144 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         setFocused(networkSearchBox);
         networkSearchBox.mouseClicked(mouseX, mouseY, 0);
         return true;
+    }
+
+    private boolean handleLnetFilesClick(double mouseX, double mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int refreshX = contentX + 8;
+        int buttonY = contentY + LNET_TOOLBAR_Y;
+
+        if (isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY)) {
+            refreshLnetFiles();
+            return true;
+        }
+
+        int listY = contentY + LNET_LIST_Y;
+        int fileX = contentX + 8;
+        int fileW = LNET_FILE_W;
+        for (int i = 0; i < LNET_FILES_PER_PAGE && i + lnetFileScrollOffset < lnetFiles.size(); i++) {
+            int index = i + lnetFileScrollOffset;
+            int rowY = listY + i * LNET_ENTRY_HEIGHT;
+            if (isHoveringAbs(fileX, rowY, fileW, LNET_ENTRY_HEIGHT - 2, mouseX, mouseY)) {
+                selectLnetFile(lnetFiles.get(index));
+                return true;
+            }
+        }
+
+        if (selectedLnetFile != null) {
+            int labelX = fileX + fileW + LNET_COLUMN_GAP;
+            int labelW = LNET_LABEL_W;
+            for (int i = 0; i < LNET_LABELS_PER_PAGE && i + lnetLabelScrollOffset < selectedLnetFile.nodes().size(); i++) {
+                int index = i + lnetLabelScrollOffset;
+                int rowY = listY + i * LNET_ENTRY_HEIGHT;
+                if (isHoveringAbs(labelX, rowY, labelW, LNET_ENTRY_HEIGHT - 2, mouseX, mouseY)) {
+                    selectedLnetLabelIndex = index;
+                    setLnetStatus(line("gui.logisticsnetworks.computer.lnet_label_selected",
+                            selectedLnetFile.nodes().get(index).label()), COLOR_TEXT_SECONDARY);
+                    return true;
+                }
+            }
+
+            int previewX = labelX + labelW + LNET_COLUMN_GAP;
+            int previewW = contentX + (imageWidth - 20) - previewX - 8;
+            if (isHoveringAbs(previewX + 6, listY + 92, previewW - 12, 14, mouseX, mouseY)) {
+                copySelectedLnetLabelToWrench();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void requestNetworkSave() {
+        setLnetStatus(line("gui.logisticsnetworks.computer.lnet_saving"), COLOR_TEXT_SECONDARY);
+        NetworkHandler.sendToServer(new RequestNetworkExportPayload(selectedNetworkId));
+    }
+
+    private void refreshLnetFiles() {
+        try {
+            lnetFiles = new ArrayList<>(LnetNetworkFile.listFiles());
+            lnetFileScrollOffset = 0;
+            if (selectedLnetPath != null && !lnetFiles.contains(selectedLnetPath)) {
+                selectedLnetPath = null;
+                selectedLnetFile = null;
+                selectedLnetLabelIndex = -1;
+            }
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_files_refreshed", lnetFiles.size()),
+                    COLOR_TEXT_SECONDARY);
+        } catch (IOException e) {
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_file_error"), COLOR_WARNING);
+            LOGGER.warn("Failed to list lnet files", e);
+        }
+    }
+
+    private void selectLnetFile(Path path) {
+        try {
+            selectedLnetPath = path;
+            selectedLnetFile = LnetNetworkFile.read(path);
+            selectedLnetLabelIndex = selectedLnetFile.nodes().isEmpty() ? -1 : 0;
+            lnetLabelScrollOffset = 0;
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_file_loaded",
+                    path.getFileName().toString()), COLOR_TEXT_SECONDARY);
+        } catch (IOException e) {
+            selectedLnetPath = path;
+            selectedLnetFile = null;
+            selectedLnetLabelIndex = -1;
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_invalid_file"), COLOR_WARNING);
+            LOGGER.warn("Failed to read lnet file {}", path, e);
+        }
+    }
+
+    private void copySelectedLnetLabelToWrench() {
+        LnetNetworkFile.NodeEntry entry = getSelectedLnetNode();
+        if (entry == null) {
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_select_label"), COLOR_WARNING);
+            return;
+        }
+
+        NodeClipboardConfig config = loadClipboardPreview(entry);
+        if (config == null) {
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_invalid_label"), COLOR_WARNING);
+            return;
+        }
+
+        // Settings only: fits 32 KB
+        config.stripUpgradeComponents();
+        NetworkHandler.sendToServer(new SetComputerWrenchClipboardPayload(
+                config.saveSettings(Minecraft.getInstance().level.registryAccess())));
+        setLnetStatus(line("gui.logisticsnetworks.computer.lnet_copy_sent", entry.label()), COLOR_TEXT_SECONDARY);
+    }
+
+    private LnetNetworkFile.NodeEntry getSelectedLnetNode() {
+        if (selectedLnetFile == null || selectedLnetLabelIndex < 0
+                || selectedLnetLabelIndex >= selectedLnetFile.nodes().size()) {
+            return null;
+        }
+        return selectedLnetFile.nodes().get(selectedLnetLabelIndex);
+    }
+
+    private NodeClipboardConfig loadClipboardPreview(LnetNetworkFile.NodeEntry entry) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) {
+            return null;
+        }
+        return NodeClipboardConfig.load(entry.clipboardTag(), minecraft.level.registryAccess());
+    }
+
+    private boolean isLnetFileColumn(double mouseX, double mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        return isHoveringAbs(contentX + 8, contentY + LNET_LIST_Y, LNET_FILE_W,
+                LNET_FILES_PER_PAGE * LNET_ENTRY_HEIGHT, mouseX, mouseY);
+    }
+
+    private boolean isLnetLabelColumn(double mouseX, double mouseY) {
+        int contentX = leftPos + 10;
+        int contentY = topPos + 34;
+        int labelX = contentX + 8 + LNET_FILE_W + LNET_COLUMN_GAP;
+        return isHoveringAbs(labelX, contentY + LNET_LIST_Y, LNET_LABEL_W,
+                LNET_LABELS_PER_PAGE * LNET_ENTRY_HEIGHT, mouseX, mouseY);
     }
 
     private boolean isHoveringAbs(int x, int y, int w, int h, double mx, double my) {
@@ -1250,6 +1564,12 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             return true;
         }
 
+        if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
+                && mouseY >= button3Y && mouseY < button3Y + OPTION_BTN_HEIGHT) {
+            requestNetworkSave();
+            return true;
+        }
+
         return false;
     }
 
@@ -1273,6 +1593,20 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                 NetworkHandler.sendToServer(new DeleteNetworkPayload(networkId));
             }
         }
+    }
+
+    private boolean handleLoadButtonClick(double mouseX, double mouseY) {
+        int textX = leftPos + DETAIL_PANEL_X + 12;
+        int loadY = topPos + DETAIL_PANEL_Y + 152;
+        int buttonWidth = DETAIL_PANEL_WIDTH - 24;
+        if (mouseX >= textX && mouseX < textX + buttonWidth
+                && mouseY >= loadY && mouseY < loadY + OPTION_BTN_HEIGHT) {
+            currentPage = Page.LNET_FILES;
+            refreshLnetFiles();
+            return true;
+        }
+
+        return false;
     }
 
     private List<RenderEntry> buildNodeRenderEntries() {
@@ -1637,6 +1971,46 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         this.networkScrollOffset = Math.min(this.networkScrollOffset,
                 Math.max(0, networkList.size() - NETWORKS_PER_PAGE));
         if (Config.debugMode) LOGGER.debug("Network list updated, now have {} networks", this.networkList.size());
+    }
+
+    public void receiveNetworkExport(SyncNetworkExportPayload payload) {
+        if (selectedNetworkId == null || !payload.networkId().equals(selectedNetworkId)) {
+            return;
+        }
+        if (!payload.errorKey().isEmpty()) {
+            setLnetStatus(formatExportError(payload.errorKey()), COLOR_WARNING);
+            return;
+        }
+
+        try {
+            List<LnetNetworkFile.NodeEntry> nodes = new ArrayList<>();
+            for (SyncNetworkExportPayload.NodeExportInfo node : payload.nodes()) {
+                nodes.add(new LnetNetworkFile.NodeEntry(node.label(), node.visible(), node.clipboardTag()));
+            }
+            Path path = LnetNetworkFile.write(payload.networkName(), nodes);
+            lnetFiles = new ArrayList<>(LnetNetworkFile.listFiles());
+            selectedLnetPath = path;
+            selectedLnetFile = new LnetNetworkFile(payload.networkName(), nodes);
+            selectedLnetLabelIndex = nodes.isEmpty() ? -1 : 0;
+            lnetLabelScrollOffset = 0;
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_saved", path.getFileName().toString()),
+                    COLOR_ACCENT);
+        } catch (IOException e) {
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_save_failed"), COLOR_WARNING);
+            if (Config.debugMode) LOGGER.warn("Failed to save lnet export", e);
+        }
+    }
+
+    private String formatExportError(String errorKey) {
+        if (errorKey.startsWith("missing_labels|")) {
+            String count = errorKey.substring("missing_labels|".length());
+            return line("gui.logisticsnetworks.computer.lnet_missing_labels", count);
+        }
+        if (errorKey.startsWith("duplicate_labels|")) {
+            String labels = errorKey.substring("duplicate_labels|".length());
+            return line("gui.logisticsnetworks.computer.lnet_duplicate_labels", labels);
+        }
+        return line("gui.logisticsnetworks.computer.lnet_export_failed");
     }
 
     public void receiveNetworkNodes(UUID networkId, List<SyncNetworkNodesPayload.NodeInfo> nodes) {

@@ -100,6 +100,10 @@ public final class NetworkHandler {
         registerServer(SetClipboardSettingsPayload.class, SetClipboardSettingsPayload.STREAM_CODEC, ServerPayloadHandler::handleSetClipboardSettings);
         registerServer(AddClipboardFilterItemPayload.class, AddClipboardFilterItemPayload.STREAM_CODEC, ServerPayloadHandler::handleAddClipboardFilterItem);
         registerClient(SyncClipboardPayload.class, SyncClipboardPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncClipboard);
+        registerServer(RequestNetworkExportPayload.class, RequestNetworkExportPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestNetworkExport);
+        registerServer(SetComputerWrenchClipboardPayload.class, SetComputerWrenchClipboardPayload.STREAM_CODEC,
+                ServerPayloadHandler::handleSetComputerWrenchClipboard);
+        registerClient(SyncNetworkExportPayload.class, SyncNetworkExportPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkExport);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {

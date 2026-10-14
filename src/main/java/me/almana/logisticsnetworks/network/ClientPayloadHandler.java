@@ -94,6 +94,14 @@ public class ClientPayloadHandler {
         });
     }
 
+    public static void handleSyncNetworkExport(SyncNetworkExportPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (Minecraft.getInstance().screen instanceof ComputerScreen computerScreen) {
+                computerScreen.receiveNetworkExport(payload);
+            }
+        });
+    }
+
     public static void handleSyncChannelData(SyncChannelDataPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             var player = Minecraft.getInstance().player;

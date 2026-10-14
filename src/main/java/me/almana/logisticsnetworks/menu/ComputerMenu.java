@@ -3,12 +3,14 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -157,6 +159,21 @@ public class ComputerMenu extends AbstractContainerMenu {
 
     public void setWrenchSlotActive(boolean active) {
         this.wrenchSlotActive = active;
+    }
+
+    public boolean hasWrench() {
+        return !wrenchStack.isEmpty() && wrenchStack.getItem() instanceof WrenchItem;
+    }
+
+    public boolean setWrenchClipboard(NodeClipboardConfig config, HolderLookup.Provider provider) {
+        if (!hasWrench() || config == null) {
+            return false;
+        }
+        ClipboardMenu.normalize(config);
+        WrenchItem.setClipboard(wrenchStack, config, provider);
+        wrenchContainer.setChanged();
+        broadcastChanges();
+        return true;
     }
 
     public BlockPos getComputerPos() {

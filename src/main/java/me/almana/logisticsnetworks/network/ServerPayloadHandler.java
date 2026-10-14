@@ -47,9 +47,11 @@ import me.almana.logisticsnetworks.network.payload.IPayloadContext;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
 
@@ -59,6 +61,8 @@ public class ServerPayloadHandler {
     private static final Map<UUID, Integer> MODIFIER_KEYS = new HashMap<>();
     private static final int SCAN_COOLDOWN_TICKS = 10;
     private static final Map<ServerPlayer, Integer> LAST_SCAN = new WeakHashMap<>();
+    // Forge caps payloads at 1MiB
+    private static final int EXPORT_BUDGET = 1_000_000;
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -1415,6 +1419,92 @@ public class ServerPayloadHandler {
             if (context.player().containerMenu instanceof ClipboardMenu menu && menu.stillValid(context.player())) {
                 menu.addFilterItem(payload.filterSlot(), payload.item());
             }
+        });
+    }
+
+    public static void handleRequestNetworkExport(RequestNetworkExportPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
+                return;
+            if (!(player.containerMenu instanceof ComputerMenu))
+                return;
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network)) {
+                sendNetworkExportError(player, payload.networkId(), "", "not_found");
+                return;
+            }
+
+            List<SyncNetworkExportPayload.NodeExportInfo> entries = new ArrayList<>();
+            Set<String> seenLabels = new HashSet<>();
+            int missingLabels = 0;
+
+            for (UUID nodeId : network.getNodeUuids()) {
+                LogisticsNodeEntity node = findNode(player, nodeId);
+                if (node == null) {
+                    missingLabels++;
+                    continue;
+                }
+
+                String label = node.getNodeLabel().trim();
+                if (label.isEmpty()) {
+                    missingLabels++;
+                    continue;
+                }
+
+                if (!seenLabels.add(label)) {
+                    continue;
+                }
+                CompoundTag clipboardTag = NodeClipboardConfig.fromNode(node).save(player.serverLevel().registryAccess());
+                entries.add(new SyncNetworkExportPayload.NodeExportInfo(label, node.isRenderVisible(), clipboardTag));
+            }
+
+            if (missingLabels > 0) {
+                sendNetworkExportError(player, network.getId(), network.getName(), "missing_labels|" + missingLabels);
+                return;
+            }
+
+            SyncNetworkExportPayload export = new SyncNetworkExportPayload(network.getId(), network.getName(), entries, "");
+            if (SyncNetworkExportPayload.encodedSize(export) > EXPORT_BUDGET) {
+                sendNetworkExportError(player, network.getId(), network.getName(), "too_large");
+                return;
+            }
+            NetworkHandler.sendToPlayer(player, export);
+        });
+    }
+
+    private static void sendNetworkExportError(ServerPlayer player, UUID networkId, String networkName, String errorKey) {
+        NetworkHandler.sendToPlayer(player,
+                new SyncNetworkExportPayload(networkId, networkName, List.of(), trimExportError(errorKey)));
+    }
+
+    private static String trimExportError(String errorKey) {
+        return errorKey.length() > 256 ? errorKey.substring(0, 256) : errorKey;
+    }
+
+    // Server owns clipboard filters
+    public static void handleSetComputerWrenchClipboard(SetComputerWrenchClipboardPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof ComputerMenu menu) || !menu.stillValid(player))
+                return;
+            NodeClipboardConfig config = NodeClipboardConfig.loadSettings(payload.clipboardTag(),
+                    player.serverLevel().registryAccess());
+            if (config == null || !config.isStructurallyValid()) {
+                player.displayClientMessage(Component.translatable("message.logisticsnetworks.lnet.invalid_clipboard"), true);
+                return;
+            }
+            config.stripUpgradeComponents();
+            config.setNetworkTarget(null, config.getNetworkName());
+
+            if (!menu.setWrenchClipboard(config, player.serverLevel().registryAccess())) {
+                player.displayClientMessage(Component.translatable("message.logisticsnetworks.lnet.no_wrench"), true);
+                return;
+            }
+
+            player.displayClientMessage(Component.translatable("message.logisticsnetworks.lnet.copied_to_wrench"), true);
         });
     }
 
