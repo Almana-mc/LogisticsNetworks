@@ -384,6 +384,7 @@ public class TransferEngine {
             int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
             int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
 
+            ChannelTelemetry.startRecording(telemetryActive ? channel.getTelemetry() : null);
             int result = switch (channel.getType()) {
                 case FLUID ->
                     transferFluids(sourceNode, sourceLevel, channel, targets, effectiveBatchSize, dimensionalCache, capCache);
@@ -397,6 +398,7 @@ public class TransferEngine {
                     transferItems(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
             };
 
+            ChannelTelemetry.startRecording(null);
             if (result < 0)
                 continue;
 
@@ -1250,6 +1252,9 @@ public class TransferEngine {
 
                     int sourceLost = targetAccepted + droppedToWorld;
                     if (sourceLost > 0) {
+                        if (ChannelTelemetry.isRecording()) {
+                            ChannelTelemetry.recordMoved(new FlowResource.Item(extracted), sourceLost);
+                        }
                         rejectedInserts.set(targetIndex, null);
                         movedAny = true;
                         movedForTarget = true;
@@ -1551,6 +1556,9 @@ public class TransferEngine {
 
             if (filled > 0) {
                 remaining -= filled;
+                if (ChannelTelemetry.isRecording()) {
+                    ChannelTelemetry.recordMoved(new FlowResource.Fluid(drained), filled);
+                }
             }
         }
         return limitMb - remaining;

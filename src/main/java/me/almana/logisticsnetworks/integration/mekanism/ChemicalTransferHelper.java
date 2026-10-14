@@ -13,6 +13,8 @@ import mekanism.api.chemical.slurry.Slurry;
 import mekanism.common.capabilities.Capabilities;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.FlowResource;
+import me.almana.logisticsnetworks.logic.ChannelTelemetry;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import net.minecraft.core.BlockPos;
@@ -487,6 +489,9 @@ public final class ChemicalTransferHelper {
 
             if (moved > 0) {
                 remaining -= moved;
+                if (chemId != null) {
+                    ChannelTelemetry.recordMoved(new FlowResource.Chemical(chemId), moved);
+                }
                 if (Config.debugMode) {
                     LOGGER.debug("[Chemical] Moved {} from tank {}", moved, tank);
                 }
