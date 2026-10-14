@@ -6,7 +6,7 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.filter.NbtFilterData;
+import me.almana.logisticsnetworks.filter.CandidateComponents;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
@@ -543,7 +543,7 @@ public class TransferEngine {
                     importFilters,
                     target.channel.getFilterMode(),
                     collectAmountConstraints(exportFilters, importFilters),
-                    FilterLogic.hasConfiguredItemNbtFilter(importFilters),
+                    FilterLogic.hasConfiguredItemNbtFilter(importFilters, filterReadCache),
                     targetAllowedSlots,
                     FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache)));
             reachableRefs.add(target);
@@ -586,7 +586,7 @@ public class TransferEngine {
                         .add(slot);
         }
         HolderLookup.Provider provider = sourceLevel.registryAccess();
-        boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters);
+        boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, filterReadCache);
         List<Map<Item, Integer>> targetItemCounts = null;
         int moved = 0;
         // Split per item type
@@ -1008,7 +1008,7 @@ public class TransferEngine {
             boolean roundRobin, @Nullable int[] sourceSlots, @Nullable ItemStack resource) {
 
         int remaining = limit;
-        boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters);
+        boolean hasExportNbtFilter = FilterLogic.hasConfiguredItemNbtFilter(exportFilters, filterReadCache);
         boolean hasAnyImportNbtFilter = false;
         for (ItemTransferTarget target : targets) {
             if (target.hasItemNbtFilter()) {
@@ -1066,8 +1066,8 @@ public class TransferEngine {
                         continue;
                     }
 
-                    CompoundTag candidateComponents = (provider != null && hasNbtFilter)
-                            ? NbtFilterData.getSerializedComponents(extracted, provider)
+                    CandidateComponents candidateComponents = (provider != null && hasNbtFilter)
+                            ? new CandidateComponents(extracted, provider)
                             : null;
 
                     if (provider != null) {
@@ -1230,8 +1230,8 @@ public class TransferEngine {
                     || resource != null && !ItemStackCompat.isSameItemSameComponents(resource, available)) {
                 continue;
             }
-            CompoundTag components = hasExportNbtFilter
-                    ? NbtFilterData.getSerializedComponents(available, provider)
+            CandidateComponents components = hasExportNbtFilter
+                    ? new CandidateComponents(available, provider)
                     : null;
             if (!FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode, available, provider, components,
                     filterReadCache, slot)) {
@@ -1275,7 +1275,7 @@ public class TransferEngine {
     }
 
     private static boolean[] importMask(Map<ItemKey, boolean[]> masks, ItemTransferTarget target,
-            ItemStack candidate, HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
+            ItemStack candidate, HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         ItemKey key = new ItemKey(candidate.getItem(), candidate.getTag());
         if (!masks.containsKey(key))
@@ -1287,7 +1287,7 @@ public class TransferEngine {
     }
 
     private static boolean[] computeImportAllowedSlots(ItemTransferTarget target, ItemStack candidate,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         boolean[] slotFilter = target.allowedSlots();
         int size = target.handler().getSlots();
@@ -1647,7 +1647,7 @@ public class TransferEngine {
             ItemStack[] importFilters, IItemHandler source, int sourceSlot,
             @Nullable IItemHandler target, @Nullable boolean[] importMask,
             Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         int allowed = Integer.MAX_VALUE;
 
@@ -1724,7 +1724,7 @@ public class TransferEngine {
     }
 
     private static int getPerEntryBatchLimit(ItemStack candidate, ItemStack[] exportFilters,
-            HolderLookup.Provider provider, @Nullable CompoundTag candidateComponents,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
             @Nullable FilterItemData.ReadCache filterReadCache) {
         if (exportFilters == null) return -1;
         int limit = Integer.MAX_VALUE;

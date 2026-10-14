@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -522,22 +523,21 @@ public class FilterMenu extends AbstractContainerMenu {
         broadcastChanges();
     }
 
-    public String getEntryNbtPath(int slot) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount)
-            return null;
-        return FilterItemData.getEntryNbtPath(getOpenedStack(), slot);
+    // Bridge until the screen port
+    public record SlotNbtRule(String path, String operator, Tag value) {
+        public static SlotNbtRule of(NbtCriterion rule) {
+            return new SlotNbtRule(rule.path().toString(), rule.operator(), rule.value());
+        }
+
+        public String displayText() {
+            return path + " " + operator + " " + value;
+        }
     }
 
-    public String getEntryNbtOperator(int slot) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount)
-            return "=";
-        return FilterItemData.getEntryNbtOperator(getOpenedStack(), slot);
-    }
-
-    public List<FilterItemData.SlotNbtRule> getSlotNbtRules(int slot) {
+    public List<SlotNbtRule> getSlotNbtRules(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return List.of();
-        return FilterItemData.getSlotNbtRules(getOpenedStack(), slot);
+        return FilterItemData.getSlotNbtRules(getOpenedStack(), slot).stream().map(SlotNbtRule::of).toList();
     }
 
     public boolean isSlotNbtMatchAny(int slot) {
@@ -568,7 +568,7 @@ public class FilterMenu extends AbstractContainerMenu {
         ItemStack filterStack = getOpenedStack();
         Tag value = null;
 
-        ItemStack slotItem = FilterItemData.getEntry(filterStack, slot, player.level().registryAccess());
+        ItemStack slotItem = FilterItemData.getEntry(filterStack, slot);
         if (!slotItem.isEmpty()) {
             if (NbtFilterData.isFluidPath(path)) {
                 net.minecraft.nbt.CompoundTag fluidComponents = NbtFilterData.getSerializedComponents(
@@ -585,7 +585,7 @@ public class FilterMenu extends AbstractContainerMenu {
             value = NbtFilterData.parseValueString(fallbackValue);
         if (value == null) return;
 
-        FilterItemData.addSlotNbtRule(filterStack, slot, path, operator, value);
+        FilterItemData.addSlotNbtRule(filterStack, slot, NbtPath.parseLenient(path), operator, value);
         broadcastChanges();
     }
 
@@ -626,20 +626,6 @@ public class FilterMenu extends AbstractContainerMenu {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
         FilterItemData.clearSlotNbtRules(getOpenedStack(), slot);
-        broadcastChanges();
-    }
-
-    public void setEntryNbt(Player player, int slot, String path, String operator) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount)
-            return;
-        ItemStack filterStack = getOpenedStack();
-        ItemStack slotItem = FilterItemData.getEntry(filterStack, slot, player.level().registryAccess());
-        if (slotItem.isEmpty())
-            return;
-        Tag value = NbtFilterData.resolvePathValue(slotItem, path, player.level().registryAccess());
-        if (value == null)
-            return;
-        FilterItemData.setEntryNbt(filterStack, slot, path, value, operator);
         broadcastChanges();
     }
 
@@ -919,7 +905,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
         ItemStack itemEntry = ItemStackCompat.copyWithCount(stack, 1);
         updateFilter(slot, s -> {
-            FilterItemData.setEntry(getOpenedStack(), s, itemEntry, player.level().registryAccess());
+            FilterItemData.setEntry(getOpenedStack(), s, itemEntry);
             isFluidSlot[s] = false;
             isChemicalSlot[s] = false;
             filterInventory.setItem(s, itemEntry);
@@ -962,7 +948,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
         updateFilter(slot, s -> {
             ItemStack stack = getOpenedStack();
-            FilterItemData.setEntry(stack, s, ItemStack.EMPTY, player.level().registryAccess());
+            FilterItemData.setEntry(stack, s, ItemStack.EMPTY);
             FilterItemData.setFluidEntry(stack, s, FluidStack.EMPTY);
             FilterItemData.setChemicalEntry(stack, s, null);
             FilterItemData.setEntryTag(stack, s, null);
@@ -1218,7 +1204,7 @@ public class FilterMenu extends AbstractContainerMenu {
                 isTagSlot[i] = false;
                 isFluidSlot[i] = false;
                 isChemicalSlot[i] = false;
-                filterInventory.setItem(i, FilterItemData.getEntry(stack, i, provider));
+                filterInventory.setItem(i, FilterItemData.getEntry(stack, i));
             }
         }
     }
@@ -1238,7 +1224,7 @@ public class FilterMenu extends AbstractContainerMenu {
                 FluidStack fluid = FilterItemData.getFluidEntry(stack, i);
                 FilterItemData.setFluidEntry(stack, i, fluid);
             } else {
-                FilterItemData.setEntry(stack, i, filterInventory.getItem(i), provider);
+                FilterItemData.setEntry(stack, i, filterInventory.getItem(i));
             }
         }
     }

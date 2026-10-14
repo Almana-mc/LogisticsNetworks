@@ -525,7 +525,7 @@ public class ServerPayloadHandler {
             } else {
                 filter = filter.copy();
             }
-            if (!FilterItemData.addItem(filter, item, node.level().registryAccess()))
+            if (!FilterItemData.addItem(filter, item))
                 return;
             channel.setFilterItem(fs, filter);
             propagateToLabelGroup(node, payload.channel());

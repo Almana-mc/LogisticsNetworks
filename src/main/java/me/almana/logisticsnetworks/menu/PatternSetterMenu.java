@@ -85,13 +85,13 @@ public class PatternSetterMenu extends AbstractContainerMenu {
         int capacity = FilterItemData.getCapacity(filter);
 
         for (int i = 0; i < capacity; i++) {
-            FilterItemData.setEntry(filter, i, ItemStack.EMPTY, provider);
+            FilterItemData.setEntry(filter, i, ItemStack.EMPTY);
         }
 
         int count = Math.min(entries.size(), capacity);
         for (int i = 0; i < count; i++) {
             AE2Compat.PatternEntry entry = entries.get(i);
-            FilterItemData.setEntry(filter, i, entry.item(), provider);
+            FilterItemData.setEntry(filter, i, entry.item());
             FilterItemData.setEntryBatch(filter, i, entry.amount() * mult);
         }
 

@@ -1824,9 +1824,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             lines.add(Component.literal("Batch | Stock: " + batch + " | " + stock).withStyle(ChatFormatting.GRAY));
         }
 
-        List<FilterItemData.SlotNbtRule> nbtRules = FilterItemData.getSlotNbtRules(filterStack, slot);
+        List<FilterMenu.SlotNbtRule> nbtRules = FilterItemData.getSlotNbtRules(filterStack, slot).stream()
+                .map(FilterMenu.SlotNbtRule::of).toList();
         if (!nbtRules.isEmpty()) {
-            for (FilterItemData.SlotNbtRule r : nbtRules) {
+            for (FilterMenu.SlotNbtRule r : nbtRules) {
                 lines.add(Component.literal("NBT: " + r.displayText()).withStyle(ChatFormatting.GOLD));
             }
         } else {
@@ -2427,15 +2428,15 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return raw;
     }
 
-    private FilterItemData.SlotNbtRule findActiveRule(List<FilterItemData.SlotNbtRule> rules, String path) {
-        for (FilterItemData.SlotNbtRule rule : rules) {
+    private FilterMenu.SlotNbtRule findActiveRule(List<FilterMenu.SlotNbtRule> rules, String path) {
+        for (FilterMenu.SlotNbtRule rule : rules) {
             if (rule.path().equals(path))
                 return rule;
         }
         return null;
     }
 
-    private int findActiveRuleIndex(List<FilterItemData.SlotNbtRule> rules, String path) {
+    private int findActiveRuleIndex(List<FilterMenu.SlotNbtRule> rules, String path) {
         for (int i = 0; i < rules.size(); i++) {
             if (rules.get(i).path().equals(path))
                 return i;
@@ -2492,7 +2493,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int clearY = panelY + 4;
         drawButton(g, clearX, clearY, clearW, 10, tr("gui.logisticsnetworks.filter.nbt.clear"), mx, my, true);
 
-        List<FilterItemData.SlotNbtRule> activeRules = menu.getSlotNbtRules(nbtEditSlot);
+        List<FilterMenu.SlotNbtRule> activeRules = menu.getSlotNbtRules(nbtEditSlot);
         int listX = panelX + 4;
         int listY = panelY + 16;
         int listW = panelW - 8;
@@ -2512,7 +2513,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void renderNbtEntryList(GuiGraphics g, int listX, int listY, int listW, int listH,
-            List<FilterItemData.SlotNbtRule> activeRules, int mx, int my) {
+            List<FilterMenu.SlotNbtRule> activeRules, int mx, int my) {
         int totalEntries = cachedSlotNbtEntries.size();
         int maxRows = Math.max(1, listH / LIST_ROW_H);
         int maxScroll = Math.max(0, totalEntries - maxRows);
@@ -2548,7 +2549,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 g.renderOutline(dotX, dotY, 5, 5, COL_GRAY);
             }
 
-            FilterItemData.SlotNbtRule activeRule = active ? activeRules.get(ruleIdx) : null;
+            FilterMenu.SlotNbtRule activeRule = active ? activeRules.get(ruleIdx) : null;
             String op = active ? activeRule.operator() : "=";
 
             int pathX = listX + NBT_INDICATOR_W;
@@ -2641,7 +2642,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return true;
         }
 
-        List<FilterItemData.SlotNbtRule> activeRules = menu.getSlotNbtRules(nbtEditSlot);
+        List<FilterMenu.SlotNbtRule> activeRules = menu.getSlotNbtRules(nbtEditSlot);
         int listX = panelX + 4;
         int listY = panelY + 16;
         int listW = panelW - 8;
@@ -2668,7 +2669,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private boolean handleNbtEntryListClick(int listX, int listY, int listW, int listH,
-            List<FilterItemData.SlotNbtRule> activeRules, double mx, double my, int btn) {
+            List<FilterMenu.SlotNbtRule> activeRules, double mx, double my, int btn) {
         int totalEntries = cachedSlotNbtEntries.size();
         int maxRows = Math.max(1, listH / LIST_ROW_H);
         int drawH = maxRows * LIST_ROW_H;
@@ -2717,7 +2718,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 if (minecraft != null && minecraft.player != null) {
                     menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, newOp);
                 }
-                List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
+                List<FilterMenu.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
                 int newIdx = findActiveRuleIndex(updatedRules, path);
                 if (newIdx >= 0) {
                     NetworkHandler.sendToServer(
@@ -2776,7 +2777,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 if (minecraft != null && minecraft.player != null) {
                     menu.addSlotNbtRule(minecraft.player, nbtEditSlot, path, newOp);
                 }
-                List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
+                List<FilterMenu.SlotNbtRule> updatedRules = menu.getSlotNbtRules(nbtEditSlot);
                 int newIdx = findActiveRuleIndex(updatedRules, path);
                 if (newIdx >= 0) {
                     NetworkHandler.sendToServer(
@@ -2985,8 +2986,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 detailCachedNbtEntries.addAll(NbtFilterData.extractEntries(
                         slotItem, minecraft.player.level().registryAccess()));
             } else {
-                List<FilterItemData.SlotNbtRule> stored = menu.getSlotNbtRules(slot);
-                for (FilterItemData.SlotNbtRule r : stored) {
+                List<FilterMenu.SlotNbtRule> stored = menu.getSlotNbtRules(slot);
+                for (FilterMenu.SlotNbtRule r : stored) {
                     String display = r.value() != null ? r.value().getAsString() : "?";
                     detailCachedNbtEntries.add(new NbtFilterData.NbtEntry(r.path(), display));
                 }
@@ -2995,8 +2996,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             buildNbtRows();
 
             detailNbtActiveOps.clear();
-            List<FilterItemData.SlotNbtRule> existingRules = menu.getSlotNbtRules(slot);
-            for (FilterItemData.SlotNbtRule r : existingRules) {
+            List<FilterMenu.SlotNbtRule> existingRules = menu.getSlotNbtRules(slot);
+            for (FilterMenu.SlotNbtRule r : existingRules) {
                 detailNbtActiveOps.put(r.path(), r.operator());
             }
             detailNbtOp = "=";
@@ -3415,10 +3416,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             drawButton(g, nbtBtnX, y, nbtBtnW, 14, nbtBtnLabel, mx, my, true);
 
             if (isHovering(nbtBtnX, y, nbtBtnW, 14, mx, my)) {
-                List<FilterItemData.SlotNbtRule> hoverRules = menu.getSlotNbtRules(detailEditSlot);
+                List<FilterMenu.SlotNbtRule> hoverRules = menu.getSlotNbtRules(detailEditSlot);
                 if (!hoverRules.isEmpty()) {
                     List<Component> tipLines = new ArrayList<>();
-                    for (FilterItemData.SlotNbtRule r : hoverRules) {
+                    for (FilterMenu.SlotNbtRule r : hoverRules) {
                         tipLines.add(Component.literal(abbreviateNbtPath(r.path()) + " " + r.operator() + " " + r.value()));
                     }
                     g.renderComponentTooltip(font, tipLines, mx, my);
@@ -4149,7 +4150,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             menu.removeSlotNbtRule(detailEditSlot, ruleIdx);
             NetworkHandler.sendToServer(SetFilterEntryNbtPayload.add(detailEditSlot, path, nextOp, savedVal));
             menu.addSlotNbtRule(minecraft.player, detailEditSlot, path, nextOp, savedVal);
-            List<FilterItemData.SlotNbtRule> updatedRules = menu.getSlotNbtRules(detailEditSlot);
+            List<FilterMenu.SlotNbtRule> updatedRules = menu.getSlotNbtRules(detailEditSlot);
             int newIdx = findActiveRuleIndex(updatedRules, path);
             if (newIdx >= 0) {
                 NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setValue(detailEditSlot, newIdx, savedVal));
@@ -4172,7 +4173,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         menu.addSlotNbtRule(minecraft.player, detailEditSlot, entry.path(), opSymbol, fallbackValue);
 
         if (!valueOverride.isEmpty() && !valueOverride.equals(entry.valueDisplay())) {
-            List<FilterItemData.SlotNbtRule> rules = menu.getSlotNbtRules(detailEditSlot);
+            List<FilterMenu.SlotNbtRule> rules = menu.getSlotNbtRules(detailEditSlot);
             int ruleIdx = findActiveRuleIndex(rules, entry.path());
             if (ruleIdx >= 0) {
                 NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setValue(detailEditSlot, ruleIdx, valueOverride));
