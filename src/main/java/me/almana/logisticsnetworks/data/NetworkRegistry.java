@@ -29,6 +29,7 @@ public class NetworkRegistry extends SavedData {
     private static final int WARNING_DISPATCH_COUNT = 50;
 
     private final Map<UUID, LogisticsNetwork> networks = new HashMap<>();
+    private final List<CompoundTag> undecodableNetworks = new ArrayList<>();
     private final Set<UUID> dirtyNetworks = new HashSet<>();
     private final TreeMap<Long, Set<UUID>> wakeBuckets = new TreeMap<>();
     private final Map<UUID, Long> scheduledWake = new HashMap<>();
@@ -215,6 +216,7 @@ public class NetworkRegistry extends SavedData {
         for (LogisticsNetwork network : networks.values()) {
             list.add(network.save());
         }
+        undecodableNetworks.forEach(tag -> list.add(tag.copy()));
         compoundTag.put(KEY_NETWORKS, list);
         return compoundTag;
     }
@@ -229,7 +231,8 @@ public class NetworkRegistry extends SavedData {
                         LogisticsNetwork network = LogisticsNetwork.load(ct);
                         registry.networks.put(network.getId(), network);
                     } catch (Exception e) {
-                        LOGGER.error("Skipping malformed network: {}", e.getMessage());
+                        LOGGER.error("Keeping undecodable network as raw data: {}", e.getMessage());
+                        registry.undecodableNetworks.add(ct.copy());
                     }
                 }
             }

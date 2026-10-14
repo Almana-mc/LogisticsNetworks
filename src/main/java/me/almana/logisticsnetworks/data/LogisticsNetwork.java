@@ -124,7 +124,8 @@ public class LogisticsNetwork {
         if (tag.contains(KEY_SLEEPING)) {
             network.sleeping = tag.getBoolean(KEY_SLEEPING);
         }
-        if (tag.hasUUID(KEY_OWNER_UUID)) {
+        // Malformed owner stays private
+        if (tag.contains(KEY_OWNER_UUID)) {
             network.ownerUuid = tag.getUUID(KEY_OWNER_UUID);
         }
 
