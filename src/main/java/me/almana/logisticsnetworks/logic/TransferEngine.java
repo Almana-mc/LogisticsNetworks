@@ -680,7 +680,7 @@ public class TransferEngine {
         }
 
         if (!anyReachable)
-            return 0;
+            return -1;
         if (equalHandlers != null)
             return dealFluids(sourceHandler, equalHandlers, equalChannels, batchLimitMb, exportChannel,
                     sourceLevel.registryAccess(), filterReadCache);
@@ -809,7 +809,7 @@ public class TransferEngine {
         IChemicalHandler sourceHandler = capCache.findChemicalHandler(sourceLevel, sourcePos,
                 exportChannel.getIoDirection());
         if (sourceHandler == null)
-            return -1;
+            return 0;
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
