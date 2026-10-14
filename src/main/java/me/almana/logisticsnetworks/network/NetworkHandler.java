@@ -77,6 +77,9 @@ public final class NetworkHandler {
         registerClient(SyncChannelDataPayload.class, SyncChannelDataPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncChannelData);
         registerClient(SyncTelemetryPayload.class, SyncTelemetryPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncTelemetry);
         registerClient(SyncChannelListPayload.class, SyncChannelListPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncChannelList);
+
+        // Last keeps earlier IDs stable
+        registerServer(SyncModifierKeysPayload.class, SyncModifierKeysPayload.STREAM_CODEC, ServerPayloadHandler::handleSyncModifierKeys);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {

@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -70,6 +71,15 @@ public final class ClientControls {
 
     public static boolean modifier3Down() {
         return modifierDown(MODIFIER_3, modifier3Down);
+    }
+
+    public static int modifierMask() {
+        int mask = 0;
+        if (modifier1Down()) mask |= 1;
+        if (modifier2Down()) mask |= 2;
+        if (modifier3Down()) mask |= 4;
+        if (ClientConfig.invertCopyPasteControls) mask |= 8;
+        return mask;
     }
 
     public static double cursorX(Minecraft minecraft) {

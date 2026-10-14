@@ -43,8 +43,10 @@ import net.minecraftforge.network.NetworkHooks;
 import me.almana.logisticsnetworks.network.payload.IPayloadContext;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import com.mojang.logging.LogUtils;
@@ -53,6 +55,7 @@ import org.slf4j.Logger;
 public class ServerPayloadHandler {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Map<UUID, Integer> MODIFIER_KEYS = new HashMap<>();
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -327,6 +330,26 @@ public class ServerPayloadHandler {
                 player.getInventory().setChanged();
             }
         });
+    }
+
+    public static void handleSyncModifierKeys(SyncModifierKeysPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player) {
+                MODIFIER_KEYS.put(player.getUUID(), payload.mask() & 0b1111);
+            }
+        });
+    }
+
+    public static boolean isModifierDown(Player player, int index) {
+        Integer mask = MODIFIER_KEYS.get(player.getUUID());
+        if (mask == null) {
+            return index == 0 && player.isShiftKeyDown();
+        }
+        return index >= 0 && index < 4 && (mask & (1 << index)) != 0;
+    }
+
+    public static void clearModifierKeys(Player player) {
+        MODIFIER_KEYS.remove(player.getUUID());
     }
 
     public static void handleSetChannelFilterItem(SetChannelFilterItemPayload payload, IPayloadContext context) {

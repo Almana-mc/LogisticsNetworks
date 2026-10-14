@@ -7,6 +7,7 @@ import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
 import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
+import me.almana.logisticsnetworks.network.SyncModifierKeysPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
@@ -15,11 +16,37 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.event.TickEvent;
 import org.jetbrains.annotations.Nullable;
 
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, value = Dist.CLIENT)
 public class WrenchInputHandler {
+    private static int lastSentModifierMask = -1;
+
+    @SubscribeEvent
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.START) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null) {
+            resetInputState();
+            return;
+        }
+
+        int modifierMask = ClientControls.modifierMask();
+        if (modifierMask != lastSentModifierMask) {
+            NetworkHandler.sendToServer(new SyncModifierKeysPayload(modifierMask));
+            lastSentModifierMask = modifierMask;
+        }
+    }
+
+    @SubscribeEvent
+    public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        resetInputState();
+    }
 
     @SubscribeEvent
     public static void onMouseScrolling(InputEvent.MouseScrollingEvent event) {
@@ -81,6 +108,10 @@ public class WrenchInputHandler {
         }
         event.setSwingHand(false);
         event.setCanceled(true);
+    }
+
+    private static void resetInputState() {
+        lastSentModifierMask = -1;
     }
 
     @Nullable

@@ -68,6 +68,7 @@ public class ModConfigScreen extends Screen {
 
     private static final Component TEXT_MAX_RENDERED = Component.translatable("gui.logisticsnetworks.config.client.maxRenderedNodes");
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
+    private static final Component TEXT_INVERT_COPY_PASTE = Component.translatable("gui.logisticsnetworks.config.client.invertCopyPasteControls");
 
     private static final Component[] TIER_LABELS = {
         Component.translatable("gui.logisticsnetworks.config.upgrades.tier.none"),
@@ -106,6 +107,7 @@ public class ModConfigScreen extends Screen {
     private int pendingMaxVisibleNodes;
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
+    private boolean pendingInvertCopyPasteControls;
 
     private String pendingTheme;
 
@@ -140,6 +142,7 @@ public class ModConfigScreen extends Screen {
         pendingBackoffMaxTicks = Config.backoffMaxTicksSpec.get();
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
+        pendingInvertCopyPasteControls = ClientConfig.invertCopyPasteControlsSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
         pendingTiers = UpgradeLimitsConfig.getAll();
 
@@ -387,7 +390,9 @@ public class ModConfigScreen extends Screen {
         g.drawString(font, TEXT_MAX_VISIBLE, cx, cy + 27, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 24 + 14, 80);
 
-        int themeY = cy + 48;
+        renderCheckbox(g, cx, cy + 44, cw, TEXT_INVERT_COPY_PASTE, pendingInvertCopyPasteControls, mx, my, false);
+
+        int themeY = cy + 66;
         g.drawString(font, Component.translatable("gui.logisticsnetworks.config.client.theme"), cx, themeY, COL_INK, false);
 
         int cols = 4;
@@ -415,7 +420,12 @@ public class ModConfigScreen extends Screen {
     }
 
     private boolean handleClientClick(double mx, double my, int cx, int cy, int cw) {
-        int themeY = cy + 48;
+        if (inBox(mx, my, cx + cw - 14, cy + 46, 9)) {
+            pendingInvertCopyPasteControls = !pendingInvertCopyPasteControls;
+            return true;
+        }
+
+        int themeY = cy + 66;
         int cols = 4;
         int swatchGap = 4;
         int swatchW = (cw - (cols - 1) * swatchGap) / cols;
@@ -675,6 +685,7 @@ public class ModConfigScreen extends Screen {
             UpgradeLimitsConfig.save();
         }
 
+        ClientConfig.invertCopyPasteControlsSpec.set(pendingInvertCopyPasteControls);
         ClientConfig.maxRenderedNodesSpec.set(pendingMaxRenderedNodes);
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
         ClientConfig.themeSpec.set(pendingTheme);
