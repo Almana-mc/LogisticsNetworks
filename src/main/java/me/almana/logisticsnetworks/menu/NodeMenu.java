@@ -19,8 +19,11 @@ import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -39,6 +42,8 @@ public class NodeMenu extends AbstractContainerMenu {
 
     private final LogisticsNodeEntity node;
     private final int nodeId;
+    @Nullable
+    private GraphMenuContext returnContext;
     private boolean remoteAccess;
     private int selectedChannel;
     private boolean nodeSlotsActive = true;
@@ -48,12 +53,17 @@ public class NodeMenu extends AbstractContainerMenu {
 
     // Server-side
     public NodeMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node, int selectedChannel) {
-        super(Registration.NODE_MENU.get(), containerId);
+        this(Registration.NODE_MENU.get(), containerId, playerInv, node, selectedChannel);
+    }
+
+    protected NodeMenu(MenuType<?> type, int containerId, Inventory playerInv, @Nullable LogisticsNodeEntity node,
+            int selectedChannel) {
+        super(type, containerId);
         this.node = node;
-        this.nodeId = node.getId();
+        this.nodeId = node == null ? -1 : node.getId();
         this.selectedChannel = selectedChannel;
         this.upgradeContainer = new UpgradeItemsContainer();
-        this.openingUpgrades = LabelUpgradeSync.snapshotUpgrades(node);
+        this.openingUpgrades = node == null ? List.of() : LabelUpgradeSync.snapshotUpgrades(node);
 
         layoutNodeSlots();
         layoutPlayerSlots(playerInv);
@@ -66,6 +76,7 @@ public class NodeMenu extends AbstractContainerMenu {
         this.node = state.node();
         this.nodeId = state.entityId();
         this.selectedChannel = state.selectedChannel();
+        this.returnContext = buf.readableBytes() > 0 && buf.readBoolean() ? GraphMenuContext.read(buf) : null;
         this.upgradeContainer = new UpgradeItemsContainer();
         this.openingUpgrades = List.of();
 
@@ -74,11 +85,21 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     public static void open(ServerPlayer player, LogisticsNodeEntity node, int selectedChannel, boolean remote) {
-        NodeMenuSync.openScreen(player, new SimpleMenuProvider(
-                (id, inv, p) -> new NodeMenu(id, inv, node, selectedChannel),
-                Component.translatable("gui.logisticsnetworks.node_config")), node, selectedChannel);
-        if (player.containerMenu instanceof NodeMenu menu) {
+        open(player, node, selectedChannel, remote, null);
+    }
+
+    public static void open(ServerPlayer player, LogisticsNodeEntity node, int selectedChannel, boolean remote,
+            @Nullable GraphMenuContext context) {
+        NodeMenuSync.openScreen(player, new SimpleMenuProvider((id, inv, p) -> {
+            NodeMenu menu = new NodeMenu(id, inv, node, selectedChannel);
             menu.setRemoteAccess(remote);
+            menu.setReturnContext(context);
+            return menu;
+        }, Component.translatable("gui.logisticsnetworks.node_config")), node, selectedChannel, buf -> {}, buf -> {
+            buf.writeBoolean(context != null);
+            if (context != null) context.write(buf);
+        });
+        if (player.containerMenu instanceof NodeMenu menu) {
             menu.sendNetworkListToClient(player);
         }
     }
@@ -101,13 +122,30 @@ public class NodeMenu extends AbstractContainerMenu {
         // Main Inventory (rows)
         for (int r = 0; r < 3; r++) {
             for (int c = 0; c < 9; c++) {
-                addSlot(new Slot(inv, c + r * 9 + 9, PLAYER_INV_X + c * 18, PLAYER_INV_Y + r * 18));
+                addSlot(playerSlot(inv, c + r * 9 + 9, PLAYER_INV_X + c * 18, PLAYER_INV_Y + r * 18));
             }
         }
         // Hotbar
         for (int c = 0; c < 9; c++) {
-            addSlot(new Slot(inv, c, PLAYER_INV_X + c * 18, PLAYER_INV_Y + 58));
+            addSlot(playerSlot(inv, c, PLAYER_INV_X + c * 18, PLAYER_INV_Y + 58));
         }
+    }
+
+    private Slot playerSlot(Inventory inventory, int index, int x, int y) {
+        return new Slot(inventory, index, x, y) {
+            @Override
+            public boolean isActive() {
+                return hasVisibleInventory();
+            }
+        };
+    }
+
+    protected boolean hasVisibleInventory() {
+        return true;
+    }
+
+    protected boolean hasAvailableNode() {
+        return node != null;
     }
 
     public LogisticsNodeEntity getNode() {
@@ -120,6 +158,15 @@ public class NodeMenu extends AbstractContainerMenu {
 
     public int getSelectedChannel() {
         return selectedChannel;
+    }
+
+    @Nullable
+    public GraphMenuContext getReturnContext() {
+        return returnContext;
+    }
+
+    public void setReturnContext(@Nullable GraphMenuContext returnContext) {
+        this.returnContext = returnContext;
     }
 
     public void setSelectedChannel(int channelIndex) {
@@ -137,6 +184,7 @@ public class NodeMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
+        if (returnContext != null) return returnContext.canEdit(player, node);
         if (node == null || !node.isAlive()) return false;
         if (!player.level().isClientSide() && !node.isOwnedBy(player)) return false;
         return remoteAccess || player.distanceToSqr(node) < 64.0;
@@ -178,7 +226,7 @@ public class NodeMenu extends AbstractContainerMenu {
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
         Slot fromSlot = slots.get(index);
-        if (!nodeSlotsActive || !fromSlot.hasItem())
+        if (!nodeSlotsActive || !hasAvailableNode() || !fromSlot.hasItem())
             return ItemStack.EMPTY;
 
         ItemStack fromStack = fromSlot.getItem();
@@ -285,7 +333,7 @@ public class NodeMenu extends AbstractContainerMenu {
 
         @Override
         public boolean isActive() {
-            return nodeSlotsActive;
+            return nodeSlotsActive && hasAvailableNode();
         }
 
         @Override

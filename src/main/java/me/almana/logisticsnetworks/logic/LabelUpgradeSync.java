@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.LabelUpgradeTemplate;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.StorageInventory;
 import me.almana.logisticsnetworks.network.GraphPayloadHandler;
@@ -22,6 +23,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -175,9 +177,15 @@ public final class LabelUpgradeSync {
 
     private static void clearLabels(ServerPlayer player, LogisticsNetwork network,
                                     List<LogisticsNodeEntity> targets) {
-        targets.forEach(target -> target.setNodeLabel(""));
+        Map<UUID, GraphPosition> splitPositions = bulkUnlabelPositions(network, targets);
+        for (LogisticsNodeEntity target : targets) {
+            target.setNodeLabel("");
+            GraphPosition position = splitPositions.get(target.getUUID());
+            if (position != null) network.setGraphPosition("node:" + target.getUUID(), position);
+        }
         markChanged(player.serverLevel(), network);
         GraphPayloadHandler.broadcast(player.getServer(), network.getId());
+        GraphPayloadHandler.refreshTable(player, network.getId());
     }
 
     private static LabelUpgradeTemplate freshTemplate(ServerPlayer player, LogisticsNetwork network, String label,
@@ -200,7 +208,9 @@ public final class LabelUpgradeSync {
                                     Map<UUID, UpgradeChanges> changes) {
         boolean refreshesAuthority = authority != null && label.equals(authority.getNodeLabel())
                 && template != network.getLabelTemplate(label);
+        GraphPosition labelPosition = bulkLabelPosition(network, targets, label);
         for (LogisticsNodeEntity target : targets) {
+            GraphPayloadHandler.preserveLabelPosition(target, label);
             target.setNodeLabel(label);
             applyTemplate(target, template);
             if (authority != null) target.setRenderVisible(authority.isRenderVisible());
@@ -208,11 +218,58 @@ public final class LabelUpgradeSync {
             returnItems(player, changes.get(target.getUUID()).returned());
         }
         if (refreshesAuthority) authority.setLabelRevision(template.revision());
+        if (labelPosition != null) network.setGraphPosition("label:" + label, labelPosition);
         network.setLabelTemplate(label, template);
         markChanged(player.serverLevel(), network);
         GraphPayloadHandler.broadcast(player.getServer(), network.getId());
+        GraphPayloadHandler.refreshTable(player, network.getId());
         player.displayClientMessage(Component.translatable(
                 "message.logisticsnetworks.label.synced", targets.size()), true);
+    }
+
+    @Nullable
+    private static GraphPosition bulkLabelPosition(LogisticsNetwork network,
+                                                   List<LogisticsNodeEntity> targets, String label) {
+        GraphPosition existing = network.getGraphPositions().get("label:" + label);
+        if (existing != null) return existing;
+        Set<String> keys = new HashSet<>();
+        float x = 0;
+        float y = 0;
+        int count = 0;
+        for (LogisticsNodeEntity target : targets) {
+            String key = target.getNodeLabel().isEmpty()
+                    ? "node:" + target.getUUID() : "label:" + target.getNodeLabel();
+            GraphPosition position = network.getGraphPositions().get(key);
+            if (position != null && keys.add(key)) {
+                x += position.x();
+                y += position.y();
+                count++;
+            }
+        }
+        return count == 0 ? null : new GraphPosition(x / count, y / count);
+    }
+
+    private static Map<UUID, GraphPosition> bulkUnlabelPositions(LogisticsNetwork network,
+                                                                 List<LogisticsNodeEntity> targets) {
+        Map<UUID, GraphPosition> positions = new LinkedHashMap<>();
+        Map<String, Integer> splitIndexes = new LinkedHashMap<>();
+        for (LogisticsNodeEntity target : targets) {
+            String oldKey = target.getNodeLabel().isEmpty()
+                    ? "node:" + target.getUUID() : "label:" + target.getNodeLabel();
+            GraphPosition oldPosition = network.getGraphPositions().get(oldKey);
+            if (oldPosition == null) continue;
+            if (target.getNodeLabel().isEmpty()) {
+                positions.put(target.getUUID(), oldPosition);
+                continue;
+            }
+            int index = splitIndexes.merge(oldKey, 1, Integer::sum) - 1;
+            double angle = index * Math.PI / 3.0;
+            float distance = 46.0f * (1 + index / 6);
+            positions.put(target.getUUID(), new GraphPosition(
+                    oldPosition.x() + (float) Math.cos(angle) * distance,
+                    oldPosition.y() + (float) Math.sin(angle) * distance));
+        }
+        return positions;
     }
 
     private static boolean validTargets(ServerPlayer player, LogisticsNetwork network,

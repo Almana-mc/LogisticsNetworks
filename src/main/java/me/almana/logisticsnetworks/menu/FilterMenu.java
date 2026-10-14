@@ -86,6 +86,8 @@ public class FilterMenu extends AbstractContainerMenu {
     private final NodeClipboardConfig clipboardSource;
     private final int nodeChannel;
     private final int nodeFilterSlot;
+    @Nullable
+    private GraphMenuContext graphContext;
 
     private String selectedTag;
     private String selectedMod;
@@ -318,6 +320,7 @@ public class FilterMenu extends AbstractContainerMenu {
             int entityId = buf.readVarInt();
             java.util.UUID nodeId = buf.readUUID();
             net.minecraft.resources.ResourceLocation dimension = buf.readResourceLocation();
+            this.graphContext = buf.readBoolean() ? GraphMenuContext.read(buf) : null;
             this.nodeChannel = buf.readVarInt();
             this.nodeFilterSlot = buf.readVarInt();
             this.inventorySlotIndex = -1;
@@ -940,6 +943,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
+        if (graphContext != null && !stillValid(player)) return false;
         if (player.level().isClientSide)
             return false;
 
@@ -1120,6 +1124,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
     @Override
     public void clicked(int slotId, int dragType, ClickType clickType, Player player) {
+        if (graphContext != null && !stillValid(player)) return;
         if (clickType == ClickType.PICKUP && slotId >= 0 && slotId < slots.size()) {
 
             if (!isSpecialMode && slotId < slotCount) {
@@ -1297,6 +1302,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
+        if (graphContext != null) return graphContext.canEdit(player, nodeSource);
         if (nodeSource != null)
             return nodeSource.isAlive() && (player.level().isClientSide() || nodeSource.isOwnedBy(player));
         if (clipboardSource != null) {
@@ -1314,6 +1320,19 @@ public class FilterMenu extends AbstractContainerMenu {
     @Override
     public void removed(Player player) {
         super.removed(player);
+        if (!player.level().isClientSide && graphContext != null) {
+            if (nodeSource == null || !nodeSource.isActive()
+                    || !(nodeSource.level() instanceof net.minecraft.server.level.ServerLevel level)
+                    || level.getEntity(nodeSource.getUUID()) != nodeSource
+                    || !graphContext.networkId().equals(nodeSource.getNetworkId())
+                    || !nodeSource.isOwnedBy(player)) return;
+            var network = me.almana.logisticsnetworks.data.NetworkRegistry.get(level)
+                    .getNetwork(graphContext.networkId());
+            if (network == null || !network.getNodeUuids().contains(nodeSource.getUUID())
+                    || !me.almana.logisticsnetworks.logic.NodeAccessPolicy.canAccess(network.getOwnerUuid(), player)) {
+                return;
+            }
+        }
         if (!player.level().isClientSide && !isSpecialMode && !returningToClipboard) {
             saveFilterItems(getOpenedStack());
         }
@@ -1351,6 +1370,15 @@ public class FilterMenu extends AbstractContainerMenu {
                 ? player.getOffhandItem()
                 : lockedSlot >= 0 ? player.getInventory().getItem(lockedSlot) : player.getMainHandItem();
         WrenchItem.setClipboard(wrench, clipboardSource, player.level().registryAccess());
+    }
+
+    @Nullable
+    public GraphMenuContext getGraphContext() {
+        return graphContext;
+    }
+
+    public void setGraphContext(GraphMenuContext graphContext) {
+        this.graphContext = graphContext;
     }
 
     private boolean hasConfiguredRules() {

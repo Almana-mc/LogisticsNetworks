@@ -445,6 +445,8 @@
   "gui.logisticsnetworks.computer.flow.moved_tooltip": "Moved: %s %s",
   "gui.logisticsnetworks.graph.open": "Graph Editor",
   "gui.logisticsnetworks.graph.description": "Arrange and configure nodes",
+  "gui.logisticsnetworks.network_graph": "Network Graph",
+  "message.logisticsnetworks.label.unloaded_unknown": "Load all network nodes before creating this label.",
   "item.logisticsnetworks.pattern_setter": "Pattern Setter",
   "gui.logisticsnetworks.pattern_setter.title": "Pattern Setter",
   "gui.logisticsnetworks.pattern_setter.input": "Input",

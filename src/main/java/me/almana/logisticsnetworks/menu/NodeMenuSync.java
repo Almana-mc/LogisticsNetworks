@@ -35,9 +35,17 @@ public final class NodeMenuSync {
     }
 
     public static void openScreen(ServerPlayer player, MenuProvider provider, LogisticsNodeEntity node,
-            int selectedChannel) {
-        boolean inline = fitsOpenBuffer(buf -> write(buf, node, selectedChannel, true));
-        NetworkHooks.openScreen(player, provider, buf -> write(buf, node, selectedChannel, inline));
+            int selectedChannel, Consumer<FriendlyByteBuf> head, Consumer<FriendlyByteBuf> tail) {
+        boolean inline = fitsOpenBuffer(buf -> {
+            head.accept(buf);
+            write(buf, node, selectedChannel, true);
+            tail.accept(buf);
+        });
+        NetworkHooks.openScreen(player, provider, buf -> {
+            head.accept(buf);
+            write(buf, node, selectedChannel, inline);
+            tail.accept(buf);
+        });
         if (inline)
             return;
         // Too big: channels follow separately

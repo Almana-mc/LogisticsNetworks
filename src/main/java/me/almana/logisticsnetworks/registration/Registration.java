@@ -24,6 +24,7 @@ import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
+import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import net.minecraft.core.registries.Registries;
@@ -160,6 +161,9 @@ public class Registration {
         public static final RegistryObject<MenuType<ComputerMenu>> COMPUTER_MENU = MENUS.register(
                         "computer_menu",
                         () -> IForgeMenuType.create(ComputerMenu::new));
+        public static final RegistryObject<MenuType<NodeGraphMenu>> NODE_GRAPH_MENU = MENUS.register(
+                        "node_graph_menu",
+                        () -> IForgeMenuType.create(NodeGraphMenu::new));
 
         public static final RegistryObject<SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",

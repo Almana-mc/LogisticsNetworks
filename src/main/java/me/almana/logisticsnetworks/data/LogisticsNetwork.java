@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.resources.ResourceKey;
@@ -36,6 +37,10 @@ public class LogisticsNetwork {
     private static final String KEY_LABEL_TEMPLATES = "LabelTemplates";
     private static final String KEY_LABEL = "Label";
     private static final String KEY_TEMPLATE = "Template";
+    private static final String KEY_GRAPH_POSITIONS = "GraphPositions";
+    private static final String KEY_GRAPH_X = "X";
+    private static final String KEY_GRAPH_Y = "Y";
+    private static final float MAX_GRAPH_COORDINATE = 1_000_000.0F;
 
     private final UUID id;
     private String name;
@@ -43,6 +48,7 @@ public class LogisticsNetwork {
     private int color = NetworkColors.randomColor();
     private long createdAt = System.currentTimeMillis();
     private final Set<UUID> nodeUuids = new HashSet<>();
+    private final Map<String, GraphPosition> graphPositions = new HashMap<>();
     private final Map<String, LabelUpgradeTemplate> labelTemplates = new HashMap<>();
     private boolean sleeping = true;
 
@@ -121,6 +127,7 @@ public class LogisticsNetwork {
             channelNamesTag.add(entry);
         }
         tag.put(KEY_CHANNEL_NAMES, channelNamesTag);
+        writeGraphPositions(tag);
 
         if (!labelTemplates.isEmpty()) {
             ListTag templatesTag = new ListTag();
@@ -170,6 +177,7 @@ public class LogisticsNetwork {
                 network.channelNames[i] = namesTag.getCompound(i).getString("Name");
             }
         }
+        network.readGraphPositions(tag);
         for (Tag value : tag.getList(KEY_LABEL_TEMPLATES, Tag.TAG_COMPOUND)) {
             if (!(value instanceof CompoundTag templateTag)) continue;
             String label = templateTag.getString(KEY_LABEL);
@@ -189,7 +197,61 @@ public class LogisticsNetwork {
 
     public void removeNode(UUID nodeUuid) {
         nodeUuids.remove(nodeUuid);
+        graphPositions.remove("node:" + nodeUuid);
         markCacheDirty();
+    }
+
+    public Map<String, GraphPosition> getGraphPositions() {
+        return Collections.unmodifiableMap(graphPositions);
+    }
+
+    public void setGraphPosition(String key, GraphPosition position) {
+        if (!validGraphKey(key) || !validGraphPosition(position)) {
+            throw new IllegalArgumentException("Invalid graph position");
+        }
+        graphPositions.put(key, position);
+    }
+
+    public void resetGraphPositions() {
+        graphPositions.clear();
+    }
+
+    private void writeGraphPositions(CompoundTag tag) {
+        if (graphPositions.isEmpty()) return;
+        CompoundTag positionsTag = new CompoundTag();
+        for (Map.Entry<String, GraphPosition> entry : new TreeMap<>(graphPositions).entrySet()) {
+            CompoundTag positionTag = new CompoundTag();
+            positionTag.putFloat(KEY_GRAPH_X, entry.getValue().x());
+            positionTag.putFloat(KEY_GRAPH_Y, entry.getValue().y());
+            positionsTag.put(entry.getKey(), positionTag);
+        }
+        tag.put(KEY_GRAPH_POSITIONS, positionsTag);
+    }
+
+    private void readGraphPositions(CompoundTag tag) {
+        CompoundTag positionsTag = tag.getCompound(KEY_GRAPH_POSITIONS);
+        for (String key : positionsTag.getAllKeys()) {
+            if (!(positionsTag.get(key) instanceof CompoundTag positionTag)
+                    || !positionTag.contains(KEY_GRAPH_X, Tag.TAG_ANY_NUMERIC)
+                    || !positionTag.contains(KEY_GRAPH_Y, Tag.TAG_ANY_NUMERIC)) {
+                continue;
+            }
+            GraphPosition position = new GraphPosition(
+                    positionTag.getFloat(KEY_GRAPH_X), positionTag.getFloat(KEY_GRAPH_Y));
+            if (validGraphKey(key) && validGraphPosition(position)) {
+                graphPositions.put(key, position);
+            }
+        }
+    }
+
+    private static boolean validGraphKey(String key) {
+        return !key.isBlank() && key.length() <= 256;
+    }
+
+    private static boolean validGraphPosition(GraphPosition position) {
+        return Float.isFinite(position.x()) && Float.isFinite(position.y())
+                && Math.abs(position.x()) <= MAX_GRAPH_COORDINATE
+                && Math.abs(position.y()) <= MAX_GRAPH_COORDINATE;
     }
 
     public UUID getId() {
@@ -259,6 +321,7 @@ public class LogisticsNetwork {
 
     public void removeLabel(String label) {
         labelTemplates.remove(label);
+        graphPositions.remove("label:" + label);
     }
 
     public boolean isSleeping() {

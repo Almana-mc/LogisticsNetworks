@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
+import me.almana.logisticsnetworks.menu.GraphMenuContext;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
@@ -730,6 +731,13 @@ public class ServerPayloadHandler {
     }
 
     private static LogisticsNodeEntity getAuthorizedNode(IPayloadContext context, int entityId) {
+        Player player = context.player();
+        GraphMenuContext graph = GraphPayloadHandler.getContext(player.containerMenu);
+        if (graph != null) {
+            LogisticsNodeEntity selected = player.containerMenu instanceof NodeMenu menu
+                    ? menu.getNode() : ((FilterMenu) player.containerMenu).getNodeSource();
+            return graph.canEdit(player, selected) && selected.getId() == entityId ? selected : null;
+        }
         LogisticsNodeEntity node = getNode(context, entityId);
         if (node == null) return null;
         return node.isOwnedBy(context.player()) ? node : null;
@@ -882,13 +890,20 @@ public class ServerPayloadHandler {
         ItemStack opened = stack.copyWithCount(1);
         boolean inline = NodeMenuSync.fitsOpenBuffer(buf -> buf.writeItem(opened));
 
+        GraphMenuContext graphContext = GraphPayloadHandler.getContext(player.containerMenu);
         NetworkHooks.openScreen(player, new SimpleMenuProvider(
-                (id, inv, p) -> new FilterMenu(id, inv, node, ch, fs),
+                (id, inv, p) -> {
+                    FilterMenu menu = new FilterMenu(id, inv, node, ch, fs);
+                    menu.setGraphContext(graphContext);
+                    return menu;
+                },
                 opened.getHoverName()), buf -> {
                     buf.writeVarInt(-2);
                     buf.writeVarInt(node.getId());
                     buf.writeUUID(node.getUUID());
                     buf.writeResourceLocation(node.level().dimension().location());
+                    buf.writeBoolean(graphContext != null);
+                    if (graphContext != null) graphContext.write(buf);
                     buf.writeVarInt(ch);
                     buf.writeVarInt(fs);
                     FilterMenu.writeOpenedStack(buf, opened, inline);
@@ -930,6 +945,13 @@ public class ServerPayloadHandler {
                 return;
             int selectedChannel = Math.max(0,
                     Math.min(LogisticsNodeEntity.CHANNEL_COUNT - 1, payload.selectedChannel()));
+            GraphMenuContext graphContext = GraphPayloadHandler.getContext(player.containerMenu);
+            if (graphContext != null) {
+                if (player.containerMenu.getCarried().isEmpty()) {
+                    GraphPayloadHandler.open(player, graphContext, node, selectedChannel);
+                }
+                return;
+            }
             NodeMenu.open(player, node, selectedChannel, false);
         });
     }
@@ -1035,6 +1057,7 @@ public class ServerPayloadHandler {
             String label = payload.label().trim();
             if (label.length() > 48)
                 label = label.substring(0, 48);
+            GraphPayloadHandler.preserveLabelPosition(node, label);
             node.setNodeLabel(label);
 
             if (!label.isEmpty() && node.getNetworkId() != null
@@ -1207,29 +1230,6 @@ public class ServerPayloadHandler {
             for (LogisticsNodeEntity node : labeledNodes) {
                 node.setHighlighted(makeVisible);
             }
-        });
-    }
-
-    public static void handleRequestOpenNodeSettings(RequestOpenNodeSettingsPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player))
-                return;
-            if (!(player.containerMenu instanceof ComputerMenu))
-                return;
-
-            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
-            LogisticsNetwork network = registry.getNetwork(payload.networkId());
-            if (network == null || !canAccessNetwork(player, network))
-                return;
-
-            if (!network.getNodeUuids().contains(payload.nodeId()))
-                return;
-
-            LogisticsNodeEntity node = findNode(player, payload.nodeId());
-            if (node == null || !node.isOwnedBy(player))
-                return;
-
-            NodeMenu.open(player, node, 0, true);
         });
     }
 

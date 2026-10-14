@@ -51,7 +51,7 @@ public final class NetworkHandler {
         registerServer(ApplyPatternPayload.class, ApplyPatternPayload.STREAM_CODEC, ServerPayloadHandler::handleApplyPattern);
         registerServer(RequestNetworkNodesPayload.class, RequestNetworkNodesPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestNetworkNodes);
         registerServer(RequestNetworkLabelsPayload.class, RequestNetworkLabelsPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestNetworkLabels);
-        registerServer(RequestOpenNodeSettingsPayload.class, RequestOpenNodeSettingsPayload.STREAM_CODEC, ServerPayloadHandler::handleRequestOpenNodeSettings);
+        registerServer(RequestOpenNodeSettingsPayload.class, RequestOpenNodeSettingsPayload.STREAM_CODEC, GraphPayloadHandler::handleOpenNodeSettings);
         registerServer(SetNodeLabelPayload.class, SetNodeLabelPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNodeLabel);
         registerServer(SetChannelNamePayload.class, SetChannelNamePayload.STREAM_CODEC, ServerPayloadHandler::handleSetChannelName);
         registerServer(SetNetworkNodesVisibilityPayload.class, SetNetworkNodesVisibilityPayload.STREAM_CODEC, ServerPayloadHandler::handleSetNetworkNodesVisibility);
@@ -83,6 +83,15 @@ public final class NetworkHandler {
         registerServer(OpenNodeMenuPayload.class, OpenNodeMenuPayload.STREAM_CODEC, ServerPayloadHandler::handleOpenNodeMenu);
         registerServer(ToggleComputerPinnedNetworkPayload.class, ToggleComputerPinnedNetworkPayload.STREAM_CODEC,
                 ServerPayloadHandler::handleToggleComputerPinnedNetwork);
+        registerServer(RequestOpenGraphPayload.class, RequestOpenGraphPayload.STREAM_CODEC, GraphPayloadHandler::handleOpen);
+        registerServer(RequestNetworkGraphPayload.class, RequestNetworkGraphPayload.STREAM_CODEC, GraphPayloadHandler::handleRequest);
+        registerServer(MoveGraphVertexPayload.class, MoveGraphVertexPayload.STREAM_CODEC, GraphPayloadHandler::handleMove);
+        registerServer(MoveGraphVerticesPayload.class, MoveGraphVerticesPayload.STREAM_CODEC, GraphPayloadHandler::handleMoveVertices);
+        registerServer(SetNodeLabelsPayload.class, SetNodeLabelsPayload.STREAM_CODEC, GraphPayloadHandler::handleSetLabels);
+        registerServer(PreviewGraphLabelsPayload.class, PreviewGraphLabelsPayload.STREAM_CODEC, GraphPayloadHandler::handlePreviewLabels);
+        registerServer(ConfirmGraphLabelsPayload.class, ConfirmGraphLabelsPayload.STREAM_CODEC, GraphPayloadHandler::handleConfirmLabels);
+        registerServer(ResetGraphLayoutPayload.class, ResetGraphLayoutPayload.STREAM_CODEC, GraphPayloadHandler::handleReset);
+        registerServer(ReturnToComputerPayload.class, ReturnToComputerPayload.STREAM_CODEC, GraphPayloadHandler::handleReturn);
         registerServer(ScanAttachedStoragePayload.class, ScanAttachedStoragePayload.STREAM_CODEC, ServerPayloadHandler::handleScanAttachedStorage);
         registerClient(SyncFilterScanResultPayload.class, SyncFilterScanResultPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncFilterScanResult);
         registerClient(SyncOpenFilterPayload.class, SyncOpenFilterPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncOpenFilter);
