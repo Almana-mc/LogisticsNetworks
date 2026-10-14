@@ -43,8 +43,9 @@ public class SlotNumberOverlay {
             }
         }
 
+        // Forge wrapper names must differ
         @SubscribeEvent
-        public static void onKeyInput(InputEvent.Key event) {
+        public static void onToggleKey(InputEvent.Key event) {
             if (ClientControls.TOGGLE_SLOT_NUMBERS.consumeClick()) {
                 toggle();
             }

@@ -148,8 +148,9 @@ public final class ClientControls {
             }
         }
 
+        // Forge wrapper names must differ
         @SubscribeEvent
-        public static void onKeyInput(InputEvent.Key event) {
+        public static void onModifierKey(InputEvent.Key event) {
             updateModifierState(InputConstants.getKey(event.getKey(), event.getScanCode()),
                     event.getAction() != GLFW.GLFW_RELEASE);
         }
