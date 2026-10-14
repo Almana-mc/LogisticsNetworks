@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -23,6 +24,8 @@ import org.slf4j.Logger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 public class ComputerMenu extends AbstractContainerMenu {
 
@@ -97,6 +100,8 @@ public class ComputerMenu extends AbstractContainerMenu {
 
         NetworkRegistry registry = NetworkRegistry.get(level);
         Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
+        ComputerBlockEntity computer = getComputer(level);
+        Set<UUID> starredNetworks = computer != null ? computer.getStarredNetworks() : Set.of();
 
         LOGGER.debug("Player {} UUID: {}", player.getName().getString(), player.getUUID());
         LOGGER.debug("Found {} networks for player", networks.size());
@@ -109,7 +114,7 @@ public class ComputerMenu extends AbstractContainerMenu {
                     net.getId(),
                     net.getName(),
                     net.getNodeUuids().size(),
-                    false,
+                    starredNetworks.contains(net.getId()),
                     NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
                     net.getColor(),
                     net.getCreatedAt()));
@@ -156,6 +161,13 @@ public class ComputerMenu extends AbstractContainerMenu {
 
     public BlockPos getComputerPos() {
         return computerPos;
+    }
+
+    private ComputerBlockEntity getComputer(ServerLevel level) {
+        if (level.getBlockEntity(computerPos) instanceof ComputerBlockEntity computer) {
+            return computer;
+        }
+        return null;
     }
 
     private class WrenchSlotContainer implements Container {

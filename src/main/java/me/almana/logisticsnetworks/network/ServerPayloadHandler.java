@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.filter.*;
 import me.almana.logisticsnetworks.item.*;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
+import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -365,6 +366,37 @@ public class ServerPayloadHandler {
                 menu.sendNetworkListToClient(player);
             }
         });
+    }
+
+    public static void handleToggleComputerPinnedNetwork(ToggleComputerPinnedNetworkPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+            if (!(player.containerMenu instanceof ComputerMenu menu)) {
+                return;
+            }
+            if (!menu.getComputerPos().equals(payload.computerPos())) {
+                return;
+            }
+            if (!(player.serverLevel().getBlockEntity(payload.computerPos()) instanceof ComputerBlockEntity computer)) {
+                return;
+            }
+
+            computer.toggleNetworkStar(payload.networkId());
+            refreshOpenComputerMenus(player, payload.computerPos());
+        });
+    }
+
+    private static void refreshOpenComputerMenus(ServerPlayer sourcePlayer, BlockPos computerPos) {
+        for (ServerPlayer player : sourcePlayer.getServer().getPlayerList().getPlayers()) {
+            if (player.containerMenu instanceof ComputerMenu menu
+                    && player.serverLevel() == sourcePlayer.serverLevel()
+                    && menu.getComputerPos().equals(computerPos)) {
+                menu.requestNetworkList(player);
+            }
+        }
     }
 
     public static void handleToggleVisibility(ToggleNodeVisibilityPayload payload, IPayloadContext context) {
