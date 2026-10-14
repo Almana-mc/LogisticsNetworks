@@ -17,6 +17,7 @@ import me.almana.logisticsnetworks.item.SlotFilterItem;
 import me.almana.logisticsnetworks.item.TagFilterItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.block.ComputerBlock;
+import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
@@ -37,6 +38,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.registries.DeferredRegister;
@@ -58,6 +60,8 @@ public class Registration {
                         Logisticsnetworks.MOD_ID);
         public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS = DeferredRegister
                         .create(Registries.RECIPE_SERIALIZER, Logisticsnetworks.MOD_ID);
+        public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES = DeferredRegister
+                        .create(Registries.BLOCK_ENTITY_TYPE, Logisticsnetworks.MOD_ID);
 
         // Some ugly shit I have done here....
         public static final RegistryObject<EntityType<LogisticsNodeEntity>> LOGISTICS_NODE = ENTITIES
@@ -76,6 +80,10 @@ public class Registration {
 
         public static final RegistryObject<ComputerBlock> COMPUTER_BLOCK = BLOCKS.register("computer",
                         () -> new ComputerBlock());
+        public static final RegistryObject<BlockEntityType<ComputerBlockEntity>> COMPUTER_BLOCK_ENTITY = BLOCK_ENTITY_TYPES
+                        .register("computer", () -> BlockEntityType.Builder.of(
+                                        ComputerBlockEntity::new,
+                                        COMPUTER_BLOCK.get()).build(null));
         public static final RegistryObject<BlockItem> COMPUTER_ITEM = ITEMS.register("computer",
                         () -> new BlockItem(COMPUTER_BLOCK.get(), new Item.Properties()));
 
@@ -183,6 +191,7 @@ public class Registration {
                 BLOCKS.register(modEventBus);
                 ITEMS.register(modEventBus);
                 MENUS.register(modEventBus);
+                BLOCK_ENTITY_TYPES.register(modEventBus);
                 RECIPE_SERIALIZERS.register(modEventBus);
                 CREATIVE_TABS.register(modEventBus);
         }
