@@ -471,6 +471,8 @@
   "item.logisticsnetworks.pattern_setter": "Pattern Setter",
   "gui.logisticsnetworks.pattern_setter.title": "Pattern Setter",
   "item.logisticsnetworks.recipe_card": "Recipe Card",
+  "item.logisticsnetworks.recipe_card.named": "Recipe Card: %s",
+  "tooltip.logisticsnetworks.recipe_card.edit": "%s + click to edit the recipe",
   "tooltip.logisticsnetworks.recipe_card.blank": "Blank. Right-click to write a recipe on it",
   "tooltip.logisticsnetworks.recipe_card.output": "Makes: %s",
   "tooltip.logisticsnetworks.recipe_card.blocking_on": "Blocking: on",

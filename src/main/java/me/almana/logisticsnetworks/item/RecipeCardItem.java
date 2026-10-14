@@ -50,6 +50,14 @@ public class RecipeCardItem extends Item {
     }
 
     @Override
+    public Component getName(ItemStack stack) {
+        return RecipeCardData.of(stack).output()
+                .<Component>map(output -> Component.translatable("item.logisticsnetworks.recipe_card.named",
+                        output.toStack().getHoverName()))
+                .orElseGet(() -> super.getName(stack));
+    }
+
+    @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
         RecipeCardData data = RecipeCardData.of(stack);
         if (data.ingredients().isEmpty()) {
