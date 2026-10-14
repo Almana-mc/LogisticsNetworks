@@ -1,8 +1,14 @@
 package me.almana.logisticsnetworks.menu;
 
 import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.item.RecipeCardItem;
+import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SetRecipeCardPayload;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -25,6 +31,7 @@ public class RecipeCardMenu extends AbstractContainerMenu {
 
     public static final int INV_X = 8;
     public static final int INV_Y = 172;
+    public static final int ID_BACK = 0;
 
     @Nullable
     private final InteractionHand hand;
@@ -32,18 +39,21 @@ public class RecipeCardMenu extends AbstractContainerMenu {
     private final LogisticsNodeEntity node;
     private final int entityId;
     private final int channel;
-    private final int slot;
+    private final int filterSlot;
+    private final int entry;
     private final int locked;
     private RecipeCardData data;
 
     private RecipeCardMenu(int containerId, Inventory inventory, @Nullable InteractionHand hand,
-            @Nullable LogisticsNodeEntity node, int entityId, int channel, int slot, RecipeCardData data) {
+            @Nullable LogisticsNodeEntity node, int entityId, int channel, int filterSlot, int entry,
+            RecipeCardData data) {
         super(Registration.RECIPE_CARD_MENU.get(), containerId);
         this.hand = hand;
         this.node = node;
         this.entityId = entityId;
         this.channel = channel;
-        this.slot = slot;
+        this.filterSlot = filterSlot;
+        this.entry = entry;
         this.data = data;
         this.locked = hand == InteractionHand.MAIN_HAND ? inventory.selected : -1;
         for (int row = 0; row < 3; row++) {
@@ -59,27 +69,34 @@ public class RecipeCardMenu extends AbstractContainerMenu {
 
     public RecipeCardMenu(int containerId, Inventory inventory, RegistryFriendlyByteBuf buf) {
         this(containerId, inventory, readHand(buf), null, buf.readVarInt(), buf.readVarInt(), buf.readVarInt(),
-                RecipeCardData.STREAM_CODEC.decode(buf));
+                buf.readVarInt(), RecipeCardData.STREAM_CODEC.decode(buf));
     }
 
     public static void openHand(ServerPlayer player, InteractionHand hand) {
         open(player, hand, null, -1, -1, -1, RecipeCardData.of(player.getItemInHand(hand)));
     }
 
-    public static void openNode(ServerPlayer player, LogisticsNodeEntity node, int channel, int slot) {
-        open(player, null, node, node.getId(), channel, slot,
-                RecipeCardData.of(node.getChannel(channel).getFilterItem(slot)));
+    public static boolean openEntry(ServerPlayer player, FilterMenu filter, int entry) {
+        ItemStack card = FilterItemData.getEntry(filter.getOpenedStack(), entry);
+        if (!RecipeCardItem.is(card) || !filter.isBoundFilter() || filter.getGraphContext() != null) return false;
+        LogisticsNodeEntity source = filter.getNodeSource();
+        open(player, source == null ? filter.getHand() : null, source, filter.getNodeChannel(),
+                filter.getNodeFilterSlot(), entry, RecipeCardData.of(card));
+        return true;
     }
 
     private static void open(ServerPlayer player, @Nullable InteractionHand hand, @Nullable LogisticsNodeEntity node,
-            int entityId, int channel, int slot, RecipeCardData data) {
+            int channel, int filterSlot, int entry, RecipeCardData data) {
+        int entityId = node == null ? -1 : node.getId();
         player.openMenu(new SimpleMenuProvider(
-                (id, inventory, ignored) -> new RecipeCardMenu(id, inventory, hand, node, entityId, channel, slot, data),
+                (id, inventory, ignored) -> new RecipeCardMenu(id, inventory, hand, node, entityId, channel,
+                        filterSlot, entry, data),
                 Component.translatable("gui.logisticsnetworks.recipe_card.title")), buf -> {
                     buf.writeVarInt(hand == null ? -1 : hand.ordinal());
                     buf.writeVarInt(entityId);
                     buf.writeVarInt(channel);
-                    buf.writeVarInt(slot);
+                    buf.writeVarInt(filterSlot);
+                    buf.writeVarInt(entry);
                     RecipeCardData.STREAM_CODEC.encode(buf, data);
                 });
     }
@@ -106,13 +123,47 @@ public class RecipeCardMenu extends AbstractContainerMenu {
         PacketDistributor.sendToServer(new SetRecipeCardPayload(data));
     }
 
-    public boolean isNodeTarget() {
-        return entityId >= 0;
+    // Server side only
+    public ItemStack card(Player player) {
+        if (!isEntryTarget()) return player.getItemInHand(hand);
+        if (node != null) return FilterItemData.getEntry(node.getChannel(channel).getFilterItem(filterSlot), entry);
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(player.getItemInHand(hand), player.registryAccess());
+        return clipboard == null ? ItemStack.EMPTY
+                : FilterItemData.getEntry(clipboard.getFilterItem(channel, filterSlot), entry);
     }
 
-    @Nullable
-    public InteractionHand hand() {
-        return hand;
+    // Server side only
+    public void store(Player player, ItemStack card) {
+        if (!isEntryTarget()) {
+            player.setItemInHand(hand, card);
+        } else if (node != null) {
+            ChannelData target = node.getChannel(channel);
+            target.setFilterItem(filterSlot, withEntry(target.getFilterItem(filterSlot), card));
+            ServerPayloadHandler.sendChannelSyncToViewers(node, channel, target);
+            ServerPayloadHandler.propagateToLabelGroup(node, channel);
+            ServerPayloadHandler.invalidateNetwork(node);
+        } else {
+            ItemStack wrench = player.getItemInHand(hand);
+            NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrench, player.registryAccess());
+            if (clipboard == null) return;
+            clipboard.setFilterItem(channel, filterSlot,
+                    withEntry(clipboard.getFilterItem(channel, filterSlot), card));
+            WrenchItem.setClipboard(wrench, clipboard, player.registryAccess());
+        }
+    }
+
+    private ItemStack withEntry(ItemStack filter, ItemStack card) {
+        ItemStack copy = filter.copy();
+        FilterItemData.setEntry(copy, entry, card);
+        return copy;
+    }
+
+    public boolean isEntryTarget() {
+        return channel >= 0;
+    }
+
+    public boolean isNodeTarget() {
+        return entityId >= 0;
     }
 
     public int entityId() {
@@ -123,14 +174,27 @@ public class RecipeCardMenu extends AbstractContainerMenu {
         return channel;
     }
 
-    public int slot() {
-        return slot;
+    public int filterSlot() {
+        return filterSlot;
     }
 
     @Override
     public boolean stillValid(Player player) {
-        if (hand != null) return RecipeCardItem.is(player.getItemInHand(hand));
-        return node == null || node.isAlive() && RecipeCardItem.is(node.getChannel(channel).getFilterItem(slot));
+        if (!isEntryTarget()) return RecipeCardItem.is(player.getItemInHand(hand));
+        if (isNodeTarget()) return node == null || node.isAlive() && RecipeCardItem.is(card(player));
+        return player.getItemInHand(hand).getItem() instanceof WrenchItem;
+    }
+
+    @Override
+    public boolean clickMenuButton(Player player, int id) {
+        if (id != ID_BACK || !isEntryTarget() || isNodeTarget() || !(player instanceof ServerPlayer serverPlayer))
+            return false;
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(player.getItemInHand(hand), player.registryAccess());
+        if (clipboard == null || !FilterMenu.openClipboard(serverPlayer, clipboard, hand, channel, filterSlot,
+                VirtualFilterType.EXISTING)) {
+            serverPlayer.closeContainer();
+        }
+        return true;
     }
 
     @Override
