@@ -166,14 +166,17 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         if (!initialized) {
             initialized = true;
             ThemeState.addListener(themeListener);
-            UUID networkId = config().getNetworkId();
-            if (networkId != null) {
-                pendingNetworkId = networkId;
-                pendingNetworkName = Objects.requireNonNullElse(config().getNetworkName(), "");
-                NetworkHandler.sendToServer(new RequestChannelListPayload(networkId));
-            }
+            requestChannelNames();
         }
         rebuildPageLayout();
+    }
+
+    public void requestChannelNames() {
+        UUID networkId = config().getNetworkId();
+        if (networkId == null) return;
+        pendingNetworkId = networkId;
+        pendingNetworkName = Objects.requireNonNullElse(config().getNetworkName(), "");
+        NetworkHandler.sendToServer(new RequestChannelListPayload(networkId));
     }
 
     private void rebuildPageLayout() {

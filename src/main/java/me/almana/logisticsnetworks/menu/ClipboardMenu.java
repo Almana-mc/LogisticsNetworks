@@ -179,6 +179,9 @@ public class ClipboardMenu extends AbstractContainerMenu {
             if (clickType == ClickType.PICKUP) applyUpgradeClick(slotId);
             return;
         }
+        int heldButton = hand == InteractionHand.OFF_HAND ? Inventory.SLOT_OFFHAND : lockedSlot;
+        // Swap would replace held wrench
+        if (clickType == ClickType.SWAP && dragType == heldButton) return;
         if (clickType != ClickType.QUICK_MOVE) super.clicked(slotId, dragType, clickType, player);
     }
 
@@ -213,9 +216,9 @@ public class ClipboardMenu extends AbstractContainerMenu {
     // Settings arrive without filters
     public boolean replaceSettings(NodeClipboardConfig next, ServerPlayer player) {
         for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
-            if (next.getChannelType(channel) != clipboard.getChannelType(channel)) continue;
+            boolean kept = next.getChannelType(channel) == clipboard.getChannelType(channel);
             for (int slot = 0; slot < clipboard.getFilterSlotCount(); slot++) {
-                next.setFilterItem(channel, slot, clipboard.getFilterItem(channel, slot));
+                next.setFilterItem(channel, slot, kept ? clipboard.getFilterItem(channel, slot) : ItemStack.EMPTY);
             }
         }
         return replaceClipboard(next, player);

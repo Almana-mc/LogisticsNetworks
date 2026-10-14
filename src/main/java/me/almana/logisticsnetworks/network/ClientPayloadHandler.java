@@ -110,6 +110,7 @@ public class ClientPayloadHandler {
             NodeClipboardConfig clipboard = NodeClipboardConfig.load(payload.clipboardTag(), null);
             if (player != null && clipboard != null && player.containerMenu instanceof ClipboardMenu menu) {
                 menu.setClipboard(clipboard);
+                if (Minecraft.getInstance().screen instanceof ClipboardScreen screen) screen.requestChannelNames();
             }
         });
     }

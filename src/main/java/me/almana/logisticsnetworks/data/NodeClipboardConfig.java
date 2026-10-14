@@ -652,6 +652,12 @@ public final class NodeClipboardConfig {
         return root;
     }
 
+    // Server owns clipboard filters
+    public static NodeClipboardConfig loadSettings(CompoundTag root, HolderLookup.Provider provider) {
+        root.remove(KEY_FILTERS);
+        return load(root, provider);
+    }
+
     public static NodeClipboardConfig load(CompoundTag root, HolderLookup.Provider provider) {
         if (root == null || root.isEmpty()) {
             return null;

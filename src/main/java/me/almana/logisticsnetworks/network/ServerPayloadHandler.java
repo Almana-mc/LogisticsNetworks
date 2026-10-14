@@ -1355,7 +1355,8 @@ public class ServerPayloadHandler {
             if (!(context.player() instanceof ServerPlayer player)
                     || !(player.containerMenu instanceof ClipboardMenu menu))
                 return;
-            NodeClipboardConfig config = NodeClipboardConfig.load(payload.clipboardTag(), player.level().registryAccess());
+            NodeClipboardConfig config = NodeClipboardConfig.loadSettings(payload.clipboardTag(),
+                    player.level().registryAccess());
             if (config == null) {
                 player.displayClientMessage(Component.translatable("message.logisticsnetworks.clipboard.invalid"), true);
                 return;
