@@ -252,6 +252,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         int placedCount = 0;
         List<WrenchItem.MassSelectionTarget> placedTargets = new ArrayList<>();
 
+        List<LogisticsNodeEntity> placedNodes = new ArrayList<>();
         for (WrenchItem.MassSelectionTarget target : validTargets) {
             LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, target.pos(), serverPlayer.getUUID());
             if (node == null) {
@@ -262,8 +263,12 @@ public class MassPlacementMenu extends AbstractContainerMenu {
                 clipboard.applyToNodeWithoutInventory(serverPlayer, node);
             }
 
+            placedNodes.add(node);
             placedTargets.add(target);
             placedCount++;
+        }
+        if (clipboardPresent && !placedNodes.isEmpty()) {
+            NodeClipboardConfig.syncPastedLabel(serverPlayer, placedNodes);
         }
 
         WrenchItem.removeMassSelections(wrenchStack, placedTargets);

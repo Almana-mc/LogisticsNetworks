@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -692,6 +693,7 @@ public final class NodeClipboardConfig {
             player.drop(leftover, false);
         }
         inventory.setChanged();
+        syncPastedLabel(player, List.of(node));
 
         return PasteResult.SUCCESS;
     }
@@ -712,6 +714,16 @@ public final class NodeClipboardConfig {
         applyToNode(node);
         applyNetworkToNode(node, player);
         return PasteResult.SUCCESS;
+    }
+
+    public static void syncPastedLabel(ServerPlayer player, List<LogisticsNodeEntity> nodes) {
+        LogisticsNodeEntity first = nodes.get(0);
+        String label = first.getNodeLabel();
+        if (label.isEmpty() || first.getNetworkId() == null) return;
+        LogisticsNetwork network = NetworkRegistry.get(player.serverLevel()).getNetwork(first.getNetworkId());
+        if (network == null) return;
+        nodes.forEach(node -> node.setLabelRevision(0));
+        LabelUpgradeSync.synchronizeLabels(player, network, nodes, first.getUUID(), label);
     }
 
     private boolean canAccessTargetNetwork(ServerPlayer player, LogisticsNodeEntity node) {
