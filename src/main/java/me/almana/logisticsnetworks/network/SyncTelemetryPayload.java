@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
+import io.netty.buffer.Unpooled;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -81,6 +82,16 @@ public record SyncTelemetryPayload(
             case 1 -> new FlowResource.Fluid(FluidStack.readFromPacket(buf));
             default -> new FlowResource.Chemical(buf.readUtf());
         };
+    }
+
+    public static int encodedSize(FlowResource resource) {
+        FriendlyByteBuf probe = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            writeResource(probe, resource);
+            return probe.readableBytes();
+        } finally {
+            probe.release();
+        }
     }
 
     private static void writeResource(FriendlyByteBuf buf, FlowResource resource) {
