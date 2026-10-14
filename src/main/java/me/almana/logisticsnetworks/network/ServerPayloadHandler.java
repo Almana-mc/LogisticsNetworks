@@ -252,6 +252,35 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleSetNetworkColor(SetNetworkColorPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+
+            NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
+            LogisticsNetwork network = registry.getNetwork(payload.networkId());
+            if (network == null || !canAccessNetwork(player, network)) {
+                return;
+            }
+
+            network.setColor(payload.color());
+            registry.setDirty();
+
+            for (UUID nodeId : network.getNodeUuids()) {
+                LogisticsNodeEntity node = findNode(player, nodeId);
+                if (node != null) {
+                    node.setNetworkColor(network.getColor());
+                }
+            }
+
+            GraphPayloadHandler.broadcast(player.getServer(), network.getId());
+            if (player.containerMenu instanceof NodeMenu menu) {
+                menu.sendNetworkListToClient(player);
+            }
+        });
+    }
+
     public static void handleToggleVisibility(ToggleNodeVisibilityPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
