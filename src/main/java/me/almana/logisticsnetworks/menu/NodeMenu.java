@@ -21,7 +21,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.network.NetworkHooks;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -75,10 +74,9 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     public static void open(ServerPlayer player, LogisticsNodeEntity node, int selectedChannel, boolean remote) {
-        NetworkHooks.openScreen(player, new SimpleMenuProvider(
+        NodeMenuSync.openScreen(player, new SimpleMenuProvider(
                 (id, inv, p) -> new NodeMenu(id, inv, node, selectedChannel),
-                Component.translatable("gui.logisticsnetworks.node_config")),
-                buf -> NodeMenuSync.write(buf, node, selectedChannel));
+                Component.translatable("gui.logisticsnetworks.node_config")), node, selectedChannel);
         if (player.containerMenu instanceof NodeMenu menu) {
             menu.setRemoteAccess(remote);
             menu.sendNetworkListToClient(player);
