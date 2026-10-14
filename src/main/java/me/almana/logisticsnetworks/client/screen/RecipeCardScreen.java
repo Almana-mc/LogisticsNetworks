@@ -31,6 +31,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     private static final int COLOR_TAG = 0xFFFFD24A;
 
     private static final int CELLS = RecipeCardData.MAX_INGREDIENTS;
+    private static final int MIN_CELLS = 5;
     private static final int GRID_X = 8;
     private static final int GRID_Y = 40;
     private static final int CELL_W = 84;
@@ -171,7 +172,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     }
 
     public int droppableCells() {
-        return Math.min(CELLS, menu.data().ingredients().size() + 1);
+        return Math.min(CELLS, Math.max(MIN_CELLS, menu.data().ingredients().size() + 1));
     }
 
     public Rect2i cellArea(int index) {
