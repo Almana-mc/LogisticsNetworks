@@ -251,20 +251,9 @@ public final class LabelUpgradeSync {
         List<ChannelData> channels = template.channels();
         for (int index = 0; index < Math.min(channels.size(), LogisticsNodeEntity.CHANNEL_COUNT); index++) {
             ChannelData target = node.getChannel(index);
-            dropReplacedFilters(node, target, channels.get(index));
             target.copyFrom(channels.get(index));
             ServerPayloadHandler.clampChannelToUpgradeLimits(node, target);
             ServerPayloadHandler.sendChannelSyncToViewers(node, index, target);
-        }
-    }
-
-    // Physical filters until Phase 4
-    private static void dropReplacedFilters(LogisticsNodeEntity node, ChannelData current, ChannelData next) {
-        for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-            ItemStack old = current.getFilterItem(slot);
-            if (!old.isEmpty() && !ItemStack.matches(old, next.getFilterItem(slot))) {
-                node.spawnAtLocation(old.copy());
-            }
         }
     }
 

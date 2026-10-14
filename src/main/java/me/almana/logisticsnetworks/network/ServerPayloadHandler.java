@@ -303,12 +303,6 @@ public class ServerPayloadHandler {
                     items.add(upgrade.copy());
                 }
             }
-            // Physical filters until Phase 4
-            for (ChannelData channel : node.getChannels()) {
-                for (ItemStack filter : channel.getFilterItems()) {
-                    if (!filter.isEmpty()) items.add(filter.copy());
-                }
-            }
         }
         return items;
     }

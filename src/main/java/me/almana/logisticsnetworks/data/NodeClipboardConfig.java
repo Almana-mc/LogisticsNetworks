@@ -752,20 +752,6 @@ public final class NodeClipboardConfig {
             }
         }
 
-        for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
-            ChannelData channelData = node.getChannel(channel);
-            if (channelData == null) {
-                continue;
-            }
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack expected = filterItems[channel][slot];
-                ItemStack current = channelData.getFilterItem(slot);
-                if (shouldReturnReplacedItem(expected, current)) {
-                    returnedItems.add(current.copy());
-                }
-            }
-        }
-
         return returnedItems;
     }
 
@@ -860,22 +846,6 @@ public final class NodeClipboardConfig {
                 continue;
             }
             addRequirement(requirements, required);
-        }
-
-        for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
-            ChannelData channelData = node == null ? null : node.getChannel(channel);
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack required = filterItems[channel][slot];
-                if (required.isEmpty()) {
-                    continue;
-                }
-
-                if (channelData != null
-                        && ItemStack.isSameItem(required, channelData.getFilterItem(slot))) {
-                    continue;
-                }
-                addRequirement(requirements, required);
-            }
         }
 
         return requirements;
