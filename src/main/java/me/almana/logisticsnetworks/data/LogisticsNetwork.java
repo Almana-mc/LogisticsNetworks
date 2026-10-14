@@ -20,6 +20,7 @@ import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.server.ServerLifecycleHooks;
 
@@ -206,10 +207,12 @@ public class LogisticsNetwork {
     }
 
     public void setGraphPosition(String key, GraphPosition position) {
-        if (!validGraphKey(key) || !validGraphPosition(position)) {
+        if (!validGraphKey(key) || !Float.isFinite(position.x()) || !Float.isFinite(position.y())) {
             throw new IllegalArgumentException("Invalid graph position");
         }
-        graphPositions.put(key, position);
+        graphPositions.put(key, new GraphPosition(
+                Mth.clamp(position.x(), -MAX_GRAPH_COORDINATE, MAX_GRAPH_COORDINATE),
+                Mth.clamp(position.y(), -MAX_GRAPH_COORDINATE, MAX_GRAPH_COORDINATE)));
     }
 
     public void resetGraphPositions() {
