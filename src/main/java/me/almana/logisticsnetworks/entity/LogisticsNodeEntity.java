@@ -6,7 +6,9 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.Registration;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -379,7 +381,19 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setUpgradeItem(int slot, ItemStack stack) {
         if (slot >= 0 && slot < UPGRADE_SLOT_COUNT) {
+            int previousTier = NodeUpgradeData.getUpgradeTier(this);
             upgradeItems[slot] = stack.isEmpty() ? ItemStack.EMPTY : ItemStackCompat.copyWithCount(stack, 1);
+            if (!level().isClientSide)
+                applyTierChange(previousTier, NodeUpgradeData.getUpgradeTier(this));
+        }
+    }
+
+    private void applyTierChange(int previousTier, int tier) {
+        if (previousTier == tier)
+            return;
+        for (int index = 0; index < channels.length; index++) {
+            NodeUpgradeData.applyTierChange(channels[index], previousTier, tier);
+            ServerPayloadHandler.sendChannelSyncToViewers(this, index, channels[index]);
         }
     }
 

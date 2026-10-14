@@ -1018,6 +1018,17 @@ public final class NodeClipboardConfig {
     }
 
     private void applyToNode(LogisticsNodeEntity node) {
+        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+            ItemStack expected = upgradeItems[slot];
+            ItemStack current = node.getUpgradeItem(slot);
+
+            if (expected.isEmpty()) {
+                node.setUpgradeItem(slot, ItemStack.EMPTY);
+            } else if (!ItemStackCompat.isSameItemSameComponents(expected, current)) {
+                node.setUpgradeItem(slot, ItemStackCompat.copyWithCount(expected, 1));
+            }
+        }
+
         for (int channelIndex = 0; channelIndex < LogisticsNodeEntity.CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = node.getChannel(channelIndex);
             ChannelConfig config = channels[channelIndex];
@@ -1046,17 +1057,6 @@ public final class NodeClipboardConfig {
                 } else if (!ItemStackCompat.isSameItemSameComponents(expected, current)) {
                     channel.setFilterItem(slot, ItemStackCompat.copyWithCount(expected, 1));
                 }
-            }
-        }
-
-        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
-            ItemStack expected = upgradeItems[slot];
-            ItemStack current = node.getUpgradeItem(slot);
-
-            if (expected.isEmpty()) {
-                node.setUpgradeItem(slot, ItemStack.EMPTY);
-            } else if (!ItemStackCompat.isSameItemSameComponents(expected, current)) {
-                node.setUpgradeItem(slot, ItemStackCompat.copyWithCount(expected, 1));
             }
         }
 
