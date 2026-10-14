@@ -10,6 +10,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import me.almana.logisticsnetworks.network.payload.IPayloadContext;
 
+import java.util.ArrayList;
+
 public class ClientPayloadHandler {
 
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -44,7 +46,7 @@ public class ClientPayloadHandler {
         context.enqueueWork(() -> {
             var screen = Minecraft.getInstance().screen;
             if (screen instanceof NodeScreen nodeScreen) {
-                nodeScreen.receiveNetworkLabels(payload.labels());
+                nodeScreen.receiveNetworkLabels(new ArrayList<>(payload.labels().keySet()));
             }
         });
     }

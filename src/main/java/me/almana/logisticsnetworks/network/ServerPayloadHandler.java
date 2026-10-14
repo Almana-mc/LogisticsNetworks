@@ -44,10 +44,9 @@ import me.almana.logisticsnetworks.network.payload.IPayloadContext;
 import me.almana.logisticsnetworks.network.SetFilterChemicalEntryPayload;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
@@ -194,6 +193,8 @@ public class ServerPayloadHandler {
             if (player.containerMenu instanceof NodeMenu menu) {
                 menu.sendNetworkListToClient(player);
             }
+            if (oldNetworkId != null) GraphPayloadHandler.broadcast(player.getServer(), oldNetworkId);
+            GraphPayloadHandler.broadcast(player.getServer(), targetNetwork.getId());
         });
     }
 
@@ -247,6 +248,7 @@ public class ServerPayloadHandler {
             if (player.containerMenu instanceof NodeMenu menu) {
                 menu.sendNetworkListToClient(player);
             }
+            GraphPayloadHandler.broadcast(player.getServer(), network.getId());
         });
     }
 
@@ -568,9 +570,10 @@ public class ServerPayloadHandler {
         return node.isOwnedBy(context.player()) ? node : null;
     }
 
-    private static void invalidateNetwork(LogisticsNodeEntity node) {
+    public static void invalidateNetwork(LogisticsNodeEntity node) {
         if (node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
             NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
+            GraphPayloadHandler.broadcast(level.getServer(), node.getNetworkId());
         }
     }
 
@@ -1007,23 +1010,20 @@ public class ServerPayloadHandler {
             if (network == null || !canAccessNetwork(player, network))
                 return;
 
-            Set<String> labels = new LinkedHashSet<>();
-            for (UUID nodeId : network.getNodeUuids()) {
-                for (ServerLevel level : player.getServer().getAllLevels()) {
-                    Entity entity = level.getEntity(nodeId);
-                    if (entity instanceof LogisticsNodeEntity node) {
-                        String label = node.getNodeLabel();
-                        if (!label.isEmpty()) {
-                            labels.add(label);
-                        }
-                        break;
-                    }
-                }
-            }
-
-            NetworkHandler.sendToPlayer(player,
-                    new SyncNetworkLabelsPayload(new ArrayList<>(labels)));
+            sendNetworkLabels(player, network);
         });
+    }
+
+    private static void sendNetworkLabels(ServerPlayer player, LogisticsNetwork network) {
+        Map<String, Integer> labels = new LinkedHashMap<>();
+        network.getLabelNames().forEach(label -> labels.put(label, 0));
+        for (UUID nodeId : network.getNodeUuids()) {
+            LogisticsNodeEntity node = findNode(player, nodeId);
+            if (node != null && !node.getNodeLabel().isEmpty()) {
+                labels.merge(node.getNodeLabel(), 1, Integer::sum);
+            }
+        }
+        NetworkHandler.sendToPlayer(player, new SyncNetworkLabelsPayload(labels));
     }
 
     public static void propagateToLabelGroup(LogisticsNodeEntity sourceNode, int channelIndex) {
@@ -1164,6 +1164,18 @@ public class ServerPayloadHandler {
                     && menu.getNode().getUUID().equals(node.getUUID())) {
                 NetworkHandler.sendToPlayer(player,
                         new SyncChannelDataPayload(node.getId(), channelIndex, tag));
+            }
+        }
+    }
+
+    public static void refreshNodeViewers(MinecraftServer server, UUID networkId) {
+        LogisticsNetwork network = NetworkRegistry.get(server.overworld()).getNetwork(networkId);
+        if (network == null) return;
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.containerMenu instanceof NodeMenu menu && menu.getNode() != null
+                    && networkId.equals(menu.getNode().getNetworkId()) && canAccessNetwork(player, network)) {
+                sendNetworkLabels(player, network);
+                NodeMenu.sendAvailableNetworkListToClient(player);
             }
         }
     }
