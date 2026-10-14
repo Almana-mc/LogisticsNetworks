@@ -224,6 +224,30 @@ public final class FilterItemData {
         });
     }
 
+    public static boolean addItem(ItemStack filter, ItemStack item, @Nullable HolderLookup.Provider provider) {
+        if (!isFilterItem(filter) || item.isEmpty() || provider == null)
+            return false;
+        ItemStack entry = ItemStackCompat.copyWithCount(item, 1);
+        int cap = getCapacity(filter);
+        for (int i = 0; i < cap; i++) {
+            if (ItemStack.isSameItemSameTags(getEntry(filter, i, provider), entry))
+                return false;
+        }
+        for (int i = 0; i < cap; i++) {
+            if (isEntrySlotAvailable(filter, i, provider)) {
+                setEntry(filter, i, entry, provider);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isEntrySlotAvailable(ItemStack filter, int slot, HolderLookup.Provider provider) {
+        return getEntry(filter, slot, provider).isEmpty() && getFluidEntry(filter, slot).isEmpty()
+                && getChemicalEntry(filter, slot) == null && getEntryTag(filter, slot) == null
+                && getEntrySlotMapping(filter, slot) == null && !isNbtOnlySlot(filter, slot);
+    }
+
     public static void clearEntryItem(ItemStack stack, int slot) {
         if (!isFilterItem(stack)) return;
         if (slot < 0 || slot >= getCapacity(stack)) return;

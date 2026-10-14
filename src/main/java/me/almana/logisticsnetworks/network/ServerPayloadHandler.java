@@ -501,6 +501,38 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleAddNodeFilterItem(AddNodeFilterItemPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            if (node == null)
+                return;
+            ChannelData channel = node.getChannel(payload.channel());
+            int fs = payload.filterSlot();
+            ItemStack item = payload.item();
+            if (channel == null || fs < 0 || fs >= ChannelData.FILTER_SIZE || item.isEmpty()
+                    || item.is(ModTags.FILTERS))
+                return;
+            FilterTargetType desired = FilterTargetType.forChannel(channel.getType());
+            if (desired == null)
+                return;
+
+            ItemStack filter = channel.getFilterItem(fs);
+            if (filter.isEmpty()) {
+                filter = VirtualFilterType.SMALL.createStack();
+                FilterItemData.setTargetType(filter, desired);
+            } else if (!FilterItemData.isFilterItem(filter)) {
+                return;
+            } else {
+                filter = filter.copy();
+            }
+            if (!FilterItemData.addItem(filter, item, node.level().registryAccess()))
+                return;
+            channel.setFilterItem(fs, filter);
+            propagateToLabelGroup(node, payload.channel());
+            invalidateNetwork(node);
+        });
+    }
+
     public static void handleModifyFilterMod(ModifyFilterModPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             Player player = (Player) context.player();
@@ -700,45 +732,97 @@ public class ServerPayloadHandler {
             if (!(context.player() instanceof ServerPlayer serverPlayer))
                 return;
 
-            Entity entity = serverPlayer.level().getEntity(payload.entityId());
-            if (!(entity instanceof LogisticsNodeEntity node) || !node.isOwnedBy(serverPlayer))
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            if (node == null)
                 return;
 
-            int channel = payload.channel();
-            int filterSlot = payload.filterSlot();
-            if (channel < 0 || channel >= 9 || filterSlot < 0 || filterSlot >= 9)
+            int ch = payload.channel();
+            int fs = payload.filterSlot();
+            if (ch < 0 || ch >= LogisticsNodeEntity.CHANNEL_COUNT || fs < 0 || fs >= ChannelData.FILTER_SIZE)
+                return;
+            FilterTargetType desired = FilterTargetType.forChannel(node.getChannel(ch).getType());
+            if (desired == null)
                 return;
 
-            ItemStack stack = node.getChannel(channel).getFilterItem(filterSlot);
-            if (stack.isEmpty() || !stack.is(ModTags.FILTERS))
+            ItemStack stack = prepareNodeFilter(node, ch, fs, payload.requestedType(), desired);
+            openNodeFilterMenu(serverPlayer, node, ch, fs, stack);
+        });
+    }
+
+    // Conjure a filter when needed
+    private static ItemStack prepareNodeFilter(LogisticsNodeEntity node, int ch, int fs,
+            VirtualFilterType requested, FilterTargetType desired) {
+        ChannelData channel = node.getChannel(ch);
+        ItemStack stack = channel.getFilterItem(fs);
+        boolean fresh = requested != VirtualFilterType.EXISTING || stack.isEmpty()
+                || !stack.is(ModTags.FILTERS) || currentTarget(stack) != desired;
+        if (!fresh)
+            return stack;
+
+        VirtualFilterType role = requested != VirtualFilterType.EXISTING
+                ? requested
+                : (stack.isEmpty() ? VirtualFilterType.SMALL : VirtualFilterType.fromStack(stack));
+        ItemStack created = role.createStack();
+        applyTarget(created, desired);
+        channel.setFilterItem(fs, created);
+        sendChannelSyncToViewers(node, ch, channel);
+        propagateToLabelGroup(node, ch);
+        invalidateNetwork(node);
+        return channel.getFilterItem(fs);
+    }
+
+    private static void openNodeFilterMenu(ServerPlayer player, LogisticsNodeEntity node, int ch, int fs,
+            ItemStack stack) {
+        VirtualFilterType type = VirtualFilterType.fromStack(stack);
+        boolean isMod = type == VirtualFilterType.MOD;
+        boolean isName = type == VirtualFilterType.NAME;
+        int slotCount = type.isSpecial() ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
+
+        NetworkHooks.openScreen(player, new SimpleMenuProvider(
+                (id, inv, p) -> new FilterMenu(id, inv, node, ch, fs),
+                stack.getHoverName()), buf -> {
+                    buf.writeVarInt(-2);
+                    buf.writeVarInt(node.getId());
+                    buf.writeVarInt(ch);
+                    buf.writeVarInt(fs);
+                    buf.writeVarInt(slotCount);
+                    writeFilterModes(buf, isMod, isName);
+                });
+    }
+
+    private static FilterTargetType currentTarget(ItemStack stack) {
+        if (FilterItemData.isFilterItem(stack)) {
+            return FilterItemData.getTargetType(stack);
+        }
+        if (NameFilterData.isNameFilter(stack)) {
+            return NameFilterData.getTargetType(stack);
+        }
+        if (ModFilterData.isModFilter(stack)) {
+            return ModFilterData.getTargetType(stack);
+        }
+        return FilterTargetType.ITEMS;
+    }
+
+    private static void applyTarget(ItemStack stack, FilterTargetType target) {
+        if (FilterItemData.isFilterItem(stack)) {
+            FilterItemData.setTargetType(stack, target);
+        } else if (NameFilterData.isNameFilter(stack)) {
+            NameFilterData.setTargetType(stack, target);
+        } else if (ModFilterData.isModFilter(stack)) {
+            ModFilterData.setTargetType(stack, target);
+        }
+    }
+
+    public static void handleOpenNodeMenu(OpenNodeMenuPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player))
                 return;
-
-            boolean isTag = stack.getItem() instanceof TagFilterItem;
-            boolean isAmount = stack.getItem() instanceof AmountFilterItem;
-            boolean isNbt = stack.getItem() instanceof NbtFilterItem;
-            boolean isDurability = stack.getItem() instanceof DurabilityFilterItem;
-            boolean isMod = stack.getItem() instanceof ModFilterItem;
-            boolean isSlot = stack.getItem() instanceof SlotFilterItem;
-            boolean isName = stack.getItem() instanceof NameFilterItem;
-            boolean isSpecial = isTag || isAmount || isNbt || isDurability || isMod || isSlot || isName;
-            int slotCount = isSpecial ? 0 : Math.max(1, FilterItemData.getCapacity(stack));
-
-            NetworkHooks.openScreen(serverPlayer, new SimpleMenuProvider(
-                    (id, inv, p) -> new FilterMenu(id, inv, node, channel, filterSlot),
-                    stack.getHoverName()), buf -> {
-                        buf.writeVarInt(-2);
-                        buf.writeVarInt(node.getId());
-                        buf.writeVarInt(channel);
-                        buf.writeVarInt(filterSlot);
-                        buf.writeVarInt(slotCount);
-                        buf.writeBoolean(isTag);
-                        buf.writeBoolean(isAmount);
-                        buf.writeBoolean(isNbt);
-                        buf.writeBoolean(isDurability);
-                        buf.writeBoolean(isMod);
-                        buf.writeBoolean(isSlot);
-                        buf.writeBoolean(isName);
-                    });
+            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
+            if (node == null)
+                return;
+            int selectedChannel = Math.max(0,
+                    Math.min(LogisticsNodeEntity.CHANNEL_COUNT - 1, payload.selectedChannel()));
+            NodeMenu.open(player, node, selectedChannel, false);
         });
     }
 

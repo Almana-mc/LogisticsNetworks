@@ -79,6 +79,8 @@ public final class NetworkHandler {
         registerServer(DeleteNetworkPayload.class, DeleteNetworkPayload.STREAM_CODEC, ServerPayloadHandler::handleDeleteNetwork);
         registerServer(SetDefaultNodeVisibilityPayload.class, SetDefaultNodeVisibilityPayload.STREAM_CODEC, ServerPayloadHandler::handleSetDefaultNodeVisibility);
         registerServer(DeleteNetworkLabelPayload.class, DeleteNetworkLabelPayload.STREAM_CODEC, ServerPayloadHandler::handleDeleteNetworkLabel);
+        registerServer(AddNodeFilterItemPayload.class, AddNodeFilterItemPayload.STREAM_CODEC, ServerPayloadHandler::handleAddNodeFilterItem);
+        registerServer(OpenNodeMenuPayload.class, OpenNodeMenuPayload.STREAM_CODEC, ServerPayloadHandler::handleOpenNodeMenu);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {
