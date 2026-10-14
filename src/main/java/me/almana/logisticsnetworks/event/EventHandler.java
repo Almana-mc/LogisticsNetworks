@@ -56,6 +56,7 @@ import java.util.UUID;
 public class EventHandler {
 
     private static final Set<LogisticsNodeEntity> PENDING_LOAD_SYNC = new LinkedHashSet<>();
+    private static final Set<LogisticsNodeEntity> PENDING_FILTER_EJECT = new LinkedHashSet<>();
 
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
@@ -63,6 +64,8 @@ public class EventHandler {
             return;
         if (!(event.getLevel() instanceof ServerLevel serverLevel))
             return;
+        if (node.hasPendingFilterEjects())
+            PENDING_FILTER_EJECT.add(node);
 
         UUID networkId = node.getNetworkId();
         if (networkId != null) {
@@ -85,21 +88,32 @@ public class EventHandler {
     // Join event cannot move items
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || PENDING_LOAD_SYNC.isEmpty())
+        if (event.phase != TickEvent.Phase.END)
             return;
-        List<LogisticsNodeEntity> pending = new ArrayList<>(PENDING_LOAD_SYNC);
-        PENDING_LOAD_SYNC.clear();
+        for (LogisticsNodeEntity node : drainLive(PENDING_FILTER_EJECT)) {
+            node.ejectPendingFilters();
+        }
+        for (LogisticsNodeEntity node : drainLive(PENDING_LOAD_SYNC)) {
+            LabelUpgradeSync.synchronizeOnLoad(node);
+        }
+    }
+
+    private static List<LogisticsNodeEntity> drainLive(Set<LogisticsNodeEntity> pending) {
+        List<LogisticsNodeEntity> live = new ArrayList<>();
         for (LogisticsNodeEntity node : pending) {
             if (!node.isRemoved() && node.level() instanceof ServerLevel level
                     && level.getEntity(node.getUUID()) == node) {
-                LabelUpgradeSync.synchronizeOnLoad(node);
+                live.add(node);
             }
         }
+        pending.clear();
+        return live;
     }
 
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
         PENDING_LOAD_SYNC.clear();
+        PENDING_FILTER_EJECT.clear();
     }
 
     @SubscribeEvent

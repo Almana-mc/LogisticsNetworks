@@ -83,11 +83,11 @@ public class Registration {
                         () -> new WrenchItem(new Item.Properties().stacksTo(1)));
 
         public static final RegistryObject<BaseFilterItem> SMALL_FILTER = ITEMS.register("small_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 9));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
         public static final RegistryObject<BaseFilterItem> MEDIUM_FILTER = ITEMS.register("medium_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 18));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
         public static final RegistryObject<BaseFilterItem> BIG_FILTER = ITEMS.register("big_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 27));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
 
         public static final RegistryObject<TagFilterItem> TAG_FILTER = ITEMS.register("tag_filter",
                         () -> new TagFilterItem(new Item.Properties()));

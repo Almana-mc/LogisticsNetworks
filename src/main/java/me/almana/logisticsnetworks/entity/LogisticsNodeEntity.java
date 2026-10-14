@@ -35,7 +35,9 @@ import com.mojang.logging.LogUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -62,6 +64,7 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_NODE_LABEL = "NodeLabel";
     private static final String KEY_LABEL_REVISION = "LabelRevision";
     private static final String KEY_HIGHLIGHTED = "Highlighted";
+    private static final String KEY_PENDING_FILTER_EJECTS = "PendingFilterEjects";
 
     private static final EntityDataAccessor<BlockPos> ATTACHED_POS = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -85,6 +88,7 @@ public class LogisticsNodeEntity extends Entity {
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
     private long labelRevision;
+    private final List<ItemStack> pendingFilterEjects = new ArrayList<>();
 
     private final long[] channelCooldowns = new long[CHANNEL_COUNT];
     private final float[] backoffTicks = new float[CHANNEL_COUNT];
@@ -153,12 +157,15 @@ public class LogisticsNodeEntity extends Entity {
 
         HolderLookup.Provider provider = this.level().registryAccess();
 
+        loadPendingFilterEjects(compound, provider);
+
         if (compound.contains(KEY_CHANNELS)) {
             CompoundTag channelsTag = compound.getCompound(KEY_CHANNELS);
             for (int i = 0; i < CHANNEL_COUNT; i++) {
                 String key = KEY_CHANNEL_PREFIX + i;
                 if (channelsTag.contains(key)) {
                     this.channels[i].load(channelsTag.getCompound(key), provider);
+                    pendingFilterEjects.addAll(this.channels[i].takeEjectedFilters());
                 }
             }
         }
@@ -211,6 +218,7 @@ public class LogisticsNodeEntity extends Entity {
             channelsTag.put(KEY_CHANNEL_PREFIX + i, this.channels[i].save(provider));
         }
         compound.put(KEY_CHANNELS, channelsTag);
+        savePendingFilterEjects(compound, provider);
 
         ListTag upgradesTag = new ListTag();
         for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
@@ -468,6 +476,40 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setBackoffTicks(int channelIndex, float value) {
         backoffTicks[channelIndex] = value;
+    }
+
+    private void loadPendingFilterEjects(CompoundTag compound, HolderLookup.Provider provider) {
+        pendingFilterEjects.clear();
+        for (Tag tag : compound.getList(KEY_PENDING_FILTER_EJECTS, Tag.TAG_COMPOUND)) {
+            if (tag instanceof CompoundTag entry) {
+                ItemStack stack = ItemStackCompat.parseOptional(provider, entry);
+                if (!stack.isEmpty())
+                    pendingFilterEjects.add(stack);
+            }
+        }
+    }
+
+    // Kept if unloaded before eject
+    private void savePendingFilterEjects(CompoundTag compound, HolderLookup.Provider provider) {
+        if (pendingFilterEjects.isEmpty())
+            return;
+        ListTag ejectsTag = new ListTag();
+        for (ItemStack stack : pendingFilterEjects) {
+            ejectsTag.add(ItemStackCompat.save(stack, provider));
+        }
+        compound.put(KEY_PENDING_FILTER_EJECTS, ejectsTag);
+    }
+
+    public boolean hasPendingFilterEjects() {
+        return !pendingFilterEjects.isEmpty();
+    }
+
+    public void ejectPendingFilters() {
+        for (ItemStack stack : pendingFilterEjects) {
+            LOGGER.info("Ejected filter {} from logistics node {} at {}", stack, getUUID(), getAttachedPos());
+            spawnAtLocation(stack);
+        }
+        pendingFilterEjects.clear();
     }
 
     public void dropUpgrades() {

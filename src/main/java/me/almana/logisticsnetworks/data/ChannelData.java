@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.data;
 
 import me.almana.logisticsnetworks.logic.ChannelTelemetry;
 import me.almana.logisticsnetworks.logic.PriorityRobin;
+import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import net.minecraft.core.Direction;
@@ -12,11 +13,13 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class ChannelData {
 
-    public static final int FILTER_SIZE = 9;
+    public static final int FILTER_SIZE = 6;
     private static final String KEY_ENABLED = "Enabled";
     private static final String KEY_MODE = "Mode";
     private static final String KEY_TYPE = "Type";
@@ -45,6 +48,7 @@ public class ChannelData {
     private final transient ChannelTelemetry telemetry = new ChannelTelemetry();
     private transient PriorityRobin.Cursor robinCursor;
     private final ItemStack[] filterItems = new ItemStack[FILTER_SIZE];
+    private final transient List<ItemStack> ejectedFilters = new ArrayList<>();
 
     public ChannelData() {
         this(false);
@@ -123,19 +127,58 @@ public class ChannelData {
         name = tag.contains(KEY_NAME) ? tag.getString(KEY_NAME) : "";
 
         Arrays.fill(filterItems, ItemStack.EMPTY);
+        ejectedFilters.clear();
+        List<ItemStack> overflow = new ArrayList<>();
         if (provider != null && tag.contains(KEY_FILTERS, Tag.TAG_LIST)) {
             ListTag list = tag.getList(KEY_FILTERS, Tag.TAG_COMPOUND);
             for (Tag t : list) {
                 if (t instanceof CompoundTag ct) {
-                    int slot = ct.getInt("Slot");
-                    if (slot >= 0 && slot < FILTER_SIZE) {
-                        filterItems[slot] = ItemStackCompat.parseOptional(provider, ct.getCompound("Item"));
-                    }
+                    placeFilter(ct.getInt("Slot"), ItemStackCompat.parseOptional(provider, ct.getCompound("Item")),
+                            overflow);
                 }
             }
         } else if (provider != null && tag.contains("FilterItem", Tag.TAG_COMPOUND)) {
-            filterItems[0] = ItemStackCompat.parseOptional(provider, tag.getCompound("FilterItem"));
+            placeFilter(0, ItemStackCompat.parseOptional(provider, tag.getCompound("FilterItem")), overflow);
         }
+        placeOverflowFilters(overflow);
+    }
+
+    private void placeFilter(int slot, ItemStack stack, List<ItemStack> overflow) {
+        if (slot < 0 || stack.isEmpty())
+            return;
+        if (isRetiredFilter(stack)) {
+            ejectedFilters.add(stack);
+        } else if (slot < FILTER_SIZE) {
+            filterItems[slot] = stack;
+        } else {
+            overflow.add(stack);
+        }
+    }
+
+    // Relocate legacy overflow filters
+    private void placeOverflowFilters(List<ItemStack> overflow) {
+        int next = 0;
+        for (ItemStack stack : overflow) {
+            while (next < FILTER_SIZE && !filterItems[next].isEmpty())
+                next++;
+            if (next < FILTER_SIZE) {
+                filterItems[next++] = stack;
+            } else {
+                ejectedFilters.add(stack);
+            }
+        }
+    }
+
+    private static boolean isRetiredFilter(ItemStack stack) {
+        return stack.is(Registration.TAG_FILTER.get()) || stack.is(Registration.AMOUNT_FILTER.get())
+                || stack.is(Registration.DURABILITY_FILTER.get()) || stack.is(Registration.NBT_FILTER.get())
+                || stack.is(Registration.SLOT_FILTER.get());
+    }
+
+    public List<ItemStack> takeEjectedFilters() {
+        List<ItemStack> taken = new ArrayList<>(ejectedFilters);
+        ejectedFilters.clear();
+        return taken;
     }
 
     private <E extends Enum<E>> E getEnum(CompoundTag tag, String key, Class<E> enumClass, E defaultValue) {
