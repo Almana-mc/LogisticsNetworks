@@ -21,11 +21,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
@@ -175,69 +176,80 @@ public class TransferEngine {
             boolean hasPerEntryAmounts) {
     }
 
+    private record NetworkContext(
+            List<LogisticsNodeEntity> sortedNodes,
+            Map<UUID, Integer> signalCache,
+            List<ImportTarget>[] itemImports,
+            List<ImportTarget>[] fluidImports,
+            List<ImportTarget>[] energyImports,
+            List<ImportTarget>[] chemicalImports,
+            List<ImportTarget>[] sourceImports,
+            Map<UUID, Boolean> dimensionalCache,
+            Map<UUID, Integer> tierCache) {
+    }
+
     public static long processNetwork(LogisticsNetwork network, MinecraftServer server) {
         if (network == null || server == null)
             return Long.MAX_VALUE;
 
+        NetworkContext context = prepareNetwork(network, server);
+        if (context == null)
+            return Long.MAX_VALUE;
+
         NetworkRegistry registry = NetworkRegistry.get((ServerLevel) server.overworld());
-        if (network.isCacheDirty()) {
-            network.rebuildCache(registry);
-            network.clearCacheDirty();
-        }
-
-        Set<UUID> nodeUuids = network.getNodeUuids();
-        if (nodeUuids.isEmpty())
-            return Long.MAX_VALUE;
-
-        // Deterministic order
-        List<UUID> sortedUuids = new ArrayList<>(nodeUuids);
-        sortedUuids.sort(Comparator.comparingLong(UUID::getMostSignificantBits)
-                .thenComparingLong(UUID::getLeastSignificantBits));
-
-        // Cache nodes and upgrades
-        List<LogisticsNodeEntity> sortedNodes = new ArrayList<>(sortedUuids.size());
-        Map<UUID, Boolean> dimensionalCache = new HashMap<>(sortedUuids.size());
-        Map<UUID, Integer> tierCache = new HashMap<>(sortedUuids.size());
-        Map<UUID, LogisticsNodeEntity> nodeCache = new HashMap<>(sortedUuids.size());
-
-        for (UUID nodeId : sortedUuids) {
-            LogisticsNodeEntity node = findNode(server, nodeId);
-            if (node != null && node.isValidNode()) {
-                sortedNodes.add(node);
-                dimensionalCache.put(node.getUUID(), NodeUpgradeData.hasDimensionalUpgrade(node));
-                tierCache.put(node.getUUID(), NodeUpgradeData.getUpgradeTier(node));
-                nodeCache.put(node.getUUID(), node);
-            } else if (Config.debugMode) {
-                LOGGER.debug("Node {} missing from world, skipping.", nodeId);
-            }
-        }
-
-        if (sortedNodes.isEmpty())
-            return Long.MAX_VALUE;
-
-        Map<UUID, Integer> signalCache = buildSignalCache(sortedNodes);
-        if (signalCache.isEmpty())
-            return Long.MAX_VALUE;
-
-        List<ImportTarget>[] itemImports = resolveCache(network.getItemImports(), nodeCache, signalCache);
-        List<ImportTarget>[] fluidImports = resolveCache(network.getFluidImports(), nodeCache, signalCache);
-        List<ImportTarget>[] energyImports = resolveCache(network.getEnergyImports(), nodeCache, signalCache);
-        List<ImportTarget>[] chemicalImports = resolveCache(network.getChemicalImports(), nodeCache, signalCache);
-        List<ImportTarget>[] sourceImports = resolveCache(network.getSourceImports(), nodeCache, signalCache);
-
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
         CapCache capCache = new CapCache();
 
         long minWakeDelta = Long.MAX_VALUE;
-        for (LogisticsNodeEntity sourceNode : sortedNodes) {
-            long delta = processNode(sourceNode, itemImports, fluidImports, energyImports, chemicalImports,
-                    sourceImports, signalCache, dimensionalCache, tierCache, telemetryActive, capCache);
+        for (LogisticsNodeEntity sourceNode : context.sortedNodes()) {
+            long delta = processNode(sourceNode, context.itemImports(), context.fluidImports(),
+                    context.energyImports(), context.chemicalImports(), context.sourceImports(),
+                    context.signalCache(), context.dimensionalCache(), context.tierCache(),
+                    telemetryActive, capCache);
             if (delta < minWakeDelta) {
                 minWakeDelta = delta;
             }
         }
 
         return minWakeDelta;
+    }
+
+    @Nullable
+    private static NetworkContext prepareNetwork(LogisticsNetwork network, MinecraftServer server) {
+        if (network.isCacheDirty()) {
+            network.rebuildCache(NetworkRegistry.get((ServerLevel) server.overworld()));
+            network.clearCacheDirty();
+        }
+
+        List<UUID> sortedUuids = network.getSortedUuids();
+        if (sortedUuids.isEmpty())
+            return null;
+
+        List<LogisticsNodeEntity> sortedNodes = new ArrayList<>(sortedUuids.size());
+        Map<UUID, LogisticsNodeEntity> nodeCache = new HashMap<>(sortedUuids.size());
+        for (UUID nodeId : sortedUuids) {
+            LogisticsNodeEntity node = findNode(server, nodeId, network.getNodeDimension(nodeId));
+            if (node != null && node.isValidNode()) {
+                sortedNodes.add(node);
+                nodeCache.put(node.getUUID(), node);
+            } else if (Config.debugMode) {
+                LOGGER.debug("Node {} missing from world, skipping.", nodeId);
+            }
+        }
+        if (sortedNodes.isEmpty())
+            return null;
+
+        Map<UUID, Integer> signalCache = buildSignalCache(sortedNodes);
+        if (signalCache.isEmpty())
+            return null;
+
+        return new NetworkContext(sortedNodes, signalCache,
+                resolveCache(network.getItemImports(), nodeCache, signalCache),
+                resolveCache(network.getFluidImports(), nodeCache, signalCache),
+                resolveCache(network.getEnergyImports(), nodeCache, signalCache),
+                resolveCache(network.getChemicalImports(), nodeCache, signalCache),
+                resolveCache(network.getSourceImports(), nodeCache, signalCache),
+                network.getDimensionalCache(), network.getTierCache());
     }
 
     private static Map<UUID, Integer> buildSignalCache(List<LogisticsNodeEntity> nodes) {
@@ -274,13 +286,36 @@ public class TransferEngine {
         return hasAnyExporter ? signalCache : Collections.emptyMap();
     }
 
+    private static final List<ImportTarget>[] EMPTY_RESOLVED = createEmptyResolved();
+
+    @SuppressWarnings("unchecked")
+    private static List<ImportTarget>[] createEmptyResolved() {
+        List<ImportTarget>[] arr = new List[9];
+        Arrays.fill(arr, Collections.emptyList());
+        return arr;
+    }
+
     @SuppressWarnings("unchecked")
     private static List<ImportTarget>[] resolveCache(List<NodeRef>[] cache,
             Map<UUID, LogisticsNodeEntity> nodeCache,
             Map<UUID, Integer> signalCache) {
+        boolean anyNonEmpty = false;
+        for (int i = 0; i < 9; i++) {
+            if (!cache[i].isEmpty()) {
+                anyNonEmpty = true;
+                break;
+            }
+        }
+        if (!anyNonEmpty)
+            return EMPTY_RESOLVED;
+
         List<ImportTarget>[] resolved = new List[9];
         for (int i = 0; i < 9; i++) {
             List<NodeRef> cachedNodes = cache[i];
+            if (cachedNodes.isEmpty()) {
+                resolved[i] = Collections.emptyList();
+                continue;
+            }
             List<ImportTarget> targets = new ArrayList<>(cachedNodes.size());
             for (NodeRef ref : cachedNodes) {
                 LogisticsNodeEntity node = nodeCache.get(ref.nodeId());
@@ -438,26 +473,21 @@ public class TransferEngine {
             return targets;
 
         switch (exportChannel.getDistributionMode()) {
-            case PRIORITY, ROUND_ROBIN -> {
-                targets.sort((a, b) -> Integer.compare(b.channel.getPriority(), a.channel.getPriority()));
-                return targets;
-            }
             case NEAREST_FIRST -> {
                 double sx = sourceNode.getX(), sy = sourceNode.getY(), sz = sourceNode.getZ();
-                targets.sort(Comparator.comparingDouble(t -> t.node.distanceToSqr(sx, sy, sz)));
-                return targets;
+                List<ImportTarget> sorted = new ArrayList<>(targets);
+                sorted.sort(Comparator.comparingDouble(t -> t.node.distanceToSqr(sx, sy, sz)));
+                return sorted;
             }
             case FARTHEST_FIRST -> {
                 double sx = sourceNode.getX(), sy = sourceNode.getY(), sz = sourceNode.getZ();
-                targets.sort(
+                List<ImportTarget> sorted = new ArrayList<>(targets);
+                sorted.sort(
                         (a, b) -> Double.compare(b.node.distanceToSqr(sx, sy, sz), a.node.distanceToSqr(sx, sy, sz)));
-                return targets;
+                return sorted;
             }
             case PRIORITY_ROBIN -> {
-                List<ImportTarget> sorted = new ArrayList<>(targets);
-                sorted.sort(Comparator.comparingInt((ImportTarget t) -> t.channel.getPriority()).reversed()
-                        .thenComparing(t -> t.node.getUUID()));
-                return PriorityRobin.rotate(sorted, exportChannel.getRobinCursor(),
+                return PriorityRobin.rotate(targets, exportChannel.getRobinCursor(),
                         t -> t.channel.getPriority(), t -> t.node.getUUID());
             }
             default -> {
@@ -1505,10 +1535,16 @@ public class TransferEngine {
         return space > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) space;
     }
 
-    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
+    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,
+            @Nullable ResourceKey<Level> cachedDim) {
+        if (cachedDim != null) {
+            ServerLevel level = server.getLevel(cachedDim);
+            if (level == null)
+                return null;
+            return level.getEntity(nodeId) instanceof LogisticsNodeEntity node ? node : null;
+        }
         for (ServerLevel level : server.getAllLevels()) {
-            Entity entity = level.getEntity(nodeId);
-            if (entity instanceof LogisticsNodeEntity node)
+            if (level.getEntity(nodeId) instanceof LogisticsNodeEntity node)
                 return node;
         }
         return null;
