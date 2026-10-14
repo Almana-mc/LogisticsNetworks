@@ -290,8 +290,8 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public static void sendOpenedStackIfDeferred(ServerPlayer player, ItemStack stack, boolean inline) {
-        if (!inline && player.containerMenu instanceof FilterMenu)
-            NetworkHandler.sendToPlayer(player, new SyncOpenFilterPayload(stack));
+        if (!inline && player.containerMenu instanceof FilterMenu menu)
+            NetworkHandler.sendToPlayer(player, new SyncOpenFilterPayload(menu.containerId, stack));
     }
 
     private static ItemStack readOpenedStack(FriendlyByteBuf buf) {
@@ -1295,7 +1295,7 @@ public class FilterMenu extends AbstractContainerMenu {
     @Override
     public boolean stillValid(Player player) {
         if (nodeSource != null)
-            return nodeSource.isAlive();
+            return nodeSource.isAlive() && (player.level().isClientSide() || nodeSource.isOwnedBy(player));
         if (clipboardSource != null) {
             ItemStack wrench = hand == InteractionHand.OFF_HAND
                     ? player.getOffhandItem()

@@ -24,10 +24,12 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -199,25 +201,6 @@ public final class FilterItemData {
         return edit(stack, slot, entry -> resourceEntry(entry, id, null));
     }
 
-    public static boolean addFluid(ItemStack filter, FluidStack fluid) {
-        if (!isFilterItem(filter) || fluid == null || fluid.isEmpty()) {
-            return false;
-        }
-        int cap = getCapacity(filter);
-        for (int i = 0; i < cap; i++) {
-            FluidStack existing = getFluidEntry(filter, i);
-            if (!existing.isEmpty() && existing.isFluidEqual(fluid)) {
-                return false;
-            }
-        }
-        for (int i = 0; i < cap; i++) {
-            if (isEntrySlotAvailable(filter, i)) {
-                return setFluidEntry(filter, i, fluid);
-            }
-        }
-        return false;
-    }
-
     public static boolean hasAnyEntries(ItemStack stack) {
         return !entries(stack).isEmpty();
     }
@@ -230,31 +213,6 @@ public final class FilterItemData {
 
     public static int getEntryCount(ItemStack stack) {
         return entries(stack).size();
-    }
-
-    public static boolean containsItem(ItemStack filter, ItemStack candidate) {
-        int cap = getCapacity(filter);
-        for (int i = 0; i < cap; i++) {
-            ItemStack entry = getEntry(filter, i);
-            if (!entry.isEmpty() && ItemStack.isSameItem(entry, candidate)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static boolean containsFluid(ItemStack filter, FluidStack candidate) {
-        if (!isFilterItem(filter) || candidate.isEmpty())
-            return false;
-
-        int cap = getCapacity(filter);
-        for (int i = 0; i < cap; i++) {
-            FluidStack entry = getFluidEntry(filter, i);
-            if (!entry.isEmpty() && entry.isFluidEqual(candidate)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Nullable
@@ -277,53 +235,68 @@ public final class FilterItemData {
                 GeneralFilterEntry.SlotMapping.EMPTY, GeneralFilterEntry.NbtConstraints.EMPTY);
     }
 
-    public static boolean addChemical(ItemStack filter, String chemicalId) {
-        if (!isFilterItem(filter) || chemicalId == null || chemicalId.isBlank()) {
-            return false;
-        }
-        int cap = getCapacity(filter);
-        for (int i = 0; i < cap; i++) {
-            if (chemicalId.equals(getChemicalEntry(filter, i))) {
-                return false;
-            }
-        }
-        for (int i = 0; i < cap; i++) {
-            if (isEntrySlotAvailable(filter, i)) {
-                return setChemicalEntry(filter, i, chemicalId);
-            }
-        }
-        return false;
-    }
-
-    public static boolean containsChemical(ItemStack filter, String chemicalId) {
-        if (!isFilterItem(filter) || chemicalId == null || chemicalId.isEmpty())
-            return false;
-
-        int cap = getCapacity(filter);
-        for (int i = 0; i < cap; i++) {
-            String entry = getChemicalEntry(filter, i);
-            if (entry != null && entry.equals(chemicalId)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static boolean isEntrySlotAvailable(ItemStack filter, int slot) {
-        GeneralFilterEntry entry = entry(filter, slot);
+        return isFree(entry(filter, slot));
+    }
+
+    private static boolean isFree(@Nullable GeneralFilterEntry entry) {
         return entry == null || (entry.item() == null && nonEmpty(entry.fluidId()) == null
                 && nonEmpty(entry.chemicalId()) == null && FilterTagUtil.normalizeTag(entry.tag()) == null
                 && entry.slotMapping().slots().isEmpty() && !isNbtOnly(entry));
     }
 
-    public static boolean hasAvailableEntrySlot(ItemStack filter) {
+    public record BulkAdd(int added, boolean full) {
+    }
+
+    // Decode once, save once
+    public static BulkAdd addAll(ItemStack filter, List<GeneralFilterEntry> candidates) {
+        if (!isFilterItem(filter))
+            return new BulkAdd(0, false);
+        List<GeneralFilterEntry> entries = new ArrayList<>(entries(filter));
+        Set<String> known = new HashSet<>();
+        entries.forEach(entry -> known.add(resourceKey(entry)));
         int cap = getCapacity(filter);
-        for (int i = 0; i < cap; i++) {
-            if (isEntrySlotAvailable(filter, i)) {
-                return true;
+        int added = 0;
+        boolean full = false;
+        for (GeneralFilterEntry candidate : candidates) {
+            if (!known.add(resourceKey(candidate)))
+                continue;
+            int slot = firstFreeSlot(entries, cap);
+            if (slot < 0) {
+                full = true;
+                break;
             }
+            int index = indexOfSlot(entries, slot);
+            GeneralFilterEntry current = index < 0 ? GeneralFilterEntry.empty(slot) : entries.get(index);
+            GeneralFilterEntry next = candidate.item() != null ? current.withItem(candidate.item())
+                    : resourceEntry(current, candidate.fluidId(), candidate.chemicalId());
+            if (index < 0)
+                entries.add(next);
+            else
+                entries.set(index, next);
+            added++;
         }
-        return false;
+        if (added > 0)
+            saveEntries(filter, entries);
+        return new BulkAdd(added, full);
+    }
+
+    private static int firstFreeSlot(List<GeneralFilterEntry> entries, int cap) {
+        for (int slot = 0; slot < cap; slot++) {
+            int index = indexOfSlot(entries, slot);
+            if (index < 0 || isFree(entries.get(index)))
+                return slot;
+        }
+        return -1;
+    }
+
+    @Nullable
+    private static String resourceKey(GeneralFilterEntry entry) {
+        if (entry.item() != null)
+            return "item:" + entry.item().tag().getString("id");
+        if (nonEmpty(entry.fluidId()) != null)
+            return "fluid:" + entry.fluidId();
+        return nonEmpty(entry.chemicalId()) == null ? null : "chemical:" + entry.chemicalId();
     }
 
     public static boolean hasAnyChemicalEntries(ItemStack stack, @Nullable ReadCache readCache) {
@@ -1123,6 +1096,11 @@ public final class FilterItemData {
             entries.remove(index);
         else
             entries.set(index, next);
+        saveEntries(stack, entries);
+        return true;
+    }
+
+    private static void saveEntries(ItemStack stack, List<GeneralFilterEntry> entries) {
         ListTag list = new ListTag();
         entries.forEach(entry -> list.add(entry.save()));
         updateRoot(stack, root -> {
@@ -1132,7 +1110,6 @@ public final class FilterItemData {
             else
                 root.put(KEY_ITEMS, list);
         });
-        return true;
     }
 
     private static boolean fluidHasTag(FluidStack fluid, String tag) {

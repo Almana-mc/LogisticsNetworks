@@ -98,7 +98,8 @@ public class ClientPayloadHandler {
     public static void handleSyncOpenFilter(SyncOpenFilterPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             var player = Minecraft.getInstance().player;
-            if (player != null && player.containerMenu instanceof FilterMenu menu && menu.isBoundFilter()) {
+            if (player != null && player.containerMenu instanceof FilterMenu menu
+                    && menu.containerId == payload.containerId() && menu.isBoundFilter()) {
                 menu.applySyncedFilter(payload.filter());
             }
         });

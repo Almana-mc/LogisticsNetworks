@@ -48,11 +48,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.WeakHashMap;
 
 public class ServerPayloadHandler {
 
     private static final Map<UUID, Boolean> DEFAULT_NODE_VISIBILITY = new HashMap<>();
     private static final Map<UUID, Integer> MODIFIER_KEYS = new HashMap<>();
+    private static final int SCAN_COOLDOWN_TICKS = 10;
+    private static final Map<ServerPlayer, Integer> LAST_SCAN = new WeakHashMap<>();
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -753,6 +756,11 @@ public class ServerPayloadHandler {
                     || !menu.stillValid(player) || !menu.canScanAttachedStorage()) {
                 return;
             }
+            int now = player.server.getTickCount();
+            if (now - LAST_SCAN.getOrDefault(player, -SCAN_COOLDOWN_TICKS) < SCAN_COOLDOWN_TICKS) {
+                return;
+            }
+            LAST_SCAN.put(player, now);
 
             LogisticsNodeEntity node = menu.getNodeSource();
             ChannelData channel = node.getChannel(menu.getNodeChannel());
