@@ -162,7 +162,7 @@ public class TransferEngine {
         }
     }
 
-    private record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
+    public record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
     }
 
     private record ItemTransferTarget(IItemHandler handler, ItemStack[] importFilters,
@@ -245,13 +245,23 @@ public class TransferEngine {
         if (signalCache.isEmpty())
             return null;
 
-        return new NetworkContext(sortedNodes, signalCache,
+        @SuppressWarnings("unchecked")
+        List<ImportTarget>[][] imports = new List[][] {
                 resolveCache(network.getItemImports(), nodeCache, signalCache),
                 resolveCache(network.getFluidImports(), nodeCache, signalCache),
                 resolveCache(network.getEnergyImports(), nodeCache, signalCache),
                 resolveCache(network.getChemicalImports(), nodeCache, signalCache),
-                resolveCache(network.getSourceImports(), nodeCache, signalCache),
-                network.getDimensionalCache(), network.getTierCache());
+                resolveCache(network.getSourceImports(), nodeCache, signalCache) };
+        Map<UUID, Boolean> dimensionalCache = network.getDimensionalCache();
+        NetworkRegistry registry = NetworkRegistry.get((ServerLevel) server.overworld());
+        List<ServerRackLinks.Link> links = registry.getRackLinks().linksFor(network.getId());
+        if (!links.isEmpty()) {
+            dimensionalCache = new HashMap<>(dimensionalCache);
+            BridgedImports.merge(links, registry, server, imports, dimensionalCache);
+        }
+
+        return new NetworkContext(sortedNodes, signalCache, imports[0], imports[1], imports[2], imports[3],
+                imports[4], dimensionalCache, network.getTierCache());
     }
 
     private static Map<UUID, Integer> buildSignalCache(List<LogisticsNodeEntity> nodes) {
@@ -1641,7 +1651,7 @@ public class TransferEngine {
         return space > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) space;
     }
 
-    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,
+    public static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,
             @Nullable ResourceKey<Level> cachedDim) {
         if (cachedDim != null) {
             ServerLevel level = server.getLevel(cachedDim);
@@ -1656,7 +1666,7 @@ public class TransferEngine {
         return null;
     }
 
-    private static boolean isRedstoneActive(RedstoneMode mode, int signalStrength) {
+    public static boolean isRedstoneActive(RedstoneMode mode, int signalStrength) {
         return switch (mode) {
             case IGNORED -> true;
             case HIGH -> signalStrength > 0;
