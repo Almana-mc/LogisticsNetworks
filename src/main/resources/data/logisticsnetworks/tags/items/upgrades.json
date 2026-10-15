@@ -7,6 +7,7 @@
     "logisticsnetworks:netherite_upgrade",
     "logisticsnetworks:dimensional_upgrade",
     "logisticsnetworks:mekanism_chemical_upgrade",
-    "logisticsnetworks:ars_source_upgrade"
+    "logisticsnetworks:ars_source_upgrade",
+    "logisticsnetworks:network_upgrade"
   ]
 }

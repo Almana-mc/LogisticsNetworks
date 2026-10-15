@@ -10,6 +10,7 @@ import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
 import me.almana.logisticsnetworks.item.ModFilterItem;
 import me.almana.logisticsnetworks.item.NameFilterItem;
+import me.almana.logisticsnetworks.item.NetworkUpgradeItem;
 import me.almana.logisticsnetworks.item.NbtFilterItem;
 import me.almana.logisticsnetworks.item.NodeUpgradeItem;
 import me.almana.logisticsnetworks.item.PatternSetterItem;
@@ -137,6 +138,10 @@ public class Registration {
                         .register(
                                         "ars_source_upgrade",
                                         () -> new ArsSourceUpgradeItem(new Item.Properties()));
+
+        public static final RegistryObject<NetworkUpgradeItem> NETWORK_UPGRADE = ITEMS.register(
+                        "network_upgrade",
+                        () -> new NetworkUpgradeItem(new Item.Properties()));
 
         public static final RegistryObject<PatternSetterItem> PATTERN_SETTER = ITEMS
                         .register(
