@@ -1090,6 +1090,15 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         return filterButtonY(filterPickerSlot) + 18;
     }
 
+    private boolean isOverFilterPicker(double mx, double my) {
+        if (!filterPickerOpen) {
+            return false;
+        }
+        int px = filterPickerX();
+        int py = filterPickerY();
+        return mx >= px && mx < px + FILTER_PICKER_W && my >= py && my < py + 3 * FILTER_PICKER_ROW_H;
+    }
+
     private void renderFilterPicker(GuiGraphics g, int mx, int my) {
         int px = filterPickerX();
         int py = filterPickerY();
@@ -1271,7 +1280,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             stopChannelNameEdit(true);
         }
 
-        if (isHoveringMenuSlot(mx, my)) {
+        if (isHoveringMenuSlot(mx, my) && !isOverFilterPicker(mx, my)) {
             return false;
         }
 
