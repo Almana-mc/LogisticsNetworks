@@ -39,9 +39,9 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.Container;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -828,8 +828,10 @@ public class WrenchItem extends Item {
         return InteractionResult.CONSUME;
     }
 
-    private static int findNodeItemSlot(Container inventory) {
+    private static int findNodeItemSlot(Inventory inventory) {
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            // Skip worn armor slots
+            if (slot >= Inventory.INVENTORY_SIZE && slot < Inventory.SLOT_OFFHAND) continue;
             if (inventory.getItem(slot).is(Registration.LOGISTICS_NODE_ITEM.get())) return slot;
         }
         return -1;
