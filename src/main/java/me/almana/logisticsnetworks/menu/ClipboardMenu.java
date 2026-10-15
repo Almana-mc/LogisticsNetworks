@@ -237,7 +237,10 @@ public class ClipboardMenu extends AbstractContainerMenu {
         } else {
             filter = filter.copy();
         }
-        if (!FilterItemData.addItem(filter, item)) return false;
+        FilterItemData.Edit result = FilterItemData.addItem(filter, item);
+        if (result == FilterItemData.Edit.REFUSED)
+            player.displayClientMessage(Component.translatable("message.logisticsnetworks.filter.too_large"), true);
+        if (result != FilterItemData.Edit.CHANGED) return false;
         clipboard.setFilterItem(channel, slot, filter);
         saveClipboard();
         return true;

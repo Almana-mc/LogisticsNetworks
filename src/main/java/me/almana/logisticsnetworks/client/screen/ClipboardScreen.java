@@ -993,7 +993,11 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         } else {
             filter = filter.copy();
         }
-        if (!FilterItemData.addItem(filter, item)) return;
+        FilterItemData.Edit result = FilterItemData.addItem(filter, item);
+        if (result == FilterItemData.Edit.REFUSED)
+            minecraft.player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.filter.too_large"), true);
+        if (result != FilterItemData.Edit.CHANGED) return;
         config().setFilterItem(selectedChannel, slot, filter);
         NetworkHandler.sendToServer(new AddClipboardFilterItemPayload(slot, item.copyWithCount(1)));
         filterAddedToastUntil = System.currentTimeMillis() + 1500;

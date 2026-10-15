@@ -983,7 +983,12 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         } else {
             filter = filter.copy();
         }
-        if (!FilterItemData.addItem(filter, item)) {
+        FilterItemData.Edit result = FilterItemData.addItem(filter, item);
+        if (result == FilterItemData.Edit.REFUSED) {
+            minecraft.player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.filter.too_large"), true);
+        }
+        if (result != FilterItemData.Edit.CHANGED) {
             return;
         }
         ch.setFilterItem(slot, filter);

@@ -175,21 +175,21 @@ public final class FilterItemData {
         return !value.hasTag() || value.getTag().sizeInBytes() <= MAX_ENTRY_TAG_BYTES;
     }
 
-    public static boolean addItem(ItemStack filter, ItemStack item) {
+    public static Edit addItem(ItemStack filter, ItemStack item) {
         if (!isFilterItem(filter) || item.isEmpty() || !fitsEntry(item))
-            return false;
+            return Edit.SAME;
         ItemStack entry = item.copyWithCount(1);
         int cap = getCapacity(filter);
         for (int i = 0; i < cap; i++) {
             if (ItemStack.isSameItemSameTags(getEntry(filter, i), entry))
-                return false;
+                return Edit.SAME;
         }
         for (int i = 0; i < cap; i++) {
             if (isEntrySlotAvailable(filter, i)) {
-                return setEntry(filter, i, entry) == Edit.CHANGED;
+                return setEntry(filter, i, entry);
             }
         }
-        return false;
+        return Edit.SAME;
     }
 
     public static void clearEntryItem(ItemStack stack, int slot) {
