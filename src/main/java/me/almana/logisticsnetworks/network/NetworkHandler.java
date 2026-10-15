@@ -120,6 +120,10 @@ public final class NetworkHandler {
         registerServer(SetWrenchModePayload.class, SetWrenchModePayload.STREAM_CODEC, SetWrenchModePayload::handle);
         registerServer(SetWrenchColorsPayload.class, SetWrenchColorsPayload.STREAM_CODEC, ServerPayloadHandler::handleSetWrenchColors);
         registerServer(SetWrenchFlowPayload.class, SetWrenchFlowPayload.STREAM_CODEC, ServerPayloadHandler::handleSetWrenchFlow);
+        registerClient(SyncMassPlacementChoicesPayload.class, SyncMassPlacementChoicesPayload.STREAM_CODEC,
+                ClientPayloadHandler::handleSyncMassPlacementChoices);
+        registerClient(SyncMassPlacementRequirementsPayload.class, SyncMassPlacementRequirementsPayload.STREAM_CODEC,
+                ClientPayloadHandler::handleSyncMassPlacementRequirements);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {

@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.network;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
+import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeEditorScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
 import me.almana.logisticsnetworks.data.ChannelData;
@@ -137,6 +138,28 @@ public class ClientPayloadHandler {
                 computerScreen.receiveChannelList(payload);
             } else if (screen instanceof ClipboardScreen clipboardScreen) {
                 clipboardScreen.receiveChannelList(payload.networkId(), payload.channelNames());
+            }
+        });
+    }
+
+    public static void handleSyncMassPlacementChoices(SyncMassPlacementChoicesPayload payload,
+            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var screen = Minecraft.getInstance().screen;
+            if (screen instanceof MassPlacementScreen massPlacementScreen
+                    && massPlacementScreen.hasContainerId(payload.containerId())) {
+                massPlacementScreen.receiveBlockChoices(payload.choices(), payload.maxNodes());
+            }
+        });
+    }
+
+    public static void handleSyncMassPlacementRequirements(SyncMassPlacementRequirementsPayload payload,
+                                                            IPayloadContext context) {
+        context.enqueueWork(() -> {
+            var screen = Minecraft.getInstance().screen;
+            if (screen instanceof MassPlacementScreen massPlacementScreen
+                    && massPlacementScreen.hasContainerId(payload.containerId())) {
+                massPlacementScreen.receiveRequirements(payload.requirements(), payload.pending());
             }
         });
     }

@@ -1,6 +1,9 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
+import me.almana.logisticsnetworks.network.SyncMassPlacementChoicesPayload;
+import me.almana.logisticsnetworks.network.SyncMassPlacementRequirementsPayload;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
@@ -12,7 +15,7 @@ import java.util.List;
 public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMenu> {
 
     private static final int GUI_WIDTH = 246;
-    private static final int GUI_HEIGHT = 218;
+    private static final int GUI_HEIGHT = 262;
 
     private static final int COLOR_BG = 0xFF161616;
     private static final int COLOR_PANEL = 0xFF1F1F1F;
@@ -28,10 +31,25 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
     private static final int COLOR_WHITE = 0xFFFFFFFF;
     private static final int COLOR_GRAY = 0xFFBBBBBB;
     private static final int COLOR_DISABLED = 0xFF666666;
+    private static final int COLOR_STORAGE = 0xFF55AAFF;
 
     private static final int BTN_H = 16;
     private static final int BTN_PAD = 10;
     private static final int BTN_GAP = 6;
+    private static final int CHOICE_ROW_H = 14;
+    private static final int CHOICE_ROW_GAP = 2;
+    private static final int MAX_CHOICE_ROWS = 3;
+    private static final int SCROLLBAR_W = 3;
+    private static final int PANEL_X_OFFSET = 10;
+    private static final int PANEL_Y_OFFSET = 24;
+    private static final int PANEL_W = GUI_WIDTH - PANEL_X_OFFSET * 2;
+    private static final int PANEL_H = 176;
+
+    private List<SyncMassPlacementChoicesPayload.BlockChoice> blockChoices = List.of();
+    private List<SyncMassPlacementRequirementsPayload.Requirement> requirements = List.of();
+    private boolean pending;
+    private int choiceScrollOffset;
+    private int maxNodes = 2048;
 
     public MassPlacementScreen(MassPlacementMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -49,6 +67,12 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
     }
 
     @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        renderBackground(graphics);
+        super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         graphics.fill(leftPos, topPos, leftPos + GUI_WIDTH, topPos + GUI_HEIGHT, COLOR_BG);
         graphics.renderOutline(leftPos, topPos, GUI_WIDTH, GUI_HEIGHT, COLOR_BORDER);
@@ -56,10 +80,10 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
         graphics.drawCenteredString(font, Component.translatable("gui.logisticsnetworks.mass_placement"),
                 leftPos + GUI_WIDTH / 2, topPos + 8, COLOR_ACCENT);
 
-        int panelX = leftPos + 10;
-        int panelY = topPos + 24;
-        int panelW = GUI_WIDTH - 20;
-        int panelH = 136;
+        int panelX = leftPos + PANEL_X_OFFSET;
+        int panelY = topPos + PANEL_Y_OFFSET;
+        int panelW = PANEL_W;
+        int panelH = PANEL_H;
         graphics.fill(panelX, panelY, panelX + panelW, panelY + panelH, COLOR_PANEL);
         graphics.renderOutline(panelX, panelY, panelW, panelH, COLOR_BORDER);
 
@@ -83,53 +107,73 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
                 textX, y, textW, COLOR_TEXT);
 
         boolean canPlace = menu.canPlace();
-        String mark = canPlace ? "\u2714" : "\u2716";
+        String mark = pending ? "\u2026" : canPlace ? "\u2714" : "\u2716";
         Component status = Component.translatable(
-                canPlace ? "gui.logisticsnetworks.mass_placement.status_ok"
+                pending ? "gui.logisticsnetworks.mass_placement.status_pending"
+                        : canPlace ? "gui.logisticsnetworks.mass_placement.status_ok"
                         : "gui.logisticsnetworks.mass_placement.status_blocked");
         y = drawWrappedLine(graphics, Component.literal(mark + " ").append(status), textX, y, textW,
-                canPlace ? COLOR_OK : COLOR_FAIL);
+                pending ? COLOR_STORAGE : canPlace ? COLOR_OK : COLOR_FAIL);
 
-        y = drawWrappedLine(graphics, Component.translatable("gui.logisticsnetworks.mass_placement.requirements"),
-                textX, y + 2, textW, COLOR_MUTED);
+        int choicesTitleY = panelY + 67;
+        drawChoiceHeader(graphics, textX, choicesTitleY, textW);
+        drawBlockChoices(graphics, textX, getChoiceListY(), textW, mouseX, mouseY);
 
-        List<MassPlacementMenu.RequirementView> requirementViews = menu.getRequirementViews();
-        int maxRequirementLines = 6;
+        int requirementsTitleY = panelY + 130;
+        drawWrappedLine(graphics, Component.translatable("gui.logisticsnetworks.mass_placement.requirements"),
+                textX, requirementsTitleY, textW, COLOR_MUTED);
 
-        if (requirementViews.isEmpty()) {
-            y = drawWrappedLine(graphics,
+        int maxRequirementLines = 2;
+        int requirementY = panelY + 143;
+
+        if (requirements.isEmpty()) {
+            drawWrappedLine(graphics,
                     Component.translatable("gui.logisticsnetworks.mass_placement.requirement_empty"),
-                    textX, y, textW, COLOR_MUTED);
+                    textX, requirementY, textW, COLOR_MUTED);
         } else {
-            int shown = Math.min(maxRequirementLines, requirementViews.size());
+            int shown = Math.min(maxRequirementLines, requirements.size());
             for (int i = 0; i < shown; i++) {
-                MassPlacementMenu.RequirementView requirement = requirementViews.get(i);
+                SyncMassPlacementRequirementsPayload.Requirement requirement = requirements.get(i);
                 String requirementMark = requirement.missing() ? "\u2716" : "\u2714";
                 int color = requirement.missing() ? COLOR_FAIL : COLOR_OK;
-                Component line = Component.literal(requirementMark + " ")
-                        .append(requirement.name().copy())
-                        .append(Component.literal(": " + requirement.available() + "/" + requirement.required()));
-                if (requirement.fromAE2() > 0) {
-                    line = line.copy().append(Component.literal(" +" + requirement.fromAE2() + " ME")
-                            .withStyle(net.minecraft.ChatFormatting.DARK_PURPLE));
+                Component line = Component.empty();
+                if (requirement.storageUsed()) {
+                    line = line.copy().append(Component.literal("Network \u2714 ")
+                            .withStyle(net.minecraft.ChatFormatting.BLUE));
                 }
-                y = drawWrappedLine(graphics, line, textX, y, textW, color);
+                long available = requirement.inventory() + requirement.storageStored();
+                line = line.copy().append(Component.literal(requirementMark + " "))
+                        .append(requirement.item().getHoverName())
+                        .append(Component.literal(": " + available + "/" + requirement.required()));
+                if (requirement.storageCraftable() && available < requirement.required()) {
+                    line = line.copy().append(Component.translatable(
+                            "gui.logisticsnetworks.mass_placement.autocraft").withStyle(
+                            net.minecraft.ChatFormatting.BLUE));
+                }
+                List<FormattedCharSequence> wrapped = font.split(line, textW);
+                if (!wrapped.isEmpty()) {
+                    graphics.drawString(font, wrapped.get(0), textX,
+                            requirementY + i * font.lineHeight, color, false);
+                }
             }
 
-            if (requirementViews.size() > shown) {
-                y = drawWrappedLine(graphics,
+            if (requirements.size() > shown) {
+                graphics.drawString(font,
                         Component.translatable("gui.logisticsnetworks.mass_placement.requirement_more",
-                                requirementViews.size() - shown),
-                        textX, y, textW, COLOR_MUTED);
+                                requirements.size() - shown),
+                        textX, requirementY + shown * font.lineHeight + 1, COLOR_MUTED, false);
             }
         }
 
         int hintY = panelY + panelH + 6;
-        drawWrappedLine(graphics, Component.translatable("gui.logisticsnetworks.mass_placement.hint"),
+        drawWrappedLine(graphics, Component.translatable("gui.logisticsnetworks.mass_placement.hint",
+                        ClientControls.SECONDARY_INTERACTION.getTranslatedKeyMessage()),
                 textX, hintY, textW, COLOR_MUTED);
 
         String clearLabel = Component.translatable("gui.logisticsnetworks.mass_placement.clear").getString();
-        String placeLabel = Component.translatable("gui.logisticsnetworks.mass_placement.place").getString();
+        String placeLabel = Component.translatable(pending
+                ? "gui.logisticsnetworks.mass_placement.queued"
+                : "gui.logisticsnetworks.mass_placement.place").getString();
         int clearW = font.width(clearLabel) + BTN_PAD * 2;
         int placeW = font.width(placeLabel) + BTN_PAD * 2;
         int totalW = clearW + BTN_GAP + placeW;
@@ -137,47 +181,190 @@ public class MassPlacementScreen extends AbstractContainerScreen<MassPlacementMe
         int btnY = topPos + GUI_HEIGHT - BTN_H - 6;
 
         drawThemedButton(graphics, startX, btnY, clearW, BTN_H, clearLabel,
-                menu.getSelectedCount() > 0, mouseX, mouseY);
+                menu.getSelectedCount() > 0 && !pending, mouseX, mouseY);
         drawThemedButton(graphics, startX + clearW + BTN_GAP, btnY, placeW, BTN_H, placeLabel,
                 menu.canPlace(), mouseX, mouseY);
     }
 
     @Override
-    public boolean mouseClicked(double mx, double my, int button) {
-        if (button == 0) {
-            String clearLabel = Component.translatable("gui.logisticsnetworks.mass_placement.clear").getString();
-            String placeLabel = Component.translatable("gui.logisticsnetworks.mass_placement.place").getString();
-            int clearW = font.width(clearLabel) + BTN_PAD * 2;
-            int placeW = font.width(placeLabel) + BTN_PAD * 2;
-            int totalW = clearW + BTN_GAP + placeW;
-            int startX = leftPos + (GUI_WIDTH - totalW) / 2;
-            int btnY = topPos + GUI_HEIGHT - BTN_H - 6;
-
-            if (menu.getSelectedCount() > 0 && isHoveringAbs(startX, btnY, clearW, BTN_H, mx, my)) {
-                if (minecraft != null && minecraft.gameMode != null) {
-                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_CLEAR_SELECTION);
-                }
-                return true;
-            }
-
-            if (menu.canPlace() && isHoveringAbs(startX + clearW + BTN_GAP, btnY, placeW, BTN_H, mx, my)) {
-                if (minecraft != null && minecraft.gameMode != null) {
-                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_PLACE_NODES);
-                }
-                return true;
-            }
-        }
-        return super.mouseClicked(mx, my, button);
-    }
-
-    @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (key == 256) return super.keyPressed(key, scan, modifiers);
+
+        int action = ClientControls.resolveKeyAction(key, scan);
+        if (action != -1) {
+            handleInteraction(ClientControls.cursorX(minecraft), ClientControls.cursorY(minecraft), action);
+            return true;
+        }
         return true;
     }
 
     @Override
+    public boolean mouseClicked(double mx, double my, int button) {
+        int action = ClientControls.resolveMouseAction(button);
+        if (action != -1 && handleInteraction(mx, my, action))
+            return true;
+        return super.mouseClicked(mx, my, button);
+    }
+
+    private boolean handleInteraction(double mx, double my, int action) {
+        if (action != 0)
+            return false;
+
+        int choiceIndex = hoveredChoiceIndex(mx, my);
+        if (choiceIndex >= 0 && choiceIndex < blockChoices.size()) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId,
+                        MassPlacementMenu.ID_SELECT_BLOCK_BASE + choiceIndex);
+            }
+            return true;
+        }
+
+        String clearLabel = Component.translatable("gui.logisticsnetworks.mass_placement.clear").getString();
+        String placeLabel = Component.translatable(pending
+                ? "gui.logisticsnetworks.mass_placement.queued"
+                : "gui.logisticsnetworks.mass_placement.place").getString();
+        int clearW = font.width(clearLabel) + BTN_PAD * 2;
+        int placeW = font.width(placeLabel) + BTN_PAD * 2;
+        int totalW = clearW + BTN_GAP + placeW;
+        int startX = leftPos + (GUI_WIDTH - totalW) / 2;
+        int btnY = topPos + GUI_HEIGHT - BTN_H - 6;
+
+        if (!pending && menu.getSelectedCount() > 0
+                && isHoveringAbs(startX, btnY, clearW, BTN_H, mx, my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_CLEAR_SELECTION);
+            }
+            return true;
+        }
+
+        if (menu.canPlace() && isHoveringAbs(startX + clearW + BTN_GAP, btnY, placeW, BTN_H, mx, my)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_PLACE_NODES);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
+    }
+
+    public void receiveBlockChoices(List<SyncMassPlacementChoicesPayload.BlockChoice> choices, int maxNodes) {
+        this.blockChoices = choices == null ? List.of() : List.copyOf(choices);
+        this.maxNodes = maxNodes;
+        clampChoiceScroll();
+    }
+
+    public void receiveRequirements(List<SyncMassPlacementRequirementsPayload.Requirement> requirements,
+                                    boolean pending) {
+        this.requirements = requirements == null ? List.of() : List.copyOf(requirements);
+        this.pending = pending;
+    }
+
+    public boolean hasContainerId(int containerId) {
+        return menu.containerId == containerId;
+    }
+
+    private int drawBlockChoices(GuiGraphics graphics, int x, int y, int width, int mouseX, int mouseY) {
+        if (blockChoices.isEmpty()) {
+            return drawWrappedLine(graphics,
+                    Component.translatable("gui.logisticsnetworks.mass_placement.block_choices_empty"),
+                    x, y, width, COLOR_MUTED);
+        }
+
+        clampChoiceScroll();
+        int shown = Math.min(MAX_CHOICE_ROWS, blockChoices.size() - choiceScrollOffset);
+        int rowWidth = getMaxChoiceScroll() > 0 ? width - SCROLLBAR_W - 4 : width;
+        for (int i = 0; i < shown; i++) {
+            SyncMassPlacementChoicesPayload.BlockChoice choice = blockChoices.get(choiceScrollOffset + i);
+            boolean hovered = isHoveringAbs(x, y, rowWidth, CHOICE_ROW_H, mouseX, mouseY);
+            boolean selected = choice.selected();
+            int border = selected ? COLOR_ACCENT : hovered ? COLOR_BTN_BORDER : COLOR_BORDER;
+            int fill = hovered ? COLOR_BTN_HOVER : COLOR_BTN_BG;
+            graphics.fill(x, y, x + rowWidth, y + CHOICE_ROW_H, fill);
+            graphics.renderOutline(x, y, rowWidth, CHOICE_ROW_H, border);
+
+            String count = choice.targetCount() > maxNodes ? maxNodes + "+" : String.valueOf(choice.targetCount());
+            String label = (selected ? "> " : "  ") + choice.name() + " (" + count + ")";
+            graphics.drawString(font, font.plainSubstrByWidth(label, rowWidth - 8), x + 4, y + 3,
+                    selected ? COLOR_WHITE : COLOR_GRAY, false);
+            y += CHOICE_ROW_H + CHOICE_ROW_GAP;
+        }
+
+        drawChoiceScrollbar(graphics, x, width);
+        return y;
+    }
+
+    private int hoveredChoiceIndex(double mouseX, double mouseY) {
+        int textX = leftPos + PANEL_X_OFFSET + 8;
+        int y = getChoiceListY();
+        int textWidth = PANEL_W - 16;
+        int rowWidth = getMaxChoiceScroll() > 0 ? textWidth - SCROLLBAR_W - 4 : textWidth;
+
+        int shown = Math.min(MAX_CHOICE_ROWS, blockChoices.size() - choiceScrollOffset);
+        for (int i = 0; i < shown; i++) {
+            if (isHoveringAbs(textX, y, rowWidth, CHOICE_ROW_H, mouseX, mouseY)) {
+                return choiceScrollOffset + i;
+            }
+            y += CHOICE_ROW_H + CHOICE_ROW_GAP;
+        }
+        return -1;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        int maxScroll = getMaxChoiceScroll();
+        if (maxScroll > 0 && isHoveringAbs(leftPos + PANEL_X_OFFSET + 8, getChoiceListY(),
+                PANEL_W - 16, MAX_CHOICE_ROWS * CHOICE_ROW_H + (MAX_CHOICE_ROWS - 1) * CHOICE_ROW_GAP,
+                mouseX, mouseY)) {
+            choiceScrollOffset = Math.max(0, Math.min(choiceScrollOffset - (int) delta, maxScroll));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
+    }
+
+    private void drawChoiceHeader(GuiGraphics graphics, int x, int y, int width) {
+        graphics.drawString(font, Component.translatable("gui.logisticsnetworks.mass_placement.block_choices"),
+                x, y, COLOR_MUTED, false);
+        int maxScroll = getMaxChoiceScroll();
+        if (maxScroll <= 0) {
+            return;
+        }
+
+        int first = choiceScrollOffset + 1;
+        int last = Math.min(choiceScrollOffset + MAX_CHOICE_ROWS, blockChoices.size());
+        String range = first + "-" + last + "/" + blockChoices.size();
+        graphics.drawString(font, range, x + width - font.width(range), y, COLOR_MUTED, false);
+    }
+
+    private int getChoiceListY() {
+        return topPos + PANEL_Y_OFFSET + 80;
+    }
+
+    private int getMaxChoiceScroll() {
+        return Math.max(0, blockChoices.size() - MAX_CHOICE_ROWS);
+    }
+
+    private void clampChoiceScroll() {
+        choiceScrollOffset = Math.max(0, Math.min(choiceScrollOffset, getMaxChoiceScroll()));
+    }
+
+    private void drawChoiceScrollbar(GuiGraphics graphics, int x, int width) {
+        int maxScroll = getMaxChoiceScroll();
+        if (maxScroll <= 0) {
+            return;
+        }
+
+        int trackX = x + width - SCROLLBAR_W;
+        int trackY = getChoiceListY();
+        int trackHeight = MAX_CHOICE_ROWS * CHOICE_ROW_H + (MAX_CHOICE_ROWS - 1) * CHOICE_ROW_GAP;
+        graphics.fill(trackX, trackY, trackX + SCROLLBAR_W, trackY + trackHeight, COLOR_BORDER);
+
+        int thumbHeight = Math.max(8, trackHeight * MAX_CHOICE_ROWS / blockChoices.size());
+        int thumbTravel = trackHeight - thumbHeight;
+        int thumbY = trackY + (thumbTravel * choiceScrollOffset) / maxScroll;
+        graphics.fill(trackX, thumbY, trackX + SCROLLBAR_W, thumbY + thumbHeight, COLOR_ACCENT);
     }
 
     private void drawThemedButton(GuiGraphics g, int x, int y, int w, int h, String label,

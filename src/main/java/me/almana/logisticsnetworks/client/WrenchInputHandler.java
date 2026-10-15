@@ -8,7 +8,6 @@ import me.almana.logisticsnetworks.item.PatternSetterItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
-import me.almana.logisticsnetworks.network.MassSelectConnectedPayload;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.SyncModifierKeysPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -158,7 +157,7 @@ public class WrenchInputHandler {
         }
 
         WrenchItem.Mode mode = WrenchItem.getMode(player.getItemInHand(hand));
-        if (mode != WrenchItem.Mode.MASS_PLACEMENT && mode != WrenchItem.Mode.COPY_PASTE) {
+        if (mode != WrenchItem.Mode.COPY_PASTE) {
             return;
         }
 
@@ -167,12 +166,7 @@ public class WrenchInputHandler {
             return;
         }
 
-        // Phase 7.8 drops mass branch
-        if (mode == WrenchItem.Mode.MASS_PLACEMENT) {
-            NetworkHandler.sendToServer(new MassSelectConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
-        } else {
-            NetworkHandler.sendToServer(new CopyPasteConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
-        }
+        NetworkHandler.sendToServer(new CopyPasteConnectedPayload(hand.ordinal(), blockHitResult.getBlockPos()));
         event.setSwingHand(false);
         event.setCanceled(true);
     }
