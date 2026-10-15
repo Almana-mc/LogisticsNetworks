@@ -36,10 +36,19 @@ public class ServerRackBlockEntity extends BlockEntity {
         register();
     }
 
-    // Also runs on chunk unload
+    @Override
+    public void onChunkUnloaded() {
+        super.onChunkUnloaded();
+        unregister();
+    }
+
     @Override
     public void setRemoved() {
         super.setRemoved();
+        unregister();
+    }
+
+    private void unregister() {
         if (level instanceof ServerLevel serverLevel) {
             NetworkRegistry.get(serverLevel).removeRack(GlobalPos.of(level.dimension(), worldPosition));
         }

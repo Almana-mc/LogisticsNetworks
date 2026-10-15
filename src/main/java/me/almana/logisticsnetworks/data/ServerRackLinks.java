@@ -1,6 +1,8 @@
 package me.almana.logisticsnetworks.data;
 
 import net.minecraft.core.GlobalPos;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -17,6 +19,7 @@ public final class ServerRackLinks {
     }
 
     private final Map<GlobalPos, ServerRackConfig> racks = new HashMap<>();
+    private final Set<GlobalPos> loaded = new HashSet<>();
     private final Map<UUID, List<Link>> byNetwork = new HashMap<>();
 
     public List<Link> linksFor(UUID networkId) {
@@ -26,12 +29,35 @@ public final class ServerRackLinks {
     Set<UUID> put(GlobalPos pos, ServerRackConfig config) {
         Set<UUID> affected = networksOf(racks.put(pos, config));
         affected.addAll(networksOf(config));
+        loaded.add(pos);
         reindex();
         return affected;
     }
 
     Set<UUID> remove(GlobalPos pos) {
         Set<UUID> affected = networksOf(racks.remove(pos));
+        loaded.remove(pos);
+        reindex();
+        return affected;
+    }
+
+    // Block entities outlive full load
+    Set<UUID> refreshLoaded(MinecraftServer server) {
+        Set<UUID> affected = null;
+        for (Map.Entry<GlobalPos, ServerRackConfig> entry : racks.entrySet()) {
+            GlobalPos pos = entry.getKey();
+            ServerLevel level = server.getLevel(pos.dimension());
+            boolean isLoaded = level != null && level.hasChunkAt(pos.pos());
+            if (isLoaded ? loaded.add(pos) : loaded.remove(pos)) {
+                if (affected == null) {
+                    affected = new HashSet<>();
+                }
+                affected.addAll(networksOf(entry.getValue()));
+            }
+        }
+        if (affected == null) {
+            return Set.of();
+        }
         reindex();
         return affected;
     }
@@ -39,8 +65,9 @@ public final class ServerRackLinks {
     // Both directions, channels swapped
     private void reindex() {
         byNetwork.clear();
-        for (ServerRackConfig config : racks.values()) {
-            if (!config.bridges()) {
+        for (Map.Entry<GlobalPos, ServerRackConfig> entry : racks.entrySet()) {
+            ServerRackConfig config = entry.getValue();
+            if (!loaded.contains(entry.getKey()) || !config.bridges()) {
                 continue;
             }
             UUID left = config.left().get();

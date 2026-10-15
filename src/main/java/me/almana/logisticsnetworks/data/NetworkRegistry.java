@@ -47,6 +47,7 @@ public class NetworkRegistry extends SavedData {
 
     public void processDirtyNetworks(MinecraftServer server) {
         long now = server.overworld().getGameTime();
+        rackLinks.refreshLoaded(server).forEach(this::invalidateNetwork);
         promoteDueWakes(now);
 
         if (dirtyNetworks.isEmpty())
