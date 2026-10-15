@@ -63,7 +63,7 @@ public class ServerPayloadHandler {
     private static final Map<ServerPlayer, Integer> LAST_SCAN = new WeakHashMap<>();
     // Forge caps payloads at 1MiB
     private static final int EXPORT_BUDGET = 1_000_000;
-    private static final int EXPORT_COOLDOWN_TICKS = 20;
+    public static final int EXPORT_COOLDOWN_TICKS = 20;
     private static final Map<ServerPlayer, Integer> LAST_EXPORT = new WeakHashMap<>();
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {

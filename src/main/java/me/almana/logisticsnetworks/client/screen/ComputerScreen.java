@@ -10,6 +10,7 @@ import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.network.RequestNetworkExportPayload;
 import me.almana.logisticsnetworks.network.DeleteNetworkPayload;
 import me.almana.logisticsnetworks.network.NetworkHandler;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.RequestNetworkNodesPayload;
 import me.almana.logisticsnetworks.network.RequestOpenNodeSettingsPayload;
 import me.almana.logisticsnetworks.network.SetComputerWrenchClipboardPayload;
@@ -153,6 +154,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private List<SyncNetworkListPayload.NetworkEntry> networkList = new ArrayList<>();
     private int networkScrollOffset = 0;
     private UUID selectedNetworkId = null;
+    private long lastExportTick = -ServerPayloadHandler.EXPORT_COOLDOWN_TICKS;
     private String selectedNetworkName = "";
     private boolean deleteConfirmationOpen;
     private EditBox networkSearchBox;
@@ -1267,6 +1269,11 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     private void requestNetworkSave() {
+        long now = minecraft.level.getGameTime();
+        // Server drops requests inside cooldown
+        if (now - lastExportTick < ServerPayloadHandler.EXPORT_COOLDOWN_TICKS)
+            return;
+        lastExportTick = now;
         setLnetStatus(line("gui.logisticsnetworks.computer.lnet_saving"), COLOR_TEXT_SECONDARY);
         NetworkHandler.sendToServer(new RequestNetworkExportPayload(selectedNetworkId));
     }
