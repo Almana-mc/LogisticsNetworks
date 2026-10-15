@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
@@ -15,6 +16,7 @@ public class NetworkScheduler {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
+        LinkedStorage.tickCraftingRequests(event.getServer());
         ServerLevel level = event.getServer().overworld();
 
         NetworkRegistry registry = NetworkRegistry.get(level);

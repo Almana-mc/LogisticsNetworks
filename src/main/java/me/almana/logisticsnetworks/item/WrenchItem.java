@@ -10,6 +10,8 @@ import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.storage.StorageBackend;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -71,6 +73,7 @@ public class WrenchItem extends Item {
     private static final String KEY_MASS_CORNER_B = "mass_corner_b";
     private static final String KEY_MASS_SELECTED_BLOCK = "mass_selected_block";
     private static final String KEY_AE2_LINK = "ae2_link";
+    private static final String KEY_STORAGE_LINK = "storage_link";
     private static final String KEY_COLORS = "colors";
     private static final String KEY_CASE = "case";
     private static final String KEY_SCREEN = "screen";
@@ -933,37 +936,55 @@ public class WrenchItem extends Item {
     }
 
     public static void setAE2Link(ItemStack stack, ResourceKey<Level> dimension, BlockPos pos) {
-        if (stack.isEmpty()) return;
-        GlobalPos globalPos = GlobalPos.of(dimension, pos);
-        Tag encoded = GlobalPos.CODEC.encodeStart(NbtOps.INSTANCE, globalPos)
-                .result().orElse(null);
-        if (encoded == null) return;
-        ItemDataUtil.updateCustomData(stack, customTag -> {
-            CompoundTag root = getRootTag(customTag);
-            root.put(KEY_AE2_LINK, encoded);
-            writeRoot(customTag, root);
-        });
+        setStorageLink(stack, new StorageLink(StorageBackend.AE2, GlobalPos.of(dimension, pos)));
     }
 
     public static void clearAE2Link(ItemStack stack) {
+        clearStorageLink(stack);
+    }
+
+    public static boolean hasAE2Link(ItemStack stack) {
+        return getAE2LinkPos(stack) != null;
+    }
+
+    @Nullable
+    public static GlobalPos getAE2LinkPos(ItemStack stack) {
+        StorageLink link = getStorageLink(stack);
+        return link != null && link.backend() == StorageBackend.AE2 ? link.position() : null;
+    }
+
+    public static void setStorageLink(ItemStack stack, StorageLink link) {
         if (stack.isEmpty()) return;
+        Tag encoded = StorageLink.CODEC.encodeStart(NbtOps.INSTANCE, link).result().orElse(null);
+        if (encoded == null) return;
         ItemDataUtil.updateCustomData(stack, customTag -> {
             CompoundTag root = getRootTag(customTag);
+            root.put(KEY_STORAGE_LINK, encoded);
             root.remove(KEY_AE2_LINK);
             writeRoot(customTag, root);
         });
     }
 
-    public static boolean hasAE2Link(ItemStack stack) {
-        return getRootTag(stack).contains(KEY_AE2_LINK);
+    public static void clearStorageLink(ItemStack stack) {
+        if (stack.isEmpty()) return;
+        ItemDataUtil.updateCustomData(stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            root.remove(KEY_STORAGE_LINK);
+            root.remove(KEY_AE2_LINK);
+            writeRoot(customTag, root);
+        });
     }
 
     @Nullable
-    public static GlobalPos getAE2LinkPos(ItemStack stack) {
-        CompoundTag root = getRootTag(stack);
+    public static StorageLink getStorageLink(ItemStack stack) {
+        CompoundTag root = peekRoot(stack);
+        if (root.contains(KEY_STORAGE_LINK)) {
+            return StorageLink.CODEC.parse(NbtOps.INSTANCE, root.get(KEY_STORAGE_LINK)).result().orElse(null);
+        }
+        // 1.3.4 wrenches link AE2 only
         if (!root.contains(KEY_AE2_LINK)) return null;
-        return GlobalPos.CODEC.decode(NbtOps.INSTANCE, root.get(KEY_AE2_LINK))
-                .result().map(com.mojang.datafixers.util.Pair::getFirst).orElse(null);
+        return GlobalPos.CODEC.parse(NbtOps.INSTANCE, root.get(KEY_AE2_LINK)).result()
+                .map(position -> new StorageLink(StorageBackend.AE2, position)).orElse(null);
     }
 
     public static int getMaxMassNodes() {

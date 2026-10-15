@@ -1,0 +1,150 @@
+package me.almana.logisticsnetworks.integration.storage;
+
+import me.almana.logisticsnetworks.item.WrenchItem;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+public final class LinkedStorage {
+
+    private static final Map<StorageBackend, StorageAdapter> ADAPTERS = new EnumMap<>(StorageBackend.class);
+
+    public record PatternEntry(ItemStack item, int amount) {
+    }
+
+    public record ItemRequirement(ItemStack stack, int count) {
+    }
+
+    public interface SupplyOperation {
+        boolean stillValid();
+
+        boolean commit();
+
+        void failed(Component detail);
+    }
+
+    public enum SupplyRequestResult {
+        COMPLETED,
+        QUEUED,
+        DUPLICATE,
+        UNAVAILABLE
+    }
+
+    private LinkedStorage() {
+    }
+
+    public static void initialize() {
+        ADAPTERS.clear();
+        ADAPTERS.values().forEach(StorageAdapter::registerWrenchLinkable);
+    }
+
+    public static boolean isBackendLoaded(StorageBackend backend) {
+        return ADAPTERS.containsKey(backend);
+    }
+
+    @Nullable
+    public static StorageBackend detect(Level level, BlockPos pos) {
+        for (StorageBackend backend : StorageBackend.values()) {
+            StorageAdapter adapter = ADAPTERS.get(backend);
+            if (adapter != null && adapter.detects(level, pos)) return backend;
+        }
+        return null;
+    }
+
+    @Nullable
+    public static StorageAccess resolve(ServerLevel level, StorageLink link) {
+        StorageAdapter adapter = ADAPTERS.get(link.backend());
+        return adapter == null ? null : adapter.resolve(level, link);
+    }
+
+    public static InterfaceStorageResolution resolveInterface(ServerLevel level, BlockPos pos,
+            @Nullable Direction direction) {
+        for (StorageAdapter adapter : ADAPTERS.values()) {
+            InterfaceStorageResolution resolution = adapter.resolveInterface(level, pos, direction);
+            if (resolution.status() != InterfaceStorageResolution.Status.UNSUPPORTED) return resolution;
+        }
+        return InterfaceStorageResolution.unsupported();
+    }
+
+    public static boolean isAccessible(ServerLevel level, StorageLink link) {
+        return resolve(level, link) != null;
+    }
+
+    public static List<PatternEntry> readPatternInputs(ItemStack stack, Level level) {
+        for (StorageAdapter adapter : ADAPTERS.values()) {
+            if (adapter.isPattern(stack, level)) return adapter.readPatternInputs(stack, level);
+        }
+        return List.of();
+    }
+
+    public static List<PatternEntry> readPatternOutputs(ItemStack stack, Level level) {
+        for (StorageAdapter adapter : ADAPTERS.values()) {
+            if (adapter.isPattern(stack, level)) return adapter.readPatternOutputs(stack, level);
+        }
+        return List.of();
+    }
+
+    @Nullable
+    public static StorageLink findAccessibleLink(ServerPlayer player, @Nullable StorageLink preferred) {
+        Inventory inventory = player.getInventory();
+        if (preferred != null) {
+            for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+                StorageLink link = linked(inventory.getItem(slot));
+                if (preferred.equals(link) && isAccessible(player.serverLevel(), link)) return link;
+            }
+        }
+        int selected = inventory.selected;
+        StorageLink selectedLink = linked(inventory.getItem(selected));
+        if (selectedLink != null && isAccessible(player.serverLevel(), selectedLink)) return selectedLink;
+        for (int slot = 0; slot < 9; slot++) {
+            if (slot == selected) continue;
+            StorageLink link = linked(inventory.getItem(slot));
+            if (link != null && isAccessible(player.serverLevel(), link)) return link;
+        }
+        for (int slot = 9; slot < inventory.getContainerSize(); slot++) {
+            StorageLink link = linked(inventory.getItem(slot));
+            if (link != null && isAccessible(player.serverLevel(), link)) return link;
+        }
+        return null;
+    }
+
+    public static void returnItems(ServerPlayer player, @Nullable StorageLink link, List<ItemStack> stacks) {
+        StorageAccess access = link == null ? null : resolve(player.serverLevel(), link);
+        if (access == null) StorageInventory.returnToPlayer(player, stacks);
+        else StorageInventory.returnToStorageOrPlayer(access, player, stacks);
+    }
+
+    public static SupplyRequestResult requestSupply(UUID requestId, ServerPlayer player, StorageLink link,
+                                                     List<ItemRequirement> requirements, int protectedSlot,
+                                                     Component subject, SupplyOperation operation) {
+        return StorageSupplyRequests.request(requestId, player, link, requirements, protectedSlot, subject, operation);
+    }
+
+    public static boolean isSupplyPending(UUID requestId) {
+        return StorageSupplyRequests.isPending(requestId);
+    }
+
+    public static void tickCraftingRequests(MinecraftServer server) {
+        StorageSupplyRequests.tick();
+    }
+
+    public static void stopCraftingRequests() {
+        StorageSupplyRequests.stop();
+    }
+
+    private static StorageLink linked(ItemStack stack) {
+        return stack.getItem() instanceof WrenchItem ? WrenchItem.getStorageLink(stack) : null;
+    }
+}
