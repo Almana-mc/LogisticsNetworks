@@ -45,7 +45,6 @@ public final class FilterItemData {
     // Bounds channel sync size
     private static final int MAX_ENTRY_TAG_BYTES = 2048;
     private static final int MAX_FILTER_BYTES = 32768;
-    private static boolean refused;
     private static final int MAX_ID_LENGTH = 256;
     private static final String KEY_ROOT = "ln_filter";
     private static final String KEY_VERSION = "v";
@@ -160,9 +159,9 @@ public final class FilterItemData {
         return entry == null || entry.item() == null ? ItemStack.EMPTY : entry.item().toStack();
     }
 
-    public static boolean setEntry(ItemStack stack, int slot, ItemStack value) {
+    public static Edit setEntry(ItemStack stack, int slot, ItemStack value) {
         if (!fitsEntry(value))
-            return false;
+            return Edit.SAME;
         return edit(stack, slot, entry -> value.isEmpty()
                 ? GeneralFilterEntry.empty(slot)
                 : entry.withItem(StackSnapshot.of(value.copyWithCount(1))));
@@ -183,7 +182,7 @@ public final class FilterItemData {
         }
         for (int i = 0; i < cap; i++) {
             if (isEntrySlotAvailable(filter, i)) {
-                return setEntry(filter, i, entry);
+                return setEntry(filter, i, entry) == Edit.CHANGED;
             }
         }
         return false;
@@ -201,7 +200,7 @@ public final class FilterItemData {
 
     public static boolean setFluidEntry(ItemStack stack, int slot, FluidStack fluid) {
         String id = fluid.isEmpty() ? null : BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString();
-        return edit(stack, slot, entry -> resourceEntry(entry, id, null));
+        return edit(stack, slot, entry -> resourceEntry(entry, id, null)) == Edit.CHANGED;
     }
 
     public static boolean hasAnyEntries(ItemStack stack) {
@@ -225,7 +224,7 @@ public final class FilterItemData {
     }
 
     public static boolean setChemicalEntry(ItemStack stack, int slot, @Nullable String chemicalId) {
-        return edit(stack, slot, entry -> resourceEntry(entry, null, nonEmpty(chemicalId)));
+        return edit(stack, slot, entry -> resourceEntry(entry, null, nonEmpty(chemicalId))) == Edit.CHANGED;
     }
 
     private static GeneralFilterEntry resourceEntry(GeneralFilterEntry current, @Nullable String fluidId,
@@ -246,6 +245,10 @@ public final class FilterItemData {
         return entry == null || (entry.item() == null && nonEmpty(entry.fluidId()) == null
                 && nonEmpty(entry.chemicalId()) == null && FilterTagUtil.normalizeTag(entry.tag()) == null
                 && entry.slotMapping().slots().isEmpty() && !isNbtOnly(entry));
+    }
+
+    public enum Edit {
+        SAME, CHANGED, REFUSED
     }
 
     public record BulkAdd(int added, boolean full) {
@@ -316,9 +319,9 @@ public final class FilterItemData {
         return entry == null ? null : FilterTagUtil.normalizeTag(entry.tag());
     }
 
-    public static void setEntryTag(ItemStack stack, int slot, @Nullable String tag) {
+    public static Edit setEntryTag(ItemStack stack, int slot, @Nullable String tag) {
         String normalized = FilterTagUtil.normalizeTag(tag);
-        edit(stack, slot, entry -> entry.withTag(normalized));
+        return edit(stack, slot, entry -> entry.withTag(normalized));
     }
 
     public static boolean hasAnyTagEntries(ItemStack stack, @Nullable ReadCache readCache) {
@@ -346,8 +349,8 @@ public final class FilterItemData {
         return entry == null ? 0 : entry.counts().batch();
     }
 
-    public static void setEntryBatch(ItemStack stack, int slot, int batch) {
-        edit(stack, slot, entry -> entry.withCounts(new GeneralFilterEntry.EntryCounts(
+    public static Edit setEntryBatch(ItemStack stack, int slot, int batch) {
+        return edit(stack, slot, entry -> entry.withCounts(new GeneralFilterEntry.EntryCounts(
                 entry.counts().amount(), Math.max(0, batch), entry.counts().stock())));
     }
 
@@ -356,8 +359,8 @@ public final class FilterItemData {
         return entry == null ? 0 : stockOf(entry);
     }
 
-    public static void setEntryStock(ItemStack stack, int slot, int stock) {
-        edit(stack, slot, entry -> entry.withCounts(new GeneralFilterEntry.EntryCounts(
+    public static Edit setEntryStock(ItemStack stack, int slot, int stock) {
+        return edit(stack, slot, entry -> entry.withCounts(new GeneralFilterEntry.EntryCounts(
                 0, entry.counts().batch(), Math.max(0, stock))));
     }
 
@@ -373,16 +376,16 @@ public final class FilterItemData {
         return mapping.slots().isEmpty() ? "" : SlotExpressionUtil.formatSlots(mapping.slots());
     }
 
-    public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots) {
-        setEntrySlotMapping(stack, slot, slots, null);
+    public static Edit setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots) {
+        return setEntrySlotMapping(stack, slot, slots, null);
     }
 
-    public static void setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots,
+    public static Edit setEntrySlotMapping(ItemStack stack, int slot, @Nullable int[] slots,
             @Nullable String expression) {
         GeneralFilterEntry.SlotMapping mapping = slots == null || slots.length == 0
                 ? GeneralFilterEntry.SlotMapping.EMPTY
                 : new GeneralFilterEntry.SlotMapping(Arrays.stream(slots).boxed().toList(), expression);
-        edit(stack, slot, entry -> entry.withSlotMapping(mapping));
+        return edit(stack, slot, entry -> entry.withSlotMapping(mapping));
     }
 
     public static boolean hasEntrySlotMapping(ItemStack stack, int slot) {
@@ -409,10 +412,10 @@ public final class FilterItemData {
         return value.getAsByte() != 0;
     }
 
-    public static void setEntryEnchanted(ItemStack stack, int slot, @Nullable Boolean value) {
+    public static Edit setEntryEnchanted(ItemStack stack, int slot, @Nullable Boolean value) {
         NbtCriterion rule = value == null ? null
                 : new NbtCriterion(GeneralFilterEntry.ENCHANTED_PATH, NBT_OP_EQUALS, ByteTag.valueOf(value));
-        edit(stack, slot, entry -> entry.withNbt(entry.nbt().withRules(
+        return edit(stack, slot, entry -> entry.withNbt(entry.nbt().withRules(
                 replaceRule(entry.nbt().rules(), GeneralFilterEntry.ENCHANTED_PATH, rule))));
     }
 
@@ -433,10 +436,10 @@ public final class FilterItemData {
         return entry == null ? null : nonEmpty(entry.nbt().raw());
     }
 
-    public static void setEntryNbtRaw(ItemStack stack, int slot, @Nullable String rawSnbt) {
+    public static Edit setEntryNbtRaw(ItemStack stack, int slot, @Nullable String rawSnbt) {
         if (rawSnbt != null && rawSnbt.length() > MAX_NBT_RAW_LENGTH)
-            return;
-        edit(stack, slot, entry -> entry.withNbt(entry.nbt().withRaw(rawSnbt)));
+            return Edit.SAME;
+        return edit(stack, slot, entry -> entry.withNbt(entry.nbt().withRaw(rawSnbt)));
     }
 
     public static boolean hasAnyNbtEntries(ItemStack stack, @Nullable ReadCache readCache) {
@@ -453,8 +456,8 @@ public final class FilterItemData {
         return entry != null && entry.item() != null && entry.nbt().strict().orElse(!hasNbt(entry));
     }
 
-    public static void setEntryNbtStrict(ItemStack stack, int slot, boolean strict) {
-        edit(stack, slot, entry -> entry.isEmpty() ? entry : entry.withNbt(entry.nbt().withStrict(strict)));
+    public static Edit setEntryNbtStrict(ItemStack stack, int slot, boolean strict) {
+        return edit(stack, slot, entry -> entry.isEmpty() ? entry : entry.withNbt(entry.nbt().withStrict(strict)));
     }
 
     // ── Multi-rule NBT per-slot methods ──
@@ -464,9 +467,9 @@ public final class FilterItemData {
         return entry == null ? List.of() : entry.nbt().rules();
     }
 
-    public static boolean addSlotNbtRule(ItemStack stack, int slot, NbtPath path, String operator, Tag value) {
+    public static Edit addSlotNbtRule(ItemStack stack, int slot, NbtPath path, String operator, Tag value) {
         if (path.isEmpty() || path.toString().length() > MAX_NBT_PATH_LENGTH || isOversizedNbtValue(value))
-            return false;
+            return Edit.SAME;
         NbtCriterion added = new NbtCriterion(path, normalizeNbtOperator(operator), value);
         return edit(stack, slot, entry -> {
             List<NbtCriterion> rules = new ArrayList<>(entry.nbt().rules());
@@ -483,7 +486,7 @@ public final class FilterItemData {
         });
     }
 
-    public static boolean removeSlotNbtRule(ItemStack stack, int slot, int ruleIndex) {
+    public static Edit removeSlotNbtRule(ItemStack stack, int slot, int ruleIndex) {
         return edit(stack, slot, entry -> {
             List<NbtCriterion> rules = new ArrayList<>(entry.nbt().rules());
             if (ruleIndex < 0 || ruleIndex >= rules.size())
@@ -509,9 +512,9 @@ public final class FilterItemData {
                 : entry.withNbt(entry.nbt().withMatchAny(!entry.nbt().matchAny())));
     }
 
-    public static boolean setSlotNbtRuleValue(ItemStack stack, int slot, int ruleIndex, Tag newValue) {
+    public static Edit setSlotNbtRuleValue(ItemStack stack, int slot, int ruleIndex, Tag newValue) {
         if (isOversizedNbtValue(newValue))
-            return false;
+            return Edit.SAME;
         return edit(stack, slot, entry -> {
             List<NbtCriterion> rules = new ArrayList<>(entry.nbt().rules());
             if (ruleIndex < 0 || ruleIndex >= rules.size())
@@ -553,12 +556,12 @@ public final class FilterItemData {
         return rule != null && rule.value() instanceof NumericTag value ? value.getAsInt() : 0;
     }
 
-    public static void setEntryDurability(ItemStack stack, int slot, @Nullable String op, int value) {
+    public static Edit setEntryDurability(ItemStack stack, int slot, @Nullable String op, int value) {
         NbtCriterion rule = op == null || op.isEmpty() ? null
                 : new NbtCriterion(GeneralFilterEntry.DURABILITY_PATH,
                         DurabilityFilterData.Operator.fromId(op).symbol(),
                         IntTag.valueOf(Math.max(0, Math.min(3000, value))));
-        edit(stack, slot, entry -> entry.isEmpty() ? entry : entry.withNbt(entry.nbt().withRules(
+        return edit(stack, slot, entry -> entry.isEmpty() ? entry : entry.withNbt(entry.nbt().withRules(
                 replaceRule(entry.nbt().rules(), GeneralFilterEntry.DURABILITY_PATH, rule))));
     }
 
@@ -935,8 +938,8 @@ public final class FilterItemData {
         return entry == null ? 0 : entry.counts().amount();
     }
 
-    public static void setEntryAmount(ItemStack stack, int slot, int amount) {
-        edit(stack, slot, entry -> entry.isEmpty() ? entry : entry.withCounts(new GeneralFilterEntry.EntryCounts(
+    public static Edit setEntryAmount(ItemStack stack, int slot, int amount) {
+        return edit(stack, slot, entry -> entry.isEmpty() ? entry : entry.withCounts(new GeneralFilterEntry.EntryCounts(
                 Math.max(0, amount), entry.counts().batch(), entry.counts().stock())));
     }
 
@@ -1061,8 +1064,6 @@ public final class FilterItemData {
     public static boolean copySanitized(ItemStack source, ItemStack target) {
         if (!isFilterItem(source) || !isFilterItem(target))
             return false;
-        setTargetType(target, getTargetType(source));
-        setBlacklist(target, isBlacklist(source));
         int cap = getCapacity(target);
         Set<Integer> used = new HashSet<>();
         List<GeneralFilterEntry> kept = new ArrayList<>();
@@ -1071,7 +1072,11 @@ public final class FilterItemData {
             if (clean != null && entry.slot() >= 0 && entry.slot() < cap && used.add(entry.slot()))
                 kept.add(clean);
         }
-        return kept.isEmpty() || saveEntries(target, kept);
+        if (!kept.isEmpty() && !saveEntries(target, kept))
+            return false;
+        setTargetType(target, getTargetType(source));
+        setBlacklist(target, isBlacklist(source));
+        return true;
     }
 
     @Nullable
@@ -1144,28 +1149,22 @@ public final class FilterItemData {
         return -1;
     }
 
-    private static boolean edit(ItemStack stack, int slot, UnaryOperator<GeneralFilterEntry> change) {
+    private static Edit edit(ItemStack stack, int slot, UnaryOperator<GeneralFilterEntry> change) {
         if (!isFilterItem(stack) || slot < 0 || slot >= getCapacity(stack))
-            return false;
+            return Edit.SAME;
         List<GeneralFilterEntry> entries = new ArrayList<>(entries(stack));
         int index = indexOfSlot(entries, slot);
         GeneralFilterEntry current = index < 0 ? GeneralFilterEntry.empty(slot) : entries.get(index);
         GeneralFilterEntry next = change.apply(current);
         if (next.equals(current))
-            return false;
+            return Edit.SAME;
         if (index < 0)
             entries.add(next);
         else if (next.isEmpty())
             entries.remove(index);
         else
             entries.set(index, next);
-        return saveEntries(stack, entries);
-    }
-
-    public static boolean takeRefusal() {
-        boolean was = refused;
-        refused = false;
-        return was;
+        return saveEntries(stack, entries) ? Edit.CHANGED : Edit.REFUSED;
     }
 
     private static boolean saveEntries(ItemStack stack, List<GeneralFilterEntry> entries) {
@@ -1174,7 +1173,6 @@ public final class FilterItemData {
         ListTag old = getRoot(stack).getList(KEY_ITEMS, Tag.TAG_COMPOUND);
         int size = list.sizeInBytes();
         if (size > MAX_FILTER_BYTES && size > old.sizeInBytes()) {
-            refused = true;
             return false;
         }
         updateRoot(stack, root -> {
