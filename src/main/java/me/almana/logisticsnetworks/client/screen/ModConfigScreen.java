@@ -72,6 +72,7 @@ public class ModConfigScreen extends Screen {
     private static final Component TEXT_MAX_RENDERED = Component.translatable("gui.logisticsnetworks.config.client.maxRenderedNodes");
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
     private static final Component TEXT_DEFAULT_NODE_VISIBILITY = Component.translatable("gui.logisticsnetworks.config.client.defaultNodeVisibility");
+    private static final Component TEXT_CONNECTED_NODE_TEXTURES = Component.translatable("gui.logisticsnetworks.config.client.connectedNodeTextures");
     private static final Component TEXT_INVERT_COPY_PASTE = Component.translatable("gui.logisticsnetworks.config.client.invertCopyPasteControls");
     private static final Component TEXT_CONFIRM_NETWORK_CREATION = Component.translatable("gui.logisticsnetworks.config.client.confirmNetworkCreation");
 
@@ -112,6 +113,7 @@ public class ModConfigScreen extends Screen {
     private boolean pendingDefaultNodeVisibility;
     private int pendingMaxRenderedNodes;
     private int pendingMaxVisibleNodes;
+    private boolean pendingConnectedNodeTextures;
     private EditBox maxRenderedNodesBox;
     private EditBox maxVisibleNodesBox;
     private boolean pendingInvertCopyPasteControls;
@@ -152,6 +154,7 @@ public class ModConfigScreen extends Screen {
         pendingDefaultNodeVisibility = ClientConfig.defaultNodeVisibilitySpec.get();
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
         pendingMaxVisibleNodes = ClientConfig.maxVisibleNodesSpec.get();
+        pendingConnectedNodeTextures = ClientConfig.connectedNodeTexturesSpec.get();
         pendingInvertCopyPasteControls = ClientConfig.invertCopyPasteControlsSpec.get();
         pendingConfirmNetworkCreation = ClientConfig.confirmNetworkCreationSpec.get();
         pendingTheme = ClientConfig.themeSpec.get();
@@ -412,6 +415,7 @@ public class ModConfigScreen extends Screen {
         g.drawString(font, TEXT_MAX_VISIBLE, cx, cy + 39, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 36 + 14, 80);
 
+        renderCheckbox(g, cx, cy + 54, cw, TEXT_CONNECTED_NODE_TEXTURES, pendingConnectedNodeTextures, mx, my, false);
         int halfWidth = (cw - 8) / 2;
         renderCheckbox(g, cx, cy + 72, halfWidth, TEXT_INVERT_COPY_PASTE, pendingInvertCopyPasteControls, mx, my, false);
         renderCheckbox(g, cx + halfWidth + 8, cy + 72, halfWidth, TEXT_CONFIRM_NETWORK_CREATION,
@@ -447,6 +451,10 @@ public class ModConfigScreen extends Screen {
     private boolean handleClientClick(double mx, double my, int cx, int cy, int cw) {
         if (inBox(mx, my, cx + cw - 14, cy + 2, 9)) {
             pendingDefaultNodeVisibility = !pendingDefaultNodeVisibility;
+            return true;
+        }
+        if (inBox(mx, my, cx + cw - 14, cy + 56, 9)) {
+            pendingConnectedNodeTextures = !pendingConnectedNodeTextures;
             return true;
         }
         int halfWidth = (cw - 8) / 2;
@@ -725,6 +733,7 @@ public class ModConfigScreen extends Screen {
         ClientConfig.defaultNodeVisibilitySpec.set(pendingDefaultNodeVisibility);
         ClientConfig.maxRenderedNodesSpec.set(pendingMaxRenderedNodes);
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
+        ClientConfig.connectedNodeTexturesSpec.set(pendingConnectedNodeTextures);
         ClientConfig.themeSpec.set(pendingTheme);
         ClientConfig.refresh();
         ThemeState.setTheme(Themes.byId(pendingTheme));
