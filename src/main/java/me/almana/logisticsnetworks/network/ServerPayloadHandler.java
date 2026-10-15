@@ -1048,8 +1048,7 @@ public class ServerPayloadHandler {
                 }
             }
 
-            NetworkHandler.sendToPlayer(player,
-                    new SyncNetworkNodesPayload(payload.networkId(), nodeInfos));
+            SyncNetworkNodesPayload.send(player, payload.networkId(), nodeInfos);
         });
     }
 
@@ -1541,8 +1540,7 @@ public class ServerPayloadHandler {
             if (player.containerMenu instanceof NodeMenu menu
                     && menu.getNode() != null
                     && menu.getNode().getUUID().equals(node.getUUID())) {
-                NetworkHandler.sendToPlayer(player,
-                        new SyncChannelDataPayload(node.getId(), channelIndex, tag));
+                SyncChannelDataPayload.send(player, node.getId(), channelIndex, tag);
             }
         }
     }

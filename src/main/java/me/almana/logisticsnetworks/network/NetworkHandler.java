@@ -1,6 +1,9 @@
 package me.almana.logisticsnetworks.network;
 
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.RegistryFriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
@@ -15,10 +18,15 @@ import net.minecraftforge.network.PacketDistributor;
 import me.almana.logisticsnetworks.network.payload.IPayloadContext;
 import net.minecraftforge.network.simple.SimpleChannel;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.BiConsumer;
 
 public final class NetworkHandler {
 
+    // Forge caps clientbound payloads at 1MiB
+    private static final int CLIENTBOUND_BUDGET = 900_000;
     private static final String PROTOCOL_VERSION = "2";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "main"),
@@ -112,6 +120,47 @@ public final class NetworkHandler {
 
     public static void sendToPlayer(ServerPlayer player, CustomPacketPayload payload) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), payload);
+    }
+
+    public static <T> List<List<T>> split(List<T> items, BiConsumer<FriendlyByteBuf, T> writer) {
+        List<List<T>> parts = new ArrayList<>();
+        List<T> part = new ArrayList<>();
+        int used = 0;
+        FriendlyByteBuf probe = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            for (T item : items) {
+                probe.clear();
+                writer.accept(probe, item);
+                int size = probe.readableBytes();
+                if (used + size > CLIENTBOUND_BUDGET && !part.isEmpty()) {
+                    parts.add(part);
+                    part = new ArrayList<>();
+                    used = 0;
+                }
+                part.add(item);
+                used += size;
+            }
+        } finally {
+            probe.release();
+        }
+        parts.add(part);
+        return parts;
+    }
+
+    public static List<byte[]> split(CompoundTag tag) {
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+        byte[] bytes;
+        try {
+            buf.writeNbt(tag);
+            bytes = ByteBufUtil.getBytes(buf);
+        } finally {
+            buf.release();
+        }
+        List<byte[]> parts = new ArrayList<>();
+        for (int start = 0; start < bytes.length; start += CLIENTBOUND_BUDGET) {
+            parts.add(Arrays.copyOfRange(bytes, start, Math.min(bytes.length, start + CLIENTBOUND_BUDGET)));
+        }
+        return parts;
     }
 
     private static <T extends CustomPacketPayload> void registerServer(

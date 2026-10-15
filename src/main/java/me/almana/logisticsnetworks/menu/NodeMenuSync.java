@@ -2,7 +2,6 @@ package me.almana.logisticsnetworks.menu;
 
 import io.netty.buffer.Unpooled;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.SyncChannelDataPayload;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.network.FriendlyByteBuf;
@@ -50,8 +49,8 @@ public final class NodeMenuSync {
             return;
         // Too big: channels follow separately
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-            NetworkHandler.sendToPlayer(player, new SyncChannelDataPayload(node.getId(), i,
-                    node.getChannel(i).save(node.level().registryAccess())));
+            SyncChannelDataPayload.send(player, node.getId(), i,
+                    node.getChannel(i).save(node.level().registryAccess()));
         }
     }
 

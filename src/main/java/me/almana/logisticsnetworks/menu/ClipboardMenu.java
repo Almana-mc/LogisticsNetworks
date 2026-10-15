@@ -12,7 +12,6 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
-import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.network.SyncClipboardPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -104,7 +103,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
                 });
         // Too big: clipboard follows separately
         if (!inline && player.containerMenu instanceof ClipboardMenu)
-            NetworkHandler.sendToPlayer(player, new SyncClipboardPayload(tag));
+            SyncClipboardPayload.send(player, tag);
         NodeMenu.sendAvailableNetworkListToClient(player);
     }
 

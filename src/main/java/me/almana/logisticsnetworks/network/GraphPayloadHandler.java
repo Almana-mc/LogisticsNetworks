@@ -394,7 +394,7 @@ public final class GraphPayloadHandler {
                     BuiltInRegistries.BLOCK.getKey(attached.getBlock()).toString(), node.getNodeLabel(),
                     node.level().dimension().location(), node.isRenderVisible(), node.isHighlighted()));
         }
-        NetworkHandler.sendToPlayer(player, new SyncNetworkNodesPayload(networkId, nodes));
+        SyncNetworkNodesPayload.send(player, networkId, nodes);
     }
 
     private static void sendSnapshot(ServerPlayer player) {
@@ -410,8 +410,8 @@ public final class GraphPayloadHandler {
                 network.getNodeUuids().size(), nodes, network.getGraphPositions()));
         if (menu.getNode() != null) {
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                NetworkHandler.sendToPlayer(player, new SyncChannelDataPayload(menu.getNodeId(), i,
-                        menu.getNode().getChannel(i).save(player.serverLevel().registryAccess())));
+                SyncChannelDataPayload.send(player, menu.getNodeId(), i,
+                        menu.getNode().getChannel(i).save(player.serverLevel().registryAccess()));
             }
         }
     }

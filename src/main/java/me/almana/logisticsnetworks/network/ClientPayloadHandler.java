@@ -11,27 +11,61 @@ import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import com.mojang.logging.LogUtils;
+import io.netty.buffer.Unpooled;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import net.minecraft.client.Minecraft;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
 import me.almana.logisticsnetworks.network.payload.IPayloadContext;
+
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ClientPayloadHandler {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final List<SyncNetworkListPayload.NetworkEntry> NETWORK_PARTS = new ArrayList<>();
+    private static final List<SyncNetworkNodesPayload.NodeInfo> NODE_PARTS = new ArrayList<>();
+    private static final ByteArrayOutputStream CHANNEL_PARTS = new ByteArrayOutputStream();
+    private static final ByteArrayOutputStream CLIPBOARD_PARTS = new ByteArrayOutputStream();
+
+    @Nullable
+    private static <T> List<T> join(List<T> parts, List<T> part, boolean first, boolean more) {
+        if (first) parts.clear();
+        parts.addAll(part);
+        if (more) return null;
+        List<T> all = new ArrayList<>(parts);
+        parts.clear();
+        return all;
+    }
+
+    @Nullable
+    private static CompoundTag join(ByteArrayOutputStream parts, byte[] part, boolean first, boolean more) {
+        if (first) parts.reset();
+        parts.writeBytes(part);
+        if (more) return null;
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(parts.toByteArray()));
+        parts.reset();
+        return buf.readAnySizeNbt();
+    }
 
     public static void handleSyncNetworkList(SyncNetworkListPayload payload, IPayloadContext context) {
         LOGGER.debug("Received SyncNetworkListPayload with {} networks", payload.networks().size());
         context.enqueueWork(() -> {
+            var networks = join(NETWORK_PARTS, payload.networks(), payload.first(), payload.more());
+            if (networks == null) return;
             var screen = Minecraft.getInstance().screen;
             LOGGER.debug("Current screen: {}", screen != null ? screen.getClass().getSimpleName() : "null");
             if (screen instanceof NodeEditorScreen<?> nodeScreen) {
                 LOGGER.debug("Passing to NodeScreen");
-                nodeScreen.receiveNetworkList(payload.networks());
+                nodeScreen.receiveNetworkList(networks);
             } else if (screen instanceof ComputerScreen computerScreen) {
                 LOGGER.debug("Passing to ComputerScreen");
-                computerScreen.receiveNetworkList(payload.networks());
+                computerScreen.receiveNetworkList(networks);
             } else if (screen instanceof ClipboardScreen clipboardScreen) {
-                clipboardScreen.receiveNetworkList(payload.networks());
+                clipboardScreen.receiveNetworkList(networks);
             } else {
                 LOGGER.debug("Screen is not NodeScreen or ComputerScreen, ignoring");
             }
@@ -56,9 +90,9 @@ public class ClientPayloadHandler {
 
     public static void handleSyncNetworkNodes(SyncNetworkNodesPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            var screen = Minecraft.getInstance().screen;
-            if (screen instanceof ComputerScreen computerScreen) {
-                computerScreen.receiveNetworkNodes(payload.networkId(), payload.nodes());
+            var nodes = join(NODE_PARTS, payload.nodes(), payload.first(), payload.more());
+            if (nodes != null && Minecraft.getInstance().screen instanceof ComputerScreen computerScreen) {
+                computerScreen.receiveNetworkNodes(payload.networkId(), nodes);
             }
         });
     }
@@ -104,13 +138,14 @@ public class ClientPayloadHandler {
 
     public static void handleSyncChannelData(SyncChannelDataPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
+            CompoundTag channelTag = join(CHANNEL_PARTS, payload.channelBytes(), payload.first(), payload.more());
             var player = Minecraft.getInstance().player;
-            if (player == null || payload.channelTag() == null)
+            if (player == null || channelTag == null)
                 return;
             if (player.containerMenu instanceof NodeMenu menu && menu.getNodeId() == payload.entityId()) {
                 ChannelData channel = menu.getNode().getChannel(payload.channelIndex());
                 if (channel != null) {
-                    channel.load(payload.channelTag(), player.level().registryAccess());
+                    channel.load(channelTag, player.level().registryAccess());
                 }
             }
         });
@@ -131,8 +166,10 @@ public class ClientPayloadHandler {
 
     public static void handleSyncClipboard(SyncClipboardPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
+            CompoundTag clipboardTag = join(CLIPBOARD_PARTS, payload.clipboardBytes(), payload.first(), payload.more());
+            if (clipboardTag == null) return;
             var player = Minecraft.getInstance().player;
-            NodeClipboardConfig clipboard = NodeClipboardConfig.load(payload.clipboardTag(), null);
+            NodeClipboardConfig clipboard = NodeClipboardConfig.load(clipboardTag, null);
             if (player != null && clipboard != null && player.containerMenu instanceof ClipboardMenu menu) {
                 menu.setClipboard(clipboard);
                 if (Minecraft.getInstance().screen instanceof ClipboardScreen screen) screen.requestChannelNames();
