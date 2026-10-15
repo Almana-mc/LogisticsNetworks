@@ -60,21 +60,27 @@ public class WrenchHudOverlay {
             WrenchItem.Mode mode = WrenchItem.getMode(wrenchStack);
             Component modeText = Component.translatable("tooltip.logisticsnetworks.wrench.mode",
                     WrenchItem.getModeDisplayName(mode));
-            Component text = WrenchItem.hasAE2Link(wrenchStack)
+            var storageLink = WrenchItem.getStorageLink(wrenchStack);
+            Component text = storageLink != null
                     ? Component.empty().append(modeText).append(" ").append(
-                            Component.literal("[ME]").withStyle(net.minecraft.ChatFormatting.DARK_PURPLE))
+                            Component.literal("[").append(storageLink.backend().displayName()).append("]")
+                                    .withStyle(net.minecraft.ChatFormatting.DARK_PURPLE))
                     : modeText;
 
             GuiGraphics g = event.getGuiGraphics();
             int screenWidth = mc.getWindow().getGuiScaledWidth();
             int screenHeight = mc.getWindow().getGuiScaledHeight();
 
-            int x = screenWidth / 2 + 98;
+            int textWidth = mc.font.width(text);
+            int x = Math.min(screenWidth / 2 + 98, screenWidth - (int) Math.ceil(textWidth * 0.75) - 8);
             int y = screenHeight - 4;
 
             g.pose().pushPose();
             g.pose().translate(x, y, 0);
             g.pose().scale(0.75f, 0.75f, 1f);
+            g.fill(-5, -mc.font.lineHeight - 3, textWidth + 4, 3, 0xCC101010);
+            int color = WrenchItem.getModeDisplayName(mode).getStyle().getColor().getValue();
+            g.fill(-5, -mc.font.lineHeight - 3, -2, 3, 0xFF000000 | color);
             g.drawString(mc.font, text, 0, -mc.font.lineHeight, 0xFFFFFF, true);
             g.pose().popPose();
         }

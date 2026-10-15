@@ -8,7 +8,7 @@ import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
@@ -539,8 +539,11 @@ public class WrenchItem extends Item {
 
         LogisticsNodeEntity node = findNodeAt(level, clickedPos);
         if (node == null) {
-            if (isSecondaryUse(player) && AE2Compat.isLoaded() && AE2Compat.isGridHost(level, clickedPos)) {
-                return toggleAE2Link(context.getItemInHand(), player, level, clickedPos);
+            if (isSecondaryUse(player)) {
+                StorageBackend backend = LinkedStorage.detect(level, clickedPos);
+                if (backend != null) {
+                    return toggleStorageLink(context.getItemInHand(), player, level, clickedPos, backend);
+                }
             }
             return InteractionResult.SUCCESS;
         }
@@ -726,19 +729,22 @@ public class WrenchItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.mode", getModeDisplayName(getMode(stack))));
-        GlobalPos ae2Link = getAE2LinkPos(stack);
-        if (ae2Link != null) {
+        StorageLink storageLink = getStorageLink(stack);
+        if (storageLink != null) {
             if (ClientControls.modifier1Down()) {
-                BlockPos p = ae2Link.pos();
-                String dim = ae2Link.dimension().location().toString();
-                tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_linked_detail",
-                        p.getX(), p.getY(), p.getZ(), dim).withStyle(ChatFormatting.GREEN));
+                BlockPos pos = storageLink.position().pos();
+                String dimension = storageLink.position().dimension().location().toString();
+                tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.storage_linked_detail",
+                        storageLink.backend().displayName(), pos.getX(), pos.getY(), pos.getZ(), dimension)
+                        .withStyle(ChatFormatting.GREEN));
             } else {
-                tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_linked")
+                tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.storage_linked",
+                                storageLink.backend().displayName())
                         .withStyle(ChatFormatting.GREEN));
             }
-        } else if (AE2Compat.isLoaded()) {
-            tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.ae2_unlinked")
+        } else if (LinkedStorage.isBackendLoaded(StorageBackend.AE2)
+                || LinkedStorage.isBackendLoaded(StorageBackend.REFINED_STORAGE)) {
+            tooltip.add(Component.translatable("tooltip.logisticsnetworks.wrench.storage_unlinked")
                     .withStyle(ChatFormatting.RED));
         }
     }
@@ -755,15 +761,21 @@ public class WrenchItem extends Item {
         return null;
     }
 
-    private InteractionResult toggleAE2Link(ItemStack wrenchStack, Player player, Level level, BlockPos clickedPos) {
-        GlobalPos current = getAE2LinkPos(wrenchStack);
-        if (current != null && current.pos().equals(clickedPos) && current.dimension().equals(level.dimension())) {
-            clearAE2Link(wrenchStack);
-            player.displayClientMessage(Component.translatable("message.logisticsnetworks.ae2.unlinked"), true);
+    private InteractionResult toggleStorageLink(ItemStack wrenchStack, Player player, Level level,
+                                                BlockPos clickedPos, StorageBackend backend) {
+        StorageLink current = getStorageLink(wrenchStack);
+        StorageLink clicked = new StorageLink(backend, GlobalPos.of(level.dimension(), clickedPos));
+        if (clicked.equals(current)) {
+            clearStorageLink(wrenchStack);
+            player.displayClientMessage(Component.translatable("message.logisticsnetworks.storage.unlinked",
+                    backend.displayName()), true);
+        } else if (current != null) {
+            player.displayClientMessage(Component.translatable("message.logisticsnetworks.storage.link_conflict",
+                    current.backend().displayName()), true);
         } else {
-            setAE2Link(wrenchStack, level.dimension(), clickedPos);
-            player.displayClientMessage(Component.translatable("message.logisticsnetworks.ae2.linked",
-                    clickedPos.getX(), clickedPos.getY(), clickedPos.getZ()), true);
+            setStorageLink(wrenchStack, clicked);
+            player.displayClientMessage(Component.translatable("message.logisticsnetworks.storage.linked",
+                    backend.displayName(), clickedPos.getX(), clickedPos.getY(), clickedPos.getZ()), true);
         }
         return InteractionResult.CONSUME;
     }
