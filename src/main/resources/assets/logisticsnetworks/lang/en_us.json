@@ -438,6 +438,7 @@
   "config.jade.plugin_logisticsnetworks.node_attached": "Node Attached Hint",
   "config.jade.plugin_logisticsnetworks.logistics_node_entity": "Logistics Node Entity",
   "block.logisticsnetworks.computer": "Computer",
+  "block.logisticsnetworks.server_rack": "Logistics Server",
   "container.logisticsnetworks.computer": "Network Manager",
   "gui.logisticsnetworks.computer.no_networks": "No networks available",
   "gui.logisticsnetworks.computer.status.online": "ONLINE",

@@ -19,6 +19,8 @@ import me.almana.logisticsnetworks.item.TagFilterItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.block.ComputerBlock;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
+import me.almana.logisticsnetworks.block.ServerRackBlock;
+import me.almana.logisticsnetworks.block.ServerRackBlockEntity;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.WrenchResetRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -89,6 +91,14 @@ public class Registration {
                                         COMPUTER_BLOCK.get()).build(null));
         public static final RegistryObject<BlockItem> COMPUTER_ITEM = ITEMS.register("computer",
                         () -> new BlockItem(COMPUTER_BLOCK.get(), new Item.Properties()));
+        public static final RegistryObject<ServerRackBlock> SERVER_RACK_BLOCK = BLOCKS.register("server_rack",
+                        () -> new ServerRackBlock());
+        public static final RegistryObject<BlockItem> SERVER_RACK_ITEM = ITEMS.register("server_rack",
+                        () -> new BlockItem(SERVER_RACK_BLOCK.get(), new Item.Properties()));
+        public static final RegistryObject<BlockEntityType<ServerRackBlockEntity>> SERVER_RACK_BLOCK_ENTITY = BLOCK_ENTITY_TYPES
+                        .register("server_rack", () -> BlockEntityType.Builder.of(
+                                        ServerRackBlockEntity::new,
+                                        SERVER_RACK_BLOCK.get()).build(null));
 
         public static final RegistryObject<WrenchItem> WRENCH = ITEMS.register("wrench",
                         () -> new WrenchItem(new Item.Properties().stacksTo(1)));
