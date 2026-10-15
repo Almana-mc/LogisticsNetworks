@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
 import me.almana.logisticsnetworks.logic.TransferEngine;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -34,6 +35,7 @@ public class NetworkRegistry extends SavedData {
     private final TreeMap<Long, Set<UUID>> wakeBuckets = new TreeMap<>();
     private final Map<UUID, Long> scheduledWake = new HashMap<>();
     private final TelemetryManager telemetryManager = new TelemetryManager();
+    private final ServerRackLinks rackLinks = new ServerRackLinks();
 
     public NetworkRegistry() {
     }
@@ -155,6 +157,18 @@ public class NetworkRegistry extends SavedData {
         return telemetryManager;
     }
 
+    public ServerRackLinks getRackLinks() {
+        return rackLinks;
+    }
+
+    public void putRack(GlobalPos pos, ServerRackConfig config) {
+        rackLinks.put(pos, config).forEach(this::invalidateNetwork);
+    }
+
+    public void removeRack(GlobalPos pos) {
+        rackLinks.remove(pos).forEach(this::invalidateNetwork);
+    }
+
     public Map<UUID, LogisticsNetwork> getAllNetworks() {
         return Collections.unmodifiableMap(networks);
     }
@@ -177,9 +191,19 @@ public class NetworkRegistry extends SavedData {
 
     public void wakeNetwork(UUID networkId) {
         if (networks.containsKey(networkId)) {
-            cancelWake(networkId);
-            dirtyNetworks.add(networkId);
+            markDirty(networkId);
+            // Rack peers share wakeups
+            for (ServerRackLinks.Link link : rackLinks.linksFor(networkId)) {
+                if (networks.containsKey(link.peer())) {
+                    markDirty(link.peer());
+                }
+            }
         }
+    }
+
+    private void markDirty(UUID networkId) {
+        cancelWake(networkId);
+        dirtyNetworks.add(networkId);
     }
 
     public void invalidateNetwork(UUID networkId) {
