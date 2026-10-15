@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.block.TwoCellBlock;
+import me.almana.logisticsnetworks.integration.iris.IrisCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.LightTexture;
@@ -45,7 +46,9 @@ public final class TwoCellPlacementPreview {
 
     @SubscribeEvent
     public static void onTwoCellPreview(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
+        var renderStage = IrisCompat.isLoaded() ? RenderLevelStageEvent.Stage.AFTER_LEVEL
+                : RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS;
+        if (event.getStage() != renderStage || IrisCompat.isRenderingShadowPass()) return;
 
         Minecraft minecraft = Minecraft.getInstance();
         if (!(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) return;
@@ -82,6 +85,10 @@ public final class TwoCellPlacementPreview {
         boolean depthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
         poseStack.pushPose();
         try {
+            if (IrisCompat.isLoaded()) {
+                minecraft.getMainRenderTarget().bindWrite(false);
+                ModRenderTypes.levelView(poseStack, event.getCamera());
+            }
             poseStack.translate(pos.getX() - camera.x, pos.getY() - camera.y, pos.getZ() - camera.z);
             VertexConsumer consumer = buffers.getBuffer(ModRenderTypes.OVERLAY);
             PoseStack.Pose pose = poseStack.last();
