@@ -44,6 +44,8 @@ public final class FilterItemData {
     private static final String NBT_OP_EQUALS = "=";
     // Bounds channel sync size
     private static final int MAX_ENTRY_TAG_BYTES = 2048;
+    private static final int MAX_FILTER_BYTES = 32768;
+    private static boolean refused;
     private static final int MAX_ID_LENGTH = 256;
     private static final String KEY_ROOT = "ln_filter";
     private static final String KEY_VERSION = "v";
@@ -277,8 +279,8 @@ public final class FilterItemData {
                 entries.set(index, next);
             added++;
         }
-        if (added > 0)
-            saveEntries(filter, entries);
+        if (added > 0 && !saveEntries(filter, entries))
+            return new BulkAdd(0, full);
         return new BulkAdd(added, full);
     }
 
@@ -1069,9 +1071,7 @@ public final class FilterItemData {
             if (clean != null && entry.slot() >= 0 && entry.slot() < cap && used.add(entry.slot()))
                 kept.add(clean);
         }
-        if (!kept.isEmpty())
-            saveEntries(target, kept);
-        return true;
+        return kept.isEmpty() || saveEntries(target, kept);
     }
 
     @Nullable
@@ -1159,13 +1159,24 @@ public final class FilterItemData {
             entries.remove(index);
         else
             entries.set(index, next);
-        saveEntries(stack, entries);
-        return true;
+        return saveEntries(stack, entries);
     }
 
-    private static void saveEntries(ItemStack stack, List<GeneralFilterEntry> entries) {
+    public static boolean takeRefusal() {
+        boolean was = refused;
+        refused = false;
+        return was;
+    }
+
+    private static boolean saveEntries(ItemStack stack, List<GeneralFilterEntry> entries) {
         ListTag list = new ListTag();
         entries.forEach(entry -> list.add(entry.save()));
+        ListTag old = getRoot(stack).getList(KEY_ITEMS, Tag.TAG_COMPOUND);
+        int size = list.sizeInBytes();
+        if (size > MAX_FILTER_BYTES && size > old.sizeInBytes()) {
+            refused = true;
+            return false;
+        }
         updateRoot(stack, root -> {
             root.putInt(KEY_VERSION, VERSION);
             if (list.isEmpty())
@@ -1173,6 +1184,7 @@ public final class FilterItemData {
             else
                 root.put(KEY_ITEMS, list);
         });
+        return true;
     }
 
     private static boolean fluidHasTag(FluidStack fluid, String tag) {

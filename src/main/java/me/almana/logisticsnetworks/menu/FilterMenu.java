@@ -18,6 +18,7 @@ import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
@@ -1115,6 +1116,13 @@ public class FilterMenu extends AbstractContainerMenu {
             isTagSlot[s] = false;
             filterInventory.setItem(s, ItemStack.EMPTY);
         });
+    }
+
+    @Override
+    public void broadcastChanges() {
+        if (FilterItemData.takeRefusal() && player instanceof ServerPlayer sp)
+            sp.displayClientMessage(Component.translatable("message.logisticsnetworks.filter.too_large"), true);
+        super.broadcastChanges();
     }
 
     private void updateFilter(int slot, java.util.function.IntConsumer action) {

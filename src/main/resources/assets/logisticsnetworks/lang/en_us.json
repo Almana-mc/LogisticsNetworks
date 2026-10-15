@@ -554,6 +554,7 @@
   "gui.logisticsnetworks.filter.paste.empty": "Paste filter (clipboard empty)",
   "gui.logisticsnetworks.filter.scan_storage": "Scan attached storage",
   "gui.logisticsnetworks.filter.scan_storage.unavailable": "Scan attached storage (standard node filters only)",
+  "message.logisticsnetworks.filter.too_large": "Filter is too large",
   "message.logisticsnetworks.filter.copy.success": "Filter copied",
   "message.logisticsnetworks.filter.copy.empty": "Nothing to copy",
   "message.logisticsnetworks.filter.paste.success": "Filter pasted",
