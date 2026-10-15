@@ -316,6 +316,7 @@
   "gui.logisticsnetworks.filter_warning": "Warning: Filter configuration issues detected:",
   "gui.logisticsnetworks.rename": "Rename",
   "message.logisticsnetworks.not_owner": "You do not own this node",
+  "message.logisticsnetworks.payload_too_large": "That change is too large to send to the server",
   "message.logisticsnetworks.admin.enabled": "Admin mode enabled",
   "message.logisticsnetworks.admin.disabled": "Admin mode disabled",
   "message.logisticsnetworks.admin.enabled_other": "Enabled admin mode for %s",

@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import me.almana.logisticsnetworks.network.payload.IPayloadContext;
 
 import java.io.ByteArrayOutputStream;
@@ -30,6 +31,11 @@ public class ClientPayloadHandler {
     private static final List<SyncNetworkNodesPayload.NodeInfo> NODE_PARTS = new ArrayList<>();
     private static final ByteArrayOutputStream CHANNEL_PARTS = new ByteArrayOutputStream();
     private static final ByteArrayOutputStream CLIPBOARD_PARTS = new ByteArrayOutputStream();
+
+    public static void warnTooLarge() {
+        Minecraft.getInstance().player.displayClientMessage(
+                Component.translatable("message.logisticsnetworks.payload_too_large"), false);
+    }
 
     @Nullable
     private static <T> List<T> join(List<T> parts, List<T> part, boolean first, boolean more) {

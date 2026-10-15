@@ -20,13 +20,18 @@ import net.minecraftforge.network.simple.SimpleChannel;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
 public final class NetworkHandler {
 
     // Forge caps clientbound payloads at 1MiB
     private static final int CLIENTBOUND_BUDGET = 900_000;
+    // Serverbound payloads cap at 32767
+    private static final int SERVERBOUND_BUDGET = 32_000;
+    private static final Map<Class<?>, StreamCodec<?, ?>> SERVERBOUND_CODECS = new HashMap<>();
     private static final String PROTOCOL_VERSION = "2";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID, "main"),
@@ -115,6 +120,10 @@ public final class NetworkHandler {
     }
 
     public static void sendToServer(CustomPacketPayload payload) {
+        if (serverboundSize(payload) > SERVERBOUND_BUDGET) {
+            ClientPayloadHandler.warnTooLarge();
+            return;
+        }
         CHANNEL.sendToServer(payload);
     }
 
@@ -163,10 +172,22 @@ public final class NetworkHandler {
         return parts;
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private static int serverboundSize(CustomPacketPayload payload) {
+        FriendlyByteBuf probe = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            encode(probe, payload, (StreamCodec) SERVERBOUND_CODECS.get(payload.getClass()));
+            return probe.readableBytes();
+        } finally {
+            probe.release();
+        }
+    }
+
     private static <T extends CustomPacketPayload> void registerServer(
             Class<T> type,
             StreamCodec<?, T> streamCodec,
             BiConsumer<T, IPayloadContext> consumer) {
+        SERVERBOUND_CODECS.put(type, streamCodec);
         CHANNEL.messageBuilder(type, nextId++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder((message, buffer) -> encode(buffer, message, streamCodec))
                 .decoder(buffer -> decode(buffer, streamCodec))
