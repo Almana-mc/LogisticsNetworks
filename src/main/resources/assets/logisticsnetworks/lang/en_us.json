@@ -358,6 +358,8 @@
   "message.logisticsnetworks.storage.failure.canceled": "The %s crafting request was canceled for %s",
   "message.logisticsnetworks.storage.failure.submission": "%s could not start or finish crafting %s",
   "message.logisticsnetworks.storage.failure.target_invalid": "The target changed before %s finished supplying %s; crafted items were returned",
+  "message.logisticsnetworks.storage.subject.mass_placement": "mass placement of %s nodes",
+  "message.logisticsnetworks.mass_placement.queued": "Mass placement queued in linked storage",
   "message.logisticsnetworks.label.rollback_incomplete": "The original upgrade was no longer available, so the source node was only partially restored",
   "key.categories.logisticsnetworks": "Logistics Networks",
   "pack.logisticsnetworks.original_textures": "Original Textures",

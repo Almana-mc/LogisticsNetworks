@@ -3,7 +3,11 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageAccess;
+import me.almana.logisticsnetworks.integration.storage.StorageAction;
+import me.almana.logisticsnetworks.integration.storage.StorageInventory;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
 import me.almana.logisticsnetworks.network.NetworkHandler;
@@ -21,9 +25,11 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class MassPlacementMenu extends AbstractContainerMenu {
@@ -39,12 +45,14 @@ public class MassPlacementMenu extends AbstractContainerMenu {
     private static final int DATA_UPGRADES_REQUIRED = 2;
     private static final int DATA_FILTERS_REQUIRED = 3;
     private static final int DATA_CAN_PLACE = 4;
-    private static final int DATA_SIZE = 5;
+    private static final int DATA_PENDING = 5;
+    private static final int DATA_SIZE = 6;
 
     private final InteractionHand hand;
     private final Player player;
     private final int lockedSlot;
     private final ContainerData data = new SimpleContainerData(DATA_SIZE);
+    private final UUID supplyRequestId = UUID.randomUUID();
     private String lastChoicesKey = "";
     private String lastRequirementsKey = "";
 
@@ -86,6 +94,10 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         return data.get(DATA_CAN_PLACE) == 1;
     }
 
+    public boolean isPending() {
+        return data.get(DATA_PENDING) == 1;
+    }
+
     @Override
     public boolean stillValid(Player player) {
         ItemStack stack = getWrenchStack();
@@ -102,6 +114,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         if (player.level().isClientSide) {
             return false;
         }
+        if (LinkedStorage.isSupplyPending(supplyRequestId)) return false;
 
         if (id == ID_PLACE_NODES) {
             boolean placed = placeSelectedNodes();
@@ -179,15 +192,17 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         boolean creative = player.isCreative();
         int protectedSlot = findProtectedSlot(player.getInventory(), wrenchStack);
         List<Requirement> requirements = buildRequirements(nodeCount, clipboardPresent && clipboardValid ? clipboard : null);
-        boolean hasItems = creative || hasInventoryRequirements(player.getInventory(), requirements, protectedSlot);
+        boolean pending = LinkedStorage.isSupplyPending(supplyRequestId);
+        boolean hasItems = creative || hasSupplyPath(player.getInventory(), requirements, protectedSlot);
         boolean canPlace = area != null && area.isComplete() && hasBlockSelection && nodeCount > 0
-                && clipboardValid && hasItems;
+                && clipboardValid && hasItems && !pending;
 
         data.set(DATA_SELECTED, selectedCount);
         data.set(DATA_NODES_REQUIRED, nodeCount);
         data.set(DATA_UPGRADES_REQUIRED, upgradesRequired);
         data.set(DATA_FILTERS_REQUIRED, filtersRequired);
         data.set(DATA_CAN_PLACE, canPlace ? 1 : 0);
+        data.set(DATA_PENDING, pending ? 1 : 0);
     }
 
     private void clearData() {
@@ -196,6 +211,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         data.set(DATA_UPGRADES_REQUIRED, 0);
         data.set(DATA_FILTERS_REQUIRED, 0);
         data.set(DATA_CAN_PLACE, 0);
+        data.set(DATA_PENDING, 0);
     }
 
     private boolean placeSelectedNodes() {
@@ -228,29 +244,70 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             return false;
         }
 
-        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrenchStack, level.registryAccess());
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrenchStack, player.level().registryAccess());
         boolean clipboardPresent = clipboard != null && !clipboard.isEffectivelyEmpty();
         if (clipboardPresent && !clipboard.isStructurallyValid()) {
             player.displayClientMessage(Component.translatable("message.logisticsnetworks.clipboard.invalid"), true);
             return false;
         }
 
-        NodeClipboardConfig pasted = clipboardPresent ? clipboard : null;
-        if (player.isCreative()) {
-            return commitPlacement(level, wrenchStack, pasted, validTargets);
+        int nodeCount = validTargets.size();
+        boolean creative = player.isCreative();
+        ItemStack requestWrench = wrenchStack;
+
+        if (creative) {
+            return commitPlacement(level, requestWrench, clipboardPresent ? clipboard : null, validTargets);
         }
 
         int protectedSlot = findProtectedSlot(player.getInventory(), wrenchStack);
-        List<Requirement> requirements = buildRequirements(validTargets.size(), pasted);
-        if (!hasInventoryRequirements(player.getInventory(), requirements, protectedSlot)) {
+        List<Requirement> requirements = buildRequirements(nodeCount, clipboardPresent ? clipboard : null);
+        StorageLink storageLink = getStorageLink();
+        if (hasInventoryRequirements(player.getInventory(), requirements, protectedSlot)) {
+            consumeInventoryRequirements(player.getInventory(), requirements, protectedSlot);
+            boolean committed = commitPlacement(level, requestWrench,
+                    clipboardPresent ? clipboard : null, validTargets);
+            if (!committed) returnInventoryRequirements(requirements, serverPlayer);
+            return committed;
+        }
+        if (storageLink == null) {
             reportMassFailure(serverPlayer, formatMissingInventory(
                     player.getInventory(), requirements, protectedSlot));
             return false;
         }
-        consumeInventoryRequirements(player.getInventory(), requirements, protectedSlot);
-        boolean committed = commitPlacement(level, wrenchStack, pasted, validTargets);
-        if (!committed) returnInventoryRequirements(player.getInventory(), requirements, serverPlayer);
-        return committed;
+
+        List<LinkedStorage.ItemRequirement> requested = requirements.stream()
+                .map(requirement -> new LinkedStorage.ItemRequirement(requirement.stack, requirement.count))
+                .toList();
+        Component subject = Component.translatable(
+                "message.logisticsnetworks.storage.subject.mass_placement", nodeCount);
+        LinkedStorage.SupplyRequestResult result = LinkedStorage.requestSupply(
+                supplyRequestId, serverPlayer, storageLink, requested, protectedSlot, subject,
+                new LinkedStorage.SupplyOperation() {
+                    @Override
+                    public boolean stillValid() {
+                        return validateSnapshot(level, requestWrench, validTargets);
+                    }
+
+                    @Override
+                    public boolean commit() {
+                        return commitPlacement(level, requestWrench,
+                                clipboardPresent ? clipboard : null, validTargets);
+                    }
+
+                    @Override
+                    public void failed(Component detail) {
+                        reportMassFailure(serverPlayer, detail);
+                    }
+                });
+        if (result == LinkedStorage.SupplyRequestResult.QUEUED) {
+            player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.mass_placement.queued"), true);
+            refreshState();
+            sendRequirements();
+            broadcastChanges();
+            return true;
+        }
+        return result == LinkedStorage.SupplyRequestResult.COMPLETED;
     }
 
     private boolean validateSnapshot(ServerLevel level, ItemStack wrenchStack,
@@ -281,8 +338,8 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             placed.add(node);
         }
         if (clipboard != null) {
-            NodeClipboardConfig.syncPastedLabel((ServerPlayer) player, placed);
-            WrenchItem.setClipboard(wrenchStack, clipboard, level.registryAccess());
+            NodeClipboardConfig.syncPastedLabel((ServerPlayer) player, placed, getStorageLink());
+            WrenchItem.setClipboard(wrenchStack, clipboard, player.level().registryAccess());
         }
         WrenchItem.clearMassSelections(wrenchStack);
         player.getInventory().setChanged();
@@ -332,11 +389,34 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         requirements.add(new Requirement(stack.copyWithCount(1), count));
     }
 
-    // Inventory only until Phase 8
+    @Nullable
+    private StorageLink getStorageLink() {
+        ItemStack wrenchStack = getWrenchStack();
+        return WrenchItem.getStorageLink(wrenchStack);
+    }
+
+    private boolean hasSupplyPath(Inventory inventory, List<Requirement> requirements, int protectedSlot) {
+        StorageLink storageLink = getStorageLink();
+        ServerLevel level = player.level() instanceof ServerLevel sl ? sl : null;
+        StorageAccess access = storageLink == null || level == null ? null
+                : LinkedStorage.resolve(level, storageLink);
+        if (access != null && !access.allows((ServerPlayer) player, StorageAction.EXTRACT)) access = null;
+        for (Requirement requirement : requirements) {
+            int inventoryCount = StorageInventory.count(inventory, requirement.stack, protectedSlot);
+            if (inventoryCount >= requirement.count) continue;
+            if (access == null) return false;
+            long stored = access.count(requirement.stack);
+            if (inventoryCount + stored >= requirement.count) continue;
+            if (!access.allows((ServerPlayer) player, StorageAction.AUTOCRAFT)
+                    || !access.isCraftable(requirement.stack)) return false;
+        }
+        return true;
+    }
+
     private boolean hasInventoryRequirements(Inventory inventory, List<Requirement> requirements,
                                              int protectedSlot) {
         for (Requirement requirement : requirements) {
-            if (AE2Compat.countInInventory(inventory, requirement.stack, protectedSlot) < requirement.count) {
+            if (StorageInventory.count(inventory, requirement.stack, protectedSlot) < requirement.count) {
                 return false;
             }
         }
@@ -346,19 +426,15 @@ public class MassPlacementMenu extends AbstractContainerMenu {
     private void consumeInventoryRequirements(Inventory inventory, List<Requirement> requirements,
                                               int protectedSlot) {
         for (Requirement requirement : requirements) {
-            AE2Compat.consumeFromInventory(inventory, requirement.stack, requirement.count, protectedSlot);
+            StorageInventory.reserve(inventory, requirement.stack, requirement.count, protectedSlot);
         }
         inventory.setChanged();
     }
 
-    private void returnInventoryRequirements(Inventory inventory, List<Requirement> requirements,
-                                             ServerPlayer serverPlayer) {
-        for (Requirement requirement : requirements) {
-            ItemStack returned = requirement.stack.copyWithCount(requirement.count);
-            inventory.add(returned);
-            if (!returned.isEmpty()) serverPlayer.drop(returned, false);
-        }
-        inventory.setChanged();
+    private void returnInventoryRequirements(List<Requirement> requirements, ServerPlayer serverPlayer) {
+        List<ItemStack> stacks = new ArrayList<>();
+        for (Requirement requirement : requirements) stacks.add(requirement.stack.copyWithCount(requirement.count));
+        StorageInventory.returnToPlayer(serverPlayer, stacks);
     }
 
     private void reportMassFailure(ServerPlayer player, Component detail) {
@@ -373,7 +449,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         int entries = 0;
         for (Requirement requirement : requirements) {
             int count = requirement.count
-                    - AE2Compat.countInInventory(inventory, requirement.stack, protectedSlot);
+                    - StorageInventory.count(inventory, requirement.stack, protectedSlot);
             if (count <= 0) continue;
             if (entries++ > 0) missing = missing.copy().append(", ");
             missing = missing.copy().append(Component.literal(count + "x "))
@@ -434,22 +510,35 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             boolean usableClipboard = clipboard != null && !clipboard.isEffectivelyEmpty()
                     && clipboard.isStructurallyValid();
             int protectedSlot = findProtectedSlot(player.getInventory(), wrenchStack);
+            StorageLink storageLink = getStorageLink();
+            StorageAccess access = storageLink == null ? null
+                    : LinkedStorage.resolve(serverPlayer.serverLevel(), storageLink);
+            if (access != null && !access.allows(serverPlayer, StorageAction.EXTRACT)) access = null;
             for (Requirement requirement : buildRequirements(
                     getNodesRequired(), usableClipboard ? clipboard : null)) {
-                int inventory = AE2Compat.countInInventory(
+                int inventory = StorageInventory.count(
                         player.getInventory(), requirement.stack, protectedSlot);
+                long stored = access == null ? 0 : access.count(requirement.stack);
+                boolean craftable = access != null && inventory + stored < requirement.count
+                        && access.allows(serverPlayer, StorageAction.AUTOCRAFT)
+                        && access.isCraftable(requirement.stack);
+                boolean storageUsed = inventory < requirement.count && access != null
+                        && (inventory + stored >= requirement.count || craftable);
+                boolean missing = inventory + stored < requirement.count && !craftable;
                 payloadRequirements.add(new SyncMassPlacementRequirementsPayload.Requirement(
                         requirement.stack.copyWithCount(1), requirement.count, inventory,
-                        0, false, false, inventory < requirement.count));
+                        stored, craftable, storageUsed, missing));
             }
         }
-        String key = payloadRequirements.stream()
-                .map(entry -> entry.item().getItem() + ":" + entry.required() + ":" + entry.inventory())
+        boolean pending = LinkedStorage.isSupplyPending(supplyRequestId);
+        String key = pending + ":" + payloadRequirements.stream()
+                .map(entry -> entry.item().getItem() + ":" + entry.required() + ":" + entry.inventory()
+                        + ":" + entry.storageStored() + ":" + entry.storageCraftable())
                 .collect(Collectors.joining("|"));
         if (key.equals(lastRequirementsKey)) return;
         lastRequirementsKey = key;
         NetworkHandler.sendToPlayer(serverPlayer,
-                new SyncMassPlacementRequirementsPayload(containerId, false, payloadRequirements));
+                new SyncMassPlacementRequirementsPayload(containerId, pending, payloadRequirements));
     }
 
     private static class Requirement {

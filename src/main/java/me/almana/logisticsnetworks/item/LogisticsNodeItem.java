@@ -90,7 +90,8 @@ public class LogisticsNodeItem extends Item {
             return;
         }
 
-        NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(serverPlayer, node, offhand);
+        NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(
+                serverPlayer, node, offhand, WrenchItem.getStorageLink(offhand));
         switch (outcome.result()) {
             case SUCCESS -> WrenchItem.setClipboard(offhand, clipboard, serverPlayer.level().registryAccess());
             case MISSING_ITEMS -> WrenchItem.reportPasteMissing(serverPlayer, outcome);

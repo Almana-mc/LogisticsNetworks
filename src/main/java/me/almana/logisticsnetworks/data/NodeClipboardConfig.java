@@ -7,14 +7,17 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.ModFilterData;
 import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageAccess;
+import me.almana.logisticsnetworks.integration.storage.StorageAction;
+import me.almana.logisticsnetworks.integration.storage.StorageInventory;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.Direction;
-import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CollectionTag;
 import net.minecraft.nbt.CompoundTag;
@@ -827,7 +830,7 @@ public final class NodeClipboardConfig {
     }
 
     public PasteOutcome applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack,
-                                   @Nullable GlobalPos ae2Link) {
+                                   @Nullable StorageLink storageLink) {
         if (player == null || node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT
                 || player.hasDisconnected() || !player.isAlive()) {
             return new PasteOutcome(PasteResult.CLIPBOARD_INVALID);
@@ -846,14 +849,15 @@ public final class NodeClipboardConfig {
         List<Requirement> requirements = buildUpgradeRequirements(node);
         List<ItemStack> returnedItems = collectReturnedItems(node);
 
-        List<RequiredItem> missingItems = findMissing(player, requirements, protectedSlot, ae2Link);
+        StorageAccess access = storageLink == null ? null : LinkedStorage.resolve(player.serverLevel(), storageLink);
+        if (access != null && !access.allows(player, StorageAction.EXTRACT)) access = null;
+        List<RequiredItem> missingItems = findMissing(inventory, requirements, protectedSlot, access);
         if (!missingItems.isEmpty()) {
             return new PasteOutcome(PasteResult.MISSING_ITEMS, missingItems);
         }
-
-        for (Requirement requirement : requirements) {
-            AE2Compat.consumeCombined(inventory, requirement.stack(), requirement.count(),
-                    protectedSlot, ae2Link, player);
+        PasteOutcome shortfall = reserveRequirements(player, requirements, protectedSlot, access);
+        if (shortfall != null) {
+            return shortfall;
         }
         applyToNode(node);
         applyNetworkToNode(node, player);
@@ -862,23 +866,49 @@ public final class NodeClipboardConfig {
             player.drop(leftover, false);
         }
         inventory.setChanged();
-        syncPastedLabel(player, List.of(node));
+        syncPastedLabel(player, List.of(node), storageLink);
 
         return new PasteOutcome(PasteResult.SUCCESS);
     }
 
-    private static List<RequiredItem> findMissing(ServerPlayer player, List<Requirement> requirements,
-            int protectedSlot, @Nullable GlobalPos ae2Link) {
+    private static List<RequiredItem> findMissing(Inventory inventory, List<Requirement> requirements,
+            int protectedSlot, @Nullable StorageAccess access) {
         List<RequiredItem> missingItems = new ArrayList<>();
         for (Requirement requirement : requirements) {
-            long available = AE2Compat.countInInventory(player.getInventory(), requirement.stack(), protectedSlot);
-            if (ae2Link != null && available < requirement.count())
-                available += AE2Compat.countAvailable(player.serverLevel(), ae2Link, requirement.stack());
+            long available = StorageInventory.count(inventory, requirement.stack(), protectedSlot);
+            if (access != null && available < requirement.count())
+                available += access.count(requirement.stack());
             long missing = requirement.count() - available;
             if (missing > 0)
                 missingItems.add(new RequiredItem(ItemStackCompat.copyWithCount(requirement.stack(), 1), (int) missing));
         }
         return missingItems;
+    }
+
+    // Undo on any shortfall
+    @Nullable
+    private static PasteOutcome reserveRequirements(ServerPlayer player, List<Requirement> requirements,
+            int protectedSlot, @Nullable StorageAccess access) {
+        List<ItemStack> inventoryReserved = new ArrayList<>();
+        List<ItemStack> storageReserved = new ArrayList<>();
+        for (Requirement requirement : requirements) {
+            List<ItemStack> fromInventory = StorageInventory.reserve(
+                    player.getInventory(), requirement.stack(), requirement.count(), protectedSlot);
+            inventoryReserved.addAll(fromInventory);
+            int remaining = requirement.count() - StorageInventory.count(fromInventory);
+            List<ItemStack> fromStorage = access == null ? List.of()
+                    : access.extract(requirement.stack(), remaining, player);
+            storageReserved.addAll(fromStorage);
+            int extracted = StorageInventory.count(fromStorage);
+            if (extracted != remaining) {
+                StorageInventory.returnToPlayer(player, inventoryReserved);
+                if (access == null) StorageInventory.returnToPlayer(player, storageReserved);
+                else StorageInventory.returnToStorageOrPlayer(access, player, storageReserved);
+                return new PasteOutcome(PasteResult.MISSING_ITEMS, List.of(new RequiredItem(
+                        requirement.stack().copyWithCount(1), Math.max(1, remaining - extracted))));
+            }
+        }
+        return null;
     }
 
     public PasteResult applyToNodeWithoutInventory(ServerPlayer player, LogisticsNodeEntity node) {
@@ -899,14 +929,15 @@ public final class NodeClipboardConfig {
         return PasteResult.SUCCESS;
     }
 
-    public static void syncPastedLabel(ServerPlayer player, List<LogisticsNodeEntity> nodes) {
+    public static void syncPastedLabel(ServerPlayer player, List<LogisticsNodeEntity> nodes,
+                                       @Nullable StorageLink storageLink) {
         LogisticsNodeEntity first = nodes.get(0);
         String label = first.getNodeLabel();
         if (label.isEmpty() || first.getNetworkId() == null) return;
         LogisticsNetwork network = NetworkRegistry.get(player.serverLevel()).getNetwork(first.getNetworkId());
         if (network == null) return;
         nodes.forEach(node -> node.setLabelRevision(0));
-        LabelUpgradeSync.synchronizeLabels(player, network, nodes, first.getUUID(), label, null);
+        LabelUpgradeSync.synchronizeLabels(player, network, nodes, first.getUUID(), label, storageLink);
     }
 
     private boolean canAccessTargetNetwork(ServerPlayer player, LogisticsNodeEntity node) {

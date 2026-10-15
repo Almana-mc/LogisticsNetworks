@@ -359,10 +359,10 @@ public class WrenchItem extends Item {
         int pasted = 0;
         NodeClipboardConfig.PasteOutcome missingOutcome = null;
         boolean incompatibleOnly = false;
-        GlobalPos ae2Link = getAE2LinkPos(wrenchStack);
+        StorageLink storageLink = getStorageLink(wrenchStack);
 
         for (LogisticsNodeEntity node : targets) {
-            NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(player, node, wrenchStack, ae2Link);
+            NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(player, node, wrenchStack, storageLink);
             switch (outcome.result()) {
                 case SUCCESS -> {
                     pasted++;
@@ -828,8 +828,8 @@ public class WrenchItem extends Item {
             return InteractionResult.CONSUME;
         }
 
-        GlobalPos ae2Link = getAE2LinkPos(wrenchStack);
-        NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(serverPlayer, node, wrenchStack, ae2Link);
+        StorageLink storageLink = getStorageLink(wrenchStack);
+        NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(serverPlayer, node, wrenchStack, storageLink);
         switch (outcome.result()) {
             case SUCCESS -> {
                 setClipboard(wrenchStack, clipboard, serverPlayer.level().registryAccess());
@@ -945,24 +945,6 @@ public class WrenchItem extends Item {
             root.remove(KEY_CLIPBOARD);
             writeRoot(customTag, root);
         });
-    }
-
-    public static void setAE2Link(ItemStack stack, ResourceKey<Level> dimension, BlockPos pos) {
-        setStorageLink(stack, new StorageLink(StorageBackend.AE2, GlobalPos.of(dimension, pos)));
-    }
-
-    public static void clearAE2Link(ItemStack stack) {
-        clearStorageLink(stack);
-    }
-
-    public static boolean hasAE2Link(ItemStack stack) {
-        return getAE2LinkPos(stack) != null;
-    }
-
-    @Nullable
-    public static GlobalPos getAE2LinkPos(ItemStack stack) {
-        StorageLink link = getStorageLink(stack);
-        return link != null && link.backend() == StorageBackend.AE2 ? link.position() : null;
     }
 
     public static void setStorageLink(ItemStack stack, StorageLink link) {
