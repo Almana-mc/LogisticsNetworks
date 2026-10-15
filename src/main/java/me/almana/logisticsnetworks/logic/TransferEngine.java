@@ -11,6 +11,8 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
+import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import mekanism.api.chemical.IChemicalHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -60,6 +62,7 @@ public class TransferEngine {
         private final Map<Long, Object> energy = new HashMap<>();
         private final Map<Long, Object> chemicals = new HashMap<>();
         private static final Object ABSENT = new Object();
+        final TransferCapabilityCache interfaces = new TransferCapabilityCache(this);
 
         IItemHandler getItemHandler(ServerLevel level, BlockPos pos, Direction dir) {
             long key = capKey(level, pos, dir);
@@ -507,7 +510,11 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IItemHandler sourceHandler = capCache.findItemHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
+        ItemStack[] exportFilters = exportChannel.getFilterItems();
+        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
+        boolean directSource = !FilterLogic.hasConfiguredSlotMapping(exportFilters, filterReadCache);
+        IItemHandler sourceHandler = capCache.interfaces.findItemExportHandler(sourceNode,
+                exportChannel.getIoDirection(), directSource);
         if (sourceHandler == null)
             return 0;
 
@@ -515,9 +522,7 @@ public class TransferEngine {
         boolean anyReachable = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
         List<ImportTarget> reachableRefs = new ArrayList<>(targets.size());
-        ItemStack[] exportFilters = exportChannel.getFilterItems();
         boolean[] sourceAllowedSlots = null;
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
 
         for (ImportTarget target : targets) {
             if (target.node.getUUID().equals(sourceNode.getUUID()))
@@ -533,11 +538,13 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IItemHandler targetHandler = capCache.findItemHandler(targetLevel, targetPos, target.channel.getIoDirection());
-            if (targetHandler == null)
+            ItemStack[] importFilters = target.channel.getFilterItems();
+            boolean hasImportSlotMapping = FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache);
+            IItemHandler targetHandler = capCache.interfaces.findItemImportHandler(target.node,
+                    target.channel.getIoDirection(), !hasImportSlotMapping);
+            if (targetHandler == null || DirectStorageHandlers.shareNetwork(sourceHandler, targetHandler))
                 continue;
 
-            ItemStack[] importFilters = target.channel.getFilterItems();
             boolean[] targetAllowedSlots = null;
 
             reachableTargets.add(new ItemTransferTarget(
@@ -547,7 +554,7 @@ public class TransferEngine {
                     collectAmountConstraints(exportFilters, importFilters),
                     FilterLogic.hasConfiguredItemNbtFilter(importFilters, filterReadCache),
                     targetAllowedSlots,
-                    FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache)));
+                    hasImportSlotMapping));
             reachableRefs.add(target);
         }
         if (!anyReachable)
@@ -577,7 +584,7 @@ public class TransferEngine {
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
                 sourceLevel, sourcePos, filterReadCache, sourceItemCounts,
-                sourceItemCounts == null ? null : buildTargetItemCounts(reachableTargets), false, null, null);
+                sourceItemCounts == null ? null : buildTargetItemCounts(reachableTargets, sourceItemCounts), false, null, null);
     }
 
     private static int dealItems(IItemHandler source, List<ItemTransferTarget> targets, int batchLimit,
@@ -606,7 +613,7 @@ public class TransferEngine {
             if (budget <= 0)
                 continue;
             if (sourceItemCounts != null && targetItemCounts == null)
-                targetItemCounts = buildTargetItemCounts(targets);
+                targetItemCounts = buildTargetItemCounts(targets, sourceItemCounts);
             moved += executeMove(source, targets, budget, exportFilters, exportFilterMode, sourceAllowedSlots,
                     provider, sourceLevel, sourcePos, filterReadCache, sourceItemCounts, targetItemCounts, true,
                     slots, resource);
@@ -624,7 +631,7 @@ public class TransferEngine {
             int moved = executeMove(source, one, batchLimit, exportChannel.getFilterItems(),
                     exportChannel.getFilterMode(), sourceAllowedSlots, sourceLevel.registryAccess(), sourceLevel,
                     sourcePos, filterReadCache, sourceItemCounts,
-                    sourceItemCounts == null ? null : buildTargetItemCounts(one), false, null, null);
+                    sourceItemCounts == null ? null : buildTargetItemCounts(one, sourceItemCounts), false, null, null);
             if (moved > 0) {
                 markServed(exportChannel, refs.get(i));
                 return moved;
@@ -662,7 +669,7 @@ public class TransferEngine {
         ItemStack[] filters = exportChannel.getFilterItems();
         FilterMode filterMode = exportChannel.getFilterMode();
         boolean nbtFilter = FilterLogic.hasConfiguredItemNbtFilter(filters, filterReadCache);
-        List<Map<Item, Integer>> targetCounts = sourceItemCounts == null ? null : buildTargetItemCounts(targets);
+        List<Map<Item, Integer>> targetCounts = sourceItemCounts == null ? null : buildTargetItemCounts(targets, sourceItemCounts);
         ItemResourceOrder.Result result = ItemResourceOrder.move(source, exportChannel.getItemResourceCursor(),
                 slots -> {
                     ItemStack resource = source.getStackInSlot(slots[0]).copy();
@@ -686,14 +693,22 @@ public class TransferEngine {
         return false;
     }
 
-    private static List<Map<Item, Integer>> buildTargetItemCounts(List<ItemTransferTarget> targets) {
+    private static List<Map<Item, Integer>> buildTargetItemCounts(List<ItemTransferTarget> targets,
+            Map<Item, Integer> sourceItemCounts) {
         List<Map<Item, Integer>> counts = new ArrayList<>(targets.size());
         for (ItemTransferTarget t : targets) {
             counts.add(t.constraints().hasImportThreshold || t.constraints().hasPerEntryAmounts
-                    ? buildItemCountCache(t.handler())
+                    ? targetItemCounts(t.handler(), sourceItemCounts)
                     : null);
         }
         return counts;
+    }
+
+    // Storage networks: count sent items
+    private static Map<Item, Integer> targetItemCounts(IItemHandler handler, Map<Item, Integer> sourceItemCounts) {
+        return handler instanceof DirectItemAccess direct
+                ? new HashMap<>(direct.countItems(sourceItemCounts.keySet()))
+                : buildItemCountCache(handler);
     }
 
     private record FluidTarget(IFluidHandler handler, ImportTarget ref) {
@@ -706,12 +721,13 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        IFluidHandler sourceHandler = capCache.findFluidHandler(sourceLevel, sourcePos, exportChannel.getIoDirection());
+        IFluidHandler sourceHandler = capCache.interfaces.findFluidExportHandler(sourceNode,
+                exportChannel.getIoDirection());
         if (sourceHandler == null)
             return 0;
 
         List<FluidTarget> resolved = new ArrayList<>(targets.size());
-        if (!resolveFluidTargets(sourceNode, targets, dimensionalCache, capCache, resolved))
+        if (!resolveFluidTargets(sourceNode, sourceHandler, targets, dimensionalCache, capCache, resolved))
             return -1;
         FilterItemData.ReadCache cache = FilterItemData.createReadCache();
         HolderLookup.Provider provider = sourceLevel.registryAccess();
@@ -723,8 +739,9 @@ public class TransferEngine {
     }
 
     // False if none reachable
-    private static boolean resolveFluidTargets(LogisticsNodeEntity sourceNode, List<ImportTarget> targets,
-            Map<UUID, Boolean> dimensionalCache, CapCache capCache, List<FluidTarget> out) {
+    private static boolean resolveFluidTargets(LogisticsNodeEntity sourceNode, IFluidHandler sourceHandler,
+            List<ImportTarget> targets, Map<UUID, Boolean> dimensionalCache, CapCache capCache,
+            List<FluidTarget> out) {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         boolean anyReachable = false;
         for (ImportTarget target : targets) {
@@ -736,8 +753,9 @@ public class TransferEngine {
             BlockPos targetPos = target.node.getAttachedPos();
             if (!targetLevel.isLoaded(targetPos))
                 continue;
-            IFluidHandler handler = capCache.findFluidHandler(targetLevel, targetPos, target.channel.getIoDirection());
-            if (handler != null)
+            IFluidHandler handler = capCache.interfaces.findFluidImportHandler(target.node,
+                    target.channel.getIoDirection());
+            if (handler != null && !DirectStorageHandlers.shareNetwork(sourceHandler, handler))
                 out.add(new FluidTarget(handler, target));
         }
         return anyReachable;
@@ -1393,7 +1411,8 @@ public class TransferEngine {
             return ItemStack.EMPTY;
         }
         if (allowedSlots == null) {
-            return ItemHandlerHelper.insertItemStacked(handler, stack, simulate);
+            return handler instanceof DirectItemAccess direct ? direct.insert(stack, simulate)
+                    : ItemHandlerHelper.insertItemStacked(handler, stack, simulate);
         }
         if (handler instanceof IItemHandlerModifiable modifiable) {
             return insertItemStrictAllowedSlots(modifiable, stack, simulate, allowedSlots);
