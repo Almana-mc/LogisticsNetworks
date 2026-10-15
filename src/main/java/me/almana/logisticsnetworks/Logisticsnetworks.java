@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks;
 
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
@@ -35,6 +35,6 @@ public class Logisticsnetworks {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
-        event.enqueueWork(AE2Compat::registerLinkable);
+        event.enqueueWork(LinkedStorage::initialize);
     }
 }

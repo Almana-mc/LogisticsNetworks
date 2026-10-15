@@ -11,8 +11,6 @@ import net.minecraft.world.level.Level;
 import net.minecraftforge.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.List;
 
 public final class AE2Compat {
 
@@ -27,24 +25,6 @@ public final class AE2Compat {
             loaded = ModList.get().isLoaded(AE2_MOD_ID);
         }
         return loaded;
-    }
-
-    public record PatternEntry(ItemStack item, int amount) {
-    }
-
-    public static List<PatternEntry> readPatternInputs(ItemStack pattern) {
-        if (!isLoaded()) return Collections.emptyList();
-        return AE2PatternHelper.readInputs(pattern);
-    }
-
-    public static List<PatternEntry> readPatternOutputs(ItemStack pattern) {
-        if (!isLoaded()) return Collections.emptyList();
-        return AE2PatternHelper.readOutputs(pattern);
-    }
-
-    public static boolean isPattern(ItemStack stack) {
-        if (!isLoaded()) return false;
-        return AE2PatternHelper.isPattern(stack);
     }
 
     public static boolean isGridHost(Level level, BlockPos pos) {
@@ -75,11 +55,6 @@ public final class AE2Compat {
     public static int extractItemsByItem(ServerLevel level, GlobalPos linkPos, Item target, int amount, ServerPlayer player) {
         if (!isLoaded()) return 0;
         return AE2StorageHelper.extractItemsByItem(level, linkPos, target, amount, player);
-    }
-
-    public static void registerLinkable() {
-        if (!isLoaded()) return;
-        AE2StorageHelper.registerWrenchLinkable();
     }
 
     public static int countInInventory(Inventory inventory, ItemStack pattern, int protectedSlot) {

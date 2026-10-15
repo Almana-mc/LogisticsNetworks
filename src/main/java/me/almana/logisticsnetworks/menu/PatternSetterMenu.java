@@ -1,10 +1,9 @@
 package me.almana.logisticsnetworks.menu;
 
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.InteractionHand;
@@ -13,6 +12,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 import java.util.List;
 
@@ -66,19 +66,18 @@ public class PatternSetterMenu extends AbstractContainerMenu {
         }
     }
 
-    public boolean applyPattern(boolean useOutputs, int multiplier, HolderLookup.Provider provider) {
+    public boolean applyPattern(boolean useOutputs, int multiplier, Level level) {
         ItemStack pattern = container.getItem(SLOT_PATTERN);
         ItemStack filter = container.getItem(SLOT_FILTER);
 
         if (pattern.isEmpty() || filter.isEmpty()) return true;
         if (!FilterItemData.isFilterItem(filter)) return true;
-        if (!AE2Compat.isLoaded()) return true;
 
         int mult = Math.max(1, Math.min(multiplier, 10_000));
 
-        List<AE2Compat.PatternEntry> entries = useOutputs
-                ? AE2Compat.readPatternOutputs(pattern)
-                : AE2Compat.readPatternInputs(pattern);
+        List<LinkedStorage.PatternEntry> entries = useOutputs
+                ? LinkedStorage.readPatternOutputs(pattern, level)
+                : LinkedStorage.readPatternInputs(pattern, level);
 
         if (entries.isEmpty()) return true;
 
@@ -92,7 +91,7 @@ public class PatternSetterMenu extends AbstractContainerMenu {
 
         int count = Math.min(entries.size(), capacity);
         for (int i = 0; i < count; i++) {
-            AE2Compat.PatternEntry entry = entries.get(i);
+            LinkedStorage.PatternEntry entry = entries.get(i);
             refused |= FilterItemData.setEntry(work, i, entry.item()) == FilterItemData.Edit.REFUSED;
             refused |= FilterItemData.setEntryBatch(work, i, entry.amount() * mult) == FilterItemData.Edit.REFUSED;
         }

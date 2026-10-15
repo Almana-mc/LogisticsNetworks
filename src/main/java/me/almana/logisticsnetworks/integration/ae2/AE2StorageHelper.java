@@ -1,7 +1,6 @@
 package me.almana.logisticsnetworks.integration.ae2;
 
 import appeng.api.config.Actionable;
-import appeng.api.features.GridLinkables;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.IInWorldGridNodeHost;
@@ -11,7 +10,6 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.server.level.ServerLevel;
@@ -110,9 +108,4 @@ final class AE2StorageHelper {
             remaining -= (int) Math.min(extracted, remaining);
         }
         return amount - remaining;
-    }
-
-    static void registerWrenchLinkable() {
-        GridLinkables.register(Registration.WRENCH.get(), AE2LinkHandler.INSTANCE);
-    }
-}
+    }}

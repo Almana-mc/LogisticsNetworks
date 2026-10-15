@@ -1015,8 +1015,7 @@ public class ServerPayloadHandler {
     public static void handleApplyPattern(ApplyPatternPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof PatternSetterMenu menu) {
-                if (!menu.applyPattern(payload.useOutputs(), payload.multiplier(),
-                        context.player().level().registryAccess()))
+                if (!menu.applyPattern(payload.useOutputs(), payload.multiplier(), context.player().level()))
                     context.player().displayClientMessage(
                             Component.translatable("message.logisticsnetworks.filter.too_large"), true);
             }

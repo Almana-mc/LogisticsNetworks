@@ -149,6 +149,7 @@ dependencies {
     }
     if (testMod("jade")) localRuntime(fg.deobf("maven.modrinth:jade:${jadeVersion}"))
     if (testMod("xaero")) localRuntime(fg.deobf("maven.modrinth:xaeros-minimap:forge-1.20.1-26.6.0"))
+    if (testMod("ae2")) localRuntime(fg.deobf("appeng:appliedenergistics2-forge:${ae2Version}"))
     if (testMod("oculus")) {
         localRuntime(fg.deobf("maven.modrinth:oculus:1.20.1-1.8.0"))
         localRuntime(fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1"))

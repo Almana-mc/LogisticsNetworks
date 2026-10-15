@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import me.almana.logisticsnetworks.integration.ae2.AE2StorageAdapter;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -10,6 +11,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.EnumMap;
@@ -47,6 +49,9 @@ public final class LinkedStorage {
 
     public static void initialize() {
         ADAPTERS.clear();
+        if (ModList.get().isLoaded(StorageBackend.AE2.modId())) {
+            ADAPTERS.put(StorageBackend.AE2, AE2StorageAdapter.INSTANCE);
+        }
         ADAPTERS.values().forEach(StorageAdapter::registerWrenchLinkable);
     }
 
