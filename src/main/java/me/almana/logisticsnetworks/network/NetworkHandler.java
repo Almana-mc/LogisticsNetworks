@@ -117,6 +117,9 @@ public final class NetworkHandler {
         registerServer(SetComputerWrenchClipboardPayload.class, SetComputerWrenchClipboardPayload.STREAM_CODEC,
                 ServerPayloadHandler::handleSetComputerWrenchClipboard);
         registerClient(SyncNetworkExportPayload.class, SyncNetworkExportPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkExport);
+        registerServer(SetWrenchModePayload.class, SetWrenchModePayload.STREAM_CODEC, SetWrenchModePayload::handle);
+        registerServer(SetWrenchColorsPayload.class, SetWrenchColorsPayload.STREAM_CODEC, ServerPayloadHandler::handleSetWrenchColors);
+        registerServer(SetWrenchFlowPayload.class, SetWrenchFlowPayload.STREAM_CODEC, ServerPayloadHandler::handleSetWrenchFlow);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {

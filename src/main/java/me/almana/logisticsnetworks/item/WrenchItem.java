@@ -2,6 +2,8 @@ package me.almana.logisticsnetworks.item;
 
 import me.almana.logisticsnetworks.util.ItemDataUtil;
 import me.almana.logisticsnetworks.client.ClientControls;
+import me.almana.logisticsnetworks.component.WrenchFlow;
+import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
@@ -61,7 +63,14 @@ public class WrenchItem extends Item {
     private static final String KEY_SELECTION_DIMENSION = "dimension";
     private static final String KEY_SELECTION_POS = "pos";
     private static final String KEY_AE2_LINK = "ae2_link";
+    private static final String KEY_COLORS = "colors";
+    private static final String KEY_CASE = "case";
+    private static final String KEY_SCREEN = "screen";
+    private static final String KEY_FLOW = "flow";
     private static final int MAX_MASS_SELECTIONS = 2048;
+
+    public static final int DEFAULT_CASE_COLOR = 0xE0E0E8;
+    public static final int DEFAULT_SCREEN_COLOR = 0x04FF00;
 
     public record MassSelectionTarget(ResourceKey<Level> dimension, BlockPos pos) {
     }
@@ -608,6 +617,47 @@ public class WrenchItem extends Item {
         });
     }
 
+    public static int getCaseColor(ItemStack stack) {
+        CompoundTag colors = peekRoot(stack).getCompound(KEY_COLORS);
+        return colors.contains(KEY_CASE, Tag.TAG_INT) ? colors.getInt(KEY_CASE) : DEFAULT_CASE_COLOR;
+    }
+
+    public static int getScreenColor(ItemStack stack) {
+        CompoundTag colors = peekRoot(stack).getCompound(KEY_COLORS);
+        return colors.contains(KEY_SCREEN, Tag.TAG_INT) ? colors.getInt(KEY_SCREEN) : DEFAULT_SCREEN_COLOR;
+    }
+
+    public static void setColors(ItemStack stack, int caseRgb, int screenRgb) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof WrenchItem)) {
+            return;
+        }
+        CompoundTag colors = new CompoundTag();
+        colors.putInt(KEY_CASE, NetworkColors.mask(caseRgb));
+        colors.putInt(KEY_SCREEN, NetworkColors.mask(screenRgb));
+        putRootValue(stack, KEY_COLORS, colors);
+    }
+
+    public static void clearColors(ItemStack stack) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof WrenchItem)) {
+            return;
+        }
+        putRootValue(stack, KEY_COLORS, null);
+    }
+
+    public static WrenchFlow getFlow(ItemStack stack) {
+        CompoundTag root = peekRoot(stack);
+        if (!root.contains(KEY_FLOW, Tag.TAG_COMPOUND)) {
+            return WrenchFlow.DEFAULT;
+        }
+        return WrenchFlow.CODEC.parse(NbtOps.INSTANCE, root.get(KEY_FLOW)).result().orElse(WrenchFlow.DEFAULT);
+    }
+
+    public static void setFlow(ItemStack stack, WrenchFlow flow) {
+        Tag encoded = flow.equals(WrenchFlow.DEFAULT) ? null
+                : WrenchFlow.CODEC.encodeStart(NbtOps.INSTANCE, flow).result().orElse(null);
+        putRootValue(stack, KEY_FLOW, encoded);
+    }
+
     public static Mode cycleMode(ItemStack stack, boolean forward) {
         Mode nextMode = forward ? getMode(stack).next() : getMode(stack).previous();
         setMode(stack, nextMode);
@@ -766,6 +816,23 @@ public class WrenchItem extends Item {
 
     private static CompoundTag getRootTag(ItemStack stack) {
         return getRootTag(ItemDataUtil.getCustomData(stack));
+    }
+
+    // No-copy per-frame read
+    private static CompoundTag peekRoot(ItemStack stack) {
+        return ItemDataUtil.peekCustomData(stack).getCompound(KEY_ROOT);
+    }
+
+    private static void putRootValue(ItemStack stack, String key, @Nullable Tag value) {
+        ItemDataUtil.updateCustomData(stack, customTag -> {
+            CompoundTag root = getRootTag(customTag);
+            if (value == null) {
+                root.remove(key);
+            } else {
+                root.put(key, value);
+            }
+            writeRoot(customTag, root);
+        });
     }
 
     private static boolean hasClipboardPayload(ItemStack stack) {

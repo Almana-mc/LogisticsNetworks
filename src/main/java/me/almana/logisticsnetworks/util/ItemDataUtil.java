@@ -26,6 +26,12 @@ public final class ItemDataUtil {
         return new CompoundTag();
     }
 
+    // Read-only view, no copy
+    public static CompoundTag peekCustomData(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        return tag == null ? new CompoundTag() : tag.getCompound(ROOT_KEY);
+    }
+
     public static void updateCustomData(ItemStack stack, Consumer<CompoundTag> updater) {
         if (stack == null || stack.isEmpty()) {
             return;
