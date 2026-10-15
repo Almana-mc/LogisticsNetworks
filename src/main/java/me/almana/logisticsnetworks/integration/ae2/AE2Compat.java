@@ -11,7 +11,6 @@ import net.minecraft.world.level.Level;
 import net.minecraftforge.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
-
 public final class AE2Compat {
 
     private static final String AE2_MOD_ID = "ae2";

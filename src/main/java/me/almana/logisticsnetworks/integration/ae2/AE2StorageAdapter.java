@@ -76,12 +76,12 @@ public final class AE2StorageAdapter implements StorageAdapter {
 
     @Override
     public List<LinkedStorage.PatternEntry> readPatternInputs(ItemStack stack, Level level) {
-        return AE2PatternHelper.readInputs(stack);
+        return AE2PatternHelper.readInputs(stack, level);
     }
 
     @Override
     public List<LinkedStorage.PatternEntry> readPatternOutputs(ItemStack stack, Level level) {
-        return AE2PatternHelper.readOutputs(stack);
+        return AE2PatternHelper.readOutputs(stack, level);
     }
 
     @Override

@@ -28,12 +28,12 @@ final class AE2PatternHelper {
         return stack.getItem() instanceof EncodedPatternItem;
     }
 
-    static List<LinkedStorage.PatternEntry> readInputs(ItemStack stack) {
+    static List<LinkedStorage.PatternEntry> readInputs(ItemStack stack, Level level) {
         if (stack.isEmpty()) return List.of();
         if (!(stack.getItem() instanceof EncodedPatternItem patternItem)) return List.of();
 
         try {
-            var decoded = patternItem.decode(stack, null, false);
+            var decoded = patternItem.decode(stack, level, false);
             if (decoded == null) return List.of();
 
             if (decoded instanceof AEProcessingPattern processing) {
@@ -53,12 +53,12 @@ final class AE2PatternHelper {
         return List.of();
     }
 
-    static List<LinkedStorage.PatternEntry> readOutputs(ItemStack stack) {
+    static List<LinkedStorage.PatternEntry> readOutputs(ItemStack stack, Level level) {
         if (stack.isEmpty()) return List.of();
         if (!(stack.getItem() instanceof EncodedPatternItem patternItem)) return List.of();
 
         try {
-            var decoded = patternItem.decode(stack, null, false);
+            var decoded = patternItem.decode(stack, level, false);
             if (decoded == null) return List.of();
 
             if (decoded instanceof AEProcessingPattern processing) {

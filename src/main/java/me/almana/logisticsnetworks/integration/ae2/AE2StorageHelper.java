@@ -108,4 +108,5 @@ final class AE2StorageHelper {
             remaining -= (int) Math.min(extracted, remaining);
         }
         return amount - remaining;
-    }}
+    }
+}
