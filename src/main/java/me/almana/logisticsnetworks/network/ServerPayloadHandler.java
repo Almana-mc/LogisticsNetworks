@@ -68,6 +68,80 @@ public class ServerPayloadHandler {
     public static final int EXPORT_COOLDOWN_TICKS = 20;
     private static final Map<ServerPlayer, Integer> LAST_EXPORT = new WeakHashMap<>();
 
+    public static void handleRequestStorageUpgradeCatalog(RequestStorageUpgradeCatalogPayload payload,
+                                                          IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof NodeMenu menu)
+                    || menu.containerId != payload.containerId()
+                    || menu.getNodeId() != payload.entityId()
+                    || !menu.canEditNode(player)
+                    || payload.preferredSlot() < 0
+                    || payload.preferredSlot() >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT) {
+                return;
+            }
+            StorageLink link = menu.getAccessibleStorageLink(player);
+            boolean available = link != null;
+            List<SyncStorageUpgradeCatalogPayload.Entry> entries = new ArrayList<>();
+            if (available) {
+                for (LinkedStorage.UpgradeEntry entry : LinkedStorage.listUpgrades(
+                        player, link, menu.getInstalledUpgrades())) {
+                    entries.add(new SyncStorageUpgradeCatalogPayload.Entry(
+                            entry.item(), entry.stored(), entry.craftable()));
+                }
+            }
+            // Forge caps payloads at 1MiB
+            entries = NetworkHandler.split(entries, SyncStorageUpgradeCatalogPayload::writeEntry).get(0);
+            NetworkHandler.sendToPlayer(player, new SyncStorageUpgradeCatalogPayload(
+                    payload.containerId(), payload.entityId(), payload.preferredSlot(),
+                    link == null ? null : link.backend(), available, entries));
+        });
+    }
+
+    public static void handleInstallStorageUpgrade(InstallStorageUpgradePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof NodeMenu menu)
+                    || menu.containerId != payload.containerId()
+                    || menu.getNodeId() != payload.entityId()
+                    || !menu.canEditNode(player)
+                    || payload.preferredSlot() < 0
+                    || payload.preferredSlot() >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT
+                    || !BuiltInRegistries.ITEM.containsKey(payload.upgradeId())) {
+                return;
+            }
+            ItemStack upgrade = BuiltInRegistries.ITEM.get(payload.upgradeId()).getDefaultInstance();
+            if (!upgrade.is(ModTags.UPGRADES)) return;
+            StorageLink link = menu.getAccessibleStorageLink(player);
+            if (link == null) {
+                player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.storage.upgrade.unavailable"), true);
+                return;
+            }
+            reportUpgradeInstall(player, upgrade, LinkedStorage.installUpgrade(
+                    player, menu.getNode(), link, payload.preferredSlot(), upgrade.getItem()));
+        });
+    }
+
+    private static void reportUpgradeInstall(ServerPlayer player, ItemStack upgrade,
+                                             LinkedStorage.UpgradeInstallResult result) {
+        switch (result) {
+            case CRAFTING -> player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.storage.upgrade.crafting",
+                            upgrade.getHoverName()), true);
+            case DUPLICATE -> player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.storage.upgrade.duplicate"), true);
+            case PENDING -> player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.storage.upgrade.pending"), true);
+            case NO_SLOT -> player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.storage.upgrade.no_slot"), true);
+            case UNAVAILABLE -> player.displayClientMessage(
+                    Component.translatable("message.logisticsnetworks.storage.upgrade.unavailable"), true);
+            case INSTALLED -> {
+            }
+        }
+    }
+
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());

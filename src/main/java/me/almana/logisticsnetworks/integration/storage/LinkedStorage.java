@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.ae2.AE2StorageAdapter;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.core.BlockPos;
@@ -9,6 +10,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fml.ModList;
@@ -26,6 +28,9 @@ public final class LinkedStorage {
     public record PatternEntry(ItemStack item, int amount) {
     }
 
+    public record UpgradeEntry(ItemStack item, long stored, boolean craftable) {
+    }
+
     public record ItemRequirement(ItemStack stack, int count) {
     }
 
@@ -35,6 +40,15 @@ public final class LinkedStorage {
         boolean commit();
 
         void failed(Component detail);
+    }
+
+    public enum UpgradeInstallResult {
+        INSTALLED,
+        CRAFTING,
+        DUPLICATE,
+        PENDING,
+        NO_SLOT,
+        UNAVAILABLE
     }
 
     public enum SupplyRequestResult {
@@ -131,6 +145,20 @@ public final class LinkedStorage {
         else StorageInventory.returnToStorageOrPlayer(access, player, stacks);
     }
 
+    public static List<UpgradeEntry> listUpgrades(ServerPlayer player, StorageLink link,
+                                                   List<ItemStack> installed) {
+        return StorageUpgradeRequests.list(player, link, installed);
+    }
+
+    public static UpgradeInstallResult installUpgrade(ServerPlayer player, LogisticsNodeEntity node,
+                                                       StorageLink link, int preferredSlot, Item upgrade) {
+        return StorageUpgradeRequests.install(player, node, link, preferredSlot, upgrade);
+    }
+
+    public static boolean isUpgradeCraftingPending(LogisticsNodeEntity node) {
+        return StorageUpgradeRequests.isPending(node);
+    }
+
     public static SupplyRequestResult requestSupply(UUID requestId, ServerPlayer player, StorageLink link,
                                                      List<ItemRequirement> requirements, int protectedSlot,
                                                      Component subject, SupplyOperation operation) {
@@ -142,11 +170,30 @@ public final class LinkedStorage {
     }
 
     public static void tickCraftingRequests(MinecraftServer server) {
+        StorageUpgradeRequests.tick(server);
         StorageSupplyRequests.tick();
     }
 
     public static void stopCraftingRequests() {
+        StorageUpgradeRequests.stop();
         StorageSupplyRequests.stop();
+    }
+
+    public static void restoreCraftingRequests(ServerPlayer player) {
+        StorageUpgradeRequests.deliverNotices(player);
+    }
+
+    public static int findUpgradeSlot(List<ItemStack> upgrades, int preferredSlot, Item upgrade) {
+        for (ItemStack installed : upgrades) {
+            if (!installed.isEmpty() && installed.is(upgrade)) return -1;
+        }
+        if (preferredSlot >= 0 && preferredSlot < upgrades.size() && upgrades.get(preferredSlot).isEmpty()) {
+            return preferredSlot;
+        }
+        for (int slot = 0; slot < upgrades.size(); slot++) {
+            if (upgrades.get(slot).isEmpty()) return slot;
+        }
+        return -1;
     }
 
     private static StorageLink linked(ItemStack stack) {

@@ -124,6 +124,12 @@ public final class NetworkHandler {
                 ClientPayloadHandler::handleSyncMassPlacementChoices);
         registerClient(SyncMassPlacementRequirementsPayload.class, SyncMassPlacementRequirementsPayload.STREAM_CODEC,
                 ClientPayloadHandler::handleSyncMassPlacementRequirements);
+        registerServer(RequestStorageUpgradeCatalogPayload.class, RequestStorageUpgradeCatalogPayload.STREAM_CODEC,
+                ServerPayloadHandler::handleRequestStorageUpgradeCatalog);
+        registerServer(InstallStorageUpgradePayload.class, InstallStorageUpgradePayload.STREAM_CODEC,
+                ServerPayloadHandler::handleInstallStorageUpgrade);
+        registerClient(SyncStorageUpgradeCatalogPayload.class, SyncStorageUpgradeCatalogPayload.STREAM_CODEC,
+                ClientPayloadHandler::handleSyncStorageUpgradeCatalog);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {

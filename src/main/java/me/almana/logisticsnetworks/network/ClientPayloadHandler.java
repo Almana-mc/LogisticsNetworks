@@ -187,6 +187,15 @@ public class ClientPayloadHandler {
         });
     }
 
+    public static void handleSyncStorageUpgradeCatalog(SyncStorageUpgradeCatalogPayload payload,
+                                                       IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (Minecraft.getInstance().screen instanceof NodeEditorScreen<?> screen) {
+                screen.receiveStorageUpgradeCatalog(payload);
+            }
+        });
+    }
+
     public static void handleSyncFilterScanResult(SyncFilterScanResultPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             var minecraft = Minecraft.getInstance();

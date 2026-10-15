@@ -132,6 +132,13 @@ public class EventHandler {
     }
 
     @SubscribeEvent
+    public static void onStoragePlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            LinkedStorage.restoreCraftingRequests(player);
+        }
+    }
+
+    @SubscribeEvent
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         ServerPayloadHandler.clearModifierKeys(event.getEntity());
         NodeAccessPolicy.setAdminMode(event.getEntity(), false);

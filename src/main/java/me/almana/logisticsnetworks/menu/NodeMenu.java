@@ -20,6 +20,7 @@ import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -53,6 +54,8 @@ public class NodeMenu extends AbstractContainerMenu {
 
     private final Container upgradeContainer;
     private final List<ItemStack> openingUpgrades;
+    private final Inventory playerInventory;
+    private int storageUpgradeAccess;
 
     // Server-side
     public NodeMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node, int selectedChannel) {
@@ -67,9 +70,11 @@ public class NodeMenu extends AbstractContainerMenu {
         this.selectedChannel = selectedChannel;
         this.upgradeContainer = new UpgradeItemsContainer();
         this.openingUpgrades = node == null ? List.of() : LabelUpgradeSync.snapshotUpgrades(node);
+        this.playerInventory = playerInv;
 
         layoutNodeSlots();
         layoutPlayerSlots(playerInv);
+        addStorageAccessData();
     }
 
     // Client-side
@@ -82,9 +87,11 @@ public class NodeMenu extends AbstractContainerMenu {
         this.returnContext = buf.readableBytes() > 0 && buf.readBoolean() ? GraphMenuContext.read(buf) : null;
         this.upgradeContainer = new UpgradeItemsContainer();
         this.openingUpgrades = List.of();
+        this.playerInventory = playerInv;
 
         layoutNodeSlots();
         layoutPlayerSlots(playerInv);
+        addStorageAccessData();
     }
 
     public static void open(ServerPlayer player, LogisticsNodeEntity node, int selectedChannel, boolean remote,
@@ -193,7 +200,41 @@ public class NodeMenu extends AbstractContainerMenu {
     }
 
     private boolean isUpgradeEditPending() {
-        return node != null && LabelUpgradeSync.isPending(node);
+        return node != null && (LabelUpgradeSync.isPending(node) || LinkedStorage.isUpgradeCraftingPending(node));
+    }
+
+    public boolean hasStorageUpgradeAccess() {
+        return storageUpgradeAccess != 0;
+    }
+
+    public List<ItemStack> getInstalledUpgrades() {
+        List<ItemStack> installed = new ArrayList<>(UPGRADE_SLOTS);
+        for (int slot = 0; slot < UPGRADE_SLOTS; slot++) {
+            installed.add(upgradeContainer.getItem(slot));
+        }
+        return installed;
+    }
+
+    public boolean canEditNode(Player player) {
+        return node != null && node.isValidNode() && node.isOwnedBy(player)
+                && stillValid(player) && hasAvailableNode();
+    }
+
+    private void addStorageAccessData() {
+        addDataSlot(new DataSlot() {
+            @Override
+            public int get() {
+                if (playerInventory.player instanceof ServerPlayer player) {
+                    return getAccessibleStorageLink(player) == null ? 0 : 1;
+                }
+                return storageUpgradeAccess;
+            }
+
+            @Override
+            public void set(int value) {
+                storageUpgradeAccess = value;
+            }
+        });
     }
 
     @Override
