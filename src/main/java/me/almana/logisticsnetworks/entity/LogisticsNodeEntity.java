@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.data.NodeRouteChannels;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -84,6 +85,8 @@ public class LogisticsNodeEntity extends Entity {
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> HIGHLIGHTED = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Long> ROUTE_CHANNELS = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.LONG);
 
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
@@ -122,6 +125,7 @@ public class LogisticsNodeEntity extends Entity {
         this.entityData.define(OWNER_UUID, Optional.empty());
         this.entityData.define(NODE_LABEL, "");
         this.entityData.define(HIGHLIGHTED, false);
+        this.entityData.define(ROUTE_CHANNELS, 0L);
     }
 
     @Override
@@ -182,6 +186,7 @@ public class LogisticsNodeEntity extends Entity {
                 }
             }
         }
+        refreshRouteChannels();
     }
 
     @Override
@@ -237,6 +242,9 @@ public class LogisticsNodeEntity extends Entity {
     @Override
     public void tick() {
         if (this.level().isClientSide()) return;
+        if (this.tickCount <= 1 || this.tickCount % 5 == 0) {
+            refreshRouteChannels();
+        }
 
         BlockPos attached = getAttachedPos();
         if (!attached.equals(BlockPos.ZERO)) {
@@ -261,6 +269,16 @@ public class LogisticsNodeEntity extends Entity {
                 }
             }
         }
+    }
+
+    private void refreshRouteChannels() {
+        long bits = 0L;
+        if (isValidNode() && getNetworkId() != null) {
+            bits = NodeRouteChannels.encode(channels, false,
+                    NodeUpgradeData.hasMekanismChemicalUpgrade(this),
+                    NodeUpgradeData.hasArsSourceUpgrade(this));
+        }
+        this.entityData.set(ROUTE_CHANNELS, bits);
     }
 
     @Override
@@ -391,6 +409,10 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setHighlighted(boolean highlighted) {
         this.entityData.set(HIGHLIGHTED, highlighted);
+    }
+
+    public long getRouteChannels() {
+        return this.entityData.get(ROUTE_CHANNELS);
     }
 
     @Nullable
