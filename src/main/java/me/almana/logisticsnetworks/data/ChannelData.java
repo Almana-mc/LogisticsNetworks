@@ -12,6 +12,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.util.StringUtil;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -132,7 +133,7 @@ public class ChannelData {
             priority = Math.max(-99, Math.min(99, tag.getInt(KEY_PRIORITY)));
         }
 
-        name = tag.contains(KEY_NAME) ? tag.getString(KEY_NAME) : "";
+        setName(tag.getString(KEY_NAME));
         resourceRoundRobin = tag.getBoolean(KEY_RESOURCE_ROUND_ROBIN);
         resetResourceRotation();
 
@@ -338,7 +339,7 @@ public class ChannelData {
     }
 
     public void setName(String name) {
-        this.name = name == null ? "" : name;
+        this.name = name == null ? "" : StringUtil.truncateStringIfNecessary(name, 24, false);
     }
 
     public ChannelTelemetry getTelemetry() {

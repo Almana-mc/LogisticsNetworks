@@ -21,6 +21,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.util.StringUtil;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.server.ServerLifecycleHooks;
 
@@ -89,7 +90,7 @@ public class LogisticsNetwork {
 
     public LogisticsNetwork(UUID id, String name) {
         this.id = id;
-        this.name = name;
+        setName(name);
 
         for (int i = 0; i < 9; i++) {
             this.channelNames[i] = "";
@@ -149,7 +150,7 @@ public class LogisticsNetwork {
         LogisticsNetwork network = new LogisticsNetwork(id);
 
         if (tag.contains(KEY_NAME)) {
-            network.name = tag.getString(KEY_NAME);
+            network.setName(tag.getString(KEY_NAME));
         }
         if (tag.contains(KEY_SLEEPING)) {
             network.sleeping = tag.getBoolean(KEY_SLEEPING);
@@ -175,7 +176,7 @@ public class LogisticsNetwork {
         if (tag.contains(KEY_CHANNEL_NAMES, Tag.TAG_LIST)) {
             ListTag namesTag = tag.getList(KEY_CHANNEL_NAMES, Tag.TAG_COMPOUND);
             for (int i = 0; i < Math.min(namesTag.size(), 9); i++) {
-                network.channelNames[i] = namesTag.getCompound(i).getString("Name");
+                network.setChannelName(i, namesTag.getCompound(i).getString("Name"));
             }
         }
         network.readGraphPositions(tag);
@@ -266,7 +267,8 @@ public class LogisticsNetwork {
     }
 
     public void setName(String name) {
-        this.name = name;
+        // Legacy names exceed packet caps
+        this.name = StringUtil.truncateStringIfNecessary(name, 64, false);
     }
 
     public int getColor() {
@@ -294,7 +296,7 @@ public class LogisticsNetwork {
 
     public void setChannelName(int index, String name) {
         if (index >= 0 && index < 9) {
-            this.channelNames[index] = name == null ? "" : name;
+            this.channelNames[index] = name == null ? "" : StringUtil.truncateStringIfNecessary(name, 24, false);
         }
     }
 
