@@ -8,6 +8,10 @@ import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.util.ItemDataUtil;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
@@ -198,9 +202,9 @@ public final class FilterItemData {
         return fluid == null ? FluidStack.EMPTY : fluid;
     }
 
-    public static boolean setFluidEntry(ItemStack stack, int slot, FluidStack fluid) {
+    public static Edit setFluidEntry(ItemStack stack, int slot, FluidStack fluid) {
         String id = fluid.isEmpty() ? null : BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString();
-        return edit(stack, slot, entry -> resourceEntry(entry, id, null)) == Edit.CHANGED;
+        return edit(stack, slot, entry -> resourceEntry(entry, id, null));
     }
 
     public static boolean hasAnyEntries(ItemStack stack) {
@@ -223,8 +227,8 @@ public final class FilterItemData {
         return entry == null ? null : nonEmpty(entry.chemicalId());
     }
 
-    public static boolean setChemicalEntry(ItemStack stack, int slot, @Nullable String chemicalId) {
-        return edit(stack, slot, entry -> resourceEntry(entry, null, nonEmpty(chemicalId))) == Edit.CHANGED;
+    public static Edit setChemicalEntry(ItemStack stack, int slot, @Nullable String chemicalId) {
+        return edit(stack, slot, entry -> resourceEntry(entry, null, nonEmpty(chemicalId)));
     }
 
     private static GeneralFilterEntry resourceEntry(GeneralFilterEntry current, @Nullable String fluidId,
@@ -251,13 +255,13 @@ public final class FilterItemData {
         SAME, CHANGED, REFUSED
     }
 
-    public record BulkAdd(int added, boolean full) {
+    public record BulkAdd(int added, boolean full, boolean tooLarge) {
     }
 
     // Decode once, save once
     public static BulkAdd addAll(ItemStack filter, List<GeneralFilterEntry> candidates) {
         if (!isFilterItem(filter))
-            return new BulkAdd(0, false);
+            return new BulkAdd(0, false, false);
         List<GeneralFilterEntry> entries = new ArrayList<>(entries(filter));
         Set<String> known = new HashSet<>();
         entries.forEach(entry -> known.add(resourceKey(entry)));
@@ -283,8 +287,8 @@ public final class FilterItemData {
             added++;
         }
         if (added > 0 && !saveEntries(filter, entries))
-            return new BulkAdd(0, full);
-        return new BulkAdd(added, full);
+            return new BulkAdd(0, full, true);
+        return new BulkAdd(added, full, false);
     }
 
     private static int firstFreeSlot(List<GeneralFilterEntry> entries, int cap) {
@@ -1167,14 +1171,22 @@ public final class FilterItemData {
         return saveEntries(stack, entries) ? Edit.CHANGED : Edit.REFUSED;
     }
 
+    private static int encodedSize(ListTag list) {
+        try (DataOutputStream out = new DataOutputStream(OutputStream.nullOutputStream())) {
+            list.write(out);
+            return out.size();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private static boolean saveEntries(ItemStack stack, List<GeneralFilterEntry> entries) {
         ListTag list = new ListTag();
         entries.forEach(entry -> list.add(entry.save()));
         ListTag old = getRoot(stack).getList(KEY_ITEMS, Tag.TAG_COMPOUND);
-        int size = list.sizeInBytes();
-        if (size > MAX_FILTER_BYTES && size > old.sizeInBytes()) {
+        int size = encodedSize(list);
+        if (size > MAX_FILTER_BYTES && size > encodedSize(old))
             return false;
-        }
         updateRoot(stack, root -> {
             root.putInt(KEY_VERSION, VERSION);
             if (list.isEmpty())

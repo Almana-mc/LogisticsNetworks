@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Set;
 
 public final class AttachedStorageFilterScanner {
-    public record Result(int added, boolean storageFound, boolean filterFull) {
+    public record Result(int added, boolean storageFound, boolean filterFull, boolean tooLarge) {
     }
 
     private AttachedStorageFilterScanner() {
@@ -35,7 +35,7 @@ public final class AttachedStorageFilterScanner {
         BlockPos pos = node.getAttachedPos();
         FilterTargetType target = FilterTargetType.forChannel(channel.getType());
         if (!level.isLoaded(pos) || target == null) {
-            return new Result(0, false, false);
+            return new Result(0, false, false, false);
         }
 
         TransferEngine.CapCache capabilities = new TransferEngine.CapCache();
@@ -44,13 +44,13 @@ public final class AttachedStorageFilterScanner {
             case FLUIDS -> scanFluids(capabilities.findFluidHandler(level, pos, channel.getIoDirection()), filter);
             case CHEMICALS -> MekanismCompat.isLoaded()
                     ? scanChemicals(capabilities.findChemicalHandler(level, pos, channel.getIoDirection()), filter)
-                    : new Result(0, false, false);
+                    : new Result(0, false, false, false);
         };
     }
 
     static Result scanItems(IItemHandler handler, ItemStack filter) {
         if (handler == null) {
-            return new Result(0, false, false);
+            return new Result(0, false, false, false);
         }
         Set<Item> seen = new HashSet<>();
         List<GeneralFilterEntry> candidates = new ArrayList<>();
@@ -65,7 +65,7 @@ public final class AttachedStorageFilterScanner {
 
     private static Result scanFluids(IFluidHandler handler, ItemStack filter) {
         if (handler == null) {
-            return new Result(0, false, false);
+            return new Result(0, false, false, false);
         }
         List<GeneralFilterEntry> candidates = new ArrayList<>();
         for (int tank = 0; tank < handler.getTanks(); tank++) {
@@ -80,7 +80,7 @@ public final class AttachedStorageFilterScanner {
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private static Result scanChemicals(IChemicalHandler handler, ItemStack filter) {
         if (handler == null) {
-            return new Result(0, false, false);
+            return new Result(0, false, false, false);
         }
         List<GeneralFilterEntry> candidates = new ArrayList<>();
         for (int tank = 0; tank < handler.getTanks(); tank++) {
@@ -98,6 +98,6 @@ public final class AttachedStorageFilterScanner {
 
     private static Result addAll(ItemStack filter, List<GeneralFilterEntry> candidates) {
         FilterItemData.BulkAdd result = FilterItemData.addAll(filter, candidates);
-        return new Result(result.added(), true, result.full());
+        return new Result(result.added(), true, result.full(), result.tooLarge());
     }
 }

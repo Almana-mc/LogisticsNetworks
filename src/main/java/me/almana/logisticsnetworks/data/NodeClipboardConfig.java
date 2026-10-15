@@ -346,12 +346,17 @@ public final class NodeClipboardConfig {
     }
 
     // Rebuild client filters server-side
-    public void sanitizeFilters() {
+    public int sanitizeFilters() {
+        int dropped = 0;
         for (ItemStack[] channel : filterItems) {
             for (int slot = 0; slot < channel.length; slot++) {
-                channel[slot] = sanitizedFilter(channel[slot]);
+                ItemStack clean = sanitizedFilter(channel[slot]);
+                if (clean.isEmpty() && !channel[slot].isEmpty())
+                    dropped++;
+                channel[slot] = clean;
             }
         }
+        return dropped;
     }
 
     private static ItemStack sanitizedFilter(ItemStack source) {

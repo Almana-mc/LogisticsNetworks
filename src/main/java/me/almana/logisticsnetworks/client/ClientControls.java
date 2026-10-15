@@ -7,6 +7,8 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraftforge.api.distmarker.Dist;
+import me.almana.logisticsnetworks.network.ClientPayloadHandler;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.client.event.ScreenEvent;
@@ -146,6 +148,11 @@ public final class ClientControls {
             if (event.phase == TickEvent.Phase.START) {
                 resetInactiveModifiers();
             }
+        }
+
+        @SubscribeEvent
+        public static void onPartsLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+            ClientPayloadHandler.clearParts();
         }
 
         // Forge wrapper names must differ

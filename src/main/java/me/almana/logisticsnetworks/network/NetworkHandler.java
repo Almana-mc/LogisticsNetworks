@@ -27,7 +27,7 @@ import java.util.function.BiConsumer;
 
 public final class NetworkHandler {
 
-    // Forge caps clientbound payloads at 1MiB
+    // Clientbound cap: 1MiB
     private static final int CLIENTBOUND_BUDGET = 900_000;
     // Serverbound payloads cap at 32767
     private static final int SERVERBOUND_BUDGET = 32_000;

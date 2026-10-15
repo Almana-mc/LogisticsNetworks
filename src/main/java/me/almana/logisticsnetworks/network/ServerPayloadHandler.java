@@ -824,6 +824,10 @@ public class ServerPayloadHandler {
             ItemStack filter = menu.getOpenedStack();
             AttachedStorageFilterScanner.Result result = AttachedStorageFilterScanner.scan(
                     level, node, channel, filter);
+            if (result.tooLarge()) {
+                player.displayClientMessage(Component.translatable("message.logisticsnetworks.filter.too_large"), true);
+                return;
+            }
             if (result.added() > 0) {
                 menu.refreshFilterEntries();
                 invalidateNetwork(node);
@@ -965,8 +969,10 @@ public class ServerPayloadHandler {
     public static void handleApplyPattern(ApplyPatternPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof PatternSetterMenu menu) {
-                menu.applyPattern(payload.useOutputs(), payload.multiplier(),
-                        context.player().level().registryAccess());
+                if (!menu.applyPattern(payload.useOutputs(), payload.multiplier(),
+                        context.player().level().registryAccess()))
+                    context.player().displayClientMessage(
+                            Component.translatable("message.logisticsnetworks.filter.too_large"), true);
             }
         });
     }
@@ -1501,7 +1507,8 @@ public class ServerPayloadHandler {
                 player.displayClientMessage(Component.translatable("message.logisticsnetworks.lnet.invalid_clipboard"), true);
                 return;
             }
-            config.sanitizeFilters();
+            if (config.sanitizeFilters() > 0)
+                player.sendSystemMessage(Component.translatable("message.logisticsnetworks.filter.too_large"));
             config.stripUpgradeComponents();
             config.setNetworkTarget(null, config.getNetworkName());
 

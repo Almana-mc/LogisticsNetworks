@@ -66,13 +66,13 @@ public class PatternSetterMenu extends AbstractContainerMenu {
         }
     }
 
-    public void applyPattern(boolean useOutputs, int multiplier, HolderLookup.Provider provider) {
+    public boolean applyPattern(boolean useOutputs, int multiplier, HolderLookup.Provider provider) {
         ItemStack pattern = container.getItem(SLOT_PATTERN);
         ItemStack filter = container.getItem(SLOT_FILTER);
 
-        if (pattern.isEmpty() || filter.isEmpty()) return;
-        if (!FilterItemData.isFilterItem(filter)) return;
-        if (!AE2Compat.isLoaded()) return;
+        if (pattern.isEmpty() || filter.isEmpty()) return true;
+        if (!FilterItemData.isFilterItem(filter)) return true;
+        if (!AE2Compat.isLoaded()) return true;
 
         int mult = Math.max(1, Math.min(multiplier, 10_000));
 
@@ -80,23 +80,28 @@ public class PatternSetterMenu extends AbstractContainerMenu {
                 ? AE2Compat.readPatternOutputs(pattern)
                 : AE2Compat.readPatternInputs(pattern);
 
-        if (entries.isEmpty()) return;
+        if (entries.isEmpty()) return true;
 
-        int capacity = FilterItemData.getCapacity(filter);
+        ItemStack work = filter.copy();
+        int capacity = FilterItemData.getCapacity(work);
+        boolean refused = false;
 
         for (int i = 0; i < capacity; i++) {
-            FilterItemData.setEntry(filter, i, ItemStack.EMPTY);
+            FilterItemData.setEntry(work, i, ItemStack.EMPTY);
         }
 
         int count = Math.min(entries.size(), capacity);
         for (int i = 0; i < count; i++) {
             AE2Compat.PatternEntry entry = entries.get(i);
-            FilterItemData.setEntry(filter, i, entry.item());
-            FilterItemData.setEntryBatch(filter, i, entry.amount() * mult);
+            refused |= FilterItemData.setEntry(work, i, entry.item()) == FilterItemData.Edit.REFUSED;
+            refused |= FilterItemData.setEntryBatch(work, i, entry.amount() * mult) == FilterItemData.Edit.REFUSED;
         }
+        if (refused) return false;
+        filter.setTag(work.getTag());
 
         container.setChanged();
         broadcastChanges();
+        return true;
     }
 
     @Override

@@ -758,7 +758,10 @@ public class FilterMenu extends AbstractContainerMenu {
             clearEntryTag(slot);
             return;
         }
-        noteRefusal(FilterItemData.setEntryTag(getOpenedStack(), slot, normalizedTag));
+        if (refused(FilterItemData.setEntryTag(getOpenedStack(), slot, normalizedTag))) {
+            broadcastChanges();
+            return;
+        }
         isTagSlot[slot] = true;
         isFluidSlot[slot] = false;
         isChemicalSlot[slot] = false;
@@ -1054,7 +1057,8 @@ public class FilterMenu extends AbstractContainerMenu {
             return false;
 
         updateFilter(slot, s -> {
-            FilterItemData.setFluidEntry(getOpenedStack(), s, fluid);
+            if (refused(FilterItemData.setFluidEntry(getOpenedStack(), s, fluid)))
+                return;
             isFluidSlot[s] = true;
             isChemicalSlot[s] = false;
             ignoreUpdates = true;
@@ -1070,7 +1074,8 @@ public class FilterMenu extends AbstractContainerMenu {
             return false;
 
         updateFilter(slot, s -> {
-            FilterItemData.setChemicalEntry(getOpenedStack(), s, chemicalId);
+            if (refused(FilterItemData.setChemicalEntry(getOpenedStack(), s, chemicalId)))
+                return;
             isChemicalSlot[s] = true;
             isFluidSlot[s] = false;
             ignoreUpdates = true;
@@ -1088,7 +1093,8 @@ public class FilterMenu extends AbstractContainerMenu {
         if (!FilterItemData.fitsEntry(itemEntry))
             return false;
         updateFilter(slot, s -> {
-            noteRefusal(FilterItemData.setEntry(getOpenedStack(), s, itemEntry));
+            if (refused(FilterItemData.setEntry(getOpenedStack(), s, itemEntry)))
+                return;
             isFluidSlot[s] = false;
             isChemicalSlot[s] = false;
             filterInventory.setItem(s, itemEntry);
@@ -1121,6 +1127,11 @@ public class FilterMenu extends AbstractContainerMenu {
 
     private void noteRefusal(FilterItemData.Edit result) {
         sizeRefused |= result == FilterItemData.Edit.REFUSED;
+    }
+
+    private boolean refused(FilterItemData.Edit result) {
+        noteRefusal(result);
+        return result == FilterItemData.Edit.REFUSED;
     }
 
     @Override

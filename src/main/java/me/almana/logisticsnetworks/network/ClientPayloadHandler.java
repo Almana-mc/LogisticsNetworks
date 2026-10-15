@@ -32,6 +32,13 @@ public class ClientPayloadHandler {
     private static final ByteArrayOutputStream CHANNEL_PARTS = new ByteArrayOutputStream();
     private static final ByteArrayOutputStream CLIPBOARD_PARTS = new ByteArrayOutputStream();
 
+    public static void clearParts() {
+        NETWORK_PARTS.clear();
+        NODE_PARTS.clear();
+        CHANNEL_PARTS.reset();
+        CLIPBOARD_PARTS.reset();
+    }
+
     public static void warnTooLarge() {
         Minecraft.getInstance().player.displayClientMessage(
                 Component.translatable("message.logisticsnetworks.payload_too_large"), false);
