@@ -31,6 +31,7 @@ import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
+import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
@@ -180,6 +181,9 @@ public class Registration {
         public static final RegistryObject<MenuType<NodeGraphMenu>> NODE_GRAPH_MENU = MENUS.register(
                         "node_graph_menu",
                         () -> IForgeMenuType.create(NodeGraphMenu::new));
+        public static final RegistryObject<MenuType<ServerRackMenu>> SERVER_RACK_MENU = MENUS.register(
+                        "server_rack_menu",
+                        () -> IForgeMenuType.create(ServerRackMenu::new));
 
         public static final RegistryObject<SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",

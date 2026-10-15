@@ -132,6 +132,8 @@ public final class NetworkHandler {
                 ClientPayloadHandler::handleSyncStorageUpgradeCatalog);
         registerClient(SyncQueuedNodePlacementPayload.class, SyncQueuedNodePlacementPayload.STREAM_CODEC,
                 ClientPayloadHandler::handleSyncQueuedNodePlacement);
+        registerServer(UpdateServerRackPayload.class, UpdateServerRackPayload.STREAM_CODEC, ServerPayloadHandler::handleUpdateServerRack);
+        registerClient(SyncServerRackPayload.class, SyncServerRackPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncServerRack);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {

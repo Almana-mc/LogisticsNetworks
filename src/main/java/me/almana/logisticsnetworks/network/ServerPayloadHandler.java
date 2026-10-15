@@ -16,6 +16,7 @@ import me.almana.logisticsnetworks.menu.GraphMenuContext;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
+import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -497,6 +498,17 @@ public class ServerPayloadHandler {
                 menu.requestNetworkList(player);
             }
         }
+    }
+
+    public static void handleUpdateServerRack(UpdateServerRackPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.containerMenu instanceof ServerRackMenu menu
+                    && menu.getRackPos().equals(payload.rackPos())
+                    && menu.stillValid(player)) {
+                menu.update(player, payload.config());
+            }
+        });
     }
 
     public static void handleToggleVisibility(ToggleNodeVisibilityPayload payload, IPayloadContext context) {
