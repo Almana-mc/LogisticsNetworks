@@ -154,6 +154,11 @@ dependencies {
         localRuntime(fg.deobf("maven.modrinth:oculus:1.20.1-1.8.0"))
         localRuntime(fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1"))
     }
+    if (testMod("fs")) {
+        localRuntime(fg.deobf("maven.modrinth:functional-storage:1.20.1-1.2.14"))
+        localRuntime(fg.deobf("maven.modrinth:titanium:1.20.1-3.8.35"))
+    }
+    if (testMod("spark")) localRuntime(fg.deobf("maven.modrinth:spark:1.10.53-forge"))
 }
 
 tasks.withType<JavaCompile>().configureEach {
