@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry> nodes) {
 
@@ -19,6 +20,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
     private static final String FORMAT_LINE = "format=lnet";
     private static final String FILE_VERSION = "1.0";
     private static final String LEGACY_VERSION_LINE = "lnet=1";
+    private static final Pattern WINDOWS_DEVICE = Pattern.compile("(?i)(con|prn|aux|nul|com[1-9]|lpt[1-9])(\\..*)?");
 
     public record NodeEntry(String label, boolean visible, CompoundTag clipboardTag) {
     }
@@ -123,7 +125,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
                 case "clipboard", "c" -> {
                     try {
                         clipboard = TagParser.parseTag(value);
-                    } catch (Exception e) {
+                    } catch (Exception | StackOverflowError e) {
                         throw new IOException("Invalid clipboard SNBT", e);
                     }
                 }
@@ -178,7 +180,8 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
         if (clean.isBlank()) {
             return "network";
         }
-        return clean.length() > 48 ? clean.substring(0, 48) : clean;
+        clean = clean.length() > 48 ? clean.substring(0, 48) : clean;
+        return WINDOWS_DEVICE.matcher(clean).matches() ? "_" + clean : clean;
     }
 
     private static String escape(String value) {

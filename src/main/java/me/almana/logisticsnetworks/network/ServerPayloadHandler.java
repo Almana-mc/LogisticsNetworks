@@ -63,6 +63,8 @@ public class ServerPayloadHandler {
     private static final Map<ServerPlayer, Integer> LAST_SCAN = new WeakHashMap<>();
     // Forge caps payloads at 1MiB
     private static final int EXPORT_BUDGET = 1_000_000;
+    private static final int EXPORT_COOLDOWN_TICKS = 20;
+    private static final Map<ServerPlayer, Integer> LAST_EXPORT = new WeakHashMap<>();
 
     public static void handleUpdateChannel(UpdateChannelPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -1428,6 +1430,10 @@ public class ServerPayloadHandler {
                 return;
             if (!(player.containerMenu instanceof ComputerMenu))
                 return;
+            int now = player.server.getTickCount();
+            if (now - LAST_EXPORT.getOrDefault(player, -EXPORT_COOLDOWN_TICKS) < EXPORT_COOLDOWN_TICKS)
+                return;
+            LAST_EXPORT.put(player, now);
 
             NetworkRegistry registry = NetworkRegistry.get(player.serverLevel());
             LogisticsNetwork network = registry.getNetwork(payload.networkId());
