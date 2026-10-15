@@ -11,7 +11,6 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
-import me.almana.logisticsnetworks.integration.storage.DirectFluidHandler;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import mekanism.api.chemical.IChemicalHandler;
@@ -166,16 +165,11 @@ public class TransferEngine {
     }
 
     private record ItemTransferTarget(IItemHandler handler, ItemStack[] importFilters,
-            FilterMode importFilterMode, AmountConstraints constraints, boolean hasItemNbtFilter,
+            FilterMode importFilterMode, TransferAmountRules.Constraints constraints, boolean hasItemNbtFilter,
             boolean[] allowedSlots, boolean hasImportSlotMapping) {
     }
 
     private record ItemKey(Item item, @Nullable CompoundTag tag) {
-    }
-
-    private record AmountConstraints(boolean hasExportThreshold, int exportThreshold,
-            boolean hasImportThreshold, int importThreshold,
-            boolean hasPerEntryAmounts) {
     }
 
     private record NetworkContext(
@@ -568,7 +562,7 @@ public class TransferEngine {
                     targetHandler,
                     importFilters,
                     target.channel.getFilterMode(),
-                    collectAmountConstraints(exportFilters, importFilters),
+                    TransferAmountRules.collect(exportFilters, importFilters, filterReadCache),
                     FilterLogic.hasConfiguredItemNbtFilter(importFilters, filterReadCache),
                     targetAllowedSlots,
                     hasImportSlotMapping));
@@ -687,7 +681,7 @@ public class TransferEngine {
         FilterMode filterMode = exportChannel.getFilterMode();
         boolean nbtFilter = FilterLogic.hasConfiguredItemNbtFilter(filters, filterReadCache);
         List<Map<Item, Integer>> targetCounts = sourceItemCounts == null ? null : buildTargetItemCounts(targets, sourceItemCounts);
-        ItemResourceOrder.Result result = ItemResourceOrder.move(source, exportChannel.getItemResourceCursor(),
+        ItemResourceOrder.Result result = ItemResourceOrder.move(source, exportChannel.getItemResourceCursor(), null,
                 slots -> {
                     ItemStack resource = source.getStackInSlot(slots[0]).copy();
                     int budget = equal ? exportableStock(source, slots, sourceAllowedSlots, filters, filterMode,
@@ -703,8 +697,8 @@ public class TransferEngine {
 
     private static boolean hasAmountConstraints(List<ItemTransferTarget> targets) {
         for (ItemTransferTarget t : targets) {
-            if (t.constraints().hasExportThreshold || t.constraints().hasImportThreshold
-                    || t.constraints().hasPerEntryAmounts)
+            if (t.constraints().hasExportThreshold() || t.constraints().hasImportThreshold()
+                    || t.constraints().hasPerEntryAmounts())
                 return true;
         }
         return false;
@@ -714,7 +708,7 @@ public class TransferEngine {
             Map<Item, Integer> sourceItemCounts) {
         List<Map<Item, Integer>> counts = new ArrayList<>(targets.size());
         for (ItemTransferTarget t : targets) {
-            counts.add(t.constraints().hasImportThreshold || t.constraints().hasPerEntryAmounts
+            counts.add(t.constraints().hasImportThreshold() || t.constraints().hasPerEntryAmounts()
                     ? targetItemCounts(t.handler(), sourceItemCounts)
                     : null);
         }
@@ -725,12 +719,12 @@ public class TransferEngine {
     private static Map<Item, Integer> targetItemCounts(IItemHandler handler, Map<Item, Integer> sourceItemCounts) {
         return handler instanceof DirectItemAccess direct
                 ? new HashMap<>(direct.countItems(sourceItemCounts.keySet()))
-                : buildItemCountCache(handler);
+                : TransferAmountRules.countItems(handler);
     }
 
     // Export views count live
     private static Map<Item, Integer> sourceItemCounts(IItemHandler handler) {
-        Map<Item, Integer> counts = buildItemCountCache(handler);
+        Map<Item, Integer> counts = TransferAmountRules.countItems(handler);
         return handler instanceof DirectItemAccess direct ? new HashMap<>(direct.countItems(counts.keySet())) : counts;
     }
 
@@ -864,7 +858,7 @@ public class TransferEngine {
         FluidStack drainable = source.drain(copyFluidWithAmount(resource, limit), IFluidHandler.FluidAction.SIMULATE);
         if (drainable.isEmpty() || !FilterLogic.matchesFluid(filters, mode, drainable, provider, cache))
             return 0;
-        int keepCap = getPerEntryFluidAmountLimit(drainable, filters, null, source, null, cache);
+        int keepCap = TransferAmountRules.perEntryFluidAmount(drainable, filters, null, source, null, cache);
         return keepCap >= 0 ? Math.min(drainable.getAmount(), keepCap) : drainable.getAmount();
     }
 
@@ -1213,21 +1207,21 @@ public class TransferEngine {
 
                     int allowedByAmount;
                     if (!anyAmountConstraints
-                            || (!target.constraints().hasExportThreshold && !target.constraints().hasImportThreshold
-                                    && !target.constraints().hasPerEntryAmounts)) {
+                            || (!target.constraints().hasExportThreshold() && !target.constraints().hasImportThreshold()
+                                    && !target.constraints().hasPerEntryAmounts())) {
                         allowedByAmount = extracted.getCount();
                     } else {
-                        allowedByAmount = getAllowedTransferCached(extracted, target.constraints(),
+                        allowedByAmount = TransferAmountRules.allowedItems(extracted, target.constraints(),
                                 sourceItemCounts, targetItemCounts.get(targetIndex));
-                        if (target.constraints().hasPerEntryAmounts && provider != null) {
-                            int perEntry = getPerEntryItemAmountLimit(extracted, exportFilters,
+                        if (target.constraints().hasPerEntryAmounts() && provider != null) {
+                            int perEntry = TransferAmountRules.perEntryItemAmount(extracted, exportFilters,
                                     target.importFilters(), source, slot, target.handler(), importAllowedSlots,
                                     sourceItemCounts, targetItemCounts.get(targetIndex), provider, candidateComponents,
                                     filterReadCache);
                             if (perEntry >= 0) {
                                 allowedByAmount = Math.min(allowedByAmount, perEntry);
                             }
-                            int batchLimit = getPerEntryBatchLimit(extracted, exportFilters, provider,
+                            int batchLimit = TransferAmountRules.perEntryItemBatch(extracted, exportFilters, provider,
                                     candidateComponents, filterReadCache);
                             if (batchLimit > 0) {
                                 Map<Item, Integer> movedByItem = roundRobin
@@ -1363,7 +1357,7 @@ public class TransferEngine {
             int count = available.getCount();
             if (sourceItemCounts != null) {
                 // Export keep amounts per item
-                int cap = keepCaps.computeIfAbsent(available.getItem(), item -> getPerEntryItemAmountLimit(
+                int cap = keepCaps.computeIfAbsent(available.getItem(), item -> TransferAmountRules.perEntryItemAmount(
                         available, exportFilters, null, source, slot, null, null, sourceItemCounts, null, provider,
                         components, filterReadCache));
                 if (cap >= 0) {
@@ -1538,7 +1532,8 @@ public class TransferEngine {
             HolderLookup.Provider provider, @Nullable FilterItemData.ReadCache filterReadCache, FluidStack required) {
 
         int remaining = limitMb;
-        AmountConstraints amountConstraints = collectAmountConstraints(exportFilters, importFilters, filterReadCache);
+        TransferAmountRules.Constraints amountConstraints = TransferAmountRules.collect(exportFilters, importFilters,
+                filterReadCache);
 
         for (int tank = 0; tank < source.getTanks() && remaining > 0; tank++) {
             FluidStack tankFluid = source.getFluidInTank(tank);
@@ -1560,11 +1555,10 @@ public class TransferEngine {
                     continue;
             }
 
-            int allowedByAmount = getAllowedTransferByFluidAmountConstraints(source, target, simulated,
-                    amountConstraints);
-            if (amountConstraints.hasPerEntryAmounts) {
-                int perEntry = getPerEntryFluidAmountLimit(simulated, exportFilters, importFilters, source, target,
-                        filterReadCache);
+            int allowedByAmount = TransferAmountRules.allowedFluids(source, target, simulated, amountConstraints);
+            if (amountConstraints.hasPerEntryAmounts()) {
+                int perEntry = TransferAmountRules.perEntryFluidAmount(simulated, exportFilters, importFilters,
+                        source, target, filterReadCache);
                 if (perEntry >= 0) {
                     allowedByAmount = Math.min(allowedByAmount, perEntry);
                 }
@@ -1573,7 +1567,8 @@ public class TransferEngine {
                 continue;
 
             int request = Math.min(simulated.getAmount(), Math.min(remaining, allowedByAmount));
-            int perEntryBatch = getPerEntryFluidBatchLimit(simulated, exportFilters, importFilters, filterReadCache);
+            int perEntryBatch = TransferAmountRules.perEntryFluidBatch(simulated, exportFilters, importFilters,
+                    filterReadCache);
             if (perEntryBatch > 0) {
                 request = Math.min(request, perEntryBatch);
             }
@@ -1678,261 +1673,6 @@ public class TransferEngine {
             case HIGH -> signalStrength > 0;
             case LOW -> signalStrength == 0;
         };
-    }
-
-    private static AmountConstraints collectAmountConstraints(ItemStack[] exportFilters, ItemStack[] importFilters) {
-        return collectAmountConstraints(exportFilters, importFilters, null);
-    }
-
-    private static AmountConstraints collectAmountConstraints(ItemStack[] exportFilters, ItemStack[] importFilters,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        int exportThreshold = 0;
-        boolean hasExportThreshold = false;
-        boolean hasPerEntryAmounts = false;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
-                    hasPerEntryAmounts = true;
-                }
-            }
-        }
-
-        int importThreshold = Integer.MAX_VALUE;
-        boolean hasImportThreshold = false;
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
-                    hasPerEntryAmounts = true;
-                }
-            }
-        }
-
-        return new AmountConstraints(hasExportThreshold, exportThreshold, hasImportThreshold, importThreshold,
-                hasPerEntryAmounts);
-    }
-
-    private static Map<Item, Integer> buildItemCountCache(IItemHandler handler) {
-        Map<Item, Integer> counts = new HashMap<>();
-        for (int i = 0; i < handler.getSlots(); i++) {
-            ItemStack stack = handler.getStackInSlot(i);
-            if (!stack.isEmpty()) {
-                counts.merge(stack.getItem(), stack.getCount(), Integer::sum);
-            }
-        }
-        return counts;
-    }
-
-    private static int getAllowedTransferCached(ItemStack candidate, AmountConstraints constraints,
-            Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (constraints.hasExportThreshold) {
-            int sourceCount = sourceCounts != null ? sourceCounts.getOrDefault(candidate.getItem(), 0) : 0;
-            int exportCap = sourceCount - constraints.exportThreshold;
-            if (exportCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, exportCap);
-        }
-
-        if (constraints.hasImportThreshold) {
-            int targetCount = targetCounts != null ? targetCounts.getOrDefault(candidate.getItem(), 0) : 0;
-            int importCap = constraints.importThreshold - targetCount;
-            if (importCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, importCap);
-        }
-
-        return allowed == Integer.MAX_VALUE ? candidate.getCount() : Math.max(0, allowed);
-    }
-
-    private static int getAllowedTransferByFluidAmountConstraints(IFluidHandler source, IFluidHandler target,
-            FluidStack candidate, AmountConstraints constraints) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (constraints.hasExportThreshold) {
-            int sourceAmount = countMatchingFluid(source, candidate);
-            int exportCap = sourceAmount - constraints.exportThreshold;
-            if (exportCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, exportCap);
-        }
-
-        if (constraints.hasImportThreshold) {
-            int targetAmount = countMatchingFluid(target, candidate);
-            int importCap = constraints.importThreshold - targetAmount;
-            if (importCap <= 0)
-                return 0;
-            allowed = Math.min(allowed, importCap);
-        }
-
-        return allowed == Integer.MAX_VALUE ? candidate.getAmount() : Math.max(0, allowed);
-    }
-
-    private static int getPerEntryItemAmountLimit(ItemStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, IItemHandler source, int sourceSlot,
-            @Nullable IItemHandler target, @Nullable boolean[] importMask,
-            Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts,
-            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                List<FilterItemData.ItemStock> stocks = FilterItemData.getItemStocksFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache, sourceSlot);
-                if (stocks.isEmpty() || stocks.get(0).amount() <= 0)
-                    continue;
-                FilterItemData.ItemStock stock = stocks.get(0);
-                int sourceCount = stockedCount(source, stock.slots(), sourceCounts, candidate.getItem());
-                int exportCap = sourceCount - stock.amount();
-                if (exportCap <= 0)
-                    return 0;
-                allowed = Math.min(allowed, exportCap);
-            }
-        }
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                int importCap = importCap(FilterItemData.getItemStocksFull(filter, candidate, provider,
-                        candidateComponents, filterReadCache, -1), target, importMask, targetCounts,
-                        candidate.getItem());
-                if (importCap <= 0)
-                    return 0;
-                allowed = Math.min(allowed, importCap);
-            }
-        }
-
-        return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
-    }
-
-    private static int importCap(List<FilterItemData.ItemStock> stocks, IItemHandler target,
-            @Nullable boolean[] importMask, @Nullable Map<Item, Integer> targetCounts, Item item) {
-        int cap = Integer.MAX_VALUE;
-        boolean wholeSeen = false;
-        for (FilterItemData.ItemStock stock : stocks) {
-            if (stock.slots() == null) {
-                if (wholeSeen)
-                    continue;
-                wholeSeen = true;
-            }
-            if (stock.amount() <= 0)
-                continue;
-            int room = stock.amount() - stockedCount(target, stock.slots(), targetCounts, item);
-            if (room > 0) {
-                cap = Math.min(cap, room);
-            } else if (stock.slots() == null) {
-                return 0;
-            } else if (importMask != null) {
-                // full bucket, block its slots
-                for (int slot : stock.slots()) {
-                    if (slot < importMask.length)
-                        importMask[slot] = false;
-                }
-            }
-        }
-        return cap;
-    }
-
-    private static int stockedCount(IItemHandler handler, @Nullable int[] slots,
-            @Nullable Map<Item, Integer> counts, Item item) {
-        if (slots == null)
-            return counts != null ? counts.getOrDefault(item, 0) : 0;
-        long count = 0;
-        for (int slot : slots) {
-            if (slot < handler.getSlots()) {
-                ItemStack stack = handler.getStackInSlot(slot);
-                if (stack.getItem() == item)
-                    count += stack.getCount();
-            }
-        }
-        return (int) Math.min(count, Integer.MAX_VALUE);
-    }
-
-    private static int getPerEntryBatchLimit(ItemStack candidate, ItemStack[] exportFilters,
-            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        if (exportFilters == null) return -1;
-        int limit = Integer.MAX_VALUE;
-        for (ItemStack filter : exportFilters) {
-            int batch = FilterItemData.getItemBatchLimitFull(filter, candidate, provider,
-                    candidateComponents, filterReadCache);
-            if (batch > 0)
-                limit = Math.min(limit, batch);
-        }
-        return limit == Integer.MAX_VALUE ? -1 : limit;
-    }
-
-    private static int getPerEntryFluidAmountLimit(FluidStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, IFluidHandler source, IFluidHandler target,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
-        int allowed = Integer.MAX_VALUE;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
-                if (threshold > 0) {
-                    int sourceAmount = countMatchingFluid(source, candidate);
-                    int exportCap = sourceAmount - threshold;
-                    if (exportCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, exportCap);
-                }
-            }
-        }
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
-                if (threshold > 0) {
-                    int targetAmount = countMatchingFluid(target, candidate);
-                    int importCap = threshold - targetAmount;
-                    if (importCap <= 0)
-                        return 0;
-                    allowed = Math.min(allowed, importCap);
-                }
-            }
-        }
-
-        return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
-    }
-
-    private static int getPerEntryFluidBatchLimit(FluidStack candidate, ItemStack[] exportFilters,
-            ItemStack[] importFilters, @Nullable FilterItemData.ReadCache filterReadCache) {
-        int limit = Integer.MAX_VALUE;
-
-        if (exportFilters != null) {
-            for (ItemStack filter : exportFilters) {
-                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate, filterReadCache);
-                if (batch > 0) {
-                    limit = Math.min(limit, batch);
-                }
-            }
-        }
-
-        if (importFilters != null) {
-            for (ItemStack filter : importFilters) {
-                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate, filterReadCache);
-                if (batch > 0) {
-                    limit = Math.min(limit, batch);
-                }
-            }
-        }
-
-        return limit == Integer.MAX_VALUE ? -1 : limit;
-    }
-
-    private static int countMatchingFluid(IFluidHandler handler, FluidStack candidate) {
-        if (handler instanceof DirectFluidHandler direct) return direct.count(candidate);
-        int amount = 0;
-        for (int i = 0; i < handler.getTanks(); i++) {
-            FluidStack stack = handler.getFluidInTank(i);
-            if (!stack.isEmpty() && sameFluid(stack, candidate)) {
-                amount += stack.getAmount();
-            }
-        }
-        return amount;
     }
 
     private static final class CombinedItemHandler implements IItemHandler {
@@ -2111,10 +1851,6 @@ public class TransferEngine {
         FluidStack copy = stack.copy();
         copy.setAmount(amount);
         return copy;
-    }
-
-    private static boolean sameFluid(FluidStack left, FluidStack right) {
-        return left.isFluidEqual(right);
     }
 
     private static final class CombinedEnergyStorage implements IEnergyStorage {

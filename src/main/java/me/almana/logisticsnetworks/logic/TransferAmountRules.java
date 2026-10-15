@@ -1,0 +1,284 @@
+package me.almana.logisticsnetworks.logic;
+
+import me.almana.logisticsnetworks.filter.CandidateComponents;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
+import me.almana.logisticsnetworks.integration.storage.DirectFluidHandler;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fluids.capability.IFluidHandler;
+import net.minecraftforge.items.IItemHandler;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+public final class TransferAmountRules {
+    public record Constraints(boolean hasExportThreshold, int exportThreshold,
+            boolean hasImportThreshold, int importThreshold,
+            boolean hasPerEntryAmounts) {
+    }
+
+    private TransferAmountRules() {
+    }
+
+    public static Constraints collect(ItemStack[] exportFilters, ItemStack[] importFilters,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        int exportThreshold = 0;
+        boolean hasExportThreshold = false;
+        boolean hasPerEntryAmounts = false;
+
+        if (exportFilters != null) {
+            for (ItemStack filter : exportFilters) {
+                if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
+                    hasPerEntryAmounts = true;
+                }
+            }
+        }
+
+        int importThreshold = Integer.MAX_VALUE;
+        boolean hasImportThreshold = false;
+
+        if (importFilters != null) {
+            for (ItemStack filter : importFilters) {
+                if (FilterItemData.hasAnyAmountEntries(filter, filterReadCache)) {
+                    hasPerEntryAmounts = true;
+                }
+            }
+        }
+
+        return new Constraints(hasExportThreshold, exportThreshold, hasImportThreshold, importThreshold,
+                hasPerEntryAmounts);
+    }
+
+    static Map<Item, Integer> countItems(IItemHandler handler) {
+        Map<Item, Integer> counts = new HashMap<>();
+        for (int i = 0; i < handler.getSlots(); i++) {
+            ItemStack stack = handler.getStackInSlot(i);
+            if (!stack.isEmpty()) {
+                counts.merge(stack.getItem(), stack.getCount(), TransferAmountRules::saturatingAdd);
+            }
+        }
+        return counts;
+    }
+
+    public static Map<Item, Integer> countItems(IItemHandler handler, Set<Item> candidates) {
+        return handler instanceof DirectItemAccess direct ? direct.countItems(candidates) : countItems(handler);
+    }
+
+    public static boolean hasStockFilter(ItemStack[] filters, @Nullable FilterItemData.ReadCache readCache) {
+        if (filters == null) return false;
+        for (ItemStack filter : filters) {
+            if (FilterItemData.hasAnyStockEntries(filter, readCache)) return true;
+        }
+        return false;
+    }
+
+    static int allowedItems(ItemStack candidate, Constraints constraints,
+            Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts) {
+        int allowed = Integer.MAX_VALUE;
+
+        if (constraints.hasExportThreshold) {
+            int sourceCount = sourceCounts != null ? sourceCounts.getOrDefault(candidate.getItem(), 0) : 0;
+            int exportCap = sourceCount - constraints.exportThreshold;
+            if (exportCap <= 0) return 0;
+            allowed = Math.min(allowed, exportCap);
+        }
+
+        if (constraints.hasImportThreshold) {
+            int targetCount = targetCounts != null ? targetCounts.getOrDefault(candidate.getItem(), 0) : 0;
+            int importCap = constraints.importThreshold - targetCount;
+            if (importCap <= 0) return 0;
+            allowed = Math.min(allowed, importCap);
+        }
+
+        return allowed == Integer.MAX_VALUE ? candidate.getCount() : Math.max(0, allowed);
+    }
+
+    static int allowedFluids(IFluidHandler source, IFluidHandler target, FluidStack candidate,
+            Constraints constraints) {
+        int allowed = Integer.MAX_VALUE;
+
+        if (constraints.hasExportThreshold) {
+            int sourceAmount = countFluids(source, candidate);
+            int exportCap = sourceAmount - constraints.exportThreshold;
+            if (exportCap <= 0) return 0;
+            allowed = Math.min(allowed, exportCap);
+        }
+
+        if (constraints.hasImportThreshold) {
+            int targetAmount = countFluids(target, candidate);
+            int importCap = constraints.importThreshold - targetAmount;
+            if (importCap <= 0) return 0;
+            allowed = Math.min(allowed, importCap);
+        }
+
+        return allowed == Integer.MAX_VALUE ? candidate.getAmount() : Math.max(0, allowed);
+    }
+
+    static int perEntryItemAmount(ItemStack candidate, ItemStack[] exportFilters,
+            ItemStack[] importFilters, IItemHandler source, int sourceSlot,
+            IItemHandler target, @Nullable boolean[] importMask,
+            Map<Item, Integer> sourceCounts, Map<Item, Integer> targetCounts,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        int allowed = Integer.MAX_VALUE;
+
+        if (exportFilters != null) {
+            for (ItemStack filter : exportFilters) {
+                List<FilterItemData.ItemStock> stocks = FilterItemData.getItemStocksFull(filter, candidate, provider,
+                        candidateComponents, filterReadCache, sourceSlot);
+                if (stocks.isEmpty() || stocks.get(0).amount() <= 0) continue;
+                FilterItemData.ItemStock stock = stocks.get(0);
+                int sourceCount = stockedCount(source, stock.slots(), sourceCounts, candidate.getItem());
+                int exportCap = sourceCount - stock.amount();
+                if (exportCap <= 0) return 0;
+                allowed = Math.min(allowed, exportCap);
+            }
+        }
+
+        if (importFilters != null) {
+            for (ItemStack filter : importFilters) {
+                int importCap = importCap(FilterItemData.getItemStocksFull(filter, candidate, provider,
+                        candidateComponents, filterReadCache, -1), target, importMask, targetCounts,
+                        candidate.getItem());
+                if (importCap <= 0) return 0;
+                allowed = Math.min(allowed, importCap);
+            }
+        }
+
+        return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
+    }
+
+    private static int importCap(List<FilterItemData.ItemStock> stocks, IItemHandler target,
+            @Nullable boolean[] importMask, @Nullable Map<Item, Integer> targetCounts, Item item) {
+        int cap = Integer.MAX_VALUE;
+        boolean wholeSeen = false;
+        for (FilterItemData.ItemStock stock : stocks) {
+            if (stock.slots() == null) {
+                if (wholeSeen) continue;
+                wholeSeen = true;
+            }
+            if (stock.amount() <= 0) continue;
+            int room = stock.amount() - stockedCount(target, stock.slots(), targetCounts, item);
+            if (room > 0) {
+                cap = Math.min(cap, room);
+            } else if (stock.slots() == null) {
+                return 0;
+            } else if (importMask != null) {
+                // full bucket, block its slots
+                for (int slot : stock.slots()) {
+                    if (slot < importMask.length) importMask[slot] = false;
+                }
+            }
+        }
+        return cap;
+    }
+
+    private static int stockedCount(IItemHandler handler, @Nullable int[] slots,
+            @Nullable Map<Item, Integer> counts, Item item) {
+        if (slots == null) return counts != null ? counts.getOrDefault(item, 0) : 0;
+        int count = 0;
+        for (int slot : slots) {
+            if (slot < handler.getSlots()) {
+                ItemStack stack = handler.getStackInSlot(slot);
+                if (stack.getItem() == item) count = saturatingAdd(count, stack.getCount());
+            }
+        }
+        return count;
+    }
+
+    static int perEntryItemBatch(ItemStack candidate, ItemStack[] exportFilters,
+            HolderLookup.Provider provider, @Nullable CandidateComponents candidateComponents,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        if (exportFilters == null) return -1;
+        int limit = Integer.MAX_VALUE;
+        for (ItemStack filter : exportFilters) {
+            int batch = FilterItemData.getItemBatchLimitFull(filter, candidate, provider,
+                    candidateComponents, filterReadCache);
+            if (batch > 0) {
+                limit = Math.min(limit, batch);
+            }
+        }
+        return limit == Integer.MAX_VALUE ? -1 : limit;
+    }
+
+    static int perEntryFluidAmount(FluidStack candidate, ItemStack[] exportFilters,
+            ItemStack[] importFilters, IFluidHandler source, IFluidHandler target,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        int allowed = Integer.MAX_VALUE;
+        int sourceAmount = -1;
+        int targetAmount = -1;
+
+        if (exportFilters != null) {
+            for (ItemStack filter : exportFilters) {
+                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
+                if (threshold > 0) {
+                    if (sourceAmount < 0) sourceAmount = countFluids(source, candidate);
+                    int exportCap = sourceAmount - threshold;
+                    if (exportCap <= 0) return 0;
+                    allowed = Math.min(allowed, exportCap);
+                }
+            }
+        }
+
+        if (importFilters != null) {
+            for (ItemStack filter : importFilters) {
+                int threshold = FilterItemData.getFluidAmountThresholdFull(filter, candidate, null, filterReadCache);
+                if (threshold > 0) {
+                    if (targetAmount < 0) targetAmount = countFluids(target, candidate);
+                    int importCap = threshold - targetAmount;
+                    if (importCap <= 0) return 0;
+                    allowed = Math.min(allowed, importCap);
+                }
+            }
+        }
+
+        return allowed == Integer.MAX_VALUE ? -1 : Math.max(0, allowed);
+    }
+
+    static int perEntryFluidBatch(FluidStack candidate, ItemStack[] exportFilters,
+            ItemStack[] importFilters, @Nullable FilterItemData.ReadCache filterReadCache) {
+        int limit = Integer.MAX_VALUE;
+
+        if (exportFilters != null) {
+            for (ItemStack filter : exportFilters) {
+                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate, filterReadCache);
+                if (batch > 0) {
+                    limit = Math.min(limit, batch);
+                }
+            }
+        }
+
+        if (importFilters != null) {
+            for (ItemStack filter : importFilters) {
+                int batch = FilterItemData.getFluidBatchLimitFull(filter, candidate, filterReadCache);
+                if (batch > 0) {
+                    limit = Math.min(limit, batch);
+                }
+            }
+        }
+
+        return limit == Integer.MAX_VALUE ? -1 : limit;
+    }
+
+    private static int countFluids(IFluidHandler handler, FluidStack candidate) {
+        if (handler instanceof DirectFluidHandler direct) return direct.count(candidate);
+        int amount = 0;
+        for (int i = 0; i < handler.getTanks(); i++) {
+            FluidStack stack = handler.getFluidInTank(i);
+            if (!stack.isEmpty() && stack.isFluidEqual(candidate)) {
+                amount = saturatingAdd(amount, stack.getAmount());
+            }
+        }
+        return amount;
+    }
+
+    private static int saturatingAdd(int left, int right) {
+        return (int) Math.min((long) left + right, Integer.MAX_VALUE);
+    }
+}
