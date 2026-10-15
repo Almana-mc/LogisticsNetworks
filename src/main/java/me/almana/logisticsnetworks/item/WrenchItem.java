@@ -9,6 +9,8 @@ import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageAccess;
+import me.almana.logisticsnetworks.integration.storage.StorageAction;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
@@ -37,6 +39,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.Container;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -59,6 +62,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 
 public class WrenchItem extends Item {
 
@@ -80,6 +84,7 @@ public class WrenchItem extends Item {
     private static final String KEY_FLOW = "flow";
     private static final int MAX_MASS_SELECTIONS = 10_000;
     private static final int MAX_MASS_NODES = 2048;
+    private static final Map<ServerPlayer, Integer> LAST_STORAGE_PLACEMENT = new WeakHashMap<>();
 
     public static final int DEFAULT_CASE_COLOR = 0xE0E0E8;
     public static final int DEFAULT_SCREEN_COLOR = 0x04FF00;
@@ -544,6 +549,9 @@ public class WrenchItem extends Item {
                 if (backend != null) {
                     return toggleStorageLink(context.getItemInHand(), player, level, clickedPos, backend);
                 }
+                if (player instanceof ServerPlayer serverPlayer) {
+                    return placeNodeFromWrench(context, serverPlayer, clickedPos);
+                }
             }
             return InteractionResult.SUCCESS;
         }
@@ -759,6 +767,72 @@ public class WrenchItem extends Item {
             }
         }
         return null;
+    }
+
+    private InteractionResult placeNodeFromWrench(UseOnContext context, ServerPlayer player, BlockPos pos) {
+        ServerLevel level = player.serverLevel();
+        if (NodePlacementHelper.validatePlacement(level, pos) != NodePlacementHelper.ValidationResult.OK) {
+            return InteractionResult.SUCCESS;
+        }
+        GlobalPos target = GlobalPos.of(level.dimension(), pos);
+        if (LinkedStorage.isNodePlacementQueued(target)) {
+            player.displayClientMessage(Component.translatable(
+                    "message.logisticsnetworks.wrench.place_node.duplicate"), true);
+            return InteractionResult.CONSUME;
+        }
+        boolean renderVisible = ServerPayloadHandler.getDefaultNodeVisibility(player);
+        int inventorySlot = findNodeItemSlot(player.getInventory());
+        if (inventorySlot >= 0) {
+            return placeNode(player, pos, renderVisible, null, inventorySlot);
+        }
+        StorageLink storageLink = getStorageLink(context.getItemInHand());
+        // Storage scans are rate limited
+        if (storageLink == null || ServerPayloadHandler.throttled(LAST_STORAGE_PLACEMENT, player)) {
+            return InteractionResult.SUCCESS;
+        }
+        StorageAccess access = LinkedStorage.resolve(level, storageLink);
+        if (access == null || !access.allows(player, StorageAction.EXTRACT)) {
+            return InteractionResult.SUCCESS;
+        }
+        if (access.count(Registration.LOGISTICS_NODE_ITEM.get()) >= 1) {
+            return placeNode(player, pos, renderVisible, access, -1);
+        }
+        LinkedStorage.NodePlacementRequestResult result = LinkedStorage.requestNodePlacement(player,
+                target, storageLink, renderVisible);
+        player.displayClientMessage(Component.translatable(switch (result) {
+            case QUEUED -> "message.logisticsnetworks.wrench.place_node.queued";
+            case DUPLICATE -> "message.logisticsnetworks.wrench.place_node.duplicate";
+            case UNAVAILABLE -> "message.logisticsnetworks.wrench.place_node.unavailable";
+        }), true);
+        return InteractionResult.CONSUME;
+    }
+
+    // Take the node after placing
+    private InteractionResult placeNode(ServerPlayer player, BlockPos pos, boolean renderVisible,
+                                        @Nullable StorageAccess access, int inventorySlot) {
+        ServerLevel level = player.serverLevel();
+        LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, pos, player.getUUID());
+        if (node == null) return InteractionResult.FAIL;
+        if (access == null) {
+            player.getInventory().getItem(inventorySlot).shrink(1);
+            player.getInventory().setChanged();
+        } else if (access.extractOne(Registration.LOGISTICS_NODE_ITEM.get(), player).isEmpty()) {
+            node.discard();
+            return InteractionResult.SUCCESS;
+        }
+        node.setRenderVisible(renderVisible);
+        level.playSound(null, pos, SoundEvents.METAL_PLACE, SoundSource.BLOCKS, 1.0f, 1.0f);
+        player.displayClientMessage(Component.translatable(access == null
+                ? "message.logisticsnetworks.wrench.place_node.inventory"
+                : "message.logisticsnetworks.wrench.place_node.storage_network"), true);
+        return InteractionResult.CONSUME;
+    }
+
+    private static int findNodeItemSlot(Container inventory) {
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            if (inventory.getItem(slot).is(Registration.LOGISTICS_NODE_ITEM.get())) return slot;
+        }
+        return -1;
     }
 
     private InteractionResult toggleStorageLink(ItemStack wrenchStack, Player player, Level level,

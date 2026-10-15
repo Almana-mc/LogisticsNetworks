@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
+import me.almana.logisticsnetworks.client.QueuedNodePlacementRenderer;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.ComputerScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
@@ -194,6 +195,11 @@ public class ClientPayloadHandler {
                 screen.receiveStorageUpgradeCatalog(payload);
             }
         });
+    }
+
+    public static void handleSyncQueuedNodePlacement(SyncQueuedNodePlacementPayload payload,
+                                                     IPayloadContext context) {
+        context.enqueueWork(() -> QueuedNodePlacementRenderer.update(payload));
     }
 
     public static void handleSyncFilterScanResult(SyncFilterScanResultPayload payload, IPayloadContext context) {

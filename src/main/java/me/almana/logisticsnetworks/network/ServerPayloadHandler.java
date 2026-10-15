@@ -127,7 +127,7 @@ public class ServerPayloadHandler {
         });
     }
 
-    private static boolean throttled(Map<ServerPlayer, Integer> last, ServerPlayer player) {
+    public static boolean throttled(Map<ServerPlayer, Integer> last, ServerPlayer player) {
         int now = player.server.getTickCount();
         if (now - last.getOrDefault(player, -SCAN_COOLDOWN_TICKS) < SCAN_COOLDOWN_TICKS) return true;
         last.put(player, now);

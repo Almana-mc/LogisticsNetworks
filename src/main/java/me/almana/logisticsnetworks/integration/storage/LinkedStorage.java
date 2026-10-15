@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.integration.ae2.AE2StorageAdapter;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -48,6 +49,12 @@ public final class LinkedStorage {
         DUPLICATE,
         PENDING,
         NO_SLOT,
+        UNAVAILABLE
+    }
+
+    public enum NodePlacementRequestResult {
+        QUEUED,
+        DUPLICATE,
         UNAVAILABLE
     }
 
@@ -159,6 +166,15 @@ public final class LinkedStorage {
         return StorageUpgradeRequests.isPending(node);
     }
 
+    public static NodePlacementRequestResult requestNodePlacement(ServerPlayer player, GlobalPos target,
+                                                                  StorageLink link, boolean renderVisible) {
+        return StorageNodePlacementRequests.request(player, target, link, renderVisible);
+    }
+
+    public static boolean isNodePlacementQueued(GlobalPos target) {
+        return StorageNodePlacementRequests.isQueued(target);
+    }
+
     public static SupplyRequestResult requestSupply(UUID requestId, ServerPlayer player, StorageLink link,
                                                      List<ItemRequirement> requirements, int protectedSlot,
                                                      Component subject, SupplyOperation operation) {
@@ -171,16 +187,19 @@ public final class LinkedStorage {
 
     public static void tickCraftingRequests(MinecraftServer server) {
         StorageUpgradeRequests.tick(server);
+        StorageNodePlacementRequests.tick();
         StorageSupplyRequests.tick();
     }
 
     public static void stopCraftingRequests() {
         StorageUpgradeRequests.stop();
+        StorageNodePlacementRequests.stop();
         StorageSupplyRequests.stop();
     }
 
     public static void restoreCraftingRequests(ServerPlayer player) {
         StorageUpgradeRequests.deliverNotices(player);
+        StorageNodePlacementRequests.restore(player);
     }
 
     public static int findUpgradeSlot(List<ItemStack> upgrades, int preferredSlot, Item upgrade) {

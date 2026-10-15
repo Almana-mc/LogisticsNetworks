@@ -130,6 +130,8 @@ public final class NetworkHandler {
                 ServerPayloadHandler::handleInstallStorageUpgrade);
         registerClient(SyncStorageUpgradeCatalogPayload.class, SyncStorageUpgradeCatalogPayload.STREAM_CODEC,
                 ClientPayloadHandler::handleSyncStorageUpgradeCatalog);
+        registerClient(SyncQueuedNodePlacementPayload.class, SyncQueuedNodePlacementPayload.STREAM_CODEC,
+                ClientPayloadHandler::handleSyncQueuedNodePlacement);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {
