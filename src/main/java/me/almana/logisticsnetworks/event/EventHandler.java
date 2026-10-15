@@ -122,6 +122,7 @@ public class EventHandler {
     public static void onServerStopped(ServerStoppedEvent event) {
         PENDING_LOAD_SYNC.clear();
         PENDING_FILTER_EJECT.clear();
+        LabelUpgradeSync.clearPending();
         TooltipLines.clear();
     }
 

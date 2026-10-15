@@ -29,14 +29,19 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 public final class LabelUpgradeSync {
 
-    private static final Set<UUID> PENDING_NODES = new HashSet<>();
+    private static final Set<UUID> PENDING_NODES = ConcurrentHashMap.newKeySet();
 
     private LabelUpgradeSync() {
+    }
+
+    public static void clearPending() {
+        PENDING_NODES.clear();
     }
 
     public static boolean isPending(LogisticsNodeEntity node) {
