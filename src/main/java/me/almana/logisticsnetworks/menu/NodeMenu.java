@@ -3,6 +3,8 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
@@ -46,6 +48,8 @@ public class NodeMenu extends AbstractContainerMenu {
     private boolean remoteAccess;
     private int selectedChannel;
     private boolean nodeSlotsActive = true;
+    @Nullable
+    private StorageLink preferredStorageLink;
 
     private final Container upgradeContainer;
     private final List<ItemStack> openingUpgrades;
@@ -83,16 +87,18 @@ public class NodeMenu extends AbstractContainerMenu {
         layoutPlayerSlots(playerInv);
     }
 
-    public static void open(ServerPlayer player, LogisticsNodeEntity node, int selectedChannel, boolean remote) {
-        open(player, node, selectedChannel, remote, null);
+    public static void open(ServerPlayer player, LogisticsNodeEntity node, int selectedChannel, boolean remote,
+            @Nullable GraphMenuContext context) {
+        open(player, node, selectedChannel, remote, context, null);
     }
 
     public static void open(ServerPlayer player, LogisticsNodeEntity node, int selectedChannel, boolean remote,
-            @Nullable GraphMenuContext context) {
+            @Nullable GraphMenuContext context, @Nullable StorageLink preferredStorageLink) {
         NodeMenuSync.openScreen(player, new SimpleMenuProvider((id, inv, p) -> {
             NodeMenu menu = new NodeMenu(id, inv, node, selectedChannel);
             menu.setRemoteAccess(remote);
             menu.setReturnContext(context);
+            menu.preferredStorageLink = preferredStorageLink;
             return menu;
         }, Component.translatable("gui.logisticsnetworks.node_config")), node, selectedChannel, buf -> {}, buf -> {
             buf.writeBoolean(context != null);
@@ -181,6 +187,15 @@ public class NodeMenu extends AbstractContainerMenu {
         this.remoteAccess = remote;
     }
 
+    @Nullable
+    public StorageLink getAccessibleStorageLink(ServerPlayer player) {
+        return LinkedStorage.findAccessibleLink(player, preferredStorageLink);
+    }
+
+    private boolean isUpgradeEditPending() {
+        return node != null && LabelUpgradeSync.isPending(node);
+    }
+
     @Override
     public boolean stillValid(Player player) {
         if (returnContext != null) return returnContext.canEdit(player, node);
@@ -225,7 +240,7 @@ public class NodeMenu extends AbstractContainerMenu {
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
         Slot fromSlot = slots.get(index);
-        if (!nodeSlotsActive || !hasAvailableNode() || !fromSlot.hasItem())
+        if (!nodeSlotsActive || !hasAvailableNode() || isUpgradeEditPending() || !fromSlot.hasItem())
             return ItemStack.EMPTY;
 
         ItemStack fromStack = fromSlot.getItem();
@@ -257,7 +272,8 @@ public class NodeMenu extends AbstractContainerMenu {
         super.removed(player);
         if (player instanceof ServerPlayer serverPlayer && node != null && node.isAlive()
                 && node.isOwnedBy(serverPlayer)) {
-            LabelUpgradeSync.synchronizeMenuClose(serverPlayer, node, openingUpgrades);
+            LabelUpgradeSync.synchronizeMenuClose(serverPlayer, node, openingUpgrades,
+                    getAccessibleStorageLink(serverPlayer));
         }
     }
 
@@ -336,8 +352,13 @@ public class NodeMenu extends AbstractContainerMenu {
         }
 
         @Override
+        public boolean mayPickup(Player player) {
+            return !isUpgradeEditPending();
+        }
+
+        @Override
         public boolean mayPlace(ItemStack stack) {
-            if (stack.isEmpty() || !stack.is(ModTags.UPGRADES)) {
+            if (isUpgradeEditPending() || stack.isEmpty() || !stack.is(ModTags.UPGRADES)) {
                 return false;
             }
             for (int i = 0; i < UPGRADE_SLOTS; i++) {

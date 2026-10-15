@@ -562,7 +562,7 @@ public class WrenchItem extends Item {
         return switch (getMode(wrenchStack)) {
             case WRENCH -> isSecondaryUse(player)
                     ? removeNode(node.level(), node, player)
-                    : openNodeGui(node, player);
+                    : openNodeGui(node, player, wrenchStack);
             // Bit 3: inverted controls
             case COPY_PASTE -> isSecondaryUse(player) != ServerPayloadHandler.isModifierDown(player, 3)
                     ? pasteToNode(node, player, wrenchStack)
@@ -796,9 +796,9 @@ public class WrenchItem extends Item {
         return InteractionResult.CONSUME;
     }
 
-    private InteractionResult openNodeGui(LogisticsNodeEntity node, Player player) {
+    private InteractionResult openNodeGui(LogisticsNodeEntity node, Player player, ItemStack wrenchStack) {
         if (player instanceof ServerPlayer serverPlayer) {
-            NodeMenu.open(serverPlayer, node, 0, false);
+            NodeMenu.open(serverPlayer, node, 0, false, null, getStorageLink(wrenchStack));
         }
         return InteractionResult.CONSUME;
     }

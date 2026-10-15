@@ -1,10 +1,12 @@
 package me.almana.logisticsnetworks.data;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
@@ -17,6 +19,7 @@ public final class LabelUpgradeTemplate {
 
     private static final String KEY_REVISION = "Revision";
     private static final String KEY_PLAYER = "Player";
+    private static final String KEY_STORAGE_LINK = "StorageLink";
     private static final String KEY_UPGRADES = "Upgrades";
     private static final String KEY_CHANNELS = "Channels";
     private static final String KEY_SLOT = "Slot";
@@ -24,12 +27,16 @@ public final class LabelUpgradeTemplate {
 
     private final long revision;
     private final UUID playerId;
+    @Nullable
+    private final StorageLink storageLink;
     private final List<ItemStack> upgrades;
     private final List<ChannelData> channels;
 
-    public LabelUpgradeTemplate(long revision, UUID playerId, List<ItemStack> upgrades, List<ChannelData> channels) {
+    public LabelUpgradeTemplate(long revision, UUID playerId, @Nullable StorageLink storageLink,
+                                List<ItemStack> upgrades, List<ChannelData> channels) {
         this.revision = revision;
         this.playerId = playerId;
+        this.storageLink = storageLink;
         this.upgrades = copyStacks(upgrades);
         this.channels = copyChannels(channels);
     }
@@ -40,6 +47,11 @@ public final class LabelUpgradeTemplate {
 
     public UUID playerId() {
         return playerId;
+    }
+
+    @Nullable
+    public StorageLink storageLink() {
+        return storageLink;
     }
 
     public List<ItemStack> upgrades() {
@@ -54,6 +66,10 @@ public final class LabelUpgradeTemplate {
         CompoundTag tag = new CompoundTag();
         tag.putLong(KEY_REVISION, revision);
         tag.putUUID(KEY_PLAYER, playerId);
+        if (storageLink != null) {
+            StorageLink.CODEC.encodeStart(NbtOps.INSTANCE, storageLink).result()
+                    .ifPresent(link -> tag.put(KEY_STORAGE_LINK, link));
+        }
         ListTag upgradesTag = new ListTag();
         for (int slot = 0; slot < upgrades.size(); slot++) {
             ItemStack stack = upgrades.get(slot);
@@ -91,7 +107,10 @@ public final class LabelUpgradeTemplate {
             channel.load(channelTag, RegistryAccess.EMPTY);
             channels.add(channel);
         }
-        return new LabelUpgradeTemplate(tag.getLong(KEY_REVISION), tag.getUUID(KEY_PLAYER), upgrades, channels);
+        StorageLink link = tag.contains(KEY_STORAGE_LINK)
+                ? StorageLink.CODEC.parse(NbtOps.INSTANCE, tag.get(KEY_STORAGE_LINK)).result().orElse(null)
+                : null;
+        return new LabelUpgradeTemplate(tag.getLong(KEY_REVISION), tag.getUUID(KEY_PLAYER), link, upgrades, channels);
     }
 
     private static List<ItemStack> copyStacks(List<ItemStack> source) {

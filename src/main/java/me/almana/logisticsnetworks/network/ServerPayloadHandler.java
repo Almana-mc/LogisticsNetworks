@@ -21,6 +21,8 @@ import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -1008,7 +1010,9 @@ public class ServerPayloadHandler {
                 }
                 return;
             }
-            NodeMenu.open(player, node, selectedChannel, false);
+            StorageLink preferredStorageLink = player.containerMenu instanceof NodeMenu currentMenu
+                    ? currentMenu.getAccessibleStorageLink(player) : null;
+            NodeMenu.open(player, node, selectedChannel, false, null, preferredStorageLink);
         });
     }
 
@@ -1130,7 +1134,8 @@ public class ServerPayloadHandler {
                             break;
                         }
                     }
-                    LabelUpgradeSync.establishLabelTemplate(player, network, authority);
+                    LabelUpgradeSync.establishLabelTemplate(player, network, authority,
+                            LinkedStorage.findAccessibleLink(player, null));
                 }
             }
             invalidateNetwork(node);
@@ -1319,7 +1324,7 @@ public class ServerPayloadHandler {
                     .filter(node -> node != null && label.equals(node.getNodeLabel()))
                     .toList();
             if (nodes.isEmpty()
-                    || LabelUpgradeSync.synchronizeLabels(player, network, nodes, player.getUUID(), "")) {
+                    || LabelUpgradeSync.synchronizeLabels(player, network, nodes, player.getUUID(), "", null)) {
                 network.removeLabel(label);
                 registry.setDirty();
                 GraphPayloadHandler.broadcast(player.getServer(), network.getId());

@@ -6,7 +6,10 @@ import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageAccess;
 import me.almana.logisticsnetworks.integration.storage.StorageInventory;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.network.GraphPayloadHandler;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import net.minecraft.network.chat.Component;
@@ -23,15 +26,21 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
-// Inventory only until Phase 8
 public final class LabelUpgradeSync {
 
+    private static final Set<UUID> PENDING_NODES = new HashSet<>();
+
     private LabelUpgradeSync() {
+    }
+
+    public static boolean isPending(LogisticsNodeEntity node) {
+        return PENDING_NODES.contains(node.getUUID());
     }
 
     public static List<ItemStack> snapshotUpgrades(LogisticsNodeEntity node) {
@@ -44,11 +53,11 @@ public final class LabelUpgradeSync {
     }
 
     public static void establishLabelTemplate(ServerPlayer player, LogisticsNetwork network,
-                                              LogisticsNodeEntity authority) {
+                                              LogisticsNodeEntity authority, @Nullable StorageLink storageLink) {
         String label = authority.getNodeLabel();
         if (label.isBlank() || network.getLabelTemplate(label) != null) return;
         long revision = Math.max(1, authority.getLabelRevision());
-        LabelUpgradeTemplate template = new LabelUpgradeTemplate(revision, player.getUUID(),
+        LabelUpgradeTemplate template = new LabelUpgradeTemplate(revision, player.getUUID(), storageLink,
                 snapshotUpgrades(authority), snapshotChannels(authority));
         authority.setLabelRevision(revision);
         network.setLabelTemplate(label, template);
@@ -68,7 +77,7 @@ public final class LabelUpgradeSync {
         else channels.get(index).copyFrom(current.get(index));
         long revision = previous + 1;
         network.setLabelTemplate(label, new LabelUpgradeTemplate(revision, template.playerId(),
-                template.upgrades(), channels));
+                template.storageLink(), template.upgrades(), channels));
         if (source.getLabelRevision() == previous) source.setLabelRevision(revision);
         for (LogisticsNodeEntity node : updated) {
             if (node.getLabelRevision() == previous) node.setLabelRevision(revision);
@@ -76,56 +85,46 @@ public final class LabelUpgradeSync {
     }
 
     public static void synchronizeMenuClose(ServerPlayer player, LogisticsNodeEntity source,
-                                            List<ItemStack> original) {
-        // Player already saved or dead
-        boolean absent = player.hasDisconnected() || !player.isAlive();
-        LogisticsNetwork network = absent || sameUpgrades(source, original) ? null : labelNetwork(source);
-        if (network == null || isTemplateCurrent(network, source)) {
-            ServerPayloadHandler.invalidateNetwork(source);
-            return;
-        }
-        List<LogisticsNodeEntity> targets = findLoadedTargets(player.getServer(), network, source);
-        List<ItemStack> desired = snapshotUpgrades(source);
-        Map<UUID, UpgradeChanges> changes = new LinkedHashMap<>();
-        List<Requirement> required = collectChanges(targets, desired, changes);
-        List<ItemStack> escrow = reserveRollbackItems(player, source, original);
-        if (!hasInventory(player.getInventory(), required)) {
-            rollbackSource(player, source, original, escrow);
-            reportFailure(player, source.getNodeLabel(), missing(required));
-            return;
-        }
-        consumeInventory(player.getInventory(), required);
-        LabelUpgradeTemplate template = new LabelUpgradeTemplate(nextRevision(network, source.getNodeLabel()),
-                player.getUUID(), desired, snapshotChannels(source));
-        for (LogisticsNodeEntity target : targets) {
-            applyTemplate(target, template);
-            returnItems(player, changes.get(target.getUUID()).returned());
-            target.setLabelRevision(template.revision());
-        }
-        applyTemplate(source, template);
-        source.setLabelRevision(template.revision());
-        network.setLabelTemplate(source.getNodeLabel(), template);
-        returnItems(player, escrow);
-        markChanged(player.serverLevel(), network);
-        player.displayClientMessage(Component.translatable(
-                "message.logisticsnetworks.label.synced", targets.size() + 1), true);
+                                            List<ItemStack> original, @Nullable StorageLink storageLink) {
+        synchronizeLoaded(player, source, original, storageLink, false);
     }
 
-    public static boolean synchronizeLabels(ServerPlayer player, LogisticsNetwork network,
-                                            List<LogisticsNodeEntity> targets, UUID sourceId, String label) {
-        return synchronizeLabels(player, network, targets, sourceId, label, () -> true, ignored -> {});
+    public static boolean synchronizeCraftedUpgrade(ServerPlayer player, LogisticsNodeEntity source,
+                                                    List<ItemStack> original, StorageLink storageLink) {
+        return synchronizeLoaded(player, source, original, storageLink, true);
     }
 
     public static boolean synchronizeLabels(ServerPlayer player, LogisticsNetwork network,
                                             List<LogisticsNodeEntity> targets, UUID sourceId, String label,
-                                            BooleanSupplier expectationValid, Consumer<Boolean> completion) {
-        boolean applied = applyLabel(player, network, targets, sourceId, label, expectationValid);
-        completion.accept(applied);
-        return applied;
+                                            @Nullable StorageLink storageLink) {
+        return synchronizeLabels(player, network, targets, sourceId, label, storageLink, () -> true, ignored -> {});
+    }
+
+    public static boolean synchronizeLabels(ServerPlayer player, LogisticsNetwork network,
+                                            List<LogisticsNodeEntity> targets, UUID sourceId, String label,
+                                            @Nullable StorageLink storageLink, BooleanSupplier expectationValid,
+                                            Consumer<Boolean> completion) {
+        if (targets.isEmpty() || new HashSet<>(targets).size() != targets.size()
+                || targets.stream().anyMatch(LabelUpgradeSync::isPending)) {
+            completion.accept(false);
+            return false;
+        }
+        if (label.isEmpty()) {
+            clearLabels(player, network, targets);
+            completion.accept(true);
+            return true;
+        }
+        BulkSync sync = BulkSync.create(player, network, targets, sourceId, label, storageLink,
+                expectationValid, completion);
+        if (sync == null) {
+            completion.accept(false);
+            return false;
+        }
+        return sync.start();
     }
 
     public static void synchronizeOnLoad(LogisticsNodeEntity node) {
-        LogisticsNetwork network = labelNetwork(node);
+        LogisticsNetwork network = isPending(node) ? null : labelNetwork(node);
         LabelUpgradeTemplate template = network == null ? null : network.getLabelTemplate(node.getNodeLabel());
         if (template == null || node.getLabelRevision() >= template.revision()) return;
         UpgradeChanges changes = getUpgradeChanges(node, template.upgrades());
@@ -137,41 +136,56 @@ public final class LabelUpgradeSync {
             }
             return;
         }
-        if (!hasInventory(player.getInventory(), changes.required())) {
+        if (hasInventory(player.getInventory(), changes.required())) {
+            consumeInventory(player.getInventory(), changes.required());
+            applyLoadedTemplate(player, node, template, changes.returned());
+        } else if (template.storageLink() == null) {
             reportFailure(player, node.getNodeLabel(), missing(changes.required()));
-            return;
+        } else {
+            supplyOnLoad(player, node, template, changes);
         }
-        consumeInventory(player.getInventory(), changes.required());
-        applyLoadedTemplate(player, node, template, changes.returned());
     }
 
-    private static boolean applyLabel(ServerPlayer player, LogisticsNetwork network,
-                                      List<LogisticsNodeEntity> targets, UUID sourceId, String label,
-                                      BooleanSupplier expectationValid) {
-        if (targets.isEmpty() || new HashSet<>(targets).size() != targets.size()) return false;
-        if (label.isEmpty()) {
-            clearLabels(player, network, targets);
-            return true;
-        }
-        LabelUpgradeTemplate storedTemplate = network.getLabelTemplate(label);
-        LogisticsNodeEntity authority = findLabelAuthority(player.getServer(), network, label, storedTemplate);
-        if (storedTemplate == null && authority == null) {
-            authority = targets.stream().filter(node -> node.getUUID().equals(sourceId)).findFirst().orElse(null);
-        }
-        if (storedTemplate == null && authority == null) return false;
-        LabelUpgradeTemplate template = freshTemplate(player, network, label, storedTemplate, authority);
-        Map<UUID, UpgradeChanges> changes = new LinkedHashMap<>();
-        List<Requirement> required = collectChanges(targets, template.upgrades(), changes);
-        if (required.isEmpty()
-                && !(expectationValid.getAsBoolean() && validTargets(player, network, targets, authority))) {
+    private static void supplyOnLoad(ServerPlayer player, LogisticsNodeEntity node, LabelUpgradeTemplate template,
+                                     UpgradeChanges changes) {
+        UUID networkId = node.getNetworkId();
+        String label = node.getNodeLabel();
+        List<ItemStack> current = snapshotUpgrades(node);
+        PENDING_NODES.add(node.getUUID());
+        LinkedStorage.requestSupply(UUID.randomUUID(), player, template.storageLink(),
+                toRequirements(changes.required()), -1, labelSubject(label, 1), new LinkedStorage.SupplyOperation() {
+                    @Override
+                    public boolean stillValid() {
+                        return validLoadedTarget(node, template, networkId, label, current);
+                    }
+
+                    @Override
+                    public boolean commit() {
+                        applyLoadedTemplate(player, node, template, changes.returned());
+                        PENDING_NODES.remove(node.getUUID());
+                        return true;
+                    }
+
+                    @Override
+                    public void failed(Component detail) {
+                        reportFailure(player, label, detail);
+                        PENDING_NODES.remove(node.getUUID());
+                    }
+                });
+    }
+
+    private static boolean synchronizeLoaded(ServerPlayer player, LogisticsNodeEntity source,
+                                             List<ItemStack> original, @Nullable StorageLink storageLink,
+                                             boolean returnSourceToStorage) {
+        // Player already saved or dead
+        boolean absent = player.hasDisconnected() || !player.isAlive();
+        LogisticsNetwork network = absent || sameUpgrades(source, original) || isPending(source)
+                ? null : labelNetwork(source);
+        if (network == null || isTemplateCurrent(network, source)) {
+            ServerPayloadHandler.invalidateNetwork(source);
             return false;
         }
-        if (!hasInventory(player.getInventory(), required)) {
-            reportFailure(player, label, missing(required));
-            return false;
-        }
-        consumeInventory(player.getInventory(), required);
-        commitLabel(player, network, targets, label, template, authority, changes);
+        new LoadedSync(player, network, source, original, storageLink, returnSourceToStorage).start();
         return true;
     }
 
@@ -190,15 +204,18 @@ public final class LabelUpgradeSync {
 
     private static LabelUpgradeTemplate freshTemplate(ServerPlayer player, LogisticsNetwork network, String label,
                                                       @Nullable LabelUpgradeTemplate storedTemplate,
-                                                      @Nullable LogisticsNodeEntity authority) {
+                                                      @Nullable LogisticsNodeEntity authority,
+                                                      @Nullable StorageLink storageLink) {
         if (authority == null || storedTemplate != null
                 && authority.getLabelRevision() == storedTemplate.revision()
                 && sameUpgrades(authority, storedTemplate.upgrades())
                 && sameChannels(authority, storedTemplate.channels())) {
             return storedTemplate;
         }
+        StorageLink templateLink = storedTemplate != null && storedTemplate.storageLink() != null
+                ? storedTemplate.storageLink() : storageLink;
         long revision = Math.max(nextRevision(network, label), authority.getLabelRevision() + 1);
-        return new LabelUpgradeTemplate(revision, player.getUUID(),
+        return new LabelUpgradeTemplate(revision, player.getUUID(), templateLink,
                 snapshotUpgrades(authority), snapshotChannels(authority));
     }
 
@@ -215,7 +232,7 @@ public final class LabelUpgradeSync {
             applyTemplate(target, template);
             if (authority != null) target.setRenderVisible(authority.isRenderVisible());
             target.setLabelRevision(template.revision());
-            returnItems(player, changes.get(target.getUUID()).returned());
+            returnItems(player, changes.get(target.getUUID()).returned(), null);
         }
         if (refreshesAuthority) authority.setLabelRevision(template.revision());
         if (labelPosition != null) network.setGraphPosition("label:" + label, labelPosition);
@@ -272,19 +289,43 @@ public final class LabelUpgradeSync {
         return positions;
     }
 
-    private static boolean validTargets(ServerPlayer player, LogisticsNetwork network,
-                                        List<LogisticsNodeEntity> targets,
-                                        @Nullable LogisticsNodeEntity authority) {
-        MinecraftServer server = player.getServer();
-        for (LogisticsNodeEntity target : targets) {
-            if (findNode(server, target.getUUID()) != target || !target.isOwnedBy(player)
-                    || !network.getId().equals(target.getNetworkId())
-                    || !network.getNodeUuids().contains(target.getUUID())) return false;
+    private static boolean validBulkTargets(ServerPlayer player, LogisticsNetwork network, String label,
+                                            @Nullable LabelUpgradeTemplate storedTemplate,
+                                            List<LogisticsNodeEntity> targets,
+                                            Map<LogisticsNodeEntity, BulkNodeState> snapshots, Set<UUID> pending) {
+        if (!PENDING_NODES.containsAll(pending) || network.getLabelTemplate(label) != storedTemplate
+                || !targets.stream().allMatch(target -> target.isOwnedBy(player))) return false;
+        for (Map.Entry<LogisticsNodeEntity, BulkNodeState> entry : snapshots.entrySet()) {
+            LogisticsNodeEntity node = entry.getKey();
+            if (findNode(player.getServer(), node.getUUID()) != node || !node.isValidNode()
+                    || !network.getId().equals(node.getNetworkId())
+                    || !network.getNodeUuids().contains(node.getUUID())
+                    || !entry.getValue().matches(node)) return false;
         }
-        return authority == null || findNode(server, authority.getUUID()) == authority
-                && authority.isValidNode()
-                && network.getId().equals(authority.getNetworkId())
-                && network.getNodeUuids().contains(authority.getUUID());
+        return true;
+    }
+
+    private static boolean validLoadedGroup(MinecraftServer server, LogisticsNodeEntity source,
+                                            List<ItemStack> desired, List<LogisticsNodeEntity> targets,
+                                            Map<UUID, List<ItemStack>> targetSnapshots,
+                                            UUID networkId, String label) {
+        if (!source.isAlive() || !sameUpgrades(source, desired)
+                || !label.equals(source.getNodeLabel())
+                || !networkId.equals(source.getNetworkId())) return false;
+        for (LogisticsNodeEntity target : targets) {
+            LogisticsNodeEntity loaded = findNode(server, target.getUUID());
+            if (loaded != target || !label.equals(target.getNodeLabel())
+                    || !Objects.equals(networkId, target.getNetworkId())
+                    || !sameUpgrades(target, targetSnapshots.get(target.getUUID()))) return false;
+        }
+        return true;
+    }
+
+    private static boolean validLoadedTarget(LogisticsNodeEntity node, LabelUpgradeTemplate template,
+                                             UUID networkId, String label, List<ItemStack> current) {
+        return node.isAlive() && !node.getNodeLabel().isBlank()
+                && label.equals(node.getNodeLabel()) && networkId.equals(node.getNetworkId())
+                && node.getLabelRevision() < template.revision() && sameUpgrades(node, current);
     }
 
     private static void applyLoadedTemplate(@Nullable ServerPlayer player, LogisticsNodeEntity node,
@@ -295,7 +336,7 @@ public final class LabelUpgradeSync {
         registry.setDirty();
         registry.invalidateNetwork(node.getNetworkId());
         if (player == null) return;
-        returnItems(player, returned);
+        returnItems(player, returned, null);
         player.displayClientMessage(Component.translatable(
                 "message.logisticsnetworks.label.loaded_synced", node.getNodeLabel()), true);
     }
@@ -442,6 +483,12 @@ public final class LabelUpgradeSync {
         requirements.add(new Requirement(stack.copyWithCount(1), count));
     }
 
+    private static List<LinkedStorage.ItemRequirement> toRequirements(List<Requirement> requirements) {
+        return requirements.stream()
+                .map(requirement -> new LinkedStorage.ItemRequirement(requirement.stack(), requirement.count()))
+                .toList();
+    }
+
     private static boolean hasInventory(Inventory inventory, List<Requirement> requirements) {
         for (Requirement requirement : requirements) {
             if (StorageInventory.count(inventory, requirement.stack(), -1) < requirement.count()) return false;
@@ -457,18 +504,28 @@ public final class LabelUpgradeSync {
     }
 
     private static List<ItemStack> reserveRollbackItems(ServerPlayer player, LogisticsNodeEntity source,
-                                                        List<ItemStack> original) {
+                                                        List<ItemStack> original, @Nullable StorageLink storageLink) {
+        StorageAccess access = storageLink == null ? null : LinkedStorage.resolve(player.serverLevel(), storageLink);
         List<ItemStack> reserved = new ArrayList<>();
         for (Requirement requirement : getUpgradeChanges(source, original).required()) {
-            reserved.addAll(StorageInventory.reserve(
-                    player.getInventory(), requirement.stack(), requirement.count(), -1));
+            List<ItemStack> fromInventory = StorageInventory.reserve(
+                    player.getInventory(), requirement.stack(), requirement.count(), -1);
+            reserved.addAll(fromInventory);
+            int remaining = requirement.count() - StorageInventory.count(fromInventory);
+            if (remaining > 0 && access != null) reserved.addAll(access.extract(requirement.stack(), remaining, player));
         }
         player.getInventory().setChanged();
         return reserved;
     }
 
     private static void rollbackSource(ServerPlayer player, LogisticsNodeEntity source,
-                                       List<ItemStack> original, List<ItemStack> escrow) {
+                                       List<ItemStack> original, List<ItemStack> escrow,
+                                       @Nullable StorageLink returnToStorage) {
+        if (source.isRemoved()) {
+            // Broken node dropped its upgrades
+            returnItems(player, escrow, returnToStorage);
+            return;
+        }
         UpgradeChanges rollback = getUpgradeChanges(source, original);
         List<ItemStack> current = snapshotUpgrades(source);
         boolean[] reused = new boolean[LogisticsNodeEntity.UPGRADE_SLOT_COUNT];
@@ -488,7 +545,8 @@ public final class LabelUpgradeSync {
             }
             source.setUpgradeItem(slot, restored);
         }
-        returnItems(player, rollback.returned());
+        returnItems(player, rollback.returned(), returnToStorage);
+        returnItems(player, escrow.stream().filter(stack -> !stack.isEmpty()).toList(), returnToStorage);
         if (incomplete) {
             player.sendSystemMessage(Component.translatable("message.logisticsnetworks.label.rollback_incomplete"));
         }
@@ -504,8 +562,9 @@ public final class LabelUpgradeSync {
         return ItemStack.EMPTY;
     }
 
-    private static void returnItems(ServerPlayer player, List<ItemStack> items) {
-        StorageInventory.returnToPlayer(player, items);
+    private static void returnItems(ServerPlayer player, List<ItemStack> items,
+                                    @Nullable StorageLink returnToStorage) {
+        LinkedStorage.returnItems(player, returnToStorage, items);
     }
 
     private static boolean sameUpgrades(LogisticsNodeEntity node, List<ItemStack> expected) {
@@ -521,6 +580,10 @@ public final class LabelUpgradeSync {
     private static long nextRevision(LogisticsNetwork network, String label) {
         LabelUpgradeTemplate current = network.getLabelTemplate(label);
         return current == null ? 1 : current.revision() + 1;
+    }
+
+    private static Component labelSubject(String label, int count) {
+        return Component.translatable("message.logisticsnetworks.storage.subject.label", label, count);
     }
 
     private static Component missing(List<Requirement> requirements) {
@@ -549,5 +612,212 @@ public final class LabelUpgradeSync {
     }
 
     private record UpgradeChanges(List<Requirement> required, List<ItemStack> returned) {
+    }
+
+    private record BulkNodeState(String label, long revision, List<ItemStack> upgrades,
+                                 List<ChannelData> channels) {
+        static BulkNodeState of(LogisticsNodeEntity node) {
+            return new BulkNodeState(node.getNodeLabel(), node.getLabelRevision(), snapshotUpgrades(node),
+                    snapshotChannels(node));
+        }
+
+        boolean matches(LogisticsNodeEntity node) {
+            return label.equals(node.getNodeLabel()) && revision == node.getLabelRevision()
+                    && sameUpgrades(node, upgrades) && sameChannels(node, channels);
+        }
+    }
+
+    // Menu close label sync
+    private static final class LoadedSync implements LinkedStorage.SupplyOperation {
+        private final ServerPlayer player;
+        private final LogisticsNetwork network;
+        private final LogisticsNodeEntity source;
+        private final List<ItemStack> original;
+        @Nullable
+        private final StorageLink storageLink;
+        private final boolean returnSourceToStorage;
+        private final String label;
+        private final UUID networkId;
+        private final List<LogisticsNodeEntity> targets;
+        private final List<ItemStack> desired;
+        private final List<ChannelData> channels;
+        private final Map<UUID, UpgradeChanges> changes = new LinkedHashMap<>();
+        private final Map<UUID, List<ItemStack>> targetSnapshots = new LinkedHashMap<>();
+        private final Set<UUID> pending = new HashSet<>();
+        private List<ItemStack> escrow = List.of();
+
+        private LoadedSync(ServerPlayer player, LogisticsNetwork network, LogisticsNodeEntity source,
+                           List<ItemStack> original, @Nullable StorageLink storageLink,
+                           boolean returnSourceToStorage) {
+            this.player = player;
+            this.network = network;
+            this.source = source;
+            this.original = original;
+            this.storageLink = storageLink;
+            this.returnSourceToStorage = returnSourceToStorage;
+            this.label = source.getNodeLabel();
+            this.networkId = source.getNetworkId();
+            this.targets = findLoadedTargets(player.getServer(), network, source);
+            this.desired = snapshotUpgrades(source);
+            this.channels = snapshotChannels(source);
+        }
+
+        private void start() {
+            List<Requirement> required = collectChanges(targets, desired, changes);
+            targets.forEach(target -> targetSnapshots.put(target.getUUID(), snapshotUpgrades(target)));
+            escrow = reserveRollbackItems(player, source, original, storageLink);
+            pending.add(source.getUUID());
+            targets.forEach(target -> pending.add(target.getUUID()));
+            PENDING_NODES.addAll(pending);
+            if (hasInventory(player.getInventory(), required)) {
+                consumeInventory(player.getInventory(), required);
+                commit();
+            } else if (storageLink == null) {
+                failed(missing(required));
+            } else {
+                LinkedStorage.requestSupply(UUID.randomUUID(), player, storageLink, toRequirements(required), -1,
+                        labelSubject(label, targets.size() + 1), this);
+            }
+        }
+
+        @Override
+        public boolean stillValid() {
+            return validLoadedGroup(player.getServer(), source, desired, targets, targetSnapshots, networkId, label);
+        }
+
+        @Override
+        public boolean commit() {
+            long revision = nextRevision(network, label);
+            LabelUpgradeTemplate template = new LabelUpgradeTemplate(revision, player.getUUID(), storageLink,
+                    desired, channels);
+            for (LogisticsNodeEntity target : targets) {
+                applyTemplate(target, template);
+                returnItems(player, changes.get(target.getUUID()).returned(), null);
+                target.setLabelRevision(revision);
+            }
+            applyTemplate(source, template);
+            source.setLabelRevision(revision);
+            network.setLabelTemplate(label, template);
+            returnItems(player, escrow, null);
+            markChanged(player.serverLevel(), network);
+            player.displayClientMessage(Component.translatable(
+                    "message.logisticsnetworks.label.synced", targets.size() + 1), true);
+            PENDING_NODES.removeAll(pending);
+            return true;
+        }
+
+        @Override
+        public void failed(Component detail) {
+            rollbackSource(player, source, original, escrow, returnSourceToStorage ? storageLink : null);
+            reportFailure(player, label, detail);
+            PENDING_NODES.removeAll(pending);
+        }
+    }
+
+    // Bulk label apply
+    private static final class BulkSync implements LinkedStorage.SupplyOperation {
+        private final ServerPlayer player;
+        private final LogisticsNetwork network;
+        private final List<LogisticsNodeEntity> targets;
+        private final String label;
+        @Nullable
+        private final LabelUpgradeTemplate storedTemplate;
+        @Nullable
+        private final LogisticsNodeEntity authority;
+        private final LabelUpgradeTemplate template;
+        @Nullable
+        private final StorageLink supplyLink;
+        private final BooleanSupplier expectationValid;
+        private final Consumer<Boolean> completion;
+        private final Map<UUID, UpgradeChanges> changes = new LinkedHashMap<>();
+        private final Map<LogisticsNodeEntity, BulkNodeState> snapshots = new LinkedHashMap<>();
+        private final Set<UUID> pending = new HashSet<>();
+        private boolean finished;
+
+        private BulkSync(ServerPlayer player, LogisticsNetwork network, List<LogisticsNodeEntity> targets,
+                         String label, @Nullable LabelUpgradeTemplate storedTemplate,
+                         @Nullable LogisticsNodeEntity authority, LabelUpgradeTemplate template,
+                         @Nullable StorageLink storageLink, BooleanSupplier expectationValid,
+                         Consumer<Boolean> completion) {
+            this.player = player;
+            this.network = network;
+            this.targets = targets;
+            this.label = label;
+            this.storedTemplate = storedTemplate;
+            this.authority = authority;
+            this.template = template;
+            this.supplyLink = template.storageLink() != null ? template.storageLink() : storageLink;
+            this.expectationValid = expectationValid;
+            this.completion = completion;
+        }
+
+        @Nullable
+        private static BulkSync create(ServerPlayer player, LogisticsNetwork network,
+                                       List<LogisticsNodeEntity> targets, UUID sourceId, String label,
+                                       @Nullable StorageLink storageLink, BooleanSupplier expectationValid,
+                                       Consumer<Boolean> completion) {
+            LabelUpgradeTemplate stored = network.getLabelTemplate(label);
+            LogisticsNodeEntity authority = findLabelAuthority(player.getServer(), network, label, stored);
+            if (stored == null && authority == null) {
+                authority = targets.stream().filter(node -> node.getUUID().equals(sourceId)).findFirst().orElse(null);
+            }
+            if (stored == null && authority == null) return null;
+            LabelUpgradeTemplate template = freshTemplate(player, network, label, stored, authority, storageLink);
+            return new BulkSync(player, network, targets, label, stored, authority, template, storageLink,
+                    expectationValid, completion);
+        }
+
+        private boolean start() {
+            List<Requirement> required = collectChanges(targets, template.upgrades(), changes);
+            targets.forEach(target -> snapshots.put(target, BulkNodeState.of(target)));
+            if (authority != null) snapshots.putIfAbsent(authority, BulkNodeState.of(authority));
+            snapshots.keySet().forEach(node -> pending.add(node.getUUID()));
+            PENDING_NODES.addAll(pending);
+            if (required.isEmpty()) {
+                if (stillValid()) commit();
+                else finish(false);
+                return true;
+            }
+            if (hasInventory(player.getInventory(), required)) {
+                consumeInventory(player.getInventory(), required);
+                commit();
+                return true;
+            }
+            if (supplyLink == null) {
+                failed(missing(required));
+                return false;
+            }
+            UUID requestId = UUID.randomUUID();
+            LinkedStorage.requestSupply(requestId, player, supplyLink, toRequirements(required), -1,
+                    labelSubject(label, targets.size()), this);
+            if (!LinkedStorage.isSupplyPending(requestId)) finish(false);
+            return true;
+        }
+
+        @Override
+        public boolean stillValid() {
+            return expectationValid.getAsBoolean()
+                    && validBulkTargets(player, network, label, storedTemplate, targets, snapshots, pending);
+        }
+
+        @Override
+        public boolean commit() {
+            commitLabel(player, network, targets, label, template, authority, changes);
+            finish(true);
+            return true;
+        }
+
+        @Override
+        public void failed(Component detail) {
+            reportFailure(player, label, detail);
+            finish(false);
+        }
+
+        private void finish(boolean success) {
+            PENDING_NODES.removeAll(pending);
+            if (finished) return;
+            finished = true;
+            completion.accept(success);
+        }
     }
 }

@@ -10,6 +10,8 @@ import me.almana.logisticsnetworks.data.graph.GraphNode;
 import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import me.almana.logisticsnetworks.data.graph.NetworkGraph;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
@@ -139,7 +141,8 @@ public final class GraphPayloadHandler {
             }
             String label = payload.label().trim();
             if (label.length() > 48) label = label.substring(0, 48);
-            LabelUpgradeSync.synchronizeLabels(player, network, nodes, payload.settingsSource(), label);
+            StorageLink link = LinkedStorage.findAccessibleLink(player, null);
+            LabelUpgradeSync.synchronizeLabels(player, network, nodes, payload.settingsSource(), label, link);
         });
     }
 
@@ -197,8 +200,9 @@ public final class GraphPayloadHandler {
                     GraphLabelPreviewPayload.Result.CONFIRM);
             return;
         }
+        StorageLink link = LinkedStorage.findAccessibleLink(player, null);
         String appliedLabel = label;
-        LabelUpgradeSync.synchronizeLabels(player, network, nodes, settingsSource, appliedLabel,
+        LabelUpgradeSync.synchronizeLabels(player, network, nodes, settingsSource, appliedLabel, link,
                 () -> state.equals(labelState(
                         player.getServer(), network, nodes, appliedLabel, settingsSource)),
                 applied -> sendLabelResult(player, requestId, networkId, nodeIds, settingsSource,

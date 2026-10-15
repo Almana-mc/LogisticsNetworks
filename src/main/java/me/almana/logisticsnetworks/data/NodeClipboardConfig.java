@@ -906,7 +906,7 @@ public final class NodeClipboardConfig {
         LogisticsNetwork network = NetworkRegistry.get(player.serverLevel()).getNetwork(first.getNetworkId());
         if (network == null) return;
         nodes.forEach(node -> node.setLabelRevision(0));
-        LabelUpgradeSync.synchronizeLabels(player, network, nodes, first.getUUID(), label);
+        LabelUpgradeSync.synchronizeLabels(player, network, nodes, first.getUUID(), label, null);
     }
 
     private boolean canAccessTargetNetwork(ServerPlayer player, LogisticsNodeEntity node) {
