@@ -5,8 +5,13 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.client.flow.WrenchFlowRenderer;
 import me.almana.logisticsnetworks.client.model.NodeModel;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.integration.create.NodeAttachmentKey;
+import me.almana.logisticsnetworks.integration.create.NodeRenderContext;
+import me.almana.logisticsnetworks.integration.iris.IrisCompat;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -15,29 +20,49 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.gui.Font;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
+
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(Logisticsnetworks.MOD_ID,
             "textures/entity/node.png");
+    private static final float BOUNDS_OFFSET = 0.5f;
+    private static final float BLOCK_MIN = -0.5f;
+    private static final float BLOCK_MAX = 0.5f;
+    private static final float BLOCK_BOTTOM = 0.0f;
+    private static final float BLOCK_TOP = 1.0f;
+    private static final double SHAPE_SIDE_EPS = 1.0E-4;
     private final NodeModel<LogisticsNodeEntity> model;
 
     private static final List<LogisticsNodeEntity> cachedNodeList = new ArrayList<>();
     private static Set<Integer> allowedNodeIds;
     private static Set<Integer> visibleNodeIds;
     private static long lastComputeTick = -1;
+    private static net.minecraft.client.multiplayer.ClientLevel selectionLevel;
+    private static final Map<NodeAttachmentKey, LogisticsNodeEntity> nodesByAttachment = new HashMap<>();
+    private static long lastLookupTick = -1;
 
     public LogisticsNodeRenderer(EntityRendererProvider.Context context) {
         super(context);
@@ -48,12 +73,17 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
     public void render(LogisticsNodeEntity entity, float yaw, float partialTick, PoseStack poseStack,
             MultiBufferSource buffer, int light) {
         var mc = Minecraft.getInstance();
-        if (mc.player == null)
+        if (mc.player == null || mc.level == null)
+            return;
+
+        NodeRenderContext context = CreateCompat.getRenderContext(entity, partialTick);
+        if (context == null)
             return;
 
         boolean isVisible = entity.isRenderVisible();
         boolean isHighlighted = entity.isHighlighted();
         boolean isHoldingWrench = mc.player.isHolding(Registration.WRENCH.get());
+        boolean shadowPass = IrisCompat.isRenderingShadowPass();
 
         if (!isVisible && !isHighlighted && !isHoldingWrench)
             return;
@@ -67,19 +97,34 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         }
 
         boolean canRenderModel = visibleNodeIds == null || visibleNodeIds.contains(entity.getId());
+        poseStack.pushPose();
+        Vec3 offset = context.position().subtract(entity.getPosition(partialTick));
+        poseStack.translate(offset.x, offset.y, offset.z);
+        poseStack.pushPose();
+        poseStack.mulPose(context.rotation());
         if ((isVisible || isHoldingWrench || isHighlighted) && canRenderModel) {
-            renderModel(entity, poseStack, buffer, light, isVisible);
+            if (isHoldingWrench && !shadowPass) {
+                WrenchFlowRenderer.queue(entity, context);
+            }
+            renderModel(entity, context, partialTick, poseStack, buffer, light, isVisible);
         }
 
-        if (isHighlighted) {
-            renderHighlightBox(poseStack, buffer, 0.15f, 0.45f, 1.0f, 0.35f, true);
-        } else if (isHoldingWrench) {
-            renderWrenchOverlay(entity, poseStack, buffer, light);
+        if (isHighlighted && !shadowPass) {
+            NodeHighlightRenderer.queue(context, 0.15F, 0.45F, 1.0F, 0.35F, true);
+        } else if (isHoldingWrench && !shadowPass) {
+            int networkColor = entity.getNetworkColor();
+            float red = ((networkColor >> 16) & 0xFF) / 255.0F;
+            float green = ((networkColor >> 8) & 0xFF) / 255.0F;
+            float blue = (networkColor & 0xFF) / 255.0F;
+            NodeHighlightRenderer.queue(context, red, green, blue, 0.35F, false);
+            renderWrenchDebug(entity, context.rotation(), poseStack, buffer, light);
         }
+        poseStack.popPose();
 
-        if (isHoldingWrench || isHighlighted) {
+        if (!shadowPass && (isHoldingWrench || isHighlighted)) {
             super.render(entity, yaw, partialTick, poseStack, buffer, light);
         }
+        poseStack.popPose();
     }
 
     @Override
@@ -93,45 +138,72 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
     protected void renderNameTag(LogisticsNodeEntity entity, Component displayName, PoseStack poseStack,
             MultiBufferSource buffer, int packedLight) {
         String networkName = entity.getNetworkName();
-        String label = (networkName == null || networkName.isBlank()) ? "No Network" : networkName;
-        super.renderNameTag(entity, Component.literal(label), poseStack, buffer, packedLight);
+        String title = (networkName == null || networkName.isBlank()) ? "No Network" : networkName;
+        String nodeLabel = entity.getNodeLabel();
+        poseStack.pushPose();
+        if (!nodeLabel.isEmpty()) {
+            super.renderNameTag(entity, Component.literal(nodeLabel), poseStack, buffer, packedLight);
+            poseStack.translate(0.0F, 9.0F * 1.15F * 0.025F, 0.0F);
+        }
+        super.renderNameTag(entity, Component.literal(title), poseStack, buffer, packedLight);
+        poseStack.popPose();
     }
 
-    private void renderModel(LogisticsNodeEntity entity, PoseStack poseStack, MultiBufferSource buffer, int light,
-            boolean isVisible) {
+    private void renderModel(LogisticsNodeEntity entity, NodeRenderContext context, float partialTick,
+            PoseStack poseStack, MultiBufferSource buffer, int light, boolean isVisible) {
+        int color = isVisible ? -1 : 0x55FFFFFF;
+        VertexConsumer consumer = buffer
+                .getBuffer(RenderType.entityCutoutNoCull(getTextureLocation(entity)));
+        if (ClientConfig.connectedNodeTextures
+                && renderConnectedModel(entity, context, partialTick, poseStack, consumer, light, color)) {
+            return;
+        }
+
         poseStack.pushPose();
 
         float scaleXZ = 17.0f / 16.0f;
         float scaleY = 18.0f / 16.0f;
         poseStack.scale(-scaleXZ, -scaleY, scaleXZ);
         poseStack.translate(0.0, -17.0f / 16.0f - (8.0f / 18.0f), 0.0);
-
-        float alpha = isVisible ? 1.0F : 0.33333334F;
-        VertexConsumer consumer = buffer
-                .getBuffer(RenderType.entityCutoutNoCull(getTextureLocation(entity)));
-        model.renderToBuffer(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, alpha);
+        model.renderToBuffer(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F,
+                (color >>> 24) / 255.0F);
 
         poseStack.popPose();
     }
 
-    private void renderWrenchOverlay(LogisticsNodeEntity entity, PoseStack poseStack, MultiBufferSource buffer,
-            int light) {
-        renderHighlightBox(poseStack, buffer, 0f, 1f, 0f, 0.35f, false);
+    private boolean renderConnectedModel(LogisticsNodeEntity entity, NodeRenderContext context, float partialTick,
+            PoseStack poseStack, VertexConsumer consumer, int light, int color) {
+        AABB shapeBounds = shapeBounds(context.shapeLevel(), context.shapePos());
+        if (shapeBounds == null) {
+            return false;
+        }
 
+        int connections = getConnectionMask(entity, context, partialTick);
+        RenderBounds bounds = renderBounds(connections, shapeBounds);
+
+        Matrix4f matrix = poseStack.last().pose();
+        NodeGeometry.emit(matrix, consumer, bounds.connections(), light, color,
+                bounds.minX(), bounds.minY(), bounds.minZ(), bounds.maxX(), bounds.maxY(), bounds.maxZ());
+        return true;
+    }
+
+    private void renderWrenchDebug(LogisticsNodeEntity entity, Quaternionf rotation, PoseStack poseStack,
+            MultiBufferSource buffer, int light) {
         if (Config.debugMode) {
             poseStack.pushPose();
             poseStack.translate(0.0, -0.75, 0.0);
-            renderDebugInfo(entity, poseStack, buffer, light);
+            renderDebugInfo(entity, new Quaternionf(rotation).conjugate(), poseStack, buffer, light);
             poseStack.popPose();
         }
     }
 
-    private void renderDebugInfo(LogisticsNodeEntity entity, PoseStack poseStack, MultiBufferSource buffer, int light) {
+    private void renderDebugInfo(LogisticsNodeEntity entity, Quaternionf inverseRotation, PoseStack poseStack,
+            MultiBufferSource buffer, int light) {
         poseStack.pushPose();
         poseStack.translate(0.0, -0.25, 0.0);
 
         String nodeId = "Node: " + entity.getUUID().toString().substring(0, 8);
-        renderLabel(entity, nodeId, poseStack, buffer, light);
+        renderLabel(entity, nodeId, inverseRotation, poseStack, buffer, light);
 
         poseStack.translate(0.0, -0.25, 0.0);
 
@@ -142,61 +214,15 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
                 channels.append(i).append(" ");
             }
         }
-        renderLabel(entity, channels.toString(), poseStack, buffer, light);
+        renderLabel(entity, channels.toString(), inverseRotation, poseStack, buffer, light);
 
         poseStack.popPose();
     }
 
-    private void renderHighlightBox(PoseStack poseStack, MultiBufferSource buffer, float r, float g, float b,
-            float a, boolean xray) {
-        VertexConsumer builder = buffer.getBuffer(xray ? ModRenderTypes.OVERLAY_XRAY : ModRenderTypes.OVERLAY);
-        Matrix4f matrix = poseStack.last().pose();
-
-        float minX = -0.501f, maxX = 0.501f;
-        float minY = -0.001f, maxY = 1.001f;
-        float minZ = -0.501f, maxZ = 0.501f;
-
-        addVertex(builder, matrix, minX, maxY, minZ, r, g, b, a);
-        addVertex(builder, matrix, minX, maxY, maxZ, r, g, b, a);
-        addVertex(builder, matrix, maxX, maxY, maxZ, r, g, b, a);
-        addVertex(builder, matrix, maxX, maxY, minZ, r, g, b, a);
-
-        addVertex(builder, matrix, maxX, minY, minZ, r, g, b, a);
-        addVertex(builder, matrix, maxX, minY, maxZ, r, g, b, a);
-        addVertex(builder, matrix, minX, minY, maxZ, r, g, b, a);
-        addVertex(builder, matrix, minX, minY, minZ, r, g, b, a);
-
-        addVertex(builder, matrix, minX, maxY, minZ, r, g, b, a);
-        addVertex(builder, matrix, minX, minY, minZ, r, g, b, a);
-        addVertex(builder, matrix, minX, minY, maxZ, r, g, b, a);
-        addVertex(builder, matrix, minX, maxY, maxZ, r, g, b, a);
-
-        addVertex(builder, matrix, maxX, maxY, maxZ, r, g, b, a);
-        addVertex(builder, matrix, maxX, minY, maxZ, r, g, b, a);
-        addVertex(builder, matrix, maxX, minY, minZ, r, g, b, a);
-        addVertex(builder, matrix, maxX, maxY, minZ, r, g, b, a);
-
-        addVertex(builder, matrix, maxX, maxY, minZ, r, g, b, a);
-        addVertex(builder, matrix, maxX, minY, minZ, r, g, b, a);
-        addVertex(builder, matrix, minX, minY, minZ, r, g, b, a);
-        addVertex(builder, matrix, minX, maxY, minZ, r, g, b, a);
-
-        addVertex(builder, matrix, minX, maxY, maxZ, r, g, b, a);
-        addVertex(builder, matrix, minX, minY, maxZ, r, g, b, a);
-        addVertex(builder, matrix, maxX, minY, maxZ, r, g, b, a);
-        addVertex(builder, matrix, maxX, maxY, maxZ, r, g, b, a);
-    }
-
-    private static void addVertex(VertexConsumer builder, Matrix4f matrix, float x, float y, float z,
-            float red, float green, float blue, float alpha) {
-        builder.vertex(matrix, x, y, z)
-                .color((int) (red * 255.0F), (int) (green * 255.0F), (int) (blue * 255.0F), (int) (alpha * 255.0F))
-                .endVertex();
-    }
-
-    private void renderLabel(LogisticsNodeEntity entity, String text, PoseStack poseStack, MultiBufferSource buffer,
-            int light) {
+    private void renderLabel(LogisticsNodeEntity entity, String text, Quaternionf inverseRotation,
+            PoseStack poseStack, MultiBufferSource buffer, int light) {
         poseStack.pushPose();
+        poseStack.mulPose(inverseRotation);
         poseStack.mulPose(this.entityRenderDispatcher.cameraOrientation());
         poseStack.scale(-0.025F, -0.025F, 0.025F);
 
@@ -213,6 +239,18 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
     }
 
     private static void updateAllowedNodes(Minecraft mc) {
+        if (selectionLevel != mc.level) {
+            selectionLevel = mc.level;
+            allowedNodeIds = null;
+            visibleNodeIds = null;
+            lastComputeTick = -5;
+        }
+        if (mc.level == null || mc.player == null) {
+            allowedNodeIds = null;
+            visibleNodeIds = null;
+            lastComputeTick = -1;
+            return;
+        }
         long tick = mc.level.getGameTime();
         if (tick - lastComputeTick < 5)
             return;
@@ -264,6 +302,186 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         } else {
             visibleNodeIds = null;
         }
+    }
+
+    private static int getConnectionMask(LogisticsNodeEntity entity, NodeRenderContext context, float partialTick) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) {
+            return NodeConnectionMask.NONE;
+        }
+
+        updateNodeLookup(mc, partialTick);
+
+        int mask = NodeConnectionMask.NONE;
+        NodeAttachmentKey attachmentKey = context.attachmentKey();
+        AABB bounds = shapeBounds(context.shapeLevel(), context.shapePos());
+        if (bounds == null) {
+            return NodeConnectionMask.NONE;
+        }
+
+        for (Direction direction : Direction.values()) {
+            LogisticsNodeEntity neighbor = nodesByAttachment.get(relative(attachmentKey, direction));
+            if (neighbor != null && neighbor != entity
+                    && hasMatchingBounds(neighbor, bounds, direction, partialTick)) {
+                mask = NodeConnectionMask.add(mask, direction);
+            }
+        }
+        for (Direction first : Direction.values()) {
+            for (Direction second : Direction.values()) {
+                if (first.ordinal() >= second.ordinal() || !NodeConnectionMask.isCornerPair(first, second)) {
+                    continue;
+                }
+                if (!NodeConnectionMask.has(mask, first) || !NodeConnectionMask.has(mask, second)) {
+                    continue;
+                }
+                NodeAttachmentKey cornerKey = relative(relative(attachmentKey, first), second);
+                LogisticsNodeEntity corner = nodesByAttachment.get(cornerKey);
+                if (corner == null || !hasCornerBounds(corner, bounds, first, second, partialTick)) {
+                    mask = NodeConnectionMask.addCorner(mask, first, second);
+                }
+            }
+        }
+        return mask;
+    }
+
+    private static RenderBounds renderBounds(int connections, AABB bounds) {
+        int boundsConnections = trimConnectionsToBounds(connections, bounds);
+        float minX = (float) bounds.minX - BOUNDS_OFFSET;
+        float minY = (float) bounds.minY;
+        float minZ = (float) bounds.minZ - BOUNDS_OFFSET;
+        float maxX = (float) bounds.maxX - BOUNDS_OFFSET;
+        float maxY = (float) bounds.maxY;
+        float maxZ = (float) bounds.maxZ - BOUNDS_OFFSET;
+
+        if (NodeConnectionMask.has(boundsConnections, Direction.WEST)) minX = BLOCK_MIN;
+        if (NodeConnectionMask.has(boundsConnections, Direction.EAST)) maxX = BLOCK_MAX;
+        if (NodeConnectionMask.has(boundsConnections, Direction.DOWN)) minY = BLOCK_BOTTOM;
+        if (NodeConnectionMask.has(boundsConnections, Direction.UP)) maxY = BLOCK_TOP;
+        if (NodeConnectionMask.has(boundsConnections, Direction.NORTH)) minZ = BLOCK_MIN;
+        if (NodeConnectionMask.has(boundsConnections, Direction.SOUTH)) maxZ = BLOCK_MAX;
+
+        return new RenderBounds(minX, minY, minZ, maxX, maxY, maxZ, boundsConnections);
+    }
+
+    private static int trimConnectionsToBounds(int connections, AABB bounds) {
+        int trimmed = connections;
+        for (Direction direction : Direction.values()) {
+            if (NodeConnectionMask.has(trimmed, direction) && !touchesSide(bounds, direction)) {
+                trimmed = NodeConnectionMask.remove(trimmed, direction);
+            }
+        }
+        return trimmed;
+    }
+
+    private static boolean touchesSide(AABB bounds, Direction direction) {
+        return switch (direction) {
+            case WEST -> bounds.minX <= SHAPE_SIDE_EPS;
+            case EAST -> bounds.maxX >= 1.0 - SHAPE_SIDE_EPS;
+            case DOWN -> bounds.minY <= SHAPE_SIDE_EPS;
+            case UP -> bounds.maxY >= 1.0 - SHAPE_SIDE_EPS;
+            case NORTH -> bounds.minZ <= SHAPE_SIDE_EPS;
+            case SOUTH -> bounds.maxZ >= 1.0 - SHAPE_SIDE_EPS;
+        };
+    }
+
+    private static AABB shapeBounds(BlockGetter level, BlockPos pos) {
+        BlockState blockState = level.getBlockState(pos);
+        VoxelShape shape = blockState.getShape(level, pos, CollisionContext.empty());
+        return shape.isEmpty() ? null : shape.bounds();
+    }
+
+    private static boolean hasMatchingBounds(LogisticsNodeEntity node, AABB bounds, Direction direction,
+            float partialTick) {
+        if (!isRenderableNeighbor(node)) {
+            return false;
+        }
+        NodeRenderContext context = CreateCompat.getRenderContext(node, partialTick);
+        AABB otherBounds = context == null ? null : shapeBounds(context.shapeLevel(), context.shapePos());
+        return otherBounds != null && sameCrossSection(bounds, otherBounds, direction.getAxis());
+    }
+
+    private static boolean hasCornerBounds(LogisticsNodeEntity node, AABB bounds, Direction first,
+            Direction second, float partialTick) {
+        if (!isRenderableNeighbor(node)) {
+            return false;
+        }
+        NodeRenderContext context = CreateCompat.getRenderContext(node, partialTick);
+        AABB otherBounds = context == null ? null : shapeBounds(context.shapeLevel(), context.shapePos());
+        return otherBounds != null && sameRemainingSection(bounds, otherBounds, first.getAxis(), second.getAxis());
+    }
+
+    private static boolean sameCrossSection(AABB first, AABB second, Direction.Axis axis) {
+        return switch (axis) {
+            case X -> sameY(first, second) && sameZ(first, second);
+            case Y -> sameX(first, second) && sameZ(first, second);
+            case Z -> sameX(first, second) && sameY(first, second);
+        };
+    }
+
+    private static boolean sameRemainingSection(AABB first, AABB second, Direction.Axis firstAxis,
+            Direction.Axis secondAxis) {
+        if (firstAxis != Direction.Axis.X && secondAxis != Direction.Axis.X) {
+            return sameX(first, second);
+        }
+        if (firstAxis != Direction.Axis.Y && secondAxis != Direction.Axis.Y) {
+            return sameY(first, second);
+        }
+        return sameZ(first, second);
+    }
+
+    private static boolean sameX(AABB first, AABB second) {
+        return close(first.minX, second.minX) && close(first.maxX, second.maxX);
+    }
+
+    private static boolean sameY(AABB first, AABB second) {
+        return close(first.minY, second.minY) && close(first.maxY, second.maxY);
+    }
+
+    private static boolean sameZ(AABB first, AABB second) {
+        return close(first.minZ, second.minZ) && close(first.maxZ, second.maxZ);
+    }
+
+    private static boolean close(double first, double second) {
+        return Math.abs(first - second) <= SHAPE_SIDE_EPS;
+    }
+
+    private static boolean isRenderableNeighbor(LogisticsNodeEntity node) {
+        return node.isAlive() && (node.isRenderVisible() || node.isHighlighted() || isWrenchVisible(node));
+    }
+
+    public static boolean isWrenchVisible(LogisticsNodeEntity entity) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null || !mc.player.isHolding(Registration.WRENCH.get())) {
+            return false;
+        }
+        updateAllowedNodes(mc);
+        return allowedNodeIds == null || allowedNodeIds.contains(entity.getId());
+    }
+
+    private static NodeAttachmentKey relative(NodeAttachmentKey key, Direction direction) {
+        return new NodeAttachmentKey(key.contraptionId(), key.position().relative(direction));
+    }
+
+    private static void updateNodeLookup(Minecraft mc, float partialTick) {
+        long tick = mc.level.getGameTime();
+        if (tick == lastLookupTick) {
+            return;
+        }
+        lastLookupTick = tick;
+
+        nodesByAttachment.clear();
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (entity instanceof LogisticsNodeEntity node && node.isActive()) {
+                NodeRenderContext context = CreateCompat.getRenderContext(node, partialTick);
+                if (context != null) {
+                    nodesByAttachment.put(context.attachmentKey(), node);
+                }
+            }
+        }
+    }
+
+    private record RenderBounds(float minX, float minY, float minZ, float maxX, float maxY, float maxZ,
+            int connections) {
     }
 
     @Override
