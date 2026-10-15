@@ -252,16 +252,22 @@ public class TransferEngine {
                 resolveCache(network.getEnergyImports(), nodeCache, signalCache),
                 resolveCache(network.getChemicalImports(), nodeCache, signalCache),
                 resolveCache(network.getSourceImports(), nodeCache, signalCache) };
-        Map<UUID, Boolean> dimensionalCache = network.getDimensionalCache();
-        NetworkRegistry registry = NetworkRegistry.get((ServerLevel) server.overworld());
-        List<ServerRackLinks.Link> links = registry.getRackLinks().linksFor(network.getId());
-        if (!links.isEmpty()) {
-            dimensionalCache = new HashMap<>(dimensionalCache);
-            BridgedImports.merge(links, registry, server, imports, dimensionalCache);
-        }
+        Map<UUID, Boolean> dimensionalCache = mergeLinkedServers(network, server, imports);
 
         return new NetworkContext(sortedNodes, signalCache, imports[0], imports[1], imports[2], imports[3],
                 imports[4], dimensionalCache, network.getTierCache());
+    }
+
+    private static Map<UUID, Boolean> mergeLinkedServers(LogisticsNetwork network, MinecraftServer server,
+            List<ImportTarget>[][] imports) {
+        NetworkRegistry registry = NetworkRegistry.get((ServerLevel) server.overworld());
+        List<ServerRackLinks.Link> links = registry.getRackLinks().linksFor(network.getId());
+        if (links.isEmpty()) {
+            return network.getDimensionalCache();
+        }
+        Map<UUID, Boolean> dimensionalCache = new HashMap<>(network.getDimensionalCache());
+        BridgedImports.merge(links, registry, server, imports, dimensionalCache);
+        return dimensionalCache;
     }
 
     private static Map<UUID, Integer> buildSignalCache(List<LogisticsNodeEntity> nodes) {
