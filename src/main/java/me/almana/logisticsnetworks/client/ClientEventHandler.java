@@ -14,12 +14,21 @@ import me.almana.logisticsnetworks.client.tooltip.ClientFilterPreviewTooltip;
 import me.almana.logisticsnetworks.client.tooltip.FilterPreviewTooltip;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.gui.screens.MenuScreens;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.PathPackResources;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackSource;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.client.event.RegisterClientTooltipComponentFactoriesEvent;
+import net.minecraftforge.event.AddPackFindersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+
+import java.nio.file.Path;
 
 @EventBusSubscriber(modid = Logisticsnetworks.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class ClientEventHandler {
@@ -45,6 +54,18 @@ public class ClientEventHandler {
     @SubscribeEvent
     public static void registerTooltips(RegisterClientTooltipComponentFactoriesEvent event) {
         event.register(FilterPreviewTooltip.class, ClientFilterPreviewTooltip::new);
+    }
+
+    @SubscribeEvent
+    public static void addPacks(AddPackFindersEvent event) {
+        if (event.getPackType() != PackType.CLIENT_RESOURCES) return;
+        Path root = ModList.get().getModFileById(Logisticsnetworks.MOD_ID).getFile()
+                .findResource("resourcepacks/original_textures");
+        Pack pack = Pack.readMetaAndCreate(Logisticsnetworks.MOD_ID + ":original_textures",
+                Component.translatable("pack.logisticsnetworks.original_textures"), false,
+                id -> new PathPackResources(id, root, true), PackType.CLIENT_RESOURCES, Pack.Position.TOP,
+                PackSource.BUILT_IN);
+        if (pack != null) event.addRepositorySource(consumer -> consumer.accept(pack));
     }
 
     @SubscribeEvent
