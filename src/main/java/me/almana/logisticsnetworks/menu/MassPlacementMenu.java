@@ -263,10 +263,11 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         List<Requirement> requirements = buildRequirements(nodeCount, clipboardPresent ? clipboard : null);
         StorageLink storageLink = getStorageLink();
         if (hasInventoryRequirements(player.getInventory(), requirements, protectedSlot)) {
-            consumeInventoryRequirements(player.getInventory(), requirements, protectedSlot);
+            List<ItemStack> reserved = consumeInventoryRequirements(
+                    player.getInventory(), requirements, protectedSlot);
             boolean committed = commitPlacement(level, requestWrench,
                     clipboardPresent ? clipboard : null, validTargets);
-            if (!committed) returnInventoryRequirements(requirements, serverPlayer);
+            if (!committed) StorageInventory.returnToPlayer(serverPlayer, reserved);
             return committed;
         }
         if (storageLink == null) {
@@ -423,18 +424,14 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         return true;
     }
 
-    private void consumeInventoryRequirements(Inventory inventory, List<Requirement> requirements,
-                                              int protectedSlot) {
+    private List<ItemStack> consumeInventoryRequirements(Inventory inventory, List<Requirement> requirements,
+                                                         int protectedSlot) {
+        List<ItemStack> reserved = new ArrayList<>();
         for (Requirement requirement : requirements) {
-            StorageInventory.reserve(inventory, requirement.stack, requirement.count, protectedSlot);
+            reserved.addAll(StorageInventory.reserve(inventory, requirement.stack, requirement.count, protectedSlot));
         }
         inventory.setChanged();
-    }
-
-    private void returnInventoryRequirements(List<Requirement> requirements, ServerPlayer serverPlayer) {
-        List<ItemStack> stacks = new ArrayList<>();
-        for (Requirement requirement : requirements) stacks.add(requirement.stack.copyWithCount(requirement.count));
-        StorageInventory.returnToPlayer(serverPlayer, stacks);
+        return reserved;
     }
 
     private void reportMassFailure(ServerPlayer player, Component detail) {
