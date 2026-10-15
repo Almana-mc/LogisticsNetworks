@@ -1514,7 +1514,7 @@ public class ServerPayloadHandler {
             if (config.sanitizeFilters() > 0)
                 player.sendSystemMessage(Component.translatable("message.logisticsnetworks.filter.too_large"));
             config.stripUpgradeComponents();
-            config.setNetworkTarget(null, config.getNetworkName());
+            config.setNetworkTarget(lastPastedNetwork(player, menu, config.getNetworkName()), config.getNetworkName());
 
             if (!menu.setWrenchClipboard(config, player.serverLevel().registryAccess())) {
                 player.displayClientMessage(Component.translatable("message.logisticsnetworks.lnet.no_wrench"), true);
@@ -1523,6 +1523,17 @@ public class ServerPayloadHandler {
 
             player.displayClientMessage(Component.translatable("message.logisticsnetworks.lnet.copied_to_wrench"), true);
         });
+    }
+
+    // Rejoin wrench's earlier same-named network
+    private static UUID lastPastedNetwork(ServerPlayer player, ComputerMenu menu, String name) {
+        NodeClipboardConfig held = WrenchItem.getClipboard(menu.getSlot(0).getItem(),
+                player.serverLevel().registryAccess());
+        if (held == null || held.getNetworkId() == null)
+            return null;
+        LogisticsNetwork network = NetworkRegistry.get(player.serverLevel()).getNetwork(held.getNetworkId());
+        return network != null && network.getName().equals(name) && canAccessNetwork(player, network)
+                ? network.getId() : null;
     }
 
     private static boolean canAccessNetwork(ServerPlayer player, LogisticsNetwork network) {

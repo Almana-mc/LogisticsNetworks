@@ -269,6 +269,7 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         }
         if (clipboardPresent && !placedNodes.isEmpty()) {
             NodeClipboardConfig.syncPastedLabel(serverPlayer, placedNodes);
+            WrenchItem.setClipboard(wrenchStack, clipboard, level.registryAccess());
         }
 
         WrenchItem.removeMassSelections(wrenchStack, placedTargets);
