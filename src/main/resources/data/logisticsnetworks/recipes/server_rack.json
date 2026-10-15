@@ -1,0 +1,39 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "conditions": [
+        {
+            "type": "forge:mod_loaded",
+            "modid": "logisticsnetworks"
+        }
+    ],
+    "category": "misc",
+    "pattern": [
+        "ECE",
+        "OPO",
+        "NSN"
+    ],
+    "key": {
+        "E": {
+            "item": "minecraft:echo_shard"
+        },
+        "C": {
+            "item": "minecraft:dropper"
+        },
+        "O": {
+            "item": "minecraft:crying_obsidian"
+        },
+        "P": {
+            "item": "logisticsnetworks:computer"
+        },
+        "N": {
+            "item": "minecraft:netherite_ingot"
+        },
+        "S": {
+            "item": "minecraft:nether_star"
+        }
+    },
+    "result": {
+        "item": "logisticsnetworks:server_rack",
+        "count": 1
+    }
+}
