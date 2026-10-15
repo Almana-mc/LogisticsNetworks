@@ -131,6 +131,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private boolean filterAddHover = false;
     private long filterAddedToastUntil = 0;
     private final StorageUpgradePicker storageUpgradePicker = new StorageUpgradePicker();
+    private int catalogRetryTicks;
     private static final long TOOLTIP_DELAY = 1000L;
 
     private long lastTabClickTime = 0;
@@ -214,6 +215,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     @Override
     protected void containerTick() {
         super.containerTick();
+        // Server drops throttled requests
+        if (storageUpgradePicker.isLoading() && ++catalogRetryTicks % 12 == 0) {
+            requestStorageCatalog(storageUpgradePicker.preferredSlot());
+        }
         LogisticsNodeEntity node = getMenu().getNode();
         if (node == null)
             return;
@@ -226,6 +231,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 rebuildPageLayout();
             }
         }
+    }
+
+    private void requestStorageCatalog(int slot) {
+        NetworkHandler.sendToServer(new RequestStorageUpgradeCatalogPayload(menu.containerId, menu.getNodeId(), slot));
     }
 
     private void validateChannelConfig(LogisticsNodeEntity node, ChannelData channel) {
@@ -1318,8 +1327,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 && menu.hasStorageUpgradeAccess() && menu.getCarried().isEmpty()
                 && menu.getNode().getUpgradeItem(storageSlot).isEmpty()) {
             storageUpgradePicker.open(storageSlot);
-            NetworkHandler.sendToServer(new RequestStorageUpgradeCatalogPayload(
-                    menu.containerId, menu.getNodeId(), storageSlot));
+            catalogRetryTicks = 0;
+            requestStorageCatalog(storageSlot);
             return true;
         }
 

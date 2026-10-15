@@ -68,6 +68,10 @@ final class StorageUpgradePicker {
         return open;
     }
 
+    boolean isLoading() {
+        return open && loading;
+    }
+
     int preferredSlot() {
         return preferredSlot;
     }
