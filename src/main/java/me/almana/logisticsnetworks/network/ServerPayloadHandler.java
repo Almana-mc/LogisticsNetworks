@@ -63,6 +63,8 @@ public class ServerPayloadHandler {
     private static final Map<UUID, Integer> MODIFIER_KEYS = new HashMap<>();
     private static final int SCAN_COOLDOWN_TICKS = 10;
     private static final Map<ServerPlayer, Integer> LAST_SCAN = new WeakHashMap<>();
+    private static final Map<ServerPlayer, Integer> LAST_UPGRADE_CATALOG = new WeakHashMap<>();
+    private static final Map<ServerPlayer, Integer> LAST_UPGRADE_INSTALL = new WeakHashMap<>();
     // Forge caps payloads at 1MiB
     private static final int EXPORT_BUDGET = 1_000_000;
     public static final int EXPORT_COOLDOWN_TICKS = 20;
@@ -77,7 +79,8 @@ public class ServerPayloadHandler {
                     || menu.getNodeId() != payload.entityId()
                     || !menu.canEditNode(player)
                     || payload.preferredSlot() < 0
-                    || payload.preferredSlot() >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT) {
+                    || payload.preferredSlot() >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT
+                    || throttled(LAST_UPGRADE_CATALOG, player)) {
                 return;
             }
             StorageLink link = menu.getAccessibleStorageLink(player);
@@ -107,7 +110,8 @@ public class ServerPayloadHandler {
                     || !menu.canEditNode(player)
                     || payload.preferredSlot() < 0
                     || payload.preferredSlot() >= LogisticsNodeEntity.UPGRADE_SLOT_COUNT
-                    || !BuiltInRegistries.ITEM.containsKey(payload.upgradeId())) {
+                    || !BuiltInRegistries.ITEM.containsKey(payload.upgradeId())
+                    || throttled(LAST_UPGRADE_INSTALL, player)) {
                 return;
             }
             ItemStack upgrade = BuiltInRegistries.ITEM.get(payload.upgradeId()).getDefaultInstance();
@@ -121,6 +125,13 @@ public class ServerPayloadHandler {
             reportUpgradeInstall(player, upgrade, LinkedStorage.installUpgrade(
                     player, menu.getNode(), link, payload.preferredSlot(), upgrade.getItem()));
         });
+    }
+
+    private static boolean throttled(Map<ServerPlayer, Integer> last, ServerPlayer player) {
+        int now = player.server.getTickCount();
+        if (now - last.getOrDefault(player, -SCAN_COOLDOWN_TICKS) < SCAN_COOLDOWN_TICKS) return true;
+        last.put(player, now);
+        return false;
     }
 
     private static void reportUpgradeInstall(ServerPlayer player, ItemStack upgrade,
