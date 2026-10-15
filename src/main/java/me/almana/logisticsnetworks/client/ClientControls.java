@@ -39,6 +39,8 @@ public final class ClientControls {
             GLFW.GLFW_MOUSE_BUTTON_RIGHT);
     public static final KeyMapping TOGGLE_WRENCH_HUD = new KeyMapping(
             "key.logisticsnetworks.toggle_wrench_hud", InputConstants.KEY_H, CATEGORY);
+    public static final KeyMapping EDIT_WRENCH_COLORS = new KeyMapping(
+            "key.logisticsnetworks.wrench_colors", InputConstants.KEY_G, CATEGORY);
     public static final KeyMapping WRENCH_MODES = new KeyMapping(
             "key.logisticsnetworks.wrench_modes", KeyConflictContext.IN_GAME,
             InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CATEGORY);
@@ -147,6 +149,7 @@ public final class ClientControls {
             event.register(PRIMARY_INTERACTION);
             event.register(SECONDARY_INTERACTION);
             event.register(TOGGLE_WRENCH_HUD);
+            event.register(EDIT_WRENCH_COLORS);
             event.register(WRENCH_MODES);
             event.register(TOGGLE_SLOT_NUMBERS);
         }
