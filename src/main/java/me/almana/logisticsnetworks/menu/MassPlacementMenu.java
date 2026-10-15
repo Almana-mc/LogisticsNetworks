@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
@@ -273,8 +274,8 @@ public class MassPlacementMenu extends AbstractContainerMenu {
             if (node == null || clipboard != null
                     && clipboard.applyToNodeWithoutInventory((ServerPlayer) player, node)
                     != NodeClipboardConfig.PasteResult.SUCCESS) {
-                if (node != null) node.discard();
-                placed.forEach(LogisticsNodeEntity::discard);
+                if (node != null) placed.add(node);
+                placed.forEach(rolledBack -> unplace(level, rolledBack));
                 return false;
             }
             placed.add(node);
@@ -288,6 +289,13 @@ public class MassPlacementMenu extends AbstractContainerMenu {
         player.displayClientMessage(
                 Component.translatable("message.logisticsnetworks.mass_placement.placed", placed.size()), true);
         return true;
+    }
+
+    private static void unplace(ServerLevel level, LogisticsNodeEntity node) {
+        if (node.getNetworkId() != null) {
+            NetworkRegistry.get(level).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
+        }
+        node.discard();
     }
 
     private List<Requirement> buildRequirements(int nodeCount, NodeClipboardConfig clipboard) {
