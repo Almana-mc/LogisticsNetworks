@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.integration.storage.DirectFluidHandler;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import mekanism.api.chemical.IChemicalHandler;
@@ -563,7 +564,7 @@ public class TransferEngine {
             return 0;
 
         Map<Item, Integer> sourceItemCounts = hasAmountConstraints(reachableTargets)
-                ? buildItemCountCache(sourceHandler)
+                ? sourceItemCounts(sourceHandler)
                 : null;
         if (exportChannel.canRotateResources()) {
             return rotateItems(sourceHandler, reachableTargets, reachableRefs, exportChannel, batchLimit,
@@ -709,6 +710,12 @@ public class TransferEngine {
         return handler instanceof DirectItemAccess direct
                 ? new HashMap<>(direct.countItems(sourceItemCounts.keySet()))
                 : buildItemCountCache(handler);
+    }
+
+    // Export views count live
+    private static Map<Item, Integer> sourceItemCounts(IItemHandler handler) {
+        Map<Item, Integer> counts = buildItemCountCache(handler);
+        return handler instanceof DirectItemAccess direct ? new HashMap<>(direct.countItems(counts.keySet())) : counts;
     }
 
     private record FluidTarget(IFluidHandler handler, ImportTarget ref) {
@@ -1901,6 +1908,7 @@ public class TransferEngine {
     }
 
     private static int countMatchingFluid(IFluidHandler handler, FluidStack candidate) {
+        if (handler instanceof DirectFluidHandler direct) return direct.count(candidate);
         int amount = 0;
         for (int i = 0; i < handler.getTanks(); i++) {
             FluidStack stack = handler.getFluidInTank(i);
