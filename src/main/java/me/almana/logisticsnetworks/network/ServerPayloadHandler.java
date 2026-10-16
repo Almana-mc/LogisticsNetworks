@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.logic.AttachedStorageFilterScanner;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
@@ -16,6 +17,7 @@ import me.almana.logisticsnetworks.menu.GraphMenuContext;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
+import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -728,6 +730,27 @@ public class ServerPayloadHandler {
             channel.setFilterItem(fs, filter);
             propagateToLabelGroup(node, payload.channel());
             invalidateNetwork(node);
+        });
+    }
+
+    public static void handleSetRecipeCard(SetRecipeCardPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            Player player = context.player();
+            if (!(player.containerMenu instanceof RecipeCardMenu menu) || !menu.stillValid(player))
+                return;
+            if (menu.isNodeTarget() && getAuthorizedNode(context, menu.entityId()) == null)
+                return;
+            RecipeCardData data = payload.data().sanitized();
+            ItemStack card = menu.card(player).copy();
+            if (!RecipeCardItem.is(card) || data.equals(RecipeCardData.of(card)))
+                return;
+            if (data.ingredients().isEmpty()) {
+                RecipeCardData.clear(card);
+            } else {
+                RecipeCardData.set(card, data);
+            }
+            menu.store(player, card);
+            menu.setData(data);
         });
     }
 

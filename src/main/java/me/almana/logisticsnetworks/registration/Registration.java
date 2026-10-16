@@ -14,6 +14,7 @@ import me.almana.logisticsnetworks.item.NetworkUpgradeItem;
 import me.almana.logisticsnetworks.item.NbtFilterItem;
 import me.almana.logisticsnetworks.item.NodeUpgradeItem;
 import me.almana.logisticsnetworks.item.PatternSetterItem;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.item.SlotFilterItem;
 import me.almana.logisticsnetworks.item.TagFilterItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -22,6 +23,7 @@ import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.block.ServerRackBlock;
 import me.almana.logisticsnetworks.block.ServerRackBlockEntity;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
+import me.almana.logisticsnetworks.recipe.RecipeCardCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.WrenchResetRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
@@ -31,6 +33,7 @@ import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
+import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -159,6 +162,9 @@ public class Registration {
                                         "pattern_setter",
                                         () -> new PatternSetterItem(new Item.Properties()));
 
+        public static final RegistryObject<RecipeCardItem> RECIPE_CARD = ITEMS.register("recipe_card",
+                        () -> new RecipeCardItem(new Item.Properties()));
+
         public static final RegistryObject<MenuType<NodeMenu>> NODE_MENU = MENUS.register("node_menu",
                         () -> IForgeMenuType.create(NodeMenu::new));
         public static final RegistryObject<MenuType<FilterMenu>> FILTER_MENU = MENUS.register(
@@ -185,12 +191,19 @@ public class Registration {
                         "server_rack_menu",
                         () -> IForgeMenuType.create(ServerRackMenu::new));
 
+        public static final RegistryObject<MenuType<RecipeCardMenu>> RECIPE_CARD_MENU = MENUS.register(
+                        "recipe_card_menu",
+                        () -> IForgeMenuType.create(RecipeCardMenu::new));
+
         public static final RegistryObject<SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
                                         () -> new SimpleCraftingRecipeSerializer<>(FilterCopyClearRecipe::new));
         public static final RegistryObject<SimpleCraftingRecipeSerializer<WrenchResetRecipe>> WRENCH_RESET_RECIPE = RECIPE_SERIALIZERS
                         .register("wrench_reset",
                                         () -> new SimpleCraftingRecipeSerializer<>(WrenchResetRecipe::new));
+        public static final RegistryObject<SimpleCraftingRecipeSerializer<RecipeCardCopyClearRecipe>> RECIPE_CARD_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
+                        .register("recipe_card_copy_clear",
+                                        () -> new SimpleCraftingRecipeSerializer<>(RecipeCardCopyClearRecipe::new));
 
         public static final RegistryObject<CreativeModeTab> TAB = CREATIVE_TABS.register(
                         "logistics_tab",

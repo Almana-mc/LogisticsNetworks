@@ -576,6 +576,10 @@ public class FilterMenu extends AbstractContainerMenu {
         return nodeFilterSlot;
     }
 
+    public InteractionHand getHand() {
+        return hand;
+    }
+
     public void refreshFilterEntries() {
         loadFilterItems(getOpenedStack());
         broadcastChanges();

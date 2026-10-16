@@ -1,10 +1,13 @@
 package me.almana.logisticsnetworks.filter;
 
+import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.component.GeneralFilterEntry;
 import me.almana.logisticsnetworks.component.NbtCriterion;
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.util.ItemDataUtil;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -27,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -50,6 +54,7 @@ public final class FilterItemData {
     private static final int MAX_ENTRY_TAG_BYTES = 2048;
     private static final int MAX_FILTER_BYTES = 32768;
     private static final int MAX_ID_LENGTH = 256;
+    private static final String RECIPE_CARD_ID = Logisticsnetworks.MOD_ID + ":recipe_card";
     private static final String KEY_ROOT = "ln_filter";
     private static final String KEY_VERSION = "v";
     private static final int VERSION = 2;
@@ -168,17 +173,28 @@ public final class FilterItemData {
             return Edit.SAME;
         return edit(stack, slot, entry -> value.isEmpty()
                 ? GeneralFilterEntry.empty(slot)
-                : entry.withItem(StackSnapshot.of(value.copyWithCount(1))));
+                : (RecipeCardItem.is(value) ? GeneralFilterEntry.empty(slot) : entry)
+                        .withItem(StackSnapshot.of(entryCopy(value))));
     }
 
+    private static ItemStack entryCopy(ItemStack value) {
+        return RecipeCardItem.is(value) ? RecipeCardItem.stamp(value) : value.copyWithCount(1);
+    }
+
+    public static boolean refusesCard(ItemStack filter, ItemStack item) {
+        return RecipeCardItem.is(item) && (getTargetType(filter) != FilterTargetType.ITEMS
+                || RecipeCardData.of(item).sanitized().ingredients().isEmpty());
+    }
+
+    // Cards are stamped, so bounded
     public static boolean fitsEntry(ItemStack value) {
-        return !value.hasTag() || value.getTag().sizeInBytes() <= MAX_ENTRY_TAG_BYTES;
+        return RecipeCardItem.is(value) || !value.hasTag() || value.getTag().sizeInBytes() <= MAX_ENTRY_TAG_BYTES;
     }
 
     public static Edit addItem(ItemStack filter, ItemStack item) {
-        if (!isFilterItem(filter) || item.isEmpty() || !fitsEntry(item))
+        if (!isFilterItem(filter) || item.isEmpty() || !fitsEntry(item) || refusesCard(filter, item))
             return Edit.SAME;
-        ItemStack entry = item.copyWithCount(1);
+        ItemStack entry = entryCopy(item);
         int cap = getCapacity(filter);
         for (int i = 0; i < cap; i++) {
             if (ItemStack.isSameItemSameTags(getEntry(filter, i), entry))
@@ -217,8 +233,49 @@ public final class FilterItemData {
         return getItemFilterView(stack, readCache).hasFluidEntries();
     }
 
+    public static boolean hasItemRules(ItemStack stack, @Nullable ReadCache readCache) {
+        if (!isFilterItem(stack))
+            return false;
+        ItemFilterView view = getItemFilterView(stack, readCache);
+        return view.hasItemEntries() || view.hasTagEntries() || view.hasSlotOnlyEntries();
+    }
+
     public static int getEntryCount(ItemStack stack) {
         return entries(stack).size();
+    }
+
+    // Peeks NBT, no copy
+    public static boolean hasRecipeCard(ItemStack filter) {
+        if (!isFilterItem(filter))
+            return false;
+        CompoundTag root = ItemDataUtil.peekCustomData(filter).getCompound(KEY_ROOT);
+        for (Tag tag : root.getList(KEY_ITEMS, Tag.TAG_COMPOUND)) {
+            if (RECIPE_CARD_ID.equals(((CompoundTag) tag).getCompound("item").getString("id")))
+                return true;
+        }
+        return false;
+    }
+
+    public static List<RecipeCardData> recipeCards(ItemStack filter) {
+        return entries(filter).stream()
+                .filter(FilterItemData::isRecipeCard)
+                .filter(entry -> entry.slot() >= 0 && entry.slot() < getCapacity(filter))
+                .sorted(Comparator.comparingInt(GeneralFilterEntry::slot))
+                .map(entry -> RecipeCardData.of(entry.item().toStack()).sanitized())
+                .toList();
+    }
+
+    public static void restampRecipeCards(ItemStack filter) {
+        if (!hasRecipeCard(filter))
+            return;
+        for (GeneralFilterEntry entry : entries(filter)) {
+            if (isRecipeCard(entry))
+                setEntry(filter, entry.slot(), entry.item().toStack());
+        }
+    }
+
+    private static boolean isRecipeCard(GeneralFilterEntry entry) {
+        return entry.item() != null && RECIPE_CARD_ID.equals(entry.item().tag().getString("id"));
     }
 
     @Nullable
@@ -991,7 +1048,7 @@ public final class FilterItemData {
 
         for (GeneralFilterEntry entry : entries(stack)) {
             int slot = entry.slot();
-            if (slot >= 0 && slot < cap && entriesBySlot[slot] == null) {
+            if (slot >= 0 && slot < cap && entriesBySlot[slot] == null && !isRecipeCard(entry)) {
                 entriesBySlot[slot] = buildItemFilterSlot(entry);
             }
         }
@@ -1088,6 +1145,9 @@ public final class FilterItemData {
         StackSnapshot item = null;
         if (entry.item() != null) {
             ItemStack stack = entry.item().toStack();
+            if (RecipeCardItem.is(stack))
+                return GeneralFilterEntry.empty(entry.slot())
+                        .withItem(StackSnapshot.of(RecipeCardItem.stamp(stack)));
             if (stack.isEmpty() || !fitsEntry(stack))
                 return null;
             ItemStack clean = new ItemStack(stack.getItem());

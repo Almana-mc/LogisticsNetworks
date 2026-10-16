@@ -134,6 +134,7 @@ public final class NetworkHandler {
                 ClientPayloadHandler::handleSyncQueuedNodePlacement);
         registerServer(UpdateServerRackPayload.class, UpdateServerRackPayload.STREAM_CODEC, ServerPayloadHandler::handleUpdateServerRack);
         registerClient(SyncServerRackPayload.class, SyncServerRackPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncServerRack);
+        registerServer(SetRecipeCardPayload.class, SetRecipeCardPayload.STREAM_CODEC, ServerPayloadHandler::handleSetRecipeCard);
     }
 
     public static void sendToServer(CustomPacketPayload payload) {
