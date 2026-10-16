@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ final class RecipeSetMover implements RecipeSets.SetMove {
     private final Consumer<ItemStack> spill;
     private int[][] matching = new int[0][];
     private int[] order = new int[0];
+    private final Map<Integer, List<ItemResource>> variants = new HashMap<>();
 
     RecipeSetMover(IItemHandler source, RecipeCardData card, List<RecipeCardData.Ingredient> blockers,
             List<TransferEngine.ItemTransferTarget> targets, @Nullable TransferEngine.MoveRecorder recorder,
@@ -83,18 +85,19 @@ final class RecipeSetMover implements RecipeSets.SetMove {
     }
 
     private int affordable(int sets) {
+        Int2IntOpenHashMap extractable = new Int2IntOpenHashMap();
         int low = 0;
         int high = sets;
         while (low < high) {
             int mid = (low + high + 1) >>> 1;
-            if (covers(mid)) low = mid;
+            if (covers(mid, extractable)) low = mid;
             else high = mid - 1;
         }
         return low;
     }
 
     // Shared slots counted once
-    private boolean covers(int sets) {
+    private boolean covers(int sets, Int2IntOpenHashMap extractable) {
         Int2IntOpenHashMap left = new Int2IntOpenHashMap();
         for (int i : order) {
             int need = sets * card.ingredients().get(i).count();
@@ -102,8 +105,10 @@ final class RecipeSetMover implements RecipeSets.SetMove {
                 if (need <= 0) break;
                 ItemStack stack = source.getStackInSlot(slot);
                 if (!usable(stack, i)) continue;
-                int have = left.containsKey(slot) ? left.get(slot)
-                        : source.extractItem(slot, stack.getCount(), true).getCount();
+                // Source fixed during search
+                if (!extractable.containsKey(slot))
+                    extractable.put(slot, source.extractItem(slot, stack.getCount(), true).getCount());
+                int have = left.containsKey(slot) ? left.get(slot) : extractable.get(slot);
                 int take = Math.min(have, need);
                 left.put(slot, have - take);
                 need -= take;
@@ -151,7 +156,7 @@ final class RecipeSetMover implements RecipeSets.SetMove {
         for (int slot : matching[ingredient]) {
             ItemStack stack = source.getStackInSlot(slot);
             if (usable(stack, ingredient)) {
-                stock.merge(new ItemResource(stack), stack.getCount(),
+                stock.merge(ItemResourceOrder.resourceOf(variants, stack), stack.getCount(),
                         (a, b) -> (int) Math.min((long) a + b, Integer.MAX_VALUE));
             }
         }

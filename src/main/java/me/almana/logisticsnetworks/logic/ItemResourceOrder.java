@@ -76,7 +76,7 @@ public final class ItemResourceOrder {
     }
 
     // One copy per group
-    private static ItemResource resourceOf(Map<Integer, List<ItemResource>> variants, ItemStack stack) {
+    static ItemResource resourceOf(Map<Integer, List<ItemResource>> variants, ItemStack stack) {
         List<ItemResource> known = variants.computeIfAbsent(Objects.hash(stack.getItem(), stack.getTag()),
                 ignored -> new ArrayList<>(1));
         for (ItemResource resource : known) {
