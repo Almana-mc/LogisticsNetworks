@@ -51,6 +51,8 @@ public class TransferEngine {
     private static final float BACKOFF_MULTIPLIER = 1.3f;
     private static final float BACKOFF_DECAY_DIVISOR = 3f;
     private static final float BACKOFF_MAX_TICKS_ENERGY = 5f;
+    private static final byte SLOT_REJECTED = 1;
+    private static final byte SLOT_PASSED = 2;
 
     private static long capKey(ServerLevel level, BlockPos pos, Direction dir) {
         long packed = pos.asLong();
@@ -167,7 +169,8 @@ public class TransferEngine {
     public record ImportTarget(LogisticsNodeEntity node, ChannelData channel, int channelIndex) {
     }
 
-    public record ItemTransferTarget(IItemHandler handler, ItemStack[] importFilters,
+    public record ItemTransferTarget(IItemHandler handler, @Nullable IItemHandler bulkHandler,
+            ItemStack[] importFilters,
             FilterMode importFilterMode, TransferAmountRules.Constraints constraints, boolean hasItemNbtFilter,
             boolean[] allowedSlots, boolean hasImportSlotMapping) {
     }
@@ -634,9 +637,13 @@ public class TransferEngine {
                 continue;
 
             boolean[] targetAllowedSlots = null;
+            IItemHandler bulkHandler = hasImportSlotMapping
+                    ? null
+                    : capCache.findBulkItemHandler(target.node, targetHandler);
 
             reachableTargets.add(new ItemTransferTarget(
                     targetHandler,
+                    bulkHandler,
                     importFilters,
                     target.channel.getFilterMode(),
                     TransferAmountRules.collect(exportFilters, importFilters, filterReadCache),
@@ -1161,16 +1168,17 @@ public class TransferEngine {
         boolean[] openTargets = new boolean[targets.size()];
         Arrays.fill(openTargets, true);
         int openTargetCount = targets.size();
-        List<List<ItemStack>> rejectedInserts = new ArrayList<>(targets.size());
+        BulkInsertRejectionCache bulkInsertRejections = null;
+        BulkInsertRejectionCache insertRejections = null;
         List<Map<ItemKey, boolean[]>> importMasks = new ArrayList<>(targets.size());
-        for (int i = 0; i < targets.size(); i++) {
-            rejectedInserts.add(null);
-            importMasks.add(targets.get(i).hasImportSlotMapping() ? new HashMap<>() : null);
+        for (ItemTransferTarget target : targets) {
+            importMasks.add(target.hasImportSlotMapping() ? new HashMap<>() : null);
         }
 
+        byte[] slotVerdicts = new byte[sourceSlots == null ? source.getSlots() : sourceSlots.length];
         if (roundRobin) {
             remaining = exportableStock(source, sourceSlots, sourceAllowedSlots, exportFilters, exportFilterMode,
-                    provider, filterReadCache, resource, sourceItemCounts, limit);
+                    provider, filterReadCache, resource, sourceItemCounts, limit, slotVerdicts);
         }
         int budget = remaining;
 
@@ -1184,6 +1192,7 @@ public class TransferEngine {
                 }
 
                 ItemTransferTarget target = targets.get(targetIndex);
+                IItemHandler bulkHandler = target.bulkHandler();
                 boolean movedForTarget = false;
                 int targetRemaining = roundRobin ? share : remaining;
 
@@ -1195,9 +1204,15 @@ public class TransferEngine {
                         continue;
                     }
 
+                    if (slotVerdicts[entry] == SLOT_REJECTED) {
+                        continue;
+                    }
+
                     ItemStack extracted = source.extractItem(slot, Math.min(remaining, targetRemaining), true);
-                    if (extracted.isEmpty() || extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
-                            || resource != null && !resource.equals(new ItemResource(extracted))) {
+                    boolean sourcePassed = slotVerdicts[entry] == SLOT_PASSED;
+                    if (extracted.isEmpty() || !sourcePassed && (extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
+                            || resource != null && !resource.equals(new ItemResource(extracted)))) {
+                        slotVerdicts[entry] = SLOT_REJECTED;
                         continue;
                     }
 
@@ -1206,12 +1221,14 @@ public class TransferEngine {
                         candidateComponents = new CandidateComponents(extracted, provider);
                     }
 
-                    if (provider != null) {
+                    if (provider != null && !sourcePassed) {
                         if (!FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode, extracted, provider,
                                 candidateComponents, filterReadCache, slot)) {
+                            slotVerdicts[entry] = SLOT_REJECTED;
                             continue;
                         }
                     }
+                    slotVerdicts[entry] = SLOT_PASSED;
 
                     boolean[] importAllowedSlots = target.allowedSlots();
                     if (provider != null) {
@@ -1268,16 +1285,30 @@ public class TransferEngine {
                         continue;
                     }
 
-                    if (hasRejectedInsert(rejectedInserts.get(targetIndex), extracted)) {
-                        continue;
-                    }
-
                     ItemStack simulatedInsert = extracted.copyWithCount(allowed);
-                    ItemStack simRemainder = insertItemWithAllowedSlots(target.handler(), simulatedInsert, true,
-                            importAllowedSlots);
+                    StackedInsertion insertion = prepareStackedInsertion(
+                            target.handler(), bulkHandler, importAllowedSlots);
+                    ItemStack simRemainder;
+                    if (bulkHandler != null) {
+                        if (bulkInsertRejections == null) {
+                            bulkInsertRejections = new BulkInsertRejectionCache(
+                                    (handler, stack) -> insertBulkItem(handler, stack, true));
+                        }
+                        simRemainder = bulkInsertRejections.simulate(bulkHandler, simulatedInsert);
+                    } else if (insertion != null) {
+                        simRemainder = insertion.simulate(simulatedInsert);
+                    } else if (importAllowedSlots == null) {
+                        if (insertRejections == null) {
+                            insertRejections = new BulkInsertRejectionCache(
+                                    (handler, stack) -> insertItemWithAllowedSlots(handler, null, stack, true, null));
+                        }
+                        simRemainder = insertRejections.simulate(target.handler(), simulatedInsert);
+                    } else {
+                        simRemainder = insertItemWithAllowedSlots(target.handler(), null,
+                                simulatedInsert, true, importAllowedSlots);
+                    }
                     int acceptableCount = allowed - simRemainder.getCount();
                     if (acceptableCount <= 0) {
-                        rememberRejectedInsert(rejectedInserts, targetIndex, extracted);
                         continue;
                     }
 
@@ -1286,9 +1317,13 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack uninserted = insertItemWithAllowedSlots(target.handler(), toMove, false,
-                            importAllowedSlots);
+                    ItemStack uninserted = insertion != null ? insertion.commit(toMove)
+                            : insertItemWithAllowedSlots(target.handler(), bulkHandler,
+                                    toMove, false, importAllowedSlots);
                     int targetAccepted = toMove.getCount() - uninserted.getCount();
+                    if (targetAccepted > 0 && bulkHandler != null) {
+                        bulkInsertRejections.clear(bulkHandler);
+                    }
                     int droppedToWorld = 0;
 
                     if (!uninserted.isEmpty()) {
@@ -1298,10 +1333,13 @@ public class TransferEngine {
                                 stillLeft = source.insertItem(fallback, stillLeft, false);
                             }
                             if (!stillLeft.isEmpty()) {
-                                ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(), stillLeft,
-                                        false, importAllowedSlots);
+                                ItemStack forcedRemainder = insertItemWithAllowedSlots(target.handler(),
+                                        bulkHandler, stillLeft, false, importAllowedSlots);
                                 int forcedIn = stillLeft.getCount() - forcedRemainder.getCount();
                                 targetAccepted += forcedIn;
+                                if (forcedIn > 0 && bulkHandler != null) {
+                                    bulkInsertRejections.clear(bulkHandler);
+                                }
                                 if (!forcedRemainder.isEmpty() && sourceLevel != null) {
                                     LOGGER.error("ITEM VOIDING PREVENTED: Could not return {} to source or fit into "
                                             + "target slot mask. Dropping at source pos {}.",
@@ -1312,10 +1350,12 @@ public class TransferEngine {
                             }
                         }
                     }
+                    // Source changed, recheck slots
+                    slotVerdicts = new byte[Math.max(slotVerdicts.length, source.getSlots())];
 
                     int sourceLost = targetAccepted + droppedToWorld;
                     if (sourceLost > 0) {
-                        rejectedInserts.set(targetIndex, null);
+                        insertRejections = null;
                         if (recorder != null && targetAccepted > 0) {
                             recorder.record(slot, targetIndex, toMove.copyWithCount(targetAccepted),
                                     importAllowedSlots);
@@ -1362,11 +1402,11 @@ public class TransferEngine {
     private static int exportableStock(IItemHandler source, @Nullable int[] sourceSlots,
             @Nullable boolean[] sourceAllowedSlots, ItemStack[] exportFilters, FilterMode exportFilterMode,
             @Nullable HolderLookup.Provider provider, FilterItemData.ReadCache filterReadCache,
-            @Nullable ItemResource resource, @Nullable Map<Item, Integer> sourceItemCounts, int limit) {
+            @Nullable ItemResource resource, @Nullable Map<Item, Integer> sourceItemCounts, int limit,
+            byte[] slotVerdicts) {
         Map<Item, Integer> keepCaps = new HashMap<>();
         long stock = 0;
-        int slotCount = sourceSlots == null ? source.getSlots() : sourceSlots.length;
-        for (int entry = 0; entry < slotCount && stock < limit; entry++) {
+        for (int entry = 0; entry < slotVerdicts.length && stock < limit; entry++) {
             int slot = sourceSlots == null ? entry : sourceSlots[entry];
             if (sourceAllowedSlots != null && (slot >= sourceAllowedSlots.length || !sourceAllowedSlots[slot])) {
                 continue;
@@ -1376,8 +1416,10 @@ public class TransferEngine {
                     || resource != null && !resource.equals(new ItemResource(available))
                     || provider != null && !FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode,
                             available, provider, null, filterReadCache, slot)) {
+                slotVerdicts[entry] = SLOT_REJECTED;
                 continue;
             }
+            slotVerdicts[entry] = SLOT_PASSED;
             int count = available.getCount();
             if (sourceItemCounts != null && provider != null) {
                 // Export keep amounts per item
@@ -1394,25 +1436,11 @@ public class TransferEngine {
         return (int) Math.min(stock, limit);
     }
 
-    private static boolean hasRejectedInsert(@Nullable List<ItemStack> rejected, ItemStack stack) {
-        if (rejected == null) {
-            return false;
-        }
-        for (ItemStack rejectedStack : rejected) {
-            if (ItemStackCompat.isSameItemSameComponents(rejectedStack, stack)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static void rememberRejectedInsert(List<List<ItemStack>> rejectedInserts, int targetIndex, ItemStack stack) {
-        List<ItemStack> rejected = rejectedInserts.get(targetIndex);
-        if (rejected == null) {
-            rejected = new ArrayList<>();
-            rejectedInserts.set(targetIndex, rejected);
-        }
-        rejected.add(stack.copyWithCount(1));
+    private static @Nullable StackedInsertion prepareStackedInsertion(IItemHandler handler,
+            @Nullable IItemHandler bulkHandler, @Nullable boolean[] allowedSlots) {
+        return bulkHandler == null && allowedSlots == null && handler.getSlots() > 64
+                && !(handler instanceof DirectItemAccess)
+                ? new StackedInsertion(handler) : null;
     }
 
     private static boolean[] importMask(Map<ItemKey, boolean[]> masks, ItemTransferTarget target,
@@ -1443,14 +1471,22 @@ public class TransferEngine {
         return any ? mask : null;
     }
 
-    private static ItemStack insertItemWithAllowedSlots(IItemHandler handler, ItemStack stack, boolean simulate,
-            boolean[] allowedSlots) {
+    private static ItemStack insertItemWithAllowedSlots(IItemHandler handler, @Nullable IItemHandler bulkHandler,
+            ItemStack stack, boolean simulate, boolean[] allowedSlots) {
         if (stack.isEmpty()) {
             return ItemStack.EMPTY;
         }
         if (allowedSlots == null) {
-            return handler instanceof DirectItemAccess direct ? direct.insert(stack, simulate)
-                    : ItemHandlerHelper.insertItemStacked(handler, stack, simulate);
+            if (handler instanceof DirectItemAccess direct) {
+                return direct.insert(stack, simulate);
+            }
+            if (bulkHandler != null) {
+                return insertBulkItem(bulkHandler, stack, simulate);
+            }
+            // Belt segments show passing items
+            return stack.isStackable() || handler.getSlots() < 2
+                    ? ItemHandlerHelper.insertItemStacked(handler, stack, simulate)
+                    : insertUnstackableItem(handler, stack, simulate);
         }
         if (handler instanceof IItemHandlerModifiable modifiable) {
             return insertItemStrictAllowedSlots(modifiable, stack, simulate, allowedSlots);
@@ -1484,6 +1520,27 @@ public class TransferEngine {
         }
 
         return remaining;
+    }
+
+    private static ItemStack insertUnstackableItem(IItemHandler handler, ItemStack stack, boolean simulate) {
+        ItemStack remaining = stack;
+        for (int slot = 0; slot < handler.getSlots() && !remaining.isEmpty(); slot++) {
+            ItemStack slotStack = handler.getStackInSlot(slot);
+            if (!slotStack.isEmpty()) {
+                int limit = handler.getSlotLimit(slot);
+                // Plain slot already full
+                if (slotStack.getCount() >= limit && limit <= slotStack.getMaxStackSize()
+                        && ItemStackCompat.isSameItemSameComponents(slotStack, remaining)) {
+                    continue;
+                }
+            }
+            remaining = handler.insertItem(slot, remaining, simulate);
+        }
+        return remaining;
+    }
+
+    private static ItemStack insertBulkItem(IItemHandler handler, ItemStack stack, boolean simulate) {
+        return DirectStorageHandlers.insertItem(handler, stack, simulate);
     }
 
     private static ItemStack insertItemStrictAllowedSlots(IItemHandlerModifiable handler, ItemStack stack,

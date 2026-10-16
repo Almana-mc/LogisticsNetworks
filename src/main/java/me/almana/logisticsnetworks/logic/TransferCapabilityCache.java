@@ -43,6 +43,12 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
+    IItemHandler findBulkItemHandler(LogisticsNodeEntity node, IItemHandler sidedHandler) {
+        if (DirectStorageHandlers.isDirect(sidedHandler)) return sidedHandler;
+        return null;
+    }
+
+    @Nullable
     IFluidHandler findFluidExportHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
         return findFluidHandler(node, direction, true);
     }
