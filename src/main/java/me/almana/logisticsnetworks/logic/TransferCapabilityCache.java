@@ -27,23 +27,27 @@ public final class TransferCapabilityCache {
         this.handlers = handlers;
     }
 
+    public static TransferCapabilityCache create() {
+        return new TransferEngine.CapCache().interfaces;
+    }
+
     static InterfaceStorageResolution resolveInterface(LogisticsNodeEntity node, @Nullable Direction direction) {
         if (!NodeUpgradeData.hasNetworkUpgrade(node)) return InterfaceStorageResolution.unsupported();
         return LinkedStorage.resolveInterface((ServerLevel) node.level(), node.getAttachedPos(), direction);
     }
 
     @Nullable
-    IItemHandler findItemExportHandler(LogisticsNodeEntity node, @Nullable Direction direction, boolean direct) {
+    public IItemHandler findItemExportHandler(LogisticsNodeEntity node, @Nullable Direction direction, boolean direct) {
         return findItemHandler(node, direction, direct, true);
     }
 
     @Nullable
-    IItemHandler findItemImportHandler(LogisticsNodeEntity node, @Nullable Direction direction, boolean direct) {
+    public IItemHandler findItemImportHandler(LogisticsNodeEntity node, @Nullable Direction direction, boolean direct) {
         return findItemHandler(node, direction, direct, false);
     }
 
     @Nullable
-    IItemHandler findBulkItemHandler(LogisticsNodeEntity node, IItemHandler sidedHandler) {
+    public IItemHandler findBulkItemHandler(LogisticsNodeEntity node, IItemHandler sidedHandler) {
         if (DirectStorageHandlers.isDirect(sidedHandler)) return sidedHandler;
         return null;
     }

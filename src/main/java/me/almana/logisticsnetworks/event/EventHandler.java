@@ -15,6 +15,7 @@ import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.logic.async.AsyncTransferRuntime;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
@@ -38,6 +39,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.eventbus.api.Event;
+import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
@@ -118,6 +120,25 @@ public class EventHandler {
     @SubscribeEvent
     public static void onAsyncServerStarted(ServerStartedEvent event) {
         ThreadGuard.markServerThread();
+        replaceAsyncRuntime();
+    }
+
+    @SubscribeEvent
+    public static void onAsyncDatapackReload(AddReloadListenerEvent event) {
+        replaceAsyncRuntime();
+    }
+
+    @SubscribeEvent
+    public static void onAsyncServerStopping(ServerStoppingEvent event) {
+        AsyncTransferRuntime.stop();
+    }
+
+    private static void replaceAsyncRuntime() {
+        if (Config.asyncPlanning) {
+            AsyncTransferRuntime.start();
+        } else {
+            AsyncTransferRuntime.stop();
+        }
     }
 
     @SubscribeEvent

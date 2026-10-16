@@ -83,6 +83,7 @@ public class LogisticsNetwork {
     private final Map<UUID, Integer> tierCache = new HashMap<>();
 
     private boolean cacheDirty = true;
+    private long generation;
 
     public LogisticsNetwork(UUID id) {
         this(id, "Network-" + id.toString().substring(0, 6));
@@ -415,10 +416,15 @@ public class LogisticsNetwork {
 
     public void markCacheDirty() {
         this.cacheDirty = true;
+        this.generation++;
     }
 
     public boolean isCacheDirty() {
         return cacheDirty;
+    }
+
+    public long getGeneration() {
+        return generation;
     }
 
     public void clearCacheDirty() {

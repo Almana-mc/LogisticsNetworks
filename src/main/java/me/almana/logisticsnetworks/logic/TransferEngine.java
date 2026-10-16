@@ -13,6 +13,7 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
+import me.almana.logisticsnetworks.logic.async.SnapshotItemHandler;
 import mekanism.api.chemical.IChemicalHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -183,7 +184,7 @@ public class TransferEngine {
     private record ItemKey(Item item, @Nullable CompoundTag tag) {
     }
 
-    private record NetworkContext(
+    public record NetworkContext(
             List<LogisticsNodeEntity> sortedNodes,
             Map<UUID, Integer> signalCache,
             List<ImportTarget>[] itemImports,
@@ -227,7 +228,7 @@ public class TransferEngine {
     }
 
     @Nullable
-    private static NetworkContext prepareNetwork(LogisticsNetwork network, MinecraftServer server) {
+    public static NetworkContext prepareNetwork(LogisticsNetwork network, MinecraftServer server) {
         if (network.isCacheDirty()) {
             network.rebuildCache(NetworkRegistry.get((ServerLevel) server.overworld()));
             network.clearCacheDirty();
@@ -456,7 +457,7 @@ public class TransferEngine {
         return Math.max(1L, cooldownRemaining(node, channel, index, tier, gameTime));
     }
 
-    private static long cooldownRemaining(LogisticsNodeEntity node, ChannelData channel, int index, int tier,
+    public static long cooldownRemaining(LogisticsNodeEntity node, ChannelData channel, int index, int tier,
             long gameTime) {
         long lastRun = node.getLastExecution(index);
         boolean isInstantType = channel.getType() == ChannelType.ENERGY;
@@ -469,7 +470,7 @@ public class TransferEngine {
         return Math.max(0L, effectiveDelay - elapsed);
     }
 
-    private static int getBatchLimit(ChannelType type, int tier) {
+    public static int getBatchLimit(ChannelType type, int tier) {
         return switch (type) {
             case FLUID -> NodeUpgradeData.getFluidOperationCapMb(tier);
             case ENERGY -> NodeUpgradeData.getEnergyOperationCap(tier);
@@ -1458,7 +1459,7 @@ public class TransferEngine {
     private static @Nullable StackedInsertion prepareStackedInsertion(IItemHandler handler,
             @Nullable IItemHandler bulkHandler, @Nullable boolean[] allowedSlots) {
         return bulkHandler == null && allowedSlots == null && handler.getSlots() > 64
-                && !(handler instanceof DirectItemAccess)
+                && !(handler instanceof SnapshotItemHandler) && !(handler instanceof DirectItemAccess)
                 ? new StackedInsertion(handler) : null;
     }
 
@@ -1502,12 +1503,17 @@ public class TransferEngine {
             if (bulkHandler != null) {
                 return insertBulkItem(bulkHandler, stack, simulate);
             }
+            if (handler instanceof SnapshotItemHandler snapshot) {
+                // Forge stacking reads item caps
+                return stack.isStackable() || handler.getSlots() < 2 ? snapshot.insertStacked(stack, simulate)
+                        : insertUnstackableItem(handler, stack, simulate);
+            }
             // Belt segments show passing items
             return stack.isStackable() || handler.getSlots() < 2
                     ? ItemHandlerHelper.insertItemStacked(handler, stack, simulate)
                     : insertUnstackableItem(handler, stack, simulate);
         }
-        if (handler instanceof IItemHandlerModifiable modifiable) {
+        if (handler instanceof IItemHandlerModifiable modifiable && !(handler instanceof SnapshotItemHandler)) {
             return insertItemStrictAllowedSlots(modifiable, stack, simulate, allowedSlots);
         }
 
@@ -1559,6 +1565,9 @@ public class TransferEngine {
     }
 
     private static ItemStack insertBulkItem(IItemHandler handler, ItemStack stack, boolean simulate) {
+        if (handler instanceof SnapshotItemHandler snapshot) {
+            return snapshot.insertBulkItem(stack, simulate);
+        }
         return DirectStorageHandlers.insertItem(handler, stack, simulate);
     }
 
