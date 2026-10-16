@@ -1175,10 +1175,14 @@ public class TransferEngine {
             importMasks.add(target.hasImportSlotMapping() ? new HashMap<>() : null);
         }
 
+        // Memo components per source slot
+        CandidateComponents[] slotComponents = hasNbtFilter ? new CandidateComponents[source.getSlots()] : null;
         byte[] slotVerdicts = new byte[sourceSlots == null ? source.getSlots() : sourceSlots.length];
+        // Simulated extracts shared across targets
+        ItemStack[] slotStacks = new ItemStack[slotVerdicts.length];
         if (roundRobin) {
             remaining = exportableStock(source, sourceSlots, sourceAllowedSlots, exportFilters, exportFilterMode,
-                    provider, filterReadCache, resource, sourceItemCounts, limit, slotVerdicts);
+                    provider, filterReadCache, resource, sourceItemCounts, limit, slotVerdicts, slotStacks);
         }
         int budget = remaining;
 
@@ -1208,7 +1212,13 @@ public class TransferEngine {
                         continue;
                     }
 
-                    ItemStack extracted = source.extractItem(slot, Math.min(remaining, targetRemaining), true);
+                    ItemStack available = slotStacks[entry];
+                    if (available == null) {
+                        available = source.extractItem(slot, remaining, true);
+                        slotStacks[entry] = available;
+                    }
+                    int request = Math.min(remaining, targetRemaining);
+                    ItemStack extracted = available.getCount() > request ? available.copyWithCount(request) : available;
                     boolean sourcePassed = slotVerdicts[entry] == SLOT_PASSED;
                     if (extracted.isEmpty() || !sourcePassed && (extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
                             || resource != null && !resource.equals(new ItemResource(extracted)))) {
@@ -1218,7 +1228,11 @@ public class TransferEngine {
 
                     CandidateComponents candidateComponents = null;
                     if (provider != null && hasNbtFilter) {
-                        candidateComponents = new CandidateComponents(extracted, provider);
+                        if (slotComponents[slot] == null) {
+                            // Copy, extracted reaches target handlers
+                            slotComponents[slot] = new CandidateComponents(extracted.copy(), provider);
+                        }
+                        candidateComponents = slotComponents[slot];
                     }
 
                     if (provider != null && !sourcePassed) {
@@ -1352,6 +1366,10 @@ public class TransferEngine {
                     }
                     // Source changed, recheck slots
                     slotVerdicts = new byte[Math.max(slotVerdicts.length, source.getSlots())];
+                    slotStacks = new ItemStack[slotVerdicts.length];
+                    if (slotComponents != null) {
+                        slotComponents = new CandidateComponents[Math.max(slotComponents.length, source.getSlots())];
+                    }
 
                     int sourceLost = targetAccepted + droppedToWorld;
                     if (sourceLost > 0) {
@@ -1403,7 +1421,7 @@ public class TransferEngine {
             @Nullable boolean[] sourceAllowedSlots, ItemStack[] exportFilters, FilterMode exportFilterMode,
             @Nullable HolderLookup.Provider provider, FilterItemData.ReadCache filterReadCache,
             @Nullable ItemResource resource, @Nullable Map<Item, Integer> sourceItemCounts, int limit,
-            byte[] slotVerdicts) {
+            byte[] slotVerdicts, ItemStack[] slotStacks) {
         Map<Item, Integer> keepCaps = new HashMap<>();
         long stock = 0;
         for (int entry = 0; entry < slotVerdicts.length && stock < limit; entry++) {
@@ -1412,6 +1430,7 @@ public class TransferEngine {
                 continue;
             }
             ItemStack available = source.extractItem(slot, limit, true);
+            slotStacks[entry] = available;
             if (available.isEmpty() || available.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
                     || resource != null && !resource.equals(new ItemResource(available))
                     || provider != null && !FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode,
