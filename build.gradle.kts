@@ -174,6 +174,7 @@ dependencies {
     if (testMod("soph")) {
         localRuntime(fg.deobf("maven.modrinth:sophisticated-core:1.20.1-1.5.10.2402"))
         localRuntime(fg.deobf("maven.modrinth:sophisticated-backpacks:1.20.1-3.26.12.2206"))
+        localRuntime(fg.deobf("maven.modrinth:sophisticated-storage:1.20.1-1.5.5.2182"))
     }
     if (testMod("arseng")) localRuntime(fg.deobf("maven.modrinth:ars-energistique:1.2.0"))
     if (testMod("oculus")) {
