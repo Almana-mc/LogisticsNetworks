@@ -1361,9 +1361,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void pasteNbt(int slot, FilterEntrySnapshot entry) {
-        if (entry.strictNbt()) {
-            menu.setEntryNbtStrict(slot, true);
-            NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setStrict(slot, true));
+        if (entry.strictNbt() != menu.isEntryNbtStrict(slot)) {
+            menu.setEntryNbtStrict(slot, entry.strictNbt());
+            NetworkHandler.sendToServer(SetFilterEntryNbtPayload.setStrict(slot, entry.strictNbt()));
         }
 
         if (entry.rawNbt() != null && !entry.rawNbt().isBlank()) {
