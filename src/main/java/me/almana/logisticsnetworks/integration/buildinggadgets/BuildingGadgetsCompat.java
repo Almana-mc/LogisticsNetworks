@@ -169,6 +169,7 @@ public final class BuildingGadgetsCompat {
             NetworkRegistry.get(level).removeNodeFromNetwork(node.getNetworkId(), original);
         }
         if (Config.dropNodeItem) node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
+        node.ejectPendingFilters();
         node.dropUpgrades();
     }
 
