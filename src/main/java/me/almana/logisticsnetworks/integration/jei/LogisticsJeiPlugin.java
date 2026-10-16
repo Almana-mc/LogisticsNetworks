@@ -3,11 +3,13 @@ package me.almana.logisticsnetworks.integration.jei;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.registration.IGuiHandlerRegistration;
+import mezz.jei.api.registration.IRecipeTransferRegistration;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
+import me.almana.logisticsnetworks.client.screen.RecipeCardScreen;
 import net.minecraft.resources.ResourceLocation;
 
 @JeiPlugin
@@ -29,6 +31,7 @@ public class LogisticsJeiPlugin implements IModPlugin {
         registration.addGhostIngredientHandler(NodeScreen.class, NODE_GHOST_HANDLER);
         registration.addGhostIngredientHandler(NodeGraphScreen.class, new NodeGhostIngredientHandler<>());
         registration.addGhostIngredientHandler(ClipboardScreen.class, new NodeGhostIngredientHandler<>());
+        registration.addGhostIngredientHandler(RecipeCardScreen.class, new RecipeCardGhostHandler());
         registration.addGuiContainerHandler(FilterScreen.class,
                 new mezz.jei.api.gui.handlers.IGuiContainerHandler<>() {
                     @Override
@@ -45,6 +48,11 @@ public class LogisticsJeiPlugin implements IModPlugin {
                                 window.getGuiScaledWidth(), window.getGuiScaledHeight()));
                     }
                 });
+    }
+
+    @Override
+    public void registerRecipeTransferHandlers(IRecipeTransferRegistration registration) {
+        registration.addUniversalRecipeTransferHandler(new RecipeCardTransferHandler());
     }
 }
 
