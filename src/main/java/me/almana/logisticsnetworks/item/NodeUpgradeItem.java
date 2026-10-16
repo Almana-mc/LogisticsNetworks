@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.item;
 
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
@@ -12,17 +13,8 @@ import java.util.List;
 
 public class NodeUpgradeItem extends Item {
 
-        private final int itemCap;
-        private final int fluidCapMb;
-        private final int energyCap;
-        private final int minDelay;
-
-        public NodeUpgradeItem(Properties properties, int itemCap, int fluidCapMb, int energyCap, int minDelay) {
+        public NodeUpgradeItem(Properties properties) {
                 super(properties);
-                this.itemCap = itemCap;
-                this.fluidCapMb = fluidCapMb;
-                this.energyCap = energyCap;
-                this.minDelay = minDelay;
         }
 
         @Override
@@ -31,12 +23,14 @@ public class NodeUpgradeItem extends Item {
                 tooltip.add(Component.translatable("tooltip.logisticsnetworks.upgrade.description")
                                 .withStyle(ChatFormatting.GRAY));
 
-                addStatTooltip(tooltip, "items", formatCap(itemCap));
-                addStatTooltip(tooltip, "fluids", String.format("%,d", fluidCapMb));
-                addStatTooltip(tooltip, "chemicals", String.format("%,d", fluidCapMb));
-                addStatTooltip(tooltip, "energy", formatCap(energyCap));
-                addStatTooltip(tooltip, "source", String.format("%,d", fluidCapMb));
-                addStatTooltip(tooltip, "delay", String.valueOf(minDelay));
+                // Values from upgrades.json
+                int tier = NodeUpgradeData.getUpgradeTier(stack);
+                addStatTooltip(tooltip, "items", formatCap(NodeUpgradeData.getItemOperationCap(tier)));
+                addStatTooltip(tooltip, "fluids", formatCap(NodeUpgradeData.getFluidOperationCapMb(tier)));
+                addStatTooltip(tooltip, "chemicals", formatCap(NodeUpgradeData.getChemicalOperationCap(tier)));
+                addStatTooltip(tooltip, "energy", formatCap(NodeUpgradeData.getEnergyOperationCap(tier)));
+                addStatTooltip(tooltip, "source", formatCap(NodeUpgradeData.getSourceOperationCap(tier)));
+                addStatTooltip(tooltip, "delay", String.valueOf(NodeUpgradeData.getMinTickDelay(tier)));
         }
 
         private void addStatTooltip(List<Component> tooltip, String statKey, String value) {

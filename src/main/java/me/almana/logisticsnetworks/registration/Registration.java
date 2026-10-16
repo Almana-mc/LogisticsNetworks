@@ -130,14 +130,14 @@ public class Registration {
                         () -> new NameFilterItem(new Item.Properties()));
 
         public static final RegistryObject<NodeUpgradeItem> IRON_UPGRADE = ITEMS.register("iron_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 16, 1_000, 10_000, 10));
+                        () -> new NodeUpgradeItem(new Item.Properties()));
         public static final RegistryObject<NodeUpgradeItem> GOLD_UPGRADE = ITEMS.register("gold_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 32, 5_000, 50_000, 5));
+                        () -> new NodeUpgradeItem(new Item.Properties()));
         public static final RegistryObject<NodeUpgradeItem> DIAMOND_UPGRADE = ITEMS.register("diamond_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 64, 20_000, 250_000, 1));
+                        () -> new NodeUpgradeItem(new Item.Properties()));
         public static final RegistryObject<NodeUpgradeItem> NETHERITE_UPGRADE = ITEMS.register(
                         "netherite_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 10_000, 1_000_000, Integer.MAX_VALUE, 1));
+                        () -> new NodeUpgradeItem(new Item.Properties()));
 
         public static final RegistryObject<DimensionalUpgradeItem> DIMENSIONAL_UPGRADE = ITEMS.register(
                         "dimensional_upgrade",
