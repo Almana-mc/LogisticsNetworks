@@ -13,6 +13,7 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
+import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
 import me.almana.logisticsnetworks.logic.async.SnapshotItemHandler;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
@@ -1060,12 +1061,13 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
+        SourceTransferHelper.SourceEnd from = sourceEnd(sourceNode, exportChannel.getIoDirection());
+        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
+        List<SourceTransferHelper.SourceEnd> equalTargets =
+                exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN ? new ArrayList<>() : null;
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
-        List<ImportTarget> equalTargets = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
-                ? new ArrayList<>() : null;
-        boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
 
         for (ImportTarget target : targets) {
             if (remaining <= 0)
@@ -1080,16 +1082,17 @@ public class TransferEngine {
             anyReachable = true;
             ServerLevel targetLevel = (ServerLevel) target.node().level();
             BlockPos targetPos = target.node().getAttachedPos();
-            if (!targetLevel.isLoaded(targetPos))
+            if (from == null || !targetLevel.isLoaded(targetPos))
+                continue;
+            SourceTransferHelper.SourceEnd to = sourceEnd(target.node(), target.channel().getIoDirection());
+            if (to == null)
                 continue;
             if (equalTargets != null) {
-                if (SourceTransferHelper.hasSourceTile(targetLevel, targetPos))
-                    equalTargets.add(target);
+                equalTargets.add(to);
                 continue;
             }
 
-            int moved = SourceTransferHelper.transferBetween(
-                    sourceLevel, sourcePos, targetLevel, targetPos, remaining);
+            int moved = SourceTransferHelper.transfer(from, to, remaining);
             if (Config.debugMode)
                 LOGGER.debug("[Source] Transfer {} -> {}: moved={}, batch={}",
                         sourcePos, targetPos, moved, batchLimit);
@@ -1105,13 +1108,20 @@ public class TransferEngine {
         if (!anyReachable)
             return -1;
         if (equalTargets != null) {
-            return (int) EvenSplit.deal(equalTargets.size(),
-                    Math.min(batchLimit, SourceTransferHelper.exportable(sourceLevel, sourcePos)),
-                    (i, share) -> SourceTransferHelper.transferBetween(sourceLevel, sourcePos,
-                            (ServerLevel) equalTargets.get(i).node().level(),
-                            equalTargets.get(i).node().getAttachedPos(), (int) share));
+            return equalTargets.isEmpty() ? 0 : (int) EvenSplit.deal(equalTargets.size(), from.extract(remaining, true),
+                    (i, share) -> SourceTransferHelper.transfer(from, equalTargets.get(i), (int) share));
         }
         return batchLimit - remaining;
+    }
+
+    @Nullable
+    static SourceTransferHelper.SourceEnd sourceEnd(LogisticsNodeEntity node, Direction direction) {
+        InterfaceStorageResolution resolution = TransferCapabilityCache.resolveInterface(node, direction);
+        if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE)
+            return SourceTransferHelper.grid(resolution.endpoint());
+        if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE)
+            return null;
+        return SourceTransferHelper.resolve((ServerLevel) node.level(), node.getAttachedPos(), direction);
     }
 
     private static boolean canReach(LogisticsNodeEntity source, LogisticsNodeEntity target, boolean sourceDim,
