@@ -20,24 +20,27 @@ public final class SourceTransferHelper {
         Object identity();
     }
 
-    private record TileEnd(ISourceTile tile, Object identity, boolean measured) implements SourceEnd {
+    private record TileEnd(ISourceTile tile, Object identity, boolean capability) implements SourceEnd {
         @Override
         public int extract(int amount, boolean simulate) {
-            int moved = Math.max(0, Math.min(amount, Math.min(tile.getSource(), tile.getTransferRate())));
-            if (simulate || moved <= 0) return moved;
             int before = tile.getSource();
+            int moved = Math.max(0, Math.min(amount, Math.min(before, tile.getTransferRate())));
+            if (simulate || moved <= 0) return moved;
             tile.removeSource(moved);
             // capability sinks may ignore removal
-            return measured ? Math.max(0, before - tile.getSource()) : moved;
+            return capability ? Math.max(0, before - tile.getSource()) : moved;
         }
 
         @Override
         public int receive(int amount, boolean simulate) {
             if (!tile.canAcceptSource()) return 0;
-            int space = tile.getMaxSource() - tile.getSource();
+            int before = tile.getSource();
+            int space = tile.getMaxSource() - before;
             int moved = Math.max(0, Math.min(amount, Math.min(space, tile.getTransferRate())));
-            if (!simulate && moved > 0) tile.addSource(moved);
-            return moved;
+            if (simulate || moved <= 0) return moved;
+            tile.addSource(moved);
+            // clamping tiles store less
+            return capability ? moved : Math.max(0, Math.min(moved, tile.getSource() - before));
         }
     }
 
@@ -72,7 +75,10 @@ public final class SourceTransferHelper {
         if (jar != null) return jar;
         ISourceTile tile = sourceTile(blockEntity, side);
         if (tile == null) return null;
-        return new TileEnd(tile, identity(level, pos, tile), !(blockEntity instanceof ISourceTile));
+        if (blockEntity instanceof ISourceTile) return new TileEnd(tile, identity(level, pos, tile), false);
+        if (ArsEngCompat.isTunnel(tile)) return null;
+        SourceEnd storage = ArsEngCompat.storageEnd(tile, level, pos);
+        return storage != null ? storage : new TileEnd(tile, identity(level, pos, tile), true);
     }
 
     public static boolean hasSourceTile(ServerLevel level, BlockPos pos) {
@@ -106,7 +112,7 @@ public final class SourceTransferHelper {
         return moved - rejected;
     }
 
-    private static Object identity(ServerLevel level, BlockPos pos, Object fallback) {
+    public static Object identity(ServerLevel level, BlockPos pos, Object fallback) {
         Object network = LinkedStorage.networkIdentity(level, pos);
         return network != null ? network : fallback;
     }
