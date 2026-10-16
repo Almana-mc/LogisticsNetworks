@@ -776,7 +776,8 @@ public class TransferEngine {
                 continue;
             IFluidHandler handler = capCache.interfaces.findFluidImportHandler(target.node,
                     target.channel.getIoDirection());
-            if (handler != null && !DirectStorageHandlers.shareNetwork(sourceHandler, handler))
+            if (handler != null && handler != sourceHandler
+                    && !DirectStorageHandlers.shareNetwork(sourceHandler, handler))
                 out.add(new FluidTarget(handler, target));
         }
         return anyReachable;
