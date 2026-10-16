@@ -543,12 +543,13 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (inputs.isEmpty()) continue;
             int x = leftPos + slot.x;
             int y = topPos + slot.y;
+            // Above slot item (z 250)
+            g.fill(x, y, x + 16, y + 16, 260, 0xFF0A0A0A);
             g.pose().pushPose();
             g.pose().translate(0, 0, 200);
-            g.fill(x, y, x + 16, y + 16, 0xFF0A0A0A);
             g.renderItem(inputs.get((int) (System.currentTimeMillis() / 1000 % inputs.size())).icon(), x, y);
             g.pose().popPose();
-            if (slot == hoveredSlot) renderSlotHighlight(g, x, y, 0);
+            if (slot == hoveredSlot && menu.getCarried().isEmpty()) renderSlotHighlight(g, x, y, 0);
         }
     }
 
