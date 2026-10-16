@@ -326,7 +326,7 @@ public final class FilterItemData {
         int added = 0;
         boolean full = false;
         for (GeneralFilterEntry candidate : candidates) {
-            if (!known.add(resourceKey(candidate)))
+            if (isRecipeCard(candidate) || !known.add(resourceKey(candidate)))
                 continue;
             int slot = firstFreeSlot(entries, cap);
             if (slot < 0) {
