@@ -105,6 +105,7 @@ the<SourceSetContainer>().named("main") {
 
 extensions.configure<MixinExtension>("mixin") {
     add(mainSourceSet, "${modId}.refmap.json")
+    config("${modId}.functionalstorage.mixins.json")
 }
 
 val jarJar = extensions.getByType<JarJarProjectExtension>()
@@ -150,6 +151,7 @@ dependencies {
     localRuntime(fg.deobf("org.appliedenergistics:guideme:${guidemeVersion}"))
     compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
     compileOnly("maven.modrinth:oculus:1.20.1-1.8.0") { isTransitive = false }
+    compileOnly("maven.modrinth:functional-storage:1.20.1-1.2.14") { isTransitive = false }
     compileOnly("maven.modrinth:sophisticated-core:1.20.1-1.5.10.2402") { isTransitive = false }
 
     // Local test mods (testmods.properties)
