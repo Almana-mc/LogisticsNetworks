@@ -85,8 +85,8 @@ final class NetworkDispatchState {
                 || plan.runtimeId() != currentRuntimeId) {
             return false;
         }
+        // Reset after commit succeeds
         if (!plan.failed()) {
-            asyncFailures.remove(id);
             return false;
         }
         if (isAsyncDisabled(id)) {
@@ -104,6 +104,10 @@ final class NetworkDispatchState {
         asyncDisabled.put(id, AsyncDisableReason.WORKER_FAILURES);
         degradedNetworks.add(id);
         return true;
+    }
+
+    void clearAsyncFailures(UUID id) {
+        asyncFailures.remove(id);
     }
 
     boolean disableForOccupiedSlots(UUID id) {

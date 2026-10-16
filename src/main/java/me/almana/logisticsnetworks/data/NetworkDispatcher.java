@@ -269,9 +269,10 @@ final class NetworkDispatcher {
             }
             long synchronousDelta = TransferEngine.processNetworkWithoutItemTransfers(network, server);
             state.scheduleResult(id, now, Math.min(itemResult.wakeDelta(), synchronousDelta));
+            state.clearAsyncFailures(id);
         } catch (Exception exception) {
-            state.markDirty(id);
             LOGGER.error("Error committing plan for network {}", id, exception);
+            recordDispatchException(network, asyncRuntime.runtimeId());
         }
     }
 
