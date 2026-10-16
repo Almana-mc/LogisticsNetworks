@@ -158,6 +158,7 @@ dependencies {
     localRuntime(fg.deobf("org.appliedenergistics:guideme:${guidemeVersion}"))
     compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
     compileOnly("maven.modrinth:oculus:1.20.1-1.8.0") { isTransitive = false }
+    compileOnly("maven.modrinth:emi:1.1.24+1.20.1+forge") { isTransitive = false }
     compileOnly("maven.modrinth:cc-tweaked:gRtcHJd8") // cc-tweaked-1.20.1-forge 1.120.2
     compileOnly(fg.deobf("curse.maven:building-gadgets-298187:6850495")) // Building Gadgets 2 1.0.8
     compileOnly("com.simibubi.create:create-1.20.1:6.0.8-289:slim") { isTransitive = false }
@@ -196,6 +197,7 @@ dependencies {
     }
     if (testMod("bg2")) localRuntime(fg.deobf("curse.maven:building-gadgets-298187:6850495"))
     if (testMod("cc")) localRuntime(fg.deobf("maven.modrinth:cc-tweaked:gRtcHJd8"))
+    if (testMod("emi")) localRuntime(fg.deobf("maven.modrinth:emi:1.1.24+1.20.1+forge"))
     if (testMod("oculus")) {
         localRuntime(fg.deobf("maven.modrinth:oculus:1.20.1-1.8.0"))
         localRuntime(fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1"))

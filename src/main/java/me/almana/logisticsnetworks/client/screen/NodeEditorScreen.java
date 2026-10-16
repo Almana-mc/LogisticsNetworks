@@ -1944,6 +1944,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         return storageUpgradePicker.isOpen();
     }
 
+    public List<Rect2i> getUpgradePickerAreas() {
+        return storageUpgradePicker.isOpen() ? List.of(storageUpgradePicker.bounds()) : List.of();
+    }
+
     protected boolean handleScreenKey(int key, int scan, int modifiers) {
         return super.keyPressed(key, scan, modifiers);
     }
