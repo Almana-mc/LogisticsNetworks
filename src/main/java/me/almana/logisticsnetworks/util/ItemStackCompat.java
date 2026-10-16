@@ -1,9 +1,12 @@
 package me.almana.logisticsnetworks.util;
 
+import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Objects;
 
 public final class ItemStackCompat {
 
@@ -21,6 +24,11 @@ public final class ItemStackCompat {
     }
 
     public static boolean isSameItemSameComponents(ItemStack left, ItemStack right) {
+        // Forge item caps: server only
+        if (ThreadGuard.isWorkerThread()) {
+            return left.isEmpty() ? right.isEmpty()
+                    : left.getItem() == right.getItem() && Objects.equals(left.getTag(), right.getTag());
+        }
         return ItemStack.isSameItemSameTags(left, right);
     }
 

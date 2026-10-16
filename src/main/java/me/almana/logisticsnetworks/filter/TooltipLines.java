@@ -1,6 +1,8 @@
 package me.almana.logisticsnetworks.filter;
 
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.logic.async.ThreadGuard;
+import me.almana.logisticsnetworks.util.ItemStackCompat;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -9,6 +11,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -21,28 +24,49 @@ public final class TooltipLines {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int MAX_CACHED = 4096;
+    private static final int MAX_PENDING = 256;
     private static final Map<Key, List<String>> CACHE = new ConcurrentHashMap<>();
+    private static final Set<Key> PENDING = ConcurrentHashMap.newKeySet();
     private static final Set<Item> QUARANTINED = ConcurrentHashMap.newKeySet();
 
     private TooltipLines() {
     }
 
+    @Nullable
     public static List<String> get(ItemStack stack) {
         Key probe = new Key(stack);
         List<String> cached = CACHE.get(probe);
         if (cached != null)
             return cached;
-        List<String> lines = build(stack).stream().map(Component::getString).toList();
-        // ponytail: full clear, not LRU
-        if (CACHE.size() >= MAX_CACHED)
-            CACHE.clear();
-        CACHE.put(probe.copy(), lines);
-        return lines;
+        if (!ThreadGuard.isServerThread()) {
+            if (PENDING.size() < MAX_PENDING)
+                PENDING.add(probe.copy());
+            return null;
+        }
+        return compute(probe.copy());
+    }
+
+    public static void drainPending() {
+        for (Key key : PENDING) {
+            PENDING.remove(key);
+            if (!CACHE.containsKey(key))
+                compute(key);
+        }
     }
 
     public static void clear() {
         CACHE.clear();
+        PENDING.clear();
         QUARANTINED.clear();
+    }
+
+    private static List<String> compute(Key key) {
+        List<String> lines = build(key.stack()).stream().map(Component::getString).toList();
+        // ponytail: full clear, not LRU
+        if (CACHE.size() >= MAX_CACHED)
+            CACHE.clear();
+        CACHE.put(key, lines);
+        return lines;
     }
 
     private static List<Component> build(ItemStack stack) {
@@ -101,7 +125,7 @@ public final class TooltipLines {
 
         @Override
         public boolean equals(Object o) {
-            return o instanceof Key other && ItemStack.isSameItemSameTags(stack, other.stack);
+            return o instanceof Key other && ItemStackCompat.isSameItemSameComponents(stack, other.stack);
         }
 
         @Override

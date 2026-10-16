@@ -15,6 +15,7 @@ import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -44,6 +45,7 @@ import net.minecraftforge.event.entity.player.PlayerContainerEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
+import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.fluids.FluidStack;
@@ -114,6 +116,11 @@ public class EventHandler {
     }
 
     @SubscribeEvent
+    public static void onAsyncServerStarted(ServerStartedEvent event) {
+        ThreadGuard.markServerThread();
+    }
+
+    @SubscribeEvent
     public static void onStorageServerStopping(ServerStoppingEvent event) {
         LinkedStorage.stopCraftingRequests();
     }
@@ -124,6 +131,7 @@ public class EventHandler {
         PENDING_FILTER_EJECT.clear();
         LabelUpgradeSync.clearPending();
         TooltipLines.clear();
+        ThreadGuard.clearServerThread();
     }
 
     @SubscribeEvent

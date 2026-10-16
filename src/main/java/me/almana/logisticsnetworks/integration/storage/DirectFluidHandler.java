@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 
@@ -11,6 +12,7 @@ public final class DirectFluidHandler implements IFluidHandler {
     private List<StorageEndpoint.StoredFluid> exports;
 
     DirectFluidHandler(StorageEndpoint endpoint, boolean exporting) {
+        ThreadGuard.requireServerThread();
         this.endpoint = endpoint;
         this.exporting = exporting;
     }
@@ -20,11 +22,13 @@ public final class DirectFluidHandler implements IFluidHandler {
     }
 
     private List<StorageEndpoint.StoredFluid> exports() {
+        ThreadGuard.requireServerThread();
         if (exports == null) exports = exporting ? endpoint.exportableFluids(true) : List.of();
         return exports;
     }
 
     public int count(FluidStack candidate) {
+        ThreadGuard.requireServerThread();
         if (!exporting) return DirectStorageReads.clamp(endpoint.fluidCount(candidate, true));
         for (var entry : endpoint.exportableFluids(true)) {
             if (entry.stack().isFluidEqual(candidate)) return DirectStorageReads.clamp(entry.amount());
@@ -56,12 +60,14 @@ public final class DirectFluidHandler implements IFluidHandler {
 
     @Override
     public int fill(FluidStack stack, FluidAction action) {
+        ThreadGuard.requireServerThread();
         if (stack.isEmpty() || !endpoint.isValid()) return 0;
         return Math.min(stack.getAmount(), DirectStorageReads.clamp(endpoint.insertFluid(stack, stack.getAmount(), action.simulate())));
     }
 
     @Override
     public FluidStack drain(FluidStack stack, FluidAction action) {
+        ThreadGuard.requireServerThread();
         if (!exporting || stack.isEmpty() || !endpoint.isValid() || !endpoint.canExportFluid(stack)) return FluidStack.EMPTY;
         int moved = Math.min(stack.getAmount(), DirectStorageReads.clamp(endpoint.extractFluid(stack, stack.getAmount(), action.simulate())));
         return moved == 0 ? FluidStack.EMPTY : new FluidStack(stack, moved);

@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import me.almana.logisticsnetworks.util.ItemStackCompat;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
@@ -25,7 +26,7 @@ public final class ItemResource {
     @Override
     public boolean equals(Object other) {
         return this == other || other instanceof ItemResource resource
-                && hash == resource.hash && ItemStack.isSameItemSameTags(stack, resource.stack);
+                && hash == resource.hash && ItemStackCompat.isSameItemSameComponents(stack, resource.stack);
     }
 
     @Override

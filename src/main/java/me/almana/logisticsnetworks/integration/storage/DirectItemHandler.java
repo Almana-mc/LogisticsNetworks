@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.items.IItemHandler;
@@ -36,6 +37,7 @@ final class DirectItemHandler implements DirectItemAccess {
     }
 
     List<StorageEndpoint.StoredItem> exports() {
+        ThreadGuard.requireServerThread();
         if (exports == null) exports = exporting ? readExports() : List.of();
         return exports;
     }
@@ -60,6 +62,7 @@ final class DirectItemHandler implements DirectItemAccess {
 
     @Override
     public ItemStack insert(ItemStack stack, boolean simulate) {
+        ThreadGuard.requireServerThread();
         if (stack.isEmpty() || !endpoint.isValid()) return stack;
         int moved = Math.min(stack.getCount(), DirectStorageReads.clamp(endpoint.insertItem(stack, stack.getCount(), simulate)));
         if (!simulate && moved > 0) reads.moved(endpoint.networkIdentity(), stack.getItem(), moved);
@@ -74,6 +77,7 @@ final class DirectItemHandler implements DirectItemAccess {
 
     @Override
     public ItemStack extract(ItemStack stack, int amount, boolean simulate) {
+        ThreadGuard.requireServerThread();
         if (!exporting || amount <= 0 || !endpoint.isValid() || !endpoint.canExportItem(stack)) return ItemStack.EMPTY;
         int networkMoved = Math.min(amount,
                 DirectStorageReads.clamp(endpoint.extractItem(stack, amount, simulate)));
@@ -87,6 +91,7 @@ final class DirectItemHandler implements DirectItemAccess {
 
     @Override
     public Map<Item, Integer> countItems(Set<Item> items) {
+        ThreadGuard.requireServerThread();
         if (!exporting) return reads.countItems(endpoint, items);
         Map<Item, Integer> result = new HashMap<>();
         for (var entry : readExports()) {

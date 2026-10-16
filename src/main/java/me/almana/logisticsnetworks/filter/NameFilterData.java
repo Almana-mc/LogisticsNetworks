@@ -212,6 +212,8 @@ public final class NameFilterData {
             return false;
 
         List<String> lines = TooltipLines.get(candidate);
+        if (lines == null)
+            return false;
         for (int i = 1; i < lines.size(); i++) {
             if (matchesView(view, lines.get(i)))
                 return true;
