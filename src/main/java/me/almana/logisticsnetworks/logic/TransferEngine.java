@@ -204,6 +204,15 @@ public class TransferEngine {
     }
 
     public static long processNetwork(LogisticsNetwork network, MinecraftServer server) {
+        return processNetwork(network, server, true);
+    }
+
+    public static long processNetworkWithoutItemTransfers(LogisticsNetwork network, MinecraftServer server) {
+        return processNetwork(network, server, false);
+    }
+
+    private static long processNetwork(LogisticsNetwork network, MinecraftServer server,
+            boolean includeItemTransfers) {
         if (network == null || server == null)
             return Long.MAX_VALUE;
 
@@ -220,7 +229,7 @@ public class TransferEngine {
             long delta = processNode(sourceNode, context.itemImports(), context.fluidImports(),
                     context.energyImports(), context.chemicalImports(), context.sourceImports(),
                     context.signalCache(), context.dimensionalCache(), context.tierCache(),
-                    telemetryActive, capCache);
+                    telemetryActive, capCache, includeItemTransfers);
             if (delta < minWakeDelta) {
                 minWakeDelta = delta;
             }
@@ -375,7 +384,8 @@ public class TransferEngine {
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache,
             boolean telemetryActive,
-            CapCache capCache) {
+            CapCache capCache,
+            boolean includeItemTransfers) {
 
         if (!sourceNode.isValidNode())
             return Long.MAX_VALUE;
@@ -411,6 +421,9 @@ public class TransferEngine {
                 if (cooldown < minWakeDelta) minWakeDelta = cooldown;
                 continue;
             }
+
+            if (!includeItemTransfers && channel.getType() == ChannelType.ITEM)
+                continue;
 
             // Item targets order on resolve
             if (channel.getType() != ChannelType.ITEM)

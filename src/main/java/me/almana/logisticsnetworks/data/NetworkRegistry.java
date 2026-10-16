@@ -1,9 +1,9 @@
 package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
-import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -17,6 +17,7 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
 import org.slf4j.Logger;
 
 import java.util.*;
+import java.util.function.BooleanSupplier;
 import org.jetbrains.annotations.Nullable;
 
 public class NetworkRegistry extends SavedData {
@@ -27,13 +28,10 @@ public class NetworkRegistry extends SavedData {
 
     // Limits & Warnings for beta
     private static final int WARNING_NODE_COUNT = 200;
-    private static final int WARNING_DISPATCH_COUNT = 50;
 
     private final Map<UUID, LogisticsNetwork> networks = new HashMap<>();
     private final List<CompoundTag> undecodableNetworks = new ArrayList<>();
-    private final Set<UUID> dirtyNetworks = new HashSet<>();
-    private final TreeMap<Long, Set<UUID>> wakeBuckets = new TreeMap<>();
-    private final Map<UUID, Long> scheduledWake = new HashMap<>();
+    private final NetworkDispatcher dispatcher = new NetworkDispatcher();
     private final TelemetryManager telemetryManager = new TelemetryManager();
     private final ServerRackLinks rackLinks = new ServerRackLinks();
 
@@ -46,76 +44,28 @@ public class NetworkRegistry extends SavedData {
     }
 
     public void processDirtyNetworks(MinecraftServer server) {
-        long now = server.overworld().getGameTime();
+        dispatcher.processDirtyNetworks(networks, server);
+    }
+
+    public boolean refreshAsyncPlanning() {
+        return dispatcher.refreshAsyncMode(Config.asyncPlanning);
+    }
+
+    public void dispatchDirty(MinecraftServer server) {
+        dispatcher.dispatchDirty(this, networks, server);
+    }
+
+    public void commitCompleted(MinecraftServer server, BooleanSupplier hasTime) {
+        dispatcher.commitCompleted(networks, server, hasTime);
+    }
+
+    public void processDegradedRecovery(MinecraftServer server) {
+        dispatcher.processDegradedRecovery(networks, server);
+    }
+
+    // Bridges need the rack chunk
+    public void refreshRackLinks(MinecraftServer server) {
         rackLinks.refreshLoaded(server).forEach(this::invalidateNetwork);
-        promoteDueWakes(now);
-
-        if (dirtyNetworks.isEmpty())
-            return;
-
-        if (dirtyNetworks.size() > WARNING_DISPATCH_COUNT) {
-            LOGGER.warn("High load: Dispatching {} dirty networks in one tick.", dirtyNetworks.size());
-        }
-
-        Set<UUID> snapshot = new HashSet<>(dirtyNetworks);
-        dirtyNetworks.clear();
-
-        for (UUID id : snapshot) {
-            LogisticsNetwork network = networks.get(id);
-            if (network == null)
-                continue;
-
-            try {
-                long delta = TransferEngine.processNetwork(network, server);
-                if (delta == 0L) {
-                    dirtyNetworks.add(id);
-                } else if (delta != Long.MAX_VALUE) {
-                    scheduleWake(id, now + delta);
-                }
-            } catch (Exception e) {
-                LOGGER.error("Error processing network {}: {}", id, e.getMessage(), e);
-            }
-        }
-    }
-
-    private void promoteDueWakes(long now) {
-        while (!wakeBuckets.isEmpty()) {
-            Map.Entry<Long, Set<UUID>> entry = wakeBuckets.firstEntry();
-            if (entry.getKey() > now)
-                break;
-            for (UUID id : entry.getValue()) {
-                scheduledWake.remove(id);
-                if (networks.containsKey(id)) {
-                    dirtyNetworks.add(id);
-                }
-            }
-            wakeBuckets.pollFirstEntry();
-        }
-    }
-
-    private void scheduleWake(UUID id, long tick) {
-        Long existing = scheduledWake.get(id);
-        if (existing != null) {
-            if (existing <= tick)
-                return;
-            Set<UUID> bucket = wakeBuckets.get(existing);
-            if (bucket != null) {
-                bucket.remove(id);
-                if (bucket.isEmpty()) wakeBuckets.remove(existing);
-            }
-        }
-        scheduledWake.put(id, tick);
-        wakeBuckets.computeIfAbsent(tick, k -> new HashSet<>()).add(id);
-    }
-
-    private void cancelWake(UUID id) {
-        Long tick = scheduledWake.remove(id);
-        if (tick == null) return;
-        Set<UUID> bucket = wakeBuckets.get(tick);
-        if (bucket != null) {
-            bucket.remove(id);
-            if (bucket.isEmpty()) wakeBuckets.remove(tick);
-        }
     }
 
     public LogisticsNetwork createNetwork() {
@@ -137,8 +87,7 @@ public class NetworkRegistry extends SavedData {
 
     public void deleteNetwork(UUID id) {
         if (networks.remove(id) != null) {
-            dirtyNetworks.remove(id);
-            cancelWake(id);
+            dispatcher.delete(id);
             setDirty();
         }
     }
@@ -203,8 +152,7 @@ public class NetworkRegistry extends SavedData {
     }
 
     private void markDirty(UUID networkId) {
-        cancelWake(networkId);
-        dirtyNetworks.add(networkId);
+        dispatcher.markDirty(networkId);
     }
 
     public void invalidateNetwork(UUID networkId) {
@@ -272,7 +220,7 @@ public class NetworkRegistry extends SavedData {
             }
         }
         if (!registry.networks.isEmpty()) {
-            registry.dirtyNetworks.addAll(registry.networks.keySet());
+            registry.networks.keySet().forEach(registry.dispatcher::markDirty);
             LOGGER.info("Loaded {} networks.", registry.networks.size());
         }
         // Persist rolled legacy colours
