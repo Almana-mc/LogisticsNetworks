@@ -7,7 +7,9 @@ import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.storage.ItemResource;
 import me.almana.logisticsnetworks.logic.FilterLogic;
+import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferAmountRules;
 import me.almana.logisticsnetworks.logic.TransferEngine;
@@ -43,6 +45,12 @@ public final class Snapshots {
             copied[i] = filters[i].isEmpty() ? ItemStack.EMPTY : filters[i].copy();
         }
         return copied;
+    }
+
+    @Nullable
+    private static ItemResourceOrder.Cursor copyCursor(@Nullable ItemResourceOrder.Cursor cursor) {
+        return cursor == null ? null : new ItemResourceOrder.Cursor(new ItemResource(cursor.previous().toStack(1)),
+                new ItemResource(cursor.next().toStack(1)), cursor.slot());
     }
 
     public static NetworkCapture captureNetwork(LogisticsNetwork network, MinecraftServer server,
@@ -171,7 +179,7 @@ public final class Snapshots {
                     channel.getFilterMode(),
                     sourceEndpoint,
                     channel.getDistributionMode(),
-                    channel.canRotateResources(), channel.getItemResourceCursor(),
+                    channel.canRotateResources(), copyCursor(channel.getItemResourceCursor()),
                     targetUnits));
         }
         return itemWakeDelta;
