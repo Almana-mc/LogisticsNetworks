@@ -1,6 +1,8 @@
 import net.minecraftforge.gradle.common.util.ModConfig
 import net.minecraftforge.gradle.common.util.RunConfig
 import net.minecraftforge.gradle.userdev.UserDevExtension
+import net.minecraftforge.gradle.userdev.jarjar.JarJarProjectExtension
+import org.spongepowered.asm.gradle.plugins.MixinExtension
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.language.jvm.tasks.ProcessResources
@@ -18,6 +20,7 @@ plugins {
     id("idea")
     id("maven-publish")
     id("net.minecraftforge.gradle") version "[6.0.24,6.2)"
+    id("org.spongepowered.mixin") version "0.7.38"
 }
 
 val minecraftVersion = property("minecraft_version") as String
@@ -100,6 +103,13 @@ the<SourceSetContainer>().named("main") {
     resources.srcDir("src/generated/resources")
 }
 
+extensions.configure<MixinExtension>("mixin") {
+    add(mainSourceSet, "${modId}.refmap.json")
+}
+
+val jarJar = extensions.getByType<JarJarProjectExtension>()
+jarJar.enable()
+
 repositories {
     mavenLocal()
     mavenCentral()
@@ -120,6 +130,13 @@ fun testMod(name: String) = testMods.getProperty(name, "false").toBoolean()
 
 dependencies {
     add("minecraft", "net.minecraftforge:forge:${minecraftVersion}-${forgeVersion}")
+
+    annotationProcessor("org.spongepowered:mixin:0.8.5:processor")
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1")!!)
+    localRuntime("io.github.llamalad7:mixinextras-forge:0.4.1")
+    add("jarJar", "io.github.llamalad7:mixinextras-forge:0.4.1") {
+        jarJar.ranged(this, "[0.4.1,)")
+    }
 
     compileOnly("mezz.jei:jei-${minecraftVersion}-common-api:${jeiVersion}")
     compileOnly("mezz.jei:jei-${minecraftVersion}-forge-api:${jeiVersion}")
@@ -165,6 +182,15 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 }
 
+tasks.named<Jar>("jar") {
+    archiveClassifier.set("slim")
+    destinationDirectory.set(layout.buildDirectory.dir("devlibs"))
+}
+
+tasks.named<Jar>("jarJar") {
+    archiveClassifier.set("")
+}
+
 tasks.named<ProcessResources>("processResources") {
     val replaceProperties = mapOf(
         "minecraft_version" to minecraftVersion,
@@ -188,7 +214,7 @@ tasks.named<ProcessResources>("processResources") {
 tasks.register<Copy>("copyJar") {
     val modsPath = "C:/Users/Kanishq/AppData/Roaming/PrismLauncher/instances/1.20.1-LN/minecraft/mods"
     val modsDir = File(modsPath)
-    from(tasks.named("jar").map { it.outputs.files })
+    from(tasks.named("jarJar").map { it.outputs.files })
     into(modsDir)
     isEnabled = modsDir.exists()
 }
@@ -201,8 +227,8 @@ publishing {
     publications {
         register<MavenPublication>("mavenJava") {
             artifactId = modId
-            artifact(tasks.named<Jar>("jar")) {
-                builtBy(provider { tasks.getByName("reobfJar") })
+            artifact(tasks.named<Jar>("jarJar")) {
+                builtBy(provider { tasks.getByName("reobfJarJar") })
             }
         }
     }
