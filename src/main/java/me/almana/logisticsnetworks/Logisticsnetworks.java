@@ -1,12 +1,14 @@
 package me.almana.logisticsnetworks;
 
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
+import me.almana.logisticsnetworks.integration.computercraft.ComputerPeripheral;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.network.NetworkHandler;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -36,5 +38,8 @@ public class Logisticsnetworks {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(LinkedStorage::initialize);
+        if (ModList.get().isLoaded("computercraft")) {
+            event.enqueueWork(ComputerPeripheral::register);
+        }
     }
 }

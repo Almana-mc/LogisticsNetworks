@@ -1182,27 +1182,30 @@ public class ServerPayloadHandler {
                 return;
             }
 
-            List<SyncNetworkNodesPayload.NodeInfo> nodeInfos = new ArrayList<>();
-            for (UUID nodeId : network.getNodeUuids()) {
-                for (ServerLevel level : player.getServer().getAllLevels()) {
-                    Entity entity = level.getEntity(nodeId);
-                    if (entity instanceof LogisticsNodeEntity node) {
-                        BlockPos attachedPos = node.getAttachedPos();
-                        String blockName = "unknown";
-                        if (node.isMountedOnCreate() || level.isLoaded(attachedPos)) {
-                            BlockState state = CreateCompat.getAttachedBlockState(node);
-                            blockName = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-                        }
-                        nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
-                                nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
-                                level.dimension().location(), node.isRenderVisible(), node.isHighlighted()));
-                        break;
+            SyncNetworkNodesPayload.send(player, payload.networkId(), nodeInfos(network, player.getServer()));
+        });
+    }
+
+    public static List<SyncNetworkNodesPayload.NodeInfo> nodeInfos(LogisticsNetwork network, MinecraftServer server) {
+        List<SyncNetworkNodesPayload.NodeInfo> nodeInfos = new ArrayList<>();
+        for (UUID nodeId : network.getNodeUuids()) {
+            for (ServerLevel level : server.getAllLevels()) {
+                Entity entity = level.getEntity(nodeId);
+                if (entity instanceof LogisticsNodeEntity node) {
+                    BlockPos attachedPos = node.getAttachedPos();
+                    String blockName = "unknown";
+                    if (node.isMountedOnCreate() || level.isLoaded(attachedPos)) {
+                        BlockState state = CreateCompat.getAttachedBlockState(node);
+                        blockName = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                     }
+                    nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(
+                            nodeId, node.blockPosition(), attachedPos, blockName, node.getNodeLabel(),
+                            level.dimension().location(), node.isRenderVisible(), node.isHighlighted()));
+                    break;
                 }
             }
-
-            SyncNetworkNodesPayload.send(player, payload.networkId(), nodeInfos);
-        });
+        }
+        return nodeInfos;
     }
 
     public static void handleSetNodeLabel(SetNodeLabelPayload payload, IPayloadContext context) {
