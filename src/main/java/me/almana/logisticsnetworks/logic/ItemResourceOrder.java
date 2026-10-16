@@ -2,7 +2,6 @@ package me.almana.logisticsnetworks.logic;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
@@ -12,6 +11,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.ToIntBiFunction;
 import java.util.function.ToIntFunction;
 
@@ -66,7 +66,7 @@ public final class ItemResourceOrder {
 
     private static Map<ItemResource, IntArrayList> groups(IItemHandler source) {
         Map<ItemResource, IntArrayList> groups = new LinkedHashMap<>();
-        Map<Item, List<ItemResource>> variants = new HashMap<>();
+        Map<Integer, List<ItemResource>> variants = new HashMap<>();
         for (int slot = 0; slot < source.getSlots(); slot++) {
             ItemStack stack = source.getStackInSlot(slot);
             if (stack.isEmpty()) continue;
@@ -76,8 +76,9 @@ public final class ItemResourceOrder {
     }
 
     // One copy per group
-    private static ItemResource resourceOf(Map<Item, List<ItemResource>> variants, ItemStack stack) {
-        List<ItemResource> known = variants.computeIfAbsent(stack.getItem(), ignored -> new ArrayList<>(1));
+    private static ItemResource resourceOf(Map<Integer, List<ItemResource>> variants, ItemStack stack) {
+        List<ItemResource> known = variants.computeIfAbsent(Objects.hash(stack.getItem(), stack.getTag()),
+                ignored -> new ArrayList<>(1));
         for (ItemResource resource : known) {
             if (resource.matches(stack)) return resource;
         }
