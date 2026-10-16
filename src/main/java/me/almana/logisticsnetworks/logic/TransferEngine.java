@@ -1386,14 +1386,15 @@ public class TransferEngine {
                                     (handler, stack) -> insertBulkItem(handler, stack, true));
                         }
                         simRemainder = bulkInsertRejections.simulate(bulkHandler, simulatedInsert);
-                    } else if (insertion != null) {
-                        simRemainder = insertion.simulate(simulatedInsert);
                     } else if (importAllowedSlots == null) {
                         if (insertRejections == null) {
                             insertRejections = new BulkInsertRejectionCache(
                                     (handler, stack) -> insertItemWithAllowedSlots(handler, null, stack, true, null));
                         }
-                        simRemainder = insertRejections.simulate(target.handler(), simulatedInsert);
+                        simRemainder = insertion == null
+                                ? insertRejections.simulate(target.handler(), simulatedInsert)
+                                : insertRejections.simulate(target.handler(), simulatedInsert,
+                                        (handler, stack) -> insertion.simulate(stack));
                     } else {
                         simRemainder = insertItemWithAllowedSlots(target.handler(), null,
                                 simulatedInsert, true, importAllowedSlots);

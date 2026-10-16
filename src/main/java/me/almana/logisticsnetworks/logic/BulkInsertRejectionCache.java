@@ -24,6 +24,10 @@ final class BulkInsertRejectionCache {
     }
 
     ItemStack simulate(IItemHandler handler, ItemStack candidate) {
+        return simulate(handler, candidate, inserter);
+    }
+
+    ItemStack simulate(IItemHandler handler, ItemStack candidate, Inserter inserter) {
         List<ItemStack> rejectedCandidates = rejected.get(handler);
         if (rejectedCandidates != null) {
             for (ItemStack rejectedCandidate : rejectedCandidates) {
