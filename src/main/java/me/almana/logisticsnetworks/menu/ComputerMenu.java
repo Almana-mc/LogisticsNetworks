@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
+import me.almana.logisticsnetworks.integration.storage.StorageInventory;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
@@ -150,8 +151,9 @@ public class ComputerMenu extends AbstractContainerMenu {
     @Override
     public void removed(Player player) {
         super.removed(player);
-        if (!wrenchStack.isEmpty() && !player.level().isClientSide) {
-            player.getInventory().placeItemBackInInventory(wrenchStack);
+        // Disconnected players already saved
+        if (!wrenchStack.isEmpty() && player instanceof ServerPlayer serverPlayer) {
+            StorageInventory.returnToPlayer(serverPlayer, List.of(wrenchStack));
             wrenchStack = ItemStack.EMPTY;
         }
     }
