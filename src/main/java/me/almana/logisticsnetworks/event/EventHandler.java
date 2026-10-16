@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.TooltipLines;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.integration.buildinggadgets.BuildingGadgetsCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -237,7 +238,8 @@ public class EventHandler {
 
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
-        if (event.getLevel().isClientSide() || !(event.getLevel() instanceof ServerLevel serverLevel))
+        if (BuildingGadgetsCompat.isCutProbe() || event.getLevel().isClientSide()
+                || !(event.getLevel() instanceof ServerLevel serverLevel))
             return;
 
         BlockPos pos = event.getPos();

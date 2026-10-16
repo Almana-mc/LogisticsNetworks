@@ -344,6 +344,16 @@ public class LogisticsNodeEntity extends Entity {
         return true;
     }
 
+    public CompoundTag saveNodeState() {
+        CompoundTag tag = new CompoundTag();
+        addAdditionalSaveData(tag);
+        return tag;
+    }
+
+    public void loadNodeState(CompoundTag tag) {
+        readAdditionalSaveData(tag);
+    }
+
     @Override
     public void kill() {
         LOGGER.warn(

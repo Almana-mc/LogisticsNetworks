@@ -1022,6 +1022,14 @@ public final class NodeClipboardConfig {
     }
 
     @Nullable
+    public UUID resolveNetworkId(ServerPlayer player) {
+        if (networkId == null && (networkName == null || networkName.isBlank())) return null;
+        LogisticsNetwork network = resolveTargetNetwork(NetworkRegistry.get(player.serverLevel()), player.getUUID(),
+                player);
+        return network == null ? null : network.getId();
+    }
+
+    @Nullable
     private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry, UUID ownerUuid, ServerPlayer player) {
         if (networkId != null) {
             LogisticsNetwork byId = registry.getNetwork(networkId);

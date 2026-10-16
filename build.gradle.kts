@@ -105,6 +105,7 @@ the<SourceSetContainer>().named("main") {
 
 extensions.configure<MixinExtension>("mixin") {
     add(mainSourceSet, "${modId}.refmap.json")
+    config("${modId}.buildinggadgets.mixins.json")
     config("${modId}.create.mixins.json")
     config("${modId}.functionalstorage.mixins.json")
 }
@@ -119,6 +120,9 @@ repositories {
     maven(url = uri("https://modmaven.dev/"))
     maven(url = uri("https://api.modrinth.com/maven"))
     maven(url = uri("https://maven.ftb.dev/releases"))
+    maven(url = uri("https://cursemaven.com")) {
+        content { includeGroup("curse.maven") }
+    }
     maven(url = uri("https://maven.createmod.net"))
     maven(url = uri("https://maven.tterrag.com"))
 }
@@ -154,6 +158,7 @@ dependencies {
     localRuntime(fg.deobf("org.appliedenergistics:guideme:${guidemeVersion}"))
     compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
     compileOnly("maven.modrinth:oculus:1.20.1-1.8.0") { isTransitive = false }
+    compileOnly(fg.deobf("curse.maven:building-gadgets-298187:6850495")) // Building Gadgets 2 1.0.8
     compileOnly("com.simibubi.create:create-1.20.1:6.0.8-289:slim") { isTransitive = false }
     compileOnly("net.createmod.ponder:Ponder-Forge-1.20.1:1.0.91") { isTransitive = false }
     compileOnly("maven.modrinth:ars-energistique:1.2.0") { isTransitive = false }
@@ -188,6 +193,7 @@ dependencies {
         localRuntime(fg.deobf("net.createmod.ponder:Ponder-Forge-1.20.1:1.0.91"))
         localRuntime(fg.deobf("com.tterrag.registrate:Registrate:MC1.20-1.3.3"))
     }
+    if (testMod("bg2")) localRuntime(fg.deobf("curse.maven:building-gadgets-298187:6850495"))
     if (testMod("oculus")) {
         localRuntime(fg.deobf("maven.modrinth:oculus:1.20.1-1.8.0"))
         localRuntime(fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1"))
