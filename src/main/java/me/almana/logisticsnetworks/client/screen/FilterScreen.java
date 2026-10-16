@@ -50,6 +50,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
+import net.minecraftforge.client.event.ContainerScreenEvent;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidUtil;
 
@@ -448,6 +450,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             this.renderBackground(g);
             this.renderBg(g, pt, mx, my);
             renderDetailPage(g, mx, my);
+            renderForegroundEvent(g, mx, my);
             return;
         } else if (tagEditSlot >= 0 || nbtEditSlot >= 0) {
             renderBackground(g);
@@ -3440,6 +3443,14 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 flushNbtSubPage();
             }
         }
+    }
+
+    // Overlays hook skipped super.render
+    private void renderForegroundEvent(GuiGraphics g, int mx, int my) {
+        g.pose().pushPose();
+        g.pose().translate(leftPos, topPos, 0);
+        MinecraftForge.EVENT_BUS.post(new ContainerScreenEvent.Render.Foreground(this, g, mx, my));
+        g.pose().popPose();
     }
 
     private void renderDetailPage(GuiGraphics g, int mx, int my) {
