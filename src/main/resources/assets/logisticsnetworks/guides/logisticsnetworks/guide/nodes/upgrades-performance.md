@@ -13,6 +13,8 @@ Performance upgrades raise a node's **batch caps** (how much can move per transf
 
 Install an upgrade in any of the 4 upgrade slots in the [Filters & Upgrades](filters-upgrades.md) panel. Duplicates are rejected.
 
+Increasing the effective tier sets each channel's Batch to its new maximum. Item and fluid delays keep their configured values; lower the Delay yourself when you want faster transfers. Energy retains its existing locked delay. Removing a tier clamps values to the remaining tier's limits. Clipboard and label configurations retain their saved settings.
+
 ## Only the highest tier counts
 
 A node picks its effective **tier** as the **highest** upgrade installed:

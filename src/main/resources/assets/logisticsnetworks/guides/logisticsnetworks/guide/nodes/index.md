@@ -18,7 +18,7 @@ Nodes are the core piece of every logistics network. You place one on a block (c
 
 ## Configuring a Node
 
-Right-click a placed node with a Wrench to open its configuration screen. The screen is split into three parts, and each part has its own chapter in this section:
+Use **Secondary Interaction (default: Right Click)** on a placed node with a Wrench to open its configuration screen. The screen is split into three parts, and each part has its own chapter in this section:
 
 1. [Header](header.md) — visibility toggle, node label, and the channel selector (picks which of the 9 channels you are editing).
 2. [Channel Settings](channel-settings.md) — the settings for the currently selected channel: status, mode, type, side, redstone, distribution, priority, batch, and delay.

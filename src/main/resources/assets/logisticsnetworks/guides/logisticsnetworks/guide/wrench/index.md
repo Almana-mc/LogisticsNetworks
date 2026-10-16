@@ -10,21 +10,45 @@ navigation:
 
 The Wrench is the tool you use for everything related to nodes — opening their configuration, removing them, copying setups between nodes, and bulk-placing lots of nodes at once.
 
-It has three modes, and every mode does something different. Cycle through them with **Shift + Mouse Wheel** while holding the wrench. The current mode is shown in the HUD overlay at the top of the screen.
+It has three modes. Hold **R** while holding the wrench to open the mode wheel, point at a mode, then release to select it. Release in the centre or press Escape to cancel. Remap the wheel key in Minecraft's Controls menu.
+
+You can also cycle modes with **Modifier Key 1 (default: Shift) + Mouse Wheel**. The HUD beside the hotbar shows the active mode: blue for Wrench, green for Copy / Paste, and gold for Mass Placement.
 
 ## Modes at a Glance
 
-- [Wrench](wrench-mode.md) — the default. Open a node's configuration, remove nodes, and (with AE2 installed) toggle AE2 linking.
+- [Wrench](wrench-mode.md) — the default. Open or remove nodes, place nodes, and link an AE2 or Refined Storage network.
 - [Copy / Paste](copy-paste.md) — clone a node's entire setup — channels, filters, upgrades, label — onto another node. Supports bulk-paste to every connected node of the same block type.
-- [Mass Placement](mass-placement.md) — select many blocks at once, then place configured nodes on all of them in one click.
+- [Mass Placement](mass-placement.md) — select a two-corner area, choose a target block type, then place configured nodes on matching blocks with **Primary Interaction (default: Left Click)**.
+
+## Wrench Settings
+
+Press **G** while holding the wrench to open its settings. Every wrench keeps its own settings, so one wrench can show the whole base while another focuses on a single network.
+
+**Colors** recolors the wrench's case and screen.
+
+**Flow Lines** controls the lines drawn between senders and receivers while you hold the wrench.
+
+- *Simple*:
+  - turn lines on or off
+  - show only some resource types (Items, Fluids, Energy, Chemicals, Source)
+  - show only some channels (1–9)
+  - limit lines to one nearby network
+  - choose whether nodes that are off-screen, or too far away to render, still get lines. This reaches every node your game is tracking, roughly 64 blocks.
+- *Advanced*:
+  - pick the line style: **Routed** (grouped right-angle paths) or **Direct** (a straight line from each sender to each receiver)
+  - set thickness, speed, opacity and the pulses
+  - choose whether lines show through blocks
+  - set the color of each resource type
+
+Press **Apply** to save. **Reset** restores the defaults of the tab you're on.
 
 ## Quick Reference
 
-| Mode | Right-click | Shift + Right-click | Ctrl + Right-click |
+| Mode | Secondary Interaction (default: Right Click) | Modifier Key 1 + Secondary Interaction | Modifier Key 2 (default: Ctrl) + Secondary Interaction |
 |------|-------------|---------------------|--------------------|
-| Wrench | Open node config | Remove node (or toggle AE2 link) | — |
+| Wrench | Open node config | Remove a node, place a node, or toggle a storage link | — |
 | Copy / Paste | Copy node → clipboard (or open Clipboard Editor on air) | Paste clipboard → node | Paste to every connected same-block-type node |
-| Mass Placement | Toggle block in selection (or open Placement Menu on air) | Same as right-click | Flood-fill select connected same-block-type |
+| Mass Placement | Set area corners (or open Placement Menu on air) | Open Placement Menu | — |
 
 ## Using Labels With The Wrench
 
