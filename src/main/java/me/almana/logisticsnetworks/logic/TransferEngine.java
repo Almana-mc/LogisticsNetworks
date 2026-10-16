@@ -14,6 +14,8 @@ import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
 import me.almana.logisticsnetworks.logic.async.SnapshotItemHandler;
+import me.almana.logisticsnetworks.logic.async.ThreadGuard;
+import me.almana.logisticsnetworks.logic.async.TransferPlan;
 import mekanism.api.chemical.IChemicalHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -597,6 +599,66 @@ public class TransferEngine {
                 next.record(slot, index, moved, mask);
             }
         };
+    }
+
+    public static ItemResourceOrder.Result recoverItemChannel(LogisticsNetwork network, MinecraftServer server,
+            TransferCapabilityCache capCache, UUID sourceNodeId, int channelIndex,
+            int plannedShortfall, int committed, Map<Item, Integer> committedByItem,
+            Map<UUID, Map<Item, Integer>> committedByTarget, @Nullable ItemResource requiredResource,
+            @Nullable UUID onlyTarget) {
+        ThreadGuard.requireServerThread();
+        if (plannedShortfall <= 0 || channelIndex < 0 || channelIndex >= LogisticsNodeEntity.CHANNEL_COUNT) {
+            return ItemResourceOrder.EMPTY;
+        }
+
+        NetworkContext context = prepareNetwork(network, server);
+        if (context == null) {
+            return ItemResourceOrder.EMPTY;
+        }
+
+        LogisticsNodeEntity sourceNode = null;
+        for (LogisticsNodeEntity node : context.sortedNodes()) {
+            if (node.getUUID().equals(sourceNodeId)) {
+                sourceNode = node;
+                break;
+            }
+        }
+        if (sourceNode == null || !sourceNode.isValidNode()) {
+            return ItemResourceOrder.EMPTY;
+        }
+
+        ChannelData channel = sourceNode.getChannel(channelIndex);
+        int signal = context.signalCache().getOrDefault(sourceNodeId, 0);
+        if (channel == null || !channel.isEnabled()
+                || channel.getMode() != ChannelMode.EXPORT || channel.getType() != ChannelType.ITEM
+                || !isRedstoneActive(channel.getRedstoneMode(), signal)) {
+            return ItemResourceOrder.EMPTY;
+        }
+
+        List<ImportTarget> targets = context.itemImports()[channelIndex];
+        if (targets == null || targets.isEmpty()) {
+            return ItemResourceOrder.EMPTY;
+        }
+        if (onlyTarget != null) {
+            // Robin recovery stays on receiver
+            targets = targets.stream().filter(t -> t.node().getUUID().equals(onlyTarget)).toList();
+        }
+
+        int tier = context.tierCache().getOrDefault(sourceNodeId, 0);
+        int configuredBatch = getBatchLimit(ChannelType.ITEM, tier);
+        int currentBatch = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
+        int recoveryLimit = Math.min(plannedShortfall, Math.max(0, currentBatch - committed));
+        if (recoveryLimit == 0) {
+            return ItemResourceOrder.EMPTY;
+        }
+
+        boolean telemetryActive = NetworkRegistry.get((ServerLevel) server.overworld())
+                .getTelemetryManager().isActive(network.getId());
+        ItemResourceOrder.Result recovered = transferItems(
+                sourceNode, (ServerLevel) sourceNode.level(), channel, channelIndex,
+                targets, recoveryLimit, context.dimensionalCache(), capCache, committedByItem, committedByTarget,
+                requiredResource, telemetryActive);
+        return recovered.moved() < 0 ? ItemResourceOrder.EMPTY : recovered;
     }
 
     public static ResolvedItemTargets resolveItemTargets(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -1454,6 +1516,74 @@ public class TransferEngine {
             stock += count;
         }
         return (int) Math.min(stock, limit);
+    }
+
+    public static int commitSingleMove(IItemHandler source, IItemHandler target,
+            @Nullable IItemHandler bulkTarget, TransferPlan.ItemMove move, LogisticsNodeEntity sourceNode) {
+        ThreadGuard.requireServerThread();
+
+        if (move.amount() <= 0 || !(source instanceof DirectItemAccess)
+                && (move.sourceSlot() < 0 || move.sourceSlot() >= source.getSlots())) {
+            return 0;
+        }
+
+        boolean[] targetSlotMask = move.targetSlotMask();
+        if (targetSlotMask != null
+                && (bulkTarget != null || targetSlotMask.length != target.getSlots())) {
+            return 0;
+        }
+
+        ItemStack expected = move.resource().toStack(move.amount());
+        ItemStack available = source instanceof DirectItemAccess direct
+                ? direct.extract(expected, move.amount(), true)
+                : source.extractItem(move.sourceSlot(), move.amount(), true);
+        if (available.isEmpty()) {
+            return 0;
+        }
+        if (!ItemStackCompat.isSameItemSameComponents(available, expected)) {
+            return 0;
+        }
+
+        StackedInsertion insertion = prepareStackedInsertion(target, bulkTarget, targetSlotMask);
+        ItemStack simulatedInsert = available.copyWithCount(available.getCount());
+        ItemStack simRemainder = insertion != null ? insertion.simulate(simulatedInsert)
+                : insertItemWithAllowedSlots(target, bulkTarget, simulatedInsert, true, targetSlotMask);
+        int acceptable = available.getCount() - simRemainder.getCount();
+        if (acceptable <= 0) {
+            return 0;
+        }
+
+        ItemStack toMove = source instanceof DirectItemAccess direct
+                ? direct.extract(expected, acceptable, false)
+                : source.extractItem(move.sourceSlot(), acceptable, false);
+        if (toMove.isEmpty()) {
+            return 0;
+        }
+
+        ItemStack uninserted = insertion != null ? insertion.commit(toMove)
+                : insertItemWithAllowedSlots(target, bulkTarget, toMove, false, targetSlotMask);
+        int accepted = toMove.getCount() - uninserted.getCount();
+
+        if (!uninserted.isEmpty()) {
+            ItemStack stillLeft = source instanceof DirectItemAccess direct ? direct.insert(uninserted, false)
+                    : source.insertItem(move.sourceSlot(), uninserted, false);
+            for (int fallback = 0; fallback < source.getSlots() && !stillLeft.isEmpty(); fallback++) {
+                stillLeft = source.insertItem(fallback, stillLeft, false);
+            }
+            if (!stillLeft.isEmpty()) {
+                ItemStack forcedRemainder = insertItemWithAllowedSlots(target, bulkTarget, stillLeft, false,
+                        targetSlotMask);
+                accepted += stillLeft.getCount() - forcedRemainder.getCount();
+                if (!forcedRemainder.isEmpty()) {
+                    LOGGER.error("ITEM VOIDING PREVENTED: could not return {} to source or target. Dropping at {}.",
+                            forcedRemainder, sourceNode.getAttachedPos());
+                    Block.popResource(sourceNode.level(), sourceNode.getAttachedPos(), forcedRemainder);
+                    accepted += forcedRemainder.getCount();
+                }
+            }
+        }
+
+        return accepted;
     }
 
     private static @Nullable StackedInsertion prepareStackedInsertion(IItemHandler handler,
