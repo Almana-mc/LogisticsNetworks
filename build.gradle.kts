@@ -150,6 +150,7 @@ dependencies {
     localRuntime(fg.deobf("org.appliedenergistics:guideme:${guidemeVersion}"))
     compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
     compileOnly("maven.modrinth:oculus:1.20.1-1.8.0") { isTransitive = false }
+    compileOnly("maven.modrinth:sophisticated-core:1.20.1-1.5.10.2402") { isTransitive = false }
 
     // Local test mods (testmods.properties)
     if (testMod("mek")) localRuntime(fg.deobf("mekanism:Mekanism:${mekanismVersion}"))
@@ -167,6 +168,10 @@ dependencies {
     if (testMod("jade")) localRuntime(fg.deobf("maven.modrinth:jade:${jadeVersion}"))
     if (testMod("xaero")) localRuntime(fg.deobf("maven.modrinth:xaeros-minimap:forge-1.20.1-26.6.0"))
     if (testMod("ae2")) localRuntime(fg.deobf("appeng:appliedenergistics2-forge:${ae2Version}"))
+    if (testMod("soph")) {
+        localRuntime(fg.deobf("maven.modrinth:sophisticated-core:1.20.1-1.5.10.2402"))
+        localRuntime(fg.deobf("maven.modrinth:sophisticated-backpacks:1.20.1-3.26.12.2206"))
+    }
     if (testMod("oculus")) {
         localRuntime(fg.deobf("maven.modrinth:oculus:1.20.1-1.8.0"))
         localRuntime(fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1"))

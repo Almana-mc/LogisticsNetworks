@@ -6,10 +6,13 @@ import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
+import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
@@ -49,7 +52,16 @@ public final class TransferCapabilityCache {
     @Nullable
     public IItemHandler findBulkItemHandler(LogisticsNodeEntity node, IItemHandler sidedHandler) {
         if (DirectStorageHandlers.isDirect(sidedHandler)) return sidedHandler;
-        return null;
+        if (!SophisticatedCoreCompat.isSidedWrapper(sidedHandler)) return null;
+        IItemHandler unsidedHandler = unsidedItemHandler((ServerLevel) node.level(), node.getAttachedPos());
+        return SophisticatedCoreCompat.isBulkHandler(unsidedHandler) ? unsidedHandler : null;
+    }
+
+    @Nullable
+    private static IItemHandler unsidedItemHandler(ServerLevel level, BlockPos pos) {
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        return blockEntity == null ? null
+                : blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER, null).orElse(null);
     }
 
     @Nullable

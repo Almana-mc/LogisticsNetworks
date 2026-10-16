@@ -71,3 +71,10 @@ mandatory = false
 versionRange = "[2001.3.2,)"
 ordering = "NONE"
 side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "sophisticatedcore"
+mandatory = false
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"

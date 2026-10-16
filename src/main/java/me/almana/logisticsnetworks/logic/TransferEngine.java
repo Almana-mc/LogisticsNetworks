@@ -10,6 +10,7 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
@@ -1734,7 +1735,10 @@ public class TransferEngine {
         if (handler instanceof SnapshotItemHandler snapshot) {
             return snapshot.insertBulkItem(stack, simulate);
         }
-        return DirectStorageHandlers.insertItem(handler, stack, simulate);
+        if (DirectStorageHandlers.isDirect(handler)) {
+            return DirectStorageHandlers.insertItem(handler, stack, simulate);
+        }
+        return SophisticatedCoreCompat.insertItem(handler, stack, simulate);
     }
 
     private static ItemStack insertItemStrictAllowedSlots(IItemHandlerModifiable handler, ItemStack stack,
