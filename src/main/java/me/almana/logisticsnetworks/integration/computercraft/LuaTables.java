@@ -84,8 +84,9 @@ final class LuaTables {
             Map<String, Object> channel = new HashMap<>();
             channel.put("index", i);
             channel.put("total", drain.total());
-            channel.put("resources", drain.top().stream()
-                    .map(entry -> resource(entry.getKey(), entry.getValue())).toList());
+            // Lua dedups shared empty lists
+            channel.put("resources", new ArrayList<>(drain.top().stream()
+                    .map(entry -> resource(entry.getKey(), entry.getValue())).toList()));
             if (drain.typeOrdinal() >= 0) {
                 channel.put("type", typeName(ChannelType.values()[drain.typeOrdinal()]));
             }
