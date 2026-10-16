@@ -119,11 +119,6 @@ final class ItemEndpointTable {
     }
 
     static NetworkSnapshot.ItemEndpoint capture(IItemHandler handler,
-            @Nullable Snapshots.OccupiedSlotBudget budget) {
-        return capture(handler, budget, false);
-    }
-
-    static NetworkSnapshot.ItemEndpoint capture(IItemHandler handler,
             @Nullable Snapshots.OccupiedSlotBudget budget, boolean bulk) {
         ThreadGuard.requireServerThread();
 

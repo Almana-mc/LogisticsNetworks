@@ -81,10 +81,6 @@ public final class AsyncTransferRuntime {
         return runtimeId;
     }
 
-    public boolean submit(NetworkSnapshot snapshot) {
-        return submit(snapshot, List.of());
-    }
-
     public boolean submit(NetworkSnapshot snapshot, List<DirectStorageBinding> capturedBindings) {
         ThreadGuard.requireServerThread();
         bindings.put(snapshot.networkId(), capturedBindings);

@@ -30,15 +30,6 @@ public final class Snapshots {
     private Snapshots() {
     }
 
-    public static NetworkSnapshot.ItemEndpoint captureItems(IItemHandler handler) {
-        return captureItems(handler, null);
-    }
-
-    static NetworkSnapshot.ItemEndpoint captureItems(
-            IItemHandler handler, @Nullable OccupiedSlotBudget budget) {
-        return ItemEndpointTable.capture(handler, budget);
-    }
-
     public static ItemStack[] copyFilters(ItemStack[] filters) {
         ItemStack[] copied = new ItemStack[filters.length];
         for (int i = 0; i < filters.length; i++) {
@@ -197,10 +188,6 @@ public final class Snapshots {
 
     public record NetworkCapture(CaptureStatus status, @Nullable NetworkSnapshot snapshot,
             List<DirectStorageBinding> bindings) {
-
-        public static NetworkCapture captured(NetworkSnapshot snapshot) {
-            return captured(snapshot, List.of());
-        }
 
         public static NetworkCapture captured(NetworkSnapshot snapshot, List<DirectStorageBinding> bindings) {
             return new NetworkCapture(CaptureStatus.CAPTURED, snapshot, bindings);
