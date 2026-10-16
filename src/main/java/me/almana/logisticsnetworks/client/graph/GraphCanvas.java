@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.client.graph;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import me.almana.logisticsnetworks.client.screen.ClickSound;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.data.ChannelMode;
@@ -180,6 +181,7 @@ public final class GraphCanvas {
         if (button != 0) return false;
         for (LegendButton legendButton : legendButtons) {
             if (legendButton.contains(mouseX, mouseY)) {
+                ClickSound.play();
                 pressLegend(legendButton.type(), clickedAt);
                 return true;
             }
@@ -230,6 +232,7 @@ public final class GraphCanvas {
         lastMouseX = mouseX;
         lastMouseY = mouseY;
         pressedNode = findNode(mouseX, mouseY);
+        if (pressedNode != null) ClickSound.play();
         pressedPositions = pressedNode == null ? Map.of() : dragPositions(pressedNode);
         draggingNode = false;
         interactionMoved = false;

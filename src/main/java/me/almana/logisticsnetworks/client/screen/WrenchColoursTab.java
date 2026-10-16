@@ -81,6 +81,7 @@ final class WrenchColoursTab implements WrenchTab {
     public boolean mouseClicked(double mouseX, double mouseY) {
         for (int i = 0; i < TARGETS.length; i++) {
             if (ColorPicker.inRect(mouseX, mouseY, x + i * (TARGET_W + 4), y, TARGET_W, TARGET_H)) {
+                ClickSound.play();
                 select(i);
                 return true;
             }

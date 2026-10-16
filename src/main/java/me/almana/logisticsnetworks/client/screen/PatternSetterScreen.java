@@ -118,12 +118,14 @@ public class PatternSetterScreen extends AbstractContainerScreen<PatternSetterMe
         int relY = (int) mouseY - topPos;
 
         if (relX >= BTN_X && relX < BTN_X + BTN_WIDTH && relY >= BTN_Y && relY < BTN_Y + BTN_HEIGHT) {
+            ClickSound.play();
             NetworkHandler.sendToServer(new ApplyPatternPayload(false, getMultiplier()));
             feedbackTimer = 40;
             return true;
         }
         int btn2X = BTN_X + BTN_WIDTH + BTN_GAP;
         if (relX >= btn2X && relX < btn2X + BTN_WIDTH && relY >= BTN_Y && relY < BTN_Y + BTN_HEIGHT) {
+            ClickSound.play();
             NetworkHandler.sendToServer(new ApplyPatternPayload(true, getMultiplier()));
             feedbackTimer = 40;
             return true;
