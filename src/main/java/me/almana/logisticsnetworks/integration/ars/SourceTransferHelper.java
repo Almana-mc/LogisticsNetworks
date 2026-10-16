@@ -20,12 +20,15 @@ public final class SourceTransferHelper {
         Object identity();
     }
 
-    private record TileEnd(ISourceTile tile, Object identity) implements SourceEnd {
+    private record TileEnd(ISourceTile tile, Object identity, boolean measured) implements SourceEnd {
         @Override
         public int extract(int amount, boolean simulate) {
             int moved = Math.max(0, Math.min(amount, Math.min(tile.getSource(), tile.getTransferRate())));
-            if (!simulate && moved > 0) tile.removeSource(moved);
-            return moved;
+            if (simulate || moved <= 0) return moved;
+            int before = tile.getSource();
+            tile.removeSource(moved);
+            // capability sinks may ignore removal
+            return measured ? Math.max(0, before - tile.getSource()) : moved;
         }
 
         @Override
@@ -64,8 +67,12 @@ public final class SourceTransferHelper {
 
     @Nullable
     public static SourceEnd resolve(ServerLevel level, BlockPos pos, @Nullable Direction side) {
-        ISourceTile tile = sourceTile(level.getBlockEntity(pos), side);
-        return tile == null ? null : new TileEnd(tile, identity(level, pos, tile));
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        SourceEnd jar = ArsEngCompat.jarEnd(blockEntity);
+        if (jar != null) return jar;
+        ISourceTile tile = sourceTile(blockEntity, side);
+        if (tile == null) return null;
+        return new TileEnd(tile, identity(level, pos, tile), !(blockEntity instanceof ISourceTile));
     }
 
     public static boolean hasSourceTile(ServerLevel level, BlockPos pos) {
