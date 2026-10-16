@@ -1298,7 +1298,7 @@ public class TransferEngine {
                     ItemStack extracted = available.getCount() > request ? available.copyWithCount(request) : available;
                     boolean sourcePassed = slotVerdicts[entry] == SLOT_PASSED;
                     if (extracted.isEmpty() || !sourcePassed && (extracted.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
-                            || resource != null && !resource.equals(new ItemResource(extracted)))) {
+                            || resource != null && !resource.matches(extracted))) {
                         slotVerdicts[entry] = SLOT_REJECTED;
                         continue;
                     }
@@ -1509,7 +1509,7 @@ public class TransferEngine {
             ItemStack available = source.extractItem(slot, limit, true);
             slotStacks[entry] = available;
             if (available.isEmpty() || available.is(ModTags.RESOURCE_BLACKLIST_ITEMS)
-                    || resource != null && !resource.equals(new ItemResource(available))
+                    || resource != null && !resource.matches(available)
                     || provider != null && !FilterLogic.matchesItemInSlot(exportFilters, exportFilterMode,
                             available, provider, null, filterReadCache, slot)) {
                 slotVerdicts[entry] = SLOT_REJECTED;

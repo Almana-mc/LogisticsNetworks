@@ -2,12 +2,15 @@ package me.almana.logisticsnetworks.logic;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.ToIntBiFunction;
 import java.util.function.ToIntFunction;
@@ -63,13 +66,24 @@ public final class ItemResourceOrder {
 
     private static Map<ItemResource, IntArrayList> groups(IItemHandler source) {
         Map<ItemResource, IntArrayList> groups = new LinkedHashMap<>();
+        Map<Item, List<ItemResource>> variants = new HashMap<>();
         for (int slot = 0; slot < source.getSlots(); slot++) {
             ItemStack stack = source.getStackInSlot(slot);
             if (stack.isEmpty()) continue;
-            ItemResource resource = new ItemResource(stack);
-            groups.computeIfAbsent(resource, ignored -> new IntArrayList()).add(slot);
+            groups.computeIfAbsent(resourceOf(variants, stack), ignored -> new IntArrayList()).add(slot);
         }
         return groups;
+    }
+
+    // One copy per group
+    private static ItemResource resourceOf(Map<Item, List<ItemResource>> variants, ItemStack stack) {
+        List<ItemResource> known = variants.computeIfAbsent(stack.getItem(), ignored -> new ArrayList<>(1));
+        for (ItemResource resource : known) {
+            if (resource.matches(stack)) return resource;
+        }
+        ItemResource resource = new ItemResource(stack);
+        known.add(resource);
+        return resource;
     }
 
     public record Cursor(ItemResource previous, ItemResource next, int slot) {
