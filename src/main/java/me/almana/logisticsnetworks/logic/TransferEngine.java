@@ -1374,8 +1374,8 @@ public class TransferEngine {
                     int sourceLost = targetAccepted + droppedToWorld;
                     if (sourceLost > 0) {
                         insertRejections = null;
-                        if (recorder != null && targetAccepted > 0) {
-                            recorder.record(slot, targetIndex, toMove.copyWithCount(targetAccepted),
+                        if (recorder != null) {
+                            recorder.record(slot, targetIndex, toMove.copyWithCount(sourceLost),
                                     importAllowedSlots);
                         }
                         movedAny = true;
