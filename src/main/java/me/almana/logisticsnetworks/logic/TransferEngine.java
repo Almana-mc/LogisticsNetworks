@@ -1278,6 +1278,14 @@ public class TransferEngine {
                 int targetRemaining = roundRobin ? share : remaining;
 
                 int slotCount = sourceSlots == null ? source.getSlots() : sourceSlots.length;
+                if (slotVerdicts.length < slotCount) {
+                    // Source grew, recheck slots
+                    slotVerdicts = new byte[slotCount];
+                    slotStacks = new ItemStack[slotCount];
+                    if (slotComponents != null) {
+                        slotComponents = new CandidateComponents[Math.max(slotComponents.length, slotCount)];
+                    }
+                }
                 for (int entry = 0; entry < slotCount && remaining > 0 && targetRemaining > 0; entry++) {
                     int slot = sourceSlots == null ? entry : sourceSlots[entry];
                     if (sourceAllowedSlots != null
