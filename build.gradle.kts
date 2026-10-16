@@ -105,6 +105,7 @@ the<SourceSetContainer>().named("main") {
 
 extensions.configure<MixinExtension>("mixin") {
     add(mainSourceSet, "${modId}.refmap.json")
+    config("${modId}.create.mixins.json")
     config("${modId}.functionalstorage.mixins.json")
 }
 
@@ -118,6 +119,8 @@ repositories {
     maven(url = uri("https://modmaven.dev/"))
     maven(url = uri("https://api.modrinth.com/maven"))
     maven(url = uri("https://maven.ftb.dev/releases"))
+    maven(url = uri("https://maven.createmod.net"))
+    maven(url = uri("https://maven.tterrag.com"))
 }
 
 val localRuntime: Configuration by configurations.creating
@@ -151,6 +154,8 @@ dependencies {
     localRuntime(fg.deobf("org.appliedenergistics:guideme:${guidemeVersion}"))
     compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
     compileOnly("maven.modrinth:oculus:1.20.1-1.8.0") { isTransitive = false }
+    compileOnly("com.simibubi.create:create-1.20.1:6.0.8-289:slim") { isTransitive = false }
+    compileOnly("net.createmod.ponder:Ponder-Forge-1.20.1:1.0.91") { isTransitive = false }
     compileOnly("maven.modrinth:ars-energistique:1.2.0") { isTransitive = false }
     compileOnly("maven.modrinth:functional-storage:1.20.1-1.2.14") { isTransitive = false }
     compileOnly("maven.modrinth:sophisticated-core:1.20.1-1.5.10.2402") { isTransitive = false }
@@ -177,6 +182,12 @@ dependencies {
         localRuntime(fg.deobf("maven.modrinth:sophisticated-storage:1.20.1-1.5.5.2182"))
     }
     if (testMod("arseng")) localRuntime(fg.deobf("maven.modrinth:ars-energistique:1.2.0"))
+    if (testMod("create")) {
+        localRuntime(fg.deobf("com.simibubi.create:create-1.20.1:6.0.8-289:slim", closureOf<ModuleDependency> { isTransitive = false }))
+        localRuntime(fg.deobf("dev.engine-room.flywheel:flywheel-forge-1.20.1:1.0.5"))
+        localRuntime(fg.deobf("net.createmod.ponder:Ponder-Forge-1.20.1:1.0.91"))
+        localRuntime(fg.deobf("com.tterrag.registrate:Registrate:MC1.20-1.3.3"))
+    }
     if (testMod("oculus")) {
         localRuntime(fg.deobf("maven.modrinth:oculus:1.20.1-1.8.0"))
         localRuntime(fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1"))

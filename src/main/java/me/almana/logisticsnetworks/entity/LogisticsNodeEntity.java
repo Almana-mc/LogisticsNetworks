@@ -7,11 +7,13 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeRouteChannels;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -42,6 +44,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 public class LogisticsNodeEntity extends Entity {
 
@@ -66,6 +69,8 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_LABEL_REVISION = "LabelRevision";
     private static final String KEY_HIGHLIGHTED = "Highlighted";
     private static final String KEY_PENDING_FILTER_EJECTS = "PendingFilterEjects";
+    private static final String KEY_CREATE_CONTRAPTION_ID = "CreateContraptionId";
+    private static final String KEY_CREATE_LOCAL_POS = "CreateLocalPos";
 
     private static final EntityDataAccessor<BlockPos> ATTACHED_POS = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -87,6 +92,10 @@ public class LogisticsNodeEntity extends Entity {
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Long> ROUTE_CHANNELS = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.LONG);
+    private static final EntityDataAccessor<Optional<UUID>> CREATE_CONTRAPTION_ID = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<BlockPos> CREATE_LOCAL_POS = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
 
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
@@ -126,6 +135,8 @@ public class LogisticsNodeEntity extends Entity {
         this.entityData.define(NODE_LABEL, "");
         this.entityData.define(HIGHLIGHTED, false);
         this.entityData.define(ROUTE_CHANNELS, 0L);
+        this.entityData.define(CREATE_CONTRAPTION_ID, Optional.empty());
+        this.entityData.define(CREATE_LOCAL_POS, BlockPos.ZERO);
     }
 
     @Override
@@ -158,6 +169,11 @@ public class LogisticsNodeEntity extends Entity {
         if (compound.contains(KEY_HIGHLIGHTED)) {
             setHighlighted(compound.getBoolean(KEY_HIGHLIGHTED));
         }
+        boolean mounted = compound.hasUUID(KEY_CREATE_CONTRAPTION_ID);
+        this.entityData.set(CREATE_CONTRAPTION_ID,
+                mounted ? Optional.of(compound.getUUID(KEY_CREATE_CONTRAPTION_ID)) : Optional.empty());
+        this.entityData.set(CREATE_LOCAL_POS,
+                mounted ? BlockPos.of(compound.getLong(KEY_CREATE_LOCAL_POS)) : BlockPos.ZERO);
 
         HolderLookup.Provider provider = this.level().registryAccess();
 
@@ -215,6 +231,11 @@ public class LogisticsNodeEntity extends Entity {
         }
         compound.putLong(KEY_LABEL_REVISION, labelRevision);
         compound.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
+        UUID contraptionId = getCreateContraptionId();
+        if (contraptionId != null) {
+            compound.putUUID(KEY_CREATE_CONTRAPTION_ID, contraptionId);
+            compound.putLong(KEY_CREATE_LOCAL_POS, getCreateLocalPos().asLong());
+        }
 
         HolderLookup.Provider provider = level().registryAccess();
 
@@ -241,10 +262,14 @@ public class LogisticsNodeEntity extends Entity {
 
     @Override
     public void tick() {
-        if (this.level().isClientSide()) return;
-        if (this.tickCount <= 1 || this.tickCount % 5 == 0) {
+        if (!this.level().isClientSide() && (this.tickCount <= 1 || this.tickCount % 5 == 0)) {
             refreshRouteChannels();
         }
+        if (isMountedOnCreate()) {
+            CreateCompat.tickMountedNode(this);
+            return;
+        }
+        if (this.level().isClientSide()) return;
 
         BlockPos attached = getAttachedPos();
         if (!attached.equals(BlockPos.ZERO)) {
@@ -273,8 +298,8 @@ public class LogisticsNodeEntity extends Entity {
 
     private void refreshRouteChannels() {
         long bits = 0L;
-        if (isValidNode() && getNetworkId() != null) {
-            bits = NodeRouteChannels.encode(channels, false,
+        if (isValidNode() && getNetworkId() != null && CreateCompat.isResolved(this)) {
+            bits = NodeRouteChannels.encode(channels, isMountedOnCreate(),
                     NodeUpgradeData.hasMekanismChemicalUpgrade(this),
                     NodeUpgradeData.hasArsSourceUpgrade(this));
         }
@@ -288,6 +313,10 @@ public class LogisticsNodeEntity extends Entity {
 
     @Override
     public AABB getBoundingBoxForCulling() {
+        if (isMountedOnCreate()) {
+            // Fits any contraption rotation
+            return AABB.ofSize(position(), 2.5, 2.5, 2.5);
+        }
         return new AABB(getX() - 0.5, getY(), getZ() - 0.5, getX() + 0.5, getY() + 1.0, getZ() + 0.5);
     }
 
@@ -348,6 +377,53 @@ public class LogisticsNodeEntity extends Entity {
 
     public BlockPos getAttachedPos() {
         return this.entityData.get(ATTACHED_POS);
+    }
+
+    public void moveAttachment(BlockPos pos, Vec3 entityPos) {
+        setPos(entityPos);
+        setAttachedPos(pos);
+        if (this.level() instanceof ServerLevel serverLevel && getNetworkId() != null) {
+            NetworkRegistry.get(serverLevel).invalidateNetwork(getNetworkId());
+        }
+    }
+
+    public boolean isMountedOnCreate() {
+        return entityData.get(CREATE_CONTRAPTION_ID).isPresent();
+    }
+
+    @Nullable
+    public UUID getCreateContraptionId() {
+        return entityData.get(CREATE_CONTRAPTION_ID).orElse(null);
+    }
+
+    public BlockPos getCreateLocalPos() {
+        return entityData.get(CREATE_LOCAL_POS);
+    }
+
+    public void mountOnCreate(UUID contraptionId, BlockPos localPos) {
+        entityData.set(CREATE_CONTRAPTION_ID, Optional.of(contraptionId));
+        entityData.set(CREATE_LOCAL_POS, localPos.immutable());
+        if (level() instanceof ServerLevel serverLevel && getNetworkId() != null) {
+            NetworkRegistry.get(serverLevel).invalidateNetwork(getNetworkId());
+        }
+    }
+
+    public void updateMountedPosition(Vec3 position) {
+        setPos(position);
+        setAttachedPos(BlockPos.containing(position));
+    }
+
+    public void dismountFromCreate(BlockPos attachedPos, Vec3 position,
+            UnaryOperator<Direction> directionTransform) {
+        entityData.set(CREATE_CONTRAPTION_ID, Optional.empty());
+        entityData.set(CREATE_LOCAL_POS, BlockPos.ZERO);
+        for (ChannelData channel : channels) {
+            Direction direction = channel.getIoDirection();
+            if (direction != null) {
+                channel.setIoDirection(directionTransform.apply(direction));
+            }
+        }
+        moveAttachment(attachedPos, position);
     }
 
     public void setValid(boolean valid) {

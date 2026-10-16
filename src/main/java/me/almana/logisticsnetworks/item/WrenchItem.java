@@ -559,7 +559,7 @@ public class WrenchItem extends Item {
         return interactWithMountedNode(node, player, context.getItemInHand());
     }
 
-    private InteractionResult interactWithMountedNode(LogisticsNodeEntity node, Player player, ItemStack wrenchStack) {
+    public InteractionResult interactWithMountedNode(LogisticsNodeEntity node, Player player, ItemStack wrenchStack) {
         if (!node.isOwnedBy(player)) {
             player.displayClientMessage(Component.translatable("message.logisticsnetworks.not_owner"), true);
             return InteractionResult.FAIL;

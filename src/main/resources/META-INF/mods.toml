@@ -73,6 +73,13 @@ ordering = "NONE"
 side = "BOTH"
 
 [[dependencies."${mod_id}"]]
+modId = "create"
+mandatory = false
+versionRange = "[6.0.8,6.1.0)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
 modId = "sophisticatedcore"
 mandatory = false
 versionRange = "[0,)"
