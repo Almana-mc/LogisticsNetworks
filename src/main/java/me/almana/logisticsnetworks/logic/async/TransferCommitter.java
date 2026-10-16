@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.PlannedItemValidation;
@@ -108,7 +109,8 @@ public final class TransferCommitter {
         }
 
         ChannelData sourceChannel = sourceNode.getChannel(channel.channelIndex());
-        if (!isItemChannel(sourceChannel, ChannelMode.EXPORT)) {
+        if (!isItemChannel(sourceChannel, ChannelMode.EXPORT)
+                || !TransferEngine.canRunChannel(sourceNode, sourceChannel)) {
             return ChannelCommitResult.skipped(planned);
         }
 
@@ -229,7 +231,8 @@ public final class TransferCommitter {
                 continue;
             }
             ChannelData channel = node.getChannel(ref.channelIndex());
-            if (!isItemChannel(channel, ChannelMode.IMPORT)) {
+            if (!isItemChannel(channel, ChannelMode.IMPORT)
+                    || !TransferEngine.canRunChannel(node, channel)) {
                 continue;
             }
             if (!isEndpointLoaded(node) || !isActive(node, channel)) {
@@ -238,9 +241,10 @@ public final class TransferCommitter {
             if (!sourceNode.level().dimension().equals(node.level().dimension())
                     && !(network.getDimensionalCache().getOrDefault(sourceNode.getUUID(), false)
                     && NodeUpgradeData.hasDimensionalUpgrade(node))) continue;
-            if (TransferEngine.isSameItemStorage(
-                    (ServerLevel) sourceNode.level(), sourceNode.getAttachedPos(),
-                    (ServerLevel) node.level(), node.getAttachedPos())) {
+            if (!sourceNode.isMountedOnCreate() && !node.isMountedOnCreate()
+                    && TransferEngine.isSameItemStorage(
+                            (ServerLevel) sourceNode.level(), sourceNode.getAttachedPos(),
+                            (ServerLevel) node.level(), node.getAttachedPos())) {
                 continue;
             }
             boolean directTarget = !FilterLogic.hasConfiguredSlotMapping(
@@ -275,6 +279,9 @@ public final class TransferCommitter {
     }
 
     private static boolean isEndpointLoaded(LogisticsNodeEntity node) {
+        if (node.isMountedOnCreate()) {
+            return CreateCompat.isResolved(node);
+        }
         return node.level() instanceof ServerLevel level && level.isLoaded(node.getAttachedPos());
     }
 
@@ -284,7 +291,7 @@ public final class TransferCommitter {
     }
 
     private static boolean isActive(LogisticsNodeEntity node, ChannelData channel) {
-        int signal = node.level().getBestNeighborSignal(node.getAttachedPos());
+        int signal = node.isMountedOnCreate() ? 0 : node.level().getBestNeighborSignal(node.getAttachedPos());
         return TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal);
     }
 

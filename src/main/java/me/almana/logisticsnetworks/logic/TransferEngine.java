@@ -669,6 +669,7 @@ public class TransferEngine {
         int signal = context.signalCache().getOrDefault(sourceNodeId, 0);
         if (channel == null || !channel.isEnabled()
                 || channel.getMode() != ChannelMode.EXPORT || channel.getType() != ChannelType.ITEM
+                || !canRunChannel(sourceNode, channel) || !CreateCompat.isResolved(sourceNode)
                 || !isRedstoneActive(channel.getRedstoneMode(), signal)) {
             return ItemResourceOrder.EMPTY;
         }

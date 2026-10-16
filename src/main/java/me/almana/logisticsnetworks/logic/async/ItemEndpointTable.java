@@ -42,12 +42,12 @@ final class ItemEndpointTable {
 
     int capture(LogisticsNodeEntity node, @Nullable Direction direction, IItemHandler handler,
             Snapshots.OccupiedSlotBudget budget, boolean bulk) {
-        bulk |= BuiltInRegistries.BLOCK
+        bulk |= !node.isMountedOnCreate() && BuiltInRegistries.BLOCK
                 .getKey(node.level().getBlockState(node.getAttachedPos()).getBlock())
                 .getNamespace().equals("functionalstorage");
         EndpointKey key = EndpointKey.of(node, direction, handler);
         Integer existing = indexes.get(key);
-        if (existing == null) {
+        if (existing == null && !node.isMountedOnCreate()) {
             Map<Integer, Integer> sides = handlerIndexes.get(handler);
             existing = sides != null ? sides.get(key.direction()) : null;
         }
@@ -77,8 +77,10 @@ final class ItemEndpointTable {
         }
         endpoints.add(captured);
         indexes.put(key, index);
-        handlerIndexes.computeIfAbsent(handler, ignored -> new HashMap<>())
-                .put(key.direction(), index);
+        if (!node.isMountedOnCreate()) {
+            handlerIndexes.computeIfAbsent(handler, ignored -> new HashMap<>())
+                    .put(key.direction(), index);
+        }
         return index;
     }
 
@@ -206,6 +208,9 @@ final class ItemEndpointTable {
                 IItemHandler handler) {
             int side = direction == null ? ALL_SIDES : direction.ordinal();
             int view = DirectStorageHandlers.snapshotView(handler);
+            if (node.isMountedOnCreate()) {
+                return new EndpointKey(null, 0L, node.getUUID(), side, view);
+            }
             ServerLevel level = (ServerLevel) node.level();
             return new EndpointKey(level.dimension(), node.getAttachedPos().asLong(), null, side, view);
         }

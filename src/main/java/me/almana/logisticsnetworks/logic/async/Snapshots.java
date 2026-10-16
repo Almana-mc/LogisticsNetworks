@@ -7,6 +7,7 @@ import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.ItemResourceOrder;
@@ -102,6 +103,9 @@ public final class Snapshots {
             if (channel.getMode() != ChannelMode.EXPORT || channel.getType() != ChannelType.ITEM) {
                 continue;
             }
+            if (!TransferEngine.canRunChannel(node, channel) || !CreateCompat.isResolved(node)) {
+                continue;
+            }
             if (!TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal)) {
                 continue;
             }
@@ -115,7 +119,7 @@ public final class Snapshots {
                 continue;
             }
 
-            if (!level.isLoaded(node.getAttachedPos())) {
+            if (!node.isMountedOnCreate() && !level.isLoaded(node.getAttachedPos())) {
                 continue;
             }
 
