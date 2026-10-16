@@ -210,6 +210,20 @@ public final class FilterLogic {
         return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
     }
 
+    public static boolean hasConfiguredItemFilter(ItemStack[] filters,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        for (ItemStack filter : filters) {
+            if (FilterItemData.hasItemRules(filter, filterReadCache)
+                    || ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter)
+                            && ModFilterData.getTargetType(filter) == FilterTargetType.ITEMS
+                    || NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter, filterReadCache)
+                            && NameFilterData.getTargetType(filter, filterReadCache) == FilterTargetType.ITEMS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters,
             @Nullable FilterItemData.ReadCache readCache) {
         if (filters == null)

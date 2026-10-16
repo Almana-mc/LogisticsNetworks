@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
@@ -101,6 +102,9 @@ public final class Snapshots {
                 continue;
             }
             if (channel.getMode() != ChannelMode.EXPORT || channel.getType() != ChannelType.ITEM) {
+                continue;
+            }
+            if (RecipeCardItem.anyIn(channel.getFilterItems())) {
                 continue;
             }
             if (!TransferEngine.canRunChannel(node, channel) || !CreateCompat.isResolved(node)) {
