@@ -27,10 +27,12 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -1445,7 +1447,7 @@ public class TransferEngine {
                                             + "target slot mask. Dropping at source pos {}.",
                                             forcedRemainder, sourcePos);
                                     droppedToWorld = forcedRemainder.getCount();
-                                    Block.popResource(sourceLevel, sourcePos, forcedRemainder);
+                                    dropAtSource(sourceLevel, sourcePos, forcedRemainder);
                                 }
                             }
                         }
@@ -1600,13 +1602,24 @@ public class TransferEngine {
                 if (!forcedRemainder.isEmpty()) {
                     LOGGER.error("ITEM VOIDING PREVENTED: could not return {} to source or target. Dropping at {}.",
                             forcedRemainder, sourceNode.getAttachedPos());
-                    Block.popResource(sourceNode.level(), sourceNode.getAttachedPos(), forcedRemainder);
+                    dropAtSource(sourceNode.level(), sourceNode.getAttachedPos(), forcedRemainder);
                     accepted += forcedRemainder.getCount();
                 }
             }
         }
 
         return accepted;
+    }
+
+    // popResource obeys doTileDrops
+    private static void dropAtSource(Level level, BlockPos pos, ItemStack stack) {
+        double halfHeight = EntityType.ITEM.getHeight() / 2.0;
+        ItemEntity item = new ItemEntity(level,
+                pos.getX() + 0.5 + Mth.nextDouble(level.random, -0.25, 0.25),
+                pos.getY() + 0.5 + Mth.nextDouble(level.random, -0.25, 0.25) - halfHeight,
+                pos.getZ() + 0.5 + Mth.nextDouble(level.random, -0.25, 0.25), stack);
+        item.setDefaultPickUpDelay();
+        level.addFreshEntity(item);
     }
 
     private static @Nullable StackedInsertion prepareStackedInsertion(IItemHandler handler,
