@@ -47,7 +47,8 @@ public class FilterMenu extends AbstractContainerMenu {
     private static final int ID_CYCLE_NAME_SCOPE = 9;
     private static final int ID_TOGGLE_RESOURCE_ROUND_ROBIN = 10;
     public static final int ID_RETURN_TO_CLIPBOARD = 11;
-    public static final int ID_EDIT_CARD_BASE = 100;
+    // Button ids are signed bytes
+    public static final int ID_EDIT_CARD_BASE = 64;
     private static final int DATA_RESOURCE_ROUND_ROBIN = 4;
 
     private static final int FILTER_COLS = 9;
