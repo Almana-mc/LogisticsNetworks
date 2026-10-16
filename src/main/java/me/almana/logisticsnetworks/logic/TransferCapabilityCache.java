@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
@@ -52,6 +53,7 @@ public final class TransferCapabilityCache {
     @Nullable
     public IItemHandler findBulkItemHandler(LogisticsNodeEntity node, IItemHandler sidedHandler) {
         if (DirectStorageHandlers.isDirect(sidedHandler)) return sidedHandler;
+        if (node.isMountedOnCreate()) return null;
         if (!SophisticatedCoreCompat.isSidedWrapper(sidedHandler)) return null;
         IItemHandler unsidedHandler = unsidedItemHandler((ServerLevel) node.level(), node.getAttachedPos());
         return SophisticatedCoreCompat.isBulkHandler(unsidedHandler) ? unsidedHandler : null;
@@ -77,6 +79,9 @@ public final class TransferCapabilityCache {
     @Nullable
     private IItemHandler findItemHandler(LogisticsNodeEntity node, @Nullable Direction direction,
             boolean direct, boolean exporting) {
+        if (node.isMountedOnCreate()) {
+            return CreateCompat.findMountedItemHandler(node);
+        }
         ServerLevel level = (ServerLevel) node.level();
         BlockPos pos = node.getAttachedPos();
         InterfaceStorageResolution resolution = resolveInterface(node, direction);
@@ -91,6 +96,9 @@ public final class TransferCapabilityCache {
     @Nullable
     private IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direction direction,
             boolean exporting) {
+        if (node.isMountedOnCreate()) {
+            return CreateCompat.findMountedFluidHandler(node);
+        }
         InterfaceStorageResolution resolution = resolveInterface(node, direction);
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE) {
             return exporting ? DirectStorageHandlers.exportFluids(resolution.endpoint())

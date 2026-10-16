@@ -10,6 +10,7 @@ import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.TooltipLines;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -193,7 +194,7 @@ public class EventHandler {
         List<LogisticsNodeEntity> nodes = level.getEntitiesOfClass(LogisticsNodeEntity.class,
                 new AABB(pos).inflate(0.5));
         for (LogisticsNodeEntity node : nodes) {
-            if (node.getAttachedPos().equals(pos) && node.isActive()) {
+            if (!node.isMountedOnCreate() && node.getAttachedPos().equals(pos) && node.isActive()) {
                 event.setUseBlock(Event.Result.DENY);
                 return;
             }
@@ -210,7 +211,7 @@ public class EventHandler {
         NetworkRegistry registry = NetworkRegistry.get(level);
 
         for (LogisticsNodeEntity node : nodes) {
-            if (!node.isActive() || node.getNetworkId() == null)
+            if (node.isMountedOnCreate() || !node.isActive() || node.getNetworkId() == null)
                 continue;
 
             if (node.getAttachedPos().equals(event.getPos())) {
@@ -244,7 +245,7 @@ public class EventHandler {
                 new AABB(pos).inflate(0.1));
 
         for (LogisticsNodeEntity node : nodes) {
-            if (node.getAttachedPos().equals(pos)) {
+            if (!node.isMountedOnCreate() && node.getAttachedPos().equals(pos)) {
                 if (node.getNetworkId() != null) {
                     NetworkRegistry.get(serverLevel).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
                 }
@@ -277,39 +278,42 @@ public class EventHandler {
         return warnings;
     }
 
-    private static List<String> getBlacklistedResourceIds(ServerLevel level, BlockPos pos) {
+    private static List<String> getBlacklistedResourceIds(ServerLevel level, LogisticsNodeEntity node) {
         List<String> ids = new ArrayList<>();
+        BlockPos pos = node.getAttachedPos();
 
-        BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (blockEntity != null) {
-            IItemHandler itemHandler = blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER, null).orElse(null);
-            if (itemHandler != null) {
-                for (int slot = 0; slot < itemHandler.getSlots(); slot++) {
-                    ItemStack stack = itemHandler.getStackInSlot(slot);
-                    if (!stack.isEmpty() && stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
-                        String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
-                        if (!ids.contains(id)) {
-                            ids.add(id);
-                        }
-                    }
-                }
-            }
-
-            IFluidHandler fluidHandler = blockEntity.getCapability(ForgeCapabilities.FLUID_HANDLER, null).orElse(null);
-            if (fluidHandler != null) {
-                for (int tank = 0; tank < fluidHandler.getTanks(); tank++) {
-                    FluidStack fluid = fluidHandler.getFluidInTank(tank);
-                    if (!fluid.isEmpty() && fluid.getFluid().builtInRegistryHolder().is(ModTags.RESOURCE_BLACKLIST_FLUIDS)) {
-                        String id = BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString();
-                        if (!ids.contains(id)) {
-                            ids.add(id);
-                        }
+        BlockEntity blockEntity = node.isMountedOnCreate() ? null : level.getBlockEntity(pos);
+        IItemHandler itemHandler = blockEntity == null ? CreateCompat.findMountedItemHandler(node)
+                : blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER, null).orElse(null);
+        if (itemHandler != null) {
+            for (int slot = 0; slot < itemHandler.getSlots(); slot++) {
+                ItemStack stack = itemHandler.getStackInSlot(slot);
+                if (!stack.isEmpty() && stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) {
+                    String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+                    if (!ids.contains(id)) {
+                        ids.add(id);
                     }
                 }
             }
         }
 
-        ids.addAll(MekanismCompat.getBlacklistedChemicalNames(level, pos));
+        IFluidHandler fluidHandler = blockEntity == null ? CreateCompat.findMountedFluidHandler(node)
+                : blockEntity.getCapability(ForgeCapabilities.FLUID_HANDLER, null).orElse(null);
+        if (fluidHandler != null) {
+            for (int tank = 0; tank < fluidHandler.getTanks(); tank++) {
+                FluidStack fluid = fluidHandler.getFluidInTank(tank);
+                if (!fluid.isEmpty() && fluid.getFluid().builtInRegistryHolder().is(ModTags.RESOURCE_BLACKLIST_FLUIDS)) {
+                    String id = BuiltInRegistries.FLUID.getKey(fluid.getFluid()).toString();
+                    if (!ids.contains(id)) {
+                        ids.add(id);
+                    }
+                }
+            }
+        }
+
+        if (!node.isMountedOnCreate()) {
+            ids.addAll(MekanismCompat.getBlacklistedChemicalNames(level, pos));
+        }
         return ids;
     }
 
@@ -328,8 +332,7 @@ public class EventHandler {
                             Component.translatable("gui.logisticsnetworks.dimensional_upgrade_warning"));
                 }
 
-                BlockPos attachedPos = node.getAttachedPos();
-                List<String> blacklisted = getBlacklistedResourceIds(level, attachedPos);
+                List<String> blacklisted = getBlacklistedResourceIds(level, node);
                 if (!blacklisted.isEmpty()) {
                     MutableComponent msg = Component.translatable("gui.logisticsnetworks.blacklisted_resource_warning")
                             .withStyle(ChatFormatting.RED);
@@ -362,7 +365,8 @@ public class EventHandler {
             List<LogisticsNodeEntity> nodes = level.getEntitiesOfClass(LogisticsNodeEntity.class,
                     new AABB(containerPos).inflate(0.1));
             for (LogisticsNodeEntity node : nodes) {
-                if (node.isActive() && node.getNetworkId() != null && node.getAttachedPos().equals(containerPos)) {
+                if (!node.isMountedOnCreate() && node.isActive() && node.getNetworkId() != null
+                        && node.getAttachedPos().equals(containerPos)) {
                     NetworkRegistry.get(level).wakeNetwork(node.getNetworkId());
                 }
             }

@@ -7,6 +7,7 @@ import me.almana.logisticsnetworks.data.NodeRef;
 import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.data.ServerRackLinks;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.logic.TransferEngine.ImportTarget;
 import net.minecraft.server.MinecraftServer;
 
@@ -65,7 +66,8 @@ final class BridgedImports {
                 continue;
             }
             ChannelData data = node.getChannel(channel);
-            if (!TransferEngine.isRedstoneActive(data.getRedstoneMode(), signal(node, data))) {
+            if (!TransferEngine.canRunChannel(node, data) || !CreateCompat.isResolved(node)
+                    || !TransferEngine.isRedstoneActive(data.getRedstoneMode(), signal(node, data))) {
                 continue;
             }
             out.add(new ImportTarget(node, data, channel));
@@ -74,7 +76,7 @@ final class BridgedImports {
     }
 
     private static int signal(LogisticsNodeEntity node, ChannelData data) {
-        if (data.getRedstoneMode() == RedstoneMode.IGNORED) {
+        if (data.getRedstoneMode() == RedstoneMode.IGNORED || node.isMountedOnCreate()) {
             return 0;
         }
         return node.level().getBestNeighborSignal(node.getAttachedPos());

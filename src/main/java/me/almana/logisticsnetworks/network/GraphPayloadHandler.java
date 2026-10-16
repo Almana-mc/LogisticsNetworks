@@ -10,9 +10,11 @@ import me.almana.logisticsnetworks.data.graph.GraphNode;
 import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import me.almana.logisticsnetworks.data.graph.NetworkGraph;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
+import me.almana.logisticsnetworks.logic.TransferEngine;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.GraphMenuContext;
@@ -392,8 +394,8 @@ public final class GraphPayloadHandler {
         List<SyncNetworkNodesPayload.NodeInfo> nodes = new ArrayList<>();
         for (UUID nodeId : network.getNodeUuids()) {
             LogisticsNodeEntity node = findNode(player.getServer(), nodeId);
-            if (node == null || !node.isAlive() || !node.isValidNode()) continue;
-            BlockState attached = node.level().getBlockState(node.getAttachedPos());
+            if (node == null || !node.isAlive() || !node.isValidNode() || !CreateCompat.isResolved(node)) continue;
+            BlockState attached = CreateCompat.getAttachedBlockState(node);
             nodes.add(new SyncNetworkNodesPayload.NodeInfo(nodeId, node.blockPosition(), node.getAttachedPos(),
                     BuiltInRegistries.BLOCK.getKey(attached.getBlock()).toString(), node.getNodeLabel(),
                     node.level().dimension().location(), node.isRenderVisible(), node.isHighlighted()));
@@ -437,7 +439,7 @@ public final class GraphPayloadHandler {
         for (UUID nodeId : network.getNodeUuids()) {
             LogisticsNodeEntity node = findNode(server, nodeId);
             if (node == null || !node.isAlive() || !node.isValidNode()
-                    || !network.getId().equals(node.getNetworkId())) continue;
+                    || !network.getId().equals(node.getNetworkId()) || !CreateCompat.isResolved(node)) continue;
             List<GraphChannel> channels = new ArrayList<>();
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 ChannelData channel = node.getChannel(i);
@@ -446,7 +448,7 @@ public final class GraphPayloadHandler {
                 }
             }
             String blockName = BuiltInRegistries.BLOCK.getKey(
-                    node.level().getBlockState(node.getAttachedPos()).getBlock()).toString();
+                    CreateCompat.getAttachedBlockState(node).getBlock()).toString();
             nodes.add(new GraphNode(nodeId, node.getNodeLabel(), blockName, node.getAttachedPos(),
                     node.level().dimension().location(), NodeUpgradeData.hasDimensionalUpgrade(node), channels));
         }
@@ -455,6 +457,7 @@ public final class GraphPayloadHandler {
     }
 
     private static boolean supportsChannel(LogisticsNodeEntity node, ChannelData channel) {
+        if (!TransferEngine.canRunChannel(node, channel)) return false;
         if (channel.getType() == ChannelType.CHEMICAL) return NodeUpgradeData.hasMekanismChemicalUpgrade(node);
         if (channel.getType() == ChannelType.SOURCE) return NodeUpgradeData.hasArsSourceUpgrade(node);
         return true;

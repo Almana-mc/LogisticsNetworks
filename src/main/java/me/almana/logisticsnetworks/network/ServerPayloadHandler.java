@@ -20,6 +20,7 @@ import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
@@ -1188,8 +1189,8 @@ public class ServerPayloadHandler {
                     if (entity instanceof LogisticsNodeEntity node) {
                         BlockPos attachedPos = node.getAttachedPos();
                         String blockName = "unknown";
-                        if (level.isLoaded(attachedPos)) {
-                            BlockState state = level.getBlockState(attachedPos);
+                        if (node.isMountedOnCreate() || level.isLoaded(attachedPos)) {
+                            BlockState state = CreateCompat.getAttachedBlockState(node);
                             blockName = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                         }
                         nodeInfos.add(new SyncNetworkNodesPayload.NodeInfo(

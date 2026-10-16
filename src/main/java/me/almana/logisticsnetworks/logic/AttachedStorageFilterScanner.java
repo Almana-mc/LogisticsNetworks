@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import mekanism.api.chemical.IChemicalHandler;
@@ -34,15 +35,18 @@ public final class AttachedStorageFilterScanner {
     public static Result scan(ServerLevel level, LogisticsNodeEntity node, ChannelData channel, ItemStack filter) {
         BlockPos pos = node.getAttachedPos();
         FilterTargetType target = FilterTargetType.forChannel(channel.getType());
-        if (!level.isLoaded(pos) || target == null) {
+        boolean mounted = node.isMountedOnCreate();
+        if ((!mounted && !level.isLoaded(pos)) || !CreateCompat.isResolved(node) || target == null) {
             return new Result(0, false, false, false);
         }
 
         TransferEngine.CapCache capabilities = new TransferEngine.CapCache();
         return switch (target) {
-            case ITEMS -> scanItems(capabilities.findItemHandler(level, pos, channel.getIoDirection()), filter);
-            case FLUIDS -> scanFluids(capabilities.findFluidHandler(level, pos, channel.getIoDirection()), filter);
-            case CHEMICALS -> MekanismCompat.isLoaded()
+            case ITEMS -> scanItems(mounted ? CreateCompat.findMountedItemHandler(node)
+                    : capabilities.findItemHandler(level, pos, channel.getIoDirection()), filter);
+            case FLUIDS -> scanFluids(mounted ? CreateCompat.findMountedFluidHandler(node)
+                    : capabilities.findFluidHandler(level, pos, channel.getIoDirection()), filter);
+            case CHEMICALS -> MekanismCompat.isLoaded() && !mounted
                     ? scanChemicals(capabilities.findChemicalHandler(level, pos, channel.getIoDirection()), filter)
                     : new Result(0, false, false, false);
         };
