@@ -47,6 +47,7 @@ public class FilterMenu extends AbstractContainerMenu {
     private static final int ID_CYCLE_NAME_SCOPE = 9;
     private static final int ID_TOGGLE_RESOURCE_ROUND_ROBIN = 10;
     public static final int ID_RETURN_TO_CLIPBOARD = 11;
+    public static final int ID_EDIT_CARD_BASE = 100;
     private static final int DATA_RESOURCE_ROUND_ROBIN = 4;
 
     private static final int FILTER_COLS = 9;
@@ -961,6 +962,8 @@ public class FilterMenu extends AbstractContainerMenu {
             returnToClipboard(serverPlayer);
             return true;
         }
+        if (id >= ID_EDIT_CARD_BASE && id < ID_EDIT_CARD_BASE + slotCount && player instanceof ServerPlayer serverPlayer)
+            return RecipeCardMenu.openEntry(serverPlayer, this, id - ID_EDIT_CARD_BASE);
 
         if (id == ID_TOGGLE_MODE)
             return toggleBlacklist();
@@ -1090,18 +1093,19 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public boolean setItemFilterEntry(Player player, int slot, ItemStack stack) {
-        if (isSpecialMode || slot < 0 || slot >= slotCount || stack.isEmpty() || stack.is(ModTags.FILTERS))
+        if (isSpecialMode || slot < 0 || slot >= slotCount || stack.isEmpty() || stack.is(ModTags.FILTERS)
+                || FilterItemData.refusesCard(getOpenedStack(), stack))
             return false;
 
-        ItemStack itemEntry = stack.copyWithCount(1);
-        if (!FilterItemData.fitsEntry(itemEntry))
+        if (!FilterItemData.fitsEntry(stack))
             return false;
         updateFilter(slot, s -> {
-            if (refused(FilterItemData.setEntry(getOpenedStack(), s, itemEntry)))
+            if (refused(FilterItemData.setEntry(getOpenedStack(), s, stack)))
                 return;
             isFluidSlot[s] = false;
             isChemicalSlot[s] = false;
-            filterInventory.setItem(s, itemEntry);
+            isTagSlot[s] = FilterItemData.getEntryTag(getOpenedStack(), s) != null;
+            filterInventory.setItem(s, FilterItemData.getEntry(getOpenedStack(), s));
         });
         return true;
     }

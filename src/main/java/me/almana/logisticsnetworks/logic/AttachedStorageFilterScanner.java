@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -60,7 +61,8 @@ public final class AttachedStorageFilterScanner {
         List<GeneralFilterEntry> candidates = new ArrayList<>();
         for (int slot = 0; slot < handler.getSlots(); slot++) {
             ItemStack stack = handler.getStackInSlot(slot);
-            if (!stack.isEmpty() && FilterItemData.fitsEntry(stack) && seen.add(stack.getItem())) {
+            if (!stack.isEmpty() && !RecipeCardItem.is(stack) && FilterItemData.fitsEntry(stack)
+                    && seen.add(stack.getItem())) {
                 candidates.add(GeneralFilterEntry.empty(0).withItem(StackSnapshot.of(stack.copyWithCount(1))));
             }
         }

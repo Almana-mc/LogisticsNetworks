@@ -804,6 +804,7 @@ public final class NodeClipboardConfig {
             config.nodeLabel = root.getString(KEY_NODE_LABEL);
         }
         config.sanitizeText();
+        config.sanitizeCards();
         return config.isStructurallyValid() ? config : null;
     }
 
@@ -815,6 +816,14 @@ public final class NodeClipboardConfig {
 
     private static int size(CompoundTag root, String key) {
         return root.get(key) instanceof CollectionTag<?> list ? list.size() : 0;
+    }
+
+    private void sanitizeCards() {
+        for (ItemStack[] slots : filterItems) {
+            for (ItemStack filter : slots) {
+                FilterItemData.restampRecipeCards(filter);
+            }
+        }
     }
 
     private void sanitizeText() {
