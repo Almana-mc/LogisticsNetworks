@@ -41,6 +41,8 @@ public class NetworkScheduler {
         if (registry == null)
             return;
 
+        // Racks may unload mid-tick
+        registry.refreshRackLinks(server);
         if (registry.refreshAsyncPlanning()) {
             registry.commitCompleted(server, hasTime);
             registry.dispatchDirty(server);
