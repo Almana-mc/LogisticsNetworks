@@ -137,29 +137,33 @@ public class RecipeCardMenu extends AbstractContainerMenu {
     }
 
     // Server side only
-    public void store(Player player, ItemStack card) {
+    public FilterItemData.Edit store(Player player, ItemStack card) {
         if (!isEntryTarget()) {
             player.setItemInHand(hand, card);
-        } else if (node != null) {
+            return FilterItemData.Edit.CHANGED;
+        }
+        if (node != null) {
             ChannelData target = node.getChannel(channel);
-            target.setFilterItem(filterSlot, withEntry(target.getFilterItem(filterSlot), card));
-            ServerPayloadHandler.sendChannelSyncToViewers(node, channel, target);
-            ServerPayloadHandler.propagateToLabelGroup(node, channel);
-            ServerPayloadHandler.invalidateNetwork(node);
-        } else {
-            ItemStack wrench = player.getItemInHand(hand);
-            NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrench, player.level().registryAccess());
-            if (clipboard == null) return;
-            clipboard.setFilterItem(channel, filterSlot,
-                    withEntry(clipboard.getFilterItem(channel, filterSlot), card));
+            ItemStack filter = target.getFilterItem(filterSlot).copy();
+            FilterItemData.Edit result = FilterItemData.setEntry(filter, entry, card);
+            if (result == FilterItemData.Edit.CHANGED) {
+                target.setFilterItem(filterSlot, filter);
+                ServerPayloadHandler.sendChannelSyncToViewers(node, channel, target);
+                ServerPayloadHandler.propagateToLabelGroup(node, channel);
+                ServerPayloadHandler.invalidateNetwork(node);
+            }
+            return result;
+        }
+        ItemStack wrench = player.getItemInHand(hand);
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrench, player.level().registryAccess());
+        if (clipboard == null) return FilterItemData.Edit.SAME;
+        ItemStack filter = clipboard.getFilterItem(channel, filterSlot).copy();
+        FilterItemData.Edit result = FilterItemData.setEntry(filter, entry, card);
+        if (result == FilterItemData.Edit.CHANGED) {
+            clipboard.setFilterItem(channel, filterSlot, filter);
             WrenchItem.setClipboard(wrench, clipboard, player.level().registryAccess());
         }
-    }
-
-    private ItemStack withEntry(ItemStack filter, ItemStack card) {
-        ItemStack copy = filter.copy();
-        FilterItemData.setEntry(copy, entry, card);
-        return copy;
+        return result;
     }
 
     public boolean isEntryTarget() {

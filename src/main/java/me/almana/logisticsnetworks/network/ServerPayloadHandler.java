@@ -749,7 +749,11 @@ public class ServerPayloadHandler {
             } else {
                 RecipeCardData.set(card, data);
             }
-            menu.store(player, card);
+            if (menu.store(player, card) == FilterItemData.Edit.REFUSED) {
+                player.displayClientMessage(
+                        Component.translatable("message.logisticsnetworks.filter.too_large"), true);
+                return;
+            }
             menu.setData(data);
         });
     }
