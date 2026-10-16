@@ -28,7 +28,10 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.ChestType;
 
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.energy.IEnergyStorage;
@@ -598,6 +601,7 @@ public class TransferEngine {
             FilterItemData.ReadCache filterReadCache) {
 
         targets = orderTargets(targets, exportChannel, sourceNode);
+        BlockPos sourcePos = sourceNode.getAttachedPos();
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         boolean anyReachable = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
@@ -617,6 +621,8 @@ public class TransferEngine {
             BlockPos targetPos = target.node.getAttachedPos();
             if (!targetLevel.isLoaded(targetPos))
                 continue;
+            if (isSameItemStorage(sourceLevel, sourcePos, targetLevel, targetPos))
+                continue;
 
             ItemStack[] importFilters = target.channel.getFilterItems();
             boolean hasImportSlotMapping = FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache);
@@ -624,7 +630,7 @@ public class TransferEngine {
                     target.node, target.channel.getIoDirection(), !hasImportSlotMapping);
             if (targetHandler == null)
                 continue;
-            if (DirectStorageHandlers.shareNetwork(sourceHandler, targetHandler))
+            if (sourceHandler == targetHandler || DirectStorageHandlers.shareNetwork(sourceHandler, targetHandler))
                 continue;
 
             boolean[] targetAllowedSlots = null;
@@ -1026,6 +1032,25 @@ public class TransferEngine {
         if (source.level().dimension().equals(target.level().dimension()))
             return true;
         return sourceDim && dimCache.getOrDefault(target.getUUID(), false);
+    }
+
+    public static boolean isSameItemStorage(ServerLevel sourceLevel, BlockPos sourcePos,
+            ServerLevel targetLevel, BlockPos targetPos) {
+        if (!sourceLevel.dimension().equals(targetLevel.dimension()))
+            return false;
+        if (sourcePos.equals(targetPos))
+            return true;
+
+        BlockState sourceState = sourceLevel.getBlockState(sourcePos);
+        BlockState targetState = targetLevel.getBlockState(targetPos);
+        if (!(sourceState.getBlock() instanceof ChestBlock) || !(targetState.getBlock() instanceof ChestBlock))
+            return false;
+        if (sourceState.getValue(ChestBlock.TYPE) == ChestType.SINGLE
+                || targetState.getValue(ChestBlock.TYPE) == ChestType.SINGLE)
+            return false;
+
+        return sourcePos.relative(ChestBlock.getConnectedDirection(sourceState)).equals(targetPos)
+                && targetPos.relative(ChestBlock.getConnectedDirection(targetState)).equals(sourcePos);
     }
 
     public static ItemResourceOrder.Result executeItemOperation(IItemHandler source,
