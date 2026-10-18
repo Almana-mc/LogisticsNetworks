@@ -121,12 +121,14 @@ final class FlowMonitorPage {
 
     boolean click(int left, int top, double mouseX, double mouseY) {
         if (inside(mouseX, mouseY, left + 6, top + 6, 36, 14)) {
+            ClickSound.play();
             onBack.run();
             return true;
         }
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
             if (typeOrdinal(i) >= 0
                     && inside(mouseX, mouseY, left + RAIL_X, top + BODY_Y + i * (ROW_H + 2), RAIL_W, ROW_H)) {
+                ClickSound.play();
                 if (i != selected) {
                     select(i);
                 }
@@ -136,15 +138,18 @@ final class FlowMonitorPage {
         if (selected < 0) return false;
         int segment = segmentAt(left + MAIN_X, top + BODY_Y + 24, mouseX, mouseY);
         if (segment >= 0) {
+            ClickSound.play();
             window = segment;
             return true;
         }
         if (filter != null && inside(mouseX, mouseY, clearX, top + BODY_Y + 24, clearW, 12)) {
+            ClickSound.play();
             filter = null;
             return true;
         }
         FlowResource resource = hasBreakdown() ? list.resourceAt(mouseX, mouseY) : null;
         if (resource != null) {
+            ClickSound.play();
             filter = resource.equals(filter) ? null : resource;
             return true;
         }

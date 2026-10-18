@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks;
 
 import me.almana.logisticsnetworks.network.GraphPayloadHandler;
+import me.almana.logisticsnetworks.network.SetRecipeCardPayload;
 import me.almana.logisticsnetworks.network.ConfirmGraphLabelsPayload;
 import me.almana.logisticsnetworks.network.GraphLabelPreviewPayload;
 import me.almana.logisticsnetworks.network.PreviewGraphLabelsPayload;
@@ -161,7 +162,7 @@ public class LogisticsNetworks {
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("15");
+                final var registrar = event.registrar(MOD_ID).versioned("16");
 
                 // Client -> Server
                 registrar.playToServer(UpdateChannelPayload.TYPE, UpdateChannelPayload.STREAM_CODEC,
@@ -172,6 +173,8 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetChannelFilterItem);
                 registrar.playToServer(AddNodeFilterItemPayload.TYPE, AddNodeFilterItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleAddNodeFilterItem);
+                registrar.playToServer(SetRecipeCardPayload.TYPE, SetRecipeCardPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetRecipeCard);
                 registrar.playToServer(SelectNodeChannelPayload.TYPE, SelectNodeChannelPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSelectNodeChannel);
                 registrar.playToServer(ModifyFilterModPayload.TYPE, ModifyFilterModPayload.STREAM_CODEC,

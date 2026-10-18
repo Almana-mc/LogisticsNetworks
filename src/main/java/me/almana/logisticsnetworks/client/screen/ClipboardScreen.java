@@ -626,6 +626,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     private boolean handleNetworkClick(double mouseX, double mouseY, int action) {
         if (action != 0) return false;
         if (isInside(leftPos + 14, topPos + 53, 108, 16, mouseX, mouseY)) {
+            ClickSound.play();
             pendingNetworkId = null;
             switchAfterChannelSync = false;
             config().setNetworkTarget(null, null);
@@ -635,6 +636,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             return true;
         }
         if (isInside(leftPos + 134, topPos + 53, 108, 16, mouseX, mouseY)) {
+            ClickSound.play();
             pendingNetworkId = null;
             switchAfterChannelSync = false;
             String name = networkNameField == null ? "" : networkNameField.getValue().trim();
@@ -650,6 +652,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         for (int index = networkScrollOffset; index < end; index++) {
             int y = topPos + 95 + (index - networkScrollOffset) * 20;
             if (!isInside(leftPos + 14, y, GUI_WIDTH - 28, 17, mouseX, mouseY)) continue;
+            ClickSound.play();
             SyncNetworkListPayload.NetworkEntry entry = filtered.get(index);
             pendingNetworkId = entry.id();
             pendingNetworkName = entry.name();
@@ -663,27 +666,32 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     private boolean handleChannelClick(double mouseX, double mouseY, int action) {
         String visibility = visibilityLabel(config().isRenderVisible());
         if (isInside(leftPos + 8, topPos + 4, font.width(visibility) + 16, 12, mouseX, mouseY)) {
+            ClickSound.play();
             config().setRenderVisible(!config().isRenderVisible());
             commit();
             return true;
         }
         if (isInside(leftPos + GUI_WIDTH - 52, topPos + 4, 44, 12, mouseX, mouseY)) {
+            ClickSound.play();
             currentPage = Page.NETWORK_SELECT;
             rebuildPageLayout();
             return true;
         }
         int utilityY = topPos + INV_Y - 36;
         if (action == 0 && isInside(leftPos + 168, topPos + 166, 38, 10, mouseX, mouseY)) {
+            ClickSound.play();
             config().clear();
             commit();
             return true;
         }
         if (action == 0 && isInside(leftPos + GUI_WIDTH - 100, utilityY, 38, 10, mouseX, mouseY)) {
+            ClickSound.play();
             GuideMeCompat.openGuide(minecraft.player,
                     ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "guide"));
             return true;
         }
         if (action == 0 && isInside(leftPos + GUI_WIDTH - 56, utilityY, 48, 10, mouseX, mouseY)) {
+            ClickSound.play();
             tweaksOpen = true;
             return true;
         }
@@ -694,6 +702,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             int labelWidth = font.width(label) + 14;
             int labelX = leftPos + 10 + (148 - labelWidth) / 2;
             if (isInside(labelX, topPos + 40, labelWidth, 12, mouseX, mouseY)) {
+                ClickSound.play();
                 openLabelPicker();
                 return true;
             }
@@ -701,6 +710,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
 
         for (int channel = 0; channel < 9; channel++) {
             if (!isInside(leftPos + 10 + channel * 26, topPos + 22, 24, 12, mouseX, mouseY)) continue;
+            ClickSound.play();
             if (channel == selectedChannel && !hasLiveNetwork() && checkTabDoubleClick(channel)) {
                 startChannelNameEdit(channel);
             } else {
@@ -716,16 +726,22 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                 if (!isInside(filterButtonX(slot) - 1, filterButtonY(slot) - 1, 18, 18, mouseX, mouseY)) continue;
                 ItemStack carried = menu.getCarried();
                 if (!carried.isEmpty() && !carried.is(ModTags.FILTERS)) {
+                    ClickSound.play();
                     addItemToFilterSlot(slot, carried);
                     return true;
                 }
                 ItemStack filter = config().getFilterItem(selectedChannel, slot);
                 if (isFilterButtonEmpty(filter)) {
-                    if (action == 0) openFilterPicker(slot);
+                    if (action == 0) {
+                        ClickSound.play();
+                        openFilterPicker(slot);
+                    }
                 } else if (action == 1) {
+                    ClickSound.play();
                     config().setFilterItem(selectedChannel, slot, ItemStack.EMPTY);
                     commit();
                 } else {
+                    ClickSound.play();
                     sendButton(ClipboardMenu.filterButtonId(slot, VirtualFilterType.EXISTING));
                 }
                 return true;
@@ -740,6 +756,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         for (int row = 0; row < 9; row++) {
             if (!isInside(x, y + row * 14, 144, 14, mouseX, mouseY)) continue;
             if (isSettingDisabled(row)) return true;
+            if (editingRow < 0) ClickSound.play();
             if (row >= 6 && ClientControls.modifier3Down()) {
                 setNumericExtremum(row, action == 0);
             } else if (row >= 6 && checkSettingDoubleClick(row)) {
@@ -756,6 +773,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         int modeX = leftPos + 168 + font.width(label) + 4;
         int modeWidth = font.width(mode) + 10;
         if (isInside(modeX, topPos + 55, modeWidth, 10, mouseX, mouseY)) {
+            ClickSound.play();
             config().setChannelFilterMode(selectedChannel,
                     cycle(config().getChannelFilterMode(selectedChannel), action == 0 ? 1 : -1));
             commit();
@@ -917,6 +935,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         for (int row = 0; row < entries; row++) {
             int rowY = y + 22 + row * LABEL_PICKER_ENTRY_H;
             if (isInside(x + 2, rowY, width - 4, LABEL_PICKER_ENTRY_H, mouseX, mouseY)) {
+                ClickSound.play();
                 String label = networkLabels.get(row + labelScrollOffset);
                 if (isInside(x + 2, rowY, 12, LABEL_PICKER_ENTRY_H, mouseX, mouseY)) requestLabelDeletion(label);
                 else commitNodeLabel(label);
@@ -925,6 +944,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         }
         int clearY = y + 22 + entries * LABEL_PICKER_ENTRY_H + 2;
         if (isInside(x + 4, clearY, width - 8, 12, mouseX, mouseY)) {
+            ClickSound.play();
             commitNodeLabel("");
         }
         return true;
@@ -951,6 +971,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         for (int row = 0; row < types.length; row++) {
             if (isInside(filterPickerX(), filterPickerY() + row * FILTER_PICKER_ROW_H,
                     FILTER_PICKER_W, FILTER_PICKER_ROW_H, mouseX, mouseY)) {
+                ClickSound.play();
                 sendButton(ClipboardMenu.filterButtonId(filterPickerSlot, types[row]));
                 closeFilterPicker();
                 return true;
@@ -1151,6 +1172,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         int y = topPos + (GUI_HEIGHT - TWEAKS_H) / 2;
         if (!isInside(x, y, TWEAKS_W, TWEAKS_H, mouseX, mouseY)
                 || isInside(x + TWEAKS_W - 14, y + 6, 10, 10, mouseX, mouseY)) {
+            if (isInside(x + TWEAKS_W - 14, y + 6, 10, 10, mouseX, mouseY)) ClickSound.play();
             tweaksOpen = false;
             return true;
         }
@@ -1159,6 +1181,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             int sx = x + 10 + (index % 2) * (swatchWidth + 4);
             int sy = y + 36 + (index / 2) * 26;
             if (isInside(sx, sy, swatchWidth, 22, mouseX, mouseY)) {
+                ClickSound.play();
                 ThemeState.setTheme(Themes.ALL.get(index));
                 return true;
             }

@@ -111,6 +111,7 @@ final class NetworkDropdown {
 
     boolean mouseClicked(double mx, double my, List<NetworkEntry> networks, @Nullable UUID blocked) {
         if (hits(mx, my, x, y, w, HEADER_H)) {
+            ClickSound.play();
             if (open) {
                 close();
             } else {
@@ -129,6 +130,7 @@ final class NetworkDropdown {
         }
         search.mouseClicked(mx, my, 0);
         if (hits(mx, my, x + 4, sortY(), ThemePaint.sortButtonWidth(font, sortLabel()), SORT_H)) {
+            ClickSound.play();
             sortMode = sortMode.next();
             scroll = 0;
             return true;
@@ -138,6 +140,7 @@ final class NetworkDropdown {
         if (row >= 0 && row < ROWS && scroll + row < visible.size()) {
             NetworkEntry entry = visible.get(scroll + row);
             if (!entry.id().equals(blocked)) {
+                ClickSound.play();
                 close();
                 onSelect.accept(entry.id());
             }

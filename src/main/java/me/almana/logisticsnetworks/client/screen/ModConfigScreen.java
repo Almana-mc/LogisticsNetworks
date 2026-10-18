@@ -571,6 +571,7 @@ public class ModConfigScreen extends Screen {
         EditBox prev = findFocusedEditBox();
 
         if (handleTabClick(mouseX, mouseY)) {
+            ClickSound.play();
             unfocusEditBoxes();
             return true;
         }
@@ -581,13 +582,14 @@ public class ModConfigScreen extends Screen {
 
         if (canEditServerConfig) {
             switch (currentTab) {
-                case COMMON -> { if (handleCommonClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
-                case UPGRADES -> { if (handleUpgradesClick(mouseX, mouseY, contentX, contentY, contentW)) { unfocusEditBoxes(); return true; } }
+                case COMMON -> { if (handleCommonClick(mouseX, mouseY, contentX, contentY, contentW)) { ClickSound.play(); unfocusEditBoxes(); return true; } }
+                case UPGRADES -> { if (handleUpgradesClick(mouseX, mouseY, contentX, contentY, contentW)) { ClickSound.play(); unfocusEditBoxes(); return true; } }
                 case CLIENT -> { /* handled below */ }
             }
         }
 
         if (currentTab == Tab.CLIENT && handleClientClick(mouseX, mouseY, contentX, contentY, contentW)) {
+            ClickSound.play();
             unfocusEditBoxes();
             return true;
         }

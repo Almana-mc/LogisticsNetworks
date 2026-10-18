@@ -17,6 +17,7 @@ import me.almana.logisticsnetworks.integration.storage.StorageAccess;
 import me.almana.logisticsnetworks.integration.storage.StorageAction;
 import me.almana.logisticsnetworks.integration.storage.StorageInventory;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
@@ -719,6 +720,7 @@ public final class NodeClipboardConfig {
             return null;
         }
         config.sanitizeText();
+        config.sanitizeCards();
         return config.isStructurallyValid() ? config : null;
     }
 
@@ -741,6 +743,14 @@ public final class NodeClipboardConfig {
         return version == VERSION
                 ? DataResult.success(version)
                 : DataResult.error(() -> "Not a version " + VERSION + " clipboard");
+    }
+
+    private void sanitizeCards() {
+        for (ItemStack[] slots : filterItems) {
+            for (ItemStack filter : slots) {
+                if (filter != null) FilterItemData.restampRecipeCards(filter);
+            }
+        }
     }
 
     private void sanitizeText() {

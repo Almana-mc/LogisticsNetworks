@@ -195,6 +195,7 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
         if (gridRow >= 0) {
             int channel = RackChannelGrid.hit(mx, my, gridX(), gridY());
             if (channel >= 0) {
+                ClickSound.play();
                 send(config.withRow(gridRow, config.rows().get(gridRow).withChannel(gridLeft, channel)));
             }
             gridRow = -1;
@@ -208,11 +209,13 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
         }
         for (int row = 0; row < ServerRackConfig.ROWS; row++) {
             if (NetworkDropdown.hits(mx, my, arrowX(), rowY(row), ARROW_W, PILL_H)) {
+                ClickSound.play();
                 send(config.withRow(row, config.rows().get(row).toggled()));
                 return true;
             }
             for (boolean left : SIDES) {
                 if (NetworkDropdown.hits(mx, my, columnX(left), rowY(row), COL_W, PILL_H)) {
+                    ClickSound.play();
                     gridRow = row;
                     gridLeft = left;
                     return true;

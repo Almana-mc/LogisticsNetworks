@@ -526,8 +526,13 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
         private void mouseClicked(double mouseX, double mouseY, int button) {
             if (button != 0) return;
             int x = (width - WIDTH) / 2;
-            if (inside(mouseX, mouseY, x + 10)) cancel();
-            else if (inside(mouseX, mouseY, x + 144)) confirm();
+            if (inside(mouseX, mouseY, x + 10)) {
+                ClickSound.play();
+                cancel();
+            } else if (inside(mouseX, mouseY, x + 144)) {
+                ClickSound.play();
+                confirm();
+            }
         }
 
         private void keyPressed(int key) {

@@ -1,0 +1,13 @@
+{
+    "type": "minecraft:crafting_shapeless",
+    "category": "misc",
+    "ingredients": [
+        { "item": "minecraft:paper" },
+        { "item": "minecraft:redstone" },
+        { "item": "minecraft:iron_nugget" }
+    ],
+    "result": {
+        "id": "logisticsnetworks:recipe_card",
+        "count": 1
+    }
+}
