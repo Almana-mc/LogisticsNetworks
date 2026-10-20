@@ -48,6 +48,7 @@ import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.client.theme.Themes;
 import me.almana.logisticsnetworks.client.tooltip.FilterPreviewTooltip;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.Rect2i;
@@ -2162,6 +2163,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             valueTipKey = "gui.logisticsnetworks.node.tip.redstone." + ch.getRedstoneMode().name().toLowerCase(Locale.ROOT);
         } else if (row == 5) {
             valueTipKey = "gui.logisticsnetworks.node.tip.distribution." + ch.getDistributionMode().name().toLowerCase(Locale.ROOT);
+        } else if (row == 7 && RecipeCardItem.anyIn(ch.getFilterItems())) {
+            valueTipKey = "gui.logisticsnetworks.node.tip.batch.recipe";
         }
 
         if (valueTipKey != null) {

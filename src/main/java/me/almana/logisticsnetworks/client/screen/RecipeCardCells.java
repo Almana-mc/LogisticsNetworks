@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.FilterResourceRenderer;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
@@ -80,7 +81,8 @@ final class RecipeCardCells {
     }
 
     static List<Component> tooltip(@Nullable RecipeCardData.Ingredient ingredient) {
-        Component hint = Component.translatable("gui.logisticsnetworks.recipe_card.contents_hint")
+        Component hint = Component.translatable("gui.logisticsnetworks.recipe_card.contents_hint",
+                ClientControls.MODIFIER_1.getTranslatedKeyMessage())
                 .withStyle(ChatFormatting.GRAY);
         if (ingredient == null) return List.of(hint);
         return List.of(ingredient.label(), Component.translatable("gui.logisticsnetworks.recipe_card.remove_hint")
