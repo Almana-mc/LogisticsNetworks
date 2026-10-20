@@ -29,7 +29,7 @@ public final class ChemicalLane implements RecipeLane {
             List<RecipeEndpoint> endpoints, FilterItemData.ReadCache cache) {
         this.source = source;
         this.wanted = ingredients.stream()
-                .map(ingredient -> stack(ingredient.chemical().orElse(""), ingredient.count())).toList();
+                .map(ingredient -> stack(ingredient.chemical().get(), ingredient.count())).toList();
         this.endpoints = endpoints;
         this.cache = cache;
     }
@@ -120,8 +120,8 @@ public final class ChemicalLane implements RecipeLane {
 
     private static ChemicalStack stack(String id, long amount) {
         ResourceLocation key = ResourceLocation.tryParse(id);
-        return key == null ? ChemicalStack.EMPTY : MekanismAPI.CHEMICAL_REGISTRY.getOptional(key)
-                .map(chemical -> new ChemicalStack(chemical, amount)).orElse(ChemicalStack.EMPTY);
+        return key == null ? ChemicalStack.EMPTY : MekanismAPI.CHEMICAL_REGISTRY.getHolder(key)
+                .map(holder -> new ChemicalStack(holder, amount)).orElse(ChemicalStack.EMPTY);
     }
 
     private static ChemicalStack scaled(ChemicalStack want, long sets) {
