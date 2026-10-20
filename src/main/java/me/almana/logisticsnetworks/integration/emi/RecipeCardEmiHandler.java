@@ -18,6 +18,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.FluidType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -25,8 +26,6 @@ import java.util.List;
 import java.util.Optional;
 
 final class RecipeCardEmiHandler implements EmiRecipeHandler<RecipeCardMenu> {
-
-    private static final int CONTAINER_AMOUNT = 1000;
 
     @Override
     public EmiPlayerInventory getInventory(AbstractContainerScreen<RecipeCardMenu> screen) {
@@ -79,7 +78,7 @@ final class RecipeCardEmiHandler implements EmiRecipeHandler<RecipeCardMenu> {
     static RecipeCardData.Ingredient ingredientOf(EmiStack stack, long amount) {
         if (stack.getKey() instanceof Fluid fluid) {
             return RecipeCardData.Ingredient.ofFluid(new FluidStack(fluid,
-                    (int) Math.min(RecipeCardData.MAX_AMOUNT, amount > 0 ? amount : CONTAINER_AMOUNT)));
+                    (int) Math.min(RecipeCardData.MAX_AMOUNT, amount > 0 ? amount : FluidType.BUCKET_VOLUME)));
         }
         ItemStack item = stack.getItemStack();
         if (!item.isEmpty()) {
@@ -91,7 +90,7 @@ final class RecipeCardEmiHandler implements EmiRecipeHandler<RecipeCardMenu> {
     @Nullable
     private static RecipeCardData.Ingredient chemical(EmiStack stack, long amount) {
         return IMekanismAccess.INSTANCE.emiHelper().asChemicalStack(stack)
-                .map(chemical -> chemical.copyWithAmount(amount > 0 ? amount : CONTAINER_AMOUNT))
+                .map(chemical -> chemical.copyWithAmount(amount > 0 ? amount : FluidType.BUCKET_VOLUME))
                 .flatMap(ChemicalTransferHelper::recipeIngredient)
                 .orElse(null);
     }

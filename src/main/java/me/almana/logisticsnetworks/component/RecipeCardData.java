@@ -235,7 +235,8 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             Optional<StackSnapshot> clean = item.map(snapshot ->
                     new StackSnapshot(snapshot.item(), 1, DataComponentPatch.EMPTY));
             Optional<String> cleanFluid = fluid.map(id -> ResourceLocation.parse(id).toString());
-            return new Ingredient(clean, tag, cleanFluid, chemical, count).withCount(count);
+            Optional<String> cleanChemical = chemical.map(id -> ResourceLocation.parse(id).toString());
+            return new Ingredient(clean, tag, cleanFluid, cleanChemical, count).withCount(count);
         }
 
         boolean sameKey(Ingredient other) {

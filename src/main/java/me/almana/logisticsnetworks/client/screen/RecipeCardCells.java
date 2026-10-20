@@ -11,6 +11,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,7 +25,6 @@ final class RecipeCardCells {
     static final int COLOR_TEXT = 0xFFE0E0E0;
     static final int COLOR_MUTED = 0xFF999999;
     private static final int COLOR_TAG = 0xFFFFD24A;
-    private static final int CONTAINER_AMOUNT = 1000;
 
     private static final int GRID_X = 8;
     private static final int GRID_Y = 40;
@@ -56,7 +56,7 @@ final class RecipeCardCells {
 
     static void icon(GuiGraphics graphics, RecipeCardData.Ingredient ingredient, int x, int y) {
         boolean drawn = switch (ingredient.kind()) {
-            case FLUID -> FilterResourceRenderer.renderFluid(graphics, ingredient.fluidStack(1000), x, y);
+            case FLUID -> FilterResourceRenderer.renderFluid(graphics, ingredient.fluidStack(FluidType.BUCKET_VOLUME), x, y);
             case CHEMICAL -> FilterResourceRenderer.renderChemical(graphics, ingredient.chemical().orElseThrow(), x, y);
             default -> false;
         };
@@ -107,7 +107,7 @@ final class RecipeCardCells {
         FluidStack fluid = FluidUtil.getFluidContained(stack).orElse(FluidStack.EMPTY);
         String chemical = MekanismCompat.getChemicalIdFromItem(stack);
         if (!fluid.isEmpty()) return RecipeCardData.Ingredient.ofFluid(fluid);
-        if (chemical != null) return RecipeCardData.Ingredient.ofChemical(chemical, CONTAINER_AMOUNT);
+        if (chemical != null) return RecipeCardData.Ingredient.ofChemical(chemical, FluidType.BUCKET_VOLUME);
         return RecipeCardData.Ingredient.ofItem(stack, stack.getCount());
     }
 

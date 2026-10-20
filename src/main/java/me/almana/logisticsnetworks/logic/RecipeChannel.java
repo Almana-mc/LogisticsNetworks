@@ -127,7 +127,7 @@ final class RecipeChannel {
             Set<RecipeCardData.Kind> kinds, TransferCapabilityCache caps, FilterItemData.ReadCache cache) {
         Direction side = channel.getIoDirection();
         boolean direct = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), cache);
-        boolean chemicals = kinds.contains(RecipeCardData.Kind.CHEMICAL) && MekanismCompat.isLoaded()
+        boolean chemicals = kinds.contains(RecipeCardData.Kind.CHEMICAL) && !node.isMountedOnCreate() && MekanismCompat.isLoaded()
                 && NodeUpgradeData.hasMekanismChemicalUpgrade(node);
         return new RecipeSets.Source(
                 kinds.contains(RecipeCardData.Kind.ITEM) ? caps.findItemExportHandler(node, side, direct) : null,
@@ -171,6 +171,8 @@ final class RecipeChannel {
     private static RecipeEndpoint.Chemicals chemicals(TransferEngine.ImportTarget target, IChemicalHandler from,
             TransferCapabilityCache caps) {
         LogisticsNodeEntity node = target.node();
+        if (node.isMountedOnCreate())
+            return null;
         IChemicalHandler handler = caps.findChemicalHandler((ServerLevel) node.level(), node.getAttachedPos(),
                 target.channel().getIoDirection());
         if (handler == null || handler == from)

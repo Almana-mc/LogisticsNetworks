@@ -21,7 +21,6 @@ import java.util.Optional;
 
 import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.*;
 
-
 public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
 
     private static final int COLOR_PANEL = 0xFF1F1F1F;
@@ -179,7 +178,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         return new Rect2i(leftPos + cellX(index), topPos + cellY(index) + 1, 16, 16);
     }
 
-    public void dropIngredient(int index, ItemStack stack) {
+    private void dropIngredient(int index, ItemStack stack) {
         dropResource(index, RecipeCardData.Ingredient.ofItem(stack, stack.getCount()));
     }
 
