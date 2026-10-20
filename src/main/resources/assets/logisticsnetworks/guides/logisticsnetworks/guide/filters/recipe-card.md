@@ -24,7 +24,7 @@ Hold **Modifier Key 2** (Ctrl by default) and click the cell to edit that copy. 
 
 ## Sending sets
 
-A channel with a card sends the whole set, whatever its own type is: items, fluids and chemicals together. The receivers are the import channels with the same number, whether they are item, fluid or chemical channels. Each receiver's own filter still applies to its own resource type. Chemicals need a Mekanism Chemical Upgrade on the sending node.
+A channel with a card sends the whole set, whatever its own type is: items, fluids and chemicals together. The receivers are the import channels with the same number, whether they are item, fluid or chemical channels. A receiver must accept every resource in the card through its side, and its own filter only restricts its own resource type. Chemicals need a Mekanism Chemical Upgrade on the sending node; without it, a card that contains chemicals sends nothing.
 
 On a channel with a card, **Batch** counts whole sets per operation (at least one). The node's upgrade limits still cap each resource, so a set bigger than one operation's limit goes out one set at a time. The distribution mode decides who gets them:
 
