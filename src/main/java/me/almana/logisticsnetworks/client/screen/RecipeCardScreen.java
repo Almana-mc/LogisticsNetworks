@@ -4,10 +4,8 @@ import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
-import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -16,31 +14,19 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.FluidUtil;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.List;
 import java.util.Optional;
 
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.AMOUNT_BOX_W;
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.COLOR_BTN;
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.COLOR_MUTED;
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.COLOR_SLOT_BORDER;
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.COLOR_TEXT;
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.ITEM_BOX_W;
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.TAG_X;
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.cellX;
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.cellY;
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.inside;
-import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.slot;
+import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.*;
+
 
 public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
 
     private static final int COLOR_PANEL = 0xFF1F1F1F;
     private static final int COLOR_BORDER = 0xFF3A3A3A;
     private static final int COLOR_BTN_ON = 0xFF2E5E2E;
-
     private static final int CELLS = RecipeCardData.MAX_INGREDIENTS;
     private static final int MIN_CELLS = 5;
     private static final int OUTPUT_X = 8;
@@ -48,7 +34,6 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     private static final int BLOCK_X = 96;
     private static final int BLOCK_Y = 21;
     private static final int BLOCK_W = 72;
-    private static final int CONTAINER_AMOUNT = 1000;
 
     private final EditBox[] counts = new EditBox[CELLS];
     private RecipeCardData known;
@@ -65,13 +50,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     protected void init() {
         super.init();
         for (int i = 0; i < CELLS; i++) {
-            EditBox box = new EditBox(font, leftPos + cellX(i) + 21, topPos + cellY(i) + 5, ITEM_BOX_W, 10,
-                    Component.empty());
-            box.setMaxLength(7);
-            box.setBordered(false);
-            box.setTextColor(COLOR_TEXT);
-            box.setFilter(value -> value.isEmpty() || value.matches("\\d+"));
-            counts[i] = addRenderableWidget(box);
+            counts[i] = addRenderableWidget(countBox(font, leftPos + cellX(i), topPos + cellY(i)));
         }
         reconcile();
     }
@@ -91,7 +70,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         List<RecipeCardData.Ingredient> list = menu.data().ingredients();
         for (int i = 0; i < CELLS; i++) {
             counts[i].visible = i < list.size();
-            if (counts[i].visible) counts[i].setWidth(isItem(list.get(i)) ? ITEM_BOX_W : AMOUNT_BOX_W);
+            if (counts[i].visible) fit(counts[i], list.get(i));
             String count = counts[i].visible ? Integer.toString(list.get(i).count()) : "";
             if (!counts[i].isFocused() && !counts[i].getValue().equals(count)) counts[i].setValue(count);
         }
@@ -174,21 +153,20 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
             return true;
         }
         List<RecipeCardData.Ingredient> list = menu.data().ingredients();
-        for (int i = 0; i < droppableCells(); i++) {
-            int index = i;
-            if (inside(x, y, cellX(i), cellY(i) + 1, 16, 16)) {
-                ClickSound.play();
-                if (action == 1 && index < list.size()) menu.edit(data -> data.withoutIngredient(index));
-                else if (action == 0 && !carried.isEmpty() && hasShiftDown()) dropContents(index, carried);
-                else if (action == 0 && !carried.isEmpty()) dropIngredient(index, carried);
-                return true;
-            }
-            if (index < list.size() && isItem(list.get(index))
-                    && inside(x, y, cellX(i) + TAG_X, cellY(i) + 2, 14, 14)) {
-                ClickSound.play();
-                menu.edit(data -> data.withIngredient(index, data.ingredients().get(index).nextTag()));
-                return true;
-            }
+        int cell = slotAt(x, y, droppableCells());
+        if (cell >= 0) {
+            ClickSound.play();
+            if (action == 1 && cell < list.size()) menu.edit(data -> data.withoutIngredient(cell));
+            else if (action == 0 && !carried.isEmpty() && ClientControls.modifier1Down()) {
+                dropResource(cell, contents(carried));
+            } else if (action == 0 && !carried.isEmpty()) dropIngredient(cell, carried);
+            return true;
+        }
+        int tag = tagAt(x, y, list);
+        if (tag >= 0) {
+            ClickSound.play();
+            menu.edit(data -> data.withIngredient(tag, data.ingredients().get(tag).nextTag()));
+            return true;
         }
         return false;
     }
@@ -211,18 +189,6 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         menu.edit(data -> data.withIngredient(at, ingredient));
     }
 
-    private void dropContents(int index, ItemStack stack) {
-        FluidStack fluid = FluidUtil.getFluidContained(stack).orElse(FluidStack.EMPTY);
-        String chemical = MekanismCompat.getChemicalIdFromItem(stack);
-        if (!fluid.isEmpty()) dropResource(index, RecipeCardData.Ingredient.ofFluid(fluid));
-        else if (chemical != null) dropResource(index, RecipeCardData.Ingredient.ofChemical(chemical, CONTAINER_AMOUNT));
-        else dropIngredient(index, stack);
-    }
-
-    private static boolean isItem(RecipeCardData.Ingredient ingredient) {
-        return ingredient.kind() == RecipeCardData.Kind.ITEM;
-    }
-
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -234,22 +200,16 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         int x = mouseX - leftPos;
         int y = mouseY - topPos;
         List<RecipeCardData.Ingredient> list = menu.data().ingredients();
-        Component hint = Component.translatable("gui.logisticsnetworks.recipe_card.contents_hint")
-                .withStyle(ChatFormatting.GRAY);
-        for (int i = 0; i < droppableCells(); i++) {
-            if (inside(x, y, cellX(i), cellY(i) + 1, 16, 16)) {
-                graphics.renderComponentTooltip(font, i < list.size() ? List.of(list.get(i).label(),
-                        Component.translatable("gui.logisticsnetworks.recipe_card.remove_hint")
-                                .withStyle(ChatFormatting.GRAY), hint) : List.of(hint), mouseX, mouseY);
-                return;
-            }
-            if (i < list.size() && isItem(list.get(i)) && inside(x, y, cellX(i) + TAG_X, cellY(i) + 2, 14, 14)) {
-                graphics.renderTooltip(font, Component.translatable("gui.logisticsnetworks.recipe_card.tag_toggle"),
-                        mouseX, mouseY);
-                return;
-            }
+        int cell = slotAt(x, y, droppableCells());
+        if (cell >= 0) {
+            graphics.renderComponentTooltip(font, RecipeCardCells.tooltip(cell < list.size() ? list.get(cell) : null),
+                    mouseX, mouseY);
+            return;
         }
-        if (inside(x, y, BLOCK_X, BLOCK_Y, BLOCK_W, 14)) {
+        if (tagAt(x, y, list) >= 0) {
+            graphics.renderTooltip(font, Component.translatable("gui.logisticsnetworks.recipe_card.tag_toggle"),
+                    mouseX, mouseY);
+        } else if (inside(x, y, BLOCK_X, BLOCK_Y, BLOCK_W, 14)) {
             graphics.renderTooltip(font, font.split(
                     Component.translatable("gui.logisticsnetworks.recipe_card.blocking.tooltip"), 180), mouseX, mouseY);
         } else if (inside(x, y, OUTPUT_X, OUTPUT_Y, 16, 16)) {
@@ -265,12 +225,10 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         graphics.fill(lp, tp, lp + imageWidth, tp + imageHeight, COLOR_BORDER);
         graphics.fill(lp + 1, tp + 1, lp + imageWidth - 1, tp + imageHeight - 1, COLOR_PANEL);
         graphics.drawCenteredString(font, title, lp + imageWidth / 2, tp + 6, COLOR_TEXT);
-
         slot(graphics, lp + OUTPUT_X, tp + OUTPUT_Y);
         data.output().ifPresent(output -> graphics.renderItem(output.toStack(), lp + OUTPUT_X, tp + OUTPUT_Y));
         graphics.drawString(font, Component.translatable("gui.logisticsnetworks.recipe_card.output"),
                 lp + OUTPUT_X + 20, tp + OUTPUT_Y + 4, COLOR_MUTED, false);
-
         graphics.fill(lp + BLOCK_X, tp + BLOCK_Y, lp + BLOCK_X + BLOCK_W, tp + BLOCK_Y + 14, COLOR_SLOT_BORDER);
         graphics.fill(lp + BLOCK_X + 1, tp + BLOCK_Y + 1, lp + BLOCK_X + BLOCK_W - 1, tp + BLOCK_Y + 13,
                 data.blocking() ? COLOR_BTN_ON : COLOR_BTN);
@@ -278,12 +236,10 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
                         ? "tooltip.logisticsnetworks.recipe_card.blocking_on"
                         : "tooltip.logisticsnetworks.recipe_card.blocking_off"),
                 lp + BLOCK_X + BLOCK_W / 2, tp + BLOCK_Y + 3, COLOR_TEXT);
-
         for (int i = 0; i < droppableCells(); i++) {
             RecipeCardCells.cell(graphics, font, lp + cellX(i), tp + cellY(i) + 1,
                     i < data.ingredients().size() ? data.ingredients().get(i) : null);
         }
-
         graphics.drawString(font, playerInventoryTitle, lp + 8, tp + RecipeCardMenu.INV_Y - 11, COLOR_MUTED, false);
         for (Slot slot : menu.slots) {
             slot(graphics, lp + slot.x, tp + slot.y);
