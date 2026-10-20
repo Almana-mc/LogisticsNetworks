@@ -34,7 +34,7 @@ final class FluidLane implements RecipeLane {
     public int available(int cap) {
         int sets = cap;
         for (FluidStack want : wanted) {
-            if (want.isEmpty() || want.getFluid().builtInRegistryHolder().is(ModTags.RESOURCE_BLACKLIST_FLUIDS))
+            if (want.isEmpty() || want.is(ModTags.RESOURCE_BLACKLIST_FLUIDS))
                 return 0;
             sets = Math.min(sets, source.drain(scaled(want, sets), IFluidHandler.FluidAction.SIMULATE).getAmount()
                     / want.getAmount());
@@ -60,6 +60,8 @@ final class FluidLane implements RecipeLane {
         IFluidHandler to = endpoints.get(target).fluids().handler();
         for (FluidStack want : wanted) {
             FluidStack request = scaled(want, sets);
+            if (to.fill(request, IFluidHandler.FluidAction.SIMULATE) < request.getAmount())
+                return false;
             FluidStack drained = source.drain(request, IFluidHandler.FluidAction.EXECUTE);
             int filled = drained.isEmpty() ? 0 : to.fill(drained, IFluidHandler.FluidAction.EXECUTE);
             if (filled < drained.getAmount())
