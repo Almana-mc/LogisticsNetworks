@@ -532,7 +532,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (slot.index < menu.getFilterSlots() && RecipeCardItem.is(slot.getItem())) {
             List<RecipeCardData.Ingredient> inputs = RecipeCardData.of(slot.getItem()).ingredients();
             if (!inputs.isEmpty()) {
-                g.renderItem(inputs.get((int) (System.currentTimeMillis() / 1000 % inputs.size())).icon(),
+                RecipeCardCells.icon(g, inputs.get((int) (System.currentTimeMillis() / 1000 % inputs.size())),
                         slot.x, slot.y);
                 return;
             }

@@ -482,6 +482,7 @@
   "gui.logisticsnetworks.recipe_card.remove_hint": "Right-click to remove",
   "gui.logisticsnetworks.recipe_card.blocking.tooltip": "Only send to receivers that hold none of this channel's recipe ingredients, so recipes never mix in one machine",
   "gui.logisticsnetworks.recipe_card.tag_toggle": "Switch between the exact item and its tags",
+  "gui.logisticsnetworks.recipe_card.contents_hint": "Shift-click with a bucket or tank to use what's inside",
   "gui.logisticsnetworks.pattern_setter.input": "Input",
   "gui.logisticsnetworks.pattern_setter.output": "Output",
   "gui.logisticsnetworks.pattern_setter.pattern_label": "Pattern:",
