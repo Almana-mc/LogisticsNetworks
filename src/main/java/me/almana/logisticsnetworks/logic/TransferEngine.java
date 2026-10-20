@@ -452,7 +452,7 @@ public class TransferEngine {
         }
     }
 
-    static void markServed(ChannelData exportChannel, ImportTarget target) {
+    private static void markServed(ChannelData exportChannel, ImportTarget target) {
         exportChannel.setRobinCursor(new PriorityRobin.Cursor(target.channel().getPriority(), target.node().getUUID()));
     }
 

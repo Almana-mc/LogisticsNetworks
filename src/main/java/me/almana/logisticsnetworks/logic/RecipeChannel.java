@@ -69,7 +69,10 @@ final class RecipeChannel {
         long[] own = new long[1];
         boolean robin = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         RecipeSets.Listener listener = (endpoint, resource, amount) -> {
-            if (robin) TransferEngine.markServed(channel, refs.get(endpoint));
+            if (robin) {
+                TransferEngine.ImportTarget ref = refs.get(endpoint);
+                channel.setRecipeRobinCursor(new PriorityRobin.Cursor(ref.channel().getPriority(), ref.node().getUUID()));
+            }
             if (telemetry) channel.getTelemetry().recordResource(resource, amount);
             if (ownType(channel.getType(), resource)) own[0] += amount;
         };
@@ -90,7 +93,11 @@ final class RecipeChannel {
         boolean usable = false;
         boolean unavailableMounted = false;
         boolean stationary = false;
-        for (TransferEngine.ImportTarget target : TransferEngine.orderTargets(targets, channel, sourceNode)) {
+        List<TransferEngine.ImportTarget> ordered = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
+                ? PriorityRobin.rotate(targets, channel.getRecipeRobinCursor(), t -> t.channel().getPriority(),
+                        t -> t.node().getUUID())
+                : TransferEngine.orderTargets(targets, channel, sourceNode);
+        for (TransferEngine.ImportTarget target : ordered) {
             LogisticsNodeEntity node = target.node();
             if (node == sourceNode || !node.isValidNode()
                     || !TransferEngine.canReach(sourceNode, node, sourceDim, dimCache))
