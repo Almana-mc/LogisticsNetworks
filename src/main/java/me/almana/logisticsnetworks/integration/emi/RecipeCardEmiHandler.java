@@ -69,14 +69,14 @@ final class RecipeCardEmiHandler implements EmiRecipeHandler<RecipeCardMenu> {
                     (int) Math.max(1, Math.min(RecipeCardData.MAX_COUNT, input.getAmount())));
         }
         for (EmiStack stack : input.getEmiStacks()) {
-            RecipeCardData.Ingredient found = of(stack, input.getAmount());
+            RecipeCardData.Ingredient found = ingredientOf(stack, input.getAmount());
             if (found != null) return found;
         }
         return null;
     }
 
     @Nullable
-    static RecipeCardData.Ingredient of(EmiStack stack, long amount) {
+    static RecipeCardData.Ingredient ingredientOf(EmiStack stack, long amount) {
         if (stack.getKey() instanceof Fluid fluid) {
             return RecipeCardData.Ingredient.ofFluid(new FluidStack(fluid,
                     (int) Math.min(RecipeCardData.MAX_AMOUNT, amount > 0 ? amount : CONTAINER_AMOUNT)));

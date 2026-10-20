@@ -37,6 +37,6 @@ final class RecipeCardDragDrop implements EmiDragDropHandler<RecipeCardScreen> {
     @Nullable
     private static RecipeCardData.Ingredient value(EmiIngredient ingredient) {
         return ingredient.getEmiStacks().size() == 1
-                ? RecipeCardEmiHandler.of(ingredient.getEmiStacks().getFirst(), ingredient.getAmount()) : null;
+                ? RecipeCardEmiHandler.ingredientOf(ingredient.getEmiStacks().getFirst(), 0) : null;
     }
 }
