@@ -307,11 +307,10 @@ public class TransferEngine {
                 default -> itemImports[i];
             };
             boolean cards = RecipeCardItem.anyIn(channel.getFilterItems());
-            List<ImportTarget> targets = cards
-                    ? RecipeChannel.receivers(itemImports[i], fluidImports[i], chemicalImports[i])
-                    : typed;
-
-            if (targets == null || targets.isEmpty())
+            boolean noTargets = cards
+                    ? itemImports[i].isEmpty() && fluidImports[i].isEmpty() && chemicalImports[i].isEmpty()
+                    : typed == null || typed.isEmpty();
+            if (noTargets)
                 continue;
 
             if (sourceNode.isMountedOnCreate()) {
@@ -336,7 +335,8 @@ public class TransferEngine {
             int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
             int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
 
-            int result = cards ? RecipeChannel.transfer(sourceNode, sourceLevel, channel, targets,
+            int result = cards ? RecipeChannel.transfer(sourceNode, sourceLevel, channel,
+                    RecipeChannel.receivers(itemImports[i], fluidImports[i], chemicalImports[i]),
                     effectiveBatchSize, sourceTier, dimensionalCache, capCache, telemetryActive) : -1;
             if (!cards || RecipeChannel.hasLoose(channel)) {
                 int loose = switch (channel.getType()) {

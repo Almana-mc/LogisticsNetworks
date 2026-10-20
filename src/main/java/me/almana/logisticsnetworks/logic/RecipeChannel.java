@@ -38,7 +38,7 @@ final class RecipeChannel {
         all.addAll(items);
         all.addAll(fluids);
         all.addAll(chemicals);
-        all.sort((a, b) -> Integer.compare(b.channel().getPriority(), a.channel().getPriority()));
+        all.sort(BridgedImports.ORDER);
         return all;
     }
 
@@ -56,33 +56,15 @@ final class RecipeChannel {
     static int transfer(LogisticsNodeEntity sourceNode, ServerLevel level, ChannelData channel,
             List<TransferEngine.ImportTarget> targets, int batch, int tier, Map<UUID, Boolean> dimCache,
             TransferCapabilityCache caps, boolean telemetry) {
-        BlockPos pos = sourceNode.getAttachedPos();
-        if (!sourceNode.isMountedOnCreate() && !level.isLoaded(pos))
+        if (!sourceNode.isMountedOnCreate() && !level.isLoaded(sourceNode.getAttachedPos()))
             return -1;
         FilterItemData.ReadCache cache = FilterItemData.createReadCache();
         List<RecipeCardData> cards = RecipeSets.cards(channel.getFilterItems());
         Set<RecipeCardData.Kind> kinds = RecipeSets.kinds(cards);
         RecipeSets.Source source = source(sourceNode, level, channel, kinds, caps, cache);
-        boolean sourceDim = dimCache.getOrDefault(sourceNode.getUUID(), false);
         List<RecipeEndpoint> endpoints = new ArrayList<>();
         List<TransferEngine.ImportTarget> refs = new ArrayList<>();
-        boolean reachable = false;
-        for (TransferEngine.ImportTarget target : TransferEngine.orderTargets(targets, channel, sourceNode)) {
-            LogisticsNodeEntity node = target.node();
-            if (node == sourceNode || !node.isValidNode()
-                    || !TransferEngine.canReach(sourceNode, node, sourceDim, dimCache))
-                continue;
-            reachable = true;
-            ServerLevel targetLevel = (ServerLevel) node.level();
-            if (!node.isMountedOnCreate() && !targetLevel.isLoaded(node.getAttachedPos()))
-                continue;
-            if (!sourceNode.isMountedOnCreate() && !node.isMountedOnCreate()
-                    && TransferEngine.isSameItemStorage(level, pos, targetLevel, node.getAttachedPos()))
-                continue;
-            endpoints.add(endpoint(target, source, kinds, caps, cache));
-            refs.add(target);
-        }
-        if (!reachable)
+        if (!connect(sourceNode, level, channel, targets, dimCache, source, kinds, caps, cache, endpoints, refs))
             return -1;
         long[] own = new long[1];
         boolean robin = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
@@ -95,6 +77,43 @@ final class RecipeChannel {
                 listener, level.registryAccess(), cache);
         // Flow total in channel units
         return sets <= 0 ? sets : (int) Math.max(sets, Math.min(Integer.MAX_VALUE, own[0]));
+    }
+
+    // False when unreachable or paused
+    private static boolean connect(LogisticsNodeEntity sourceNode, ServerLevel level, ChannelData channel,
+            List<TransferEngine.ImportTarget> targets, Map<UUID, Boolean> dimCache, RecipeSets.Source source,
+            Set<RecipeCardData.Kind> kinds, TransferCapabilityCache caps, FilterItemData.ReadCache cache,
+            List<RecipeEndpoint> endpoints, List<TransferEngine.ImportTarget> refs) {
+        BlockPos pos = sourceNode.getAttachedPos();
+        boolean sourceDim = dimCache.getOrDefault(sourceNode.getUUID(), false);
+        boolean reachable = false;
+        boolean usable = false;
+        boolean unavailableMounted = false;
+        boolean stationary = false;
+        for (TransferEngine.ImportTarget target : TransferEngine.orderTargets(targets, channel, sourceNode)) {
+            LogisticsNodeEntity node = target.node();
+            if (node == sourceNode || !node.isValidNode()
+                    || !TransferEngine.canReach(sourceNode, node, sourceDim, dimCache))
+                continue;
+            reachable = true;
+            stationary |= !node.isMountedOnCreate();
+            ServerLevel targetLevel = (ServerLevel) node.level();
+            if (!node.isMountedOnCreate() && !targetLevel.isLoaded(node.getAttachedPos()))
+                continue;
+            if (!sourceNode.isMountedOnCreate() && !node.isMountedOnCreate()
+                    && TransferEngine.isSameItemStorage(level, pos, targetLevel, node.getAttachedPos()))
+                continue;
+            RecipeEndpoint endpoint = endpoint(target, source, kinds, caps, cache);
+            if (endpoint.items() == null && endpoint.fluids() == null && endpoint.chemicals() == null) {
+                unavailableMounted |= node.isMountedOnCreate();
+                continue;
+            }
+            usable = true;
+            endpoints.add(endpoint);
+            refs.add(target);
+        }
+        return reachable
+                && !TransferEngine.shouldPauseForUnavailableMountedTargets(usable, unavailableMounted, stationary);
     }
 
     private static RecipeSets.Source source(LogisticsNodeEntity node, ServerLevel level, ChannelData channel,
