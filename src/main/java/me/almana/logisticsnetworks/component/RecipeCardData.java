@@ -177,8 +177,8 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         }
 
         public boolean matches(FluidStack stack) {
-            return !stack.isEmpty()
-                    && fluid.filter(BuiltInRegistries.FLUID.getKey(stack.getFluid()).toString()::equals).isPresent();
+            return fluid.isPresent() && !stack.isEmpty()
+                    && fluid.get().equals(BuiltInRegistries.FLUID.getKey(stack.getFluid()).toString());
         }
 
         public FluidStack fluidStack(int amount) {
@@ -234,7 +234,7 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
                     + (chemical.isPresent() ? 1 : 0);
             if (kinds != 1) return false;
             if (fluid.isPresent()) return !fluidStack(1).isEmpty();
-            if (chemical.isPresent()) return !chemical.get().isBlank();
+            if (chemical.isPresent()) return ResourceLocation.tryParse(chemical.get()) != null;
             if (tag.isPresent()) return true;
             return item.get().item().value() != Items.AIR;
         }
@@ -242,7 +242,8 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         Ingredient stripped() {
             Optional<StackSnapshot> clean = item.map(snapshot ->
                     new StackSnapshot(snapshot.item(), 1, DataComponentPatch.EMPTY));
-            return new Ingredient(clean, tag, fluid, chemical, count).withCount(count);
+            Optional<String> cleanFluid = fluid.map(id -> ResourceLocation.parse(id).toString());
+            return new Ingredient(clean, tag, cleanFluid, chemical, count).withCount(count);
         }
 
         boolean sameKey(Ingredient other) {
