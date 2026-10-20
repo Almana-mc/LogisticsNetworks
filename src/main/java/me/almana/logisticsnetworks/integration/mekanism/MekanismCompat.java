@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.mekanism;
 
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
@@ -8,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -94,5 +96,11 @@ public final class MekanismCompat {
         if (!isLoaded())
             return Collections.emptyList();
         return ChemicalTransferHelper.getAllChemicalTags();
+    }
+
+    public static Optional<RecipeCardData.Ingredient> recipeIngredient(Object value) {
+        if (!isLoaded())
+            return Optional.empty();
+        return ChemicalTransferHelper.recipeIngredient(value);
     }
 }

@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.mekanism.ChemicalLane;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.HolderLookup;
@@ -110,7 +111,8 @@ public final class RecipeSets {
                         : new ItemLane(source.items(), part, endpoints, provider, cache);
                 case FLUID -> source.fluids() == null ? null
                         : new FluidLane(source.fluids(), part, endpoints, provider, cache);
-                case CHEMICAL -> null;
+                case CHEMICAL -> source.chemicals() == null ? null
+                        : new ChemicalLane(source.chemicals(), part, endpoints, cache);
             };
             if (lane == null) return List.of();
             lanes.add(lane);
@@ -152,7 +154,8 @@ public final class RecipeSets {
 
     private static boolean holds(RecipeEndpoint endpoint, List<RecipeCardData.Ingredient> blockers) {
         return endpoint.items() != null && ItemLane.holds(endpoint.items().handler(), blockers)
-                || endpoint.fluids() != null && FluidLane.holds(endpoint.fluids().handler(), blockers);
+                || endpoint.fluids() != null && FluidLane.holds(endpoint.fluids().handler(), blockers)
+                || endpoint.chemicals() != null && ChemicalLane.holds(endpoint.chemicals().handler(), blockers);
     }
 
     private static int firstTaker(int targets, int sets, SetMove move) {

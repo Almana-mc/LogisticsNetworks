@@ -8,6 +8,7 @@ import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.chemical.IChemicalHandler;
 import mekanism.common.capabilities.Capabilities;
 import me.almana.logisticsnetworks.Config;
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.logic.FilterLogic;
@@ -34,7 +35,7 @@ public final class ChemicalTransferHelper {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    private static final TagKey<Chemical> RESOURCE_BLACKLIST_CHEMICALS = TagKey.create(
+    static final TagKey<Chemical> RESOURCE_BLACKLIST_CHEMICALS = TagKey.create(
             MekanismAPI.CHEMICAL_REGISTRY_NAME,
             ResourceLocation.fromNamespaceAndPath("logisticsnetworks", "blacklist/chemicals"));
 
@@ -490,5 +491,12 @@ public final class ChemicalTransferHelper {
         if (id == null)
             return null;
         return MekanismAPI.CHEMICAL_REGISTRY.getOptional(id).map(Chemical::getTextComponent).orElse(null);
+    }
+
+    public static Optional<RecipeCardData.Ingredient> recipeIngredient(Object value) {
+        if (!(value instanceof ChemicalStack stack) || stack.isEmpty())
+            return Optional.empty();
+        return Optional.ofNullable(getChemicalId(stack))
+                .map(id -> RecipeCardData.Ingredient.ofChemical(id, stack.getAmount()));
     }
 }
