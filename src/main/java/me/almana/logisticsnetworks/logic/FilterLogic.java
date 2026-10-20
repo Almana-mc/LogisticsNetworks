@@ -224,6 +224,36 @@ public final class FilterLogic {
         return false;
     }
 
+    public static boolean hasConfiguredFluidFilter(ItemStack[] filters,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        return hasConfiguredResourceFilter(filters, filterReadCache, FilterTargetType.FLUIDS);
+    }
+
+    public static boolean hasConfiguredChemicalFilter(ItemStack[] filters,
+            @Nullable FilterItemData.ReadCache filterReadCache) {
+        return hasConfiguredResourceFilter(filters, filterReadCache, FilterTargetType.CHEMICALS);
+    }
+
+    // Mirrors matchesFluid / matchesChemical
+    private static boolean hasConfiguredResourceFilter(ItemStack[] filters,
+            @Nullable FilterItemData.ReadCache filterReadCache, FilterTargetType type) {
+        for (ItemStack filter : filters) {
+            boolean entries = FilterItemData.isFilterItem(filter)
+                    && (FilterItemData.hasAnyTagEntries(filter, filterReadCache)
+                            || (type == FilterTargetType.FLUIDS
+                                    ? FilterItemData.hasAnyFluidEntries(filter, filterReadCache)
+                                    : FilterItemData.hasAnyChemicalEntries(filter, filterReadCache)));
+            if (entries
+                    || ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter, filterReadCache)
+                            && ModFilterData.getTargetType(filter, filterReadCache) == type
+                    || NameFilterData.isNameFilter(filter) && NameFilterData.hasNameFilter(filter, filterReadCache)
+                            && NameFilterData.getTargetType(filter, filterReadCache) == type) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean hasConfiguredItemNbtFilter(ItemStack[] filters,
             @Nullable FilterItemData.ReadCache readCache) {
         if (filters == null)

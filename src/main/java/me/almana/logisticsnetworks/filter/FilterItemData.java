@@ -162,13 +162,12 @@ public final class FilterItemData {
         return RecipeCardItem.is(value) ? RecipeCardItem.stamp(value) : value.copyWithCount(1);
     }
 
-    public static boolean refusesCard(ItemStack filter, ItemStack item) {
-        return RecipeCardItem.is(item) && (getTargetType(filter) != FilterTargetType.ITEMS
-                || RecipeCardData.of(item).sanitized().ingredients().isEmpty());
+    public static boolean refusesCard(ItemStack item) {
+        return RecipeCardItem.is(item) && RecipeCardData.of(item).sanitized().ingredients().isEmpty();
     }
 
     public static boolean addItem(ItemStack filter, ItemStack item) {
-        if (!isFilterItem(filter) || item.isEmpty() || refusesCard(filter, item))
+        if (!isFilterItem(filter) || item.isEmpty() || refusesCard(item))
             return false;
         ItemStack entry = entryCopy(item);
         int cap = getCapacity(filter);
