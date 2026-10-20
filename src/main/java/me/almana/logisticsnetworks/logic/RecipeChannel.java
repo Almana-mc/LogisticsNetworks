@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
+import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
@@ -83,8 +84,17 @@ final class RecipeChannel {
         }
         if (!reachable)
             return -1;
-        return RecipeSets.transfer(source, endpoints, cards, batch, tier, channel.getDistributionMode(),
-                listener(channel, refs, telemetry), level.registryAccess(), cache);
+        long[] own = new long[1];
+        boolean robin = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
+        RecipeSets.Listener listener = (endpoint, resource, amount) -> {
+            if (robin) TransferEngine.markServed(channel, refs.get(endpoint));
+            if (telemetry) channel.getTelemetry().recordResource(resource, amount);
+            if (ownType(channel.getType(), resource)) own[0] += amount;
+        };
+        int sets = RecipeSets.transfer(source, endpoints, cards, batch, tier, channel.getDistributionMode(),
+                listener, level.registryAccess(), cache);
+        // Flow total in channel units
+        return sets <= 0 ? sets : (int) Math.max(sets, Math.min(Integer.MAX_VALUE, own[0]));
     }
 
     private static RecipeSets.Source source(LogisticsNodeEntity node, ServerLevel level, ChannelData channel,
@@ -148,15 +158,11 @@ final class RecipeChannel {
         return channel.getType() == type ? channel.getFilterItems() : NO_FILTERS;
     }
 
-    @Nullable
-    private static RecipeSets.Listener listener(ChannelData channel, List<TransferEngine.ImportTarget> refs,
-            boolean telemetry) {
-        boolean robin = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
-        if (!robin && !telemetry)
-            return null;
-        return (endpoint, resource, amount) -> {
-            if (robin) TransferEngine.markServed(channel, refs.get(endpoint));
-            if (telemetry) channel.getTelemetry().recordResource(resource, amount);
+    private static boolean ownType(ChannelType type, FlowResource resource) {
+        return switch (resource) {
+            case FlowResource.Item item -> type == ChannelType.ITEM;
+            case FlowResource.Fluid fluid -> type == ChannelType.FLUID;
+            case FlowResource.Chemical chemical -> type == ChannelType.CHEMICAL;
         };
     }
 }
