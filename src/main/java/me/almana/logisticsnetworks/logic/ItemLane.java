@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.logic;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -18,38 +19,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
-final class RecipeSetMover implements RecipeSets.SetMove {
+final class ItemLane implements RecipeLane {
 
     private record Moved(int sourceSlot, ItemStack stack) {
     }
 
     private final IItemHandler source;
-    private final RecipeCardData card;
-    private final List<RecipeCardData.Ingredient> blockers;
-    private final List<TransferEngine.ItemTransferTarget> targets;
-    @Nullable
-    private final TransferEngine.MoveRecorder recorder;
+    private final List<RecipeCardData.Ingredient> ingredients;
+    private final List<RecipeEndpoint> endpoints;
     private final HolderLookup.Provider provider;
     private final FilterItemData.ReadCache cache;
+    private final List<Moved> pending = new ArrayList<>();
     private int[][] matching = new int[0][];
     private int[] order = new int[0];
 
-    RecipeSetMover(IItemHandler source, RecipeCardData card, List<RecipeCardData.Ingredient> blockers,
-            List<TransferEngine.ItemTransferTarget> targets, @Nullable TransferEngine.MoveRecorder recorder,
+    ItemLane(IItemHandler source, List<RecipeCardData.Ingredient> ingredients, List<RecipeEndpoint> endpoints,
             HolderLookup.Provider provider, FilterItemData.ReadCache cache) {
         this.source = source;
-        this.card = card;
-        this.blockers = blockers;
-        this.targets = targets;
-        this.recorder = recorder;
+        this.ingredients = ingredients;
+        this.endpoints = endpoints;
         this.provider = provider;
         this.cache = cache;
     }
 
     // Indexes matching slots once
-    int available(int cap) {
-        List<RecipeCardData.Ingredient> ingredients = card.ingredients();
-        if (ingredients.isEmpty()) return 0;
+    @Override
+    public int available(int cap) {
         IntArrayList[] found = new IntArrayList[ingredients.size()];
         long[] stock = new long[ingredients.size()];
         for (int i = 0; i < found.length; i++) {
@@ -94,7 +89,7 @@ final class RecipeSetMover implements RecipeSets.SetMove {
     private boolean covers(int sets) {
         Int2IntOpenHashMap left = new Int2IntOpenHashMap();
         for (int i : order) {
-            int need = sets * card.ingredients().get(i).count();
+            int need = sets * ingredients.get(i).count();
             for (int slot : matching[i]) {
                 if (need <= 0) break;
                 ItemStack stack = source.getStackInSlot(slot);
@@ -111,35 +106,64 @@ final class RecipeSetMover implements RecipeSets.SetMove {
     }
 
     @Override
-    public int apply(int targetIndex, int sets) {
-        TransferEngine.ItemTransferTarget target = targets.get(targetIndex);
-        int count = fit(target, affordable(sets));
-        if (count == 0) return 0;
-        List<Moved> done = new ArrayList<>();
-        for (int i : order) {
-            int amount = count * card.ingredients().get(i).count();
-            if (move(target, i, amount, done) < amount) {
-                rollback(target, done);
-                return 0;
-            }
-        }
-        if (recorder != null) {
-            for (Moved moved : done) {
-                recorder.record(moved.sourceSlot(), targetIndex, moved.stack(), null);
-            }
-        }
-        return count;
-    }
-
-    private int fit(TransferEngine.ItemTransferTarget target, int sets) {
-        if (card.blocking() && holdsBlocker(target.handler())) return 0;
-        int fit = sets;
-        for (int i = 0; i < matching.length; i++) {
-            int count = card.ingredients().get(i).count();
-            fit = Math.min(fit, accepted(target, i, sets * count) / count);
-            if (fit == 0) return 0;
+    public int fit(int target, int sets) {
+        TransferEngine.ItemTransferTarget to = endpoints.get(target).items();
+        int fit = affordable(sets);
+        for (int i = 0; i < matching.length && fit > 0; i++) {
+            int count = ingredients.get(i).count();
+            fit = Math.min(fit, accepted(to, i, fit * count) / count);
         }
         return fit;
+    }
+
+    @Override
+    public boolean move(int target, int sets) {
+        TransferEngine.ItemTransferTarget to = endpoints.get(target).items();
+        for (int i : order) {
+            int amount = sets * ingredients.get(i).count();
+            if (move(to, i, amount) < amount) return false;
+        }
+        return true;
+    }
+
+    @Override
+    public void rollback(int target) {
+        TransferEngine.ItemTransferTarget to = endpoints.get(target).items();
+        IItemHandler handler = to.handler();
+        for (Moved moved : pending) {
+            int left = moved.stack().getCount();
+            for (int slot = 0; slot < handler.getSlots() && left > 0; slot++) {
+                if (!ItemStack.isSameItemSameComponents(handler.getStackInSlot(slot), moved.stack())) continue;
+                ItemStack back = handler.extractItem(slot, left, false);
+                left -= back.getCount();
+                ItemStack stuck = back.isEmpty() ? back : giveBack(moved.sourceSlot(), back);
+                // Source full, keep in receiver
+                if (!stuck.isEmpty()) stuck = handler.insertItem(slot, stuck, false);
+                if (!stuck.isEmpty()) insert(to, stuck, false);
+            }
+        }
+        pending.clear();
+    }
+
+    @Override
+    public void commit(int target, @Nullable RecipeSets.Listener listener) {
+        if (listener != null) {
+            for (Moved moved : pending) {
+                listener.moved(target, new FlowResource.Item(moved.stack()), moved.stack().getCount());
+            }
+        }
+        pending.clear();
+    }
+
+    static boolean holds(IItemHandler handler, List<RecipeCardData.Ingredient> blockers) {
+        for (int slot = 0; slot < handler.getSlots(); slot++) {
+            ItemStack stack = handler.getStackInSlot(slot);
+            if (stack.isEmpty()) continue;
+            for (RecipeCardData.Ingredient blocker : blockers) {
+                if (blocker.matches(stack)) return true;
+            }
+        }
+        return false;
     }
 
     // One simulation per exact stack
@@ -161,21 +185,20 @@ final class RecipeSetMover implements RecipeSets.SetMove {
         return accepted;
     }
 
-    private int move(TransferEngine.ItemTransferTarget target, int ingredient, int amount, List<Moved> done) {
+    private int move(TransferEngine.ItemTransferTarget target, int ingredient, int amount) {
         int left = amount;
         for (int slot : matching[ingredient]) {
             if (left <= 0) break;
             int moved;
             do {
-                moved = moveFromSlot(target, ingredient, slot, left, done);
+                moved = moveFromSlot(target, ingredient, slot, left);
                 left -= moved;
             } while (moved > 0 && left > 0);
         }
         return amount - left;
     }
 
-    private int moveFromSlot(TransferEngine.ItemTransferTarget target, int ingredient, int slot, int limit,
-            List<Moved> done) {
+    private int moveFromSlot(TransferEngine.ItemTransferTarget target, int ingredient, int slot, int limit) {
         ItemStack stack = source.getStackInSlot(slot);
         if (!usable(stack, ingredient)) return 0;
         ItemStack probe = stack.copyWithCount(Math.min(limit, stack.getCount()));
@@ -188,24 +211,8 @@ final class RecipeSetMover implements RecipeSets.SetMove {
         ItemStack stuck = rest.isEmpty() ? rest : giveBack(slot, rest);
         // Last resort, like executeMove
         if (!stuck.isEmpty()) moved += stuck.getCount() - insert(target, stuck, false).getCount();
-        if (moved > 0) done.add(new Moved(slot, pulled.copyWithCount(moved)));
+        if (moved > 0) pending.add(new Moved(slot, pulled.copyWithCount(moved)));
         return moved;
-    }
-
-    private void rollback(TransferEngine.ItemTransferTarget target, List<Moved> done) {
-        IItemHandler handler = target.handler();
-        for (Moved moved : done) {
-            int left = moved.stack().getCount();
-            for (int slot = 0; slot < handler.getSlots() && left > 0; slot++) {
-                if (!ItemStack.isSameItemSameComponents(handler.getStackInSlot(slot), moved.stack())) continue;
-                ItemStack back = handler.extractItem(slot, left, false);
-                left -= back.getCount();
-                ItemStack stuck = back.isEmpty() ? back : giveBack(moved.sourceSlot(), back);
-                // Source full, keep in receiver
-                if (!stuck.isEmpty()) stuck = handler.insertItem(slot, stuck, false);
-                if (!stuck.isEmpty()) insert(target, stuck, false);
-            }
-        }
     }
 
     private ItemStack giveBack(int slot, ItemStack stack) {
@@ -214,17 +221,6 @@ final class RecipeSetMover implements RecipeSets.SetMove {
             left = source.insertItem(other, left, false);
         }
         return left;
-    }
-
-    private boolean holdsBlocker(IItemHandler handler) {
-        for (int slot = 0; slot < handler.getSlots(); slot++) {
-            ItemStack stack = handler.getStackInSlot(slot);
-            if (stack.isEmpty()) continue;
-            for (RecipeCardData.Ingredient blocker : blockers) {
-                if (blocker.matches(stack)) return true;
-            }
-        }
-        return false;
     }
 
     private ItemStack insert(TransferEngine.ItemTransferTarget target, ItemStack stack, boolean simulate) {
@@ -242,6 +238,6 @@ final class RecipeSetMover implements RecipeSets.SetMove {
     }
 
     private boolean usable(ItemStack stack, int ingredient) {
-        return !stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS) && card.ingredients().get(ingredient).matches(stack);
+        return !stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS) && ingredients.get(ingredient).matches(stack);
     }
 }

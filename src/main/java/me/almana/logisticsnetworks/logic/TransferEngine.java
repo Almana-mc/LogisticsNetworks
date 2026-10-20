@@ -299,13 +299,17 @@ public class TransferEngine {
             if (!isRedstoneActive(channel.getRedstoneMode(), redstoneSignal))
                 continue;
 
-            List<ImportTarget> targets = switch (channel.getType()) {
+            List<ImportTarget> typed = switch (channel.getType()) {
                 case FLUID -> fluidImports[i];
                 case ENERGY -> energyImports[i];
                 case CHEMICAL -> chemicalImports[i];
                 case SOURCE -> sourceImports[i];
                 default -> itemImports[i];
             };
+            boolean cards = RecipeCardItem.anyIn(channel.getFilterItems());
+            List<ImportTarget> targets = cards
+                    ? RecipeChannel.receivers(itemImports[i], fluidImports[i], chemicalImports[i])
+                    : typed;
 
             if (targets == null || targets.isEmpty())
                 continue;
@@ -326,28 +330,33 @@ public class TransferEngine {
                 continue;
             }
 
-            if (!includeItemTransfers && channel.getType() == ChannelType.ITEM
-                    && !RecipeCardItem.anyIn(channel.getFilterItems()))
+            if (!includeItemTransfers && channel.getType() == ChannelType.ITEM && !cards)
                 continue;
 
             int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
             int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
 
-            int result = switch (channel.getType()) {
-                case FLUID ->
-                    transferFluids(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache,
-                            telemetryActive);
-                case ENERGY ->
-                    transferEnergy(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache, capCache);
-                case CHEMICAL ->
-                    transferChemicals(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache,
-                            capCache, telemetryActive);
-                case SOURCE ->
-                    transferSource(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache);
-                default ->
-                    transferItems(sourceNode, sourceLevel, channel, i, targets, effectiveBatchSize, dimensionalCache,
-                            capCache, telemetryActive);
-            };
+            int result = cards ? RecipeChannel.transfer(sourceNode, sourceLevel, channel, targets,
+                    effectiveBatchSize, sourceTier, dimensionalCache, capCache, telemetryActive) : -1;
+            if (!cards || RecipeChannel.hasLoose(channel)) {
+                int loose = switch (channel.getType()) {
+                    case FLUID ->
+                        transferFluids(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache, capCache,
+                                telemetryActive);
+                    case ENERGY ->
+                        transferEnergy(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache, capCache);
+                    case CHEMICAL ->
+                        transferChemicals(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache,
+                                capCache, telemetryActive);
+                    case SOURCE ->
+                        transferSource(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache);
+                    default ->
+                        transferItems(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache,
+                                capCache, telemetryActive);
+                };
+                // Separate budgets, -1 means unreachable
+                result = result < 0 ? loose : loose < 0 ? result : result + loose;
+            }
 
             if (result < 0)
                 continue;
@@ -414,7 +423,7 @@ public class TransferEngine {
         }
     }
 
-    private static List<ImportTarget> orderTargets(List<ImportTarget> targets, ChannelData exportChannel,
+    static List<ImportTarget> orderTargets(List<ImportTarget> targets, ChannelData exportChannel,
             LogisticsNodeEntity sourceNode) {
         if (targets.size() <= 1)
             return targets;
@@ -443,7 +452,7 @@ public class TransferEngine {
         }
     }
 
-    private static void markServed(ChannelData exportChannel, ImportTarget target) {
+    static void markServed(ChannelData exportChannel, ImportTarget target) {
         exportChannel.setRobinCursor(new PriorityRobin.Cursor(target.channel().getPriority(), target.node().getUUID()));
     }
 
@@ -489,17 +498,8 @@ public class TransferEngine {
                 ? (slot, index, moved, mask) -> markServed(exportChannel, resolved.refs().get(index))
                 : null;
         MoveRecorder recorder = telemetryActive ? withTelemetry(served, exportChannel.getTelemetry()) : served;
-        int recipeMoved = 0;
-        if (RecipeCardItem.anyIn(exportFilters)) {
-            recipeMoved = RecipeSets.transfer(sourceHandler, resolved.targets(), exportFilters, batchLimit,
-                    distribution, recorder, sourceLevel.registryAccess(), filterReadCache);
-            // Budget spent or card-only
-            if (recipeMoved >= batchLimit || !FilterLogic.hasConfiguredItemFilter(exportFilters, filterReadCache)) {
-                return new ItemResourceOrder.Result(null, recipeMoved);
-            }
-        }
         ItemResourceOrder.Result result = executeItemOperation(sourceHandler, resolved.targets(),
-                batchLimit - recipeMoved, exportFilters, exportChannel.getFilterMode(),
+                batchLimit, exportFilters, exportChannel.getFilterMode(),
                 sourceAllowedSlots,
                 sourceLevel.registryAccess(),
                 sourceLevel, sourcePos, filterReadCache,
@@ -507,8 +507,7 @@ public class TransferEngine {
                         .map(ref -> priorTargetBatches.getOrDefault(ref.node().getUUID(), Map.of())).toList(),
                 exportChannel.canRotateResources(), exportChannel.getItemResourceCursor(), requiredResource);
         if (result.cursor() != null) exportChannel.setItemResourceCursor(result.cursor());
-        return recipeMoved == 0 ? result
-                : new ItemResourceOrder.Result(result.resource(), result.moved() + recipeMoved, result.cursor());
+        return result;
     }
 
     private static MoveRecorder withTelemetry(@Nullable MoveRecorder next, ChannelTelemetry telemetry) {
@@ -972,7 +971,7 @@ public class TransferEngine {
         return SourceTransferHelper.resolve((ServerLevel) node.level(), node.getAttachedPos(), direction);
     }
 
-    private static boolean canReach(LogisticsNodeEntity source, LogisticsNodeEntity target, boolean sourceDim,
+    static boolean canReach(LogisticsNodeEntity source, LogisticsNodeEntity target, boolean sourceDim,
             Map<UUID, Boolean> dimCache) {
         if (source.level().dimension().equals(target.level().dimension()))
             return true;
