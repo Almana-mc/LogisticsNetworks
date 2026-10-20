@@ -108,7 +108,8 @@ public final class RecipeSets {
             RecipeLane lane = switch (kind) {
                 case ITEM -> source.items() == null ? null
                         : new ItemLane(source.items(), part, endpoints, provider, cache);
-                case FLUID -> null;
+                case FLUID -> source.fluids() == null ? null
+                        : new FluidLane(source.fluids(), part, endpoints, provider, cache);
                 case CHEMICAL -> null;
             };
             if (lane == null) return List.of();
@@ -150,7 +151,8 @@ public final class RecipeSets {
     }
 
     private static boolean holds(RecipeEndpoint endpoint, List<RecipeCardData.Ingredient> blockers) {
-        return endpoint.items() != null && ItemLane.holds(endpoint.items().handler(), blockers);
+        return endpoint.items() != null && ItemLane.holds(endpoint.items().handler(), blockers)
+                || endpoint.fluids() != null && FluidLane.holds(endpoint.fluids().handler(), blockers);
     }
 
     private static int firstTaker(int targets, int sets, SetMove move) {
