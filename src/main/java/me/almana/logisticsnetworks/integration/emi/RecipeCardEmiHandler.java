@@ -9,10 +9,15 @@ import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.api.stack.TagEmiIngredient;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
+import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.menu.RecipeCardMenu;
+import mekanism.api.IMekanismAccess;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.material.Fluid;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -20,6 +25,8 @@ import java.util.List;
 import java.util.Optional;
 
 final class RecipeCardEmiHandler implements EmiRecipeHandler<RecipeCardMenu> {
+
+    private static final int CONTAINER_AMOUNT = 1000;
 
     @Override
     public EmiPlayerInventory getInventory(AbstractContainerScreen<RecipeCardMenu> screen) {
@@ -57,14 +64,35 @@ final class RecipeCardEmiHandler implements EmiRecipeHandler<RecipeCardMenu> {
 
     @Nullable
     private static RecipeCardData.Ingredient ingredient(EmiIngredient input) {
-        int count = (int) Math.max(1, Math.min(RecipeCardData.MAX_COUNT, input.getAmount()));
         if (input instanceof TagEmiIngredient tag && tag.key.isFor(Registries.ITEM)) {
-            return RecipeCardData.Ingredient.ofTag(tag.key.location(), count);
+            return RecipeCardData.Ingredient.ofTag(tag.key.location(),
+                    (int) Math.max(1, Math.min(RecipeCardData.MAX_COUNT, input.getAmount())));
         }
         for (EmiStack stack : input.getEmiStacks()) {
-            ItemStack item = stack.getItemStack();
-            if (!item.isEmpty()) return RecipeCardData.Ingredient.ofItem(item, count);
+            RecipeCardData.Ingredient found = of(stack, input.getAmount());
+            if (found != null) return found;
         }
         return null;
+    }
+
+    @Nullable
+    static RecipeCardData.Ingredient of(EmiStack stack, long amount) {
+        if (stack.getKey() instanceof Fluid fluid) {
+            return RecipeCardData.Ingredient.ofFluid(new FluidStack(fluid,
+                    (int) Math.min(RecipeCardData.MAX_AMOUNT, amount > 0 ? amount : CONTAINER_AMOUNT)));
+        }
+        ItemStack item = stack.getItemStack();
+        if (!item.isEmpty()) {
+            return RecipeCardData.Ingredient.ofItem(item, (int) Math.max(1, Math.min(RecipeCardData.MAX_COUNT, amount)));
+        }
+        return MekanismCompat.isLoaded() ? chemical(stack, amount) : null;
+    }
+
+    @Nullable
+    private static RecipeCardData.Ingredient chemical(EmiStack stack, long amount) {
+        return IMekanismAccess.INSTANCE.emiHelper().asChemicalStack(stack)
+                .map(chemical -> chemical.copyWithAmount(amount > 0 ? amount : CONTAINER_AMOUNT))
+                .flatMap(ChemicalTransferHelper::recipeIngredient)
+                .orElse(null);
     }
 }
