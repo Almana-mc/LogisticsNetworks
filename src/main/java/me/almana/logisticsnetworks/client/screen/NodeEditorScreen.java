@@ -238,7 +238,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         boolean backgroundInteractive = networkEditor == null && confirmation == null
-                && !storageUpgradePicker.isOpen();
+                && !storageUpgradePicker.isOpen() && !resources.isOpen();
         int backgroundMouseX = backgroundInteractive ? mx : Integer.MIN_VALUE;
         int backgroundMouseY = backgroundInteractive ? my : Integer.MIN_VALUE;
         super.render(g, backgroundMouseX, backgroundMouseY, pt);
@@ -271,8 +271,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 g.renderTooltip(font, hoveredChannelName, mx, my);
             }
             if (settingsHoverRow >= 0 && currentPage == Page.CHANNEL_CONFIG
-                    && System.currentTimeMillis() - settingsHoverStartTime >= TOOLTIP_DELAY && !tweaksOpen
-                    && !resources.isOpen()) {
+                    && System.currentTimeMillis() - settingsHoverStartTime >= TOOLTIP_DELAY && !tweaksOpen) {
                 LogisticsNodeEntity node = getMenu().getNode();
                 List<Component> tip = getSettingTooltip(node.getChannel(selectedChannel), settingsHoverRow);
                 g.renderComponentTooltip(font, tip, mx, my);
@@ -820,7 +819,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 ch.isEnabled() ? tr("gui.logisticsnetworks.node.value.enabled")
                         : tr("gui.logisticsnetworks.node.value.disabled"),
                 getChannelModeLabel(ch.getMode()),
-                ResourcesPopover.summary(ch.getTypes()),
+                ResourceLabels.summary(ch.getTypes()),
                 ch.getIoDirection() != null ? getDirectionLabel(ch.getIoDirection().getName()) : getDirectionLabel("all"),
                 getRedstoneModeLabel(ch.getRedstoneMode()),
                 getDistributionModeLabel(ch.getDistributionMode()),
@@ -863,7 +862,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         }
 
         int summaryW = font.width(values[2]) + 8;
-        ResourcesPopover.dots(g, rx + rowW - summaryW - 3 - 22, ry + 2 * rowH + 5, ch.getTypes(), t);
+        ResourceLabels.dots(g, rx + rowW - summaryW - 3 - 22, ry + 2 * rowH + 5, ch.getTypes(), t);
 
         if (hoveredRow != settingsHoverRow) {
             settingsHoverRow = hoveredRow;
@@ -1244,6 +1243,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         }
         if (action != -1 && handleInteraction(mx, my, action))
             return true;
+        if (resources.isOpen())
+            return true;
         return super.mouseClicked(mx, my, btn);
     }
 
@@ -1261,6 +1262,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         if (storageUpgradePicker.isOpen()) {
             handleStorageUpgradePickerAction(mx, my, action);
             return true;
+        }
+        if (currentPage == Page.CHANNEL_CONFIG && resources.isOpen()) {
+            return resources.click(mx, my, action);
         }
         if (tweaksOpen) {
             if (action == 0) return handleTweaksClick(mx, my);

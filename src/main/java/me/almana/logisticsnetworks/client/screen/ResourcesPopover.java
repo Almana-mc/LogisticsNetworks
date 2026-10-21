@@ -5,14 +5,10 @@ import me.almana.logisticsnetworks.client.theme.ChannelTint;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.data.ChannelType;
-import me.almana.logisticsnetworks.integration.ars.ArsCompat;
-import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
-
-import java.util.Locale;
 
 final class ResourcesPopover {
 
@@ -35,7 +31,6 @@ final class ResourcesPopover {
     private static final int HEADER_H = 15;
     private static final int SETS_ROW = ChannelType.values().length;
     private static final int MAX_SETS = 1024;
-    private static final String KEY = "gui.logisticsnetworks.node.resources.";
 
     private final Font font;
     private Target target;
@@ -73,9 +68,9 @@ final class ResourcesPopover {
         g.pose().translate(0, 0, 400);
         g.fill(x - 1, y - 1, x + W + 1, y + height() + 1, t.borderStrong());
         g.fill(x, y, x + W, y + height(), t.surface());
-        g.drawString(font, tr("title"), x + 4, y + 4, t.textMuted(), false);
-        ThemePaint.button(g, font, x + W - 60, y + 2, 27, 11, tr("all"), inside(mx, my, x + W - 60, y + 2, 27, 11), t);
-        ThemePaint.button(g, font, x + W - 31, y + 2, 27, 11, tr("none"), inside(mx, my, x + W - 31, y + 2, 27, 11), t);
+        g.drawString(font, ResourceLabels.tr("title"), x + 4, y + 4, t.textMuted(), false);
+        ThemePaint.button(g, font, x + W - 60, y + 2, 27, 11, ResourceLabels.tr("all"), inside(mx, my, x + W - 60, y + 2, 27, 11), t);
+        ThemePaint.button(g, font, x + W - 31, y + 2, 27, 11, ResourceLabels.tr("none"), inside(mx, my, x + W - 31, y + 2, 27, 11), t);
         for (int row = 0; row < rows(); row++) {
             renderRow(g, t, row, y + HEADER_H + row * ROW_H, mx, my);
         }
@@ -83,7 +78,7 @@ final class ResourcesPopover {
         g.pose().popPose();
     }
 
-    // True when the popover used the click
+    // True when click consumed
     boolean click(double mx, double my, int action) {
         if (!open) return false;
         if (edit != null && edit.isMouseOver(mx, my)) {
@@ -134,24 +129,10 @@ final class ResourcesPopover {
         return true;
     }
 
-    static String summary(int types) {
-        if (types == ChannelType.ALL) return tr("summary.all");
-        if (types == 0) return tr("summary.none");
-        return Component.translatable(KEY + "summary.some", Integer.bitCount(types), ChannelType.values().length)
-                .getString();
-    }
-
-    static void dots(GuiGraphics g, int dx, int dy, int types, Theme t) {
-        for (ChannelType type : ChannelType.values()) {
-            g.fill(dx, dy, dx + 3, dy + 3, type.in(types) ? ChannelTint.hue(type) : t.borderStrong());
-            dx += 4;
-        }
-    }
-
     private void renderRow(GuiGraphics g, Theme t, int row, int ry, int mx, int my) {
         if (inside(mx, my, x, ry, W, ROW_H)) g.fill(x, ry, x + W, ry + ROW_H, 0x22FFFFFF);
         if (row == SETS_ROW) {
-            g.drawString(font, tr("recipe_sets"), x + 20, ry + 3, t.text(), false);
+            g.drawString(font, ResourceLabels.tr("recipe_sets"), x + 20, ry + 3, t.text(), false);
             if (editRow != row) chip(g, t, amountLabel(row), ry);
             return;
         }
@@ -161,9 +142,9 @@ final class ResourcesPopover {
         g.fill(x + 4, ry + 3, x + 11, ry + 10, t.borderStrong());
         g.fill(x + 5, ry + 4, x + 10, ry + 9, on ? t.accent() : t.surfaceSunken());
         g.fill(x + 14, ry + 4, x + 17, ry + 9, ChannelTint.hue(type));
-        g.drawString(font, typeName(type), x + 20, ry + 3, on && !locked ? t.text() : t.textSubtle(), false);
+        g.drawString(font, ResourceLabels.typeName(type), x + 20, ry + 3, on && !locked ? t.text() : t.textSubtle(), false);
         if (locked) {
-            String reason = font.plainSubstrByWidth(lockReason(type), W - 70);
+            String reason = font.plainSubstrByWidth(ResourceLabels.lockReason(type), W - 70);
             g.drawString(font, reason, x + W - 4 - font.width(reason), ry + 3, t.textSubtle(), false);
         } else if (target.exporting() && editRow != row) {
             chip(g, t, amountLabel(row), ry);
@@ -239,7 +220,7 @@ final class ResourcesPopover {
 
     private String amountLabel(int row) {
         int value = value(row);
-        if (value <= 0 || row < SETS_ROW && ChannelType.values()[row] == ChannelType.ENERGY) return tr("max");
+        if (value <= 0 || row < SETS_ROW && ChannelType.values()[row] == ChannelType.ENERGY) return ResourceLabels.tr("max");
         if (row == SETS_ROW) return String.valueOf(value);
         return switch (ChannelType.values()[row]) {
             case FLUID -> Component.translatable("gui.logisticsnetworks.node.value.batch.fluid", value).getString();
@@ -256,21 +237,6 @@ final class ResourcesPopover {
 
     private int height() {
         return HEADER_H + rows() * ROW_H + 2;
-    }
-
-    private static String typeName(ChannelType type) {
-        return Component.translatable("gui.logisticsnetworks.channel_type." + type.name().toLowerCase(Locale.ROOT))
-                .getString();
-    }
-
-    private static String lockReason(ChannelType type) {
-        if (type == ChannelType.ENERGY) return tr("locked.mounted");
-        boolean modLoaded = type == ChannelType.CHEMICAL ? MekanismCompat.isLoaded() : ArsCompat.isLoaded();
-        return tr((modLoaded ? "locked.upgrade." : "locked.mod.") + type.name().toLowerCase(Locale.ROOT));
-    }
-
-    private static String tr(String key) {
-        return Component.translatable(KEY + key).getString();
     }
 
     private static boolean inside(double mx, double my, int x, int y, int w, int h) {
