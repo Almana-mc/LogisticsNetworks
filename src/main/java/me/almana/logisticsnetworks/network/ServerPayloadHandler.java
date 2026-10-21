@@ -148,7 +148,7 @@ public class ServerPayloadHandler {
             if (channel == null)
                 return;
 
-            updateChannelData(channel, payload, NodeUpgradeData.getUpgradeTier(node));
+            updateChannelData(channel, payload);
             clampChannelToUpgradeLimits(node, channel);
             sendChannelSyncToViewers(node, payload.channelIndex(), channel);
             propagateToLabelGroup(node, payload.channelIndex());
@@ -156,17 +156,19 @@ public class ServerPayloadHandler {
         });
     }
 
-    private static void updateChannelData(ChannelData channel, UpdateChannelPayload payload, int tier) {
+    private static void updateChannelData(ChannelData channel, UpdateChannelPayload payload) {
         channel.setEnabled(payload.enabled());
 
         if (isValidEnum(payload.modeOrdinal(), ChannelMode.values()))
             channel.setMode(ChannelMode.values()[payload.modeOrdinal()]);
 
-        channel.setBatchSize(payload.batchSize());
+        channel.setTypes(payload.types());
+        for (ChannelType type : ChannelType.values()) {
+            if (type.ordinal() < payload.batches().size())
+                channel.setBatch(type, payload.batches().get(type.ordinal()));
+        }
+        channel.setRecipeSets(payload.recipeSets());
         channel.setTickDelay(payload.tickDelay());
-
-        if (isValidEnum(payload.typeOrdinal(), ChannelType.values()))
-            NodeUpgradeData.applyTypeChange(channel, ChannelType.values()[payload.typeOrdinal()], tier);
 
         if (payload.directionOrdinal() == 6) {
             channel.setIoDirection(null);
@@ -1156,12 +1158,10 @@ public class ServerPayloadHandler {
 
     public static void clampChannelToUpgradeLimits(LogisticsNodeEntity node, ChannelData channel) {
         int tier = NodeUpgradeData.getUpgradeTier(node);
-        int maxBatch = NodeUpgradeData.getOperationCap(channel.getType(), tier);
-
-        if (channel.getType() == ChannelType.ENERGY) {
-            channel.setBatchSize(maxBatch);
-        } else {
-            channel.setBatchSize(Math.max(1, Math.min(channel.getBatchSize(), maxBatch)));
+        for (ChannelType type : ChannelType.values()) {
+            if (type == ChannelType.ENERGY || channel.getBatch(type) > NodeUpgradeData.getOperationCap(type, tier)) {
+                channel.setBatch(type, 0);
+            }
         }
 
         int minDelay = NodeUpgradeData.getMinTickDelay(tier);

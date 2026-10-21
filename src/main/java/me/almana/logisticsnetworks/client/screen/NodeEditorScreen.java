@@ -231,8 +231,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     private void validateChannelConfig(LogisticsNodeEntity node, ChannelData channel) {
         int tier = NodeUpgradeData.getUpgradeTier(node);
-        int maximum = NodeUpgradeData.getOperationCap(channel.getType(), tier);
-        channel.setBatchSize(Math.max(1, Math.min(channel.getBatchSize(), maximum)));
+        for (ChannelType type : ChannelType.values()) {
+            if (channel.getBatch(type) > NodeUpgradeData.getOperationCap(type, tier)) channel.setBatch(type, 0);
+        }
         channel.setTickDelay(Math.max(channel.getTickDelay(), NodeUpgradeData.getMinTickDelay(tier)));
     }
 
@@ -1781,15 +1782,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     private void commitChannelUpdate(LogisticsNodeEntity node, ChannelData ch) {
         validateChannelConfig(node, ch);
-        PacketDistributor.sendToServer(new UpdateChannelPayload(
-                node.getId(), selectedChannel, ch.isEnabled(),
-                ch.getMode().ordinal(), ch.getType().ordinal(),
-                ch.getBatchSize(), ch.getTickDelay(),
-                ch.getIoDirection() != null ? ch.getIoDirection().ordinal() : 6,
-                ch.getRedstoneMode().ordinal(),
-                ch.getDistributionMode().ordinal(),
-                ch.getFilterMode().ordinal(),
-                ch.getPriority(), ch.isResourceRoundRobin()));
+        PacketDistributor.sendToServer(UpdateChannelPayload.of(node.getId(), selectedChannel, ch));
     }
 
     private void sendNetworkAssign(Optional<UUID> id, String name) {
