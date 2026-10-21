@@ -1,9 +1,9 @@
 package me.almana.logisticsnetworks.logic.async;
 
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
-import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -24,8 +24,6 @@ import java.util.UUID;
 
 final class ItemEndpointTable {
 
-    private static final int ALL_SIDES = Direction.values().length;
-
     private final Map<EndpointKey, Integer> indexes = new HashMap<>();
     private final IdentityHashMap<IItemHandler, Map<Integer, Integer>> handlerIndexes =
             new IdentityHashMap<>();
@@ -35,17 +33,17 @@ final class ItemEndpointTable {
     private final List<Set<Item>> requestedCounts = new ArrayList<>();
     private final List<DirectStorageBinding> bindings = new ArrayList<>();
 
-    int capture(LogisticsNodeEntity node, @Nullable Direction direction, IItemHandler handler,
+    int capture(LogisticsNodeEntity node, IoSide side, IItemHandler handler,
             Snapshots.OccupiedSlotBudget budget) {
-        return capture(node, direction, handler, budget, false);
+        return capture(node, side, handler, budget, false);
     }
 
-    int capture(LogisticsNodeEntity node, @Nullable Direction direction, IItemHandler handler,
+    int capture(LogisticsNodeEntity node, IoSide side, IItemHandler handler,
             Snapshots.OccupiedSlotBudget budget, boolean bulk) {
         bulk |= !node.isMountedOnCreate() && BuiltInRegistries.BLOCK
                 .getKey(node.level().getBlockState(node.getAttachedPos()).getBlock())
                 .getNamespace().equals("functionalstorage");
-        EndpointKey key = EndpointKey.of(node, direction, handler);
+        EndpointKey key = EndpointKey.of(node, side, handler);
         Integer existing = indexes.get(key);
         if (existing == null && !node.isMountedOnCreate()) {
             Map<Integer, Integer> sides = handlerIndexes.get(handler);
@@ -209,9 +207,9 @@ final class ItemEndpointTable {
             int direction,
             int view) {
 
-        private static EndpointKey of(LogisticsNodeEntity node, @Nullable Direction direction,
+        private static EndpointKey of(LogisticsNodeEntity node, IoSide ioSide,
                 IItemHandler handler) {
-            int side = direction == null ? ALL_SIDES : direction.ordinal();
+            int side = ioSide.ordinal();
             int view = DirectStorageHandlers.snapshotView(handler);
             if (node.isMountedOnCreate()) {
                 return new EndpointKey(null, 0L, node.getUUID(), side, view);

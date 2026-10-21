@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.integration.mekanism;
 
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.ModList;
@@ -26,6 +27,10 @@ public final class MekanismCompat {
             loaded = ModList.get().isLoaded(MEKANISM_MOD_ID);
         }
         return loaded;
+    }
+
+    public static boolean isMekanismBlock(ServerLevel level, BlockPos pos) {
+        return BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()).getNamespace().equals(MEKANISM_MOD_ID);
     }
 
     public static boolean hasChemicalStorage(ServerLevel level, BlockPos pos) {

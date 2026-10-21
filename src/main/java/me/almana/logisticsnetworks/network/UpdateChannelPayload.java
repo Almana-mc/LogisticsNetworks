@@ -40,7 +40,7 @@ public record UpdateChannelPayload(
         }
         return new UpdateChannelPayload(entityId, channelIndex, channel.isEnabled(), channel.getMode().ordinal(),
                 channel.getTypes(), batches, channel.getRecipeSets(), channel.getTickDelay(),
-                channel.getIoDirection() != null ? channel.getIoDirection().ordinal() : 6,
+                channel.getIoSide().ordinal(),
                 channel.getRedstoneMode().ordinal(), channel.getDistributionMode().ordinal(),
                 channel.getFilterMode().ordinal(), channel.getPriority(), channel.isResourceRoundRobin());
     }

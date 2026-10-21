@@ -9,7 +9,6 @@ import me.almana.logisticsnetworks.logic.ChannelTelemetry;
 import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import me.almana.logisticsnetworks.logic.FluidResourceOrder;
 import me.almana.logisticsnetworks.logic.PriorityRobin;
-import net.minecraft.core.Direction;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -33,7 +32,7 @@ public class ChannelData {
             ChannelType.CODEC.lenientOptionalFieldOf("Type", ChannelType.ITEM).forGetter(ChannelState::primaryType),
             Codec.INT.lenientOptionalFieldOf("BatchSize", 8).forGetter(ChannelState::primaryBatch),
             Codec.INT.lenientOptionalFieldOf("TickDelay", 20).forGetter(ChannelState::tickDelay),
-            ChannelState.DIRECTION.lenientOptionalFieldOf("IoDirection", Optional.of(Direction.UP))
+            ChannelState.DIRECTION.lenientOptionalFieldOf("IoDirection", Optional.of(IoSide.UP))
                     .forGetter(ChannelState::direction),
             Codec.STRING.lenientOptionalFieldOf("RedstoneMode", "").forGetter(state -> state.redstoneMode().name()),
             DistributionMode.CODEC.lenientOptionalFieldOf("DistributionMode", DistributionMode.PRIORITY)
@@ -70,8 +69,7 @@ public class ChannelData {
     private final int[] batches = new int[ChannelType.values().length];
     private int recipeSets;
     private int tickDelay = 20;
-    @Nullable
-    private Direction ioDirection = Direction.UP;
+    private IoSide ioDirection = IoSide.UP;
     private RedstoneMode redstoneMode = RedstoneMode.IGNORED;
     private DistributionMode distributionMode = DistributionMode.PRIORITY;
     private FilterMode filterMode = FilterMode.MATCH_ANY;
@@ -104,7 +102,7 @@ public class ChannelData {
         }
         channel.setRecipeSets(settings.recipeSets());
         channel.setTickDelay(settings.tickDelay());
-        channel.setIoDirection(settings.direction().orElse(null));
+        channel.setIoSide(settings.direction().orElse(IoSide.ALL));
         channel.setRedstoneMode(settings.redstoneMode());
         channel.setDistributionMode(settings.distributionMode());
         channel.setFilterMode(settings.filterMode());
@@ -117,7 +115,7 @@ public class ChannelData {
 
     private ChannelState settings() {
         return new ChannelState(enabled, mode, types, Arrays.stream(batches).boxed().toList(), recipeSets,
-                tickDelay, Optional.ofNullable(ioDirection), redstoneMode, distributionMode, filterMode, priority,
+                tickDelay, Optional.of(ioDirection), redstoneMode, distributionMode, filterMode, priority,
                 name, resourceRoundRobin);
     }
 
@@ -215,12 +213,11 @@ public class ChannelData {
         this.tickDelay = Math.max(1, tickDelay);
     }
 
-    @Nullable
-    public Direction getIoDirection() {
+    public IoSide getIoSide() {
         return ioDirection;
     }
 
-    public void setIoDirection(@Nullable Direction ioDirection) {
+    public void setIoSide(IoSide ioDirection) {
         this.ioDirection = ioDirection;
     }
 

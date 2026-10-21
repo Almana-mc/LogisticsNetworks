@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.NodeState;
 import net.minecraft.core.Direction;
@@ -54,8 +55,8 @@ public final class NodeTransit {
         NodeClipboardConfig clipboard = NodeClipboardConfig.load(config, registries);
         if (clipboard == null) return config.copy();
         for (int channel = 0; channel < clipboard.getChannelCount(); channel++) {
-            Direction direction = clipboard.getChannelDirection(channel);
-            if (direction != null) clipboard.setChannelDirection(channel, Rotation.CLOCKWISE_90.rotate(direction));
+            Direction direction = clipboard.getChannelDirection(channel).direction();
+            if (direction != null) clipboard.setChannelDirection(channel, IoSide.of(Rotation.CLOCKWISE_90.rotate(direction)));
         }
         return clipboard.save(registries);
     }
@@ -64,8 +65,8 @@ public final class NodeTransit {
         CompoundTag rotated = payload.copy();
         ComponentCodecs.parse(NodeState.CODEC, registries, payload.getCompound("state")).ifPresent(state -> {
             for (ChannelData channel : state.channels()) {
-                Direction direction = channel.getIoDirection();
-                if (direction != null) channel.setIoDirection(Rotation.CLOCKWISE_90.rotate(direction));
+                Direction direction = channel.getIoSide().direction();
+                if (direction != null) channel.setIoSide(IoSide.of(Rotation.CLOCKWISE_90.rotate(direction)));
             }
             rotated.put("state", ComponentCodecs.encode(NodeState.CODEC, registries, state));
         });

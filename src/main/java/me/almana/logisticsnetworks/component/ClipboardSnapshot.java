@@ -8,9 +8,9 @@ import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import net.minecraft.core.Direction;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -67,7 +67,7 @@ public record ClipboardSnapshot(
             List<Integer> batches,
             int recipeSets,
             int tickDelay,
-            Optional<Direction> direction,
+            Optional<IoSide> direction,
             RedstoneMode redstoneMode,
             DistributionMode distributionMode,
             FilterMode filterMode,
@@ -77,10 +77,10 @@ public record ClipboardSnapshot(
 
         public static final List<Integer> MAX_BATCHES = List.of(0, 0, 0, 0, 0);
         public static final ChannelState DEFAULT = new ChannelState(false, ChannelMode.IMPORT, ChannelType.ALL,
-                MAX_BATCHES, 0, 20, Optional.of(Direction.UP), RedstoneMode.IGNORED, DistributionMode.PRIORITY,
+                MAX_BATCHES, 0, 20, Optional.of(IoSide.UP), RedstoneMode.IGNORED, DistributionMode.PRIORITY,
                 FilterMode.MATCH_ANY, 0, "", false);
-        public static final Codec<Optional<Direction>> DIRECTION = Codec.STRING.xmap(ChannelState::parseDirection,
-                direction -> direction.map(Direction::getName).orElse("all"));
+        public static final Codec<Optional<IoSide>> DIRECTION = Codec.STRING.xmap(ChannelState::parseDirection,
+                direction -> direction.map(IoSide::key).orElse(IoSide.ALL.key()));
         private static final Codec<Map<ChannelType, Integer>> BATCHES =
                 Codec.unboundedMap(ChannelType.CODEC, Codec.INT);
         public static final MapCodec<ChannelState> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
@@ -127,7 +127,7 @@ public record ClipboardSnapshot(
         public static ChannelState fromSerialized(boolean enabled, ChannelMode mode, ChannelType type,
                 Optional<List<ChannelType>> types, Optional<Integer> batchSize,
                 Optional<Map<ChannelType, Integer>> batches, int recipeSets, int tickDelay,
-                Optional<Direction> direction, String redstoneMode, DistributionMode distributionMode,
+                Optional<IoSide> direction, String redstoneMode, DistributionMode distributionMode,
                 FilterMode filterMode, int priority, String name, boolean resourceRoundRobin) {
             int mask = types.map(ChannelType::maskOf).orElse(type.bit());
             List<Integer> values = batches.map(ChannelState::batchList)
@@ -149,7 +149,7 @@ public record ClipboardSnapshot(
         }
 
         public static ChannelState legacy(boolean enabled, ChannelMode mode, ChannelType type, int batchSize,
-                int tickDelay, Optional<Direction> direction, String redstoneMode,
+                int tickDelay, Optional<IoSide> direction, String redstoneMode,
                 DistributionMode distributionMode, FilterMode filterMode, int priority, String name,
                 boolean resourceRoundRobin) {
             return fromSerialized(enabled, mode, type, Optional.empty(), Optional.of(batchSize), Optional.empty(),
@@ -187,12 +187,8 @@ public record ClipboardSnapshot(
             return List.copyOf(list);
         }
 
-        private static Optional<Direction> parseDirection(String name) {
-            if ("all".equals(name)) {
-                return Optional.empty();
-            }
-            Direction direction = Direction.byName(name);
-            return Optional.of(direction == null ? Direction.UP : direction);
+        private static Optional<IoSide> parseDirection(String name) {
+            return Optional.of(IoSide.byKey(name));
         }
     }
 

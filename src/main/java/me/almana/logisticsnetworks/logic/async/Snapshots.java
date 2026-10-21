@@ -135,7 +135,7 @@ public final class Snapshots {
             boolean directSource = !FilterLogic.hasConfiguredSlotMapping(
                     channel.getFilterItems(), readCache);
             IItemHandler sourceHandler = capCache.findItemExportHandler(
-                    node, channel.getIoDirection(), directSource);
+                    node, channel.getIoSide(), directSource);
             if (sourceHandler == null) {
                 itemWakeDelta = itemWakeDelta(itemWakeDelta, targets,
                         TransferEngine.finishChannelAttempt(node, channel, i, ChannelType.ITEM.ordinal(), 0, gameTime, tier, false));
@@ -151,13 +151,13 @@ public final class Snapshots {
 
             int batchLimit = NodeUpgradeData.effectiveBatch(channel, ChannelType.ITEM, tier);
             int sourceEndpoint = endpoints.capture(
-                    node, channel.getIoDirection(), sourceHandler, occupiedSlots);
+                    node, channel.getIoSide(), sourceHandler, occupiedSlots);
 
             List<NetworkSnapshot.TargetUnit> targetUnits = new ArrayList<>(resolved.refs().size());
             for (int t = 0; t < resolved.refs().size(); t++) {
                 TransferEngine.ImportTarget ref = resolved.refs().get(t);
                 TransferEngine.ItemTransferTarget engineTarget = resolved.targets().get(t);
-                int targetEndpoint = endpoints.capture(ref.node(), ref.channel().getIoDirection(),
+                int targetEndpoint = endpoints.capture(ref.node(), ref.channel().getIoSide(),
                         engineTarget.handler(), occupiedSlots, engineTarget.bulkHandler() != null);
                 if (engineTarget.constraints().hasImportThreshold()
                         || TransferAmountRules.hasStockFilter(engineTarget.importFilters(), readCache)) {

@@ -61,6 +61,12 @@ public final class ChemicalTransferHelper {
         return new CombinedChemicalHandler(found.toArray(new IChemicalHandler[0]));
     }
 
+    @Nullable
+    public static IChemicalHandler getUnsidedHandler(ServerLevel level, BlockPos pos) {
+        if (MekanismCompat.isMekanismBlock(level, pos)) return null;
+        return level.getCapability(Capabilities.CHEMICAL.block(), pos, null);
+    }
+
     private static final class CombinedChemicalHandler implements IChemicalHandler {
         private final IChemicalHandler[] handlers;
         private final int[] tankOffsets;

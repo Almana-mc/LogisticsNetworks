@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.event;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.RedstoneMode;
@@ -212,7 +213,7 @@ public class EventHandler {
         List<String> ids = new ArrayList<>();
         TransferCapabilityCache capabilities = NetworkRegistry.get(level).getCapabilityCache();
 
-        IItemHandler itemHandler = capabilities.findItemHandler(node, null);
+        IItemHandler itemHandler = capabilities.findItemHandler(node, IoSide.ALL);
         if (itemHandler != null) {
             for (int slot = 0; slot < itemHandler.getSlots(); slot++) {
                 ItemStack stack = itemHandler.getStackInSlot(slot);
@@ -224,7 +225,7 @@ public class EventHandler {
             }
         }
 
-        IFluidHandler fluidHandler = capabilities.findFluidHandler(node, null);
+        IFluidHandler fluidHandler = capabilities.findFluidHandler(node, IoSide.ALL);
         if (fluidHandler != null) {
             for (int tank = 0; tank < fluidHandler.getTanks(); tank++) {
                 FluidStack fluid = fluidHandler.getFluidInTank(tank);

@@ -34,10 +34,10 @@ public final class AttachedStorageFilterScanner {
         TransferCapabilityCache capabilities = NetworkRegistry.get(level).getCapabilityCache();
         Result total = new Result(0, false, false);
         if (channel.hasType(ChannelType.ITEM)) {
-            total = merge(total, scanItems(capabilities.findItemHandler(node, channel.getIoDirection()), filter));
+            total = merge(total, scanItems(capabilities.findItemHandler(node, channel.getIoSide()), filter));
         }
         if (channel.hasType(ChannelType.FLUID) && !total.filterFull()) {
-            total = merge(total, scanFluids(capabilities.findFluidHandler(node, channel.getIoDirection()), filter));
+            total = merge(total, scanFluids(capabilities.findFluidHandler(node, channel.getIoSide()), filter));
         }
         if (channel.hasType(ChannelType.CHEMICAL) && !total.filterFull() && !node.isMountedOnCreate()) {
             total = merge(total, scanChemicals(level, node, channel, capabilities, filter));
@@ -99,7 +99,7 @@ public final class AttachedStorageFilterScanner {
         if (!MekanismCompat.isLoaded()) {
             return new Result(0, false, false);
         }
-        IChemicalHandler handler = capabilities.findChemicalHandler(level, node.getAttachedPos(), channel.getIoDirection());
+        IChemicalHandler handler = capabilities.findChemicalHandler(level, node.getAttachedPos(), channel.getIoSide());
         if (handler == null) {
             return new Result(0, false, false);
         }

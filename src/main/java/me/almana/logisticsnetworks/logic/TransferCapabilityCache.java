@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
@@ -8,6 +9,7 @@ import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
@@ -77,14 +79,17 @@ public final class TransferCapabilityCache {
         }
     }
 
-    IItemHandler findItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+    IItemHandler findItemHandler(ServerLevel level, BlockPos pos, IoSide side) {
+        Direction dir = side.direction();
         if (dir != null) return getItemHandler(level, pos, dir);
+        // Mekanism null side read-only
+        if (side == IoSide.NONE) return MekanismCompat.isMekanismBlock(level, pos) ? null : getItemHandler(level, pos, null);
         if (level.getBlockState(pos).getBlock() instanceof ChestBlock) {
             return getItemHandler(level, pos, Direction.UP);
         }
         List<IItemHandler> found = new ArrayList<>(6);
-        for (Direction side : DIRECTIONS) {
-            IItemHandler handler = getItemHandler(level, pos, side);
+        for (Direction face : DIRECTIONS) {
+            IItemHandler handler = getItemHandler(level, pos, face);
             if (handler != null && !containsIdentity(found, handler)) {
                 found.add(handler);
             }
@@ -94,34 +99,35 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
-    public IItemHandler findItemHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
-        return findItemHandler(node, direction, false, false);
+    public IItemHandler findItemHandler(LogisticsNodeEntity node, IoSide side) {
+        return findItemHandler(node, side, false, false);
     }
 
     @Nullable
-    public IItemHandler findItemExportHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+    public IItemHandler findItemExportHandler(LogisticsNodeEntity node, IoSide side,
             boolean directInterfaces) {
-        return findItemHandler(node, direction, directInterfaces, true);
+        return findItemHandler(node, side, directInterfaces, true);
     }
 
     @Nullable
-    public IItemHandler findItemImportHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+    public IItemHandler findItemImportHandler(LogisticsNodeEntity node, IoSide side,
             boolean directInterfaces) {
-        return findItemHandler(node, direction, directInterfaces, false);
+        return findItemHandler(node, side, directInterfaces, false);
     }
 
     @Nullable
-    private IItemHandler findItemHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+    private IItemHandler findItemHandler(LogisticsNodeEntity node, IoSide side,
             boolean directInterfaces, boolean exporting) {
         if (node.isMountedOnCreate()) {
             return CreateCompat.findMountedItemHandler(node);
         }
-        InterfaceStorageResolution resolution = resolveInterface(node, direction);
+        if (side == IoSide.NONE) return findItemHandler((ServerLevel) node.level(), node.getAttachedPos(), side);
+        InterfaceStorageResolution resolution = resolveInterface(node, side.direction());
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE) {
             if (directInterfaces) {
                 IItemHandler buffer = exporting
                         ? findInterfaceBuffer((ServerLevel) node.level(), node.getAttachedPos(),
-                                direction, resolution.endpoint())
+                                side.direction(), resolution.endpoint())
                         : null;
                 if (storageOperation != null) {
                     return storageOperation.itemHandler(resolution.endpoint(), buffer, exporting);
@@ -133,7 +139,7 @@ public final class TransferCapabilityCache {
             }
         }
         if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
-        return findItemHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
+        return findItemHandler((ServerLevel) node.level(), node.getAttachedPos(), side);
     }
 
     static InterfaceStorageResolution resolveInterface(LogisticsNodeEntity node,
@@ -146,11 +152,11 @@ public final class TransferCapabilityCache {
     private IItemHandler findInterfaceBuffer(ServerLevel level, BlockPos pos,
             @Nullable Direction direction, StorageEndpoint endpoint) {
         if (direction != null) return getItemHandler(level, pos, direction);
-        for (Direction side : DIRECTIONS) {
-            InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(level, pos, side);
+        for (Direction face : DIRECTIONS) {
+            InterfaceStorageResolution resolution = LinkedStorage.resolveInterface(level, pos, face);
             if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE
                     && resolution.endpoint().endpointIdentity() == endpoint.endpointIdentity()) {
-                return getItemHandler(level, pos, side);
+                return getItemHandler(level, pos, face);
             }
         }
         return null;
@@ -173,11 +179,13 @@ public final class TransferCapabilityCache {
         return findBulkItemHandler((ServerLevel) node.level(), node.getAttachedPos(), sidedHandler);
     }
 
-    IFluidHandler findFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+    IFluidHandler findFluidHandler(ServerLevel level, BlockPos pos, IoSide side) {
+        Direction dir = side.direction();
         if (dir != null) return getFluidHandler(level, pos, dir);
+        if (side == IoSide.NONE) return MekanismCompat.isMekanismBlock(level, pos) ? null : getFluidHandler(level, pos, null);
         List<IFluidHandler> found = new ArrayList<>(6);
-        for (Direction side : DIRECTIONS) {
-            IFluidHandler handler = getFluidHandler(level, pos, side);
+        for (Direction face : DIRECTIONS) {
+            IFluidHandler handler = getFluidHandler(level, pos, face);
             if (handler != null && !containsIdentity(found, handler)) {
                 found.add(handler);
             }
@@ -187,29 +195,30 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
-    public IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
-        return findFluidHandler(node, direction, false, false);
+    public IFluidHandler findFluidHandler(LogisticsNodeEntity node, IoSide side) {
+        return findFluidHandler(node, side, false, false);
     }
 
     @Nullable
-    public IFluidHandler findFluidExportHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+    public IFluidHandler findFluidExportHandler(LogisticsNodeEntity node, IoSide side,
             boolean directInterfaces) {
-        return findFluidHandler(node, direction, directInterfaces, true);
+        return findFluidHandler(node, side, directInterfaces, true);
     }
 
     @Nullable
-    public IFluidHandler findFluidImportHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+    public IFluidHandler findFluidImportHandler(LogisticsNodeEntity node, IoSide side,
             boolean directInterfaces) {
-        return findFluidHandler(node, direction, directInterfaces, false);
+        return findFluidHandler(node, side, directInterfaces, false);
     }
 
     @Nullable
-    private IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+    private IFluidHandler findFluidHandler(LogisticsNodeEntity node, IoSide side,
             boolean directInterfaces, boolean exporting) {
         if (node.isMountedOnCreate()) {
             return CreateCompat.findMountedFluidHandler(node);
         }
-        InterfaceStorageResolution resolution = resolveInterface(node, direction);
+        if (side == IoSide.NONE) return findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), side);
+        InterfaceStorageResolution resolution = resolveInterface(node, side.direction());
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE) {
             if (directInterfaces) {
                 return exporting
@@ -218,14 +227,16 @@ public final class TransferCapabilityCache {
             }
         }
         if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
-        return findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
+        return findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), side);
     }
 
-    IEnergyStorage findEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+    IEnergyStorage findEnergyHandler(ServerLevel level, BlockPos pos, IoSide side) {
+        Direction dir = side.direction();
         if (dir != null) return getEnergyHandler(level, pos, dir);
+        if (side == IoSide.NONE) return MekanismCompat.isMekanismBlock(level, pos) ? null : getEnergyHandler(level, pos, null);
         List<IEnergyStorage> found = new ArrayList<>(6);
-        for (Direction side : DIRECTIONS) {
-            IEnergyStorage handler = getEnergyHandler(level, pos, side);
+        for (Direction face : DIRECTIONS) {
+            IEnergyStorage handler = getEnergyHandler(level, pos, face);
             if (handler != null && !containsIdentity(found, handler)) {
                 found.add(handler);
             }
@@ -234,38 +245,42 @@ public final class TransferCapabilityCache {
         return found.size() == 1 ? found.get(0) : new CombinedEnergyHandler(found.toArray(IEnergyStorage[]::new));
     }
 
-    IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-        return ChemicalTransferHelper.getHandler(level, pos, dir);
+    IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, IoSide side) {
+        if (side == IoSide.NONE) return ChemicalTransferHelper.getUnsidedHandler(level, pos);
+        return ChemicalTransferHelper.getHandler(level, pos, side.direction());
     }
 
     public void evict(ResourceKey<Level> dim, BlockPos pos) {
         long packed = pos.asLong();
-        for (int d = 0; d < DIRECTIONS.length; d++) {
+        for (int d = 0; d <= DIRECTIONS.length; d++) {
             CapKey key = new CapKey(dim, packed, d);
             items.remove(key);
             fluids.remove(key);
             energy.remove(key);
         }
-        items.remove(new CapKey(dim, packed, DIRECTIONS.length));
+    }
+
+    private static int sideIndex(@Nullable Direction dir) {
+        return dir == null ? DIRECTIONS.length : dir.ordinal();
     }
 
     private IItemHandler getItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
         BlockCapabilityCache<IItemHandler, Direction> cache = items.computeIfAbsent(
-                new CapKey(level.dimension(), pos.asLong(), dir == null ? DIRECTIONS.length : dir.ordinal()),
+                new CapKey(level.dimension(), pos.asLong(), sideIndex(dir)),
                 k -> BlockCapabilityCache.create(Capabilities.ItemHandler.BLOCK, level, pos, dir));
         return cache.getCapability();
     }
 
-    private IFluidHandler getFluidHandler(ServerLevel level, BlockPos pos, Direction dir) {
+    private IFluidHandler getFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
         BlockCapabilityCache<IFluidHandler, Direction> cache = fluids.computeIfAbsent(
-                new CapKey(level.dimension(), pos.asLong(), dir.ordinal()),
+                new CapKey(level.dimension(), pos.asLong(), sideIndex(dir)),
                 k -> BlockCapabilityCache.create(Capabilities.FluidHandler.BLOCK, level, pos, dir));
         return cache.getCapability();
     }
 
-    private IEnergyStorage getEnergyHandler(ServerLevel level, BlockPos pos, Direction dir) {
+    private IEnergyStorage getEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
         BlockCapabilityCache<IEnergyStorage, Direction> cache = energy.computeIfAbsent(
-                new CapKey(level.dimension(), pos.asLong(), dir.ordinal()),
+                new CapKey(level.dimension(), pos.asLong(), sideIndex(dir)),
                 k -> BlockCapabilityCache.create(Capabilities.EnergyStorage.BLOCK, level, pos, dir));
         return cache.getCapability();
     }

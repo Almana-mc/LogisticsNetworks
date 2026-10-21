@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.entity;
 
 import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NodeRouteChannels;
 import me.almana.logisticsnetworks.data.SlotStack;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
@@ -329,9 +330,9 @@ public class LogisticsNodeEntity extends Entity {
         entityData.set(CREATE_CONTRAPTION_ID, Optional.empty());
         entityData.set(CREATE_LOCAL_POS, BlockPos.ZERO);
         for (ChannelData channel : channels) {
-            Direction direction = channel.getIoDirection();
+            Direction direction = channel.getIoSide().direction();
             if (direction != null) {
-                channel.setIoDirection(directionTransform.apply(direction));
+                channel.setIoSide(IoSide.of(directionTransform.apply(direction)));
             }
         }
         moveAttachment(attachedPos, position);

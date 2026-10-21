@@ -133,7 +133,7 @@ public final class TransferCommitter {
         boolean directSource = !FilterLogic.hasConfiguredSlotMapping(
                 sourceChannel.getFilterItems(), FilterItemData.createReadCache());
         IItemHandler source = capCache.findItemExportHandler(
-                sourceNode, sourceChannel.getIoDirection(), directSource);
+                sourceNode, sourceChannel.getIoSide(), directSource);
         if (source == null) {
             long wakeDelta = TransferEngine.finishChannelAttempt(sourceNode, sourceChannel, channel.channelIndex(), ChannelType.ITEM.ordinal(), 0,
                     sourceNode.level().getGameTime(), network.getTierCache().getOrDefault(sourceNode.getUUID(), 0),
@@ -263,7 +263,7 @@ public final class TransferCommitter {
             boolean directTarget = !FilterLogic.hasConfiguredSlotMapping(
                     channel.getFilterItems(), FilterItemData.createReadCache());
             IItemHandler handler = capCache.findItemImportHandler(
-                    node, channel.getIoDirection(), directTarget);
+                    node, channel.getIoSide(), directTarget);
             if (handler == null) {
                 continue;
             }
