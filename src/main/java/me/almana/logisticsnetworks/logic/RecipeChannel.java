@@ -4,7 +4,6 @@ import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
-import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
@@ -42,14 +41,18 @@ final class RecipeChannel {
         return all;
     }
 
-    static boolean hasLoose(ChannelData channel) {
+    // Card kinds only move loose entries
+    static boolean runsLoose(ChannelData channel, ChannelType type) {
         ItemStack[] filters = channel.getFilterItems();
+        boolean cardKind = RecipeSets.kinds(RecipeSets.cards(filters)).stream()
+                .anyMatch(kind -> kind.channel == type);
+        if (!cardKind)
+            return true;
         FilterItemData.ReadCache cache = FilterItemData.createReadCache();
-        return switch (channel.getType()) {
+        return switch (type) {
             case ITEM -> FilterLogic.hasConfiguredItemFilter(filters, cache);
             case FLUID -> FilterLogic.hasConfiguredFluidFilter(filters, cache);
-            case CHEMICAL -> FilterLogic.hasConfiguredChemicalFilter(filters, cache);
-            default -> false;
+            default -> FilterLogic.hasConfiguredChemicalFilter(filters, cache);
         };
     }
 
@@ -66,20 +69,19 @@ final class RecipeChannel {
         List<TransferEngine.ImportTarget> refs = new ArrayList<>();
         if (!connect(sourceNode, level, channel, targets, dimCache, source, kinds, caps, cache, endpoints, refs))
             return -1;
-        long[] own = new long[1];
         boolean robin = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         RecipeSets.Listener listener = (endpoint, resource, amount) -> {
             if (robin) {
                 TransferEngine.ImportTarget ref = refs.get(endpoint);
                 channel.setRecipeRobinCursor(new PriorityRobin.Cursor(ref.channel().getPriority(), ref.node().getUUID()));
             }
-            if (telemetry) channel.getTelemetry().recordResource(resource, amount);
-            if (ownType(channel.getType(), resource)) own[0] += amount;
+            if (telemetry) {
+                channel.getTelemetry().recordResource(resource, amount);
+                channel.getTelemetry().record(resource.type(), amount);
+            }
         };
-        int sets = RecipeSets.transfer(source, endpoints, cards, batch, tier, channel.getDistributionMode(),
+        return RecipeSets.transfer(source, endpoints, cards, batch, tier, channel.getDistributionMode(),
                 listener, level.registryAccess(), cache);
-        // Flow total in channel units
-        return sets <= 0 ? sets : (int) Math.max(sets, Math.min(Integer.MAX_VALUE, own[0]));
     }
 
     // False when unreachable or paused
@@ -127,26 +129,34 @@ final class RecipeChannel {
             Set<RecipeCardData.Kind> kinds, TransferCapabilityCache caps, FilterItemData.ReadCache cache) {
         Direction side = channel.getIoDirection();
         boolean direct = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), cache);
-        boolean chemicals = kinds.contains(RecipeCardData.Kind.CHEMICAL) && !node.isMountedOnCreate() && MekanismCompat.isLoaded()
+        int types = channel.getTypes();
+        boolean chemicals = kinds.contains(RecipeCardData.Kind.CHEMICAL) && ChannelType.CHEMICAL.in(types)
+                && !node.isMountedOnCreate() && MekanismCompat.isLoaded()
                 && NodeUpgradeData.hasMekanismChemicalUpgrade(node);
         return new RecipeSets.Source(
-                kinds.contains(RecipeCardData.Kind.ITEM) ? caps.findItemExportHandler(node, side, direct) : null,
-                kinds.contains(RecipeCardData.Kind.FLUID) ? caps.findFluidExportHandler(node, side, true) : null,
+                kinds.contains(RecipeCardData.Kind.ITEM) && ChannelType.ITEM.in(types)
+                        ? caps.findItemExportHandler(node, side, direct) : null,
+                kinds.contains(RecipeCardData.Kind.FLUID) && ChannelType.FLUID.in(types)
+                        ? caps.findFluidExportHandler(node, side, true) : null,
                 chemicals ? caps.findChemicalHandler(level, node.getAttachedPos(), side) : null);
     }
 
     private static RecipeEndpoint endpoint(TransferEngine.ImportTarget target, RecipeSets.Source source,
             Set<RecipeCardData.Kind> kinds, TransferCapabilityCache caps, FilterItemData.ReadCache cache) {
+        int accepts = NodeUpgradeData.effectiveTypes(target.node(), target.channel());
         return new RecipeEndpoint(
-                kinds.contains(RecipeCardData.Kind.ITEM) ? items(target, source.items(), caps, cache) : null,
-                kinds.contains(RecipeCardData.Kind.FLUID) ? fluids(target, source.fluids(), caps) : null,
-                source.chemicals() != null ? chemicals(target, source.chemicals(), caps) : null);
+                kinds.contains(RecipeCardData.Kind.ITEM) && ChannelType.ITEM.in(accepts)
+                        ? items(target, source.items(), caps, cache) : null,
+                kinds.contains(RecipeCardData.Kind.FLUID) && ChannelType.FLUID.in(accepts)
+                        ? fluids(target, source.fluids(), caps) : null,
+                source.chemicals() != null && ChannelType.CHEMICAL.in(accepts)
+                        ? chemicals(target, source.chemicals(), caps) : null);
     }
 
     @Nullable
     private static TransferEngine.ItemTransferTarget items(TransferEngine.ImportTarget target,
             @Nullable IItemHandler from, TransferCapabilityCache caps, FilterItemData.ReadCache cache) {
-        ItemStack[] filters = filtersFor(target.channel(), ChannelType.ITEM);
+        ItemStack[] filters = target.channel().getFilterItems();
         boolean mapped = FilterLogic.hasConfiguredSlotMapping(filters, cache);
         IItemHandler handler = caps.findItemImportHandler(target.node(), target.channel().getIoDirection(), !mapped);
         if (handler == null || handler == from || from != null && DirectStorageHandlers.shareNetwork(from, handler))
@@ -163,7 +173,7 @@ final class RecipeChannel {
         IFluidHandler handler = caps.findFluidImportHandler(target.node(), target.channel().getIoDirection(), true);
         if (handler == null || handler == from || from != null && DirectStorageHandlers.shareNetwork(from, handler))
             return null;
-        return new TransferEngine.FluidTransferTarget(handler, filtersFor(target.channel(), ChannelType.FLUID),
+        return new TransferEngine.FluidTransferTarget(handler, target.channel().getFilterItems(),
                 target.channel().getFilterMode());
     }
 
@@ -177,20 +187,7 @@ final class RecipeChannel {
                 target.channel().getIoDirection());
         if (handler == null || handler == from)
             return null;
-        return new RecipeEndpoint.Chemicals(handler, filtersFor(target.channel(), ChannelType.CHEMICAL),
+        return new RecipeEndpoint.Chemicals(handler, target.channel().getFilterItems(),
                 target.channel().getFilterMode());
-    }
-
-    // Receiver filter, own type only
-    private static ItemStack[] filtersFor(ChannelData channel, ChannelType type) {
-        return channel.getType() == type ? channel.getFilterItems() : NO_FILTERS;
-    }
-
-    private static boolean ownType(ChannelType type, FlowResource resource) {
-        return switch (resource) {
-            case FlowResource.Item item -> type == ChannelType.ITEM;
-            case FlowResource.Fluid fluid -> type == ChannelType.FLUID;
-            case FlowResource.Chemical chemical -> type == ChannelType.CHEMICAL;
-        };
     }
 }

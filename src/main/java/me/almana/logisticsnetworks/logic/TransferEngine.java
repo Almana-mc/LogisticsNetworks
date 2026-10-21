@@ -299,74 +299,94 @@ public class TransferEngine {
             if (!isRedstoneActive(channel.getRedstoneMode(), redstoneSignal))
                 continue;
 
-            List<ImportTarget> typed = switch (channel.getType()) {
-                case FLUID -> fluidImports[i];
-                case ENERGY -> energyImports[i];
-                case CHEMICAL -> chemicalImports[i];
-                case SOURCE -> sourceImports[i];
-                default -> itemImports[i];
-            };
+            int types = NodeUpgradeData.effectiveTypes(sourceNode, channel);
             boolean cards = RecipeCardItem.anyIn(channel.getFilterItems());
-            boolean noTargets = cards
-                    ? itemImports[i].isEmpty() && fluidImports[i].isEmpty() && chemicalImports[i].isEmpty()
-                    : typed == null || typed.isEmpty();
-            if (noTargets)
-                continue;
+            if (cards) {
+                long delta = recipeLane(sourceNode, sourceLevel, channel, i, itemImports[i], fluidImports[i],
+                        chemicalImports[i], sourceTier, gameTime, dimensionalCache, capCache, telemetryActive);
+                if (delta < minWakeDelta) minWakeDelta = delta;
+            }
 
-            if (sourceNode.isMountedOnCreate()) {
-                boolean storageAvailable = switch (channel.getType()) {
-                    case ITEM -> capCache.findItemHandler(sourceNode, channel.getIoDirection()) != null;
-                    case FLUID -> capCache.findFluidHandler(sourceNode, channel.getIoDirection()) != null;
-                    default -> false;
-                };
-                if (!storageAvailable)
+            for (ChannelType type : ChannelType.ORDER) {
+                if (!type.in(types) || cards && !RecipeChannel.runsLoose(channel, type))
                     continue;
-            }
+                List<ImportTarget> typed = importsFor(type, i, itemImports, fluidImports, energyImports,
+                        chemicalImports, sourceImports);
+                if (typed == null || typed.isEmpty())
+                    continue;
+                if (sourceNode.isMountedOnCreate() && !hasMountedStorage(sourceNode, channel, type, capCache))
+                    continue;
 
-            long cooldown = cooldownRemaining(sourceNode, channel, i, channel.getType().ordinal(), sourceTier, gameTime);
-            if (cooldown > 0) {
-                if (cooldown < minWakeDelta) minWakeDelta = cooldown;
-                continue;
-            }
+                int lane = type.ordinal();
+                long cooldown = cooldownRemaining(sourceNode, channel, i, lane, sourceTier, gameTime);
+                if (cooldown > 0) {
+                    if (cooldown < minWakeDelta) minWakeDelta = cooldown;
+                    continue;
+                }
+                if (type == ChannelType.ITEM && !includeItemTransfers && !cards)
+                    continue;
 
-            if (!includeItemTransfers && channel.getType() == ChannelType.ITEM && !cards)
-                continue;
-
-            int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
-            int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
-
-            int result = cards ? RecipeChannel.transfer(sourceNode, sourceLevel, channel,
-                    RecipeChannel.receivers(itemImports[i], fluidImports[i], chemicalImports[i]),
-                    effectiveBatchSize, sourceTier, dimensionalCache, capCache, telemetryActive) : -1;
-            if (!cards || RecipeChannel.hasLoose(channel)) {
-                int loose = switch (channel.getType()) {
-                    case FLUID ->
-                        transferFluids(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache, capCache,
-                                telemetryActive);
-                    case ENERGY ->
-                        transferEnergy(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache, capCache);
-                    case CHEMICAL ->
-                        transferChemicals(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache,
-                                capCache, telemetryActive);
-                    case SOURCE ->
-                        transferSource(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache);
-                    default ->
-                        transferItems(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache,
-                                capCache, telemetryActive);
+                int batch = NodeUpgradeData.effectiveBatch(channel, type, sourceTier);
+                int result = switch (type) {
+                    case ITEM -> transferItems(sourceNode, sourceLevel, channel, i, typed, batch, dimensionalCache,
+                            capCache, telemetryActive);
+                    case FLUID -> transferFluids(sourceNode, sourceLevel, channel, i, typed, batch,
+                            dimensionalCache, capCache, telemetryActive);
+                    case ENERGY -> transferEnergy(sourceNode, sourceLevel, channel, i, typed, batch,
+                            dimensionalCache, capCache);
+                    case CHEMICAL -> transferChemicals(sourceNode, sourceLevel, channel, i, typed, batch,
+                            dimensionalCache, capCache, telemetryActive);
+                    case SOURCE -> transferSource(sourceNode, sourceLevel, channel, i, typed, batch,
+                            dimensionalCache);
                 };
-                // Separate budgets, -1 means unreachable
-                result = result < 0 ? loose : loose < 0 ? result : result + loose;
+                if (result < 0)
+                    continue;
+
+                long wakeDelta = finishChannelAttempt(sourceNode, channel, i, lane, result, gameTime, sourceTier,
+                        telemetryActive);
+                if (wakeDelta < minWakeDelta) minWakeDelta = wakeDelta;
             }
-
-            if (result < 0)
-                continue;
-
-            long wakeDelta = finishChannelAttempt(
-                    sourceNode, channel, i, channel.getType().ordinal(), result, gameTime, sourceTier, telemetryActive);
-            if (wakeDelta < minWakeDelta) minWakeDelta = wakeDelta;
         }
 
         return minWakeDelta;
+    }
+
+    private static long recipeLane(LogisticsNodeEntity sourceNode, ServerLevel level, ChannelData channel, int index,
+            List<ImportTarget> items, List<ImportTarget> fluids, List<ImportTarget> chemicals, int tier,
+            long gameTime, Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache,
+            boolean telemetryActive) {
+        if (items.isEmpty() && fluids.isEmpty() && chemicals.isEmpty())
+            return Long.MAX_VALUE;
+        long cooldown = cooldownRemaining(sourceNode, channel, index, ChannelData.RECIPE_LANE, tier, gameTime);
+        if (cooldown > 0)
+            return cooldown;
+        int sets = RecipeChannel.transfer(sourceNode, level, channel, RecipeChannel.receivers(items, fluids, chemicals),
+                NodeUpgradeData.recipeBudget(channel), tier, dimensionalCache, capCache, telemetryActive);
+        if (sets < 0)
+            return Long.MAX_VALUE;
+        return finishChannelAttempt(sourceNode, channel, index, ChannelData.RECIPE_LANE, sets, gameTime, tier,
+                telemetryActive);
+    }
+
+    private static List<ImportTarget> importsFor(ChannelType type, int channel, List<ImportTarget>[] items,
+            List<ImportTarget>[] fluids, List<ImportTarget>[] energy, List<ImportTarget>[] chemicals,
+            List<ImportTarget>[] source) {
+        return switch (type) {
+            case ITEM -> items[channel];
+            case FLUID -> fluids[channel];
+            case ENERGY -> energy[channel];
+            case CHEMICAL -> chemicals[channel];
+            case SOURCE -> source[channel];
+        };
+    }
+
+    private static boolean hasMountedStorage(LogisticsNodeEntity node, ChannelData channel, ChannelType type,
+            TransferCapabilityCache capCache) {
+        return switch (type) {
+            case ITEM -> capCache.findItemHandler(node, channel.getIoDirection()) != null;
+            case FLUID -> capCache.findFluidHandler(node, channel.getIoDirection()) != null;
+            default -> false;
+        };
     }
 
     public static long finishChannelAttempt(LogisticsNodeEntity node, ChannelData channel, int index, int lane,
