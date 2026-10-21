@@ -205,9 +205,7 @@ public class LogisticsNodeEntity extends Entity {
     private void refreshRouteChannels() {
         long bits = 0L;
         if (isValidNode() && getNetworkId() != null && CreateCompat.isResolved(this)) {
-            bits = NodeRouteChannels.encode(channels, isMountedOnCreate(),
-                    NodeUpgradeData.hasMekanismChemicalUpgrade(this),
-                    NodeUpgradeData.hasArsSourceUpgrade(this));
+            bits = NodeRouteChannels.encode(channels, isMountedOnCreate(), NodeUpgradeData.availableTypes(this));
         }
         this.entityData.set(ROUTE_CHANNELS, bits);
     }

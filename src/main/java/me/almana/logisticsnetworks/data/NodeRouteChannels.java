@@ -2,19 +2,16 @@ package me.almana.logisticsnetworks.data;
 
 public final class NodeRouteChannels {
     private static final int CHANNEL_COUNT = 9;
-    private static final int BITS_PER_CHANNEL = 4;
+    private static final int BITS_PER_CHANNEL = 6;
+    private static final int EXPORT_BIT = 1 << 5;
 
     private NodeRouteChannels() {
     }
 
-    public static long encode(ChannelData[] channels, boolean mounted, boolean chemicalUpgrade,
-            boolean sourceUpgrade) {
+    public static long encode(ChannelData[] channels, boolean mounted, int available) {
         long bits = 0L;
         for (int channel = 0; channel < CHANNEL_COUNT; channel++) {
-            ChannelData data = channels[channel];
-            if (isSupported(data, mounted, chemicalUpgrade, sourceUpgrade)) {
-                bits |= (long) descriptor(data.getType(), data.getMode()) << channel * BITS_PER_CHANNEL;
-            }
+            bits |= (long) descriptor(channels[channel], mounted, available) << channel * BITS_PER_CHANNEL;
         }
         return bits;
     }
@@ -23,27 +20,18 @@ public final class NodeRouteChannels {
         if (channel < 0 || channel >= CHANNEL_COUNT) {
             return false;
         }
-        long descriptor = bits >>> channel * BITS_PER_CHANNEL & 0xFL;
-        return descriptor == descriptor(type, mode);
+        int descriptor = (int) (bits >>> channel * BITS_PER_CHANNEL & 0x3FL);
+        return type.in(descriptor) && ((descriptor & EXPORT_BIT) != 0) == (mode == ChannelMode.EXPORT);
     }
 
-    private static boolean isSupported(ChannelData channel, boolean mounted, boolean chemicalUpgrade,
-            boolean sourceUpgrade) {
-        if (!channel.isEnabled()) {
-            return false;
+    private static int descriptor(ChannelData channel, boolean mounted, int available) {
+        if (!channel.isEnabled() || mounted && channel.getRedstoneMode() == RedstoneMode.HIGH) {
+            return 0;
         }
-        ChannelType type = channel.getType();
-        if (mounted && (channel.getRedstoneMode() == RedstoneMode.HIGH
-                || type != ChannelType.ITEM && type != ChannelType.FLUID)) {
-            return false;
+        int types = channel.getTypes() & available;
+        if (types == 0) {
+            return 0;
         }
-        if (type == ChannelType.CHEMICAL) {
-            return chemicalUpgrade;
-        }
-        return type != ChannelType.SOURCE || sourceUpgrade;
-    }
-
-    private static int descriptor(ChannelType type, ChannelMode mode) {
-        return type.ordinal() + (mode == ChannelMode.IMPORT ? 1 : 6);
+        return types | (channel.getMode() == ChannelMode.EXPORT ? EXPORT_BIT : 0);
     }
 }

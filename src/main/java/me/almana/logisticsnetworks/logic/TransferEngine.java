@@ -1817,16 +1817,8 @@ public class TransferEngine {
         };
     }
 
-    static boolean canRunChannel(boolean mounted, ChannelType type, RedstoneMode redstoneMode) {
-        if (!mounted) {
-            return true;
-        }
-        return redstoneMode != RedstoneMode.HIGH
-                && (type == ChannelType.ITEM || type == ChannelType.FLUID);
-    }
-
     public static boolean canRunChannel(LogisticsNodeEntity node, ChannelData channel) {
-        return canRunChannel(node.isMountedOnCreate(), channel.getType(), channel.getRedstoneMode());
+        return !node.isMountedOnCreate() || channel.getRedstoneMode() != RedstoneMode.HIGH;
     }
 
     static boolean shouldPauseForUnavailableMountedTargets(boolean hasUsableTarget,
