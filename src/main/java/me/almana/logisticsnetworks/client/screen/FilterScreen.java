@@ -3118,11 +3118,9 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         detailEditSlot = slot;
         tagEditSlot = -1;
         nbtEditSlot = -1;
-        detailTagScrollOffset = 0;
         detailNbtRawMode = false;
         detailNbtPageOpen = false;
         detailNbtScrollOffset = 0;
-        lastDetailIdFilter = "";
 
         savedImageHeight = imageHeight;
         savedTopPos = topPos;
@@ -3140,6 +3138,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private void loadDetailKind(int slot) {
         FilterTargetType targetType = detailKind;
         boolean isFluidOrChemical = targetType != FilterTargetType.ITEMS;
+        detailTagScrollOffset = 0;
+        lastDetailIdFilter = "";
 
         detailCachedTags.clear();
         detailAllTags.clear();
