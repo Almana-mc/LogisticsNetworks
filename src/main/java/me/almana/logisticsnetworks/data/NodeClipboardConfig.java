@@ -56,8 +56,8 @@ public final class NodeClipboardConfig {
                     ChannelMode.CODEC.lenientOptionalFieldOf("mode", ChannelMode.IMPORT)
                             .forGetter(ChannelState::mode),
                     ChannelType.CODEC.lenientOptionalFieldOf("type", ChannelType.ITEM)
-                            .forGetter(ChannelState::type),
-                    Codec.INT.lenientOptionalFieldOf("batch", 8).forGetter(ChannelState::batchSize),
+                            .forGetter(ChannelState::primaryType),
+                    Codec.INT.lenientOptionalFieldOf("batch", 8).forGetter(ChannelState::primaryBatch),
                     Codec.INT.lenientOptionalFieldOf("delay", 20).forGetter(ChannelState::tickDelay),
                     ChannelState.DIRECTION.lenientOptionalFieldOf("io", Optional.of(Direction.UP))
                             .forGetter(ChannelState::direction),
@@ -71,7 +71,7 @@ public final class NodeClipboardConfig {
                     Codec.STRING.lenientOptionalFieldOf("name", "").forGetter(ChannelState::name),
                     Codec.BOOL.lenientOptionalFieldOf("resource_round_robin", false)
                             .forGetter(ChannelState::resourceRoundRobin)
-            ).apply(instance, ChannelState::fromSerialized));
+            ).apply(instance, ChannelState::legacy));
     private static final Codec<Pair<Integer, ChannelState>> LEGACY_CHANNEL =
             Codec.mapPair(Codec.INT.lenientOptionalFieldOf("index", 0), LEGACY_CHANNEL_STATE).codec();
     private static final Codec<Pair<Integer, SlotStack>> LEGACY_FILTER =
@@ -181,8 +181,9 @@ public final class NodeClipboardConfig {
             channelStates.add(new ClipboardSnapshot.ChannelState(
                     config.enabled,
                     config.mode,
-                    config.type,
-                    config.batchSize,
+                    config.type.bit(),
+                    singleBatch(config.type, config.batchSize),
+                    0,
                     config.tickDelay,
                     Optional.ofNullable(config.ioDirection),
                     config.redstoneMode,
@@ -231,8 +232,8 @@ public final class NodeClipboardConfig {
             ChannelConfig config = result.channels[channel];
             config.enabled = state.enabled();
             config.mode = state.mode();
-            config.type = state.type();
-            config.batchSize = state.batchSize();
+            config.type = state.primaryType();
+            config.batchSize = Math.max(1, state.primaryBatch());
             config.tickDelay = config.type == ChannelType.ENERGY ? 1 : state.tickDelay();
             config.ioDirection = state.direction().orElse(null);
             config.redstoneMode = state.redstoneMode();
@@ -1154,6 +1155,12 @@ public final class NodeClipboardConfig {
 
         node.setRenderVisible(renderVisible);
         node.setNodeLabel(nodeLabel);
+    }
+
+    private static List<Integer> singleBatch(ChannelType type, int batch) {
+        List<Integer> batches = new ArrayList<>(ClipboardSnapshot.ChannelState.MAX_BATCHES);
+        batches.set(type.ordinal(), batch);
+        return batches;
     }
 
     private static ChannelConfig defaultChannelConfig() {

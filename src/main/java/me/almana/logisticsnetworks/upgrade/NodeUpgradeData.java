@@ -5,6 +5,8 @@ import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.ars.ArsCompat;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -29,6 +31,34 @@ public final class NodeUpgradeData {
             case CHEMICAL -> getChemicalOperationCap(tier);
             case SOURCE -> getSourceOperationCap(tier);
         };
+    }
+
+    public static int availableTypes(boolean mounted, boolean chemicalUpgrade, boolean sourceUpgrade) {
+        if (mounted) return ChannelType.ITEM.bit() | ChannelType.FLUID.bit();
+        int mask = ChannelType.ITEM.bit() | ChannelType.FLUID.bit() | ChannelType.ENERGY.bit();
+        if (chemicalUpgrade) mask |= ChannelType.CHEMICAL.bit();
+        if (sourceUpgrade) mask |= ChannelType.SOURCE.bit();
+        return mask;
+    }
+
+    public static int availableTypes(LogisticsNodeEntity node) {
+        return availableTypes(node.isMountedOnCreate(),
+                MekanismCompat.isLoaded() && hasMekanismChemicalUpgrade(node),
+                ArsCompat.isLoaded() && hasArsSourceUpgrade(node));
+    }
+
+    public static int effectiveTypes(LogisticsNodeEntity node, ChannelData channel) {
+        return channel.getTypes() & availableTypes(node);
+    }
+
+    public static int effectiveBatch(ChannelData channel, ChannelType type, int tier) {
+        int cap = getOperationCap(type, tier);
+        int value = channel.getBatch(type);
+        return type == ChannelType.ENERGY || value <= 0 ? cap : Math.min(value, cap);
+    }
+
+    public static int recipeBudget(ChannelData channel) {
+        return channel.getRecipeSets() <= 0 ? Integer.MAX_VALUE : channel.getRecipeSets();
     }
 
     public static void applyTypeChange(ChannelData channel, ChannelType type, int tier) {

@@ -24,12 +24,14 @@ import java.util.Optional;
 public class ChannelData {
 
     public static final int FILTER_SIZE = 6;
+    public static final int RECIPE_LANE = ChannelType.values().length;
+    public static final int LANES = RECIPE_LANE + 1;
 
     private static final MapCodec<ChannelState> LEGACY_SETTINGS = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Codec.BOOL.lenientOptionalFieldOf("Enabled", false).forGetter(ChannelState::enabled),
             ChannelMode.CODEC.lenientOptionalFieldOf("Mode", ChannelMode.IMPORT).forGetter(ChannelState::mode),
-            ChannelType.CODEC.lenientOptionalFieldOf("Type", ChannelType.ITEM).forGetter(ChannelState::type),
-            Codec.INT.lenientOptionalFieldOf("BatchSize", 8).forGetter(ChannelState::batchSize),
+            ChannelType.CODEC.lenientOptionalFieldOf("Type", ChannelType.ITEM).forGetter(ChannelState::primaryType),
+            Codec.INT.lenientOptionalFieldOf("BatchSize", 8).forGetter(ChannelState::primaryBatch),
             Codec.INT.lenientOptionalFieldOf("TickDelay", 20).forGetter(ChannelState::tickDelay),
             ChannelState.DIRECTION.lenientOptionalFieldOf("IoDirection", Optional.of(Direction.UP))
                     .forGetter(ChannelState::direction),
@@ -42,7 +44,7 @@ public class ChannelData {
             Codec.STRING.lenientOptionalFieldOf("Name", "").forGetter(ChannelState::name),
             Codec.BOOL.lenientOptionalFieldOf("ResourceRoundRobin", false)
                     .forGetter(ChannelState::resourceRoundRobin)
-    ).apply(instance, ChannelState::fromSerialized));
+    ).apply(instance, ChannelState::legacy));
 
     static final Codec<ChannelData> CURRENT_CODEC = RecordCodecBuilder.create(instance -> instance.group(
             ChannelState.MAP_CODEC.forGetter(ChannelData::settings),
@@ -64,8 +66,9 @@ public class ChannelData {
 
     private boolean enabled;
     private ChannelMode mode = ChannelMode.IMPORT;
-    private ChannelType type = ChannelType.ITEM;
-    private int batchSize = 8;
+    private int types = ChannelType.ALL;
+    private final int[] batches = new int[ChannelType.values().length];
+    private int recipeSets;
     private int tickDelay = 20;
     @Nullable
     private Direction ioDirection = Direction.UP;
@@ -95,8 +98,11 @@ public class ChannelData {
     private static ChannelData of(ChannelState settings, List<SlotStack> filters) {
         ChannelData channel = new ChannelData(settings.enabled());
         channel.setMode(settings.mode());
-        channel.setType(settings.type());
-        channel.setBatchSize(settings.batchSize());
+        channel.setTypes(settings.types());
+        for (ChannelType type : ChannelType.values()) {
+            channel.setBatch(type, settings.batches().get(type.ordinal()));
+        }
+        channel.setRecipeSets(settings.recipeSets());
         channel.setTickDelay(settings.tickDelay());
         channel.setIoDirection(settings.direction().orElse(null));
         channel.setRedstoneMode(settings.redstoneMode());
@@ -110,8 +116,9 @@ public class ChannelData {
     }
 
     private ChannelState settings() {
-        return new ChannelState(enabled, mode, type, batchSize, tickDelay, Optional.ofNullable(ioDirection),
-                redstoneMode, distributionMode, filterMode, priority, name, resourceRoundRobin);
+        return new ChannelState(enabled, mode, types, Arrays.stream(batches).boxed().toList(), recipeSets,
+                tickDelay, Optional.ofNullable(ioDirection), redstoneMode, distributionMode, filterMode, priority,
+                name, resourceRoundRobin);
     }
 
     private List<SlotStack> filterSlots() {
@@ -168,24 +175,57 @@ public class ChannelData {
             this.mode = mode;
     }
 
+    public int getTypes() {
+        return types;
+    }
+
+    public void setTypes(int mask) {
+        types = mask & ChannelType.ALL;
+    }
+
+    public boolean hasType(ChannelType type) {
+        return type.in(types);
+    }
+
+    public boolean hasFilterableType() {
+        return (types & ChannelType.FILTERABLE) != 0;
+    }
+
+    public int getBatch(ChannelType type) {
+        return batches[type.ordinal()];
+    }
+
+    public void setBatch(ChannelType type, int batch) {
+        batches[type.ordinal()] = Math.max(0, batch);
+    }
+
+    public int getRecipeSets() {
+        return recipeSets;
+    }
+
+    public void setRecipeSets(int sets) {
+        recipeSets = Math.max(0, sets);
+    }
+
+    // Transitional, removed in Task 16
     public ChannelType getType() {
-        return type;
+        return ChannelType.first(types);
     }
 
+    // Transitional, removed in Task 16
     public void setType(ChannelType type) {
-        if (type != null) {
-            this.type = type;
-            if (type == ChannelType.ENERGY)
-                tickDelay = 1;
-        }
+        if (type != null) types = type.bit();
     }
 
+    // Transitional, removed in Task 16
     public int getBatchSize() {
-        return batchSize;
+        int value = batches[getType().ordinal()];
+        return value <= 0 ? Integer.MAX_VALUE : value;
     }
 
+    // Transitional, removed in Task 16
     public void setBatchSize(int batchSize) {
-        this.batchSize = Math.max(1, batchSize);
+        batches[getType().ordinal()] = Math.max(1, batchSize);
     }
 
     public int getTickDelay() {
@@ -193,7 +233,7 @@ public class ChannelData {
     }
 
     public void setTickDelay(int tickDelay) {
-        this.tickDelay = type == ChannelType.ENERGY ? 1 : Math.max(1, tickDelay);
+        this.tickDelay = Math.max(1, tickDelay);
     }
 
     @Nullable
@@ -247,7 +287,7 @@ public class ChannelData {
 
     public boolean canRotateResources() {
         return resourceRoundRobin && mode == ChannelMode.EXPORT
-                && (type == ChannelType.ITEM || type == ChannelType.FLUID)
+                && (hasType(ChannelType.ITEM) || hasType(ChannelType.FLUID))
                 && Arrays.stream(filterItems).anyMatch(stack -> !stack.isEmpty());
     }
 
@@ -331,8 +371,9 @@ public class ChannelData {
         recipeRobinCursor = null;
         this.enabled = source.enabled;
         this.mode = source.mode;
-        setType(source.type);
-        this.batchSize = source.batchSize;
+        this.types = source.types;
+        System.arraycopy(source.batches, 0, this.batches, 0, this.batches.length);
+        this.recipeSets = source.recipeSets;
         setTickDelay(source.tickDelay);
         this.ioDirection = source.ioDirection;
         this.redstoneMode = source.redstoneMode;
