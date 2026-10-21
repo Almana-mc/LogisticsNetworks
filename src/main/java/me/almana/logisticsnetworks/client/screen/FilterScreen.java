@@ -177,6 +177,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     private List<ItemStack> nbtOnlyCycleItems;
     private List<Fluid> anyCycleFluids;
     private List<String> anyCycleChemicals;
+    private FilterTargetType[] anyCycleKinds;
     private EditBox detailNbtValueBox;
     private EditBox detailIdInputBox;
     private EditBox detailBatchInputBox;
@@ -604,21 +605,24 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         renderChemicalGhostItems(g);
         renderKindSummary(g);
 
-        renderModeControls(g, mx, my, false);
+        renderModeControls(g, mx, my);
     }
 
     private void renderKindSummary(GuiGraphics g) {
-        int items = 0, fluids = 0, chemicals = 0, cards = 0;
+        int[] counts = new int[FilterTargetType.values().length];
+        int cards = 0;
         for (int i = 0; i < menu.getFilterSlots() && i < menu.slots.size(); i++) {
             if (RecipeCardItem.is(menu.slots.get(i).getItem())) cards++;
-            else if (!hasEntryInSlot(i)) continue;
-            else switch (menu.getEntryKind(i)) {
-                case FLUIDS -> fluids++;
-                case CHEMICALS -> chemicals++;
-                default -> items++;
-            }
+            else if (hasEntryInSlot(i)) counts[menu.getEntryKind(i).ordinal()]++;
         }
-        g.drawString(font, tr("gui.logisticsnetworks.filter.summary", items, fluids, chemicals, cards),
+        List<String> parts = new ArrayList<>();
+        for (FilterTargetType kind : FilterTargetType.values()) {
+            if (counts[kind.ordinal()] > 0)
+                parts.add(tr("gui.logisticsnetworks.filter.summary." + kind.getSerializedName(), counts[kind.ordinal()]));
+        }
+        if (cards > 0) parts.add(tr("gui.logisticsnetworks.filter.summary.cards", cards));
+        if (parts.isEmpty()) return;
+        g.drawString(font, font.plainSubstrByWidth(String.join(" \u00B7 ", parts), imageWidth - 16),
                 leftPos + 8, topPos + menu.getPlayerInventoryY() - 24, COL_GRAY, false);
     }
 
@@ -680,10 +684,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
 
     private void renderModMode(GuiGraphics g, int mx, int my) {
-        renderModeControls(g, mx, my, false);
-        String typeLabel = targetLabel(menu.getTargetType());
-        int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-        drawButton(g, leftPos + imageWidth - 8 - typeBtnW, topPos + 20, typeBtnW, 12, typeLabel, mx, my, true);
+        renderModeControls(g, mx, my);
+        int typeBtnW = modTargetButtonW();
+        drawButton(g, leftPos + imageWidth - 8 - typeBtnW, topPos + 20, typeBtnW, 12,
+                targetLabel(menu.getTargetType()), mx, my, true);
         renderDropdownMode(g, mx, my, cachedMods,
                 menu.getSelectedMod(),
                 Component.translatable("gui.logisticsnetworks.filter.mod.input_full_hint"));
@@ -698,7 +702,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
         renderExtractorSlotTarget(g, mx, my);
         String displayValue = current == null ? tr("gui.logisticsnetworks.filter.none") : current;
-        g.drawString(font, Component.translatable("gui.logisticsnetworks.filter.selector.selected", displayValue),
+        String selected = tr("gui.logisticsnetworks.filter.selector.selected", displayValue);
+        g.drawString(font, font.plainSubstrByWidth(selected, imageWidth - 20 - modTargetButtonW()),
                 leftPos + 8, topPos + 22, COL_GRAY, false);
 
         manualInputBox.setHint(fitHint(hint, w));
@@ -862,7 +867,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return centers;
     }
 
-    private void renderModeControls(GuiGraphics g, int mx, int my, boolean showTargetType) {
+    private void renderModeControls(GuiGraphics g, int mx, int my) {
         int btnH = 12;
         int btnY = topPos + 6;
         int rightEdge = leftPos + imageWidth - 8;
@@ -873,20 +878,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
         int modeBtnX = rightEdge - modeBtnW;
         drawButton(g, modeBtnX, btnY, modeBtnW, btnH, modeLabel, mx, my, true);
-
-        if (showTargetType) {
-            String typeLabel;
-            if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
-            } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
-            } else {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.items");
-            }
-            int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-            int typeBtnX = modeBtnX - typeBtnW - 4;
-            drawButton(g, typeBtnX, btnY, typeBtnW, btnH, typeLabel, mx, my, true);
-        }
     }
 
     private void renderPlayerSlots(GuiGraphics g) {
@@ -930,7 +921,12 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private void renderAnyResource(GuiGraphics g, int x, int y) {
         long tick = System.currentTimeMillis() / 1000;
-        switch (FilterTargetType.values()[(int) (tick % FilterTargetType.values().length)]) {
+        if (anyCycleKinds == null) {
+            anyCycleKinds = MekanismCompat.isLoaded()
+                    ? FilterTargetType.values()
+                    : new FilterTargetType[] { FilterTargetType.ITEMS, FilterTargetType.FLUIDS };
+        }
+        switch (anyCycleKinds[(int) (tick % anyCycleKinds.length)]) {
             case FLUIDS -> {
                 if (anyCycleFluids == null) {
                     anyCycleFluids = BuiltInRegistries.FLUID.stream()
@@ -1568,7 +1564,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             }
         }
 
-        return finishInteraction(handleModeControlClick(mx, my, false), mx, my);
+        return finishInteraction(handleModeControlClick(mx, my), mx, my);
     }
 
     private boolean handleDetailPageInteraction(double mx, double my, int action) {
@@ -1599,7 +1595,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         return false;
     }
 
-    private boolean handleModeControlClick(double mx, double my, boolean hasTargetType) {
+    private boolean handleModeControlClick(double mx, double my) {
         int btnH = 12;
         int btnY = topPos + 6;
         int rightEdge = leftPos + imageWidth - 8;
@@ -1616,27 +1612,6 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
             }
             return true;
-        }
-
-        if (hasTargetType) {
-            String typeLabel;
-            if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
-            } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
-            } else {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.items");
-            }
-            int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-            int typeBtnX = modeBtnX - typeBtnW - 4;
-
-            if (isHovering(typeBtnX, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
-                ClickSound.play();
-                if (minecraft != null && minecraft.gameMode != null) {
-                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
-                }
-                return true;
-            }
         }
 
         return false;
@@ -1658,11 +1633,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int w = getSelectorInputWidth();
         int arrowX = getSelectorArrowX();
 
-        if (handleModeControlClick(mx, my, false))
+        if (handleModeControlClick(mx, my))
             return true;
 
-        String typeLabel = targetLabel(menu.getTargetType());
-        int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
+        int typeBtnW = modTargetButtonW();
         if (isHovering(leftPos + imageWidth - 8 - typeBtnW, topPos + 20, typeBtnW, 12, (int) mx, (int) my)) {
             ClickSound.play();
             if (minecraft != null && minecraft.gameMode != null) {
@@ -2143,6 +2117,14 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private String targetLabel(FilterTargetType kind) {
         return tr("gui.logisticsnetworks.filter.target." + kind.getSerializedName());
+    }
+
+    private String kindLabel(FilterTargetType kind) {
+        return tr("gui.logisticsnetworks.filter.kind." + kind.getSerializedName());
+    }
+
+    private int modTargetButtonW() {
+        return Math.max(40, font.width(targetLabel(menu.getTargetType())) + 8);
     }
 
     private static FilterTargetType nextKind(FilterTargetType kind) {
@@ -3404,7 +3386,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (idVal.startsWith("#")) {
             String normalizedTag = FilterTagUtil.normalizeTag(idVal);
             String current = menu.getEntryTag(slot);
-            if (!Objects.equals(normalizedTag, current)) {
+            if (!Objects.equals(normalizedTag, current)
+                    || normalizedTag != null && menu.getEntryKind(slot) != targetType) {
                 if (normalizedTag == null) {
                     PacketDistributor.sendToServer(SetFilterEntryTagPayload.clear(slot));
                     menu.clearEntryTag(slot);
@@ -3520,9 +3503,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int clearW = 40;
         int clearXPos = panelX + panelW - clearW - 4;
         drawButton(g, clearXPos, panelY + 4, clearW, 12, tr("gui.logisticsnetworks.filter.detail.clear"), mx, my, true);
-        String kindLabel = targetLabel(detailKind);
-        int kindW = Math.max(40, font.width(kindLabel) + 8);
-        drawButton(g, clearXPos - kindW - 4, panelY + 4, kindW, 12, kindLabel, mx, my, true);
+        drawButton(g, clearXPos - 40 - 4, panelY + 4, 40, 12, kindLabel(detailKind), mx, my, true);
 
         int y = panelY + 20;
 
@@ -4100,12 +4081,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             return true;
         }
 
-        String kindLabel = targetLabel(detailKind);
-        int kindW = Math.max(40, font.width(kindLabel) + 8);
-        if (isHovering(clearXPos - kindW - 4, panelY + 4, kindW, 12, (int) mx, (int) my)) {
+        if (isHovering(clearXPos - 40 - 4, panelY + 4, 40, 12, (int) mx, (int) my)) {
             ClickSound.play();
+            flushDetailPageInputs();
             detailKind = nextKind(detailKind);
-            detailIdInputBox.setValue("");
             loadDetailKind(detailEditSlot);
             return true;
         }
