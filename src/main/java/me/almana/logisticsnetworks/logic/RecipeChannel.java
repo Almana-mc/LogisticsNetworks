@@ -6,7 +6,6 @@ import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
@@ -23,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 final class RecipeChannel {
 
@@ -33,12 +33,8 @@ final class RecipeChannel {
 
     static List<TransferEngine.ImportTarget> receivers(List<TransferEngine.ImportTarget> items,
             List<TransferEngine.ImportTarget> fluids, List<TransferEngine.ImportTarget> chemicals) {
-        List<TransferEngine.ImportTarget> all = new ArrayList<>(items.size() + fluids.size() + chemicals.size());
-        all.addAll(items);
-        all.addAll(fluids);
-        all.addAll(chemicals);
-        all.sort(BridgedImports.ORDER);
-        return all;
+        return Stream.of(items, fluids, chemicals).flatMap(List::stream).distinct().sorted(BridgedImports.ORDER)
+                .toList();
     }
 
     // Card kinds only move loose entries
@@ -52,7 +48,8 @@ final class RecipeChannel {
         return switch (type) {
             case ITEM -> FilterLogic.hasConfiguredItemFilter(filters, cache);
             case FLUID -> FilterLogic.hasConfiguredFluidFilter(filters, cache);
-            default -> FilterLogic.hasConfiguredChemicalFilter(filters, cache);
+            case CHEMICAL -> FilterLogic.hasConfiguredChemicalFilter(filters, cache);
+            default -> true;
         };
     }
 
@@ -129,10 +126,8 @@ final class RecipeChannel {
             Set<RecipeCardData.Kind> kinds, TransferCapabilityCache caps, FilterItemData.ReadCache cache) {
         Direction side = channel.getIoDirection();
         boolean direct = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), cache);
-        int types = channel.getTypes();
-        boolean chemicals = kinds.contains(RecipeCardData.Kind.CHEMICAL) && ChannelType.CHEMICAL.in(types)
-                && !node.isMountedOnCreate() && MekanismCompat.isLoaded()
-                && NodeUpgradeData.hasMekanismChemicalUpgrade(node);
+        int types = NodeUpgradeData.effectiveTypes(node, channel);
+        boolean chemicals = kinds.contains(RecipeCardData.Kind.CHEMICAL) && ChannelType.CHEMICAL.in(types);
         return new RecipeSets.Source(
                 kinds.contains(RecipeCardData.Kind.ITEM) && ChannelType.ITEM.in(types)
                         ? caps.findItemExportHandler(node, side, direct) : null,
@@ -145,9 +140,9 @@ final class RecipeChannel {
             Set<RecipeCardData.Kind> kinds, TransferCapabilityCache caps, FilterItemData.ReadCache cache) {
         int accepts = NodeUpgradeData.effectiveTypes(target.node(), target.channel());
         return new RecipeEndpoint(
-                kinds.contains(RecipeCardData.Kind.ITEM) && ChannelType.ITEM.in(accepts)
+                source.items() != null && kinds.contains(RecipeCardData.Kind.ITEM) && ChannelType.ITEM.in(accepts)
                         ? items(target, source.items(), caps, cache) : null,
-                kinds.contains(RecipeCardData.Kind.FLUID) && ChannelType.FLUID.in(accepts)
+                source.fluids() != null && kinds.contains(RecipeCardData.Kind.FLUID) && ChannelType.FLUID.in(accepts)
                         ? fluids(target, source.fluids(), caps) : null,
                 source.chemicals() != null && ChannelType.CHEMICAL.in(accepts)
                         ? chemicals(target, source.chemicals(), caps) : null);

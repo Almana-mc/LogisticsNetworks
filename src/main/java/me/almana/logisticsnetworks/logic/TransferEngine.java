@@ -308,12 +308,17 @@ public class TransferEngine {
             }
 
             for (ChannelType type : ChannelType.ORDER) {
-                if (!type.in(types) || cards && !RecipeChannel.runsLoose(channel, type))
+                if (!type.in(types))
                     continue;
                 List<ImportTarget> typed = importsFor(type, i, itemImports, fluidImports, energyImports,
                         chemicalImports, sourceImports);
-                if (typed == null || typed.isEmpty())
+                if (typed.isEmpty() || cards && !RecipeChannel.runsLoose(channel, type))
                     continue;
+                if (type == ChannelType.ENERGY && capCache.findEnergyHandler(sourceLevel,
+                        sourceNode.getAttachedPos(), channel.getIoDirection()) == null) {
+                    minWakeDelta = Math.min(minWakeDelta, Config.backoffMaxTicks);
+                    continue;
+                }
                 if (sourceNode.isMountedOnCreate() && !hasMountedStorage(sourceNode, channel, type, capCache))
                     continue;
 
@@ -420,10 +425,6 @@ public class TransferEngine {
     // Recipe lane follows item backoff
     private static boolean backoffEnabled(int lane) {
         return Config.backoffEnabled[lane == ChannelData.RECIPE_LANE ? ChannelType.ITEM.ordinal() : lane];
-    }
-
-    public static int getBatchLimit(ChannelType type, int tier) {
-        return NodeUpgradeData.getOperationCap(type, tier);
     }
 
     private static void updateBackoff(LogisticsNodeEntity node, ChannelData channel, int index, int lane,
