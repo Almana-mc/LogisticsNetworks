@@ -6,6 +6,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
@@ -26,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import me.almana.logisticsnetworks.data.LogisticsNetwork;
 
 public class LogisticsCommand {
 
@@ -132,8 +132,6 @@ public class LogisticsCommand {
                 registry.evictCapabilities(level, node.getAttachedPos());
             }
 
-            node.dropFilters();
-            node.dropUpgrades();
             node.discard(); // Safely removes it without triggering drops again via standard tick()
             removedCount++;
         }
@@ -180,8 +178,6 @@ public class LogisticsCommand {
                 Entity entity = serverLevel.getEntity(nodeId);
                 if (entity instanceof LogisticsNodeEntity node) {
                     node.setNetworkId(null);
-                    node.dropFilters();
-                    node.dropUpgrades();
                     node.discard();
                     removedNodes++;
                     break;

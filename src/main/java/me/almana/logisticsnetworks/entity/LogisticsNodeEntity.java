@@ -1,12 +1,17 @@
 package me.almana.logisticsnetworks.entity;
 
+import com.mojang.logging.LogUtils;
+import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeRouteChannels;
 import me.almana.logisticsnetworks.data.SlotStack;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.utils.ItemStackUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -16,7 +21,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerEntity;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.RelativeMovement;
@@ -27,6 +32,7 @@ import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.util.Arrays;
 import java.util.List;
@@ -34,13 +40,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
-
-import me.almana.logisticsnetworks.Config;
-import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.server.level.ServerLevel;
-import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
 
 public class LogisticsNodeEntity extends Entity {
 
@@ -194,8 +193,6 @@ public class LogisticsNodeEntity extends Entity {
                         this.spawnAtLocation(
                                 Registration.LOGISTICS_NODE_ITEM.get());
                     }
-                    this.dropFilters();
-                    this.dropUpgrades();
                     this.discard();
                 }
             }
@@ -490,23 +487,35 @@ public class LogisticsNodeEntity extends Entity {
         backoffTicks[channelIndex] = value;
     }
 
-    public void dropUpgrades() {
+    public void dropUpgrades(@Nullable Player player) {
         for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
             ItemStack stack = upgradeItems[i];
             if (!stack.isEmpty()) {
-                spawnAtLocation(stack.copy());
+                if (player == null) {
+                    spawnAtLocation(stack.copy());
+                } else {
+                    ItemStackUtils.give(player, stack.copy());
+                }
                 upgradeItems[i] = ItemStack.EMPTY;
             }
         }
     }
 
+    public void dropUpgrades() {
+        dropUpgrades(null);
+    }
+
     public void dropFilters() {
         for (int channelIndex = 0; channelIndex < CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = channels[channelIndex];
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                channel.setFilterItem(slot, ItemStack.EMPTY);
-            }
+            channel.clearFilterItems();
         }
     }
 
+    @Override
+    public void remove(RemovalReason reason) {
+        this.dropFilters();
+        this.dropUpgrades();
+        super.remove(reason);
+    }
 }
