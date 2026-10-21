@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.component;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
+import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtPath;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.IntTag;
@@ -22,7 +23,8 @@ public record GeneralFilterEntry(
         SlotMapping slotMapping,
         @Nullable Boolean enchanted,
         NbtConstraints nbt,
-        @Nullable DurabilityConstraint durability) {
+        @Nullable DurabilityConstraint durability,
+        @Nullable FilterTargetType tagKind) {
 
     public static final NbtPath ENCHANTED_PATH = NbtPath.of(NbtPath.Component.of("minecraft:enchanted"));
     public static final NbtPath DURABILITY_PATH = NbtPath.of(NbtPath.Component.of("minecraft:durability"));
@@ -38,10 +40,12 @@ public record GeneralFilterEntry(
             Codec.BOOL.optionalFieldOf("enchanted").forGetter(entry -> Optional.ofNullable(entry.enchanted)),
             NbtConstraints.CODEC.optionalFieldOf("nbt", NbtConstraints.EMPTY).forGetter(GeneralFilterEntry::nbt),
             DurabilityConstraint.CODEC.optionalFieldOf("durability")
-                    .forGetter(entry -> Optional.ofNullable(entry.durability))
-    ).apply(instance, (slot, item, fluid, chemical, tag, counts, mapping, enchanted, nbt, durability) ->
+                    .forGetter(entry -> Optional.ofNullable(entry.durability)),
+            FilterTargetType.CODEC.optionalFieldOf("tag_kind").forGetter(entry -> Optional.ofNullable(entry.tagKind))
+    ).apply(instance, (slot, item, fluid, chemical, tag, counts, mapping, enchanted, nbt, durability, tagKind) ->
             new GeneralFilterEntry(slot, item.orElse(null), fluid.orElse(null), chemical.orElse(null),
-                    tag.orElse(null), counts, mapping, enchanted.orElse(null), nbt, durability.orElse(null))));
+                    tag.orElse(null), counts, mapping, enchanted.orElse(null), nbt, durability.orElse(null),
+                    tagKind.orElse(null))));
 
     public GeneralFilterEntry {
         counts = counts == null ? EntryCounts.EMPTY : counts;
@@ -64,7 +68,7 @@ public record GeneralFilterEntry(
 
     public static GeneralFilterEntry empty(int slot) {
         return new GeneralFilterEntry(slot, null, null, null, null, EntryCounts.EMPTY, SlotMapping.EMPTY,
-                null, NbtConstraints.EMPTY, null);
+                null, NbtConstraints.EMPTY, null, null);
     }
 
     public boolean isEmpty() {
@@ -73,27 +77,27 @@ public record GeneralFilterEntry(
 
     public GeneralFilterEntry withItem(@Nullable StackSnapshot value) {
         return new GeneralFilterEntry(slot, value, fluidId, chemicalId, tag, counts, slotMapping, enchanted,
-                nbt, durability);
+                nbt, durability, tagKind);
     }
 
-    public GeneralFilterEntry withTag(@Nullable String value) {
+    public GeneralFilterEntry withTag(@Nullable String value, @Nullable FilterTargetType kind) {
         return new GeneralFilterEntry(slot, item, fluidId, chemicalId, value, counts, slotMapping, enchanted,
-                nbt, durability);
+                nbt, durability, value == null ? null : kind);
     }
 
     public GeneralFilterEntry withCounts(EntryCounts value) {
         return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, value, slotMapping, enchanted,
-                nbt, durability);
+                nbt, durability, tagKind);
     }
 
     public GeneralFilterEntry withNbt(NbtConstraints value) {
         return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, slotMapping, enchanted,
-                value, durability);
+                value, durability, tagKind);
     }
 
     public GeneralFilterEntry withSlotMapping(SlotMapping value) {
         return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, value, enchanted,
-                nbt, durability);
+                nbt, durability, tagKind);
     }
 
     public record EntryCounts(int amount, int batch, int stock) {

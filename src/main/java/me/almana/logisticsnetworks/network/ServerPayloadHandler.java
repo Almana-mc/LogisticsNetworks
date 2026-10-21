@@ -940,7 +940,8 @@ public class ServerPayloadHandler {
                 if (normalizedTag == null) {
                     menu.clearEntryTag(payload.slot());
                 } else {
-                    menu.setEntryTag((Player) context.player(), payload.slot(), normalizedTag);
+                    menu.setEntryTag((Player) context.player(), payload.slot(), normalizedTag,
+                            FilterTargetType.fromOrdinal(payload.kindOrdinal()));
                 }
             }
         });

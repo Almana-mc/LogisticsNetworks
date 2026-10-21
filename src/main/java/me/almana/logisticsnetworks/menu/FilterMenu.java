@@ -732,7 +732,7 @@ public class FilterMenu extends AbstractContainerMenu {
                 || FilterItemData.isNbtOnlySlot(getOpenedStack(), slot);
     }
 
-    public void setEntryTag(Player player, int slot, String tag) {
+    public void setEntryTag(Player player, int slot, String tag, FilterTargetType kind) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
         String normalizedTag = FilterTagUtil.normalizeTag(tag);
@@ -740,7 +740,7 @@ public class FilterMenu extends AbstractContainerMenu {
             clearEntryTag(slot);
             return;
         }
-        FilterItemData.setEntryTag(getOpenedStack(), slot, normalizedTag);
+        FilterItemData.setEntryTag(getOpenedStack(), slot, normalizedTag, kind);
         isTagSlot[slot] = true;
         isFluidSlot[slot] = false;
         isChemicalSlot[slot] = false;
@@ -750,10 +750,14 @@ public class FilterMenu extends AbstractContainerMenu {
         broadcastChanges();
     }
 
+    public FilterTargetType getEntryKind(int slot) {
+        return FilterItemData.getEntryKind(getOpenedStack(), slot);
+    }
+
     public void clearEntryTag(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
-        FilterItemData.setEntryTag(getOpenedStack(), slot, null);
+        FilterItemData.setEntryTag(getOpenedStack(), slot, null, null);
         isTagSlot[slot] = false;
         broadcastChanges();
     }
@@ -1088,7 +1092,7 @@ public class FilterMenu extends AbstractContainerMenu {
             FilterItemData.setEntry(stack, s, ItemStack.EMPTY);
             FilterItemData.setFluidEntry(stack, s, FluidStack.EMPTY);
             FilterItemData.setChemicalEntry(stack, s, null);
-            FilterItemData.setEntryTag(stack, s, null);
+            FilterItemData.setEntryTag(stack, s, null, null);
             FilterItemData.clearSlotNbtRules(stack, s);
             FilterItemData.setEntryDurability(stack, s, null, 0);
             FilterItemData.setEntrySlotMapping(stack, s, null);

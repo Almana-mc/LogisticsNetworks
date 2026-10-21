@@ -64,6 +64,7 @@ public final class FilterItemData {
 
     private record ItemFilterSlot(
             @Nullable String tag,
+            @Nullable FilterTargetType tagKind,
             @Nullable Item item,
             @Nullable DataComponentMap expectedComponents,
             @Nullable String chemicalId,
@@ -86,7 +87,9 @@ public final class FilterItemData {
             boolean hasItemEntries,
             boolean hasFluidEntries,
             boolean hasChemicalEntries,
-            boolean hasTagEntries,
+            boolean hasItemTags,
+            boolean hasFluidTags,
+            boolean hasChemicalTags,
             boolean hasNbtEntries,
             boolean hasAmountEntries,
             boolean hasSlotOnlyEntries,
@@ -231,7 +234,7 @@ public final class FilterItemData {
         if (!isFilterItem(stack))
             return false;
         ItemFilterView view = getItemFilterView(stack, readCache);
-        return view.hasItemEntries() || view.hasTagEntries() || view.hasSlotOnlyEntries();
+        return view.hasItemEntries() || view.hasItemTags() || view.hasSlotOnlyEntries();
     }
 
     public static int getEntryCount(ItemStack stack) {
@@ -313,7 +316,7 @@ public final class FilterItemData {
         GeneralFilterEntry.EntryCounts counts = new GeneralFilterEntry.EntryCounts(0,
                 Math.max(0, current.counts().batch()), Math.max(0, stockOf(current)));
         return new GeneralFilterEntry(current.slot(), null, fluidId, chemicalId, null, counts,
-                GeneralFilterEntry.SlotMapping.EMPTY, null, GeneralFilterEntry.NbtConstraints.EMPTY, null);
+                GeneralFilterEntry.SlotMapping.EMPTY, null, GeneralFilterEntry.NbtConstraints.EMPTY, null, null);
     }
 
     public static boolean addChemical(ItemStack filter, String chemicalId) {
@@ -379,13 +382,33 @@ public final class FilterItemData {
         return entry == null ? null : FilterTagUtil.normalizeTag(entry.tag());
     }
 
-    public static void setEntryTag(ItemStack stack, int slot, @Nullable String tag) {
+    public static void setEntryTag(ItemStack stack, int slot, @Nullable String tag, @Nullable FilterTargetType kind) {
         String normalized = FilterTagUtil.normalizeTag(tag);
-        edit(stack, slot, entry -> entry.withTag(normalized));
+        edit(stack, slot, entry -> entry.withTag(normalized, kind));
     }
 
-    public static boolean hasAnyTagEntries(ItemStack stack, @Nullable ReadCache readCache) {
-        return isFilterItem(stack) && getItemFilterView(stack, readCache).hasTagEntries();
+    public static FilterTargetType getEntryKind(ItemStack stack, int slot) {
+        GeneralFilterEntry entry = entry(stack, slot);
+        if (entry == null)
+            return FilterTargetType.ITEMS;
+        if (nonEmpty(entry.fluidId()) != null)
+            return FilterTargetType.FLUIDS;
+        if (nonEmpty(entry.chemicalId()) != null)
+            return FilterTargetType.CHEMICALS;
+        if (FilterTagUtil.normalizeTag(entry.tag()) != null)
+            return entry.tagKind() != null ? entry.tagKind() : FilterSettingsData.get(stack).target();
+        return FilterTargetType.ITEMS;
+    }
+
+    public static boolean hasTagEntries(ItemStack stack, FilterTargetType kind, @Nullable ReadCache readCache) {
+        if (!isFilterItem(stack))
+            return false;
+        ItemFilterView view = getItemFilterView(stack, readCache);
+        return switch (kind) {
+            case ITEMS -> view.hasItemTags();
+            case FLUIDS -> view.hasFluidTags();
+            case CHEMICALS -> view.hasChemicalTags();
+        };
     }
 
     public static boolean hasAnyAmountEntries(ItemStack stack, @Nullable ReadCache readCache) {
@@ -675,7 +698,7 @@ public final class FilterItemData {
         if (!isFilterItem(filter))
             return ItemVerdict.NONE;
         ItemFilterView view = getItemFilterView(filter, readCache);
-        if (!view.hasItemEntries() && !view.hasTagEntries() && !view.hasSlotOnlyEntries())
+        if (!view.hasItemEntries() && !view.hasItemTags() && !view.hasSlotOnlyEntries())
             return ItemVerdict.NONE;
         boolean matched = matchesView(view, candidate, provider, candidateComponents, inventorySlot);
         if (view.blacklist())
@@ -696,7 +719,8 @@ public final class FilterItemData {
 
             String tag = entry.tag();
             if (tag != null) {
-                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
+                if (entry.tagKind() == FilterTargetType.ITEMS
+                        && candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
                         && entryConstraintsMatch(entry, candidate, components))
                     return true;
                 continue;
@@ -729,7 +753,7 @@ public final class FilterItemData {
                 continue;
             String tag = slot.tag();
             if (tag != null || slot.nbtOnly()) {
-                if (tag == null || candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
+                if (tag == null || slot.tagKind() == FilterTargetType.FLUIDS && candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)) {
                     if (slot.hasNbt()) {
                         if (!candidateComponentsResolved) {
                             candidateComponents = CandidateComponents.of(candidate, provider);
@@ -768,7 +792,7 @@ public final class FilterItemData {
                 continue;
             String tag = slot.tag();
             if (tag != null) {
-                if (MekanismCompat.chemicalHasTag(chemicalId, tag))
+                if (slot.tagKind() == FilterTargetType.CHEMICALS && MekanismCompat.chemicalHasTag(chemicalId, tag))
                     return true;
                 continue;
             }
@@ -804,7 +828,8 @@ public final class FilterItemData {
             CandidateComponents components) {
         String tag = entry.tag();
         if (tag != null)
-            return candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
+            return entry.tagKind() == FilterTargetType.ITEMS
+                    && candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
                     && entryConstraintsMatch(entry, candidate, components);
         if (entry.nbtOnly())
             return entryConstraintsMatch(entry, candidate, components);
@@ -834,7 +859,8 @@ public final class FilterItemData {
 
             String tag = entry.tag();
             if (tag != null) {
-                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
+                if (entry.tagKind() == FilterTargetType.ITEMS
+                        && candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals)
                         && entryConstraintsMatch(entry, candidate, components))
                     return entry.batch();
                 continue;
@@ -864,7 +890,8 @@ public final class FilterItemData {
                 continue;
             String tag = slot.tag();
             if (tag != null) {
-                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals))
+                if (slot.tagKind() == FilterTargetType.FLUIDS
+                        && candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals))
                     return slot.stock();
                 continue;
             }
@@ -887,7 +914,7 @@ public final class FilterItemData {
                 continue;
             String tag = slot.tag();
             if (tag != null) {
-                if (MekanismCompat.chemicalHasTag(chemicalId, tag))
+                if (slot.tagKind() == FilterTargetType.CHEMICALS && MekanismCompat.chemicalHasTag(chemicalId, tag))
                     return slot.stock();
                 continue;
             }
@@ -910,7 +937,8 @@ public final class FilterItemData {
                 continue;
             String tag = slot.tag();
             if (tag != null) {
-                if (candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals))
+                if (slot.tagKind() == FilterTargetType.FLUIDS
+                        && candidate.getTags().map(t -> t.location().toString()).anyMatch(tag::equals))
                     return slot.batch();
                 continue;
             }
@@ -933,7 +961,7 @@ public final class FilterItemData {
                 continue;
             String tag = slot.tag();
             if (tag != null) {
-                if (MekanismCompat.chemicalHasTag(chemicalId, tag))
+                if (slot.tagKind() == FilterTargetType.CHEMICALS && MekanismCompat.chemicalHasTag(chemicalId, tag))
                     return slot.batch();
                 continue;
             }
@@ -1054,6 +1082,7 @@ public final class FilterItemData {
             @Nullable GeneralFilterConfig config) {
         int cap = getCapacity(stack);
         ItemFilterSlot[] entriesBySlot = new ItemFilterSlot[Math.max(cap, 0)];
+        FilterTargetType fallback = settings == null ? FilterTargetType.ITEMS : settings.target();
         if (!isFilterItem(stack) || cap <= 0) {
             return emptyItemFilterView(entriesBySlot);
         }
@@ -1062,18 +1091,19 @@ public final class FilterItemData {
             for (GeneralFilterEntry entry : config.entries()) {
                 int slot = entry.slot();
                 if (slot >= 0 && slot < cap && entriesBySlot[slot] == null && !isRecipeCard(entry)) {
-                    entriesBySlot[slot] = buildItemFilterSlot(entry);
+                    entriesBySlot[slot] = buildItemFilterSlot(entry, fallback);
                 }
             }
         }
         return summarizeItemFilterView(settings != null && settings.blacklist(), entriesBySlot);
     }
 
-    private static ItemFilterSlot buildItemFilterSlot(GeneralFilterEntry entry) {
+    private static ItemFilterSlot buildItemFilterSlot(GeneralFilterEntry entry, FilterTargetType fallback) {
         ItemStack expected = entry.item() == null ? ItemStack.EMPTY : entry.item().toStack();
         Item item = expected.isEmpty() ? null : expected.getItem();
         DataComponentMap expectedComponents = expected.isEmpty() ? null : expected.getComponents();
         String tag = FilterTagUtil.normalizeTag(entry.tag());
+        FilterTargetType tagKind = tag == null ? null : entry.tagKind() != null ? entry.tagKind() : fallback;
         String fluidId = nonEmpty(entry.fluidId());
         String chemicalId = nonEmpty(entry.chemicalId());
         List<NbtCriterion> rules = entry.nbt().rules().stream()
@@ -1089,14 +1119,15 @@ public final class FilterItemData {
                 && tag == null && item == null && fluidId == null && chemicalId == null;
         boolean slotOnly = mapping != null && tag == null && item == null && fluidId == null
                 && chemicalId == null && !hasNbt;
-        return new ItemFilterSlot(tag, item, expectedComponents, chemicalId, resolveFluidEntry(fluidId),
+        return new ItemFilterSlot(tag, tagKind, item, expectedComponents, chemicalId, resolveFluidEntry(fluidId),
                 entry.counts().batch(), stock, raw.value(), raw.invalid(), hasNbt, nbtOnly,
                 item != null && entry.nbt().strict().orElse(!hasNbt), rules, entry.nbt().matchAny(), mapping,
                 slotOnly);
     }
 
     private static ItemFilterView summarizeItemFilterView(boolean blacklist, ItemFilterSlot[] entriesBySlot) {
-        boolean item = false, fluid = false, chemical = false, tag = false;
+        boolean item = false, fluid = false, chemical = false;
+        boolean itemTag = false, fluidTag = false, chemicalTag = false;
         boolean nbt = false, amount = false, slotOnly = false;
         for (ItemFilterSlot entry : entriesBySlot) {
             if (entry == null)
@@ -1104,16 +1135,18 @@ public final class FilterItemData {
             item |= entry.item() != null || entry.nbtOnly();
             fluid |= entry.fluidEntry() != null || entry.nbtOnly();
             chemical |= entry.chemicalId() != null || entry.nbtOnly();
-            tag |= entry.tag() != null;
+            itemTag |= entry.tagKind() == FilterTargetType.ITEMS;
+            fluidTag |= entry.tagKind() == FilterTargetType.FLUIDS;
+            chemicalTag |= entry.tagKind() == FilterTargetType.CHEMICALS;
             nbt |= entry.hasNbt();
             amount |= entry.batch() > 0 || entry.stock() > 0;
             slotOnly |= entry.slotOnly();
         }
-        return new ItemFilterView(blacklist, item, fluid, chemical, tag, nbt, amount, slotOnly, entriesBySlot);
+        return new ItemFilterView(blacklist, item, fluid, chemical, itemTag, fluidTag, chemicalTag, nbt, amount, slotOnly, entriesBySlot);
     }
 
     private static ItemFilterView emptyItemFilterView(ItemFilterSlot[] entriesBySlot) {
-        return new ItemFilterView(false, false, false, false, false, false, false, false, entriesBySlot);
+        return new ItemFilterView(false, false, false, false, false, false, false, false, false, false, entriesBySlot);
     }
 
     @Nullable

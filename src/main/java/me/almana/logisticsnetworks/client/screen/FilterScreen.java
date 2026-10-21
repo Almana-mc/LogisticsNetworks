@@ -1291,7 +1291,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int copied = Math.min(menu.getFilterSlots(), copiedFilter.entries().size());
         for (int slot = 0; slot < menu.getFilterSlots(); slot++) {
             clearFilterEntry(slot);
-            PacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, ""));
+            PacketDistributor.sendToServer(SetFilterEntryTagPayload.clear(slot));
             PacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(slot));
             PacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
             PacketDistributor.sendToServer(new SetFilterEntryEnchantedPayload(slot, false, false));
@@ -1312,8 +1312,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
 
     private void pasteEntry(int slot, FilterEntrySnapshot entry) {
         if (entry.tag() != null) {
-            PacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, entry.tag()));
-            menu.setEntryTag(minecraft.player, slot, entry.tag());
+            PacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, entry.tag(), menu.getTargetType()));
+            menu.setEntryTag(minecraft.player, slot, entry.tag(), menu.getTargetType());
         } else if (!entry.fluid().isEmpty()) {
             setFluidFilterEntry(minecraft.player, slot, entry.fluid());
         } else if (entry.chemicalId() != null && !entry.chemicalId().isBlank()) {
@@ -2563,7 +2563,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         int clearX = panelX + panelW - clearW - 4;
         int clearY = panelY + 4;
         if (isHovering(clearX, clearY, clearW, 12, (int) mx, (int) my)) {
-            PacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, ""));
+            PacketDistributor.sendToServer(SetFilterEntryTagPayload.clear(tagEditSlot));
             menu.clearEntryTag(tagEditSlot);
             closeTagSubMode();
             return true;
@@ -2617,8 +2617,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             if (mx >= listX && mx < listX + rowW
                     && my >= rowY && my < rowY + LIST_ROW_H) {
                 String tag = cachedSlotTags.get(i);
-                PacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, tag));
-                menu.setEntryTag(minecraft.player, tagEditSlot, tag);
+                PacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, tag, menu.getTargetType()));
+                menu.setEntryTag(minecraft.player, tagEditSlot, tag, menu.getTargetType());
                 closeTagSubMode();
                 return true;
             }
@@ -2633,8 +2633,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         String rawValue = tagInputBox.getValue();
         String normalizedTag = FilterTagUtil.normalizeTag(rawValue);
         if (normalizedTag != null) {
-            PacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, normalizedTag));
-            menu.setEntryTag(minecraft.player, tagEditSlot, normalizedTag);
+            PacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, normalizedTag, menu.getTargetType()));
+            menu.setEntryTag(minecraft.player, tagEditSlot, normalizedTag, menu.getTargetType());
         }
         closeTagSubMode();
     }
@@ -3391,11 +3391,11 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             String current = menu.getEntryTag(slot);
             if (!Objects.equals(normalizedTag, current)) {
                 if (normalizedTag == null) {
-                    PacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, ""));
+                    PacketDistributor.sendToServer(SetFilterEntryTagPayload.clear(slot));
                     menu.clearEntryTag(slot);
                 } else {
-                    PacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, normalizedTag));
-                    menu.setEntryTag(minecraft.player, slot, normalizedTag);
+                    PacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, normalizedTag, menu.getTargetType()));
+                    menu.setEntryTag(minecraft.player, slot, normalizedTag, menu.getTargetType());
                 }
             }
         } else if (!idVal.isEmpty()) {
@@ -3767,8 +3767,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     }
 
     private void applyDetailTag(String tag) {
-        PacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, tag));
-        menu.setEntryTag(minecraft.player, detailEditSlot, tag);
+        PacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, tag, menu.getTargetType()));
+        menu.setEntryTag(minecraft.player, detailEditSlot, tag, menu.getTargetType());
         detailIdInputBox.setValue("#" + tag);
         rebuildIdFilteredList();
         detailTagPicker = null;
@@ -4132,8 +4132,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
                         ClickSound.play();
                         String selected = dropdownList.get(i);
                         if (isTagInput) {
-                            PacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, selected));
-                            menu.setEntryTag(minecraft.player, detailEditSlot, selected);
+                            PacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, selected, menu.getTargetType()));
+                            menu.setEntryTag(minecraft.player, detailEditSlot, selected, menu.getTargetType());
                             detailIdInputBox.setValue("#" + selected);
                         } else if (targetType == FilterTargetType.FLUIDS) {
                             ResourceLocation fluidId = ResourceLocation.tryParse(selected);
@@ -4492,8 +4492,8 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
         if (val.startsWith("#")) {
             String normalized = FilterTagUtil.normalizeTag(val);
             if (normalized != null) {
-                PacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, normalized));
-                menu.setEntryTag(minecraft.player, detailEditSlot, normalized);
+                PacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, normalized, menu.getTargetType()));
+                menu.setEntryTag(minecraft.player, detailEditSlot, normalized, menu.getTargetType());
                 detailIdInputBox.setValue("#" + normalized);
             }
         } else {
