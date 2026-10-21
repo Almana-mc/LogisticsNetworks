@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -16,7 +17,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,12 +30,16 @@ public class TelemetryManager {
     static final int TOP_RESOURCES = 16;
     private static final int SYNC_INTERVAL = 20;
 
-    public record ChannelDrain(int typeOrdinal, long total, List<Map.Entry<FlowResource, Long>> top) {
-        static ChannelDrain of(int typeOrdinal, long total, Map<FlowResource, Long> resources) {
-            return new ChannelDrain(typeOrdinal, total, resources.entrySet().stream()
+    public record ChannelDrain(int typeMask, long[] totals, List<Map.Entry<FlowResource, Long>> top) {
+        static ChannelDrain of(int typeMask, long[] totals, Map<FlowResource, Long> resources) {
+            return new ChannelDrain(typeMask, totals, resources.entrySet().stream()
                     .sorted(Map.Entry.<FlowResource, Long>comparingByValue().reversed())
                     .limit(TOP_RESOURCES)
                     .toList());
+        }
+
+        public long total(ChannelType type) {
+            return totals[type.ordinal()];
         }
     }
 
@@ -112,9 +116,8 @@ public class TelemetryManager {
 
     private static List<ChannelDrain> drainNetwork(LogisticsNetwork network, MinecraftServer server) {
         int count = LogisticsNodeEntity.CHANNEL_COUNT;
-        long[] totals = new long[count];
+        long[][] totals = new long[count][ChannelType.values().length];
         int[] types = new int[count];
-        Arrays.fill(types, -1);
         List<Map<FlowResource, Long>> resources = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             resources.add(new HashMap<>());
@@ -125,12 +128,10 @@ public class TelemetryManager {
             if (node == null) continue;
             for (int i = 0; i < count; i++) {
                 ChannelData channel = node.getChannel(i);
-                long[] flows = new long[ChannelType.values().length];
-                channel.getTelemetry().drainFlows(flows);
-                totals[i] += Arrays.stream(flows).sum();
+                channel.getTelemetry().drainFlows(totals[i]);
                 channel.getTelemetry().drainResources(resources.get(i));
-                if (types[i] < 0 && channel.isEnabled()) {
-                    types[i] = channel.getType().ordinal();
+                if (channel.isEnabled()) {
+                    types[i] |= NodeUpgradeData.effectiveTypes(node, channel);
                 }
             }
         }

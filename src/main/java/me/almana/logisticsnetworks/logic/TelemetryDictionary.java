@@ -36,7 +36,7 @@ final class TelemetryDictionary {
                 }
                 entries.add(new SyncTelemetryPayload.Entry(id, entry.getValue()));
             }
-            samples.add(new SyncTelemetryPayload.ChannelSample(channel.typeOrdinal(), channel.total(), entries));
+            samples.add(new SyncTelemetryPayload.ChannelSample(channel.typeMask(), channel.totals(), entries));
         }
         return new SyncTelemetryPayload(networkId, reset, added, samples);
     }

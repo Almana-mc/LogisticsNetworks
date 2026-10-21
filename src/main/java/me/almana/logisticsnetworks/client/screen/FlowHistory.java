@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.network.SyncTelemetryPayload;
@@ -14,6 +15,7 @@ import java.util.Map;
 
 final class FlowHistory {
 
+    static final int TYPES = ChannelType.values().length;
     private static final int SIZE = 120;
     private static final float GROW_MS = 300f;
     private static final Sample EMPTY = new Sample(0, Map.of());
@@ -28,18 +30,21 @@ final class FlowHistory {
         }
     }
 
-    private final Sample[][] samples = new Sample[LogisticsNodeEntity.CHANNEL_COUNT][SIZE];
+    private final Sample[][] samples = new Sample[LogisticsNodeEntity.CHANNEL_COUNT * TYPES][SIZE];
     private final int[] types = new int[LogisticsNodeEntity.CHANNEL_COUNT];
     private final Map<Integer, FlowResource> dictionary = new HashMap<>();
     private int head;
     private int count;
     private long receivedAt;
 
+    static int slot(int channel, ChannelType type) {
+        return channel * TYPES + type.ordinal();
+    }
+
     FlowHistory() {
         for (Sample[] row : samples) {
             Arrays.fill(row, EMPTY);
         }
-        Arrays.fill(types, -1);
     }
 
     void accept(SyncTelemetryPayload payload) {
@@ -51,15 +56,17 @@ final class FlowHistory {
         }
         for (int channel = 0; channel < types.length; channel++) {
             SyncTelemetryPayload.ChannelSample sample = payload.channels().get(channel);
-            Map<FlowResource, Long> resources = new HashMap<>();
-            for (SyncTelemetryPayload.Entry entry : sample.entries()) {
-                FlowResource resource = dictionary.get(entry.id());
-                if (resource != null) {
-                    resources.merge(resource, entry.amount(), Long::sum);
+            for (ChannelType type : ChannelType.values()) {
+                Map<FlowResource, Long> resources = new HashMap<>();
+                for (SyncTelemetryPayload.Entry entry : sample.entries()) {
+                    FlowResource resource = dictionary.get(entry.id());
+                    if (resource != null && resource.type() == type) {
+                        resources.merge(resource, entry.amount(), Long::sum);
+                    }
                 }
+                samples[slot(channel, type)][head] = new Sample(sample.totals()[type.ordinal()], resources);
             }
-            types[channel] = sample.typeOrdinal();
-            samples[channel][head] = new Sample(sample.total(), resources);
+            types[channel] = sample.typeMask();
         }
         head = (head + 1) % SIZE;
         count = Math.min(SIZE, count + 1);
@@ -70,7 +77,7 @@ final class FlowHistory {
         return count > 0;
     }
 
-    int type(int channel) {
+    int types(int channel) {
         return types[channel];
     }
 

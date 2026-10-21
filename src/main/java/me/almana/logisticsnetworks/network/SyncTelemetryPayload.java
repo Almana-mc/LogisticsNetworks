@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -26,7 +27,7 @@ public record SyncTelemetryPayload(
     public record Entry(int id, long amount) {
     }
 
-    public record ChannelSample(int typeOrdinal, long total, List<Entry> entries) {
+    public record ChannelSample(int typeMask, long[] totals, List<Entry> entries) {
     }
 
     public static final CustomPacketPayload.Type<SyncTelemetryPayload> TYPE = new CustomPacketPayload.Type<>(
@@ -45,14 +46,17 @@ public record SyncTelemetryPayload(
         }
         List<ChannelSample> channels = new ArrayList<>(LogisticsNodeEntity.CHANNEL_COUNT);
         for (int c = 0; c < LogisticsNodeEntity.CHANNEL_COUNT; c++) {
-            int typeOrdinal = buf.readVarInt() - 1;
-            long total = buf.readVarLong();
+            int typeMask = buf.readVarInt();
+            long[] totals = new long[ChannelType.values().length];
+            for (ChannelType type : ChannelType.values()) {
+                if (type.in(typeMask)) totals[type.ordinal()] = buf.readVarLong();
+            }
             int entryCount = buf.readVarInt();
             List<Entry> entries = new ArrayList<>(entryCount);
             for (int e = 0; e < entryCount; e++) {
                 entries.add(new Entry(buf.readVarInt(), buf.readVarLong()));
             }
-            channels.add(new ChannelSample(typeOrdinal, total, entries));
+            channels.add(new ChannelSample(typeMask, totals, entries));
         }
         return new SyncTelemetryPayload(networkId, reset, added, channels);
     }
@@ -66,8 +70,10 @@ public record SyncTelemetryPayload(
             writeResource(buf, definition.resource());
         }
         for (ChannelSample channel : payload.channels) {
-            buf.writeVarInt(channel.typeOrdinal() + 1);
-            buf.writeVarLong(channel.total());
+            buf.writeVarInt(channel.typeMask());
+            for (ChannelType type : ChannelType.values()) {
+                if (type.in(channel.typeMask())) buf.writeVarLong(channel.totals()[type.ordinal()]);
+            }
             buf.writeVarInt(channel.entries().size());
             for (Entry entry : channel.entries()) {
                 buf.writeVarInt(entry.id());

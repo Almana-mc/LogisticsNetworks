@@ -1493,8 +1493,7 @@ public class ServerPayloadHandler {
     public static List<SyncChannelListPayload.ChannelEntry> channelEntries(LogisticsNetwork network,
             MinecraftServer server) {
         int[] nodeCounts = new int[LogisticsNodeEntity.CHANNEL_COUNT];
-        int[] typeOrdinals = new int[LogisticsNodeEntity.CHANNEL_COUNT];
-        boolean[] found = new boolean[LogisticsNodeEntity.CHANNEL_COUNT];
+        int[] typeMasks = new int[LogisticsNodeEntity.CHANNEL_COUNT];
 
         for (UUID nodeId : network.getNodeUuids()) {
             LogisticsNodeEntity node = findNode(server, nodeId);
@@ -1505,10 +1504,7 @@ public class ServerPayloadHandler {
                 if (channel == null) continue;
                 if (channel.isEnabled()) {
                     nodeCounts[i]++;
-                    if (!found[i]) {
-                        typeOrdinals[i] = channel.getType().ordinal();
-                        found[i] = true;
-                    }
+                    typeMasks[i] |= NodeUpgradeData.effectiveTypes(node, channel);
                 }
             }
         }
@@ -1516,7 +1512,7 @@ public class ServerPayloadHandler {
         List<SyncChannelListPayload.ChannelEntry> entries = new ArrayList<>();
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
             if (nodeCounts[i] > 0) {
-                entries.add(new SyncChannelListPayload.ChannelEntry(i, typeOrdinals[i], nodeCounts[i]));
+                entries.add(new SyncChannelListPayload.ChannelEntry(i, typeMasks[i], nodeCounts[i]));
             }
         }
         return entries;
