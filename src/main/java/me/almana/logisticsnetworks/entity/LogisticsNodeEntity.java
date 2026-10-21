@@ -78,8 +78,8 @@ public class LogisticsNodeEntity extends Entity {
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
     private long labelRevision;
 
-    private final long[] channelCooldowns = new long[CHANNEL_COUNT];
-    private final float[] backoffTicks = new float[CHANNEL_COUNT];
+    private final long[] channelCooldowns = new long[CHANNEL_COUNT * ChannelData.LANES];
+    private final float[] backoffTicks = new float[CHANNEL_COUNT * ChannelData.LANES];
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
@@ -474,20 +474,20 @@ public class LogisticsNodeEntity extends Entity {
         }
     }
 
-    public long getLastExecution(int index) {
-        return channelCooldowns[index];
+    public long getLastExecution(int index, int lane) {
+        return channelCooldowns[index * ChannelData.LANES + lane];
     }
 
-    public void setLastExecution(int index, long time) {
-        channelCooldowns[index] = time;
+    public void setLastExecution(int index, int lane, long time) {
+        channelCooldowns[index * ChannelData.LANES + lane] = time;
     }
 
-    public float getBackoffTicks(int channelIndex) {
-        return backoffTicks[channelIndex];
+    public float getBackoffTicks(int index, int lane) {
+        return backoffTicks[index * ChannelData.LANES + lane];
     }
 
-    public void setBackoffTicks(int channelIndex, float value) {
-        backoffTicks[channelIndex] = value;
+    public void setBackoffTicks(int index, int lane, float value) {
+        backoffTicks[index * ChannelData.LANES + lane] = value;
     }
 
     public void dropUpgrades() {

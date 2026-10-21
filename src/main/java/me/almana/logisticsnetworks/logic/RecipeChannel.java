@@ -96,7 +96,7 @@ final class RecipeChannel {
         List<TransferEngine.ImportTarget> ordered = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
                 ? PriorityRobin.rotate(targets, channel.getRecipeRobinCursor(), t -> t.channel().getPriority(),
                         t -> t.node().getUUID())
-                : TransferEngine.orderTargets(targets, channel, sourceNode);
+                : TransferEngine.orderTargets(targets, channel, sourceNode, ChannelType.ITEM);
         for (TransferEngine.ImportTarget target : ordered) {
             LogisticsNodeEntity node = target.node();
             if (node == sourceNode || !node.isValidNode()

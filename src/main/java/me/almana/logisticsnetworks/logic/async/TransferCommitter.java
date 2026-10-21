@@ -135,7 +135,7 @@ public final class TransferCommitter {
         IItemHandler source = capCache.findItemExportHandler(
                 sourceNode, sourceChannel.getIoDirection(), directSource);
         if (source == null) {
-            long wakeDelta = TransferEngine.finishChannelAttempt(sourceNode, sourceChannel, channel.channelIndex(), 0,
+            long wakeDelta = TransferEngine.finishChannelAttempt(sourceNode, sourceChannel, channel.channelIndex(), ChannelType.ITEM.ordinal(), 0,
                     sourceNode.level().getGameTime(), network.getTierCache().getOrDefault(sourceNode.getUUID(), 0),
                     telemetryActive);
             return new ChannelCommitResult(planned, 0, 0, wakeDelta, false);
@@ -159,8 +159,7 @@ public final class TransferCommitter {
                 ? ItemResourceOrder.after(source, channel.moves().getFirst().resource()) : null;
         me.almana.logisticsnetworks.integration.storage.ItemResource movedResource = null;
         int tier = network.getTierCache().getOrDefault(sourceNode.getUUID(), 0);
-        int currentBatch = Math.max(1, Math.min(sourceChannel.getBatchSize(),
-                TransferEngine.getBatchLimit(ChannelType.ITEM, tier)));
+        int currentBatch = NodeUpgradeData.effectiveBatch(sourceChannel, ChannelType.ITEM, tier);
         boolean roundRobin = sourceChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN;
         Map<Item, Integer> committedByItem = new HashMap<>();
         Map<UUID, Map<Item, Integer>> committedByTarget = new HashMap<>();
@@ -223,12 +222,12 @@ public final class TransferCommitter {
             sourceChannel.setItemResourceCursor(cursor);
         }
         if (servedNode != null) {
-            sourceChannel.setRobinCursor(new PriorityRobin.Cursor(
+            sourceChannel.setRobinCursor(ChannelType.ITEM, new PriorityRobin.Cursor(
                     targets[servedTarget].channel().getPriority(), servedNode));
         }
 
         long wakeDelta = TransferEngine.finishChannelAttempt(
-                sourceNode, sourceChannel, channel.channelIndex(), totalMoved,
+                sourceNode, sourceChannel, channel.channelIndex(), ChannelType.ITEM.ordinal(), totalMoved,
                 sourceLevel.getGameTime(), tier, telemetryActive);
         return new ChannelCommitResult(planned, committed, recovered, wakeDelta, revalidated);
     }
@@ -289,7 +288,7 @@ public final class TransferCommitter {
 
     private static boolean isItemChannel(@Nullable ChannelData channel, ChannelMode mode) {
         return channel != null && channel.isEnabled()
-                && channel.getMode() == mode && channel.getType() == ChannelType.ITEM;
+                && channel.getMode() == mode && channel.hasType(ChannelType.ITEM);
     }
 
     private static boolean isEndpointLoaded(LogisticsNodeEntity node) {

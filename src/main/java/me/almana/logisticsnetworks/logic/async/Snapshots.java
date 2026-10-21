@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
@@ -104,7 +105,7 @@ public final class Snapshots {
             if (channel == null || !channel.isEnabled()) {
                 continue;
             }
-            if (channel.getMode() != ChannelMode.EXPORT || channel.getType() != ChannelType.ITEM) {
+            if (channel.getMode() != ChannelMode.EXPORT || !channel.hasType(ChannelType.ITEM)) {
                 continue;
             }
             if (RecipeCardItem.anyIn(channel.getFilterItems())) {
@@ -120,7 +121,7 @@ public final class Snapshots {
             if (targets == null || targets.isEmpty()) {
                 continue;
             }
-            long cooldown = TransferEngine.cooldownRemaining(node, channel, i, tier, gameTime);
+            long cooldown = TransferEngine.cooldownRemaining(node, channel, i, ChannelType.ITEM.ordinal(), tier, gameTime);
             if (cooldown > 0L) {
                 itemWakeDelta = itemWakeDelta(itemWakeDelta, targets, cooldown);
                 continue;
@@ -137,7 +138,7 @@ public final class Snapshots {
                     node, channel.getIoDirection(), directSource);
             if (sourceHandler == null) {
                 itemWakeDelta = itemWakeDelta(itemWakeDelta, targets,
-                        TransferEngine.finishChannelAttempt(node, channel, i, 0, gameTime, tier, false));
+                        TransferEngine.finishChannelAttempt(node, channel, i, ChannelType.ITEM.ordinal(), 0, gameTime, tier, false));
                 continue;
             }
 
@@ -148,8 +149,7 @@ public final class Snapshots {
                 continue;
             }
 
-            int configuredBatch = TransferEngine.getBatchLimit(ChannelType.ITEM, tier);
-            int batchLimit = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
+            int batchLimit = NodeUpgradeData.effectiveBatch(channel, ChannelType.ITEM, tier);
             int sourceEndpoint = endpoints.capture(
                     node, channel.getIoDirection(), sourceHandler, occupiedSlots);
 
