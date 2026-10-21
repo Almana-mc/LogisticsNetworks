@@ -14,7 +14,6 @@ import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.ModFilterData;
 import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
@@ -920,7 +919,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
         int gridY = y + 12;
         int gridW = 3 * 19 - 1;
-        boolean filterable = ch.getType() != ChannelType.ENERGY && ch.getType() != ChannelType.SOURCE;
+        boolean filterable = ch.hasFilterableType();
         ThemePaint.sunkPanel(g, x - 2, gridY - 2, gridW + 4, 2 * 19 + 2, t);
         for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
             int bx = x + (i % 3) * 19;
@@ -981,7 +980,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             return false;
         }
         ChannelData ch = node.getChannel(selectedChannel);
-        if (ch == null || ch.getType() == ChannelType.ENERGY || ch.getType() == ChannelType.SOURCE) {
+        if (ch == null || !ch.hasFilterableType()) {
             return false;
         }
         ItemStack filter = ch.getFilterItem(slot);
@@ -998,13 +997,12 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             return;
         }
         ChannelData ch = node.getChannel(selectedChannel);
-        if (ch == null || ch.getType() == ChannelType.ENERGY || ch.getType() == ChannelType.SOURCE) {
+        if (ch == null || !ch.hasFilterableType()) {
             return;
         }
         ItemStack filter = ch.getFilterItem(slot);
         if (filter.isEmpty()) {
             filter = VirtualFilterType.SMALL.createStack();
-            FilterItemData.setTargetType(filter, FilterTargetType.forChannel(ch.getType()));
         } else if (!FilterItemData.isFilterItem(filter)) {
             return;
         } else {
@@ -1580,9 +1578,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
         if (action == 0 || action == 1) {
             ChannelData channel = node.getChannel(selectedChannel);
-            if (channel != null
-                    && channel.getType() != ChannelType.ENERGY
-                    && channel.getType() != ChannelType.SOURCE) {
+            if (channel != null && channel.hasFilterableType()) {
                 for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
                     if (isHoveringFilterButton(i, mx, my)) {
                         ItemStack carried = menu.getCarried();

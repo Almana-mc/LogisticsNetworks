@@ -16,7 +16,6 @@ import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.ModFilterData;
 import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
@@ -1005,7 +1004,6 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         ItemStack filter = config().getFilterItem(selectedChannel, slot);
         if (filter.isEmpty()) {
             filter = VirtualFilterType.SMALL.createStack();
-            FilterItemData.setTargetType(filter, FilterTargetType.forChannel(config().getChannelType(selectedChannel)));
         } else {
             filter = filter.copy();
         }
@@ -1235,8 +1233,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     }
 
     private boolean isFilterable() {
-        ChannelType type = config().getChannelType(selectedChannel);
-        return type != ChannelType.ENERGY && type != ChannelType.SOURCE;
+        return config().hasFilterableType(selectedChannel);
     }
 
     private String filterButtonText(ItemStack stack) {
