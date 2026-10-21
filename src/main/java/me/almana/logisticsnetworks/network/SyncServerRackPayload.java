@@ -1,7 +1,6 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
-import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.ServerRackConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.core.BlockPos;
@@ -9,7 +8,6 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,10 +30,8 @@ public record SyncServerRackPayload(BlockPos rackPos, ServerRackConfig config, S
         public static final Side EMPTY = new Side(false, "", 0, Collections.nCopies(CHANNELS, ""),
                 new int[CHANNELS], new int[CHANNELS]);
 
-        @Nullable
-        public ChannelType type(int channel) {
-            int mask = exports[channel] | imports[channel];
-            return mask == 0 ? null : ChannelType.values()[Integer.numberOfTrailingZeros(mask)];
+        public int types(int channel) {
+            return exports[channel] | imports[channel];
         }
 
         private static Side read(FriendlyByteBuf buf) {

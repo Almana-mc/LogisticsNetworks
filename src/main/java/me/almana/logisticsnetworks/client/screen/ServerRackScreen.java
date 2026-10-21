@@ -113,16 +113,16 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
     private void renderPill(GuiGraphics g, Theme t, boolean left, int row, int mx, int my) {
         int channel = config.rows().get(row).channel(left);
         Side side = side(left);
-        ChannelType type = side.type(channel);
+        int types = side.types(channel);
         String name = side.channelNames().get(channel);
         String detail = !name.isEmpty() ? name
-                : type != null ? typeLabel(type) : tr("gui.logisticsnetworks.server_rack.channel_empty");
+                : types != 0 ? typeList(types) : tr("gui.logisticsnetworks.server_rack.channel_empty");
         String label = font.plainSubstrByWidth(
                 tr("gui.logisticsnetworks.computer.flow.channel_short", channel) + " · " + detail, COL_W - 8);
         int x = columnX(left);
         int y = rowY(row);
         boolean active = gridRow == row && gridLeft == left;
-        ThemePaint.channelTab(g, font, x, y, COL_W, PILL_H, label, type, active, false,
+        ThemePaint.channelTab(g, font, x, y, COL_W, PILL_H, label, types, active, false,
                 NetworkDropdown.hits(mx, my, x, y, COL_W, PILL_H), t);
     }
 

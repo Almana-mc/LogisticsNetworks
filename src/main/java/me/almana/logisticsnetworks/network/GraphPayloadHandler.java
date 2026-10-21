@@ -456,8 +456,9 @@ public final class GraphPayloadHandler {
             List<GraphChannel> channels = new ArrayList<>();
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 ChannelData channel = node.getChannel(i);
-                if (channel.isEnabled() && supportsChannel(node, channel)) {
-                    channels.add(new GraphChannel(i, channel.getType(), channel.getMode()));
+                if (!channel.isEnabled() || !TransferEngine.canRunChannel(node, channel)) continue;
+                for (ChannelType type : ChannelType.listOf(NodeUpgradeData.effectiveTypes(node, channel))) {
+                    channels.add(new GraphChannel(i, type, channel.getMode()));
                 }
             }
             String blockName = BuiltInRegistries.BLOCK.getKey(CreateCompat.getAttachedBlockState(node).getBlock()).toString();
@@ -466,13 +467,6 @@ public final class GraphPayloadHandler {
         }
         nodes.sort(Comparator.comparing(GraphNode::nodeId));
         return nodes;
-    }
-
-    private static boolean supportsChannel(LogisticsNodeEntity node, ChannelData channel) {
-        if (!TransferEngine.canRunChannel(node, channel)) return false;
-        if (channel.getType() == ChannelType.CHEMICAL) return NodeUpgradeData.hasMekanismChemicalUpgrade(node);
-        if (channel.getType() == ChannelType.SOURCE) return NodeUpgradeData.hasArsSourceUpgrade(node);
-        return true;
     }
 
     private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {

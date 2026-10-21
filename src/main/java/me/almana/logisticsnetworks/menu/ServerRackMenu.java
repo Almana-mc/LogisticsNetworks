@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.menu;
 
 import me.almana.logisticsnetworks.block.ServerRackBlockEntity;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -90,7 +91,7 @@ public class ServerRackMenu extends AbstractContainerMenu {
                 if (!channel.isEnabled()) {
                     continue;
                 }
-                int bit = 1 << channel.getType().ordinal();
+                int bit = NodeUpgradeData.effectiveTypes(node, channel);
                 if (channel.getMode() == ChannelMode.EXPORT) {
                     exports[i] |= bit;
                 } else {
