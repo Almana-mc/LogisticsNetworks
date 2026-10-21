@@ -1,7 +1,6 @@
 package me.almana.logisticsnetworks.filter;
 
 import com.mojang.serialization.Codec;
-import me.almana.logisticsnetworks.data.ChannelType;
 import net.minecraft.util.StringRepresentable;
 import org.jetbrains.annotations.NotNull;
 
@@ -11,15 +10,6 @@ public enum FilterTargetType implements StringRepresentable {
     CHEMICALS;
 
     public static final Codec<FilterTargetType> CODEC = StringRepresentable.fromEnum(FilterTargetType::values);
-
-    public static FilterTargetType forChannel(ChannelType type) {
-        return switch (type) {
-            case ITEM -> ITEMS;
-            case FLUID -> FLUIDS;
-            case CHEMICAL -> CHEMICALS;
-            case ENERGY, SOURCE -> null;
-        };
-    }
 
     public FilterTargetType next() {
         FilterTargetType[] values = values();

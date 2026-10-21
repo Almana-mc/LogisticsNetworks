@@ -207,27 +207,6 @@ public class ChannelData {
         recipeSets = Math.max(0, sets);
     }
 
-    // Transitional, removed in Task 16
-    public ChannelType getType() {
-        return ChannelType.first(types);
-    }
-
-    // Transitional, removed in Task 16
-    public void setType(ChannelType type) {
-        if (type != null) types = type.bit();
-    }
-
-    // Transitional, removed in Task 16
-    public int getBatchSize() {
-        int value = batches[getType().ordinal()];
-        return value <= 0 ? Integer.MAX_VALUE : value;
-    }
-
-    // Transitional, removed in Task 16
-    public void setBatchSize(int batchSize) {
-        batches[getType().ordinal()] = Math.max(1, batchSize);
-    }
-
     public int getTickDelay() {
         return tickDelay;
     }

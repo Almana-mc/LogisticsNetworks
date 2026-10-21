@@ -426,27 +426,6 @@ public final class NodeClipboardConfig {
         getChannelConfig(channel).recipeSets = Math.max(0, sets);
     }
 
-    // Transitional, removed in Task 16
-    public ChannelType getChannelType(int channel) {
-        return ChannelType.first(getChannelTypes(channel));
-    }
-
-    // Transitional, removed in Task 16
-    public void setChannelType(int channel, ChannelType type) {
-        setChannelTypes(channel, type.bit());
-    }
-
-    // Transitional, removed in Task 16
-    public int getChannelBatchSize(int channel) {
-        int value = getChannelBatch(channel, getChannelType(channel));
-        return value <= 0 ? NodeUpgradeData.getOperationCap(getChannelType(channel), getUpgradeTier()) : value;
-    }
-
-    // Transitional, removed in Task 16
-    public void setChannelBatchSize(int channel, int batchSize) {
-        setChannelBatch(channel, getChannelType(channel), batchSize);
-    }
-
     public int getChannelTickDelay(int channel) {
         return getChannelConfig(channel).tickDelay;
     }
