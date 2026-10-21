@@ -106,6 +106,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     private int lastSettingClickRow = -1;
 
     private boolean filterPickerOpen;
+    private ResourcesPopover resources;
     private int filterPickerSlot = -1;
     private boolean filterDisabledHover;
     private boolean filterAddHover;
@@ -158,6 +159,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     @Override
     protected void init() {
         super.init();
+        resources = new ResourcesPopover(font);
         leftPos = (width - GUI_WIDTH) / 2;
         topPos = (height - GUI_HEIGHT) / 2;
         selectedChannel = menu.getSelectedChannel();
@@ -219,11 +221,13 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             confirmation.render(g, mouseX, mouseY, theme());
             return;
         }
-        super.render(g, tweaksOpen ? Integer.MIN_VALUE : mouseX, tweaksOpen ? Integer.MIN_VALUE : mouseY, partialTick);
+        boolean blocked = tweaksOpen || resources.isOpen();
+        super.render(g, blocked ? Integer.MIN_VALUE : mouseX, blocked ? Integer.MIN_VALUE : mouseY, partialTick);
         if (labelPickerOpen) renderLabelPicker(g, mouseX, mouseY, partialTick);
         if (filterPickerOpen) renderFilterPicker(g, mouseX, mouseY);
+        if (resources.isOpen()) resources.render(g, theme(), mouseX, mouseY);
         if (tweaksOpen) renderTweaksPanel(g, mouseX, mouseY);
-        if (!tweaksOpen) {
+        if (!blocked) {
             renderTooltip(g, mouseX, mouseY);
             if (hoveredChannelName != null) g.renderTooltip(font, hoveredChannelName, mouseX, mouseY);
             if (filterDisabledHover) {
@@ -315,7 +319,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             boolean enabled = config().isChannelEnabled(channel);
             boolean hovered = isInside(x, topPos + 22, 24, 12, mouseX, mouseY);
             ThemePaint.channelTab(g, font, x, topPos + 22, 24, 12, String.valueOf(channel),
-                    config().getChannelType(channel), selected, enabled && !selected, hovered, theme());
+                    config().getChannelTypes(channel), selected, enabled && !selected, hovered, theme());
             if (selected && !enabled) {
                 ThemePaint.roundOutline(g, x, topPos + 22, 24, 12, 2, cDanger(), theme().sharpCorners());
             }
@@ -364,12 +368,12 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                 config().isChannelEnabled(selectedChannel) ? tr("gui.logisticsnetworks.node.value.enabled")
                         : tr("gui.logisticsnetworks.node.value.disabled"),
                 channelModeLabel(config().getChannelMode(selectedChannel)),
-                channelTypeLabel(config().getChannelType(selectedChannel)),
+                ResourceLabels.summary(config().getChannelTypes(selectedChannel)),
                 directionLabel(config().getChannelDirection(selectedChannel)),
                 redstoneLabel(config().getChannelRedstoneMode(selectedChannel)),
                 distributionLabel(config().getChannelDistributionMode(selectedChannel)),
                 editingRow == 6 ? "" : String.valueOf(config().getChannelPriority(selectedChannel)),
-                editingRow == 7 ? "" : batchLabel(),
+                editingRow == 7 ? "" : tr("gui.logisticsnetworks.node.value.batch.per_type"),
                 editingRow == 8 ? "" : tr("gui.logisticsnetworks.node.value.tick_delay",
                         config().getChannelTickDelay(selectedChannel))
         };
@@ -377,7 +381,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                 config().isChannelEnabled(selectedChannel) ? Theme.Variant.ACCENT : Theme.Variant.NEUTRAL,
                 config().getChannelMode(selectedChannel) == ChannelMode.EXPORT
                         ? Theme.Variant.WARN : Theme.Variant.ACCENT,
-                typeVariant(config().getChannelType(selectedChannel)),
+                Theme.Variant.NEUTRAL,
                 Theme.Variant.NEUTRAL,
                 switch (config().getChannelRedstoneMode(selectedChannel)) {
                     case IGNORED -> Theme.Variant.NEUTRAL;
@@ -391,6 +395,9 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             drawSettingRow(g, x + 2, y + 2 + row * rowHeight, width - 4, rowHeight,
                     labels[row], values[row], variants[row], row, mouseX, mouseY, !isSettingDisabled(row));
         }
+        int summaryW = font.width(values[2]) + 8;
+        ResourceLabels.dots(g, x + 2 + width - 4 - summaryW - 3 - 22, y + 2 + 2 * rowHeight + 5,
+                config().getChannelTypes(selectedChannel), theme());
     }
 
     private void drawSettingRow(GuiGraphics g, int x, int y, int width, int height, String label,
@@ -398,7 +405,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         if (enabled && editingRow < 0 && isInside(x, y, width, height, mouseX, mouseY)) {
             g.fill(x, y, x + width, y + height, cHover());
         }
-        int valueWidth = value.isEmpty() ? 0 : row >= 3 && row != 4 && row != 5
+        int valueWidth = value.isEmpty() ? 0 : row >= 2 && row != 4 && row != 5
                 ? font.width(value) + 8 : ThemePaint.pillWidth(font, value);
         int maxLabel = width - valueWidth - 10;
         g.drawString(font, font.plainSubstrByWidth(label, Math.max(0, maxLabel)), x + 4, y + 3,
@@ -407,7 +414,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         if (value.isEmpty()) return;
         if (!enabled) {
             g.drawString(font, value, x + width - font.width(value) - 4, y + 3, cSubtle(), false);
-        } else if (row >= 3 && row != 4 && row != 5) {
+        } else if (row >= 2 && row != 4 && row != 5) {
             int valueX = x + width - valueWidth - 3;
             g.fill(valueX, y + 2, valueX + valueWidth, y + 11, theme().surfaceSunken());
             g.drawString(font, value, valueX + 4, y + 3, cText(), false);
@@ -596,12 +603,14 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             return true;
         }
         if (action != -1 && handleInteraction(mouseX, mouseY, action)) return true;
+        if (resources.isOpen()) return true;
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private boolean handleInteraction(double mouseX, double mouseY, int action) {
         if (action != 0 && action != 1) return false;
         if (tweaksOpen) return action != 0 || handleTweaksClick(mouseX, mouseY);
+        if (resources.isOpen()) return resources.click(mouseX, mouseY, action);
         if (editingRow >= 0 && numericEditBox != null && !numericEditBox.isMouseOver(mouseX, mouseY)) {
             stopNumericEdit(true);
         }
@@ -756,6 +765,11 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         for (int row = 0; row < 9; row++) {
             if (!isInside(x, y + row * 14, 144, 14, mouseX, mouseY)) continue;
             if (isSettingDisabled(row)) return true;
+            if (row == 2 || row == 7) {
+                ClickSound.play();
+                resources.open(resourcesTarget(), leftPos + 40, topPos + 102);
+                return true;
+            }
             if (editingRow < 0) ClickSound.play();
             if (row >= 6 && ClientControls.modifier3Down()) {
                 setNumericExtremum(row, action == 0);
@@ -787,7 +801,6 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             case 0 -> config().setChannelEnabled(selectedChannel, !config().isChannelEnabled(selectedChannel));
             case 1 -> config().setChannelMode(selectedChannel,
                     cycle(config().getChannelMode(selectedChannel), direction));
-            case 2 -> config().setChannelType(selectedChannel, cycleChannelType(direction));
             case 3 -> config().setChannelDirection(selectedChannel,
                     cycleDirection(config().getChannelDirection(selectedChannel), direction));
             case 4 -> config().setChannelRedstoneMode(selectedChannel,
@@ -796,27 +809,9 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                     cycle(config().getChannelDistributionMode(selectedChannel), direction));
             case 6 -> config().setChannelPriority(selectedChannel,
                     config().getChannelPriority(selectedChannel) + direction * (ClientControls.modifier1Down() ? 10 : 1));
-            case 7 -> config().setChannelBatchSize(selectedChannel,
-                    config().getChannelBatchSize(selectedChannel) + direction * (ClientControls.modifier1Down() ? 8 : 1));
             case 8 -> config().setChannelTickDelay(selectedChannel,
                     config().getChannelTickDelay(selectedChannel) + direction * (ClientControls.modifier1Down() ? 10 : 1));
         }
-    }
-
-    private ChannelType cycleChannelType(int direction) {
-        ChannelType current = config().getChannelType(selectedChannel);
-        ChannelType[] values = ChannelType.values();
-        int index = current.ordinal();
-        for (int count = 0; count < values.length; count++) {
-            index = (index + direction + values.length) % values.length;
-            ChannelType candidate = values[index];
-            if (candidate == ChannelType.CHEMICAL
-                    && (!MekanismCompat.isLoaded() || !hasUpgrade(Registration.MEKANISM_CHEMICAL_UPGRADE.get()))) continue;
-            if (candidate == ChannelType.SOURCE
-                    && (!ArsCompat.isLoaded() || !hasUpgrade(Registration.ARS_SOURCE_UPGRADE.get()))) continue;
-            return candidate;
-        }
-        return current;
     }
 
     private boolean hasUpgrade(net.minecraft.world.item.Item upgrade) {
@@ -830,14 +825,11 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         if (config().getChannelMode(selectedChannel) == ChannelMode.IMPORT) {
             return row == 5 || row == 7 || row == 8;
         }
-        return config().getChannelType(selectedChannel) == ChannelType.ENERGY && row == 8;
+        return config().getChannelTypes(selectedChannel) == ChannelType.ENERGY.bit() && row == 8;
     }
 
     private void setNumericExtremum(int row, boolean maximum) {
         if (row == 6) config().setChannelPriority(selectedChannel, maximum ? 99 : -99);
-        else if (row == 7) config().setChannelBatchSize(selectedChannel,
-                maximum ? NodeUpgradeData.getOperationCap(config().getChannelType(selectedChannel),
-                        config().getUpgradeTier()) : 1);
         else if (row == 8) config().setChannelTickDelay(selectedChannel, maximum ? 10_000 : 1);
     }
 
@@ -845,7 +837,6 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         stopNumericEdit(false);
         editingRow = row;
         int value = row == 6 ? config().getChannelPriority(selectedChannel)
-                : row == 7 ? config().getChannelBatchSize(selectedChannel)
                 : config().getChannelTickDelay(selectedChannel);
         numericEditBox = new EditBox(font, x, y, 70, 11, Component.empty());
         numericEditBox.setMaxLength(32);
@@ -862,7 +853,6 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             try {
                 int value = ArithmeticExpression.evaluate(numericEditBox.getValue().trim());
                 if (editingRow == 6) config().setChannelPriority(selectedChannel, value);
-                else if (editingRow == 7) config().setChannelBatchSize(selectedChannel, value);
                 else if (editingRow == 8) config().setChannelTickDelay(selectedChannel, value);
                 commit();
             } catch (NumberFormatException ignored) {
@@ -1064,6 +1054,71 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                 config().save(minecraft.level.registryAccess())));
     }
 
+    private ResourcesPopover.Target resourcesTarget() {
+        int channel = selectedChannel;
+        return new ResourcesPopover.Target() {
+            @Override
+            public int types() {
+                return config().getChannelTypes(channel);
+            }
+
+            @Override
+            public void setTypes(int mask) {
+                config().setChannelTypes(channel, mask);
+            }
+
+            @Override
+            public int available() {
+                return NodeUpgradeData.availableTypes(false,
+                        MekanismCompat.isLoaded() && hasUpgrade(Registration.MEKANISM_CHEMICAL_UPGRADE.get()),
+                        ArsCompat.isLoaded() && hasUpgrade(Registration.ARS_SOURCE_UPGRADE.get()));
+            }
+
+            @Override
+            public int batch(ChannelType type) {
+                return config().getChannelBatch(channel, type);
+            }
+
+            @Override
+            public void setBatch(ChannelType type, int value) {
+                config().setChannelBatch(channel, type, value);
+            }
+
+            @Override
+            public int cap(ChannelType type) {
+                return NodeUpgradeData.getOperationCap(type, config().getUpgradeTier());
+            }
+
+            @Override
+            public int recipeSets() {
+                return config().getChannelRecipeSets(channel);
+            }
+
+            @Override
+            public void setRecipeSets(int value) {
+                config().setChannelRecipeSets(channel, value);
+            }
+
+            @Override
+            public boolean exporting() {
+                return config().getChannelMode(channel) == ChannelMode.EXPORT;
+            }
+
+            @Override
+            public boolean hasCard() {
+                for (int slot = 0; slot < getFilterSlotCount(); slot++) {
+                    if (RecipeCardItem.is(config().getFilterItem(channel, slot))) return true;
+                }
+                return false;
+            }
+
+            @Override
+            public void commit() {
+                ClipboardScreen.this.commit();
+            }
+        };
+    }
+
     private void sendButton(int id) {
         if (minecraft != null && minecraft.gameMode != null) {
             minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
@@ -1076,6 +1131,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             confirmation.keyPressed(key, scanCode, modifiers);
             return true;
         }
+        if (resources.keyPressed(key, scanCode, modifiers)) return true;
         if (key == 256) {
             if (tweaksOpen) {
                 tweaksOpen = false;
@@ -1138,6 +1194,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
         if (confirmation != null) return true;
+        if (resources.charTyped(codePoint, modifiers)) return true;
         if (channelNameEditBox != null) return channelNameEditBox.charTyped(codePoint, modifiers);
         if (numericEditBox != null) {
             return ArithmeticExpression.accepts(codePoint)
@@ -1272,31 +1329,6 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                 .map(SyncNetworkListPayload.NetworkEntry::color).findFirst().orElse(NetworkColors.DEFAULT);
     }
 
-    private String batchLabel() {
-        int value = config().getChannelBatchSize(selectedChannel);
-        ItemStack[] filters = new ItemStack[getFilterSlotCount()];
-        for (int slot = 0; slot < filters.length; slot++)
-            filters[slot] = config().getFilterItem(selectedChannel, slot);
-        if (RecipeCardItem.anyIn(filters))
-            return String.valueOf(value);
-        return switch (config().getChannelType(selectedChannel)) {
-            case FLUID -> tr("gui.logisticsnetworks.node.value.batch.fluid", value);
-            case ENERGY -> tr("gui.logisticsnetworks.node.value.batch.energy", value);
-            case CHEMICAL -> tr("gui.logisticsnetworks.node.value.batch.chemical", value);
-            case SOURCE -> tr("gui.logisticsnetworks.node.value.batch.source", value);
-            default -> String.valueOf(value);
-        };
-    }
-
-    private Theme.Variant typeVariant(ChannelType type) {
-        return switch (type) {
-            case ITEM -> Theme.Variant.ACCENT;
-            case FLUID, SOURCE -> Theme.Variant.INFO;
-            case ENERGY -> Theme.Variant.WARN;
-            case CHEMICAL -> Theme.Variant.NEUTRAL;
-        };
-    }
-
     private Theme.Variant distributionVariant(DistributionMode mode) {
         return switch (mode) {
             case PRIORITY -> Theme.Variant.INFO;
@@ -1359,10 +1391,6 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
 
     private String channelModeLabel(ChannelMode mode) {
         return tr("gui.logisticsnetworks.channel_mode." + mode.name().toLowerCase(Locale.ROOT));
-    }
-
-    private String channelTypeLabel(ChannelType type) {
-        return tr("gui.logisticsnetworks.channel_type." + type.name().toLowerCase(Locale.ROOT));
     }
 
     private String redstoneLabel(RedstoneMode mode) {
