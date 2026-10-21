@@ -314,8 +314,7 @@ public class TransferEngine {
                         chemicalImports, sourceImports);
                 if (typed.isEmpty() || cards && !RecipeChannel.runsLoose(channel, type))
                     continue;
-                if (type == ChannelType.ENERGY && capCache.findEnergyHandler(sourceLevel,
-                        sourceNode.getAttachedPos(), channel.getIoSide()) == null) {
+                if (type == ChannelType.ENERGY && !canExtractEnergy(sourceNode, sourceLevel, channel, capCache)) {
                     minWakeDelta = Math.min(minWakeDelta, Config.backoffMaxTicks);
                     continue;
                 }
@@ -383,6 +382,12 @@ public class TransferEngine {
             case CHEMICAL -> chemicals[channel];
             case SOURCE -> source[channel];
         };
+    }
+
+    private static boolean canExtractEnergy(LogisticsNodeEntity node, ServerLevel level, ChannelData channel,
+            TransferCapabilityCache capCache) {
+        var handler = capCache.findEnergyHandler(level, node.getAttachedPos(), channel.getIoSide());
+        return handler != null && handler.canExtract();
     }
 
     private static boolean hasMountedStorage(LogisticsNodeEntity node, ChannelData channel, ChannelType type,

@@ -146,7 +146,7 @@ Redstone gating applies to both Senders and Receivers.
 
 **What it does:** caps a single transfer attempt, separately for each kind. Units depend on the kind: items for Item, mB for Fluid and Chemical, Source for Source. Energy always moves as much as the upgrades allow.
 
-**How to change it:** click the Batch row (or the Resources row) to open the popover, then click a kind's amount. Left click adds 1, right click removes 1, Shift steps by 8, Alt jumps to Max or 1, and a double-click lets you type a value. The box also takes simple math with `+ - * /` and parentheses, so `64*7` saves as 448. **Max** follows your upgrade tier.
+**How to change it:** click the Batch row (or the Resources row) to open the popover, then click a kind's amount. Left click adds 1, right click removes 1, **Modifier Key 1 (default: Shift)** steps by 8, **Modifier Key 3 (default: Alt)** jumps to Max or 1, and a double-click lets you type a value. The box also takes simple math with `+ - * /` and parentheses, so `64*7` saves as 448. **Max** follows your upgrade tier.
 
 **Gotcha:** Batch is capped by the upgrades installed on the node. A value above the cap is treated as Max. Install higher-tier upgrades to raise the ceiling — see [Performance Upgrades](upgrades-performance.md).
 

@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.item.RecipeCardItem;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.server.level.ServerLevel;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -33,13 +34,14 @@ public final class AttachedStorageFilterScanner {
 
         TransferCapabilityCache capabilities = NetworkRegistry.get(level).getCapabilityCache();
         Result total = new Result(0, false, false);
-        if (channel.hasType(ChannelType.ITEM)) {
+        int types = NodeUpgradeData.effectiveTypes(node, channel);
+        if (ChannelType.ITEM.in(types)) {
             total = merge(total, scanItems(capabilities.findItemHandler(node, channel.getIoSide()), filter));
         }
-        if (channel.hasType(ChannelType.FLUID) && !total.filterFull()) {
+        if (ChannelType.FLUID.in(types) && !total.filterFull()) {
             total = merge(total, scanFluids(capabilities.findFluidHandler(node, channel.getIoSide()), filter));
         }
-        if (channel.hasType(ChannelType.CHEMICAL) && !total.filterFull() && !node.isMountedOnCreate()) {
+        if (ChannelType.CHEMICAL.in(types) && !total.filterFull() && !node.isMountedOnCreate()) {
             total = merge(total, scanChemicals(level, node, channel, capabilities, filter));
         }
         return total;

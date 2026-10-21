@@ -99,8 +99,8 @@ final class ResourcesPopover {
         int row = (int) (my - y - HEADER_H) / ROW_H;
         if (my < y + HEADER_H || row >= rows()) return true;
         ClickSound.play();
-        if (mx >= x + W - 64 && editable(row)) {
-            amountClick(row, action);
+        if (mx >= x + W - 64) {
+            if (editable(row)) amountClick(row, action);
         } else if (row < SETS_ROW) {
             target.setTypes(target.types() ^ ChannelType.values()[row].bit());
         }

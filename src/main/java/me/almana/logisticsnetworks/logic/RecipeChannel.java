@@ -37,19 +37,15 @@ final class RecipeChannel {
                 .toList();
     }
 
-    // Card kinds only move loose entries
+    // Cards allow loose entries only
     static boolean runsLoose(ChannelData channel, ChannelType type) {
         ItemStack[] filters = channel.getFilterItems();
-        boolean cardKind = RecipeSets.kinds(RecipeSets.cards(filters)).stream()
-                .anyMatch(kind -> kind.channel == type);
-        if (!cardKind)
-            return true;
         FilterItemData.ReadCache cache = FilterItemData.createReadCache();
         return switch (type) {
             case ITEM -> FilterLogic.hasConfiguredItemFilter(filters, cache);
             case FLUID -> FilterLogic.hasConfiguredFluidFilter(filters, cache);
             case CHEMICAL -> FilterLogic.hasConfiguredChemicalFilter(filters, cache);
-            default -> true;
+            default -> false;
         };
     }
 

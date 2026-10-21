@@ -564,9 +564,7 @@ public final class NodeClipboardConfig {
             ChannelConfig config = getChannelConfig(channel);
             if (config.enabled != defaults.enabled
                     || config.mode != defaults.mode
-                    || config.types != defaults.types
-                    || !Arrays.equals(config.batches, defaults.batches)
-                    || config.recipeSets != defaults.recipeSets
+                    || !isDefaultTypes(config, defaults)
                     || config.tickDelay != defaults.tickDelay
                     || config.ioDirection != defaults.ioDirection
                     || config.redstoneMode != defaults.redstoneMode
@@ -1168,6 +1166,18 @@ public final class NodeClipboardConfig {
 
         node.setRenderVisible(renderVisible);
         node.setNodeLabel(nodeLabel);
+    }
+
+    private static boolean isDefaultTypes(ChannelConfig config, ChannelConfig defaults) {
+        if (config.recipeSets != 0) {
+            return false;
+        }
+        if (config.types == defaults.types && Arrays.equals(config.batches, defaults.batches)) {
+            return true;
+        }
+        int[] legacy = new int[config.batches.length];
+        legacy[0] = 8;
+        return config.types == ChannelType.ITEM.bit() && Arrays.equals(config.batches, legacy);
     }
 
     private static ChannelConfig defaultChannelConfig() {
