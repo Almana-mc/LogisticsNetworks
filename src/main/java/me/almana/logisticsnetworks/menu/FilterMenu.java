@@ -593,7 +593,7 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public int getPlayerInventoryY() {
-        return isSpecialMode ? 122 : FILTER_Y + rows * 18 + 18;
+        return isSpecialMode ? 122 : FILTER_Y + rows * 18 + 28;
     }
 
     public boolean isPlayerInventorySlot(int menuSlotIndex) {
