@@ -31,7 +31,7 @@ The right-hand panel of the node configuration screen holds four things: a 3x2 g
 - The button picker creates **Normal**, **Mod**, or **Regex** filters. Inside a Normal filter you configure item, fluid, chemical, tag, NBT, durability, enchanted, slot, batch, and stock rules, and adjust its capacity.
 - For detail on each filter type and how to configure them, see [Filters](../filters/index.md).
 
-**Empty slots = pass everything.** If all 6 slots are empty, the channel transfers any matching resource (subject to Type — an Item channel still only moves items, obviously). Filters are an optional narrowing, not a requirement.
+**Empty slots = pass everything.** If all 6 slots are empty, the channel transfers anything its Resources allow. Filters are an optional narrowing, not a requirement.
 
 ### The Any / All button
 
@@ -49,7 +49,7 @@ Use Primary Interaction on the button above the filter grid to toggle between th
 
 ## Round-robin resources
 
-On an Item or Fluid Sender with a filter, the **RR** button beside the filter grid enables resource rotation. It is off by default. Each operation moves one distinct matching resource type from the attached storage, then the next successful operation starts after that type. Duplicate slots count as one type; different components remain distinct. Blocked types are skipped, and no movement leaves the turn unchanged. Existing batch, delay, stock, slot and receiver-distribution rules still apply.
+On a Sender carrying Items or Fluids with a filter, the **RR** button beside the filter grid enables resource rotation. It is off by default. Each operation moves one distinct matching resource type from the attached storage, then the next successful operation starts after that type. Duplicate slots count as one type; different components remain distinct. Blocked types are skipped, and no movement leaves the turn unchanged. Existing batch, delay, stock, slot and receiver-distribution rules still apply.
 
 ## Upgrades
 
@@ -59,7 +59,7 @@ On an Item or Fluid Sender with a filter, the **RR** button beside the filter gr
 
 **What it does:** upgrade items installed here affect the whole node — they increase the batch caps, lower the minimum tick delay, and unlock special capabilities (like the Chemical and Source channel types).
 
-**Per-node, not per-channel.** Upgrades are shared by **all 9 channels** on the node. Increasing the tier sets each channel's Batch to its new maximum and allows a shorter delay. Non-energy channels keep their configured Delay until you change it.
+**Per-node, not per-channel.** Upgrades are shared by **all 9 channels** on the node. Increasing the tier sets each channel's Batch to its new maximum. Each kind's Batch returns to Max. A higher tier also allows a shorter delay. Non-energy channels keep their configured Delay until you change it.
 
 **What fits in the slots:**
 

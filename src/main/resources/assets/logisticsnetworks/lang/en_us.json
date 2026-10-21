@@ -653,7 +653,7 @@
   "gui.logisticsnetworks.theme.brutalist": "Brutalist",
   "gui.logisticsnetworks.config.client.theme": "Theme",
   "gui.logisticsnetworks.config.client.density": "Density",
-  "gui.logisticsnetworks.node.filter.unfilterable": "This channel type can't be filtered",
+  "gui.logisticsnetworks.node.filter.unfilterable": "Energy and Source can't be filtered",
   "gui.logisticsnetworks.node.filter.pick.normal": "Normal",
   "gui.logisticsnetworks.node.filter.pick.mod": "Mod",
   "gui.logisticsnetworks.node.filter.pick.regex": "Regex",
