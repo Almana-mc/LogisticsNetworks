@@ -7,8 +7,6 @@ import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
-import me.almana.logisticsnetworks.integration.ars.ArsCompat;
-import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.registration.ModTags;
@@ -203,24 +201,13 @@ public class ClipboardMenu extends AbstractContainerMenu {
     static void normalize(NodeClipboardConfig config) {
         config.setNetworkTarget(config.getNetworkId(), config.getNetworkName());
         config.setNodeLabel(config.getNodeLabel());
-        boolean chemical = MekanismCompat.isLoaded() && hasUpgrade(config, Registration.MEKANISM_CHEMICAL_UPGRADE.get());
-        boolean source = ArsCompat.isLoaded() && hasUpgrade(config, Registration.ARS_SOURCE_UPGRADE.get());
         for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
             config.setChannelName(channel, config.getChannelName(channel));
-            ChannelType type = config.getChannelType(channel);
-            if ((type == ChannelType.CHEMICAL && !chemical) || (type == ChannelType.SOURCE && !source)) {
-                config.setChannelType(channel, ChannelType.ITEM);
+            for (ChannelType type : ChannelType.values()) {
+                config.setChannelBatch(channel, type, config.getChannelBatch(channel, type));
             }
-            config.setChannelBatchSize(channel, config.getChannelBatchSize(channel));
             config.setChannelTickDelay(channel, config.getChannelTickDelay(channel));
         }
-    }
-
-    private static boolean hasUpgrade(NodeClipboardConfig config, net.minecraft.world.item.Item upgrade) {
-        for (int slot = 0; slot < config.getUpgradeSlotCount(); slot++) {
-            if (config.getUpgradeItem(slot).is(upgrade)) return true;
-        }
-        return false;
     }
 
     public void saveClipboard() {
