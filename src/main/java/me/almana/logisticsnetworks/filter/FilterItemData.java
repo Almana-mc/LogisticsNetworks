@@ -143,12 +143,6 @@ public final class FilterItemData {
         return FilterSettingsData.get(stack).target();
     }
 
-    public static void setTargetType(ItemStack stack, FilterTargetType type) {
-        if (!isFilterItem(stack) || !LegacyComponentMigration.migrateGeneralFilter(stack, null))
-            return;
-        FilterSettingsData.setTarget(stack, type);
-    }
-
     public static ItemStack getEntry(ItemStack stack, int slot) {
         GeneralFilterEntry entry = entry(stack, slot);
         return entry == null || entry.item() == null ? ItemStack.EMPTY : entry.item().toStack();
