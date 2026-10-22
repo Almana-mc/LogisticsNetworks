@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.filter.CandidateComponents;
 import me.almana.logisticsnetworks.filter.FilterItemData;
@@ -23,8 +24,8 @@ public final class PlannedItemValidation {
     private final HolderLookup.Provider registries;
     private final FilterItemData.ReadCache filters = FilterItemData.createReadCache();
     private final Set<Item> candidates = new HashSet<>();
-    private final Map<IItemHandler, Map<Item, Integer>> targetCounts = new IdentityHashMap<>();
-    private Map<Item, Integer> sourceCounts;
+    private final Map<IItemHandler, Object2IntMap<Item>> targetCounts = new IdentityHashMap<>();
+    private Object2IntMap<Item> sourceCounts;
 
     public PlannedItemValidation(IItemHandler source, ChannelData channel, HolderLookup.Provider registries,
             List<TransferPlan.ItemMove> moves) {
@@ -64,7 +65,7 @@ public final class PlannedItemValidation {
                 || TransferAmountRules.hasStockFilter(channel.getFilterItems(), filters))) {
             sourceCounts = TransferAmountRules.countItems(source, candidates);
         }
-        Map<Item, Integer> counts = null;
+        Object2IntMap<Item> counts = null;
         if (constraints.hasImportThreshold() || TransferAmountRules.hasStockFilter(imports, filters)) {
             counts = target instanceof DirectItemAccess direct ? direct.countItems(candidates)
                     : targetCounts.computeIfAbsent(target, ignored -> TransferAmountRules.countItems(target, candidates));
@@ -80,7 +81,7 @@ public final class PlannedItemValidation {
 
     public void moved(Item item, int amount, IItemHandler target) {
         if (sourceCounts != null) sourceCounts.computeIfPresent(item, (key, count) -> Math.max(0, count - amount));
-        Map<Item, Integer> counts = targetCounts.get(target);
+        var counts = targetCounts.get(target);
         if (counts != null) counts.merge(item, amount, (a, b) -> DirectStorageReads.clamp((long) a + b));
     }
 }

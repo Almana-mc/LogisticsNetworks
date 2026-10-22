@@ -1139,9 +1139,9 @@ public class TransferEngine {
                 if (!candidate.isEmpty()) countCandidates.add(candidate.getItem());
             }
         }
-        Map<Item, Integer> sourceItemCounts = sourceNeedsCounts
+        var sourceItemCounts = sourceNeedsCounts
                 ? TransferAmountRules.countItems(source, countCandidates) : null;
-        Map<Item, Integer> batchMoved = anyAmountConstraints && !roundRobin
+        var batchMoved = anyAmountConstraints && !roundRobin
                 ? new HashMap<>(priorBatchMoved)
                 : null;
         List<Map<Item, Integer>> targetBatchMoved = null;
