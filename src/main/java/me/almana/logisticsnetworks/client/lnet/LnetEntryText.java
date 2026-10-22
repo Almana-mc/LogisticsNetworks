@@ -314,11 +314,8 @@ final class LnetEntryText {
         String raw = "";
         int matchesStart = matchesStart(text);
         if (matchesStart >= 0) {
-            raw = text.substring(matchesStart).trim().substring("matches ".length()).trim();
+            raw = rawNbt(text.substring(matchesStart));
             text = text.substring(0, Math.max(0, matchesStart - 1));
-            if (raw.length() > FilterItemData.MAX_NBT_RAW_LENGTH) {
-                throw new IOException("'matches' text longer than " + FilterItemData.MAX_NBT_RAW_LENGTH);
-            }
         }
         for (String part : text.isEmpty() ? List.<String>of() : split(text, ",")) {
             if (part.startsWith("keep ")) {
@@ -346,6 +343,14 @@ final class LnetEntryText {
         return entry.withCounts(new GeneralFilterEntry.EntryCounts(0, entry.counts().batch(), stock))
                 .withSlotMapping(slots)
                 .withNbt(new GeneralFilterEntry.NbtConstraints(where.rules(), where.matchAny(), strict, raw));
+    }
+
+    private static String rawNbt(String clause) throws IOException {
+        String raw = clause.trim().substring("matches ".length()).trim();
+        if (raw.length() > FilterItemData.MAX_NBT_RAW_LENGTH) {
+            throw new IOException("'matches' text longer than " + FilterItemData.MAX_NBT_RAW_LENGTH);
+        }
+        return raw;
     }
 
     private static int matchesStart(String text) {

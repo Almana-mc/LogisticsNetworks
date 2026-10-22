@@ -326,7 +326,6 @@ final class LnetDocument {
         }
     }
 
-
     private static boolean untouched(ChannelState s) {
         return !s.enabled() && s.mode() == ChannelMode.IMPORT && s.name().isBlank()
                 && s.direction().orElse(IoSide.ALL) == IoSide.UP && s.tickDelay() == 20 && s.priority() == 0

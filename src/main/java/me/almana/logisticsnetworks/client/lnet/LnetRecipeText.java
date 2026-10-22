@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 import java.io.IOException;
@@ -82,7 +83,8 @@ final class LnetRecipeText {
                     Optional.of(id), count);
         }
         if (rest.startsWith("fluid ") || mb) {
-            String id = LnetEntryText.readFluid(rest.startsWith("fluid ") ? rest.substring("fluid ".length()).trim() : rest);
+            String fluid = rest.startsWith("fluid ") ? rest.substring("fluid ".length()).trim() : rest;
+            String id = LnetEntryText.readFluid(fluid);
             return new RecipeCardData.Ingredient(Optional.empty(), Optional.empty(), Optional.of(id),
                     Optional.empty(), count);
         }
@@ -106,8 +108,8 @@ final class LnetRecipeText {
             id = matcher.group(3).trim();
         }
         ItemStack stack = LnetEntryText.readItem(id, registries);
-        if (count < 1 || count > 99) {
-            throw new IOException("output count must be 1 to 99");
+        if (count < 1 || count > Item.ABSOLUTE_MAX_STACK_SIZE) {
+            throw new IOException("output count must be 1 to " + Item.ABSOLUTE_MAX_STACK_SIZE);
         }
         return StackSnapshot.of(stack.copyWithCount(count));
     }

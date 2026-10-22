@@ -184,7 +184,8 @@ final class LnetChannelText {
                 readInline(text, registries, skip);
                 return;
             }
-            ChannelType type = ChannelType.values()[WORDS.indexOf(resource.group(3).equals("item") ? "items" : resource.group(3))];
+            String word = resource.group(3).equals("item") ? "items" : resource.group(3);
+            ChannelType type = ChannelType.values()[WORDS.indexOf(word)];
             if (resource.group(2) != null && type != ChannelType.FLUID && type != ChannelType.CHEMICAL) {
                 throw new IOException("'mb' only fits fluids and chemicals");
             }
@@ -218,11 +219,15 @@ final class LnetChannelText {
                 return;
             }
             for (LnetFilterText.FilterDraft filter : all) {
-                if (filter.entries == null || filter.settings.blacklist() && !filter.droppedCard) {
+                boolean guarded = filter.entries != null
+                        && (!filter.settings.blacklist() || filter.droppedCard);
+                if (!guarded) {
                     continue;
                 }
+                FilterTargetType target = filter.settings.target();
                 for (ChannelType kind : filter.skippedKinds) {
-                    if (filter.settings.blacklist() || filter.entries.stream().noneMatch(entry -> keeps(entry, kind, filter.settings.target()))) {
+                    if (filter.settings.blacklist()
+                            || filter.entries.stream().noneMatch(entry -> keeps(entry, kind, target))) {
                         types &= ~kind.bit();
                     }
                 }
