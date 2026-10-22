@@ -40,12 +40,12 @@ import java.util.function.UnaryOperator;
 
 public final class FilterItemData {
 
-    private static final int MAX_NBT_RULES_PER_SLOT = 8;
-    private static final int MAX_NBT_PATH_LENGTH = 512;
-    private static final int MAX_NBT_VALUE_LENGTH = 1024;
+    public static final int MAX_NBT_RULES_PER_SLOT = 8;
+    public static final int MAX_NBT_PATH_LENGTH = 512;
+    public static final int MAX_NBT_VALUE_LENGTH = 1024;
     // Bounds nbt rule sizes
-    private static final int MAX_NBT_VALUE_BYTES = 2048;
-    private static final int MAX_NBT_RAW_LENGTH = 4096;
+    public static final int MAX_NBT_VALUE_BYTES = 2048;
+    public static final int MAX_NBT_RAW_LENGTH = 4096;
     private static final String NBT_OP_EQUALS = "=";
 
     public static final class ReadCache {
