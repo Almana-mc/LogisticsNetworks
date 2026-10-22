@@ -237,7 +237,7 @@ final class LnetChannelText {
             HolderLookup.Provider registries) {
         List<GeneralFilterEntry> inline = inlineEntries(state, filters, registries);
         String name = state.name().isBlank() ? ""
-                : " \"" + state.name().replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+                : " \"" + state.name().replace('\r', ' ').replace('\n', ' ').replace("\\","\\\\").replace("\"", "\\\"") + "\"";
         String title = "Channel " + (index + 1) + name + ": " + String.join(", ", head(state, inline, registries));
         String extra = String.join(", ", settings(state));
         if (extra.isEmpty()) {
