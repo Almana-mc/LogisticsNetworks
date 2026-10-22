@@ -57,7 +57,7 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
     }
 
     public static LnetNetworkFile readString(String text, HolderLookup.Provider registries) throws IOException {
-        String body = text.startsWith("﻿") ? text.substring(1) : text;
+        String body = text.startsWith("\uFEFF") ? text.substring(1) : text;
         try {
             return LnetDocument.isV2(body) ? LnetDocument.read(body, registries) : LnetLegacyFormat.read(body);
         } catch (RuntimeException | StackOverflowError e) {
