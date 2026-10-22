@@ -2026,7 +2026,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
                     COLOR_ACCENT);
         } catch (IOException e) {
             setLnetStatus(line("gui.logisticsnetworks.computer.lnet_save_failed"), COLOR_WARNING);
-            if (Config.debugMode) LOGGER.warn("Failed to save lnet export", e);
+            LOGGER.warn("Failed to save lnet export", e);
         }
     }
 
