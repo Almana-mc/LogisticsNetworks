@@ -13,11 +13,13 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public record NbtPath(Component[] components) {
     public static final Codec<NbtPath> CODEC = Codec.STRING.xmap(NbtPath::parseLenient, NbtPath::toString);
     public static final StreamCodec<ByteBuf, NbtPath> STREAM_CODEC = ByteBufCodecs.STRING_UTF8.map(NbtPath::parseLenient, NbtPath::toString);
 
+    private static final Pattern SAFE_KEY = Pattern.compile("[A-Za-z0-9_:/+-]+");
     public static final NbtPath EMPTY = NbtPath.of();
 
     public static NbtPath of(Component... components) {
@@ -95,7 +97,7 @@ public record NbtPath(Component[] components) {
     }
 
     private static boolean needsQuotes(String key) {
-        return key.isEmpty() || !key.matches("[A-Za-z0-9_:/+-]+");
+        return key.isEmpty() || !SAFE_KEY.matcher(key).matches();
     }
 
     private static int parseIndex(String str, int start, List<Component> out) {
