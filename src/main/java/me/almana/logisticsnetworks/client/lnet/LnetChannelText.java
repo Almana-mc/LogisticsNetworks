@@ -54,6 +54,7 @@ final class LnetChannelText {
         private FilterMode filterMode = FilterMode.MATCH_ANY;
         private int priority;
         private boolean rotate;
+        private boolean droppedFilter;
 
         ChannelDraft(int index, String name) {
             this.index = index;
@@ -79,8 +80,15 @@ final class LnetChannelText {
                 throw new IOException("[" + label + "] channel " + (index + 1) + " needs a 'send' or 'receive' clause");
             }
             guardWhitelists();
+            if (droppedFilter) {
+                types = 0;
+            }
             return new ChannelState(enabled, mode, types, Arrays.stream(batches).boxed().toList(), recipeSets,
                     tickDelay, Optional.of(side), redstone, distribution, filterMode, priority, name, rotate);
+        }
+
+        void dropFilter() {
+            droppedFilter = true;
         }
 
         List<ItemStack> filterStacks() {

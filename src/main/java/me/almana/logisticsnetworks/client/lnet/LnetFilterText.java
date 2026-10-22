@@ -199,6 +199,9 @@ final class LnetFilterText {
 
     private static List<String> writeGeneral(ItemStack filter, String head, FilterSettings settings,
             ChannelMode mode, HolderLookup.Provider registries) {
+        if (!entries(filter).stream().allMatch(entry -> survives(entry, settings.target(), mode, registries))) {
+            return List.of("raw filter: " + LnetEntryText.writeItem(filter, registries));
+        }
         List<String> lines = new ArrayList<>();
         List<String> plain = new ArrayList<>();
         for (GeneralFilterEntry entry : entries(filter)) {
@@ -213,6 +216,24 @@ final class LnetFilterText {
         }
         lines.add(0, withBody(head + ":", String.join(", ", plain)));
         return lines;
+    }
+
+    private static boolean survives(GeneralFilterEntry entry, FilterTargetType target, ChannelMode mode,
+            HolderLookup.Provider registries) {
+        try {
+            if (LnetRecipeText.isCard(entry)) {
+                RecipeCardData card = RecipeCardData.of(entry.item().toStack());
+                if (!card.ingredients().isEmpty()) {
+                    LnetRecipeText.readCard(LnetRecipeText.writeCard(card, registries), registries);
+                }
+            } else if (!LnetEntryText.isBlank(entry)) {
+                String text = LnetEntryText.writeEntry(entry, target, mode, registries);
+                LnetEntryText.readEntry(text, 0, mode, target, registries);
+            }
+            return true;
+        } catch (IOException | RuntimeException e) {
+            return false;
+        }
     }
 
     private static String withBody(String head, String body) {
@@ -231,7 +252,9 @@ final class LnetFilterText {
                 && entry.counts().stock() == 0 && entry.counts().amount() == 0
                 && entry.slotMapping().slots().isEmpty()
                 && entry.nbt().equals(GeneralFilterEntry.NbtConstraints.EMPTY));
-        return simple ? entries : List.of();
+        boolean readable = entries.stream()
+                .allMatch(entry -> survives(entry, FilterTargetType.ITEMS, ChannelMode.EXPORT, registries));
+        return simple && readable ? entries : List.of();
     }
 
     private static boolean isGeneral(ItemStack stack) {

@@ -224,6 +224,7 @@ final class LnetDocument {
             channel.addFilter(LnetFilterText.readRaw(body, registries));
         } catch (LnetEntryText.MissingMod e) {
             skip(e.getMessage());
+            channel.dropFilter();
         }
     }
 
