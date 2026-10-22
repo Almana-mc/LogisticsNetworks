@@ -11,7 +11,10 @@ import me.almana.logisticsnetworks.component.NameFilterConfig;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
+import me.almana.logisticsnetworks.filter.ModFilterData;
+import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.filter.NameMatchScope;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
@@ -32,7 +35,6 @@ import java.util.function.Consumer;
 
 final class LnetFilterText {
 
-    private static final int MAX_ENTRIES = 45;
     private static final Map<NameMatchScope, String> SCOPE_WORDS = Map.of(
             NameMatchScope.NAME, "names",
             NameMatchScope.TOOLTIP, "tooltips",
@@ -60,7 +62,7 @@ final class LnetFilterText {
         void addEntry(String text, @Nullable ChannelMode mode, HolderLookup.Provider registries,
                 Consumer<String> skip) throws IOException {
             try {
-                entries.add(LnetEntryText.readEntry(text, entries.size(), mode, registries));
+                entries.add(LnetEntryText.readEntry(text, entries.size(), mode, settings.target(), registries));
             } catch (LnetEntryText.MissingMod e) {
                 skip.accept(e.getMessage());
                 skippedKinds.add(e.kind);
@@ -73,7 +75,7 @@ final class LnetFilterText {
                 entries.add(LnetRecipeText.cardEntry(LnetRecipeText.readCard(text, registries), entries.size()));
             } catch (LnetEntryText.MissingMod e) {
                 skip.accept("recipe dropped, " + e.getMessage());
-                skippedKinds.addAll(EnumSet.of(ChannelType.ITEM, ChannelType.FLUID, ChannelType.CHEMICAL));
+                skippedKinds.addAll(EnumSet.allOf(ChannelType.class));
             }
             checkSize();
         }
@@ -90,8 +92,9 @@ final class LnetFilterText {
         }
 
         private void checkSize() throws IOException {
-            if (entries.size() > MAX_ENTRIES) {
-                throw new IOException("more than " + MAX_ENTRIES + " entries in one filter");
+            int capacity = FilterItemData.getCapacity(stack);
+            if (entries.size() > capacity) {
+                throw new IOException("more than " + capacity + " entries in one filter");
             }
         }
     }
@@ -107,7 +110,11 @@ final class LnetFilterText {
         }
         List<String> words = new ArrayList<>(List.of(line.substring(0, colon).trim().split("\\s+")));
         String body = line.substring(colon + 1).trim();
-        boolean blacklist = words.remove(0).equals("block");
+        String first = words.remove(0);
+        if (!first.equals("allow") && !first.equals("block")) {
+            throw new IOException("filter line must start with 'allow' or 'block'");
+        }
+        boolean blacklist = first.equals("block");
         FilterTargetType target = FilterTargetType.ITEMS;
         if (!words.isEmpty() && (words.get(0).equals("fluid") || words.get(0).equals("chemical"))) {
             target = words.remove(0).equals("fluid") ? FilterTargetType.FLUIDS : FilterTargetType.CHEMICALS;
@@ -144,23 +151,27 @@ final class LnetFilterText {
         List<String> namespaces = new ArrayList<>();
         if (!body.isEmpty()) {
             for (String namespace : body.split(",")) {
-                String clean = namespace.trim();
-                if (!clean.matches("[a-z0-9_.-]+")) {
-                    throw new IOException("bad mod id '" + clean + "'");
+                String clean = ModFilterData.normalizeModId(namespace);
+                if (clean == null) {
+                    throw new IOException("bad mod id '" + namespace.trim() + "'");
                 }
                 namespaces.add(clean);
             }
         }
         ItemStack stack = new ItemStack(Registration.MOD_FILTER.get());
         FilterSettingsData.set(stack, settings);
-        stack.set(LogisticsDataComponents.MOD_FILTER.get(), new ModFilterConfig(namespaces));
+        if (!namespaces.isEmpty()) {
+            stack.set(LogisticsDataComponents.MOD_FILTER.get(), new ModFilterConfig(namespaces));
+        }
         return new FilterDraft(stack, null, settings);
     }
 
     private static FilterDraft nameFilter(FilterSettings settings, String body, NameMatchScope scope) {
         ItemStack stack = new ItemStack(Registration.NAME_FILTER.get());
         FilterSettingsData.set(stack, settings);
-        stack.set(LogisticsDataComponents.NAME_FILTER.get(), new NameFilterConfig(body, scope));
+        if (!body.isEmpty() || scope != NameMatchScope.NAME) {
+            stack.set(LogisticsDataComponents.NAME_FILTER.get(), new NameFilterConfig(body, scope));
+        }
         return new FilterDraft(stack, null, settings);
     }
 
@@ -171,15 +182,15 @@ final class LnetFilterText {
         if (isGeneral(filter)) {
             return writeGeneral(filter, head, settings, mode, registries);
         }
-        if (filter.is(Registration.MOD_FILTER.get()) && onlyHas(filter, LogisticsDataComponents.MOD_FILTER.get())) {
-            ModFilterConfig config = filter.getOrDefault(LogisticsDataComponents.MOD_FILTER.get(),
-                    new ModFilterConfig(List.of()));
-            return List.of(withBody(head + " mods:", String.join(", ", config.namespaces())));
+        if (ModFilterData.isModFilter(filter) && onlyHas(filter, LogisticsDataComponents.MOD_FILTER.get())) {
+            String mods = String.join(", ", ModFilterData.getModFilters(filter));
+            return List.of(withBody(head + " mods:", mods));
         }
-        if (filter.is(Registration.NAME_FILTER.get()) && onlyHas(filter, LogisticsDataComponents.NAME_FILTER.get())) {
+        if (NameFilterData.isNameFilter(filter) && onlyHas(filter, LogisticsDataComponents.NAME_FILTER.get())) {
             NameFilterConfig config = filter.getOrDefault(LogisticsDataComponents.NAME_FILTER.get(),
                     new NameFilterConfig("", NameMatchScope.NAME));
-            return List.of(withBody(head + " " + SCOPE_WORDS.get(config.scope()) + ":", config.expression()));
+            String expression = config.expression().replaceAll("[\r\n]", " ");
+            return List.of(withBody(head + " " + SCOPE_WORDS.get(config.scope()) + ":", expression));
         }
         return List.of("raw filter: " + LnetEntryText.writeItem(filter, registries));
     }
@@ -222,9 +233,7 @@ final class LnetFilterText {
     }
 
     private static boolean isGeneral(ItemStack stack) {
-        boolean generalItem = stack.is(Registration.SMALL_FILTER.get()) || stack.is(Registration.MEDIUM_FILTER.get())
-                || stack.is(Registration.BIG_FILTER.get());
-        return generalItem && onlyHas(stack, LogisticsDataComponents.FILTER_ENTRIES.get());
+        return FilterItemData.isFilterItem(stack) && onlyHas(stack, LogisticsDataComponents.FILTER_ENTRIES.get());
     }
 
     private static boolean onlyHas(ItemStack stack, DataComponentType<?> extra) {

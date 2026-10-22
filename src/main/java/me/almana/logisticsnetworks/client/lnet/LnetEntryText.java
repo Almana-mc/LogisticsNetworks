@@ -196,7 +196,7 @@ final class LnetEntryText {
     }
 
     static GeneralFilterEntry readEntry(String text, int slot, @Nullable ChannelMode mode,
-            HolderLookup.Provider registries) throws IOException {
+            FilterTargetType target, HolderLookup.Provider registries) throws IOException {
         String head = text;
         String modifiers = "";
         int open = find(text, "(", 0);
@@ -216,7 +216,7 @@ final class LnetEntryText {
             mb = matcher.group(2) != null;
             head = matcher.group(3).trim();
         }
-        GeneralFilterEntry entry = readTarget(head, batch, mb, slot, registries);
+        GeneralFilterEntry entry = readTarget(head, batch, mb, slot, target, registries);
         GeneralFilterEntry result = modifiers.isEmpty() ? entry : readModifiers(entry, modifiers, mode);
         if (isBlank(result)) {
             throw new IOException("'any' needs a count, keep, fill to, slots, where or matches");
@@ -225,10 +225,13 @@ final class LnetEntryText {
     }
 
     private static GeneralFilterEntry readTarget(String head, int batch, boolean mb, int slot,
-            HolderLookup.Provider registries) throws IOException {
-        ChannelType kind = mb ? ChannelType.FLUID : ChannelType.ITEM;
+            FilterTargetType target, HolderLookup.Provider registries) throws IOException {
+        ChannelType kind = defaultKind(target, mb);
         boolean kindWord = true;
-        if (head.startsWith("fluid ")) {
+        if (head.startsWith("item ")) {
+            kind = ChannelType.ITEM;
+            head = head.substring("item ".length()).trim();
+        } else if (head.startsWith("fluid ")) {
             kind = ChannelType.FLUID;
             head = head.substring("fluid ".length()).trim();
         } else if (head.startsWith("chemical ")) {
@@ -396,7 +399,9 @@ final class LnetEntryText {
         if (batch > 0) {
             out.append(batch).append(kind == ChannelType.ITEM || any ? "" : "mb").append(" of ");
         }
-        out.append(any ? "any" : writeTarget(entry, kind, batch, registries));
+        boolean mb = batch > 0 && kind != ChannelType.ITEM;
+        String word = kind == defaultKind(target, mb) ? "" : kind.name().toLowerCase() + " ";
+        out.append(any ? "any" : word + writeTarget(entry, registries));
         List<String> modifiers = modifiers(entry, mode);
         if (!modifiers.isEmpty()) {
             out.append(" (").append(String.join(", ", modifiers)).append(')');
@@ -404,19 +409,16 @@ final class LnetEntryText {
         return out.toString();
     }
 
-    private static String writeTarget(GeneralFilterEntry entry, ChannelType kind, int batch,
-            HolderLookup.Provider registries) {
-        String prefix = kind == ChannelType.CHEMICAL ? "chemical "
-                : kind == ChannelType.FLUID && batch == 0 ? "fluid " : "";
+    private static String writeTarget(GeneralFilterEntry entry, HolderLookup.Provider registries) {
         String tag = FilterTagUtil.normalizeTag(entry.tag());
         if (present(entry.fluidId())) {
-            return prefix + shortId(entry.fluidId());
+            return shortId(entry.fluidId());
         }
         if (present(entry.chemicalId())) {
-            return prefix + shortId(entry.chemicalId());
+            return shortId(entry.chemicalId());
         }
         if (tag != null) {
-            return prefix + '#' + shortId(tag);
+            return '#' + shortId(tag);
         }
         return writeItem(entry.item().toStack(), registries);
     }
@@ -465,6 +467,13 @@ final class LnetEntryText {
         int stock = entry.counts().stock() != 0 ? entry.counts().stock() : entry.counts().amount();
         return !hasTarget(entry) && entry.slotMapping().slots().isEmpty() && entry.nbt().rules().isEmpty()
                 && entry.nbt().raw().isBlank() && entry.counts().batch() == 0 && stock == 0;
+    }
+
+    private static ChannelType defaultKind(FilterTargetType target, boolean mb) {
+        if (target != FilterTargetType.ITEMS) {
+            return channelOf(target);
+        }
+        return mb ? ChannelType.FLUID : ChannelType.ITEM;
     }
 
     private static ChannelType channelOf(FilterTargetType target) {
