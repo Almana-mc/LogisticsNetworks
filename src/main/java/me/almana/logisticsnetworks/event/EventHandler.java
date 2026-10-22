@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.event;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.command.LogisticsCommand;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
@@ -13,13 +14,14 @@ import me.almana.logisticsnetworks.integration.buildinggadgets.BuildingGadgetsCo
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.item.WrenchItem;
-import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
+import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.utils.ItemStackUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -36,19 +38,19 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.util.TriState;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import me.almana.logisticsnetworks.command.LogisticsCommand;
 
 @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID)
 public class EventHandler {
@@ -181,11 +183,19 @@ public class EventHandler {
                     registry.evictCapabilities(serverLevel, node.getAttachedPos());
                 }
 
+                var player = event.getPlayer();
+
                 if (Config.dropNodeItem) {
-                    node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
+                    if (!player.isFakePlayer()) {
+                        ItemStackUtils.give(player, Registration.LOGISTICS_NODE_ITEM.get().getDefaultInstance());
+                    } else {
+                        node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
+                    }
                 }
-                node.dropFilters();
-                node.dropUpgrades();
+
+                if (!player.isFakePlayer()) {
+                    node.dropUpgrades(player);
+                }
                 node.discard();
             }
         }

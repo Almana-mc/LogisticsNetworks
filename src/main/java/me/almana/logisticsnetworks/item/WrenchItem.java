@@ -9,21 +9,22 @@ import me.almana.logisticsnetworks.component.WrenchColors;
 import me.almana.logisticsnetworks.component.WrenchFlow;
 import me.almana.logisticsnetworks.component.WrenchMassPlacement;
 import me.almana.logisticsnetworks.data.ChannelType;
-import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
+import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageAccess;
 import me.almana.logisticsnetworks.integration.storage.StorageAction;
 import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.logic.NodePlacementHelper;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.NodeMenuSync;
-import me.almana.logisticsnetworks.logic.NodePlacementHelper;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.Registration;
+import me.almana.logisticsnetworks.utils.ItemStackUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
@@ -36,10 +37,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.Container;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.Entity;
@@ -564,37 +565,43 @@ public class WrenchItem extends Item {
         }
 
         Item nodeItem = Registration.LOGISTICS_NODE_ITEM.get();
-        int inventorySlot = findNodeItemSlot(player.getInventory());
+        int inventorySlot = -1;
         StorageLink storageLink = null;
         StorageAccess access = null;
         boolean renderVisible = ServerPayloadHandler.getDefaultNodeVisibility(player);
-        if (inventorySlot < 0) {
-            storageLink = getStorageLink(context.getItemInHand());
-            if (storageLink == null) {
-                return InteractionResult.SUCCESS;
-            }
-            access = LinkedStorage.resolve(level, storageLink);
-            if (access == null || !access.allows(player, StorageAction.EXTRACT)) {
-                return InteractionResult.SUCCESS;
-            }
-            if (access.count(nodeItem) < 1) {
-                LinkedStorage.NodePlacementRequestResult result = LinkedStorage.requestNodePlacement(player,
-                        target, storageLink, renderVisible);
-                player.displayClientMessage(Component.translatable(switch (result) {
-                    case QUEUED -> "message.logisticsnetworks.wrench.place_node.queued";
-                    case DUPLICATE -> "message.logisticsnetworks.wrench.place_node.duplicate";
-                    case UNAVAILABLE -> "message.logisticsnetworks.wrench.place_node.unavailable";
-                }), true);
-                return InteractionResult.CONSUME;
+
+        if (!player.hasInfiniteMaterials()) {
+            inventorySlot = findNodeItemSlot(player.getInventory());
+            if (inventorySlot < 0) {
+                storageLink = getStorageLink(context.getItemInHand());
+                if (storageLink == null) {
+                    return InteractionResult.SUCCESS;
+                }
+                access = LinkedStorage.resolve(level, storageLink);
+                if (access == null || !access.allows(player, StorageAction.EXTRACT)) {
+                    return InteractionResult.SUCCESS;
+                }
+                if (access.count(nodeItem) < 1) {
+                    LinkedStorage.NodePlacementRequestResult result = LinkedStorage.requestNodePlacement(player,
+                            target, storageLink, renderVisible);
+                    player.displayClientMessage(Component.translatable(switch (result) {
+                        case QUEUED -> "message.logisticsnetworks.wrench.place_node.queued";
+                        case DUPLICATE -> "message.logisticsnetworks.wrench.place_node.duplicate";
+                        case UNAVAILABLE -> "message.logisticsnetworks.wrench.place_node.unavailable";
+                    }), true);
+                    return InteractionResult.CONSUME;
+                }
             }
         }
 
         LogisticsNodeEntity node = NodePlacementHelper.placeNode(level, pos, player.getUUID());
         if (node == null) return InteractionResult.FAIL;
 
-        boolean fromInventory = inventorySlot >= 0;
+        boolean fromInventory = player.hasInfiniteMaterials() || inventorySlot >= 0;
         if (fromInventory) {
-            player.getInventory().getItem(inventorySlot).shrink(1);
+            if (inventorySlot >= 0) {
+                player.getInventory().getItem(inventorySlot).shrink(1);
+            }
             player.getInventory().setChanged();
         } else if (access == null || access.extractOne(nodeItem, player).isEmpty()) {
             node.discard();
@@ -819,9 +826,8 @@ public class WrenchItem extends Item {
             registry.evictCapabilities(serverLevel, node.getAttachedPos());
         }
 
-        node.dropFilters();
-        node.dropUpgrades();
-        node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
+        node.dropUpgrades(player);
+        ItemStackUtils.give(player, Registration.LOGISTICS_NODE_ITEM.get().getDefaultInstance());
         node.discard();
 
         level.playSound(null, node.blockPosition(), SoundEvents.METAL_BREAK, SoundSource.BLOCKS, 1.0f, 1.0f);
