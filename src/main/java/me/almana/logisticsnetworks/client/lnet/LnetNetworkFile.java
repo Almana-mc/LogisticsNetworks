@@ -44,7 +44,11 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
             throws IOException {
         Files.createDirectories(directory());
         Path path = filePath(networkName);
-        Files.writeString(path, LnetDocument.write(networkName, nodes, registries), StandardCharsets.UTF_8);
+        try {
+            Files.writeString(path, LnetDocument.write(networkName, nodes, registries), StandardCharsets.UTF_8);
+        } catch (RuntimeException | StackOverflowError e) {
+            throw new IOException("Unwritable network: " + e, e);
+        }
         return path;
     }
 
@@ -53,7 +57,12 @@ public record LnetNetworkFile(String networkName, List<LnetNetworkFile.NodeEntry
     }
 
     public static LnetNetworkFile readString(String text, HolderLookup.Provider registries) throws IOException {
-        return LnetDocument.isV2(text) ? LnetDocument.read(text, registries) : LnetLegacyFormat.read(text);
+        String body = text.startsWith("﻿") ? text.substring(1) : text;
+        try {
+            return LnetDocument.isV2(body) ? LnetDocument.read(body, registries) : LnetLegacyFormat.read(body);
+        } catch (RuntimeException | StackOverflowError e) {
+            throw new IOException("Unreadable file: " + e, e);
+        }
     }
 
     private static Path filePath(String networkName) {

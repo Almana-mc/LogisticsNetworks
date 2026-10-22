@@ -191,7 +191,7 @@ final class LnetFilterText {
         if (NameFilterData.isNameFilter(filter) && onlyHas(filter, LogisticsDataComponents.NAME_FILTER.get())) {
             NameFilterConfig config = filter.getOrDefault(LogisticsDataComponents.NAME_FILTER.get(),
                     new NameFilterConfig("", NameMatchScope.NAME));
-            String expression = config.expression().replaceAll("[\r\n]", " ");
+            String expression = LnetEntryText.oneLine(config.expression());
             return List.of(withBody(head + " " + SCOPE_WORDS.get(config.scope()) + ":", expression));
         }
         return List.of("raw filter: " + LnetEntryText.writeItem(filter, registries));

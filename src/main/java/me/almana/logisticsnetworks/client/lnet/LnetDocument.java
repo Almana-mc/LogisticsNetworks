@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 final class LnetDocument {
 
     static final String HEADER = "lnet 2";
+    private static final int MAX_DEPTH = 256;
     private static final Pattern CHANNEL =
             Pattern.compile("[Cc]hannel\\s+(\\d+)\\s*(?:\"((?:[^\"\\\\]|\\\\.)*)\")?\\s*:(.*)");
 
@@ -60,7 +61,7 @@ final class LnetDocument {
         for (String line : text.split("\\R")) {
             String trimmed = line.strip();
             if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
-                return trimmed.equals(HEADER);
+                return trimmed.startsWith("lnet ");
             }
         }
         return false;
@@ -84,6 +85,9 @@ final class LnetDocument {
                 continue;
             }
             try {
+                if (LnetEntryText.depth(line) > MAX_DEPTH) {
+                    throw new IOException("nesting deeper than " + MAX_DEPTH);
+                }
                 document.readLine(line);
             } catch (IOException e) {
                 throw new IOException("Line " + (i + 1) + ": " + e.getMessage(), e);
@@ -256,7 +260,7 @@ final class LnetDocument {
             HolderLookup.Provider registries) throws IOException {
         List<String> lines = new ArrayList<>();
         lines.add(HEADER);
-        lines.add("network: " + oneLine(networkName));
+        lines.add("network: " + LnetEntryText.oneLine(networkName));
         for (LnetNetworkFile.NodeEntry entry : entries) {
             writeNode(lines, entry, registries);
         }
@@ -269,7 +273,7 @@ final class LnetDocument {
                 .parse(registries.createSerializationContext(NbtOps.INSTANCE), entry.clipboardTag())
                 .getOrThrow(error -> new IOException("Bad clipboard for '" + entry.label() + "': " + error));
         lines.add("");
-        lines.add("[" + oneLine(entry.label()) + "]");
+        lines.add("[" + LnetEntryText.oneLine(entry.label()) + "]");
         if (!entry.visible()) {
             lines.add("hidden");
         }
@@ -294,7 +298,4 @@ final class LnetDocument {
         }
     }
 
-    private static String oneLine(String text) {
-        return text.replace('\r', ' ').replace('\n', ' ');
-    }
 }
