@@ -1,5 +1,5 @@
 ---
-item_ids: [logisticsnetworks:dimensional_upgrade, logisticsnetworks:mekanism_chemical_upgrade, logisticsnetworks:ars_source_upgrade]
+item_ids: [logisticsnetworks:dimensional_upgrade, logisticsnetworks:mekanism_chemical_upgrade, logisticsnetworks:ars_source_upgrade, logisticsnetworks:network_upgrade]
 navigation:
   title: 特种升级
   parent: nodes/index.md
@@ -9,7 +9,7 @@ navigation:
 
 # 特种升级
 
-特种升级不会改动节点的吞吐量上限，而是会解锁**新能力**——跨维度传输、传输通用机械的化学品、传输新生魔艺的魔源。每一种都需占据一个升级槽，且可和同节点中的[性能升级](upgrades-performance.md)协同使用。
+特种升级不会改动节点的吞吐量上限，而是会解锁**新能力**——跨维度传输、传输通用机械的化学品、传输新生魔艺的魔源、访问存储网络。每一种都需占据一个升级槽，且可和同节点中的[性能升级](upgrades-performance.md)协同使用。
 
 升级槽位于[过滤器与升级](filters-upgrades.md)面板。它们不接受重复升级，但不重复的升级可以随意添加——通常来说，高端节点的配置如下：下界合金级、跨维度、通用机械化学品、新生魔艺魔源各一。
 
@@ -35,10 +35,22 @@ navigation:
 
 ## 新生魔艺魔源升级
 
-**解锁魔源频道类型。**&zwnj;与通用机械化学品升级一致，只不过对应的是新生魔艺魔源。安装后，即可将频道类型设为魔源，并在新生魔艺魔源罐和其他接受魔源的方块间进行传输。
+**解锁魔源频道类型。**&zwnj;与通用机械化学品升级一致，只不过对应的是新生魔艺魔源。安装后，即可将频道类型设为魔源，并在新生魔艺魔源罐和其他接受魔源的方块间进行传输。安装有Ars Énergistique时，依附于ME魔源罐的节点可访问AE2网络中的所有魔源。
 
 需要传输魔源的所有节点（输出端和输入端）都需安装新生魔艺魔源升级。
 
 此升级需要安装**新生魔艺**模组才可合成和使用。下方配方仅会在加载有新生魔艺时出现。
 
 <RecipeFor id="logisticsnetworks:ars_source_upgrade" fallbackText="安装新生魔艺以解锁此配方。" />
+
+## 网络升级
+
+**允许直接访问存储网络。**&zwnj;位于应用能源2/精致存储接口、且带有此升级的节点可直接传输相连存储网络中的物品和流体，与在[频道设置](channel-settings.md)中描述的一致。安装有Ars Énergistique时，AE2接口上的节点也可访问魔源，但此类节点只会在接口配置中设置了魔源时输出魔源。未安装此升级时，接口和其他的普通容器没有区别，节点也只能看见接口内部存储的资源。
+
+位于接口、且需要访问网络的所有节点均需安装网络升级。其他方块上的节点无需安装。
+
+此升级有两个配方，两存储模组各对应一个。相应配方只会在安装模组时出现。
+
+<Recipe id="logisticsnetworks:network_upgrade_ae2" fallbackText="安装应用能源2以解锁此配方。" />
+
+<Recipe id="logisticsnetworks:network_upgrade_refinedstorage" fallbackText="安装精致存储以解锁此配方。" />
