@@ -44,7 +44,7 @@ final class LnetEntryText {
     }
 
     private static final Pattern BATCH = Pattern.compile("(\\d+)(mb)? of (.+)");
-    private static final Pattern ANY_ID = Pattern.compile("([a-z0-9_.-]+):[a-z0-9_./-]+");
+    private static final Pattern QUOTED_ID = Pattern.compile("([\"'])(([a-z0-9_.-]+):[a-z0-9_./-]+)\\1");
     private static final String[] OPERATORS = {">=", "<=", "!=", "=", ">", "<"};
 
     private LnetEntryText() {
@@ -120,13 +120,31 @@ final class LnetEntryText {
             }
             return new ItemStack(result.item(), 1, result.components());
         } catch (CommandSyntaxException e) {
-            Matcher ids = ANY_ID.matcher(text);
+            ResourceLocation at = idAt(e.getInput(), e.getCursor());
+            if (at != null && !loaded(at.getNamespace())) {
+                throw new MissingMod(at, at.getNamespace(), ChannelType.ITEM);
+            }
+            Matcher ids = QUOTED_ID.matcher(text);
             while (ids.find()) {
-                if (!loaded(ids.group(1))) {
-                    throw new MissingMod(ResourceLocation.parse(ids.group()), ids.group(1), ChannelType.ITEM);
+                if (!loaded(ids.group(3))) {
+                    throw new MissingMod(ResourceLocation.parse(ids.group(2)), ids.group(3), ChannelType.ITEM);
                 }
             }
             throw new IOException(e.getRawMessage().getString() + " in '" + text + "'");
+        }
+    }
+
+    @Nullable
+    private static ResourceLocation idAt(@Nullable String input, int cursor) {
+        if (input == null || cursor < 0) {
+            return null;
+        }
+        StringReader reader = new StringReader(input);
+        reader.setCursor(cursor);
+        try {
+            return ResourceLocation.read(reader);
+        } catch (CommandSyntaxException e) {
+            return null;
         }
     }
 
@@ -187,7 +205,11 @@ final class LnetEntryText {
             head = matcher.group(3).trim();
         }
         GeneralFilterEntry entry = readTarget(head, batch, mb, slot, registries);
-        return modifiers.isEmpty() ? entry : readModifiers(entry, modifiers, mode);
+        GeneralFilterEntry result = modifiers.isEmpty() ? entry : readModifiers(entry, modifiers, mode);
+        if (!hasTarget(result) && isBlank(result)) {
+            throw new IOException("'any' needs a count, keep, fill to, slots, where or matches");
+        }
+        return result;
     }
 
     private static GeneralFilterEntry readTarget(String head, int batch, boolean mb, int slot,
@@ -238,7 +260,12 @@ final class LnetEntryText {
         GeneralFilterEntry.NbtConstraints where = GeneralFilterEntry.NbtConstraints.EMPTY;
         Optional<Boolean> strict = Optional.empty();
         String raw = "";
-        for (String part : split(text, ",")) {
+        int rawAt = text.startsWith("matches ") ? 0 : find(text, ", matches ", 0) + 2;
+        if (rawAt > 1 || (rawAt == 0 && text.startsWith("matches "))) {
+            raw = text.substring(rawAt + "matches ".length()).trim();
+            text = rawAt == 0 ? "" : text.substring(0, rawAt - 2);
+        }
+        for (String part : text.isEmpty() ? List.<String>of() : split(text, ",")) {
             if (part.startsWith("keep ")) {
                 if (mode != ChannelMode.EXPORT) {
                     throw new IOException("'keep' only works on send channels, use 'fill to'");
@@ -257,8 +284,6 @@ final class LnetEntryText {
                 strict = Optional.of(true);
             } else if (part.equals("not strict")) {
                 strict = Optional.of(false);
-            } else if (part.startsWith("matches ")) {
-                raw = part.substring("matches ".length()).trim();
             } else {
                 throw new IOException("unknown modifier '" + part + "'");
             }
