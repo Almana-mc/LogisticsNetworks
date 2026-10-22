@@ -41,6 +41,7 @@ final class LnetChannelText {
         @Nullable
         ChannelMode mode;
         int recipeTarget = -1;
+        int line;
         @Nullable
         private LnetFilterText.FilterDraft inline;
         private boolean enabled = true;

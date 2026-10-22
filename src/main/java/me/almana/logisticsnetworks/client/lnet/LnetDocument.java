@@ -13,6 +13,7 @@ import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.world.item.ItemStack;
@@ -88,6 +89,9 @@ final class LnetDocument {
                 }
                 header = true;
                 continue;
+            }
+            if (line.startsWith("[")) {
+                document.finishNode();
             }
             try {
                 if (LnetEntryText.depth(line) > MAX_DEPTH) {
@@ -174,7 +178,6 @@ final class LnetDocument {
         if (label.isEmpty()) {
             throw new IOException("empty node label");
         }
-        finishNode();
         if (!labels.add(label)) {
             throw new IOException("duplicate node label '" + label + "'");
         }
@@ -191,6 +194,7 @@ final class LnetDocument {
         }
         String name = header.group(2) == null ? "" : header.group(2).replaceAll("\\\\(.)", "$1");
         channel = new LnetChannelText.ChannelDraft(number - 1, name);
+        channel.line = lineNumber;
         node.channels[number - 1] = channel;
         String rest = header.group(3).trim();
         if (!rest.isEmpty()) {
@@ -201,7 +205,7 @@ final class LnetDocument {
     private void readUpgrades(String body) throws IOException {
         for (String text : LnetEntryText.split(body, ",")) {
             try {
-                node.upgrades.add(LnetEntryText.readItem(text, registries));
+                addUpgrade(LnetEntryText.readItem(text, registries));
             } catch (LnetEntryText.MissingMod e) {
                 skip(e.getMessage());
             }
@@ -209,6 +213,16 @@ final class LnetDocument {
         if (node.upgrades.size() > LogisticsNodeEntity.UPGRADE_SLOT_COUNT) {
             throw new IOException("more than " + LogisticsNodeEntity.UPGRADE_SLOT_COUNT + " upgrades");
         }
+    }
+
+    private void addUpgrade(ItemStack upgrade) throws IOException {
+        for (ItemStack present : node.upgrades) {
+            if (present.getItem() == upgrade.getItem()) {
+                throw new IOException("upgrade '" + BuiltInRegistries.ITEM.getKey(upgrade.getItem())
+                        + "' listed twice");
+            }
+        }
+        node.upgrades.add(upgrade);
     }
 
     private void readRecipe(String body) throws IOException {
@@ -232,6 +246,14 @@ final class LnetDocument {
         skipped.add("Line " + lineNumber + ": " + message);
     }
 
+    private ChannelState stateOf(LnetChannelText.ChannelDraft draft) throws IOException {
+        try {
+            return draft.state(node.label);
+        } catch (IOException e) {
+            throw new IOException("Line " + draft.line + ": " + e.getMessage(), e);
+        }
+    }
+
     private void finishNode() throws IOException {
         if (node == null) {
             return;
@@ -244,7 +266,7 @@ final class LnetDocument {
                 states.add(ChannelState.DEFAULT);
                 continue;
             }
-            states.add(draft.state(node.label));
+            states.add(stateOf(draft));
             List<ItemStack> stacks = draft.filterStacks();
             for (int slot = 0; slot < stacks.size(); slot++) {
                 filters.add(new ClipboardSnapshot.FilterSlot(i, slot, StackSnapshot.of(stacks.get(slot))));
