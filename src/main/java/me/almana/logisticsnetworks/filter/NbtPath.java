@@ -95,7 +95,7 @@ public record NbtPath(Component[] components) {
     }
 
     private static boolean needsQuotes(String key) {
-        return key.isEmpty() || key.charAt(0) == '"' || key.indexOf('.') >= 0 || key.indexOf('[') >= 0;
+        return key.isEmpty() || !key.matches("[A-Za-z0-9_:/+-]+");
     }
 
     private static int parseIndex(String str, int start, List<Component> out) {
