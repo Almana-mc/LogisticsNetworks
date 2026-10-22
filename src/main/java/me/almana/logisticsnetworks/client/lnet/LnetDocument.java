@@ -290,7 +290,13 @@ final class LnetDocument {
         lines.add(HEADER);
         lines.add("network: " + LnetEntryText.oneLine(networkName));
         for (LnetNetworkFile.NodeEntry entry : entries) {
+            int start = lines.size();
             writeNode(lines, entry, registries);
+            if (lines.subList(start, lines.size()).stream()
+                    .anyMatch(line -> line.contains("\n") || line.contains("\r"))) {
+                throw new IOException("Node '" + entry.label()
+                        + "' holds text with a line break, which .lnet cannot store");
+            }
         }
         return String.join("\n", lines) + "\n";
     }
