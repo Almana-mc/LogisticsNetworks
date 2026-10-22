@@ -214,8 +214,15 @@ final class LnetFilterText {
                 plain.add(LnetEntryText.writeEntry(entry, settings.target(), mode, registries));
             }
         }
+        if (!joinable(plain)) {
+            return List.of("raw filter: " + LnetEntryText.writeItem(filter, registries));
+        }
         lines.add(0, withBody(head + ":", String.join(", ", plain)));
         return lines;
+    }
+
+    private static boolean joinable(List<String> parts) {
+        return parts.isEmpty() || LnetEntryText.split(String.join(", ", parts), ",").size() == parts.size();
     }
 
     private static boolean survives(GeneralFilterEntry entry, FilterTargetType target, ChannelMode mode,
@@ -254,7 +261,10 @@ final class LnetFilterText {
                 && entry.nbt().equals(GeneralFilterEntry.NbtConstraints.EMPTY));
         boolean readable = entries.stream()
                 .allMatch(entry -> survives(entry, FilterTargetType.ITEMS, ChannelMode.EXPORT, registries));
-        return simple && readable ? entries : List.of();
+        List<String> texts = entries.stream()
+                .map(entry -> LnetEntryText.writeEntry(entry, FilterTargetType.ITEMS, ChannelMode.EXPORT, registries))
+                .toList();
+        return simple && readable && joinable(texts) ? entries : List.of();
     }
 
     private static boolean isGeneral(ItemStack stack) {
