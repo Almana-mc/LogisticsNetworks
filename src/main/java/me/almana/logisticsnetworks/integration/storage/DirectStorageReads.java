@@ -1,15 +1,10 @@
 package me.almana.logisticsnetworks.integration.storage;
 
-import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenCustomHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenCustomHashMap;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.world.item.Item;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Map;

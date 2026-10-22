@@ -5,7 +5,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 
-import java.util.Map;
 import java.util.Set;
 
 public interface DirectItemAccess extends IItemHandler {
