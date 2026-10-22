@@ -20,6 +20,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
@@ -36,13 +37,14 @@ final class LnetEntryText {
     static final class MissingMod extends IOException {
         final ChannelType kind;
 
-        MissingMod(ResourceLocation id, ChannelType kind) {
-            super("'" + id + "' needs mod '" + id.getNamespace() + "'");
+        MissingMod(ResourceLocation id, String mod, ChannelType kind) {
+            super("'" + id + "' needs mod '" + mod + "'");
             this.kind = kind;
         }
     }
 
     private static final Pattern BATCH = Pattern.compile("(\\d+)(mb)? of (.+)");
+    private static final Pattern ANY_ID = Pattern.compile("([a-z0-9_.-]+):[a-z0-9_./-]+");
     private static final String[] OPERATORS = {">=", "<=", "!=", "=", ">", "<"};
 
     private LnetEntryText() {
@@ -70,7 +72,7 @@ final class LnetEntryText {
             } else if (ch == '[' || ch == '(' || ch == '{') {
                 depth++;
             } else if (ch == ']' || ch == ')' || ch == '}') {
-                depth--;
+                depth = Math.max(0, depth - 1);
             }
         }
         return -1;
@@ -113,28 +115,23 @@ final class LnetEntryText {
             if (reader.canRead()) {
                 throw new IOException("unexpected '" + reader.getRemaining() + "' after item");
             }
+            if (result.item().value() == Items.AIR) {
+                throw new IOException("'air' is not an item");
+            }
             return new ItemStack(result.item(), 1, result.components());
         } catch (CommandSyntaxException e) {
-            ResourceLocation id = idAt(e.getInput(), e.getCursor());
-            if (id != null && !ModList.get().isLoaded(id.getNamespace())) {
-                throw new MissingMod(id, ChannelType.ITEM);
+            Matcher ids = ANY_ID.matcher(text);
+            while (ids.find()) {
+                if (!loaded(ids.group(1))) {
+                    throw new MissingMod(ResourceLocation.parse(ids.group()), ids.group(1), ChannelType.ITEM);
+                }
             }
             throw new IOException(e.getRawMessage().getString() + " in '" + text + "'");
         }
     }
 
-    @Nullable
-    private static ResourceLocation idAt(@Nullable String input, int cursor) {
-        if (input == null || cursor < 0) {
-            return null;
-        }
-        StringReader reader = new StringReader(input);
-        reader.setCursor(cursor);
-        try {
-            return ResourceLocation.read(reader);
-        } catch (CommandSyntaxException e) {
-            return null;
-        }
+    private static boolean loaded(String namespace) {
+        return ModList.get().isLoaded(namespace) || namespace.equals("c");
     }
 
     static String readFluid(String text) throws IOException {
@@ -142,16 +139,17 @@ final class LnetEntryText {
         if (BuiltInRegistries.FLUID.containsKey(id)) {
             return id.toString();
         }
-        if (!ModList.get().isLoaded(id.getNamespace())) {
-            throw new MissingMod(id, ChannelType.FLUID);
+        if (!loaded(id.getNamespace())) {
+            throw new MissingMod(id, id.getNamespace(), ChannelType.FLUID);
         }
         throw new IOException("unknown fluid '" + id + "'");
     }
 
     static String readChemical(String text) throws IOException {
         ResourceLocation id = id(text, "chemical");
-        if (!MekanismCompat.isLoaded() || !ModList.get().isLoaded(id.getNamespace())) {
-            throw new MissingMod(id, ChannelType.CHEMICAL);
+        if (!MekanismCompat.isLoaded() || !loaded(id.getNamespace())) {
+            String mod = MekanismCompat.isLoaded() ? id.getNamespace() : "mekanism";
+            throw new MissingMod(id, mod, ChannelType.CHEMICAL);
         }
         if (!MekanismCompat.isValidChemicalId(id.toString())) {
             throw new IOException("unknown chemical '" + id + "'");
@@ -161,7 +159,7 @@ final class LnetEntryText {
 
     static ResourceLocation id(String text, String kind) throws IOException {
         ResourceLocation id = ResourceLocation.tryParse(text);
-        if (id == null) {
+        if (id == null || id.getPath().isEmpty()) {
             throw new IOException("bad " + kind + " id '" + text + "'");
         }
         return id;
@@ -188,14 +186,22 @@ final class LnetEntryText {
             mb = matcher.group(2) != null;
             head = matcher.group(3).trim();
         }
+        GeneralFilterEntry entry = readTarget(head, batch, mb, slot, registries);
+        return modifiers.isEmpty() ? entry : readModifiers(entry, modifiers, mode);
+    }
 
+    private static GeneralFilterEntry readTarget(String head, int batch, boolean mb, int slot,
+            HolderLookup.Provider registries) throws IOException {
         ChannelType kind = mb ? ChannelType.FLUID : ChannelType.ITEM;
+        boolean kindWord = true;
         if (head.startsWith("fluid ")) {
             kind = ChannelType.FLUID;
             head = head.substring("fluid ".length()).trim();
         } else if (head.startsWith("chemical ")) {
             kind = ChannelType.CHEMICAL;
             head = head.substring("chemical ".length()).trim();
+        } else {
+            kindWord = false;
         }
 
         StackSnapshot item = null;
@@ -203,7 +209,14 @@ final class LnetEntryText {
         String chemical = null;
         String tag = null;
         FilterTargetType tagKind = null;
-        if (head.startsWith("#")) {
+        if (head.equals("any")) {
+            if (mb) {
+                throw new IOException("'any' takes a plain count, not mb");
+            }
+            if (kindWord) {
+                throw new IOException("'any' takes no kind word");
+            }
+        } else if (head.startsWith("#")) {
             tag = id(head.substring(1), "tag").toString();
             tagKind = targetOf(kind);
         } else if (kind == ChannelType.FLUID) {
@@ -213,19 +226,16 @@ final class LnetEntryText {
         } else {
             item = StackSnapshot.of(readItem(head, registries));
         }
-
-        GeneralFilterEntry entry = new GeneralFilterEntry(slot, item, fluid, chemical, tag,
+        return new GeneralFilterEntry(slot, item, fluid, chemical, tag,
                 new GeneralFilterEntry.EntryCounts(0, batch, 0), GeneralFilterEntry.SlotMapping.EMPTY, null,
                 GeneralFilterEntry.NbtConstraints.EMPTY, null, tagKind);
-        return modifiers.isEmpty() ? entry : readModifiers(entry, modifiers, mode);
     }
 
     private static GeneralFilterEntry readModifiers(GeneralFilterEntry entry, String text,
             @Nullable ChannelMode mode) throws IOException {
         int stock = 0;
         GeneralFilterEntry.SlotMapping slots = GeneralFilterEntry.SlotMapping.EMPTY;
-        List<NbtCriterion> rules = List.of();
-        boolean any = false;
+        GeneralFilterEntry.NbtConstraints where = GeneralFilterEntry.NbtConstraints.EMPTY;
         Optional<Boolean> strict = Optional.empty();
         String raw = "";
         for (String part : split(text, ",")) {
@@ -233,45 +243,59 @@ final class LnetEntryText {
                 if (mode != ChannelMode.EXPORT) {
                     throw new IOException("'keep' only works on send channels, use 'fill to'");
                 }
-                stock = number(part.substring("keep ".length()));
+                stock = amount(part.substring("keep ".length()));
             } else if (part.startsWith("fill to ")) {
                 if (mode != ChannelMode.IMPORT) {
                     throw new IOException("'fill to' only works on receive channels, use 'keep'");
                 }
-                stock = number(part.substring("fill to ".length()));
+                stock = amount(part.substring("fill to ".length()));
             } else if (part.startsWith("slots ")) {
-                String expression = part.substring("slots ".length()).trim();
-                BitSet bits = SlotExpressionUtil.parseSlots(expression);
-                if (bits == null || bits.isEmpty()) {
-                    throw new IOException("bad slots '" + expression + "'");
-                }
-                slots = new GeneralFilterEntry.SlotMapping(bits.stream().boxed().toList(), expression);
+                slots = readSlots(part.substring("slots ".length()).trim());
             } else if (part.startsWith("where ")) {
-                String body = part.substring("where ".length());
-                List<String> ands = split(body, " and ");
-                List<String> ors = split(body, " or ");
-                if (ands.size() > 1 && ors.size() > 1) {
-                    throw new IOException("'where' mixes 'and' and 'or'");
-                }
-                any = ors.size() > 1;
-                rules = new ArrayList<>();
-                for (String rule : any ? ors : ands) {
-                    rules.add(readRule(rule));
-                }
+                where = readWhere(part.substring("where ".length()));
             } else if (part.equals("strict")) {
                 strict = Optional.of(true);
             } else if (part.equals("not strict")) {
                 strict = Optional.of(false);
             } else if (part.startsWith("matches ")) {
                 raw = part.substring("matches ".length()).trim();
-                readTag(raw);
             } else {
                 throw new IOException("unknown modifier '" + part + "'");
             }
         }
         return entry.withCounts(new GeneralFilterEntry.EntryCounts(0, entry.counts().batch(), stock))
                 .withSlotMapping(slots)
-                .withNbt(new GeneralFilterEntry.NbtConstraints(rules, any, strict, raw));
+                .withNbt(new GeneralFilterEntry.NbtConstraints(where.rules(), where.matchAny(), strict, raw));
+    }
+
+    private static int amount(String text) throws IOException {
+        int value = number(text);
+        if (value < 0) {
+            throw new IOException("'" + text.trim() + "' can't be negative");
+        }
+        return value;
+    }
+
+    private static GeneralFilterEntry.SlotMapping readSlots(String expression) throws IOException {
+        BitSet bits = SlotExpressionUtil.parseMask(expression);
+        if (bits == null || bits.isEmpty()) {
+            throw new IOException("bad slots '" + expression + "'");
+        }
+        return new GeneralFilterEntry.SlotMapping(bits.stream().boxed().toList(), expression);
+    }
+
+    private static GeneralFilterEntry.NbtConstraints readWhere(String body) throws IOException {
+        List<String> ands = split(body, " and ");
+        List<String> ors = split(body, " or ");
+        if (ands.size() > 1 && ors.size() > 1) {
+            throw new IOException("'where' mixes 'and' and 'or'");
+        }
+        boolean any = ors.size() > 1;
+        List<NbtCriterion> rules = new ArrayList<>();
+        for (String rule : any ? ors : ands) {
+            rules.add(readRule(rule));
+        }
+        return new GeneralFilterEntry.NbtConstraints(rules, any, Optional.empty(), "");
     }
 
     private static NbtCriterion readRule(String text) throws IOException {
@@ -302,34 +326,47 @@ final class LnetEntryText {
         }
     }
 
+    static boolean hasTarget(GeneralFilterEntry entry) {
+        return entry.item() != null || present(entry.fluidId()) || present(entry.chemicalId())
+                || FilterTagUtil.normalizeTag(entry.tag()) != null;
+    }
+
+    private static boolean present(@Nullable String id) {
+        return id != null && !id.isEmpty();
+    }
+
     static String writeEntry(GeneralFilterEntry entry, FilterTargetType target, ChannelMode mode,
             HolderLookup.Provider registries) {
         ChannelType kind = kindOf(entry, target);
         int batch = entry.counts().batch();
+        boolean any = !hasTarget(entry);
         StringBuilder out = new StringBuilder();
         if (batch > 0) {
-            out.append(batch).append(kind == ChannelType.ITEM ? "" : "mb").append(" of ");
+            out.append(batch).append(kind == ChannelType.ITEM || any ? "" : "mb").append(" of ");
         }
-        if (kind == ChannelType.CHEMICAL) {
-            out.append("chemical ");
-        } else if (kind == ChannelType.FLUID && batch == 0) {
-            out.append("fluid ");
-        }
-        String tag = FilterTagUtil.normalizeTag(entry.tag());
-        if (entry.fluidId() != null) {
-            out.append(shortId(entry.fluidId()));
-        } else if (entry.chemicalId() != null) {
-            out.append(shortId(entry.chemicalId()));
-        } else if (tag != null) {
-            out.append('#').append(shortId(tag));
-        } else {
-            out.append(writeItem(entry.item().toStack(), registries));
-        }
+        out.append(any ? "any" : writeTarget(entry, kind, batch, registries));
         List<String> modifiers = modifiers(entry, mode);
         if (!modifiers.isEmpty()) {
             out.append(" (").append(String.join(", ", modifiers)).append(')');
         }
         return out.toString();
+    }
+
+    private static String writeTarget(GeneralFilterEntry entry, ChannelType kind, int batch,
+            HolderLookup.Provider registries) {
+        String prefix = kind == ChannelType.CHEMICAL ? "chemical "
+                : kind == ChannelType.FLUID && batch == 0 ? "fluid " : "";
+        String tag = FilterTagUtil.normalizeTag(entry.tag());
+        if (present(entry.fluidId())) {
+            return prefix + shortId(entry.fluidId());
+        }
+        if (present(entry.chemicalId())) {
+            return prefix + shortId(entry.chemicalId());
+        }
+        if (tag != null) {
+            return prefix + '#' + shortId(tag);
+        }
+        return writeItem(entry.item().toStack(), registries);
     }
 
     private static List<String> modifiers(GeneralFilterEntry entry, ChannelMode mode) {
@@ -360,10 +397,10 @@ final class LnetEntryText {
     }
 
     static ChannelType kindOf(GeneralFilterEntry entry, FilterTargetType target) {
-        if (entry.fluidId() != null) {
+        if (present(entry.fluidId())) {
             return ChannelType.FLUID;
         }
-        if (entry.chemicalId() != null) {
+        if (present(entry.chemicalId())) {
             return ChannelType.CHEMICAL;
         }
         if (FilterTagUtil.normalizeTag(entry.tag()) != null) {
@@ -373,8 +410,9 @@ final class LnetEntryText {
     }
 
     static boolean isBlank(GeneralFilterEntry entry) {
-        return entry.item() == null && entry.fluidId() == null && entry.chemicalId() == null
-                && FilterTagUtil.normalizeTag(entry.tag()) == null;
+        int stock = entry.counts().stock() != 0 ? entry.counts().stock() : entry.counts().amount();
+        return !hasTarget(entry) && entry.slotMapping().slots().isEmpty() && entry.nbt().rules().isEmpty()
+                && entry.nbt().raw().isBlank() && entry.counts().batch() == 0 && stock == 0;
     }
 
     private static ChannelType channelOf(FilterTargetType target) {

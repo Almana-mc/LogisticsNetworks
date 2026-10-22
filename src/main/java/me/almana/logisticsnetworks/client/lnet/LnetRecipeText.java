@@ -53,6 +53,9 @@ final class LnetRecipeText {
             }
             ingredients.add(readIngredient(part, registries));
         }
+        if (ingredients.isEmpty()) {
+            throw new IOException("recipe needs at least one ingredient");
+        }
         if (ingredients.size() > RecipeCardData.MAX_INGREDIENTS) {
             throw new IOException("more than " + RecipeCardData.MAX_INGREDIENTS + " ingredients");
         }
@@ -79,9 +82,12 @@ final class LnetRecipeText {
                     Optional.of(id), count);
         }
         if (rest.startsWith("fluid ") || mb) {
-            String id = LnetEntryText.readFluid(rest.startsWith("fluid ") ? rest.substring(6).trim() : rest);
+            String id = LnetEntryText.readFluid(rest.startsWith("fluid ") ? rest.substring("fluid ".length()).trim() : rest);
             return new RecipeCardData.Ingredient(Optional.empty(), Optional.empty(), Optional.of(id),
                     Optional.empty(), count);
+        }
+        if (count > RecipeCardData.MAX_COUNT) {
+            throw new IOException("count out of range in '" + text + "'");
         }
         if (rest.startsWith("#")) {
             return new RecipeCardData.Ingredient(Optional.empty(),
@@ -100,7 +106,10 @@ final class LnetRecipeText {
             id = matcher.group(3).trim();
         }
         ItemStack stack = LnetEntryText.readItem(id, registries);
-        return StackSnapshot.of(stack.copyWithCount(Math.max(1, Math.min(99, count))));
+        if (count < 1 || count > 99) {
+            throw new IOException("output count must be 1 to 99");
+        }
+        return StackSnapshot.of(stack.copyWithCount(count));
     }
 
     static String writeCard(RecipeCardData card, HolderLookup.Provider registries) {
