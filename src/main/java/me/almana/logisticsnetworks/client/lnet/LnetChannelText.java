@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 
 final class LnetChannelText {
 
-    private static final Pattern RESOURCE = Pattern.compile("(max|\\d+)(mb)? (items|fluids|energy|chemicals|source)");
+    private static final Pattern RESOURCE = Pattern.compile("(max|\\d+)(mb)? (items?|fluids|energy|chemicals|source)");
     private static final Pattern EVERY = Pattern.compile("every (\\d+) ticks?");
     private static final Pattern PRIORITY = Pattern.compile("priority (-?\\d+)");
     private static final Pattern RECIPE_SETS = Pattern.compile("(\\d+) recipe sets?");
@@ -175,7 +175,7 @@ final class LnetChannelText {
                 readInline(text, registries, skip);
                 return;
             }
-            ChannelType type = ChannelType.values()[WORDS.indexOf(resource.group(3))];
+            ChannelType type = ChannelType.values()[WORDS.indexOf(resource.group(3).equals("item") ? "items" : resource.group(3))];
             if (resource.group(2) != null && type != ChannelType.FLUID && type != ChannelType.CHEMICAL) {
                 throw new IOException("'mb' only fits fluids and chemicals");
             }
@@ -275,8 +275,9 @@ final class LnetChannelText {
         } else {
             for (ChannelType type : ChannelType.values()) {
                 if (type.in(state.types()) && !type.in(inlineKinds)) {
-                    head.add(verb + amount(type, state.batches().get(type.ordinal())) + " "
-                            + WORDS.get(type.ordinal()));
+                    int batch = state.batches().get(type.ordinal());
+                    String word = type == ChannelType.ITEM && batch == 1 ? "item" : WORDS.get(type.ordinal());
+                    head.add(verb + amount(type, batch) + " " + word);
                 }
             }
         }

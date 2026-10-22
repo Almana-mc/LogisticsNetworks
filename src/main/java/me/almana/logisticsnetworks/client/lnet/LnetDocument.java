@@ -5,7 +5,12 @@ import me.almana.logisticsnetworks.component.ClipboardSnapshot.ChannelState;
 import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.component.FilterSettings;
 import me.almana.logisticsnetworks.component.StackSnapshot;
+import me.almana.logisticsnetworks.data.ChannelMode;
+import me.almana.logisticsnetworks.data.DistributionMode;
+import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
+import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -292,10 +297,17 @@ final class LnetDocument {
                     .sorted(Comparator.comparingInt(ClipboardSnapshot.FilterSlot::slot))
                     .map(filter -> filter.stack().toStack())
                     .toList();
-            if (!state.equals(ChannelState.DEFAULT) || !filters.isEmpty()) {
+            if (!filters.isEmpty() || !untouched(state)) {
                 LnetChannelText.write(lines, i, state, filters, registries);
             }
         }
     }
 
+
+    private static boolean untouched(ChannelState s) {
+        return !s.enabled() && s.mode() == ChannelMode.IMPORT && s.name().isBlank()
+                && s.direction().orElse(IoSide.ALL) == IoSide.UP && s.tickDelay() == 20 && s.priority() == 0
+                && s.redstoneMode() == RedstoneMode.IGNORED && s.distributionMode() == DistributionMode.PRIORITY
+                && s.filterMode() == FilterMode.MATCH_ANY && !s.resourceRoundRobin() && s.recipeSets() == 0;
+    }
 }
