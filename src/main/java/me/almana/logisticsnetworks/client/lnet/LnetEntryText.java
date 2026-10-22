@@ -120,7 +120,8 @@ final class LnetEntryText {
             }
             return new ItemStack(result.item(), 1, result.components());
         } catch (CommandSyntaxException e) {
-            ResourceLocation at = idAt(e.getInput(), e.getCursor());
+            ResourceLocation at = atIdPosition(e.getInput(), e.getCursor())
+                    ? idAt(e.getInput(), e.getCursor()) : null;
             if (at != null && !loaded(at.getNamespace())) {
                 throw new MissingMod(at, at.getNamespace(), ChannelType.ITEM);
             }
@@ -132,6 +133,17 @@ final class LnetEntryText {
             }
             throw new IOException(e.getRawMessage().getString() + " in '" + text + "'");
         }
+    }
+
+    private static boolean atIdPosition(@Nullable String input, int cursor) {
+        if (input == null || cursor < 0 || cursor > input.length()) {
+            return false;
+        }
+        int i = cursor - 1;
+        while (i >= 0 && Character.isWhitespace(input.charAt(i))) {
+            i--;
+        }
+        return i < 0 || "[,!".indexOf(input.charAt(i)) >= 0;
     }
 
     @Nullable
@@ -206,7 +218,7 @@ final class LnetEntryText {
         }
         GeneralFilterEntry entry = readTarget(head, batch, mb, slot, registries);
         GeneralFilterEntry result = modifiers.isEmpty() ? entry : readModifiers(entry, modifiers, mode);
-        if (!hasTarget(result) && isBlank(result)) {
+        if (isBlank(result)) {
             throw new IOException("'any' needs a count, keep, fill to, slots, where or matches");
         }
         return result;
@@ -260,10 +272,10 @@ final class LnetEntryText {
         GeneralFilterEntry.NbtConstraints where = GeneralFilterEntry.NbtConstraints.EMPTY;
         Optional<Boolean> strict = Optional.empty();
         String raw = "";
-        int rawAt = text.startsWith("matches ") ? 0 : find(text, ", matches ", 0) + 2;
-        if (rawAt > 1 || (rawAt == 0 && text.startsWith("matches "))) {
-            raw = text.substring(rawAt + "matches ".length()).trim();
-            text = rawAt == 0 ? "" : text.substring(0, rawAt - 2);
+        int matchesStart = matchesStart(text);
+        if (matchesStart >= 0) {
+            raw = text.substring(matchesStart).trim().substring("matches ".length()).trim();
+            text = text.substring(0, Math.max(0, matchesStart - 1));
         }
         for (String part : text.isEmpty() ? List.<String>of() : split(text, ",")) {
             if (part.startsWith("keep ")) {
@@ -291,6 +303,21 @@ final class LnetEntryText {
         return entry.withCounts(new GeneralFilterEntry.EntryCounts(0, entry.counts().batch(), stock))
                 .withSlotMapping(slots)
                 .withNbt(new GeneralFilterEntry.NbtConstraints(where.rules(), where.matchAny(), strict, raw));
+    }
+
+    private static int matchesStart(String text) {
+        int start = 0;
+        while (true) {
+            int comma = find(text, ",", start);
+            int end = comma < 0 ? text.length() : comma;
+            if (text.substring(start, end).trim().startsWith("matches ")) {
+                return start;
+            }
+            if (comma < 0) {
+                return -1;
+            }
+            start = comma + 1;
+        }
     }
 
     private static int amount(String text) throws IOException {
