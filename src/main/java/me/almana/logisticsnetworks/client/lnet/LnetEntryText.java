@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -226,19 +227,14 @@ final class LnetEntryText {
 
     private static GeneralFilterEntry readTarget(String head, int batch, boolean mb, int slot,
             FilterTargetType target, HolderLookup.Provider registries) throws IOException {
-        ChannelType kind = defaultKind(target, mb);
-        boolean kindWord = true;
-        if (head.startsWith("item ")) {
-            kind = ChannelType.ITEM;
-            head = head.substring("item ".length()).trim();
-        } else if (head.startsWith("fluid ")) {
-            kind = ChannelType.FLUID;
-            head = head.substring("fluid ".length()).trim();
-        } else if (head.startsWith("chemical ")) {
-            kind = ChannelType.CHEMICAL;
-            head = head.substring("chemical ".length()).trim();
-        } else {
-            kindWord = false;
+        ChannelType explicit = kindWord(head);
+        ChannelType kind = explicit != null ? explicit : defaultKind(target, mb);
+        boolean kindWord = explicit != null;
+        if (kindWord) {
+            head = head.substring(head.indexOf(' ')).trim();
+        }
+        if (mb && kind == ChannelType.ITEM) {
+            throw new IOException("'mb' only fits fluids and chemicals");
         }
 
         StackSnapshot item = null;
@@ -266,6 +262,19 @@ final class LnetEntryText {
         return new GeneralFilterEntry(slot, item, fluid, chemical, tag,
                 new GeneralFilterEntry.EntryCounts(0, batch, 0), GeneralFilterEntry.SlotMapping.EMPTY, null,
                 GeneralFilterEntry.NbtConstraints.EMPTY, null, tagKind);
+    }
+
+    @Nullable
+    private static ChannelType kindWord(String head) {
+        if (head.indexOf(' ') < 0) {
+            return null;
+        }
+        return switch (head.split(" ", 2)[0]) {
+            case "item" -> ChannelType.ITEM;
+            case "fluid" -> ChannelType.FLUID;
+            case "chemical" -> ChannelType.CHEMICAL;
+            default -> null;
+        };
     }
 
     private static GeneralFilterEntry readModifiers(GeneralFilterEntry entry, String text,
@@ -400,7 +409,7 @@ final class LnetEntryText {
             out.append(batch).append(kind == ChannelType.ITEM || any ? "" : "mb").append(" of ");
         }
         boolean mb = batch > 0 && kind != ChannelType.ITEM;
-        String word = kind == defaultKind(target, mb) ? "" : kind.name().toLowerCase() + " ";
+        String word = kind == defaultKind(target, mb) ? "" : kind.name().toLowerCase(Locale.ROOT) + " ";
         out.append(any ? "any" : word + writeTarget(entry, registries));
         List<String> modifiers = modifiers(entry, mode);
         if (!modifiers.isEmpty()) {
