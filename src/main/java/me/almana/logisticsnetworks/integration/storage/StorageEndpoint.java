@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -31,7 +32,7 @@ public interface StorageEndpoint {
 
     List<StoredItem> exportableItems(boolean fresh);
 
-    Map<Item, Long> itemCounts(Set<Item> items, boolean fresh);
+    Object2LongMap<Item> itemCounts(Set<Item> items, boolean fresh);
 
     default List<StoredFluid> exportableFluids() {
         return exportableFluids(false);

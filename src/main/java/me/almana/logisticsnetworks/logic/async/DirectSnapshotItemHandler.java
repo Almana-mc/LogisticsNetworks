@@ -1,8 +1,12 @@
 package me.almana.logisticsnetworks.logic.async;
 
+import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenCustomHashMap;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
+import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
@@ -65,8 +69,8 @@ final class DirectSnapshotItemHandler implements DirectItemAccess {
     }
 
     @Override
-    public Map<Item, Integer> countItems(Set<Item> candidates) {
-        Map<Item, Integer> result = new HashMap<>();
+    public Object2IntMap<Item> countItems(Set<Item> candidates) {
+        var result = HashUtils.itemToIntMap();
         if (!endpoint.exporting()) {
             for (Item item : candidates) result.put(item, stock.total(item));
             return result;

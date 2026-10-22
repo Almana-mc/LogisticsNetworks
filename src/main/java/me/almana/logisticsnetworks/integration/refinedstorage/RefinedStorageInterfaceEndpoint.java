@@ -10,7 +10,11 @@ import com.refinedmods.refinedstorage.api.resource.ResourceAmount;
 import com.refinedmods.refinedstorage.api.resource.ResourceKey;
 import com.refinedmods.refinedstorage.common.support.resource.FluidResource;
 import com.refinedmods.refinedstorage.common.support.resource.ItemResource;
+import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenCustomHashMap;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
+import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -72,10 +76,12 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
     }
 
     @Override
-    public Map<Item, Long> itemCounts(Set<Item> items, boolean fresh) {
-        if (items.isEmpty() || !isValid()) return Map.of();
+    public Object2LongMap<Item> itemCounts(Set<Item> items, boolean fresh) {
+        if (items.isEmpty() || !isValid()) {
+            return HashUtils.itemToLongMap();
+        };
         StorageNetworkComponent storage = storage();
-        Map<Item, Long> counts = new IdentityHashMap<>();
+        var counts = HashUtils.itemToLongMap();
         for (Item item : items) counts.put(item, 0L);
         for (ResourceAmount entry : storage.getAll()) {
             if (entry.resource() instanceof ItemResource resource && items.contains(resource.item())) {

@@ -14,12 +14,14 @@ import com.refinedmods.refinedstorage.common.api.security.SecurityHelper;
 import com.refinedmods.refinedstorage.common.api.storage.PlayerActor;
 import com.refinedmods.refinedstorage.common.support.resource.ItemResource;
 import com.refinedmods.refinedstorage.neoforge.api.RefinedStorageNeoForgeApi;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import me.almana.logisticsnetworks.integration.storage.CraftingBatch;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageAccess;
 import me.almana.logisticsnetworks.integration.storage.StorageAction;
 import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -34,9 +36,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 final class RefinedStorageAccess implements StorageAccess {
@@ -151,8 +151,8 @@ final class RefinedStorageAccess implements StorageAccess {
     }
 
     @Override
-    public Map<Item, Long> countTagged(TagKey<Item> tag) {
-        Map<Item, Long> counts = new IdentityHashMap<>();
+    public Object2LongMap<Item> countTagged(TagKey<Item> tag) {
+        var counts = HashUtils.itemToLongMap();
         if (!isValid()) return counts;
         for (ResourceAmount entry : storage().getAll()) {
             if (entry.resource() instanceof ItemResource resource && resource.toItemStack().is(tag)) {

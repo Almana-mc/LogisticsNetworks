@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
@@ -28,7 +29,7 @@ public interface StorageAccess {
 
     long insert(ItemStack stack, long amount, ServerPlayer player);
 
-    Map<Item, Long> countTagged(TagKey<Item> tag);
+    Object2LongMap<Item> countTagged(TagKey<Item> tag);
 
     Set<Item> craftableTagged(TagKey<Item> tag);
 
