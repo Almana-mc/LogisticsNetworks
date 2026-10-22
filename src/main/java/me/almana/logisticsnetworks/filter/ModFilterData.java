@@ -218,7 +218,7 @@ public final class ModFilterData {
         return checkModMatch(stack, id);
     }
 
-    private static String normalizeModId(String modId) {
+    public static String normalizeModId(String modId) {
         if (modId == null)
             return null;
         String s = modId.trim().toLowerCase();
