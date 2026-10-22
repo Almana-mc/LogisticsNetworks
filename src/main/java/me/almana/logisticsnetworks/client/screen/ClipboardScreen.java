@@ -352,7 +352,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         int y = topPos + 58;
         int width = 148;
         int rowHeight = 14;
-        ThemePaint.panel(g, x, y, width, rowHeight * 9 + 4, theme());
+        ThemePaint.panel(g, x, y, width, rowHeight * 8 + 4, theme());
         String[] labels = {
                 tr("gui.logisticsnetworks.node.setting.status"),
                 tr("gui.logisticsnetworks.node.setting.mode"),
@@ -361,7 +361,6 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                 tr("gui.logisticsnetworks.node.setting.redstone"),
                 tr("gui.logisticsnetworks.node.setting.distribution"),
                 tr("gui.logisticsnetworks.node.setting.priority"),
-                tr("gui.logisticsnetworks.node.setting.batch"),
                 tr("gui.logisticsnetworks.node.setting.delay")
         };
         String[] values = {
@@ -373,8 +372,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                 redstoneLabel(config().getChannelRedstoneMode(selectedChannel)),
                 distributionLabel(config().getChannelDistributionMode(selectedChannel)),
                 editingRow == 6 ? "" : String.valueOf(config().getChannelPriority(selectedChannel)),
-                editingRow == 7 ? "" : tr("gui.logisticsnetworks.node.value.batch.per_type"),
-                editingRow == 8 ? "" : tr("gui.logisticsnetworks.node.value.tick_delay",
+                editingRow == 7 ? "" : tr("gui.logisticsnetworks.node.value.tick_delay",
                         config().getChannelTickDelay(selectedChannel))
         };
         Theme.Variant[] variants = {
@@ -389,9 +387,9 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                     case LOW -> Theme.Variant.WARN;
                 },
                 distributionVariant(config().getChannelDistributionMode(selectedChannel)),
-                Theme.Variant.NEUTRAL, Theme.Variant.NEUTRAL, Theme.Variant.NEUTRAL
+                Theme.Variant.NEUTRAL, Theme.Variant.NEUTRAL
         };
-        for (int row = 0; row < 9; row++) {
+        for (int row = 0; row < 8; row++) {
             drawSettingRow(g, x + 2, y + 2 + row * rowHeight, width - 4, rowHeight,
                     labels[row], values[row], variants[row], row, mouseX, mouseY, !isSettingDisabled(row));
         }
@@ -410,7 +408,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         int maxLabel = width - valueWidth - 10;
         g.drawString(font, font.plainSubstrByWidth(label, Math.max(0, maxLabel)), x + 4, y + 3,
                 enabled ? cMuted() : cSubtle(), false);
-        if (row < 8) g.fill(x + 2, y + height - 1, x + width - 2, y + height, theme().border());
+        if (row < 7) g.fill(x + 2, y + height - 1, x + width - 2, y + height, theme().border());
         if (value.isEmpty()) return;
         if (!enabled) {
             g.drawString(font, value, x + width - font.width(value) - 4, y + 3, cSubtle(), false);
@@ -762,10 +760,10 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
     private boolean handleSettingsClick(double mouseX, double mouseY, int action) {
         int x = leftPos + 12;
         int y = topPos + 60;
-        for (int row = 0; row < 9; row++) {
+        for (int row = 0; row < 8; row++) {
             if (!isInside(x, y + row * 14, 144, 14, mouseX, mouseY)) continue;
             if (isSettingDisabled(row)) return true;
-            if (row == 2 || row == 7) {
+            if (row == 2) {
                 ClickSound.play();
                 resources.open(resourcesTarget(), leftPos + 40, topPos + 102);
                 return true;
@@ -809,7 +807,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
                     cycle(config().getChannelDistributionMode(selectedChannel), direction));
             case 6 -> config().setChannelPriority(selectedChannel,
                     config().getChannelPriority(selectedChannel) + direction * (ClientControls.modifier1Down() ? 10 : 1));
-            case 8 -> config().setChannelTickDelay(selectedChannel,
+            case 7 -> config().setChannelTickDelay(selectedChannel,
                     config().getChannelTickDelay(selectedChannel) + direction * (ClientControls.modifier1Down() ? 10 : 1));
         }
     }
@@ -823,14 +821,14 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
 
     private boolean isSettingDisabled(int row) {
         if (config().getChannelMode(selectedChannel) == ChannelMode.IMPORT) {
-            return row == 5 || row == 7 || row == 8;
+            return row == 5 || row == 7;
         }
-        return config().getChannelTypes(selectedChannel) == ChannelType.ENERGY.bit() && row == 8;
+        return config().getChannelTypes(selectedChannel) == ChannelType.ENERGY.bit() && row == 7;
     }
 
     private void setNumericExtremum(int row, boolean maximum) {
         if (row == 6) config().setChannelPriority(selectedChannel, maximum ? 99 : -99);
-        else if (row == 8) config().setChannelTickDelay(selectedChannel, maximum ? 10_000 : 1);
+        else if (row == 7) config().setChannelTickDelay(selectedChannel, maximum ? 10_000 : 1);
     }
 
     private void startNumericEdit(int row, int x, int y) {
@@ -853,7 +851,7 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             try {
                 int value = ArithmeticExpression.evaluate(numericEditBox.getValue().trim());
                 if (editingRow == 6) config().setChannelPriority(selectedChannel, value);
-                else if (editingRow == 8) config().setChannelTickDelay(selectedChannel, value);
+                else if (editingRow == 7) config().setChannelTickDelay(selectedChannel, value);
                 commit();
             } catch (NumberFormatException ignored) {
             }
