@@ -45,6 +45,7 @@ final class LnetFilterText {
         @Nullable
         final List<GeneralFilterEntry> entries;
         final FilterSettings settings;
+        boolean droppedCard;
         final EnumSet<ChannelType> skippedKinds = EnumSet.noneOf(ChannelType.class);
 
         private FilterDraft(ItemStack stack, @Nullable List<GeneralFilterEntry> entries, FilterSettings settings) {
@@ -75,6 +76,7 @@ final class LnetFilterText {
                 entries.add(LnetRecipeText.cardEntry(LnetRecipeText.readCard(text, registries), entries.size()));
             } catch (LnetEntryText.MissingMod e) {
                 skip.accept("recipe dropped, " + e.getMessage());
+                droppedCard = true;
                 skippedKinds.addAll(EnumSet.allOf(ChannelType.class));
             }
             checkSize();

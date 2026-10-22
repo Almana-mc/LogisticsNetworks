@@ -209,11 +209,11 @@ final class LnetChannelText {
                 return;
             }
             for (LnetFilterText.FilterDraft filter : all) {
-                if (filter.entries == null || filter.settings.blacklist()) {
+                if (filter.entries == null || filter.settings.blacklist() && !filter.droppedCard) {
                     continue;
                 }
                 for (ChannelType kind : filter.skippedKinds) {
-                    if (filter.entries.stream().noneMatch(entry -> keeps(entry, kind, filter.settings.target()))) {
+                    if (filter.settings.blacklist() || filter.entries.stream().noneMatch(entry -> keeps(entry, kind, filter.settings.target()))) {
                         types &= ~kind.bit();
                     }
                 }
@@ -224,9 +224,9 @@ final class LnetChannelText {
             if (LnetEntryText.kindOf(entry, target) == kind) {
                 return true;
             }
-            int stock = entry.counts().stock() != 0 ? entry.counts().stock() : entry.counts().amount();
-            return !LnetEntryText.hasTarget(entry) && (!entry.nbt().rules().isEmpty()
-                    || !entry.nbt().raw().isBlank() || entry.counts().batch() > 0 || stock > 0);
+            boolean widens = kind == ChannelType.ITEM || kind == ChannelType.FLUID || kind == ChannelType.CHEMICAL;
+            return widens && !LnetEntryText.hasTarget(entry) && (!entry.nbt().rules().isEmpty()
+                    || !entry.nbt().raw().isBlank() || entry.counts().batch() > 0 || LnetEntryText.stockOf(entry) > 0);
         }
     }
 

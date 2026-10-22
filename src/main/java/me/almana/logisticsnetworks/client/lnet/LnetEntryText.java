@@ -434,7 +434,7 @@ final class LnetEntryText {
 
     private static List<String> modifiers(GeneralFilterEntry entry, ChannelMode mode) {
         List<String> out = new ArrayList<>();
-        int stock = entry.counts().stock() != 0 ? entry.counts().stock() : entry.counts().amount();
+        int stock = stockOf(entry);
         if (stock > 0) {
             out.add((mode == ChannelMode.EXPORT ? "keep " : "fill to ") + stock);
         }
@@ -473,7 +473,7 @@ final class LnetEntryText {
     }
 
     static boolean isBlank(GeneralFilterEntry entry) {
-        int stock = entry.counts().stock() != 0 ? entry.counts().stock() : entry.counts().amount();
+        int stock = stockOf(entry);
         return !hasTarget(entry) && entry.slotMapping().slots().isEmpty() && entry.nbt().rules().isEmpty()
                 && entry.nbt().raw().isBlank() && entry.counts().batch() == 0 && stock == 0;
     }
@@ -499,5 +499,9 @@ final class LnetEntryText {
             case CHEMICAL -> FilterTargetType.CHEMICALS;
             default -> FilterTargetType.ITEMS;
         };
+    }
+
+    static int stockOf(GeneralFilterEntry entry) {
+        return entry.counts().stock() != 0 ? entry.counts().stock() : entry.counts().amount();
     }
 }
