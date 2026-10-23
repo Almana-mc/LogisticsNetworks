@@ -2016,6 +2016,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             handleInteraction(editorMouseX(), editorMouseY(), action);
             return true;
         }
+        checkHotbarKeyPressed(key, scan);
         return true;
     }
 
