@@ -37,7 +37,7 @@ public class NodeMenu extends AbstractContainerMenu {
     // Grid Layout constants
     private static final int FILTER_GRID_X = 168;
 
-    private static final int UPGRADE_GRID_Y = 118;
+    private static final int UPGRADE_GRID_Y = 140;
     private static final int UPGRADE_SLOTS = LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
     private static final int GRID_STEP = 19;
 
@@ -109,10 +109,10 @@ public class NodeMenu extends AbstractContainerMenu {
     // Slot Layout
 
     private void layoutNodeSlots() {
-        // 2x2 Upgrade Grid
+        // 3x2 Upgrade Grid
         for (int r = 0; r < 2; r++) {
-            for (int c = 0; c < 2; c++) {
-                int index = r * 2 + c;
+            for (int c = 0; c < 3; c++) {
+                int index = r * 3 + c;
                 addSlot(new UpgradeSlot(upgradeContainer, index,
                         FILTER_GRID_X + c * GRID_STEP,
                         UPGRADE_GRID_Y + r * GRID_STEP));

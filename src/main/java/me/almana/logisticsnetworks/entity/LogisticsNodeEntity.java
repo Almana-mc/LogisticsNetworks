@@ -46,7 +46,7 @@ public class LogisticsNodeEntity extends Entity {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public static final int UPGRADE_SLOT_COUNT = 4;
+    public static final int UPGRADE_SLOT_COUNT = 6;
     public static final int CHANNEL_COUNT = 9;
 
     private static final EntityDataAccessor<BlockPos> ATTACHED_POS = SynchedEntityData

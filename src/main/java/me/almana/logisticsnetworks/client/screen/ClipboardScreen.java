@@ -456,10 +456,10 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         int upgradeY = gridY + 40;
         g.drawString(font, Component.translatable("gui.logisticsnetworks.node.upgrades"),
                 x, upgradeY, cMuted(), false);
-        ThemePaint.sunkPanel(g, x - 2, upgradeY + 8, 41, 40, theme());
-        for (int slot = 0; slot < 4; slot++) {
-            ThemePaint.slot(g, leftPos + 167 + (slot % 2) * 19,
-                    topPos + 117 + (slot / 2) * 19, 18, theme());
+        ThemePaint.sunkPanel(g, x - 2, upgradeY + 8, 60, 40, theme());
+        for (int slot = 0; slot < config().getUpgradeSlotCount(); slot++) {
+            ThemePaint.slot(g, leftPos + 167 + (slot % 3) * 19,
+                    topPos + 117 + (slot / 3) * 19, 18, theme());
         }
     }
 

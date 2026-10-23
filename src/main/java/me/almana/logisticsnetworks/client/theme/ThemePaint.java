@@ -156,14 +156,12 @@ public final class ThemePaint {
         channelTab(g, font, x, y, w, h, label, count == 1 ? ChannelType.first(types) : null, active, hasDot,
                 hovered, t);
         if (count < 2) return;
-        int span = w - 6;
-        int index = 0;
+        int seg = (w - 6 - (count - 1)) / count;
+        int from = x + (w - seg * count - (count - 1)) / 2;
         for (ChannelType type : ChannelType.values()) {
             if (!type.in(types)) continue;
-            int from = x + 3 + span * index / count;
-            int to = x + 3 + span * (index + 1) / count;
-            g.fill(from, y + h - 3, index + 1 < count ? to - 1 : to, y + h - 2, ChannelTint.hue(type));
-            index++;
+            g.fill(from, y + h - 3, from + seg, y + h - 2, ChannelTint.hue(type));
+            from += seg + 1;
         }
     }
 
