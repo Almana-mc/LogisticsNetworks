@@ -2,12 +2,9 @@ package me.almana.logisticsnetworks.integration.ae2;
 
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.security.IActionHost;
-import appeng.api.parts.IPart;
 import appeng.api.parts.IPartHost;
-import appeng.blockentity.misc.InterfaceBlockEntity;
 import appeng.blockentity.networking.ControllerBlockEntity;
 import appeng.helpers.InterfaceLogicHost;
-import appeng.parts.misc.InterfacePart;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageAccess;
@@ -52,9 +49,8 @@ public final class AE2StorageAdapter implements StorageAdapter {
             @Nullable Direction direction) {
         BlockEntity blockEntity = level.getBlockEntity(pos);
         InterfaceLogicHost host = interfaceHost(blockEntity, direction);
-        if (host == null) return InterfaceStorageResolution.unsupported();
+        if (!(host instanceof IActionHost actionHost)) return InterfaceStorageResolution.unsupported();
 
-        IActionHost actionHost = (IActionHost) host;
         IGridNode node = actionHost.getActionableNode();
         if (node == null || !node.isActive() || node.getGrid() == null) {
             return InterfaceStorageResolution.unavailable();
@@ -92,15 +88,13 @@ public final class AE2StorageAdapter implements StorageAdapter {
     @Nullable
     private static InterfaceLogicHost interfaceHost(@Nullable BlockEntity blockEntity,
             @Nullable Direction direction) {
-        if (blockEntity instanceof InterfaceBlockEntity interfaceBlock) return interfaceBlock;
+        if (blockEntity instanceof InterfaceLogicHost host) return host;
         if (!(blockEntity instanceof IPartHost partHost)) return null;
         if (direction != null) {
-            IPart part = partHost.getPart(direction);
-            return part instanceof InterfacePart interfacePart ? interfacePart : null;
+            return partHost.getPart(direction) instanceof InterfaceLogicHost host ? host : null;
         }
         for (Direction side : Direction.values()) {
-            IPart part = partHost.getPart(side);
-            if (part instanceof InterfacePart interfacePart) return interfacePart;
+            if (partHost.getPart(side) instanceof InterfaceLogicHost host) return host;
         }
         return null;
     }
