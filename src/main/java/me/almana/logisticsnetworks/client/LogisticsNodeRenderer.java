@@ -48,6 +48,9 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID,
             "textures/entity/node.png");
+    private static final ResourceLocation FRAME_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            LogisticsNetworks.MOD_ID, "textures/block/node_frame.png");
+    private static final float MODEL_SCALE = 1.002f;
     private static final float BOUNDS_OFFSET = 0.5f;
     private static final float BLOCK_MIN = -0.5f;
     private static final float BLOCK_MAX = 0.5f;
@@ -152,26 +155,23 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
     private void renderModel(LogisticsNodeEntity entity, NodeRenderContext context, float partialTick,
             PoseStack poseStack, MultiBufferSource buffer, int light, boolean isVisible) {
         int color = isVisible ? -1 : 0x55FFFFFF;
-        VertexConsumer consumer = buffer
-                .getBuffer(RenderType.entityCutoutNoCull(getTextureLocation(entity)));
         if (ClientConfig.connectedNodeTextures
-                && renderConnectedModel(entity, context, partialTick, poseStack, consumer, light, color)) {
+                && renderConnectedModel(entity, context, partialTick, poseStack, buffer, light, color)) {
             return;
         }
 
+        VertexConsumer consumer = buffer
+                .getBuffer(RenderType.entityCutoutNoCull(getTextureLocation(entity)));
         poseStack.pushPose();
-
-        float scaleXZ = 17.0f / 16.0f;
-        float scaleY = 18.0f / 16.0f;
-        poseStack.scale(-scaleXZ, -scaleY, scaleXZ);
-        poseStack.translate(0.0, -17.0f / 16.0f - (8.0f / 18.0f), 0.0);
+        poseStack.translate(0.0, 0.5, 0.0);
+        poseStack.scale(-MODEL_SCALE, -MODEL_SCALE, MODEL_SCALE);
+        poseStack.translate(0.0, -1.0, 0.0);
         model.renderToBuffer(poseStack, consumer, light, OverlayTexture.NO_OVERLAY, color);
-
         poseStack.popPose();
     }
 
     private boolean renderConnectedModel(LogisticsNodeEntity entity, NodeRenderContext context, float partialTick,
-            PoseStack poseStack, VertexConsumer consumer, int light, int color) {
+            PoseStack poseStack, MultiBufferSource buffer, int light, int color) {
         AABB shapeBounds = shapeBounds(context.shapeLevel(), context.shapePos());
         if (shapeBounds == null) {
             return false;
@@ -181,6 +181,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         RenderBounds bounds = renderBounds(connections, shapeBounds);
 
         Matrix4f matrix = poseStack.last().pose();
+        VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(FRAME_TEXTURE));
         NodeGeometry.emit(matrix, consumer, bounds.connections(), light, color,
                 bounds.minX(), bounds.minY(), bounds.minZ(), bounds.maxX(), bounds.maxY(), bounds.maxZ());
         return true;

@@ -6,7 +6,11 @@ import me.almana.logisticsnetworks.LogisticsNetworks;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeDeformation;
+import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
+import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.client.renderer.RenderType;
@@ -16,8 +20,6 @@ public class NodeModel<T extends Entity> extends EntityModel<T> {
         public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(
                         ResourceLocation.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "node"), "main");
 
-        private static final String MODEL_PATH = "/assets/logisticsnetworks/models/entity/node.json";
-
         private final ModelPart mainBody;
 
         public NodeModel(ModelPart root) {
@@ -26,7 +28,11 @@ public class NodeModel<T extends Entity> extends EntityModel<T> {
         }
 
         public static LayerDefinition createBodyLayer() {
-                return JsonModelLoader.loadLayerDefinition(MODEL_PATH);
+                MeshDefinition mesh = new MeshDefinition();
+                mesh.getRoot().addOrReplaceChild("bb_main", CubeListBuilder.create().texOffs(0, 0)
+                                .addBox(-8.0F, -16.0F, -8.0F, 16.0F, 16.0F, 16.0F, new CubeDeformation(0.0F)),
+                                PartPose.offset(0.0F, 24.0F, 0.0F));
+                return LayerDefinition.create(mesh, 64, 64);
         }
 
         @Override
