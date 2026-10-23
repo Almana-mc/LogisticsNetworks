@@ -839,7 +839,6 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         numericEditBox = new EditBox(font, x, y, 70, 11, Component.empty());
         numericEditBox.setMaxLength(32);
         numericEditBox.setValue(String.valueOf(value));
-        numericEditBox.setTextColor(cText());
         numericEditBox.setFocused(true);
         addRenderableWidget(numericEditBox);
         setFocused(numericEditBox);
@@ -896,7 +895,6 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
         labelEditBox = new EditBox(font, x + 2, topPos + 60, width - 4, 16, Component.empty());
         labelEditBox.setMaxLength(48);
         labelEditBox.setValue(config().getNodeLabel());
-        labelEditBox.setTextColor(cText());
         labelEditBox.setFocused(true);
         addRenderableWidget(labelEditBox);
         setFocused(labelEditBox);
