@@ -24,6 +24,9 @@ final class ItemLane implements RecipeLane {
     private record Moved(int sourceSlot, ItemStack stack) {
     }
 
+    private record Placement(@Nullable boolean[] mask, int share) {
+    }
+
     private final IItemHandler source;
     private final List<RecipeCardData.Ingredient> ingredients;
     private final List<RecipeEndpoint> endpoints;
@@ -110,8 +113,11 @@ final class ItemLane implements RecipeLane {
         TransferEngine.ItemTransferTarget to = endpoints.get(target).items();
         int fit = affordable(sets);
         for (int i = 0; i < matching.length && fit > 0; i++) {
-            int count = ingredients.get(i).count();
-            fit = Math.min(fit, accepted(to, i, fit * count) / count);
+            List<Placement> placements = placements(to.handler(), ingredients.get(i));
+            if (placements.isEmpty()) return 0;
+            for (Placement place : placements) {
+                fit = Math.min(fit, accepted(to, i, fit * place.share(), place.mask()) / place.share());
+            }
         }
         return fit;
     }
@@ -120,10 +126,42 @@ final class ItemLane implements RecipeLane {
     public boolean move(int target, int sets) {
         TransferEngine.ItemTransferTarget to = endpoints.get(target).items();
         for (int i : order) {
-            int amount = sets * ingredients.get(i).count();
-            if (move(to, i, amount) < amount) return false;
+            for (Placement place : placements(to.handler(), ingredients.get(i))) {
+                int amount = sets * place.share();
+                if (move(to, i, amount, place.mask()) < amount) return false;
+            }
         }
         return true;
+    }
+
+    // Split shares count across slots
+    private static List<Placement> placements(IItemHandler handler, RecipeCardData.Ingredient ingredient) {
+        if (ingredient.slots().isEmpty()) return List.of(new Placement(null, ingredient.count()));
+        int size = handler.getSlots();
+        if (!ingredient.split()) return List.of(new Placement(mask(size, ingredient.slots()), ingredient.count()));
+        List<Integer> present = ingredient.slots().stream().filter(slot -> slot < size).toList();
+        List<Placement> placements = new ArrayList<>(present.size());
+        for (int k = 0; k < present.size(); k++) {
+            int share = ingredient.count() / present.size() + (k < ingredient.count() % present.size() ? 1 : 0);
+            if (share > 0) placements.add(new Placement(mask(size, List.of(present.get(k))), share));
+        }
+        return placements;
+    }
+
+    private static boolean[] mask(int size, List<Integer> slots) {
+        boolean[] mask = new boolean[size];
+        for (int slot : slots) {
+            if (slot < size) mask[slot] = true;
+        }
+        return mask;
+    }
+
+    private static boolean[] both(boolean[] a, boolean[] b) {
+        boolean[] out = new boolean[Math.min(a.length, b.length)];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = a[i] && b[i];
+        }
+        return out;
     }
 
     @Override
@@ -139,7 +177,7 @@ final class ItemLane implements RecipeLane {
                 ItemStack stuck = back.isEmpty() ? back : giveBack(moved.sourceSlot(), back);
                 // Source full, keep in receiver
                 if (!stuck.isEmpty()) stuck = handler.insertItem(slot, stuck, false);
-                if (!stuck.isEmpty()) insert(to, stuck, false);
+                if (!stuck.isEmpty()) insert(to, stuck, false, null);
             }
         }
         pending.clear();
@@ -167,7 +205,8 @@ final class ItemLane implements RecipeLane {
     }
 
     // One simulation per exact stack
-    private int accepted(TransferEngine.ItemTransferTarget target, int ingredient, int amount) {
+    private int accepted(TransferEngine.ItemTransferTarget target, int ingredient, int amount,
+            @Nullable boolean[] mask) {
         Map<ItemResource, Integer> stock = new LinkedHashMap<>();
         for (int slot : matching[ingredient]) {
             ItemStack stack = source.getStackInSlot(slot);
@@ -180,37 +219,38 @@ final class ItemLane implements RecipeLane {
         for (Map.Entry<ItemResource, Integer> entry : stock.entrySet()) {
             if (accepted >= amount) break;
             ItemStack probe = entry.getKey().toStack(Math.min(amount - accepted, entry.getValue()));
-            accepted += probe.getCount() - insert(target, probe, true).getCount();
+            accepted += probe.getCount() - insert(target, probe, true, mask).getCount();
         }
         return accepted;
     }
 
-    private int move(TransferEngine.ItemTransferTarget target, int ingredient, int amount) {
+    private int move(TransferEngine.ItemTransferTarget target, int ingredient, int amount, @Nullable boolean[] mask) {
         int left = amount;
         for (int slot : matching[ingredient]) {
             if (left <= 0) break;
             int moved;
             do {
-                moved = moveFromSlot(target, ingredient, slot, left);
+                moved = moveFromSlot(target, ingredient, slot, left, mask);
                 left -= moved;
             } while (moved > 0 && left > 0);
         }
         return amount - left;
     }
 
-    private int moveFromSlot(TransferEngine.ItemTransferTarget target, int ingredient, int slot, int limit) {
+    private int moveFromSlot(TransferEngine.ItemTransferTarget target, int ingredient, int slot, int limit,
+            @Nullable boolean[] mask) {
         ItemStack stack = source.getStackInSlot(slot);
         if (!usable(stack, ingredient)) return 0;
         ItemStack probe = stack.copyWithCount(Math.min(limit, stack.getCount()));
-        int fits = probe.getCount() - insert(target, probe, true).getCount();
+        int fits = probe.getCount() - insert(target, probe, true, mask).getCount();
         if (fits <= 0) return 0;
         ItemStack pulled = source.extractItem(slot, fits, false);
         if (pulled.isEmpty()) return 0;
-        ItemStack rest = insert(target, pulled, false);
+        ItemStack rest = insert(target, pulled, false, mask);
         int moved = pulled.getCount() - rest.getCount();
         ItemStack stuck = rest.isEmpty() ? rest : giveBack(slot, rest);
         // Last resort, like executeMove
-        if (!stuck.isEmpty()) moved += stuck.getCount() - insert(target, stuck, false).getCount();
+        if (!stuck.isEmpty()) moved += stuck.getCount() - insert(target, stuck, false, null).getCount();
         if (moved > 0) pending.add(new Moved(slot, pulled.copyWithCount(moved)));
         return moved;
     }
@@ -223,12 +263,14 @@ final class ItemLane implements RecipeLane {
         return left;
     }
 
-    private ItemStack insert(TransferEngine.ItemTransferTarget target, ItemStack stack, boolean simulate) {
-        boolean[] allowed = null;
+    private ItemStack insert(TransferEngine.ItemTransferTarget target, ItemStack stack, boolean simulate,
+            @Nullable boolean[] slots) {
+        boolean[] allowed = slots;
         if (target.hasImportSlotMapping()) {
-            allowed = TransferEngine.computeImportAllowedSlots(target.handler(), target.importFilters(),
+            boolean[] mapped = TransferEngine.computeImportAllowedSlots(target.handler(), target.importFilters(),
                     target.importFilterMode(), stack, provider, null, cache);
-            if (allowed == null) return stack;
+            if (mapped == null) return stack;
+            allowed = slots == null ? mapped : both(mapped, slots);
         } else if (!FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(), stack,
                 provider, null, cache, -1)) {
             return stack;
