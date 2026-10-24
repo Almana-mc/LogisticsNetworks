@@ -7,6 +7,7 @@ import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.mekanism.DirectChemicalHandler;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
@@ -57,7 +58,7 @@ final class RecipeChannel {
         FilterItemData.ReadCache cache = FilterItemData.createReadCache();
         List<RecipeCardData> cards = RecipeSets.cards(channel.getFilterItems());
         Set<RecipeCardData.Kind> kinds = RecipeSets.kinds(cards);
-        RecipeSets.Source source = source(sourceNode, level, channel, kinds, caps, cache);
+        RecipeSets.Source source = source(sourceNode, channel, kinds, caps, cache);
         List<RecipeEndpoint> endpoints = new ArrayList<>();
         List<TransferEngine.ImportTarget> refs = new ArrayList<>();
         if (!connect(sourceNode, level, channel, targets, dimCache, source, kinds, caps, cache, endpoints, refs))
@@ -118,7 +119,7 @@ final class RecipeChannel {
                 && !TransferEngine.shouldPauseForUnavailableMountedTargets(usable, unavailableMounted, stationary);
     }
 
-    private static RecipeSets.Source source(LogisticsNodeEntity node, ServerLevel level, ChannelData channel,
+    private static RecipeSets.Source source(LogisticsNodeEntity node, ChannelData channel,
             Set<RecipeCardData.Kind> kinds, TransferCapabilityCache caps, FilterItemData.ReadCache cache) {
         IoSide side = channel.getIoSide();
         boolean direct = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), cache);
@@ -129,7 +130,7 @@ final class RecipeChannel {
                         ? caps.findItemExportHandler(node, side, direct) : null,
                 kinds.contains(RecipeCardData.Kind.FLUID) && ChannelType.FLUID.in(types)
                         ? caps.findFluidExportHandler(node, side, true) : null,
-                chemicals ? caps.findChemicalHandler(level, node.getAttachedPos(), side) : null);
+                chemicals ? caps.findChemicalHandler(node, side, true) : null);
     }
 
     private static RecipeEndpoint endpoint(TransferEngine.ImportTarget target, RecipeSets.Source source,
@@ -174,9 +175,8 @@ final class RecipeChannel {
         LogisticsNodeEntity node = target.node();
         if (node.isMountedOnCreate())
             return null;
-        IChemicalHandler handler = caps.findChemicalHandler((ServerLevel) node.level(), node.getAttachedPos(),
-                target.channel().getIoSide());
-        if (handler == null || handler == from)
+        IChemicalHandler handler = caps.findChemicalHandler(node, target.channel().getIoSide(), false);
+        if (handler == null || handler == from || DirectChemicalHandler.shareNetwork(from, handler))
             return null;
         return new RecipeEndpoint.Chemicals(handler, target.channel().getFilterItems(),
                 target.channel().getFilterMode());

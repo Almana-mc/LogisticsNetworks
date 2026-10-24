@@ -167,6 +167,12 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
     }
 
     @Override
+    public long chemicalCount(ChemicalStack stack) {
+        AEKey key = AppMekCompat.key(stack);
+        return key == null || !isValid() ? 0 : Math.max(0, available(true).get(key));
+    }
+
+    @Override
     public boolean canExportItem(ItemStack stack) {
         AEItemKey key = AEItemKey.of(stack);
         return key != null && isValid() && canExport(key);

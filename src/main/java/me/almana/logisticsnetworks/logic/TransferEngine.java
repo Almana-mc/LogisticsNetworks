@@ -13,6 +13,7 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
+import me.almana.logisticsnetworks.integration.mekanism.DirectChemicalHandler;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
@@ -837,8 +838,7 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
-        IChemicalHandler sourceHandler = capCache.findChemicalHandler(sourceLevel, sourcePos,
-                exportChannel.getIoSide());
+        IChemicalHandler sourceHandler = capCache.findChemicalHandler(sourceNode, exportChannel.getIoSide(), true);
         if (sourceHandler == null)
             return 0;
 
@@ -871,9 +871,9 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            IChemicalHandler targetHandler = capCache.findChemicalHandler(targetLevel, targetPos,
-                    target.channel().getIoSide());
-            if (targetHandler == null)
+            IChemicalHandler targetHandler = capCache.findChemicalHandler(target.node(), target.channel().getIoSide(),
+                    false);
+            if (targetHandler == null || DirectChemicalHandler.shareNetwork(sourceHandler, targetHandler))
                 continue;
             if (equalHandlers != null) {
                 equalHandlers.add(targetHandler);

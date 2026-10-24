@@ -77,4 +77,8 @@ public interface StorageEndpoint {
     default long extractChemical(ChemicalStack stack, long amount, boolean simulate) {
         return 0;
     }
+
+    default long chemicalCount(ChemicalStack stack) {
+        return 0;
+    }
 }

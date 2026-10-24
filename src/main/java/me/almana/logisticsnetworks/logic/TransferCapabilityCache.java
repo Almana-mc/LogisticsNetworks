@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
+import me.almana.logisticsnetworks.integration.mekanism.DirectChemicalHandler;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
@@ -248,6 +249,17 @@ public final class TransferCapabilityCache {
     IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, IoSide side) {
         if (side == IoSide.NONE) return ChemicalTransferHelper.getUnsidedHandler(level, pos);
         return ChemicalTransferHelper.getHandler(level, pos, side.direction());
+    }
+
+    @Nullable
+    public IChemicalHandler findChemicalHandler(LogisticsNodeEntity node, IoSide side, boolean exporting) {
+        ServerLevel level = (ServerLevel) node.level();
+        if (side == IoSide.NONE || node.isMountedOnCreate()) return findChemicalHandler(level, node.getAttachedPos(), side);
+        InterfaceStorageResolution resolution = resolveInterface(node, side.direction());
+        if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
+        if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE && resolution.endpoint().storesChemicals())
+            return DirectChemicalHandler.of(resolution.endpoint(), exporting);
+        return findChemicalHandler(level, node.getAttachedPos(), side);
     }
 
     public void evict(ResourceKey<Level> dim, BlockPos pos) {
