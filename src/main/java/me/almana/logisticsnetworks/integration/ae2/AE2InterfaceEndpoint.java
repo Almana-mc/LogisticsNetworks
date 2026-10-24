@@ -16,9 +16,11 @@ import appeng.api.storage.MEStorage;
 import appeng.core.definitions.AEItems;
 import appeng.helpers.InterfaceLogicHost;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import me.almana.logisticsnetworks.integration.appmek.AppMekCompat;
 import me.almana.logisticsnetworks.integration.arseng.ArsEngCompat;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import me.almana.logisticsnetworks.utils.HashUtils;
+import mekanism.api.chemical.ChemicalStack;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -210,6 +212,34 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
     public long extractFluid(FluidStack stack, long amount, boolean simulate) {
         AEFluidKey key = AEFluidKey.of(stack);
         return key == null ? 0 : extract(key, amount, simulate);
+    }
+
+    @Override
+    public boolean storesChemicals() {
+        return AppMekCompat.isLoaded();
+    }
+
+    @Override
+    public List<ChemicalStack> exportableChemicals() {
+        if (!isValid()) return List.of();
+        List<ChemicalStack> chemicals = new ArrayList<>();
+        for (var entry : available(true)) {
+            ChemicalStack stack = AppMekCompat.stack(entry.getKey(), entry.getLongValue());
+            if (stack != null && canExport(entry.getKey())) chemicals.add(stack);
+        }
+        return chemicals;
+    }
+
+    @Override
+    public long insertChemical(ChemicalStack stack, long amount, boolean simulate) {
+        AEKey key = AppMekCompat.key(stack);
+        return key == null ? 0 : insert(key, amount, simulate);
+    }
+
+    @Override
+    public long extractChemical(ChemicalStack stack, long amount, boolean simulate) {
+        AEKey key = AppMekCompat.key(stack);
+        return key != null && isValid() && canExport(key) ? extract(key, amount, simulate) : 0;
     }
 
     private void addItems(List<StoredItem> items, Set<AEKey> seen, KeyCounter available,

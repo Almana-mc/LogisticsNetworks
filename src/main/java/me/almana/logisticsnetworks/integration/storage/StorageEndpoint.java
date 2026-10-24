@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.integration.storage;
 
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import mekanism.api.chemical.ChemicalStack;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -58,6 +59,22 @@ public interface StorageEndpoint {
     }
 
     default long extractSource(long amount, boolean simulate) {
+        return 0;
+    }
+
+    default boolean storesChemicals() {
+        return false;
+    }
+
+    default List<ChemicalStack> exportableChemicals() {
+        return List.of();
+    }
+
+    default long insertChemical(ChemicalStack stack, long amount, boolean simulate) {
+        return 0;
+    }
+
+    default long extractChemical(ChemicalStack stack, long amount, boolean simulate) {
         return 0;
     }
 }
