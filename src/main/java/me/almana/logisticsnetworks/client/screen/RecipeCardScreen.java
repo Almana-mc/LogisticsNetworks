@@ -5,13 +5,18 @@ import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.filter.SlotExpressionUtil;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -34,11 +39,17 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     private static final int BLOCK_X = 108;
     private static final int BLOCK_Y = 21;
     private static final int BLOCK_W = 72;
+    private static final int PATTERN_X = 88;
+    private static final int PATTERN_Y = 20;
 
     private final EditBox[] counts = new EditBox[CELLS];
     private EditBox slots;
     private int editing = -1;
     private RecipeCardData known;
+    private final boolean patterns = LinkedStorage.isBackendLoaded(StorageBackend.AE2)
+            || LinkedStorage.isBackendLoaded(StorageBackend.REFINED_STORAGE);
+    private final ItemStack patternIcon = new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.parse(
+            LinkedStorage.isBackendLoaded(StorageBackend.AE2) ? "ae2:blank_pattern" : "refinedstorage:pattern")));
 
     public RecipeCardScreen(RecipeCardMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -194,6 +205,11 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
             }
             return true;
         }
+        if (patterns && inside(x, y, PATTERN_X, PATTERN_Y, 16, 16)) {
+            ClickSound.play();
+            if (action == 0 && !carried.isEmpty()) fillFromPattern(carried);
+            return true;
+        }
         if (inside(x, y, BLOCK_X, BLOCK_Y, BLOCK_W, 14)) {
             ClickSound.play();
             menu.edit(data -> data.withBlocking(!data.blocking()));
@@ -247,6 +263,15 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         menu.edit(data -> data.withIngredient(at, ingredient));
     }
 
+    private void fillFromPattern(ItemStack pattern) {
+        List<RecipeCardData.Ingredient> ingredients = LinkedStorage.readPatternIngredients(pattern, minecraft.level);
+        if (ingredients.isEmpty()) return;
+        Optional<StackSnapshot> output = LinkedStorage.readPatternOutputs(pattern, minecraft.level).stream()
+                .findFirst()
+                .map(entry -> StackSnapshot.of(entry.item().copyWithCount(entry.amount())));
+        menu.edit(data -> new RecipeCardData(ingredients, output, data.blocking()));
+    }
+
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -278,6 +303,11 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
                     Component.translatable("gui.logisticsnetworks.recipe_card.blocking.tooltip"), 180), mouseX, mouseY);
         } else if (inside(x, y, OUTPUT_X, OUTPUT_Y, 16, 16)) {
             menu.data().output().ifPresent(output -> graphics.renderTooltip(font, output.toStack(), mouseX, mouseY));
+        } else if (patterns && inside(x, y, PATTERN_X, PATTERN_Y, 16, 16)) {
+            graphics.renderComponentTooltip(font, List.of(
+                    Component.translatable("gui.logisticsnetworks.recipe_card.pattern"),
+                    Component.translatable("gui.logisticsnetworks.recipe_card.pattern.tooltip")
+                            .withStyle(ChatFormatting.GRAY)), mouseX, mouseY);
         }
     }
 
@@ -293,6 +323,14 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         data.output().ifPresent(output -> graphics.renderItem(output.toStack(), lp + OUTPUT_X, tp + OUTPUT_Y));
         graphics.drawString(font, Component.translatable("gui.logisticsnetworks.recipe_card.output"),
                 lp + OUTPUT_X + 20, tp + OUTPUT_Y + 4, COLOR_MUTED, false);
+        if (patterns) {
+            slot(graphics, lp + PATTERN_X, tp + PATTERN_Y);
+            graphics.renderItem(patternIcon, lp + PATTERN_X, tp + PATTERN_Y);
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 200);
+            graphics.fill(lp + PATTERN_X, tp + PATTERN_Y, lp + PATTERN_X + 16, tp + PATTERN_Y + 16, 0xAA2A2A2A);
+            graphics.pose().popPose();
+        }
         graphics.fill(lp + BLOCK_X, tp + BLOCK_Y, lp + BLOCK_X + BLOCK_W, tp + BLOCK_Y + 14, COLOR_SLOT_BORDER);
         graphics.fill(lp + BLOCK_X + 1, tp + BLOCK_Y + 1, lp + BLOCK_X + BLOCK_W - 1, tp + BLOCK_Y + 13,
                 data.blocking() ? COLOR_BTN_ON : COLOR_BTN);

@@ -5,6 +5,7 @@ import appeng.api.networking.security.IActionHost;
 import appeng.api.parts.IPartHost;
 import appeng.blockentity.networking.ControllerBlockEntity;
 import appeng.helpers.InterfaceLogicHost;
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageAccess;
@@ -78,6 +79,11 @@ public final class AE2StorageAdapter implements StorageAdapter {
     @Override
     public List<LinkedStorage.PatternEntry> readPatternOutputs(ItemStack stack, Level level) {
         return AE2PatternReader.readOutputs(stack);
+    }
+
+    @Override
+    public List<RecipeCardData.Ingredient> readPatternIngredients(ItemStack stack, Level level) {
+        return AE2PatternReader.readIngredients(stack);
     }
 
     @Override

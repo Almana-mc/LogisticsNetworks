@@ -508,6 +508,8 @@
   "tooltip.logisticsnetworks.recipe_card.slots_split": "Slots: %s, split evenly",
   "gui.logisticsnetworks.recipe_card.slots_edit_hint": "Click to set receiver slots, like 0-2, 5",
   "gui.logisticsnetworks.recipe_card.slots_mode_hint": "Right-click: Allowed or Split evenly",
+  "gui.logisticsnetworks.recipe_card.pattern": "Pattern",
+  "gui.logisticsnetworks.recipe_card.pattern.tooltip": "Click with an AE2 or Refined Storage pattern to copy its recipe",
   "gui.logisticsnetworks.pattern_setter.input": "Input",
   "gui.logisticsnetworks.pattern_setter.output": "Output",
   "gui.logisticsnetworks.pattern_setter.pattern_label": "Pattern:",

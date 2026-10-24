@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -33,6 +34,8 @@ public interface StorageAdapter {
     List<LinkedStorage.PatternEntry> readPatternInputs(ItemStack stack, Level level);
 
     List<LinkedStorage.PatternEntry> readPatternOutputs(ItemStack stack, Level level);
+
+    List<RecipeCardData.Ingredient> readPatternIngredients(ItemStack stack, Level level);
 
     void registerWrenchLinkable();
 }

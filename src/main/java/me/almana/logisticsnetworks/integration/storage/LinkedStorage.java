@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.ae2.AE2StorageAdapter;
 import me.almana.logisticsnetworks.integration.refinedstorage.RefinedStorageAdapter;
@@ -138,6 +139,13 @@ public final class LinkedStorage {
     public static List<PatternEntry> readPatternOutputs(ItemStack stack, Level level) {
         for (StorageAdapter adapter : ADAPTERS.values()) {
             if (adapter.isPattern(stack, level)) return adapter.readPatternOutputs(stack, level);
+        }
+        return List.of();
+    }
+
+    public static List<RecipeCardData.Ingredient> readPatternIngredients(ItemStack stack, Level level) {
+        for (StorageAdapter adapter : ADAPTERS.values()) {
+            if (adapter.isPattern(stack, level)) return adapter.readPatternIngredients(stack, level);
         }
         return List.of();
     }
