@@ -35,6 +35,8 @@ val sophisticated_core_version: String by project
 val create_version: String by project
 val ponder_version: String by project
 val building_gadgets_file_id: String by project
+val appmek_file_id: String by project
+val rs_mekanism_file_id: String by project
 val cc_version: String by project
 val create_runtime = providers.gradleProperty("create_runtime").orElse("true").map { it.toBoolean() }
 val ae2Runtime = providers.gradleProperty("ae2_runtime").orElse("true").map { it.toBoolean() }
@@ -165,6 +167,9 @@ dependencies {
     if (refinedStorageRuntime.get()) {
         localRuntime("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
     }
+
+    compileOnly("curse.maven:applied-mekanistics-574300:${appmek_file_id}")
+    compileOnly("curse.maven:refined-storage-mekanism-integration-1230504:${rs_mekanism_file_id}")
 
     compileOnly("maven.modrinth:cable-tiers:${cable_tiers_version}") {
         isTransitive = false
