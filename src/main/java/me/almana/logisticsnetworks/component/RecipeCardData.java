@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.component;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.filter.SlotExpressionUtil;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponentPatch;
@@ -122,15 +123,28 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
     }
 
     public record Ingredient(Optional<StackSnapshot> item, Optional<TagKey<Item>> tag, Optional<String> fluid,
-            Optional<String> chemical, int count) {
+            Optional<String> chemical, int count, List<Integer> slots, boolean split) {
 
         public static final Codec<Ingredient> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 StackSnapshot.CODEC.optionalFieldOf("item").forGetter(Ingredient::item),
                 TagKey.codec(Registries.ITEM).optionalFieldOf("tag").forGetter(Ingredient::tag),
                 Codec.STRING.optionalFieldOf("fluid").forGetter(Ingredient::fluid),
                 Codec.STRING.optionalFieldOf("chemical").forGetter(Ingredient::chemical),
-                Codec.intRange(1, MAX_AMOUNT).fieldOf("count").forGetter(Ingredient::count)
+                Codec.intRange(1, MAX_AMOUNT).fieldOf("count").forGetter(Ingredient::count),
+                Codec.intRange(SlotExpressionUtil.MIN_SLOT, SlotExpressionUtil.MAX_SLOT)
+                        .listOf(0, SlotExpressionUtil.MAX_SLOT + 1)
+                        .optionalFieldOf("slots", List.of()).forGetter(Ingredient::slots),
+                Codec.BOOL.optionalFieldOf("split", false).forGetter(Ingredient::split)
         ).apply(instance, Ingredient::new));
+
+        public Ingredient {
+            slots = List.copyOf(slots);
+        }
+
+        public Ingredient(Optional<StackSnapshot> item, Optional<TagKey<Item>> tag, Optional<String> fluid,
+                Optional<String> chemical, int count) {
+            this(item, tag, fluid, chemical, count, List.of(), false);
+        }
 
         public static Ingredient ofItem(ItemStack stack, int count) {
             return new Ingredient(Optional.of(StackSnapshot.of(stack.copyWithCount(1))), Optional.empty(),
@@ -213,12 +227,26 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             int at = tag.map(tags::indexOf).orElse(-1);
             Optional<StackSnapshot> anchor = Optional.of(StackSnapshot.of(base.copyWithCount(1)));
             return new Ingredient(anchor, at + 1 < tags.size() ? Optional.of(tags.get(at + 1)) : Optional.empty(),
-                    Optional.empty(), Optional.empty(), count);
+                    Optional.empty(), Optional.empty(), count, slots, split);
         }
 
         public Ingredient withCount(int value) {
             int max = kind() == Kind.ITEM ? MAX_COUNT : MAX_AMOUNT;
-            return new Ingredient(item, tag, fluid, chemical, Math.max(1, Math.min(max, value)));
+            return new Ingredient(item, tag, fluid, chemical, Math.max(1, Math.min(max, value)), slots, split);
+        }
+
+        public Ingredient withSlots(List<Integer> value) {
+            return new Ingredient(item, tag, fluid, chemical, count, value, split);
+        }
+
+        public Ingredient withSplit(boolean value) {
+            return new Ingredient(item, tag, fluid, chemical, count, slots, value);
+        }
+
+        public MutableComponent slotsLabel() {
+            if (slots.isEmpty()) return Component.translatable("tooltip.logisticsnetworks.recipe_card.slots_any");
+            return Component.translatable(split ? "tooltip.logisticsnetworks.recipe_card.slots_split"
+                    : "tooltip.logisticsnetworks.recipe_card.slots", SlotExpressionUtil.formatSlots(slots));
         }
 
         boolean valid() {
@@ -236,11 +264,13 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
                     new StackSnapshot(snapshot.item(), 1, DataComponentPatch.EMPTY));
             Optional<String> cleanFluid = fluid.map(id -> ResourceLocation.parse(id).toString());
             Optional<String> cleanChemical = chemical.map(id -> ResourceLocation.parse(id).toString());
-            return new Ingredient(clean, tag, cleanFluid, cleanChemical, count).withCount(count);
+            List<Integer> cleanSlots = kind() == Kind.ITEM ? slots.stream().distinct().sorted().toList() : List.of();
+            return new Ingredient(clean, tag, cleanFluid, cleanChemical, count, cleanSlots,
+                    split && !cleanSlots.isEmpty()).withCount(count);
         }
 
         boolean sameKey(Ingredient other) {
-            if (kind() != other.kind()) return false;
+            if (kind() != other.kind() || !slots.equals(other.slots) || split != other.split) return false;
             if (tag.isPresent() || other.tag.isPresent()) return tag.equals(other.tag);
             if (kind() != Kind.ITEM) return fluid.equals(other.fluid) && chemical.equals(other.chemical);
             return item.map(StackSnapshot::item).equals(other.item.map(StackSnapshot::item));
