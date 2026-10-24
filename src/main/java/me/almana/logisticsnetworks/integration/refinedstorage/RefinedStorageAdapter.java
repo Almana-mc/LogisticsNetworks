@@ -1,6 +1,8 @@
 package me.almana.logisticsnetworks.integration.refinedstorage;
 
 import com.refinedmods.refinedstorage.api.network.Network;
+import com.refinedmods.refinedstorage.api.network.impl.node.AbstractNetworkNode;
+import com.refinedmods.refinedstorage.api.network.impl.node.iface.InterfaceExportState;
 import com.refinedmods.refinedstorage.api.network.impl.node.iface.InterfaceNetworkNode;
 import com.refinedmods.refinedstorage.api.network.node.NetworkNode;
 import com.refinedmods.refinedstorage.common.controller.ControllerBlockEntity;
@@ -19,6 +21,7 @@ import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 public final class RefinedStorageAdapter implements StorageAdapter {
 
@@ -51,13 +54,21 @@ public final class RefinedStorageAdapter implements StorageAdapter {
         if (provider == null) return InterfaceStorageResolution.unsupported();
         for (var container : provider.getContainers()) {
             NetworkNode node = container.getNode();
-            if (!(node instanceof InterfaceNetworkNode interfaceNode)) continue;
+            Supplier<InterfaceExportState> exportState = exportState(node);
+            if (exportState == null) continue;
+            AbstractNetworkNode interfaceNode = (AbstractNetworkNode) node;
             Network network = interfaceNode.getNetwork();
             if (!interfaceNode.isActive() || network == null) return InterfaceStorageResolution.unavailable();
             return InterfaceStorageResolution.available(
-                    new RefinedStorageInterfaceEndpoint(interfaceNode, network));
+                    new RefinedStorageInterfaceEndpoint(interfaceNode, exportState, network));
         }
         return InterfaceStorageResolution.unsupported();
+    }
+
+    @Nullable
+    private static Supplier<InterfaceExportState> exportState(NetworkNode node) {
+        if (node instanceof InterfaceNetworkNode vanilla) return vanilla::getExportState;
+        return CableTiersInterfaces.exportState(node);
     }
 
     @Override

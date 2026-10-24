@@ -27,6 +27,7 @@ val ars_nouveau_version: String by project
 val arseng_version: String by project
 val ae2_version: String by project
 val refined_storage_version: String by project
+val cable_tiers_version: String by project
 val ftb_teams_version: String by project
 val emi_version: String by project
 val guideme_version: String by project
@@ -163,6 +164,10 @@ dependencies {
     compileOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
     if (refinedStorageRuntime.get()) {
         localRuntime("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+    }
+
+    compileOnly("maven.modrinth:cable-tiers:${cable_tiers_version}") {
+        isTransitive = false
     }
 
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-forge-api:${cc_version}")
