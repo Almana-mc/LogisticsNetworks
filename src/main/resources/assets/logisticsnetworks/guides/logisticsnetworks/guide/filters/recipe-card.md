@@ -14,6 +14,8 @@ A Recipe Card makes a channel send whole recipe sets instead of loose resources.
 
 Craft paper, redstone and an iron nugget for a blank card. Right-click a card to open it. With JEI or EMI, open any recipe and press **+** to copy its ingredients onto the card, fluids and chemicals included. You can also click a cell while holding an item, type the amount, and press **#** to switch between the exact item and its tags. Hold **Modifier Key 1** (Shift by default) while clicking with a bucket or tank to add what's inside instead of the container itself. Fluid and chemical amounts are in mB. Right-click a cell to remove it. A card holds up to 12 different ingredients.
 
+With AE2 or Refined Storage installed, hold an encoded pattern and click the pattern slot next to **Output** to copy the pattern's items, fluids and chemicals onto the card. This replaces the card's ingredients and output and keeps Blocking. The pattern stays in your hand.
+
 Craft a written card on its own to wipe it, or together with blank cards to copy it onto them.
 
 ## Target slots
