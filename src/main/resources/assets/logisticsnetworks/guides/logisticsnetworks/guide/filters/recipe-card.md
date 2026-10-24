@@ -16,6 +16,15 @@ Craft paper, redstone and an iron nugget for a blank card. Right-click a card to
 
 Craft a written card on its own to wipe it, or together with blank cards to copy it onto them.
 
+## Target slots
+
+Press **S** next to an item ingredient to choose the receiver slots it goes into, like `0-2, 5`. Slots start at 0, and `!3` means every slot but 3. Leave it empty for any slot. Right-click **S** to switch modes:
+
+- **Allowed** (green): the ingredient may go into any listed slot and fills them like normal.
+- **Split** (blue): the count is shared evenly over the listed slots, leftovers to the first ones. 3 iron on `0-2` puts 1 in each.
+
+The same item can sit in several rows with different slots. For a vanilla Crafter making an iron pickaxe, use 3 iron ingots on `0-2` with Split and 2 sticks on `4, 7` with Split. A receiver that lacks a listed slot, or can't take its full share, gets nothing. Fluids and chemicals have no slots.
+
 ## Using it in a filter
 
 A card is an entry in a filter, like any other entry, and it works on any channel that carries the card's kinds. Hold it and click a cell in the filter, or click a node's filter slot to add it to that slot's filter. The filter gets a copy and you keep the card. The cell cycles through the card's ingredients, and its name shows what the recipe makes.
