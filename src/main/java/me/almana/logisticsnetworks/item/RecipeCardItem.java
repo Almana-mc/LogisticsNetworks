@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
@@ -69,8 +70,9 @@ public class RecipeCardItem extends Item {
                 "tooltip.logisticsnetworks.recipe_card.output", output.toStack().getHoverName())
                 .withStyle(ChatFormatting.GOLD)));
         for (RecipeCardData.Ingredient ingredient : data.ingredients()) {
-            lines.add(Component.literal(ingredient.amountText() + " ").append(ingredient.label())
-                    .withStyle(ChatFormatting.GRAY));
+            MutableComponent line = Component.literal(ingredient.amountText() + " ").append(ingredient.label());
+            if (!ingredient.slots().isEmpty()) line.append(" · ").append(ingredient.slotsLabel());
+            lines.add(line.withStyle(ChatFormatting.GRAY));
         }
         lines.add(Component.translatable(data.blocking()
                 ? "tooltip.logisticsnetworks.recipe_card.blocking_on"
