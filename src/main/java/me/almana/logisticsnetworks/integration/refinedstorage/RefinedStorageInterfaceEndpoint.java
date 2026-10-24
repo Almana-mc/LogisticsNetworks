@@ -13,6 +13,7 @@ import com.refinedmods.refinedstorage.common.support.resource.ItemResource;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import me.almana.logisticsnetworks.utils.HashUtils;
+import mekanism.api.chemical.ChemicalStack;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -150,6 +151,48 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
     @Override
     public long extractFluid(FluidStack stack, long amount, boolean simulate) {
         return extract(new FluidResource(stack.getFluid(), stack.getComponentsPatch()), amount, simulate);
+    }
+
+    @Override
+    public boolean storesChemicals() {
+        return RefinedStorageChemicals.isLoaded();
+    }
+
+    @Override
+    public List<ChemicalStack> exportableChemicals() {
+        InterfaceExportState state = exportState.get();
+        if (state == null || !isValid()) return List.of();
+        StorageNetworkComponent storage = storage();
+        List<ChemicalStack> chemicals = new ArrayList<>();
+        Set<ResourceKey> seen = new HashSet<>();
+        for (int slot = 0; slot < state.getSlots(); slot++) {
+            ResourceKey requested = state.getRequestedResource(slot);
+            if (requested == null) continue;
+            for (ResourceKey candidate : state.expandExportCandidates(storage, requested)) {
+                if (!state.isExportedResourceValid(requested, candidate) || !seen.add(candidate)) continue;
+                ChemicalStack stack = RefinedStorageChemicals.stack(candidate, storage.get(candidate));
+                if (stack != null) chemicals.add(stack);
+            }
+        }
+        return chemicals;
+    }
+
+    @Override
+    public long chemicalCount(ChemicalStack stack) {
+        ResourceKey resource = RefinedStorageChemicals.resource(stack);
+        return resource == null || !isValid() ? 0 : Math.max(0, storage().get(resource));
+    }
+
+    @Override
+    public long insertChemical(ChemicalStack stack, long amount, boolean simulate) {
+        ResourceKey resource = RefinedStorageChemicals.resource(stack);
+        return resource == null ? 0 : insert(resource, amount, simulate);
+    }
+
+    @Override
+    public long extractChemical(ChemicalStack stack, long amount, boolean simulate) {
+        ResourceKey resource = RefinedStorageChemicals.resource(stack);
+        return resource != null && canExport(resource) ? extract(resource, amount, simulate) : 0;
     }
 
     private boolean canExport(ResourceKey candidate) {
