@@ -7,6 +7,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
+// Old item, no longer in use, will be removed later
 public record ApplyPatternPayload(boolean useOutputs, int multiplier) implements CustomPacketPayload {
 
     public static final Type<ApplyPatternPayload> TYPE = new Type<>(

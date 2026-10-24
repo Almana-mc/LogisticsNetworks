@@ -11,6 +11,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
+// Old item, no longer in use, will be removed later
 public class PatternSetterItem extends Item {
 
     public PatternSetterItem(Properties properties) {

@@ -16,6 +16,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.List;
 
+// Old item, no longer in use, will be removed later
 public class PatternSetterMenu extends AbstractContainerMenu {
 
     private static final int SLOT_PATTERN = 0;

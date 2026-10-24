@@ -10,6 +10,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+// Old item, no longer in use, will be removed later
 public class PatternSetterScreen extends AbstractContainerScreen<PatternSetterMenu> {
 
     private static final int GUI_WIDTH = 176;
