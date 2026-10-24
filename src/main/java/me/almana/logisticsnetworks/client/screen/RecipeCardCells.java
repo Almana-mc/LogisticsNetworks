@@ -15,6 +15,7 @@ import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 final class RecipeCardCells {
@@ -22,17 +23,21 @@ final class RecipeCardCells {
     static final int COLOR_SLOT = 0xFF2A2A2A;
     static final int COLOR_SLOT_BORDER = 0xFF444444;
     static final int COLOR_BTN = 0xFF2E2E2E;
+    static final int COLOR_BTN_ON = 0xFF2E5E2E;
     static final int COLOR_TEXT = 0xFFE0E0E0;
     static final int COLOR_MUTED = 0xFF999999;
     private static final int COLOR_TAG = 0xFFFFD24A;
+    private static final int COLOR_SPLIT = 0xFF2E4A6E;
 
     private static final int GRID_X = 8;
     private static final int GRID_Y = 40;
-    private static final int CELL_W = 84;
+    private static final int CELL_W = 88;
     private static final int CELL_H = 20;
     static final int TAG_X = 52;
+    static final int SLOTS_X = 70;
     static final int ITEM_BOX_W = 26;
     static final int AMOUNT_BOX_W = 42;
+    static final int SLOTS_BOX_W = 44;
 
     private RecipeCardCells() {
     }
@@ -70,10 +75,10 @@ final class RecipeCardCells {
         return -1;
     }
 
-    static int tagAt(int x, int y, List<RecipeCardData.Ingredient> list) {
+    static int itemButtonAt(int x, int y, List<RecipeCardData.Ingredient> list, int offset) {
         for (int i = 0; i < list.size(); i++) {
             if (list.get(i).kind() == RecipeCardData.Kind.ITEM
-                    && inside(x, y, cellX(i) + TAG_X, cellY(i) + 2, 14, 14)) {
+                    && inside(x, y, cellX(i) + offset, cellY(i) + 2, 14, 14)) {
                 return i;
             }
         }
@@ -85,8 +90,31 @@ final class RecipeCardCells {
                 ClientControls.MODIFIER_1.getTranslatedKeyMessage())
                 .withStyle(ChatFormatting.GRAY);
         if (ingredient == null) return List.of(hint);
-        return List.of(ingredient.label(), Component.translatable("gui.logisticsnetworks.recipe_card.remove_hint")
-                .withStyle(ChatFormatting.GRAY), hint);
+        List<Component> lines = new ArrayList<>();
+        lines.add(ingredient.label());
+        if (!ingredient.slots().isEmpty()) lines.add(ingredient.slotsLabel().withStyle(ChatFormatting.GRAY));
+        lines.add(Component.translatable("gui.logisticsnetworks.recipe_card.remove_hint")
+                .withStyle(ChatFormatting.GRAY));
+        lines.add(hint);
+        return lines;
+    }
+
+    static List<Component> slotsTooltip(RecipeCardData.Ingredient ingredient) {
+        return List.of(ingredient.slotsLabel(),
+                Component.translatable("gui.logisticsnetworks.recipe_card.slots_edit_hint")
+                        .withStyle(ChatFormatting.GRAY),
+                Component.translatable("gui.logisticsnetworks.recipe_card.slots_mode_hint")
+                        .withStyle(ChatFormatting.GRAY));
+    }
+
+    static EditBox slotsBox(Font font) {
+        EditBox box = new EditBox(font, 0, 0, SLOTS_BOX_W, 10, Component.empty());
+        box.setBordered(false);
+        box.setTextColor(COLOR_TEXT);
+        box.setMaxLength(64);
+        box.setFilter(value -> value.matches("[0-9,!\\- ]*"));
+        box.visible = false;
+        return box;
     }
 
     static EditBox countBox(Font font, int x, int y) {
@@ -111,7 +139,8 @@ final class RecipeCardCells {
         return RecipeCardData.Ingredient.ofItem(stack, stack.getCount());
     }
 
-    static void cell(GuiGraphics graphics, Font font, int x, int y, @Nullable RecipeCardData.Ingredient ingredient) {
+    static void cell(GuiGraphics graphics, Font font, int x, int y, @Nullable RecipeCardData.Ingredient ingredient,
+            boolean editing) {
         slot(graphics, x, y);
         if (ingredient == null) return;
         icon(graphics, ingredient, x, y);
@@ -127,10 +156,17 @@ final class RecipeCardCells {
             graphics.drawString(font, "#", x + 11, y + 8, COLOR_TAG, true);
             graphics.pose().popPose();
         }
-        graphics.fill(x + 18, y + 2, x + 22 + ITEM_BOX_W, y + 14, COLOR_SLOT_BORDER);
-        graphics.fill(x + 19, y + 3, x + 21 + ITEM_BOX_W, y + 13, COLOR_SLOT);
-        graphics.fill(x + TAG_X, y + 1, x + TAG_X + 14, y + 15, COLOR_SLOT_BORDER);
-        graphics.fill(x + TAG_X + 1, y + 2, x + TAG_X + 13, y + 14, COLOR_BTN);
-        graphics.drawCenteredString(font, "#", x + TAG_X + 7, y + 4, COLOR_TEXT);
+        int boxW = editing ? SLOTS_BOX_W : ITEM_BOX_W;
+        graphics.fill(x + 18, y + 2, x + 22 + boxW, y + 14, COLOR_SLOT_BORDER);
+        graphics.fill(x + 19, y + 3, x + 21 + boxW, y + 13, COLOR_SLOT);
+        if (!editing) button(graphics, font, x + TAG_X, y, COLOR_BTN, "#");
+        button(graphics, font, x + SLOTS_X, y, ingredient.slots().isEmpty() ? COLOR_BTN
+                : ingredient.split() ? COLOR_SPLIT : COLOR_BTN_ON, "S");
+    }
+
+    private static void button(GuiGraphics graphics, Font font, int x, int y, int fill, String label) {
+        graphics.fill(x, y + 1, x + 14, y + 15, COLOR_SLOT_BORDER);
+        graphics.fill(x + 1, y + 2, x + 13, y + 14, fill);
+        graphics.drawCenteredString(font, label, x + 7, y + 4, COLOR_TEXT);
     }
 }

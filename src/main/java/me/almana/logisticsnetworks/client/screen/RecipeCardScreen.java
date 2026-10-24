@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.client.screen;
 import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
+import me.almana.logisticsnetworks.filter.SlotExpressionUtil;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
@@ -16,6 +17,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import java.util.BitSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,21 +27,22 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
 
     private static final int COLOR_PANEL = 0xFF1F1F1F;
     private static final int COLOR_BORDER = 0xFF3A3A3A;
-    private static final int COLOR_BTN_ON = 0xFF2E5E2E;
     private static final int CELLS = RecipeCardData.MAX_INGREDIENTS;
     private static final int MIN_CELLS = 5;
     private static final int OUTPUT_X = 8;
     private static final int OUTPUT_Y = 20;
-    private static final int BLOCK_X = 96;
+    private static final int BLOCK_X = 108;
     private static final int BLOCK_Y = 21;
     private static final int BLOCK_W = 72;
 
     private final EditBox[] counts = new EditBox[CELLS];
+    private EditBox slots;
+    private int editing = -1;
     private RecipeCardData known;
 
     public RecipeCardScreen(RecipeCardMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
-        imageWidth = 176;
+        imageWidth = 188;
         imageHeight = RecipeCardMenu.INV_Y + 80;
         titleLabelY = 10_000;
         inventoryLabelY = 10_000;
@@ -51,6 +54,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         for (int i = 0; i < CELLS; i++) {
             counts[i] = addRenderableWidget(countBox(font, leftPos + cellX(i), topPos + cellY(i)));
         }
+        slots = addRenderableWidget(slotsBox(font));
         reconcile();
     }
 
@@ -65,10 +69,12 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         if (menu.data() != known) {
             known = menu.data();
             setFocused(null);
+            editing = -1;
+            slots.visible = false;
         }
         List<RecipeCardData.Ingredient> list = menu.data().ingredients();
         for (int i = 0; i < CELLS; i++) {
-            counts[i].visible = i < list.size();
+            counts[i].visible = i < list.size() && i != editing;
             if (counts[i].visible) fit(counts[i], list.get(i));
             String count = counts[i].visible ? Integer.toString(list.get(i).count()) : "";
             if (!counts[i].isFocused() && !counts[i].getValue().equals(count)) counts[i].setValue(count);
@@ -88,8 +94,37 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
         reconcile();
     }
 
+    private void startSlots(int index) {
+        editing = index;
+        slots.setValue(SlotExpressionUtil.formatSlots(menu.data().ingredients().get(index).slots()));
+        slots.setPosition(leftPos + cellX(index) + 21, topPos + cellY(index) + 5);
+        slots.visible = true;
+        counts[index].visible = false;
+        setFocused(slots);
+    }
+
+    private void commitSlots() {
+        if (editing < 0) return;
+        int index = editing;
+        BitSet parsed = SlotExpressionUtil.parseMask(slots.getValue());
+        cancelSlots();
+        if (parsed != null && index < menu.data().ingredients().size()) {
+            List<Integer> chosen = SlotExpressionUtil.bitSetToList(parsed);
+            menu.edit(data -> data.withIngredient(index, data.ingredients().get(index).withSlots(chosen)));
+        }
+        reconcile();
+    }
+
+    private void cancelSlots() {
+        editing = -1;
+        slots.visible = false;
+        if (getFocused() == slots) setFocused(null);
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (slots.visible && slots.isMouseOver(mouseX, mouseY)) return super.mouseClicked(mouseX, mouseY, button);
+        commitSlots();
         commitCount();
         int action = ClientControls.resolveMouseAction(button);
         boolean handled = action != -1 && clickCard((int) mouseX - leftPos, (int) mouseY - topPos, action);
@@ -99,6 +134,17 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
+        if (slots.isFocused()) {
+            if (key == 256) {
+                cancelSlots();
+                reconcile();
+            } else if (key == 257 || key == 335) {
+                commitSlots();
+            } else {
+                slots.keyPressed(key, scan, modifiers);
+            }
+            return true;
+        }
         for (EditBox box : counts) {
             if (!box.isFocused()) continue;
             if (key == 256) {
@@ -119,6 +165,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
 
     @Override
     public void onClose() {
+        commitSlots();
         commitCount();
         if (menu.isNodeTarget()) {
             PacketDistributor.sendToServer(new OpenNodeFilterPayload(menu.entityId(), menu.channel(),
@@ -132,6 +179,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
 
     @Override
     public void removed() {
+        commitSlots();
         commitCount();
         super.removed();
     }
@@ -161,8 +209,19 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
             } else if (action == 0 && !carried.isEmpty()) dropIngredient(cell, carried);
             return true;
         }
-        int tag = tagAt(x, y, list);
-        if (tag >= 0) {
+        int slotButton = itemButtonAt(x, y, list, SLOTS_X);
+        if (slotButton >= 0) {
+            ClickSound.play();
+            RecipeCardData.Ingredient ingredient = list.get(slotButton);
+            if (action == 1) {
+                menu.edit(data -> data.withIngredient(slotButton, ingredient.withSplit(!ingredient.split())));
+            } else {
+                startSlots(slotButton);
+            }
+            return true;
+        }
+        int tag = itemButtonAt(x, y, list, TAG_X);
+        if (tag >= 0 && tag != editing) {
             ClickSound.play();
             menu.edit(data -> data.withIngredient(tag, data.ingredients().get(tag).nextTag()));
             return true;
@@ -205,7 +264,13 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
                     mouseX, mouseY);
             return;
         }
-        if (tagAt(x, y, list) >= 0) {
+        int slotButton = itemButtonAt(x, y, list, SLOTS_X);
+        if (slotButton >= 0) {
+            graphics.renderComponentTooltip(font, slotsTooltip(list.get(slotButton)), mouseX, mouseY);
+            return;
+        }
+        int tag = itemButtonAt(x, y, list, TAG_X);
+        if (tag >= 0 && tag != editing) {
             graphics.renderTooltip(font, Component.translatable("gui.logisticsnetworks.recipe_card.tag_toggle"),
                     mouseX, mouseY);
         } else if (inside(x, y, BLOCK_X, BLOCK_Y, BLOCK_W, 14)) {
@@ -237,9 +302,10 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
                 lp + BLOCK_X + BLOCK_W / 2, tp + BLOCK_Y + 3, COLOR_TEXT);
         for (int i = 0; i < droppableCells(); i++) {
             RecipeCardCells.cell(graphics, font, lp + cellX(i), tp + cellY(i) + 1,
-                    i < data.ingredients().size() ? data.ingredients().get(i) : null);
+                    i < data.ingredients().size() ? data.ingredients().get(i) : null, i == editing);
         }
-        graphics.drawString(font, playerInventoryTitle, lp + 8, tp + RecipeCardMenu.INV_Y - 11, COLOR_MUTED, false);
+        graphics.drawString(font, playerInventoryTitle, lp + RecipeCardMenu.INV_X, tp + RecipeCardMenu.INV_Y - 11,
+                COLOR_MUTED, false);
         for (Slot slot : menu.slots) {
             slot(graphics, lp + slot.x, tp + slot.y);
         }
