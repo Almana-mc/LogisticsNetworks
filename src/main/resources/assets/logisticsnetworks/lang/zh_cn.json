@@ -458,7 +458,7 @@
   "gui.logisticsnetworks.wrench.flow.pulses": "显示脉冲",
   "gui.logisticsnetworks.wrench.flow.pulseSpacing": "脉冲间距",
   "gui.logisticsnetworks.wrench.flow.pulseLength": "脉冲长度",
-  "gui.logisticsnetworks.wrench.flow.throughBlocks": "显示穿过的方块",
+  "gui.logisticsnetworks.wrench.flow.throughBlocks": "显示穿过方块的流动线",
   "message.logisticsnetworks.wrench.colors.no_wrench": "手持扳手以编辑其设置",
   "key.logisticsnetworks.toggle_slot_numbers": "切换槽位序号显示",
   "message.logisticsnetworks.slot_numbers.enabled": "槽位序号已显示 (按 %s 隐藏)",
