@@ -78,7 +78,6 @@ public class TransferEngine {
 
     public record NetworkContext(
             List<LogisticsNodeEntity> sortedNodes,
-            Map<UUID, Integer> signalCache,
             List<ImportTarget>[] itemImports,
             List<ImportTarget>[] fluidImports,
             List<ImportTarget>[] energyImports,
@@ -120,7 +119,7 @@ public class TransferEngine {
             for (LogisticsNodeEntity sourceNode : context.sortedNodes()) {
                 long delta = processNode(sourceNode, context.itemImports(), context.fluidImports(),
                         context.energyImports(), context.chemicalImports(), context.sourceImports(),
-                        context.signalCache(), context.dimensionalCache(), context.tierCache(),
+                        context.dimensionalCache(), context.tierCache(),
                         telemetryActive, capCache, includeItemTransfers);
                 if (delta < minWakeDelta) {
                     minWakeDelta = delta;
@@ -159,18 +158,13 @@ public class TransferEngine {
             return null;
         }
 
-        Map<UUID, Integer> signalCache = buildSignalCache(sortedNodes);
-        if (signalCache.isEmpty()) {
-            return null;
-        }
-
         @SuppressWarnings("unchecked")
         List<ImportTarget>[][] imports = new List[][] {
-                resolveCache(network.getItemImports(), nodeCache, signalCache),
-                resolveCache(network.getFluidImports(), nodeCache, signalCache),
-                resolveCache(network.getEnergyImports(), nodeCache, signalCache),
-                resolveCache(network.getChemicalImports(), nodeCache, signalCache),
-                resolveCache(network.getSourceImports(), nodeCache, signalCache) };
+                resolveCache(network.getItemImports(), nodeCache),
+                resolveCache(network.getFluidImports(), nodeCache),
+                resolveCache(network.getEnergyImports(), nodeCache),
+                resolveCache(network.getChemicalImports(), nodeCache),
+                resolveCache(network.getSourceImports(), nodeCache) };
         Map<UUID, Boolean> dimensionalCache = network.getDimensionalCache();
         List<ServerRackLinks.Link> links = registry.getRackLinks().linksFor(network.getId());
         if (!links.isEmpty()) {
@@ -178,43 +172,8 @@ public class TransferEngine {
             BridgedImports.merge(links, registry, server, imports, dimensionalCache);
         }
 
-        return new NetworkContext(sortedNodes, signalCache, imports[0], imports[1], imports[2], imports[3],
+        return new NetworkContext(sortedNodes, imports[0], imports[1], imports[2], imports[3],
                 imports[4], dimensionalCache, network.getTierCache());
-    }
-
-    private static Map<UUID, Integer> buildSignalCache(List<LogisticsNodeEntity> nodes) {
-        Map<UUID, Integer> signalCache = new HashMap<>();
-        boolean hasAnyExporter = false;
-
-        for (LogisticsNodeEntity node : nodes) {
-            if (!node.isValidNode())
-                continue;
-            boolean needsSignal = false;
-            boolean hasExport = false;
-
-            for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                ChannelData ch = node.getChannel(i);
-                if (ch != null && ch.isEnabled()) {
-                    if (ch.getRedstoneMode() != RedstoneMode.IGNORED) {
-                        needsSignal = true;
-                    }
-                    if (ch.getMode() == ChannelMode.EXPORT) {
-                        hasExport = true;
-                    }
-                }
-            }
-
-            if (hasExport)
-                hasAnyExporter = true;
-
-            if (!node.isMountedOnCreate() && node.level() instanceof ServerLevel level) {
-                signalCache.put(node.getUUID(), needsSignal ? level.getBestNeighborSignal(node.getAttachedPos()) : 0);
-            } else if (node.isMountedOnCreate()) {
-                signalCache.put(node.getUUID(), 0);
-            }
-        }
-
-        return hasAnyExporter ? signalCache : Collections.emptyMap();
     }
 
     private static final List<ImportTarget>[] EMPTY_RESOLVED = createEmptyResolved();
@@ -228,8 +187,7 @@ public class TransferEngine {
 
     @SuppressWarnings("unchecked")
     private static List<ImportTarget>[] resolveCache(List<NodeRef>[] cache,
-            Map<UUID, LogisticsNodeEntity> nodeCache,
-            Map<UUID, Integer> signalCache) {
+            Map<UUID, LogisticsNodeEntity> nodeCache) {
         boolean anyNonEmpty = false;
         for (int i = 0; i < 9; i++) {
             if (!cache[i].isEmpty()) {
@@ -257,7 +215,7 @@ public class TransferEngine {
                     continue;
                 if (!canRunChannel(node, cd) || !CreateCompat.isResolved(node))
                     continue;
-                int sig = signalCache.getOrDefault(ref.nodeId(), 0);
+                int sig = node.signal;
                 if (!isRedstoneActive(cd.getRedstoneMode(), sig))
                     continue;
                 targets.add(new ImportTarget(node, cd, i));
@@ -273,7 +231,6 @@ public class TransferEngine {
             List<ImportTarget>[] energyImports,
             List<ImportTarget>[] chemicalImports,
             List<ImportTarget>[] sourceImports,
-            Map<UUID, Integer> signalCache,
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache,
             boolean telemetryActive,
@@ -285,7 +242,7 @@ public class TransferEngine {
 
         ServerLevel sourceLevel = (ServerLevel) sourceNode.level();
         long gameTime = sourceLevel.getGameTime();
-        int redstoneSignal = signalCache.getOrDefault(sourceNode.getUUID(), 0);
+        int redstoneSignal = sourceNode.signal;
         int sourceTier = tierCache.getOrDefault(sourceNode.getUUID(), 0);
         long minWakeDelta = Long.MAX_VALUE;
 
@@ -581,7 +538,7 @@ public class TransferEngine {
         }
 
         ChannelData channel = sourceNode.getChannel(channelIndex);
-        int signal = context.signalCache().getOrDefault(sourceNodeId, 0);
+        int signal = sourceNode.signal;
         if (channel == null || !channel.isEnabled()
                 || channel.getMode() != ChannelMode.EXPORT || !channel.hasType(ChannelType.ITEM)
                 || !canRunChannel(sourceNode, channel) || !CreateCompat.isResolved(sourceNode)

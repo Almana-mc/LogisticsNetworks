@@ -97,7 +97,7 @@ public final class Snapshots {
 
         ServerLevel level = (ServerLevel) node.level();
         long gameTime = level.getGameTime();
-        int signal = context.signalCache().getOrDefault(node.getUUID(), 0);
+        int signal = node.signal;
         int tier = context.tierCache().getOrDefault(node.getUUID(), 0);
 
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
