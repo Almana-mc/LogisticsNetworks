@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.component.ComponentCodecs;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.INodeTracker;
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeRouteChannels;
@@ -80,6 +81,8 @@ public class LogisticsNodeEntity extends Entity {
 
     private final long[] channelCooldowns = new long[CHANNEL_COUNT * ChannelData.LANES];
     private final float[] backoffTicks = new float[CHANNEL_COUNT * ChannelData.LANES];
+
+    public int signal = -1;
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
@@ -175,6 +178,10 @@ public class LogisticsNodeEntity extends Entity {
             return;
         }
         if (this.level().isClientSide()) return;
+
+        if (signal < 0) {
+            signal = this.level().getBestNeighborSignal(this.blockPosition());
+        }
 
         BlockPos attached = getAttachedPos();
         if (!attached.equals(BlockPos.ZERO)) {
@@ -515,6 +522,7 @@ public class LogisticsNodeEntity extends Entity {
     public void remove(RemovalReason reason) {
         this.dropFilters();
         this.dropUpgrades();
+        ((INodeTracker) this.level()).logisticsNetworks$removeNode(this.blockPosition());
         super.remove(reason);
     }
 }

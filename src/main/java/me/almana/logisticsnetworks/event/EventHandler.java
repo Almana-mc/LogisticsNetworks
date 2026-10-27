@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.command.LogisticsCommand;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.INodeTracker;
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -311,4 +312,27 @@ public class EventHandler {
         }
     }
 
+    @SubscribeEvent
+    public static void onNeighbourNotify(BlockEvent.NeighborNotifyEvent event) {
+        var pos = event.getPos().mutable();
+        var level = event.getLevel();
+        for (var side : event.getNotifiedSides()) {
+            pos.move(side);
+
+            var node = ((INodeTracker) level).logisticsNetworks$getNode(pos);
+            if (node != null) {
+                node.signal = level.getBestNeighborSignal(node.blockPosition());
+            }
+
+            pos.move(side.getOpposite());
+        }
+    }
+
+    @SubscribeEvent
+    public static void onEntityJoin(EntityJoinLevelEvent event) {
+        if (event.getLevel() instanceof ServerLevel level && event.getEntity() instanceof LogisticsNodeEntity node) {
+            node.signal = level.getBestNeighborSignal(node.blockPosition());
+            ((INodeTracker) level).logisticsNetworks$registerNode(node);
+        }
+    }
 }
