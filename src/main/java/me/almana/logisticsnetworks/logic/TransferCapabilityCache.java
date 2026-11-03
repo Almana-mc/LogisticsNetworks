@@ -42,9 +42,12 @@ public final class TransferCapabilityCache {
     private record CapKey(ResourceKey<Level> dim, long pos, int dir) {
     }
 
+    private record PosKey(ResourceKey<Level> dim, long pos) {
+    }
+
     private final Map<CapKey, BlockCapabilityCache<IItemHandler, Direction>> items = new HashMap<>();
     private final Map<CapKey, BlockCapabilityCache<IFluidHandler, Direction>> fluids = new HashMap<>();
-    private final Map<CapKey, BlockCapabilityCache<IEnergyStorage, Direction>> energy = new HashMap<>();
+    private final Map<PosKey, EnergySides> energy = new HashMap<>();
     private StorageOperation storageOperation;
 
     public StorageOperation storageOperation(boolean fresh) {
@@ -238,18 +241,12 @@ public final class TransferCapabilityCache {
     }
 
     IEnergyStorage findEnergyHandler(ServerLevel level, BlockPos pos, IoSide side) {
+        EnergySides sides = energy.computeIfAbsent(new PosKey(level.dimension(), pos.asLong()),
+                key -> new EnergySides());
         Direction dir = side.direction();
-        if (dir != null) return getEnergyHandler(level, pos, dir);
-        if (side == IoSide.NONE) return MekanismCompat.isMekanismBlock(level, pos) ? null : getEnergyHandler(level, pos, null);
-        List<IEnergyStorage> found = new ArrayList<>(6);
-        for (Direction face : DIRECTIONS) {
-            IEnergyStorage handler = getEnergyHandler(level, pos, face);
-            if (handler != null && !containsIdentity(found, handler)) {
-                found.add(handler);
-            }
-        }
-        if (found.isEmpty()) return null;
-        return found.size() == 1 ? found.get(0) : new CombinedEnergyHandler(found.toArray(IEnergyStorage[]::new));
+        if (dir != null) return sides.side(level, pos, dir);
+        if (side == IoSide.NONE) return MekanismCompat.isMekanismBlock(level, pos) ? null : sides.side(level, pos, null);
+        return sides.all(level, pos);
     }
 
     IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, IoSide side) {
@@ -274,8 +271,8 @@ public final class TransferCapabilityCache {
             CapKey key = new CapKey(dim, packed, d);
             items.remove(key);
             fluids.remove(key);
-            energy.remove(key);
         }
+        energy.remove(new PosKey(dim, packed));
     }
 
     private static int sideIndex(@Nullable Direction dir) {
@@ -293,13 +290,6 @@ public final class TransferCapabilityCache {
         BlockCapabilityCache<IFluidHandler, Direction> cache = fluids.computeIfAbsent(
                 new CapKey(level.dimension(), pos.asLong(), sideIndex(dir)),
                 k -> BlockCapabilityCache.create(Capabilities.FluidHandler.BLOCK, level, pos, dir));
-        return cache.getCapability();
-    }
-
-    private IEnergyStorage getEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-        BlockCapabilityCache<IEnergyStorage, Direction> cache = energy.computeIfAbsent(
-                new CapKey(level.dimension(), pos.asLong(), sideIndex(dir)),
-                k -> BlockCapabilityCache.create(Capabilities.EnergyStorage.BLOCK, level, pos, dir));
         return cache.getCapability();
     }
 
@@ -473,6 +463,47 @@ public final class TransferCapabilityCache {
                 remaining -= drained.getAmount();
             }
             return template.isEmpty() ? FluidStack.EMPTY : template.copyWithAmount(totalAmount);
+        }
+    }
+
+    // Per-block energy caps, memoised combine
+    private static final class EnergySides {
+        @SuppressWarnings("unchecked")
+        private final BlockCapabilityCache<IEnergyStorage, Direction>[] caches =
+                new BlockCapabilityCache[DIRECTIONS.length + 1];
+        private IEnergyStorage[] combinedOf = new IEnergyStorage[0];
+        private IEnergyStorage combined;
+
+        @Nullable
+        IEnergyStorage side(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+            int index = sideIndex(dir);
+            if (caches[index] == null) {
+                caches[index] = BlockCapabilityCache.create(Capabilities.EnergyStorage.BLOCK, level, pos, dir);
+            }
+            return caches[index].getCapability();
+        }
+
+        @Nullable
+        IEnergyStorage all(ServerLevel level, BlockPos pos) {
+            List<IEnergyStorage> found = new ArrayList<>(DIRECTIONS.length);
+            for (Direction face : DIRECTIONS) {
+                IEnergyStorage handler = side(level, pos, face);
+                if (handler != null && !containsIdentity(found, handler)) found.add(handler);
+            }
+            if (found.size() <= 1) return found.isEmpty() ? null : found.get(0);
+            if (!sameHandlers(found)) {
+                combinedOf = found.toArray(IEnergyStorage[]::new);
+                combined = new CombinedEnergyHandler(combinedOf);
+            }
+            return combined;
+        }
+
+        private boolean sameHandlers(List<IEnergyStorage> found) {
+            if (found.size() != combinedOf.length) return false;
+            for (int i = 0; i < combinedOf.length; i++) {
+                if (found.get(i) != combinedOf[i]) return false;
+            }
+            return true;
         }
     }
 }
