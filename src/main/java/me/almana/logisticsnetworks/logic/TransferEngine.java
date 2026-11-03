@@ -515,7 +515,7 @@ public class TransferEngine {
         if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos))
             return new ItemResourceOrder.Result(null, -1);
         ItemStack[] exportFilters = exportChannel.getFilterItems();
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
+        FilterItemData.ReadCache filterReadCache = capCache.filterCache();
         boolean directSource = !FilterLogic.hasConfiguredSlotMapping(exportFilters, filterReadCache);
         IItemHandler sourceHandler = capCache.findItemExportHandler(
                 sourceNode, exportChannel.getIoSide(), directSource);
@@ -735,7 +735,7 @@ public class TransferEngine {
         boolean hasUsableTarget = false;
         boolean hasUnavailableMountedTarget = false;
         boolean hasStationaryTarget = false;
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
+        FilterItemData.ReadCache filterReadCache = capCache.filterCache();
         boolean exportSides = FilterLogic.hasConfiguredEntrySides(exportChannel.getFilterItems(), filterReadCache);
 
         for (ImportTarget target : targets) {
@@ -892,7 +892,7 @@ public class TransferEngine {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
+        FilterItemData.ReadCache filterReadCache = capCache.filterCache();
         boolean exportSides = FilterLogic.hasConfiguredEntrySides(exportChannel.getFilterItems(), filterReadCache);
         ObjLongConsumer<String> onMoved = telemetryActive
                 ? (id, amount) -> exportChannel.getTelemetry().recordResource(new FlowResource.Chemical(id), amount)

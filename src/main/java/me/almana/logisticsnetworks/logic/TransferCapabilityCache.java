@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
@@ -50,10 +51,15 @@ public final class TransferCapabilityCache {
         return new StorageOperation(fresh);
     }
 
+    public FilterItemData.ReadCache filterCache() {
+        return storageOperation != null ? storageOperation.filters : FilterItemData.createReadCache();
+    }
+
     public final class StorageOperation implements AutoCloseable {
         private final StorageOperation previous;
         private final DirectStorageReads reads;
         private final Map<Object, IItemHandler[]> handlers = new IdentityHashMap<>();
+        private final FilterItemData.ReadCache filters = FilterItemData.createReadCache();
 
         private StorageOperation(boolean fresh) {
             previous = storageOperation;
