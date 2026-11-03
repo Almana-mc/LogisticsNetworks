@@ -98,7 +98,6 @@ public final class Snapshots {
 
         ServerLevel level = (ServerLevel) node.level();
         long gameTime = level.getGameTime();
-        int signal = context.signalCache().getOrDefault(node.getUUID(), 0);
         int tier = context.tierCache().getOrDefault(node.getUUID(), 0);
 
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
@@ -115,10 +114,10 @@ public final class Snapshots {
             if (!TransferEngine.canRunChannel(node, channel) || !CreateCompat.isResolved(node)) {
                 continue;
             }
-            if (!TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal)) {
+            if (!context.signals().active(node, channel.getRedstoneMode())) {
                 continue;
             }
-            List<TransferEngine.ImportTarget> targets = context.itemImports()[i];
+            List<TransferEngine.ImportTarget> targets = context.imports().get(ChannelType.ITEM, i);
             if (targets == null || targets.isEmpty()) {
                 continue;
             }
