@@ -17,23 +17,25 @@ val mod_version: String by project
 val mod_group_id: String by project
 val mod_authors: String by project
 val mod_description: String by project
-val jei_version: String by project
-val jade_version: String by project
-val iris_version: String by project
+val jei_file_id: String by project
+val jade_file_id: String by project
+val iris_file_id: String by project
 val parchment_minecraft_version: String by project
 val parchment_mappings_version: String by project
-val mekanism_version: String by project
-val ars_nouveau_version: String by project
-val arseng_version: String by project
+val mekanism_file_id: String by project
+val ars_nouveau_file_id: String by project
+val arseng_file_id: String by project
 val ae2_version: String by project
+val ae2_file_id: String by project
 val refined_storage_version: String by project
-val cable_tiers_version: String by project
-val ftb_teams_version: String by project
-val emi_version: String by project
-val guideme_version: String by project
-val sophisticated_core_version: String by project
-val create_version: String by project
-val ponder_version: String by project
+val refined_storage_file_id: String by project
+val cable_tiers_file_id: String by project
+val ftb_teams_file_id: String by project
+val emi_file_id: String by project
+val guideme_file_id: String by project
+val sophisticated_core_file_id: String by project
+val functional_storage_file_id: String by project
+val create_file_id: String by project
 val building_gadgets_file_id: String by project
 val appmek_file_id: String by project
 val rs_mekanism_file_id: String by project
@@ -50,13 +52,6 @@ group = mod_group_id
 repositories {
     mavenLocal()
     mavenCentral()
-    maven("https://maven.blamejared.com")
-    maven("https://modmaven.dev/artifactory/local-releases/")
-    maven("https://api.modrinth.com/maven")
-    maven("https://maven.ftb.dev/releases")
-    maven("https://maven.terraformersmc.com/releases")
-    maven("https://maven.createmod.net")
-    maven("https://maven.creeperhost.net")
     maven("https://maven.squiddev.cc") {
         content { includeGroup("cc.tweaked") }
     }
@@ -128,20 +123,17 @@ sourceSets.main.get().resources.srcDir("src/generated/resources")
 val localRuntime: Configuration by configurations.creating
 configurations.runtimeClasspath { extendsFrom(localRuntime) }
 configurations.testRuntimeClasspath { extendsFrom(localRuntime) }
+val createJar: Configuration by configurations.creating
+configurations.compileOnly { extendsFrom(createJar) }
 
 dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
 
-    compileOnly("com.simibubi.create:create-${minecraft_version}:${create_version}") {
-        isTransitive = false
-    }
-    compileOnly("net.createmod.ponder:ponder-neoforge:${ponder_version}") {
-        isTransitive = false
-    }
+    createJar("curse.maven:create-328085:${create_file_id}")
+    // Ponder only ships inside Create
+    compileOnly(files(provider { zipTree(createJar.singleFile).matching { include("META-INF/jarjar/ponder-*.jar") } }))
     if (create_runtime.get()) {
-        localRuntime("com.simibubi.create:create-${minecraft_version}:${create_version}") {
-            isTransitive = false
-        }
+        localRuntime("curse.maven:create-328085:${create_file_id}")
     }
 
     compileOnly("curse.maven:building-gadgets-298187:${building_gadgets_file_id}")
@@ -149,64 +141,49 @@ dependencies {
         localRuntime("curse.maven:building-gadgets-298187:${building_gadgets_file_id}")
     }
 
-    compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
-    compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
-    localRuntime("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
+    compileOnly("curse.maven:jei-238222:${jei_file_id}")
+    localRuntime("curse.maven:jei-238222:${jei_file_id}")
 
-    compileOnly("mekanism:Mekanism:${mekanism_version}")
+    compileOnly("curse.maven:mekanism-268560:${mekanism_file_id}")
 
-    compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}")
-    compileOnly("maven.modrinth:ars-energistique:${arseng_version}")
+    compileOnly("curse.maven:ars-nouveau-401955:${ars_nouveau_file_id}")
+    compileOnly("curse.maven:ars-energistique-905641:${arseng_file_id}")
 
-    compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+    compileOnly("curse.maven:applied-energistics-2-223794:${ae2_file_id}")
     if (ae2Runtime.get()) {
-        localRuntime("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+        localRuntime("curse.maven:applied-energistics-2-223794:${ae2_file_id}")
     }
 
-    compileOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+    compileOnly("curse.maven:refined-storage-243076:${refined_storage_file_id}")
     if (refinedStorageRuntime.get()) {
-        localRuntime("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+        localRuntime("curse.maven:refined-storage-243076:${refined_storage_file_id}")
     }
 
     compileOnly("curse.maven:applied-mekanistics-574300:${appmek_file_id}")
     compileOnly("curse.maven:refined-storage-mekanism-integration-1230504:${rs_mekanism_file_id}")
 
-    compileOnly("maven.modrinth:cable-tiers:${cable_tiers_version}") {
-        isTransitive = false
-    }
+    compileOnly("curse.maven:cable-tiers-454382:${cable_tiers_file_id}")
 
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-forge-api:${cc_version}")
     if (ccRuntime.get()) {
         localRuntime("cc.tweaked:cc-tweaked-${minecraft_version}-forge:${cc_version}")
     }
 
-    compileOnly("org.appliedenergistics:guideme:${guideme_version}:api")
-    localRuntime("org.appliedenergistics:guideme:${guideme_version}")
+    compileOnly("curse.maven:guideme-1173950:${guideme_file_id}")
+    localRuntime("curse.maven:guideme-1173950:${guideme_file_id}")
 
-    compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftb_teams_version}") {
-        isTransitive = false
-    }
+    compileOnly("curse.maven:ftb-teams-404468:${ftb_teams_file_id}")
 
-    compileOnly("dev.emi:emi-neoforge:${emi_version}") {
-        isTransitive = false
-    }
+    compileOnly("curse.maven:emi-580555:${emi_file_id}")
 
-    compileOnly("maven.modrinth:jade:${jade_version}")
-    localRuntime("maven.modrinth:jade:${jade_version}")
+    compileOnly("curse.maven:jade-324717:${jade_file_id}")
+    localRuntime("curse.maven:jade-324717:${jade_file_id}")
 
-    compileOnly("maven.modrinth:iris:${iris_version}") {
-        isTransitive = false
-    }
+    compileOnly("curse.maven:iris-455508:${iris_file_id}")
 
-    compileOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") {
-        isTransitive = false
-    }
-    compileOnly("maven.modrinth:functional-storage:1.21-1.5.5") {
-        isTransitive = false
-    }
-    testRuntimeOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") {
-        isTransitive = false
-    }
+    compileOnly("curse.maven:sophisticated-core-618298:${sophisticated_core_file_id}")
+    compileOnly("curse.maven:functional-storage-556861:${functional_storage_file_id}")
+    testRuntimeOnly("curse.maven:sophisticated-core-618298:${sophisticated_core_file_id}")
 }
 
 tasks.test {
