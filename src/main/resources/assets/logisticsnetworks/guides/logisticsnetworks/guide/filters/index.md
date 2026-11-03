@@ -113,6 +113,7 @@ Every slot in a Normal Filter's main grid is more than a single-item check. Open
 - **Stock**: reserve items on Senders, or cap destination stock on Receivers.
 - **NBT**: add up to 6 active NBT/component rules, or paste raw SNBT for advanced cases.
 - **Slots**: restrict this entry to specific attached-inventory slot indices.
+- **Side**: the face of the receiving block this item, fluid or chemical goes in through. **Same as node** uses the receiving channel's side. On a Sender's filter it applies to every Receiver; on a Receiver's filter it applies to that block and wins over the Sender's. A vanilla Furnace can take ore through Up and coal through North from one channel. The face the Sender pulls from is always the channel's side. Left-click cycles forward, right-click goes back.
 
 Leave Batch or Stock at `0` to fall back to the channel settings or disable the threshold.
 
@@ -126,7 +127,7 @@ This clipboard lives only in your current game session. It is **not** saved to t
 
 What gets copied depends on the filter type:
 
-- **Normal Filter**: every entry plus its per-entry rules — item, fluid, chemical, or `#tag`, batch and stock amounts, slot mapping, NBT (strict flag, raw SNBT, rules, and Match Any/All mode), durability, and enchanted state — along with the filter's Whitelist/Blacklist mode.
+- **Normal Filter**: every entry plus its per-entry rules — item, fluid, chemical, or `#tag`, batch and stock amounts, slot mapping, side, NBT (strict flag, raw SNBT, rules, and Match Any/All mode), durability, and enchanted state — along with the filter's Whitelist/Blacklist mode.
 - **Mod**: Whitelist/Blacklist mode, Type, and the selected mod id.
 - **Regex**: Whitelist/Blacklist mode, Type, the regex pattern, and the match scope.
 

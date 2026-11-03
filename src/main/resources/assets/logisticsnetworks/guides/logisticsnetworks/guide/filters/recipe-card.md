@@ -18,14 +18,17 @@ With AE2 or Refined Storage installed, hold an encoded pattern and click the pat
 
 Craft a written card on its own to wipe it, or together with blank cards to copy it onto them.
 
-## Target slots
+## Ingredient settings
 
-Press **S** next to an item ingredient to choose the receiver slots it goes into, like `0-2, 5`. Slots start at 0, and `!3` means every slot but 3. Leave it empty for any slot. Right-click **S** to switch modes:
+Press the **pencil** next to an ingredient to open the same advanced entry page normal filter entries use. The pencil turns green when a setting differs from the default. Press the back button or Esc to return to the card.
 
-- **Allowed** (green): the ingredient may go into any listed slot and fills them like normal.
-- **Split** (blue): the count is shared evenly over the listed slots, leftovers to the first ones. 3 iron on `0-2` puts 1 in each.
+- **Side**: which face of the receiving block the ingredient goes in through. This works for items, fluids and chemicals. **Same as node** uses the face the node sits on. Right-click to cycle back. A vanilla Furnace takes raw iron on **Up** and coal on **North**, all from one node.
+- **NBT** (items only): **Strict** (the default) only sends items with exactly this NBT, like damage, enchantments and custom names. Turn Strict off to send any item of this type, or press **Edit** to add NBT rules or raw SNBT, just like a filter entry. Tag ingredients never need exact NBT, but they can use rules.
+- **Slots** (items only): the receiver slots it goes into, like `0-2, 5`. Slots start at 0, and `!3` means every slot but 3. Leave it empty for any slot. Press Enter to save. The button next to it switches between:
+  - **Allowed**: the ingredient may go into any listed slot and fills them like normal.
+  - **Split**: the count is shared evenly over the listed slots, leftovers to the first ones. 3 iron on `0-2` puts 1 in each.
 
-The same item can sit in several rows with different slots. For a vanilla Crafter making an iron pickaxe, use 3 iron ingots on `0-2` with Split and 2 sticks on `4, 7` with Split. A receiver that lacks a listed slot, or can't take its full share, gets nothing. Fluids and chemicals have no slots.
+The same resource can sit in several rows with different settings. For a vanilla Crafter making an iron pickaxe, use 3 iron ingots on `0-2` with Split and 2 sticks on `4, 7` with Split. A receiver that lacks a listed slot or side, or can't take its full share, gets nothing.
 
 ## Using it in a filter
 
@@ -43,11 +46,11 @@ Set how many whole sets move per operation on the **Recipe sets** line of the Re
 - **Priority Robin**: one receiver per operation, rotating.
 - **Equal Distribution**: sets are split evenly; leftovers go to the first receivers.
 
-If a receiver can't fit a whole set, it gets nothing. Every ingredient has to go in through the one side the receiving node is on, so machines that take a second input on a different side can't be fed a multi-ingredient card from one node.
+If a receiver can't fit a whole set, it gets nothing. Each ingredient goes in through the side set on its pencil, or the node's side by default, so one node can feed a machine that takes its inputs on different faces.
 
 ## Blocking
 
-Turn on **Blocking** to send only to receivers that hold none of this channel's recipe ingredients, in any slot or tank. Machines that take several recipes then never get two recipes mixed.
+Turn on **Blocking** to send only to receivers that hold none of this channel's recipe ingredients, in any slot or tank on the sides the card uses. Machines that take several recipes then never get two recipes mixed.
 
 ## Mixing with normal filters
 
