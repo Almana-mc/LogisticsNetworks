@@ -21,7 +21,7 @@ import java.util.stream.IntStream;
 
 final class ItemLane implements RecipeLane {
 
-    private record Moved(int sourceSlot, ItemStack stack) {
+    private record Moved(int sourceSlot, ItemStack stack, TransferEngine.ItemTransferTarget to) {
     }
 
     private record Placement(@Nullable boolean[] mask, int share) {
@@ -58,7 +58,7 @@ final class ItemLane implements RecipeLane {
             if (stack.isEmpty() || stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) continue;
             int extractable = -1;
             for (int i = 0; i < found.length; i++) {
-                if (!ingredients.get(i).matches(stack)) continue;
+                if (!ingredients.get(i).matches(stack, provider)) continue;
                 if (extractable < 0) extractable = source.extractItem(slot, stack.getCount(), true).getCount();
                 found[i].add(slot);
                 stock[i] += extractable;
@@ -110,9 +110,10 @@ final class ItemLane implements RecipeLane {
 
     @Override
     public int fit(int target, int sets) {
-        TransferEngine.ItemTransferTarget to = endpoints.get(target).items();
         int fit = affordable(sets);
         for (int i = 0; i < matching.length && fit > 0; i++) {
+            TransferEngine.ItemTransferTarget to = target(target, i);
+            if (to == null) return 0;
             List<Placement> placements = placements(to.handler(), ingredients.get(i));
             if (placements.isEmpty()) return 0;
             for (Placement place : placements) {
@@ -124,8 +125,8 @@ final class ItemLane implements RecipeLane {
 
     @Override
     public boolean move(int target, int sets) {
-        TransferEngine.ItemTransferTarget to = endpoints.get(target).items();
         for (int i : order) {
+            TransferEngine.ItemTransferTarget to = target(target, i);
             for (Placement place : placements(to.handler(), ingredients.get(i))) {
                 int amount = sets * place.share();
                 if (move(to, i, amount, place.mask()) < amount) return false;
@@ -164,11 +165,16 @@ final class ItemLane implements RecipeLane {
         return out;
     }
 
+    @Nullable
+    private TransferEngine.ItemTransferTarget target(int endpoint, int ingredient) {
+        return endpoints.get(endpoint).items(ingredients.get(ingredient).side());
+    }
+
     @Override
     public void rollback(int target) {
-        TransferEngine.ItemTransferTarget to = endpoints.get(target).items();
-        IItemHandler handler = to.handler();
         for (Moved moved : pending) {
+            TransferEngine.ItemTransferTarget to = moved.to();
+            IItemHandler handler = to.handler();
             int left = moved.stack().getCount();
             for (int slot = 0; slot < handler.getSlots() && left > 0; slot++) {
                 if (!ItemStack.isSameItemSameComponents(handler.getStackInSlot(slot), moved.stack())) continue;
@@ -193,12 +199,13 @@ final class ItemLane implements RecipeLane {
         pending.clear();
     }
 
-    static boolean holds(IItemHandler handler, List<RecipeCardData.Ingredient> blockers) {
+    static boolean holds(IItemHandler handler, List<RecipeCardData.Ingredient> blockers,
+            HolderLookup.Provider provider) {
         for (int slot = 0; slot < handler.getSlots(); slot++) {
             ItemStack stack = handler.getStackInSlot(slot);
             if (stack.isEmpty()) continue;
             for (RecipeCardData.Ingredient blocker : blockers) {
-                if (blocker.matches(stack)) return true;
+                if (blocker.matches(stack, provider)) return true;
             }
         }
         return false;
@@ -251,7 +258,7 @@ final class ItemLane implements RecipeLane {
         ItemStack stuck = rest.isEmpty() ? rest : giveBack(slot, rest);
         // Last resort, like executeMove
         if (!stuck.isEmpty()) moved += stuck.getCount() - insert(target, stuck, false, null).getCount();
-        if (moved > 0) pending.add(new Moved(slot, pulled.copyWithCount(moved)));
+        if (moved > 0) pending.add(new Moved(slot, pulled.copyWithCount(moved), target));
         return moved;
     }
 
@@ -280,6 +287,6 @@ final class ItemLane implements RecipeLane {
     }
 
     private boolean usable(ItemStack stack, int ingredient) {
-        return !stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS) && ingredients.get(ingredient).matches(stack);
+        return !stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS) && ingredients.get(ingredient).matches(stack, provider);
     }
 }

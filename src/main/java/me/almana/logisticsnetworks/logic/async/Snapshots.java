@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -159,18 +160,24 @@ public final class Snapshots {
                 TransferEngine.ItemTransferTarget engineTarget = resolved.targets().get(t);
                 int targetEndpoint = endpoints.capture(ref.node(), ref.channel().getIoSide(),
                         engineTarget.handler(), occupiedSlots, engineTarget.bulkHandler() != null);
-                if (engineTarget.constraints().hasImportThreshold()
-                        || TransferAmountRules.hasStockFilter(engineTarget.importFilters(), readCache)) {
+                boolean counts = engineTarget.constraints().hasImportThreshold()
+                        || TransferAmountRules.hasStockFilter(engineTarget.importFilters(), readCache);
+                if (counts) {
                     endpoints.requireCounts(targetEndpoint, sourceEndpoint);
                 }
+                ItemStack[] importFilters = copyFilters(engineTarget.importFilters());
                 targetUnits.add(new NetworkSnapshot.TargetUnit(
                         ref.node().getUUID(),
                         ref.channelIndex(),
-                        copyFilters(engineTarget.importFilters()),
+                        importFilters,
                         engineTarget.importFilterMode(),
                         engineTarget.hasImportSlotMapping(),
                         engineTarget.bulkHandler() != null,
-                        targetEndpoint));
+                        targetEndpoint,
+                        ref.channel().getIoSide(),
+                        engineTarget.faces() == null ? null : captureFaces(ref, engineTarget, importFilters,
+                                channel.getFilterItems(), counts, sourceEndpoint, endpoints, occupiedSlots,
+                                readCache)));
             }
 
             units.add(new NetworkSnapshot.ChannelUnit(
@@ -185,6 +192,32 @@ public final class Snapshots {
                     targetUnits));
         }
         return itemWakeDelta;
+    }
+
+    private static NetworkSnapshot.TargetUnit[] captureFaces(TransferEngine.ImportTarget ref,
+            TransferEngine.ItemTransferTarget target, ItemStack[] importFilters, ItemStack[] exportFilters,
+            boolean counts, int sourceEndpoint, ItemEndpointTable endpoints, OccupiedSlotBudget occupiedSlots,
+            FilterItemData.ReadCache readCache) {
+        var faces = target.faces();
+        int mask = (faces.imports() ? FilterLogic.entrySideMask(target.importFilters(), readCache) : 0)
+                | (faces.exports() ? FilterLogic.entrySideMask(exportFilters, readCache) : 0);
+        NetworkSnapshot.TargetUnit[] units = new NetworkSnapshot.TargetUnit[IoSide.values().length];
+        for (IoSide side : IoSide.values()) {
+            if ((mask & 1 << side.ordinal()) == 0 || side == ref.channel().getIoSide())
+                continue;
+            TransferEngine.ItemTransferTarget face = faces.face(side, target);
+            if (face == null)
+                continue;
+            int endpoint = endpoints.capture(ref.node(), side, face.handler(), occupiedSlots,
+                    face.bulkHandler() != null);
+            if (counts) {
+                endpoints.requireCounts(endpoint, sourceEndpoint);
+            }
+            units[side.ordinal()] = new NetworkSnapshot.TargetUnit(ref.node().getUUID(), ref.channelIndex(),
+                    importFilters, target.importFilterMode(), target.hasImportSlotMapping(),
+                    face.bulkHandler() != null, endpoint, side, null);
+        }
+        return units;
     }
 
     static long earlierItemWakeDelta(long currentMinimum, long cooldown) {

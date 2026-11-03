@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.logic.async;
 
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.Item;
@@ -42,7 +43,9 @@ public record NetworkSnapshot(
             FilterMode importFilterMode,
             boolean hasImportSlotMapping,
             boolean bulk,
-            int endpoint) {
+            int endpoint,
+            IoSide side,
+            @Nullable TargetUnit[] faces) {
     }
 
     public record ItemEndpoint(

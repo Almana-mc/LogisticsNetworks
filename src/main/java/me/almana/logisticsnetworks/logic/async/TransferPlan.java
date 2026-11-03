@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic.async;
 
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.integration.storage.ItemResource;
 import net.minecraft.world.item.Item;
 import org.jetbrains.annotations.Nullable;
@@ -23,7 +24,7 @@ public record TransferPlan(
             List<ItemMove> moves) {
     }
 
-    public record TargetRef(UUID nodeId, int channelIndex, boolean bulk, int binding) {
+    public record TargetRef(UUID nodeId, int channelIndex, boolean bulk, int binding, boolean faced) {
     }
 
     public record ItemMove(
@@ -31,13 +32,14 @@ public record TransferPlan(
             int targetIndex,
             ItemResource resource,
             int amount,
-            @Nullable boolean[] targetSlotMask) {
+            @Nullable boolean[] targetSlotMask,
+            @Nullable IoSide face) {
         public Item expectedItem() {
             return resource.item();
         }
 
         public ItemMove withAmount(int count, @Nullable boolean[] mask) {
-            return new ItemMove(sourceSlot, targetIndex, resource, count, mask);
+            return new ItemMove(sourceSlot, targetIndex, resource, count, mask, face);
         }
     }
 }

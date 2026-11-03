@@ -5,12 +5,14 @@ import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FlowResource;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
+import me.almana.logisticsnetworks.logic.EntryFaces;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.PlannedItemValidation;
 import me.almana.logisticsnetworks.logic.PriorityRobin;
@@ -172,6 +174,9 @@ public final class TransferCommitter {
                 continue;
             }
             ResolvedTarget target = targets[move.targetIndex()];
+            if (target != null && move.face() != null) {
+                target = target.faces() == null ? null : target.faces().face(move.face(), target);
+            }
             if (target == null || sharesItemHandler(
                     source, sourceBulk, target.handler(), target.bulkHandler())) {
                 continue;
@@ -275,9 +280,22 @@ public final class TransferCommitter {
                     continue;
                 }
             }
-            targets[i] = new ResolvedTarget(handler, bulkHandler, channel);
+            targets[i] = new ResolvedTarget(handler, bulkHandler, channel, ref.faced()
+                    ? new EntryFaces<>(channel.getIoSide(), false, false,
+                            side -> face(node, channel, side, directTarget, capCache))
+                    : null);
         }
         return targets;
+    }
+
+    @Nullable
+    private static ResolvedTarget face(LogisticsNodeEntity node, ChannelData channel, IoSide side,
+            boolean directTarget, TransferCapabilityCache capCache) {
+        IItemHandler handler = capCache.findItemImportHandler(node, side, directTarget);
+        if (handler == null)
+            return null;
+        return new ResolvedTarget(handler, directTarget ? capCache.findBulkItemHandler(node, handler) : null,
+                channel, null);
     }
 
     static boolean sharesItemHandler(IItemHandler source, @Nullable IItemHandler sourceBulk,
@@ -309,6 +327,7 @@ public final class TransferCommitter {
         return TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal);
     }
 
-    private record ResolvedTarget(IItemHandler handler, @Nullable IItemHandler bulkHandler, ChannelData channel) {
+    private record ResolvedTarget(IItemHandler handler, @Nullable IItemHandler bulkHandler, ChannelData channel,
+            @Nullable EntryFaces<ResolvedTarget> faces) {
     }
 }

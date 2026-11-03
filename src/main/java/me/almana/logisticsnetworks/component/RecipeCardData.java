@@ -3,9 +3,12 @@ package me.almana.logisticsnetworks.component;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.IoSide;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.SlotExpressionUtil;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -123,7 +126,10 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
     }
 
     public record Ingredient(Optional<StackSnapshot> item, Optional<TagKey<Item>> tag, Optional<String> fluid,
-            Optional<String> chemical, int count, List<Integer> slots, boolean split) {
+            Optional<String> chemical, int count, List<Integer> slots, boolean split, Optional<IoSide> side,
+            GeneralFilterEntry.NbtConstraints nbt) {
+
+        private static final Codec<IoSide> SIDE_CODEC = Codec.STRING.xmap(IoSide::byKey, IoSide::key);
 
         public static final Codec<Ingredient> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 StackSnapshot.CODEC.optionalFieldOf("item").forGetter(Ingredient::item),
@@ -134,7 +140,10 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
                 Codec.intRange(SlotExpressionUtil.MIN_SLOT, SlotExpressionUtil.MAX_SLOT)
                         .listOf(0, SlotExpressionUtil.MAX_SLOT + 1)
                         .optionalFieldOf("slots", List.of()).forGetter(Ingredient::slots),
-                Codec.BOOL.optionalFieldOf("split", false).forGetter(Ingredient::split)
+                Codec.BOOL.optionalFieldOf("split", false).forGetter(Ingredient::split),
+                SIDE_CODEC.optionalFieldOf("side").forGetter(Ingredient::side),
+                GeneralFilterEntry.NbtConstraints.CODEC.optionalFieldOf("nbt", GeneralFilterEntry.NbtConstraints.EMPTY)
+                        .forGetter(Ingredient::nbt)
         ).apply(instance, Ingredient::new));
 
         public Ingredient {
@@ -143,7 +152,8 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
 
         public Ingredient(Optional<StackSnapshot> item, Optional<TagKey<Item>> tag, Optional<String> fluid,
                 Optional<String> chemical, int count) {
-            this(item, tag, fluid, chemical, count, List.of(), false);
+            this(item, tag, fluid, chemical, count, List.of(), false, Optional.empty(),
+                    GeneralFilterEntry.NbtConstraints.EMPTY);
         }
 
         public static Ingredient ofItem(ItemStack stack, int count) {
@@ -176,10 +186,17 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             return chemical.isPresent() ? Kind.CHEMICAL : Kind.ITEM;
         }
 
-        public boolean matches(ItemStack stack) {
+        // Strict unless rules given
+        public boolean strict() {
+            return tag.isEmpty() && nbt.strict().orElse(nbt.rules().isEmpty() && nbt.raw().isEmpty());
+        }
+
+        public boolean matches(ItemStack stack, HolderLookup.Provider provider) {
             if (stack.isEmpty()) return false;
-            if (tag.isPresent()) return stack.is(tag.get());
-            return item.isPresent() && stack.is(item.get().item());
+            if (tag.isPresent()) return stack.is(tag.get()) && FilterItemData.matchesNbt(nbt, stack, provider);
+            if (item.isEmpty() || !stack.is(item.get().item())) return false;
+            return strict() ? stack.getComponentsPatch().equals(item.get().components())
+                    : FilterItemData.matchesNbt(nbt, stack, provider);
         }
 
         public boolean matches(FluidStack stack) {
@@ -227,26 +244,67 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             int at = tag.map(tags::indexOf).orElse(-1);
             Optional<StackSnapshot> anchor = Optional.of(StackSnapshot.of(base.copyWithCount(1)));
             return new Ingredient(anchor, at + 1 < tags.size() ? Optional.of(tags.get(at + 1)) : Optional.empty(),
-                    Optional.empty(), Optional.empty(), count, slots, split);
+                    Optional.empty(), Optional.empty(), count, slots, split, side, nbt);
         }
 
         public Ingredient withCount(int value) {
             int max = kind() == Kind.ITEM ? MAX_COUNT : MAX_AMOUNT;
-            return new Ingredient(item, tag, fluid, chemical, Math.max(1, Math.min(max, value)), slots, split);
+            return new Ingredient(item, tag, fluid, chemical, Math.max(1, Math.min(max, value)), slots, split, side,
+                    nbt);
         }
 
         public Ingredient withSlots(List<Integer> value) {
-            return new Ingredient(item, tag, fluid, chemical, count, value, split);
+            return new Ingredient(item, tag, fluid, chemical, count, value, split, side, nbt);
         }
 
         public Ingredient withSplit(boolean value) {
-            return new Ingredient(item, tag, fluid, chemical, count, slots, value);
+            return new Ingredient(item, tag, fluid, chemical, count, slots, value, side, nbt);
+        }
+
+        public Ingredient withSide(Optional<IoSide> value) {
+            return new Ingredient(item, tag, fluid, chemical, count, slots, split, value, nbt);
+        }
+
+        public Ingredient withNbt(GeneralFilterEntry.NbtConstraints value) {
+            return new Ingredient(item, tag, fluid, chemical, count, slots, split, side, value);
+        }
+
+        public boolean customized() {
+            return !slots.isEmpty() || side.isPresent() || !defaultNbt();
+        }
+
+        private boolean defaultNbt() {
+            return tag.isPresent() ? nbt.rules().isEmpty() && nbt.raw().isEmpty() : strict();
         }
 
         public MutableComponent slotsLabel() {
             if (slots.isEmpty()) return Component.translatable("tooltip.logisticsnetworks.recipe_card.slots_any");
             return Component.translatable(split ? "tooltip.logisticsnetworks.recipe_card.slots_split"
                     : "tooltip.logisticsnetworks.recipe_card.slots", SlotExpressionUtil.formatSlots(slots));
+        }
+
+        public MutableComponent sideLabel() {
+            return Component.translatable("tooltip.logisticsnetworks.recipe_card.side", side
+                    .map(value -> Component.translatable("gui.logisticsnetworks.direction." + value.key()))
+                    .orElse(Component.translatable("tooltip.logisticsnetworks.recipe_card.side_node")));
+        }
+
+        public MutableComponent nbtLabel() {
+            if (strict()) return Component.translatable("tooltip.logisticsnetworks.recipe_card.nbt_strict");
+            if (!nbt.rules().isEmpty()) {
+                return Component.translatable("tooltip.logisticsnetworks.recipe_card.nbt_rules", nbt.rules().size());
+            }
+            return Component.translatable(nbt.raw().isEmpty() ? "tooltip.logisticsnetworks.recipe_card.nbt_ignored"
+                    : "tooltip.logisticsnetworks.recipe_card.nbt_raw");
+        }
+
+        // Non-default settings only
+        public List<MutableComponent> settingLabels() {
+            List<MutableComponent> labels = new ArrayList<>(3);
+            if (side.isPresent()) labels.add(sideLabel());
+            if (!slots.isEmpty()) labels.add(slotsLabel());
+            if (!defaultNbt()) labels.add(nbtLabel());
+            return labels;
         }
 
         boolean valid() {
@@ -259,21 +317,39 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             return item.get().item().value() != Items.AIR;
         }
 
+        // Components kept so toggling is lossless
         Ingredient stripped() {
             Optional<StackSnapshot> clean = item.map(snapshot ->
-                    new StackSnapshot(snapshot.item(), 1, DataComponentPatch.EMPTY));
+                    new StackSnapshot(snapshot.item(), 1, snapshot.components()));
             Optional<String> cleanFluid = fluid.map(id -> ResourceLocation.parse(id).toString());
             Optional<String> cleanChemical = chemical.map(id -> ResourceLocation.parse(id).toString());
-            List<Integer> cleanSlots = kind() == Kind.ITEM ? slots.stream().distinct().sorted().toList() : List.of();
+            boolean items = kind() == Kind.ITEM;
+            List<Integer> cleanSlots = items ? slots.stream().distinct().sorted().toList() : List.of();
             return new Ingredient(clean, tag, cleanFluid, cleanChemical, count, cleanSlots,
-                    split && !cleanSlots.isEmpty()).withCount(count);
+                    split && !cleanSlots.isEmpty(), side, items ? bounded(nbt) : GeneralFilterEntry.NbtConstraints.EMPTY)
+                    .withCount(count);
+        }
+
+        // Filter NBT limits, strict as default
+        private static GeneralFilterEntry.NbtConstraints bounded(GeneralFilterEntry.NbtConstraints nbt) {
+            List<NbtCriterion> rules = nbt.rules().stream()
+                    .filter(rule -> !rule.path().isEmpty()
+                            && rule.path().toString().length() <= FilterItemData.MAX_NBT_PATH_LENGTH
+                            && rule.value().sizeInBytes() <= FilterItemData.MAX_NBT_VALUE_BYTES)
+                    .limit(FilterItemData.MAX_NBT_RULES_PER_SLOT)
+                    .toList();
+            String raw = nbt.raw().length() <= FilterItemData.MAX_NBT_RAW_LENGTH ? nbt.raw() : "";
+            return new GeneralFilterEntry.NbtConstraints(rules, nbt.matchAny() && !rules.isEmpty(),
+                    nbt.strict().filter(strict -> !strict || !rules.isEmpty() || !raw.isEmpty()), raw);
         }
 
         boolean sameKey(Ingredient other) {
-            if (kind() != other.kind() || !slots.equals(other.slots) || split != other.split) return false;
+            if (kind() != other.kind() || !slots.equals(other.slots) || split != other.split
+                    || !side.equals(other.side) || !nbt.equals(other.nbt)) return false;
             if (tag.isPresent() || other.tag.isPresent()) return tag.equals(other.tag);
             if (kind() != Kind.ITEM) return fluid.equals(other.fluid) && chemical.equals(other.chemical);
-            return item.map(StackSnapshot::item).equals(other.item.map(StackSnapshot::item));
+            if (!item.map(StackSnapshot::item).equals(other.item.map(StackSnapshot::item))) return false;
+            return !strict() || item.map(StackSnapshot::components).equals(other.item.map(StackSnapshot::components));
         }
     }
 }

@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.component.GeneralFilterEntry;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.filter.SlotExpressionUtil;
 import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -24,6 +25,7 @@ import java.util.regex.Pattern;
 final class LnetRecipeText {
 
     private static final Pattern COUNT = Pattern.compile("(\\d+)(mb)? (.+)");
+    private static final Pattern SIDE = Pattern.compile("(.+) side ([a-z]+)");
 
     private LnetRecipeText() {
     }
@@ -79,6 +81,34 @@ final class LnetRecipeText {
         }
         boolean mb = matcher.group(2) != null;
         String rest = matcher.group(3).trim();
+        String raw = "";
+        int matches = LnetEntryText.find(rest, " matches ", 0);
+        if (matches >= 0) {
+            raw = LnetEntryText.rawNbt(rest.substring(matches));
+            rest = rest.substring(0, matches).trim();
+        }
+        Optional<Boolean> strict = Optional.empty();
+        if (rest.endsWith(" not strict")) {
+            strict = Optional.of(false);
+            rest = rest.substring(0, rest.length() - " not strict".length()).trim();
+        } else if (rest.endsWith(" strict")) {
+            strict = Optional.of(true);
+            rest = rest.substring(0, rest.length() - " strict".length()).trim();
+        }
+        GeneralFilterEntry.NbtConstraints where = GeneralFilterEntry.NbtConstraints.EMPTY;
+        int whereAt = LnetEntryText.find(rest, " where ", 0);
+        if (whereAt >= 0) {
+            where = LnetEntryText.readWhere(rest.substring(whereAt + " where ".length()).trim());
+            rest = rest.substring(0, whereAt).trim();
+        }
+        GeneralFilterEntry.NbtConstraints nbt = new GeneralFilterEntry.NbtConstraints(where.rules(),
+                where.matchAny(), strict, raw);
+        Optional<IoSide> side = Optional.empty();
+        Matcher sided = SIDE.matcher(rest);
+        if (sided.matches()) {
+            side = Optional.of(readSide(sided.group(2)));
+            rest = sided.group(1).trim();
+        }
         boolean split = rest.endsWith(" split");
         if (split) {
             rest = rest.substring(0, rest.length() - " split".length()).trim();
@@ -92,19 +122,20 @@ final class LnetRecipeText {
         if (split && slots.isEmpty()) {
             throw new IOException("'split' needs slots in '" + text + "'");
         }
-        if (!slots.isEmpty() && (mb || rest.startsWith("chemical ") || rest.startsWith("fluid "))) {
-            throw new IOException("slots only work on items: '" + text + "'");
+        boolean itemOnly = !slots.isEmpty() || !nbt.equals(GeneralFilterEntry.NbtConstraints.EMPTY);
+        if (itemOnly && (mb || rest.startsWith("chemical ") || rest.startsWith("fluid "))) {
+            throw new IOException("slots and nbt only work on items: '" + text + "'");
         }
         if (rest.startsWith("chemical ")) {
             String id = LnetEntryText.readChemical(rest.substring("chemical ".length()).trim());
             return new RecipeCardData.Ingredient(Optional.empty(), Optional.empty(), Optional.empty(),
-                    Optional.of(id), count);
+                    Optional.of(id), count).withSide(side);
         }
         if (rest.startsWith("fluid ") || mb) {
             String fluid = rest.startsWith("fluid ") ? rest.substring("fluid ".length()).trim() : rest;
             String id = LnetEntryText.readFluid(fluid);
             return new RecipeCardData.Ingredient(Optional.empty(), Optional.empty(), Optional.of(id),
-                    Optional.empty(), count);
+                    Optional.empty(), count).withSide(side);
         }
         if (count > RecipeCardData.MAX_COUNT) {
             throw new IOException("count out of range in '" + text + "'");
@@ -114,7 +145,16 @@ final class LnetRecipeText {
                         Optional.of(TagKey.create(Registries.ITEM, LnetEntryText.id(rest.substring(1), "tag"))),
                         Optional.empty(), Optional.empty(), count)
                 : RecipeCardData.Ingredient.ofItem(LnetEntryText.readItem(rest, registries), count);
-        return ingredient.withSlots(slots).withSplit(split);
+        return ingredient.withSlots(slots).withSplit(split).withSide(side).withNbt(nbt);
+    }
+
+    static IoSide readSide(String key) throws IOException {
+        for (IoSide side : IoSide.values()) {
+            if (side.key().equals(key)) {
+                return side;
+            }
+        }
+        throw new IOException("bad side '" + key + "'");
     }
 
     private static List<Integer> readSlots(String expression) throws IOException {
@@ -162,6 +202,10 @@ final class LnetRecipeText {
         if (ingredient.split()) {
             out.append(" split");
         }
+        ingredient.side().ifPresent(side -> out.append(" side ").append(side.key()));
+        List<String> nbt = new ArrayList<>();
+        LnetEntryText.writeNbt(ingredient.nbt(), nbt);
+        nbt.forEach(part -> out.append(' ').append(part));
         return out.toString();
     }
 

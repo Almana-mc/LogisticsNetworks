@@ -7,6 +7,7 @@ import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
@@ -289,7 +290,7 @@ final class LnetEntryText {
         }
         return new GeneralFilterEntry(slot, item, fluid, chemical, tag,
                 new GeneralFilterEntry.EntryCounts(0, batch, 0), GeneralFilterEntry.SlotMapping.EMPTY, null,
-                GeneralFilterEntry.NbtConstraints.EMPTY, null, tagKind);
+                GeneralFilterEntry.NbtConstraints.EMPTY, null, tagKind, null);
     }
 
     @Nullable
@@ -311,6 +312,7 @@ final class LnetEntryText {
         GeneralFilterEntry.SlotMapping slots = GeneralFilterEntry.SlotMapping.EMPTY;
         GeneralFilterEntry.NbtConstraints where = GeneralFilterEntry.NbtConstraints.EMPTY;
         Optional<Boolean> strict = Optional.empty();
+        IoSide side = null;
         String raw = "";
         int matchesStart = matchesStart(text);
         if (matchesStart >= 0) {
@@ -332,6 +334,8 @@ final class LnetEntryText {
                 slots = readSlots(part.substring("slots ".length()).trim());
             } else if (part.startsWith("where ")) {
                 where = readWhere(part.substring("where ".length()));
+            } else if (part.startsWith("side ")) {
+                side = LnetRecipeText.readSide(part.substring("side ".length()).trim());
             } else if (part.equals("strict")) {
                 strict = Optional.of(true);
             } else if (part.equals("not strict")) {
@@ -342,10 +346,11 @@ final class LnetEntryText {
         }
         return entry.withCounts(new GeneralFilterEntry.EntryCounts(0, entry.counts().batch(), stock))
                 .withSlotMapping(slots)
+                .withSide(side)
                 .withNbt(new GeneralFilterEntry.NbtConstraints(where.rules(), where.matchAny(), strict, raw));
     }
 
-    private static String rawNbt(String clause) throws IOException {
+    static String rawNbt(String clause) throws IOException {
         String raw = clause.trim().substring("matches ".length()).trim();
         if (raw.length() > FilterItemData.MAX_NBT_RAW_LENGTH) {
             throw new IOException("'matches' text longer than " + FilterItemData.MAX_NBT_RAW_LENGTH);
@@ -384,7 +389,7 @@ final class LnetEntryText {
         return new GeneralFilterEntry.SlotMapping(bits.stream().boxed().toList(), expression);
     }
 
-    private static GeneralFilterEntry.NbtConstraints readWhere(String body) throws IOException {
+    static GeneralFilterEntry.NbtConstraints readWhere(String body) throws IOException {
         List<String> ands = split(body, " and ");
         List<String> ors = split(body, " or ");
         if (ands.size() > 1 && ors.size() > 1) {
@@ -499,7 +504,14 @@ final class LnetEntryText {
                     : slots.expression();
             out.add("slots " + expression.trim().replaceAll("[,;\\s]+", " "));
         }
-        GeneralFilterEntry.NbtConstraints nbt = entry.nbt();
+        if (entry.side() != null) {
+            out.add("side " + entry.side().key());
+        }
+        writeNbt(entry.nbt(), out);
+        return out;
+    }
+
+    static void writeNbt(GeneralFilterEntry.NbtConstraints nbt, List<String> out) {
         if (!nbt.rules().isEmpty()) {
             List<String> rules = nbt.rules().stream()
                     .map(rule -> rule.path() + " " + rule.operator() + " " + rule.value())
@@ -510,7 +522,6 @@ final class LnetEntryText {
         if (!nbt.raw().isBlank()) {
             out.add("matches " + nbt.raw().trim());
         }
-        return out;
     }
 
     static ChannelType kindOf(GeneralFilterEntry entry, FilterTargetType target) {

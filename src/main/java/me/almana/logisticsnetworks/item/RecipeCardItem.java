@@ -71,7 +71,7 @@ public class RecipeCardItem extends Item {
                 .withStyle(ChatFormatting.GOLD)));
         for (RecipeCardData.Ingredient ingredient : data.ingredients()) {
             MutableComponent line = Component.literal(ingredient.amountText() + " ").append(ingredient.label());
-            if (!ingredient.slots().isEmpty()) line.append(" · ").append(ingredient.slotsLabel());
+            ingredient.settingLabels().forEach(label -> line.append(" · ").append(label));
             lines.add(line.withStyle(ChatFormatting.GRAY));
         }
         lines.add(Component.translatable(data.blocking()

@@ -19,25 +19,44 @@ import java.util.List;
 
 public final class ChemicalLane implements RecipeLane {
 
+    private record Moved(ChemicalStack stack, IChemicalHandler to) {
+    }
+
     private final IChemicalHandler source;
+    private final List<RecipeCardData.Ingredient> ingredients;
     private final List<ChemicalStack> wanted;
+    private final List<ChemicalStack> totals = new ArrayList<>();
     private final List<RecipeEndpoint> endpoints;
     private final FilterItemData.ReadCache cache;
-    private final List<ChemicalStack> pending = new ArrayList<>();
+    private final List<Moved> pending = new ArrayList<>();
 
     public ChemicalLane(IChemicalHandler source, List<RecipeCardData.Ingredient> ingredients,
             List<RecipeEndpoint> endpoints, FilterItemData.ReadCache cache) {
         this.source = source;
+        this.ingredients = ingredients;
         this.wanted = ingredients.stream()
                 .map(ingredient -> stack(ingredient.chemical().get(), ingredient.count())).toList();
         this.endpoints = endpoints;
         this.cache = cache;
+        // Same chemical on several sides
+        for (ChemicalStack want : wanted) {
+            int at = indexOf(want);
+            if (at < 0) totals.add(want);
+            else totals.set(at, want.copyWithAmount(totals.get(at).getAmount() + want.getAmount()));
+        }
+    }
+
+    private int indexOf(ChemicalStack want) {
+        for (int i = 0; i < totals.size(); i++) {
+            if (ChemicalStack.isSameChemical(totals.get(i), want)) return i;
+        }
+        return -1;
     }
 
     @Override
     public int available(int cap) {
         long sets = cap;
-        for (ChemicalStack want : wanted) {
+        for (ChemicalStack want : totals) {
             if (want.isEmpty() || want.is(ChemicalTransferHelper.RESOURCE_BLACKLIST_CHEMICALS))
                 return 0;
             sets = Math.min(sets, source.extractChemical(scaled(want, sets), Action.SIMULATE).getAmount()
@@ -48,10 +67,11 @@ public final class ChemicalLane implements RecipeLane {
 
     @Override
     public int fit(int target, int sets) {
-        RecipeEndpoint.Chemicals to = endpoints.get(target).chemicals();
         long fit = available(sets);
-        for (ChemicalStack want : wanted) {
-            if (fit == 0 || !FilterLogic.matchesChemical(to.filters(), to.mode(),
+        for (int i = 0; i < wanted.size(); i++) {
+            RecipeEndpoint.Chemicals to = target(target, i);
+            ChemicalStack want = wanted.get(i);
+            if (fit == 0 || to == null || !FilterLogic.matchesChemical(to.filters(), to.mode(),
                     ChemicalTransferHelper.getChemicalId(want), cache))
                 return 0;
             ChemicalStack request = scaled(want, fit);
@@ -63,9 +83,9 @@ public final class ChemicalLane implements RecipeLane {
 
     @Override
     public boolean move(int target, int sets) {
-        IChemicalHandler to = endpoints.get(target).chemicals().handler();
-        for (ChemicalStack want : wanted) {
-            ChemicalStack request = scaled(want, sets);
+        for (int i = 0; i < wanted.size(); i++) {
+            IChemicalHandler to = target(target, i).handler();
+            ChemicalStack request = scaled(wanted.get(i), sets);
             if (!to.insertChemical(request, Action.SIMULATE).isEmpty())
                 return false;
             ChemicalStack pulled = source.extractChemical(request, Action.EXECUTE);
@@ -74,18 +94,23 @@ public final class ChemicalLane implements RecipeLane {
                 source.insertChemical(rest, Action.EXECUTE);
             long moved = pulled.getAmount() - rest.getAmount();
             if (moved > 0)
-                pending.add(pulled.copyWithAmount(moved));
+                pending.add(new Moved(pulled.copyWithAmount(moved), to));
             if (moved < request.getAmount())
                 return false;
         }
         return true;
     }
 
+    @Nullable
+    private RecipeEndpoint.Chemicals target(int endpoint, int ingredient) {
+        return endpoints.get(endpoint).chemicals(ingredients.get(ingredient).side());
+    }
+
     @Override
     public void rollback(int target) {
-        IChemicalHandler to = endpoints.get(target).chemicals().handler();
-        for (ChemicalStack moved : pending) {
-            ChemicalStack back = to.extractChemical(moved, Action.EXECUTE);
+        for (Moved moved : pending) {
+            IChemicalHandler to = moved.to();
+            ChemicalStack back = to.extractChemical(moved.stack(), Action.EXECUTE);
             ChemicalStack stuck = back.isEmpty() ? back : source.insertChemical(back, Action.EXECUTE);
             // Source full, keep in receiver
             if (!stuck.isEmpty())
@@ -97,9 +122,9 @@ public final class ChemicalLane implements RecipeLane {
     @Override
     public void commit(int target, @Nullable RecipeSets.Listener listener) {
         if (listener != null) {
-            for (ChemicalStack moved : pending) {
-                listener.moved(target, new FlowResource.Chemical(ChemicalTransferHelper.getChemicalId(moved)),
-                        moved.getAmount());
+            for (Moved moved : pending) {
+                listener.moved(target, new FlowResource.Chemical(ChemicalTransferHelper.getChemicalId(moved.stack())),
+                        moved.stack().getAmount());
             }
         }
         pending.clear();

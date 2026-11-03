@@ -10,7 +10,9 @@ import mekanism.common.capabilities.Capabilities;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.logic.EntryFaces;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -254,14 +256,14 @@ public final class ChemicalTransferHelper {
             LOGGER.debug("[Chemical] Transferring {} -> {}, limit={}, srcTanks={}, tgtTanks={}",
                     sourcePos, targetPos, limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
-                importFilters, importFilterMode, filterReadCache, null, null);
+                importFilters, importFilterMode, filterReadCache, null, null, null);
     }
 
     public static long transferBetween(IChemicalHandler source, IChemicalHandler target, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
             @Nullable FilterItemData.ReadCache filterReadCache, @Nullable ObjLongConsumer<String> onMoved,
-            @Nullable String requiredId) {
+            @Nullable String requiredId, @Nullable EntryFaces<IChemicalHandler> faces) {
         if (source == null || target == null) {
             return 0;
         }
@@ -269,7 +271,7 @@ public final class ChemicalTransferHelper {
             LOGGER.debug("[Chemical] Transferring limit={}, srcTanks={}, tgtTanks={}",
                     limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
-                importFilters, importFilterMode, filterReadCache, onMoved, requiredId);
+                importFilters, importFilterMode, filterReadCache, onMoved, requiredId, faces);
     }
 
     public static Map<String, Long> exportableAmounts(IChemicalHandler source, ItemStack[] exportFilters,
@@ -296,8 +298,9 @@ public final class ChemicalTransferHelper {
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
             @Nullable FilterItemData.ReadCache filterReadCache, @Nullable ObjLongConsumer<String> onMoved,
-            @Nullable String requiredId) {
+            @Nullable String requiredId, @Nullable EntryFaces<IChemicalHandler> faces) {
         long remaining = limitAmount;
+        IChemicalHandler channelTarget = target;
 
         for (int tank = 0; tank < source.getChemicalTanks(); tank++) {
             if (remaining <= 0)
@@ -317,6 +320,15 @@ public final class ChemicalTransferHelper {
                     continue;
                 if (!FilterLogic.matchesChemical(importFilters, importFilterMode, chemId, filterReadCache))
                     continue;
+                if (faces != null) {
+                    IoSide side = faces.imports() ? FilterLogic.chemicalSide(importFilters, chemId, filterReadCache)
+                            : null;
+                    if (side == null && faces.exports())
+                        side = FilterLogic.chemicalSide(exportFilters, chemId, filterReadCache);
+                    target = faces.face(side, channelTarget);
+                    if (target == null)
+                        continue;
+                }
             }
 
             long allowedByAmount = remaining;
