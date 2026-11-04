@@ -17,7 +17,6 @@ import java.util.UUID;
 public final class NetworkImports {
     private final List<NodeRef>[][] refs;
     private final Map<UUID, LogisticsNodeEntity> nodes;
-    private final NodeSignals signals;
     private final List<ServerRackLinks.Link> links;
     private final NetworkRegistry registry;
     private final MinecraftServer server;
@@ -26,12 +25,11 @@ public final class NetworkImports {
     private final List<ImportTarget>[][] resolved =
             new List[ChannelType.values().length][LogisticsNodeEntity.CHANNEL_COUNT];
 
-    NetworkImports(LogisticsNetwork network, Map<UUID, LogisticsNodeEntity> nodes, NodeSignals signals,
+    NetworkImports(LogisticsNetwork network, Map<UUID, LogisticsNodeEntity> nodes,
             List<ServerRackLinks.Link> links, NetworkRegistry registry, MinecraftServer server,
             Map<UUID, Boolean> dimensionalCache) {
         this.refs = refs(network);
         this.nodes = nodes;
-        this.signals = signals;
         this.links = links;
         this.registry = registry;
         this.server = server;
@@ -43,10 +41,9 @@ public final class NetworkImports {
         if (row[channel] == null) {
             List<NodeRef> local = refs[type.ordinal()][channel];
             List<ImportTarget> targets = local.isEmpty() ? List.of()
-                    : TransferEngine.resolveImports(local, channel, nodes, signals);
+                    : TransferEngine.resolveImports(local, channel, nodes);
             row[channel] = links.isEmpty() ? targets
-                    : BridgedImports.extend(targets, type, channel, links, registry, server, signals,
-                            dimensionalCache);
+                    : BridgedImports.extend(targets, type, channel, links, registry, server, dimensionalCache);
         }
         return row[channel];
     }

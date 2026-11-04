@@ -113,7 +113,7 @@ public final class Snapshots {
             if (!TransferEngine.canRunChannel(node, channel) || !CreateCompat.isResolved(node)) {
                 continue;
             }
-            if (!context.signals().active(node, channel.getRedstoneMode())) {
+            if (!TransferEngine.isRedstoneActive(node, channel.getRedstoneMode())) {
                 continue;
             }
             List<TransferEngine.ImportTarget> targets = context.imports().get(ChannelType.ITEM, i);

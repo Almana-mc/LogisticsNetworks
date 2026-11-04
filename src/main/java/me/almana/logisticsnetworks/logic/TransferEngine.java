@@ -84,7 +84,6 @@ public class TransferEngine {
 
     public record NetworkContext(
             List<LogisticsNodeEntity> sortedNodes,
-            NodeSignals signals,
             NetworkImports imports,
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache) {
@@ -120,7 +119,7 @@ public class TransferEngine {
         try (var operation = capCache.storageOperation()) {
             long minWakeDelta = Long.MAX_VALUE;
             for (LogisticsNodeEntity sourceNode : context.sortedNodes()) {
-                long delta = processNode(sourceNode, context.imports(), context.signals(),
+                long delta = processNode(sourceNode, context.imports(),
                         context.dimensionalCache(), context.tierCache(),
                         telemetryActive, capCache, includeItemTransfers);
                 if (delta < minWakeDelta) {
@@ -160,15 +159,13 @@ public class TransferEngine {
             return null;
         }
 
-        NodeSignals signals = new NodeSignals();
         Map<UUID, Boolean> dimensionalCache = network.getDimensionalCache();
         List<ServerRackLinks.Link> links = registry.getRackLinks().linksFor(network.getId());
         if (!links.isEmpty()) {
             dimensionalCache = new HashMap<>(dimensionalCache);
         }
-        NetworkImports imports = new NetworkImports(network, nodeCache, signals, links, registry, server,
-                dimensionalCache);
-        return new NetworkContext(sortedNodes, signals, imports, dimensionalCache, network.getTierCache());
+        NetworkImports imports = new NetworkImports(network, nodeCache, links, registry, server, dimensionalCache);
+        return new NetworkContext(sortedNodes, imports, dimensionalCache, network.getTierCache());
     }
 
     private static boolean hasExporter(List<LogisticsNodeEntity> nodes) {
@@ -184,7 +181,7 @@ public class TransferEngine {
     }
 
     static List<ImportTarget> resolveImports(List<NodeRef> refs, int channel,
-            Map<UUID, LogisticsNodeEntity> nodeCache, NodeSignals signals) {
+            Map<UUID, LogisticsNodeEntity> nodeCache) {
         List<ImportTarget> targets = new ArrayList<>(refs.size());
         for (NodeRef ref : refs) {
             LogisticsNodeEntity node = nodeCache.get(ref.nodeId());
@@ -195,14 +192,14 @@ public class TransferEngine {
                 continue;
             if (!canRunChannel(node, cd) || !CreateCompat.isResolved(node))
                 continue;
-            if (!signals.active(node, cd.getRedstoneMode()))
+            if (!isRedstoneActive(node, cd.getRedstoneMode()))
                 continue;
             targets.add(new ImportTarget(node, cd, channel));
         }
         return targets;
     }
 
-    private static long processNode(LogisticsNodeEntity sourceNode, NetworkImports imports, NodeSignals signals,
+    private static long processNode(LogisticsNodeEntity sourceNode, NetworkImports imports,
             Map<UUID, Boolean> dimensionalCache, Map<UUID, Integer> tierCache, boolean telemetryActive,
             TransferCapabilityCache capCache, boolean includeItemTransfers) {
 
@@ -226,7 +223,7 @@ public class TransferEngine {
             int types = NodeUpgradeData.effectiveTypes(sourceNode, channel);
             boolean cards = RecipeCardItem.anyIn(channel.getFilterItems());
             if (cards) {
-                long delta = recipeLane(sourceNode, sourceLevel, channel, i, imports, signals, sourceTier, gameTime,
+                long delta = recipeLane(sourceNode, sourceLevel, channel, i, imports, sourceTier, gameTime,
                         dimensionalCache, capCache, telemetryActive);
                 if (delta < minWakeDelta) minWakeDelta = delta;
             }
@@ -241,7 +238,7 @@ public class TransferEngine {
                     if (cooldown < minWakeDelta) minWakeDelta = cooldown;
                     continue;
                 }
-                if (!signals.active(sourceNode, channel.getRedstoneMode()))
+                if (!isRedstoneActive(sourceNode, channel.getRedstoneMode()))
                     break;
                 if (type == ChannelType.ITEM && !includeItemTransfers && !cards)
                     continue;
@@ -282,12 +279,12 @@ public class TransferEngine {
     }
 
     private static long recipeLane(LogisticsNodeEntity sourceNode, ServerLevel level, ChannelData channel, int index,
-            NetworkImports imports, NodeSignals signals, int tier, long gameTime, Map<UUID, Boolean> dimensionalCache,
+            NetworkImports imports, int tier, long gameTime, Map<UUID, Boolean> dimensionalCache,
             TransferCapabilityCache capCache, boolean telemetryActive) {
         long cooldown = cooldownRemaining(sourceNode, channel, index, ChannelData.RECIPE_LANE, tier, gameTime);
         if (cooldown > 0)
             return cooldown;
-        if (!signals.active(sourceNode, channel.getRedstoneMode()))
+        if (!isRedstoneActive(sourceNode, channel.getRedstoneMode()))
             return Long.MAX_VALUE;
         List<ImportTarget> items = imports.get(ChannelType.ITEM, index);
         List<ImportTarget> fluids = imports.get(ChannelType.FLUID, index);
@@ -502,7 +499,7 @@ public class TransferEngine {
         if (channel == null || !channel.isEnabled()
                 || channel.getMode() != ChannelMode.EXPORT || !channel.hasType(ChannelType.ITEM)
                 || !canRunChannel(sourceNode, channel) || !CreateCompat.isResolved(sourceNode)
-                || !context.signals().active(sourceNode, channel.getRedstoneMode())
+                || !isRedstoneActive(sourceNode, channel.getRedstoneMode())
                 || RecipeCardItem.anyIn(channel.getFilterItems())) {
             return ItemResourceOrder.EMPTY;
         }
@@ -1813,6 +1810,11 @@ public class TransferEngine {
             case HIGH -> signalStrength > 0;
             case LOW -> signalStrength == 0;
         };
+    }
+
+    public static boolean isRedstoneActive(LogisticsNodeEntity node, RedstoneMode mode) {
+        return mode == RedstoneMode.IGNORED
+                || isRedstoneActive(mode, node.isMountedOnCreate() ? 0 : node.signal);
     }
 
     public static boolean canRunChannel(LogisticsNodeEntity node, ChannelData channel) {
