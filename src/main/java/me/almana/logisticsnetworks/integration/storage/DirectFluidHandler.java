@@ -23,17 +23,13 @@ public final class DirectFluidHandler implements IFluidHandler {
 
     private List<StorageEndpoint.StoredFluid> exports() {
         ThreadGuard.requireServerThread();
-        if (exports == null) exports = exporting ? endpoint.exportableFluids(false) : List.of();
+        if (exports == null) exports = exporting ? endpoint.exportableFluids() : List.of();
         return exports;
     }
 
     public int count(FluidStack candidate) {
         ThreadGuard.requireServerThread();
-        if (!exporting) return DirectStorageReads.clamp(endpoint.fluidCount(candidate, true));
-        for (var entry : endpoint.exportableFluids(true)) {
-            if (FluidStack.isSameFluidSameComponents(entry.stack(), candidate)) return DirectStorageReads.clamp(entry.amount());
-        }
-        return 0;
+        return DirectStorageReads.clamp(endpoint.fluidCount(candidate));
     }
 
     @Override

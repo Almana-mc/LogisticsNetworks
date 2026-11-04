@@ -93,7 +93,7 @@ public final class TransferCommitter {
                 .getTelemetryManager().isActive(network.getId());
         for (TransferPlan.ChannelMoves channel : plan.channels()) {
             ChannelCommitResult result;
-            try (var operation = capCache.storageOperation(true)) {
+            try (var operation = capCache.storageOperation()) {
                 result = commitChannel(channel, network, server, capCache, telemetryActive, bindings);
             }
             total += result.moved();
@@ -167,7 +167,7 @@ public final class TransferCommitter {
         var committedByItem = HashUtils.itemToIntMap();
         Map<UUID, Map<Item, Integer>> committedByTarget = new HashMap<>();
         PlannedItemValidation validation = new PlannedItemValidation(
-                source, sourceChannel, sourceNode.level().registryAccess(), channel.moves());
+                source, sourceChannel, sourceNode.level().registryAccess());
         for (TransferPlan.ItemMove move : channel.moves()) {
             if (committed >= currentBatch) break;
             if (move.targetIndex() < 0 || move.targetIndex() >= targets.length) {
@@ -213,7 +213,7 @@ public final class TransferCommitter {
         boolean revalidated = committed < recoveryGoal;
         int recovered = 0;
         if (revalidated) {
-            try (var operation = capCache.storageOperation(true)) {
+            try (var operation = capCache.storageOperation()) {
                 var recovery = TransferEngine.recoverItemChannel(
                         network, server, capCache, channel.sourceNodeId(), channel.channelIndex(),
                         recoveryGoal - committed, committed, committedByItem, committedByTarget, movedResource,

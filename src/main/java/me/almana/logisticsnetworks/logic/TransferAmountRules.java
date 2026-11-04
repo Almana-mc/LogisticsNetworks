@@ -16,7 +16,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public final class TransferAmountRules {
     public record Constraints(boolean hasExportThreshold, int exportThreshold,
@@ -57,6 +56,7 @@ public final class TransferAmountRules {
     }
 
     static Object2IntMap<Item> countItems(IItemHandler handler) {
+        if (handler instanceof DirectItemAccess direct) return direct.countItems();
         var counts = HashUtils.itemToIntMap();
         for (int i = 0; i < handler.getSlots(); i++) {
             ItemStack stack = handler.getStackInSlot(i);
@@ -65,10 +65,6 @@ public final class TransferAmountRules {
             }
         }
         return counts;
-    }
-
-    public static Object2IntMap<Item> countItems(IItemHandler handler, Set<Item> candidates) {
-        return handler instanceof DirectItemAccess direct ? direct.countItems(candidates) : countItems(handler);
     }
 
     public static boolean hasStockFilter(ItemStack[] filters, @Nullable FilterItemData.ReadCache readCache) {

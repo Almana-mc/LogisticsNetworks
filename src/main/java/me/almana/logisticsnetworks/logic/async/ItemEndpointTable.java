@@ -1,15 +1,12 @@
 package me.almana.logisticsnetworks.logic.async;
 
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
-import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -17,11 +14,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 final class ItemEndpointTable {
@@ -31,8 +26,6 @@ final class ItemEndpointTable {
             new IdentityHashMap<>();
     private final List<NetworkSnapshot.ItemEndpoint> endpoints = new ArrayList<>();
     private final Map<Object, Integer> networks = new IdentityHashMap<>();
-    private final List<StorageEndpoint> networkEndpoints = new ArrayList<>();
-    private final List<Set<Item>> requestedCounts = new ArrayList<>();
     private final List<DirectStorageBinding> bindings = new ArrayList<>();
 
     int capture(LogisticsNodeEntity node, IoSide side, IItemHandler handler,
@@ -64,16 +57,12 @@ final class ItemEndpointTable {
         NetworkSnapshot.ItemEndpoint captured = capture(handler, budget, bulk);
         if (captured.direct() != null) {
             StorageEndpoint storage = DirectStorageHandlers.endpoint(handler);
-            int network = networks.computeIfAbsent(storage.networkIdentity(), ignored -> {
-                networkEndpoints.add(storage);
-                requestedCounts.add(new HashSet<>());
-                return networkEndpoints.size() - 1;
-            });
+            int network = networks.computeIfAbsent(storage.networkIdentity(), ignored -> networks.size());
             int binding = bindings.size();
             bindings.add(new DirectStorageBinding(storage));
             var direct = captured.direct();
             captured = directEndpoint(new NetworkSnapshot.DirectEndpoint(network, binding,
-                    direct.exporting(), direct.exports(), Map.of()));
+                    direct.exporting(), direct.exports(), storage.itemCounts()));
         }
         endpoints.add(captured);
         indexes.put(key, index);
@@ -85,35 +74,11 @@ final class ItemEndpointTable {
     }
 
     List<NetworkSnapshot.ItemEndpoint> endpoints() {
-        List<Object2LongMap<Item>> counts = new ArrayList<>();
-        for (int i = 0; i < networkEndpoints.size(); i++) {
-            counts.add(requestedCounts.get(i).isEmpty() ? HashUtils.itemToLongMap()
-                    : networkEndpoints.get(i).itemCounts(requestedCounts.get(i), false));
-        }
-        for (int i = 0; i < endpoints.size(); i++) {
-            var direct = endpoints.get(i).direct();
-            if (direct != null) {
-                endpoints.set(i, directEndpoint(new NetworkSnapshot.DirectEndpoint(direct.network(), direct.binding(),
-                        direct.exporting(), direct.exports(), counts.get(direct.network()))));
-            }
-        }
         return List.copyOf(endpoints);
     }
 
     List<DirectStorageBinding> bindings() {
         return List.copyOf(bindings);
-    }
-
-    void requireCounts(int target, int source) {
-        var destination = endpoints.get(target).direct();
-        if (destination == null) return;
-        var origin = endpoints.get(source);
-        Set<Item> requested = requestedCounts.get(destination.network());
-        if (origin.direct() != null) {
-            for (var entry : origin.direct().exports()) requested.add(entry.stack().getItem());
-        } else {
-            for (ItemStack stack : origin.occupiedStacks()) requested.add(stack.getItem());
-        }
     }
 
     private static NetworkSnapshot.ItemEndpoint directEndpoint(NetworkSnapshot.DirectEndpoint direct) {

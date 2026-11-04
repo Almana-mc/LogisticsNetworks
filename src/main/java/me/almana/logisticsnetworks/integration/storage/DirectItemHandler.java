@@ -11,21 +11,17 @@ import org.jetbrains.annotations.Nullable;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 final class DirectItemHandler implements DirectItemAccess {
     private final StorageEndpoint endpoint;
     @Nullable
     private final IItemHandler buffer;
-    private final DirectStorageReads reads;
     private final boolean exporting;
     private List<StorageEndpoint.StoredItem> exports;
 
-    DirectItemHandler(StorageEndpoint endpoint, @Nullable IItemHandler buffer,
-            DirectStorageReads reads, boolean exporting) {
+    DirectItemHandler(StorageEndpoint endpoint, @Nullable IItemHandler buffer, boolean exporting) {
         this.endpoint = endpoint;
         this.buffer = buffer;
-        this.reads = reads;
         this.exporting = exporting;
     }
 
@@ -40,7 +36,7 @@ final class DirectItemHandler implements DirectItemAccess {
     List<StorageEndpoint.StoredItem> exports() {
         ThreadGuard.requireServerThread();
         // Listing may lag one tick
-        if (exports == null) exports = exporting ? readExports(false) : List.of();
+        if (exports == null) exports = exporting ? readExports() : List.of();
         return exports;
     }
 
@@ -67,7 +63,6 @@ final class DirectItemHandler implements DirectItemAccess {
         ThreadGuard.requireServerThread();
         if (stack.isEmpty() || !endpoint.isValid()) return stack;
         int moved = Math.min(stack.getCount(), DirectStorageReads.clamp(endpoint.insertItem(stack, stack.getCount(), simulate)));
-        if (!simulate && moved > 0) reads.moved(endpoint.networkIdentity(), stack.getItem(), moved);
         return moved == stack.getCount() ? ItemStack.EMPTY : stack.copyWithCount(stack.getCount() - moved);
     }
 
@@ -85,30 +80,20 @@ final class DirectItemHandler implements DirectItemAccess {
                 DirectStorageReads.clamp(endpoint.extractItem(stack, amount, simulate)));
         int bufferMoved = extractBuffer(stack, amount - networkMoved, simulate);
         int moved = networkMoved + bufferMoved;
-        if (!simulate && networkMoved > 0) {
-            reads.moved(endpoint.networkIdentity(), stack.getItem(), -networkMoved);
-        }
         return moved == 0 ? ItemStack.EMPTY : stack.copyWithCount(moved);
     }
 
     @Override
-    public Object2IntMap<Item> countItems(Set<Item> items) {
+    public Object2IntMap<Item> countItems() {
         ThreadGuard.requireServerThread();
-        if (!exporting) return reads.countItems(endpoint, items);
         var result = HashUtils.itemToIntMap();
-        for (var entry : readExports(reads.fresh())) {
-            if (items.contains(entry.stack().getItem())) {
-                result.mergeInt(entry.stack().getItem(), DirectStorageReads.clamp(
-                                add(entry.amount(), entry.bufferedAmount())),
-                        (a, b) -> DirectStorageReads.clamp((long) a + b));
-            }
-        }
+        endpoint.itemCounts().forEach((item, amount) -> result.put(item, DirectStorageReads.clamp(amount)));
         return result;
     }
 
-    private List<StorageEndpoint.StoredItem> readExports(boolean fresh) {
+    private List<StorageEndpoint.StoredItem> readExports() {
         Map<ItemResource, StorageEndpoint.StoredItem> items = new LinkedHashMap<>();
-        for (var stored : endpoint.exportableItems(fresh)) {
+        for (var stored : endpoint.exportableItems()) {
             ItemStack stack = stored.stack();
             ItemResource key = new ItemResource(stack);
             var current = items.get(key);

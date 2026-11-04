@@ -6,7 +6,6 @@ import com.refinedmods.refinedstorage.api.network.impl.node.iface.InterfaceExpor
 import com.refinedmods.refinedstorage.api.network.impl.node.AbstractNetworkNode;
 import com.refinedmods.refinedstorage.api.network.node.NetworkNodeActor;
 import com.refinedmods.refinedstorage.api.network.storage.StorageNetworkComponent;
-import com.refinedmods.refinedstorage.api.resource.ResourceAmount;
 import com.refinedmods.refinedstorage.api.resource.ResourceKey;
 import com.refinedmods.refinedstorage.common.support.resource.FluidResource;
 import com.refinedmods.refinedstorage.common.support.resource.ItemResource;
@@ -56,7 +55,7 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
     }
 
     @Override
-    public List<StoredItem> exportableItems(boolean fresh) {
+    public List<StoredItem> exportableItems() {
         InterfaceExportState state = exportState.get();
         if (state == null || !isValid()) return List.of();
         StorageNetworkComponent storage = storage();
@@ -77,23 +76,21 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
     }
 
     @Override
-    public Object2LongMap<Item> itemCounts(Set<Item> items, boolean fresh) {
-        if (items.isEmpty() || !isValid()) {
-            return HashUtils.itemToLongMap();
-        }
-        StorageNetworkComponent storage = storage();
+    public Object2LongMap<Item> itemCounts() {
         var counts = HashUtils.itemToLongMap();
-        for (Item item : items) counts.put(item, 0L);
-        for (ResourceAmount entry : storage.getAll()) {
-            if (entry.resource() instanceof ItemResource resource && items.contains(resource.item())) {
-                counts.merge(resource.item(), entry.amount(), RefinedStorageInterfaceEndpoint::saturatingAdd);
+        InterfaceExportState state = exportState.get();
+        if (state == null) return counts;
+        for (int slot = 0; slot < state.getSlots(); slot++) {
+            if (state.getExportedResource(slot) instanceof ItemResource resource) {
+                counts.merge(resource.item(), state.getExportedAmount(slot),
+                        RefinedStorageInterfaceEndpoint::saturatingAdd);
             }
         }
         return counts;
     }
 
     @Override
-    public List<StoredFluid> exportableFluids(boolean fresh) {
+    public List<StoredFluid> exportableFluids() {
         InterfaceExportState state = exportState.get();
         if (state == null || !isValid()) return List.of();
         StorageNetworkComponent storage = storage();
@@ -118,9 +115,8 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
     }
 
     @Override
-    public long fluidCount(FluidStack stack, boolean fresh) {
-        if (stack.isEmpty() || !isValid()) return 0;
-        return Math.max(0, storage().get(new FluidResource(stack.getFluid(), stack.getComponentsPatch())));
+    public long fluidCount(FluidStack stack) {
+        return stack.isEmpty() ? 0 : storedAmount(new FluidResource(stack.getFluid(), stack.getComponentsPatch()));
     }
 
     @Override
@@ -180,7 +176,7 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
     @Override
     public long chemicalCount(ChemicalStack stack) {
         ResourceKey resource = RefinedStorageChemicals.resource(stack);
-        return resource == null || !isValid() ? 0 : Math.max(0, storage().get(resource));
+        return resource == null ? 0 : storedAmount(resource);
     }
 
     @Override
@@ -193,6 +189,18 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
     public long extractChemical(ChemicalStack stack, long amount, boolean simulate) {
         ResourceKey resource = RefinedStorageChemicals.resource(stack);
         return resource != null && canExport(resource) ? extract(resource, amount, simulate) : 0;
+    }
+
+    private long storedAmount(ResourceKey resource) {
+        InterfaceExportState state = exportState.get();
+        if (state == null) return 0;
+        long amount = 0;
+        for (int slot = 0; slot < state.getSlots(); slot++) {
+            if (resource.equals(state.getExportedResource(slot))) {
+                amount = saturatingAdd(amount, state.getExportedAmount(slot));
+            }
+        }
+        return amount;
     }
 
     private boolean canExport(ResourceKey candidate) {

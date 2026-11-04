@@ -12,27 +12,21 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 
-import java.util.HashSet;
 import java.util.IdentityHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public final class PlannedItemValidation {
     private final IItemHandler source;
     private final ChannelData channel;
     private final HolderLookup.Provider registries;
     private final FilterItemData.ReadCache filters = FilterItemData.createReadCache();
-    private final Set<Item> candidates = new HashSet<>();
     private final Map<IItemHandler, Object2IntMap<Item>> targetCounts = new IdentityHashMap<>();
     private Object2IntMap<Item> sourceCounts;
 
-    public PlannedItemValidation(IItemHandler source, ChannelData channel, HolderLookup.Provider registries,
-            List<TransferPlan.ItemMove> moves) {
+    public PlannedItemValidation(IItemHandler source, ChannelData channel, HolderLookup.Provider registries) {
         this.source = source;
         this.channel = channel;
         this.registries = registries;
-        for (var move : moves) candidates.add(move.expectedItem());
     }
 
     public TransferPlan.ItemMove validate(TransferPlan.ItemMove move, IItemHandler target,
@@ -63,12 +57,11 @@ public final class PlannedItemValidation {
                 && !constraints.hasExportThreshold()) return candidate.getCount();
         if (sourceCounts == null && (constraints.hasExportThreshold()
                 || TransferAmountRules.hasStockFilter(channel.getFilterItems(), filters))) {
-            sourceCounts = TransferAmountRules.countItems(source, candidates);
+            sourceCounts = TransferAmountRules.countItems(source);
         }
         Object2IntMap<Item> counts = null;
         if (constraints.hasImportThreshold() || TransferAmountRules.hasStockFilter(imports, filters)) {
-            counts = target instanceof DirectItemAccess direct ? direct.countItems(candidates)
-                    : targetCounts.computeIfAbsent(target, ignored -> TransferAmountRules.countItems(target, candidates));
+            counts = targetCounts.computeIfAbsent(target, TransferAmountRules::countItems);
         }
         int allowed = TransferAmountRules.allowedItems(candidate, constraints, sourceCounts, counts);
         int perEntry = TransferAmountRules.perEntryItemAmount(candidate, channel.getFilterItems(), imports,

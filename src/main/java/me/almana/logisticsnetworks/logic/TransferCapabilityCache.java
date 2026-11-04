@@ -5,7 +5,6 @@ import me.almana.logisticsnetworks.integration.mekanism.DirectChemicalHandler;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
-import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
@@ -50,8 +49,8 @@ public final class TransferCapabilityCache {
     private final Map<PosKey, EnergySides> energy = new HashMap<>();
     private StorageOperation storageOperation;
 
-    public StorageOperation storageOperation(boolean fresh) {
-        return new StorageOperation(fresh);
+    public StorageOperation storageOperation() {
+        return new StorageOperation();
     }
 
     public FilterItemData.ReadCache filterCache() {
@@ -60,13 +59,11 @@ public final class TransferCapabilityCache {
 
     public final class StorageOperation implements AutoCloseable {
         private final StorageOperation previous;
-        private final DirectStorageReads reads;
         private final Map<Object, IItemHandler[]> handlers = new IdentityHashMap<>();
         private final FilterItemData.ReadCache filters = FilterItemData.createReadCache();
 
-        private StorageOperation(boolean fresh) {
+        private StorageOperation() {
             previous = storageOperation;
-            reads = new DirectStorageReads(fresh);
             storageOperation = this;
         }
 
@@ -76,8 +73,8 @@ public final class TransferCapabilityCache {
             int index = exporting ? 0 : 1;
             IItemHandler existing = views[index];
             if (existing == null || DirectStorageHandlers.networkIdentity(existing) != endpoint.networkIdentity()) {
-                views[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, buffer, reads)
-                        : DirectStorageHandlers.importItems(endpoint, reads);
+                views[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, buffer)
+                        : DirectStorageHandlers.importItems(endpoint);
             }
             return views[index];
         }
@@ -143,8 +140,7 @@ public final class TransferCapabilityCache {
                     return storageOperation.itemHandler(resolution.endpoint(), buffer, exporting);
                 }
                 return exporting
-                        ? DirectStorageHandlers.exportItems(
-                                resolution.endpoint(), buffer, new DirectStorageReads(true))
+                        ? DirectStorageHandlers.exportItems(resolution.endpoint(), buffer)
                         : DirectStorageHandlers.importItems(resolution.endpoint());
             }
         }

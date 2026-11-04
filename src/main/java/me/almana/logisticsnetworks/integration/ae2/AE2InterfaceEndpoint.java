@@ -66,12 +66,12 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
     }
 
     @Override
-    public List<StoredItem> exportableItems(boolean fresh) {
+    public List<StoredItem> exportableItems() {
         if (!isValid()) {
             return List.of();
         }
 
-        KeyCounter available = available(fresh);
+        KeyCounter available = available();
         var config = host.getConfig();
         List<StoredItem> items = new ArrayList<>();
         Set<AEKey> seen = new HashSet<>();
@@ -107,24 +107,21 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
     }
 
     @Override
-    public Object2LongMap<Item> itemCounts(Set<Item> items, boolean fresh) {
-        if (items.isEmpty() || !isValid()) return HashUtils.itemToLongMap();
-        KeyCounter available = available(fresh);
+    public Object2LongMap<Item> itemCounts() {
         var counts = HashUtils.itemToLongMap();
-        for (Item item : items) counts.put(item, 0L);
-        for (Object2LongMap.Entry<AEKey> entry : available) {
-            if (entry.getKey() instanceof AEItemKey key
-                    && entry.getLongValue() > 0 && items.contains(key.getItem())) {
-                counts.mergeLong(key.getItem(), entry.getLongValue(), AE2InterfaceEndpoint::saturatingAdd);
+        var storage = host.getStorage();
+        for (int slot = 0; slot < storage.size(); slot++) {
+            if (storage.getKey(slot) instanceof AEItemKey key) {
+                counts.mergeLong(key.getItem(), storage.getAmount(slot), AE2InterfaceEndpoint::saturatingAdd);
             }
         }
         return counts;
     }
 
     @Override
-    public List<StoredFluid> exportableFluids(boolean fresh) {
+    public List<StoredFluid> exportableFluids() {
         if (!isValid()) return List.of();
-        KeyCounter available = available(fresh);
+        KeyCounter available = available();
         List<StoredFluid> fluids = new ArrayList<>();
         Set<AEKey> seen = new HashSet<>();
         var config = host.getConfig();
@@ -160,16 +157,15 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
     }
 
     @Override
-    public long fluidCount(FluidStack stack, boolean fresh) {
-        if (stack.isEmpty() || !isValid()) return 0;
+    public long fluidCount(FluidStack stack) {
         AEFluidKey key = AEFluidKey.of(stack);
-        return key == null ? 0 : Math.max(0, available(fresh).get(key));
+        return key == null ? 0 : storedAmount(key);
     }
 
     @Override
     public long chemicalCount(ChemicalStack stack) {
         AEKey key = AppMekCompat.key(stack);
-        return key == null || !isValid() ? 0 : Math.max(0, available(true).get(key));
+        return key == null ? 0 : storedAmount(key);
     }
 
     @Override
@@ -229,7 +225,7 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
     public List<ChemicalStack> exportableChemicals() {
         if (!isValid()) return List.of();
         List<ChemicalStack> chemicals = new ArrayList<>();
-        for (var entry : available(true)) {
+        for (var entry : storage().getAvailableStacks()) {
             ChemicalStack stack = AppMekCompat.stack(entry.getKey(), entry.getLongValue());
             if (stack != null && canExport(entry.getKey())) chemicals.add(stack);
         }
@@ -327,8 +323,17 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
         return host.getConfigManager().getSetting(Settings.FUZZY_MODE);
     }
 
-    private KeyCounter available(boolean fresh) {
-        return fresh ? storage().getAvailableStacks() : grid.getStorageService().getCachedInventory();
+    private long storedAmount(AEKey key) {
+        var storage = host.getStorage();
+        long amount = 0;
+        for (int slot = 0; slot < storage.size(); slot++) {
+            if (key.equals(storage.getKey(slot))) amount = saturatingAdd(amount, storage.getAmount(slot));
+        }
+        return amount;
+    }
+
+    private KeyCounter available() {
+        return grid.getStorageService().getCachedInventory();
     }
 
     private MEStorage storage() {

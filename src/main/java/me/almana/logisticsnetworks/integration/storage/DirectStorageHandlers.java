@@ -12,28 +12,14 @@ public final class DirectStorageHandlers {
     private DirectStorageHandlers() {
     }
 
-    public static IItemHandler exportItems(StorageEndpoint endpoint) {
-        return exportItems(endpoint, new DirectStorageReads(true));
-    }
-
-    public static IItemHandler exportItems(StorageEndpoint endpoint, DirectStorageReads reads) {
+    public static IItemHandler exportItems(StorageEndpoint endpoint, @Nullable IItemHandler buffer) {
         ThreadGuard.requireServerThread();
-        return new DirectItemHandler(endpoint, null, reads, true);
-    }
-
-    public static IItemHandler exportItems(StorageEndpoint endpoint, @Nullable IItemHandler buffer,
-            DirectStorageReads reads) {
-        ThreadGuard.requireServerThread();
-        return new DirectItemHandler(endpoint, buffer, reads, true);
+        return new DirectItemHandler(endpoint, buffer, true);
     }
 
     public static IItemHandler importItems(StorageEndpoint endpoint) {
-        return importItems(endpoint, new DirectStorageReads(true));
-    }
-
-    public static IItemHandler importItems(StorageEndpoint endpoint, DirectStorageReads reads) {
         ThreadGuard.requireServerThread();
-        return new DirectItemHandler(endpoint, null, reads, false);
+        return new DirectItemHandler(endpoint, null, false);
     }
 
     public static IFluidHandler exportFluids(StorageEndpoint endpoint) {
