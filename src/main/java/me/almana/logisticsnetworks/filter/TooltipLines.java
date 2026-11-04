@@ -12,6 +12,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.TooltipProvider;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.Holder;
+
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -20,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+
 
 public final class TooltipLines {
 
@@ -76,16 +81,21 @@ public final class TooltipLines {
         Item item = stack.getItem();
         if (!QUARANTINED.contains(item)) {
             try {
-                return stack.getTooltipLines(context, null, TooltipFlag.NORMAL);
+                List<Component> lines = new ArrayList<>(
+                        stack.getTooltipLines(context, null, TooltipFlag.ADVANCED));
+                appendTags(stack, lines);
+                return lines;
             } catch (LinkageError | RuntimeException e) {
                 QUARANTINED.add(item);
                 LOGGER.warn("Tooltip of {} is not server-safe; regex filter uses fallback lines: {}",
                         BuiltInRegistries.ITEM.getKey(item), e.toString());
             }
         }
-        return fallback(stack, context);
+        List<Component> lines = fallback(stack, context);
+        appendTags(stack, lines);
+        return lines;
     }
-
+   
     private static List<Component> fallback(ItemStack stack, Item.TooltipContext context) {
         List<Component> lines = new ArrayList<>();
         if (stack.has(DataComponents.HIDE_TOOLTIP))
@@ -93,7 +103,7 @@ public final class TooltipLines {
         lines.add(stack.getHoverName());
         if (!stack.has(DataComponents.HIDE_ADDITIONAL_TOOLTIP)) {
             try {
-                stack.getItem().appendHoverText(stack, context, lines, TooltipFlag.NORMAL);
+                stack.getItem().appendHoverText(stack, context, lines, TooltipFlag.ADVANCED);
             } catch (LinkageError | RuntimeException ignored) {
                 // keeps lines added before throw
             }
@@ -102,11 +112,21 @@ public final class TooltipLines {
             if (!(component.value() instanceof TooltipProvider provider))
                 continue;
             try {
-                provider.addToTooltip(context, lines::add, TooltipFlag.NORMAL);
+                provider.addToTooltip(context, lines::add, TooltipFlag.ADVANCED);
             } catch (LinkageError | RuntimeException ignored) {
             }
         }
         return lines;
+    }
+
+    private static void appendTags(ItemStack stack, List<Component> lines) {
+        try {
+            Holder<Item> holder = BuiltInRegistries.ITEM.wrapAsHolder(stack.getItem());
+            holder.tags().forEach(tag -> lines.add(
+                    Component.literal("#" + tag.location())));
+        } catch (LinkageError | RuntimeException ignored) {
+            // tags: supplementary text source for regex matching only. exceptions must not affect the main filter flow.
+        }
     }
 
     private record Key(ItemStack stack) {
