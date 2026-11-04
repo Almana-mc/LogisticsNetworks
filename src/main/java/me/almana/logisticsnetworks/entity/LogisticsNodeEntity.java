@@ -82,7 +82,7 @@ public class LogisticsNodeEntity extends Entity {
     private final long[] channelCooldowns = new long[CHANNEL_COUNT * ChannelData.LANES];
     private final float[] backoffTicks = new float[CHANNEL_COUNT * ChannelData.LANES];
 
-    public int signal = -1;
+    private int signal = -1;
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
@@ -178,10 +178,6 @@ public class LogisticsNodeEntity extends Entity {
             return;
         }
         if (this.level().isClientSide()) return;
-
-        if (signal < 0) {
-            signal = this.level().getBestNeighborSignal(this.blockPosition());
-        }
 
         BlockPos attached = getAttachedPos();
         if (!attached.equals(BlockPos.ZERO)) {
@@ -288,7 +284,26 @@ public class LogisticsNodeEntity extends Entity {
         return this.entityData.get(ATTACHED_POS);
     }
 
+    public int signal() {
+        if (isMountedOnCreate()) {
+            return 0;
+        }
+        if (signal < 0) {
+            signal = level().getBestNeighborSignal(getAttachedPos());
+            ((INodeTracker) level()).logisticsNetworks$registerNode(this);
+        }
+        return signal;
+    }
+
+    public void forgetSignal() {
+        signal = -1;
+        if (level() instanceof INodeTracker tracker) {
+            tracker.logisticsNetworks$removeNode(this);
+        }
+    }
+
     public void moveAttachment(BlockPos pos, Vec3 entityPos) {
+        forgetSignal();
         BlockPos previousPos = getAttachedPos();
         setPos(entityPos);
         setAttachedPos(pos);
@@ -315,6 +330,7 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     public void mountOnCreate(UUID contraptionId, BlockPos localPos) {
+        forgetSignal();
         entityData.set(CREATE_CONTRAPTION_ID, Optional.of(contraptionId));
         entityData.set(CREATE_LOCAL_POS, localPos.immutable());
         if (level() instanceof ServerLevel serverLevel && getNetworkId() != null) {
@@ -522,7 +538,12 @@ public class LogisticsNodeEntity extends Entity {
     public void remove(RemovalReason reason) {
         this.dropFilters();
         this.dropUpgrades();
-        ((INodeTracker) this.level()).logisticsNetworks$removeNode(this.blockPosition());
         super.remove(reason);
+    }
+
+    @Override
+    public void onRemovedFromLevel() {
+        super.onRemovedFromLevel();
+        forgetSignal();
     }
 }

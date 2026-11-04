@@ -1813,8 +1813,7 @@ public class TransferEngine {
     }
 
     public static boolean isRedstoneActive(LogisticsNodeEntity node, RedstoneMode mode) {
-        return mode == RedstoneMode.IGNORED
-                || isRedstoneActive(mode, node.isMountedOnCreate() ? 0 : node.signal);
+        return mode == RedstoneMode.IGNORED || isRedstoneActive(mode, node.signal());
     }
 
     public static boolean canRunChannel(LogisticsNodeEntity node, ChannelData channel) {

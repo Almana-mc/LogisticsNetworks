@@ -336,25 +336,19 @@ public class EventHandler {
 
     @SubscribeEvent
     public static void onNeighbourNotify(BlockEvent.NeighborNotifyEvent event) {
+        if (!(event.getLevel() instanceof INodeTracker tracker))
+            return;
+
         var pos = event.getPos().mutable();
-        var level = event.getLevel();
         for (var side : event.getNotifiedSides()) {
             pos.move(side);
 
-            var node = ((INodeTracker) level).logisticsNetworks$getNode(pos);
+            var node = tracker.logisticsNetworks$getNode(pos);
             if (node != null) {
-                node.signal = level.getBestNeighborSignal(node.blockPosition());
+                node.forgetSignal();
             }
 
             pos.move(side.getOpposite());
-        }
-    }
-
-    @SubscribeEvent
-    public static void onEntityJoin(EntityJoinLevelEvent event) {
-        if (event.getLevel() instanceof ServerLevel level && event.getEntity() instanceof LogisticsNodeEntity node) {
-            node.signal = level.getBestNeighborSignal(node.blockPosition());
-            ((INodeTracker) level).logisticsNetworks$registerNode(node);
         }
     }
 }

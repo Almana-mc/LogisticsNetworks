@@ -14,20 +14,20 @@ import org.spongepowered.asm.mixin.Unique;
 @Mixin(ServerLevel.class)
 public class ServerLevelMixin implements INodeTracker {
     @Unique
-    private static final Long2ObjectOpenHashMap<LogisticsNodeEntity> logisticsNetworks$NODES = new Long2ObjectOpenHashMap<>();
+    private final Long2ObjectOpenHashMap<LogisticsNodeEntity> logisticsNetworks$nodes = new Long2ObjectOpenHashMap<>();
 
     @Override
     public void logisticsNetworks$registerNode(@NotNull LogisticsNodeEntity node) {
-        logisticsNetworks$NODES.put(node.blockPosition().asLong(), node);
+        logisticsNetworks$nodes.put(node.getAttachedPos().asLong(), node);
     }
 
     @Override
-    public void logisticsNetworks$removeNode(@NotNull BlockPos pos) {
-        logisticsNetworks$NODES.remove(pos.asLong());
+    public void logisticsNetworks$removeNode(@NotNull LogisticsNodeEntity node) {
+        logisticsNetworks$nodes.remove(node.getAttachedPos().asLong(), node);
     }
 
     @Override
     public @Nullable LogisticsNodeEntity logisticsNetworks$getNode(@NotNull BlockPos pos) {
-        return logisticsNetworks$NODES.getOrDefault(pos.asLong(), null);
+        return logisticsNetworks$nodes.getOrDefault(pos.asLong(), null);
     }
 }
