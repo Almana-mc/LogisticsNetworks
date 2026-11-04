@@ -63,6 +63,8 @@ Nodes with a [Network Upgrade](upgrades-special.md) on Applied Energistics 2 and
 
 For item Senders, the direct path pulls from the storage network first, then uses items stocked in that Interface to fill any remaining batch. Buffer-only items stay available to later transfers, allowing the Interface to empty. Direct fluid and chemical transfers still ignore exposed tanks. On Refined Storage, chemicals are not exported while the Interface is in fuzzy mode. Adding an explicit Logistics slot mapping switches that item channel back to the exposed Interface inventory. A disconnected or inactive storage network waits without using the Interface buffer, and direct transfers never request autocrafting.
 
+Stock amounts on these nodes only check what is stocked in the Interface itself, never the whole storage network. A Sender only moves a resource with a Stock amount while the Interface holds more than that amount, so set the resource in the Interface config. A Receiver stops once the Interface holds the Stock amount, so a resource the Interface does not hold is never capped.
+
 ## Side
 
 ![Side: Up](images/channel-side-up.png)
