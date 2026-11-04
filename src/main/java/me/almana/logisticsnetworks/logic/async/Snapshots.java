@@ -118,7 +118,7 @@ public final class Snapshots {
                 continue;
             }
             List<TransferEngine.ImportTarget> targets = context.imports().get(ChannelType.ITEM, i);
-            if (targets == null || targets.isEmpty()) {
+            if (targets.isEmpty()) {
                 continue;
             }
             long cooldown = TransferEngine.cooldownRemaining(node, channel, i, ChannelType.ITEM.ordinal(), tier, gameTime);

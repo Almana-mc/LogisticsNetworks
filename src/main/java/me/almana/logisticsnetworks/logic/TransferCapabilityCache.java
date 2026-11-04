@@ -471,7 +471,8 @@ public final class TransferCapabilityCache {
         @SuppressWarnings("unchecked")
         private final BlockCapabilityCache<IEnergyStorage, Direction>[] caches =
                 new BlockCapabilityCache[DIRECTIONS.length + 1];
-        private IEnergyStorage[] combinedOf = new IEnergyStorage[0];
+        private static final IEnergyStorage[] NO_HANDLERS = new IEnergyStorage[0];
+        private IEnergyStorage[] combinedOf = NO_HANDLERS;
         private IEnergyStorage combined;
 
         @Nullable
@@ -490,7 +491,11 @@ public final class TransferCapabilityCache {
                 IEnergyStorage handler = side(level, pos, face);
                 if (handler != null && !containsIdentity(found, handler)) found.add(handler);
             }
-            if (found.size() <= 1) return found.isEmpty() ? null : found.get(0);
+            if (found.size() <= 1) {
+                combinedOf = NO_HANDLERS;
+                combined = null;
+                return found.isEmpty() ? null : found.get(0);
+            }
             if (!sameHandlers(found)) {
                 combinedOf = found.toArray(IEnergyStorage[]::new);
                 combined = new CombinedEnergyHandler(combinedOf);

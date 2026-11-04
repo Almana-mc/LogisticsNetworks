@@ -243,6 +243,8 @@ public class TransferEngine {
                 }
                 if (!signals.active(sourceNode, channel.getRedstoneMode()))
                     break;
+                if (type == ChannelType.ITEM && !includeItemTransfers && !cards)
+                    continue;
                 List<ImportTarget> typed = imports.get(type, i);
                 if (typed.isEmpty())
                     continue;
@@ -251,8 +253,6 @@ public class TransferEngine {
                     continue;
                 }
                 if (sourceNode.isMountedOnCreate() && !hasMountedStorage(sourceNode, channel, type, capCache))
-                    continue;
-                if (type == ChannelType.ITEM && !includeItemTransfers && !cards)
                     continue;
 
                 int batch = NodeUpgradeData.effectiveBatch(channel, type, sourceTier);
