@@ -26,6 +26,7 @@ import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.RecipeCardCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.WrenchResetRecipe;
+import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
@@ -145,7 +146,8 @@ public class Registration {
                         () -> new NodeUpgradeItem(new Item.Properties(), 64, 20_000, 250_000, 1));
         public static final DeferredHolder<Item, NodeUpgradeItem> NETHERITE_UPGRADE = ITEMS.register(
                         "netherite_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 10_000, 1_000_000, Integer.MAX_VALUE, 1));
+                        () -> new NodeUpgradeItem(new Item.Properties(), 10_000, 1_000_000,
+                                        UpgradeLimitsConfig.MAX_ENERGY_BATCH, 1));
 
         public static final DeferredHolder<Item, DimensionalUpgradeItem> DIMENSIONAL_UPGRADE = ITEMS.register(
                         "dimensional_upgrade",

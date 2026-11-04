@@ -22,6 +22,9 @@ public final class UpgradeLimitsConfig {
     private static final String FILE_NAME = "upgrades.json";
     private static final String DIR_NAME = "logistics-network";
     private static final String[] TIER_KEYS = { "none", "iron", "gold", "diamond", "netherite" };
+    private static final int NETHERITE_TIER = 4;
+    // Matches EnergyMove call ceiling
+    public static final long MAX_ENERGY_BATCH = 64L * Integer.MAX_VALUE;
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final TierLimits[] TIERS = new TierLimits[5];
@@ -69,6 +72,8 @@ public final class UpgradeLimitsConfig {
             LOGGER.error("Failed to parse {}, using defaults", FILE_NAME, e);
             loadDefaults();
         }
+
+        if (migrateNetheriteEnergy()) save();
     }
 
     private static void generateDefault(File file) {
@@ -103,7 +108,7 @@ public final class UpgradeLimitsConfig {
                 getInt(obj, "minTicks", defaults.minTicks()),
                 getInt(obj, "itemBatch", defaults.itemBatch()),
                 getInt(obj, "fluidBatch", defaults.fluidBatch()),
-                getInt(obj, "energyBatch", defaults.energyBatch()),
+                getLong(obj, "energyBatch", defaults.energyBatch()),
                 getInt(obj, "chemicalBatch", defaults.chemicalBatch()),
                 getInt(obj, "sourceBatch", defaults.sourceBatch()));
     }
@@ -111,6 +116,20 @@ public final class UpgradeLimitsConfig {
     private static int getInt(JsonObject obj, String key, int fallback) {
         JsonElement el = obj.get(key);
         return el != null && el.isJsonPrimitive() ? el.getAsInt() : fallback;
+    }
+
+    private static long getLong(JsonObject obj, String key, long fallback) {
+        JsonElement el = obj.get(key);
+        return el != null && el.isJsonPrimitive() ? el.getAsLong() : fallback;
+    }
+
+    private static boolean migrateNetheriteEnergy() {
+        TierLimits old = TIERS[NETHERITE_TIER];
+        if (old.energyBatch() != Integer.MAX_VALUE) return false;
+        TIERS[NETHERITE_TIER] = new TierLimits(old.minTicks(), old.itemBatch(), old.fluidBatch(),
+                MAX_ENERGY_BATCH, old.chemicalBatch(), old.sourceBatch());
+        LOGGER.info("Raised Netherite energyBatch to {}", MAX_ENERGY_BATCH);
+        return true;
     }
 
     private static void loadDefaults() {
@@ -125,7 +144,7 @@ public final class UpgradeLimitsConfig {
             case 1 -> new TierLimits(10, 32, 10_000, 10_000, 1_000, 1_000);
             case 2 -> new TierLimits(5, 64, 100_000, 50_000, 5_000, 5_000);
             case 3 -> new TierLimits(1, 256, 1_000_000, 250_000, 20_000, 20_000);
-            case 4 -> new TierLimits(1, 10_000, 2_100_000_000, Integer.MAX_VALUE, 1_000_000, 1_000_000);
+            case 4 -> new TierLimits(1, 10_000, 2_100_000_000, MAX_ENERGY_BATCH, 1_000_000, 1_000_000);
             default -> new TierLimits(20, 16, 1_000, 2_000, 500, 500);
         };
     }
@@ -164,7 +183,7 @@ public final class UpgradeLimitsConfig {
         return TIER_KEYS.clone();
     }
 
-    public record TierLimits(int minTicks, int itemBatch, int fluidBatch, int energyBatch, int chemicalBatch,
+    public record TierLimits(int minTicks, int itemBatch, int fluidBatch, long energyBatch, int chemicalBatch,
             int sourceBatch) {
     }
 }
