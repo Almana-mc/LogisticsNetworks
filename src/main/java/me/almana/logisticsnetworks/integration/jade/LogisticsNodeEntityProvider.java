@@ -1,10 +1,9 @@
 package me.almana.logisticsnetworks.integration.jade;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
-import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.item.WornWrench;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
 import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.IEntityComponentProvider;
 import snownee.jade.api.IServerDataProvider;
@@ -24,9 +23,7 @@ public enum LogisticsNodeEntityProvider implements IEntityComponentProvider, ISe
 
     @Override
     public void appendTooltip(ITooltip tooltip, EntityAccessor accessor, IPluginConfig config) {
-        ItemStack main = accessor.getPlayer().getMainHandItem();
-        ItemStack off = accessor.getPlayer().getOffhandItem();
-        if (main.getItem() instanceof WrenchItem || off.getItem() instanceof WrenchItem) {
+        if (!WornWrench.held(accessor.getPlayer()).isEmpty()) {
             tooltip.remove(JadeIds.CORE_MOD_NAME);
             return;
         }

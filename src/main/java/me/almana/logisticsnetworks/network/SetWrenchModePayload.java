@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -22,7 +23,7 @@ public record SetWrenchModePayload(InteractionHand hand, WrenchItem.Mode mode) i
     public static void handle(SetWrenchModePayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)) return;
-            var held = player.getItemInHand(payload.hand());
+            var held = WornWrench.orDrawn(player, player.getItemInHand(payload.hand()));
             if (!(held.getItem() instanceof WrenchItem)) return;
             WrenchItem.setMode(held, payload.mode());
             player.getInventory().setChanged();

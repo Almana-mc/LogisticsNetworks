@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.client.ClientControls;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -28,7 +29,7 @@ public final class WrenchModeScreen extends Screen {
     @Override
     public void tick() {
         if (!minecraft.isWindowActive() || minecraft.player == null
-                || !(minecraft.player.getItemInHand(hand).getItem() instanceof WrenchItem)) {
+                || !(WornWrench.orDrawn(minecraft.player, minecraft.player.getItemInHand(hand)).getItem() instanceof WrenchItem)) {
             onClose();
         } else if (!ClientControls.wrenchModesDown()) {
             int selected = sector(ClientControls.cursorX(minecraft) - width / 2.0,

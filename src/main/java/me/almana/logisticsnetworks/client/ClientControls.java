@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.integration.curios.CuriosCompat;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
@@ -42,6 +43,9 @@ public final class ClientControls {
     public static final KeyMapping WRENCH_MODES = new KeyMapping(
             "key.logisticsnetworks.wrench_modes", KeyConflictContext.IN_GAME,
             InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CATEGORY);
+    public static final KeyMapping TOGGLE_WORN_WRENCH = new KeyMapping(
+            "key.logisticsnetworks.toggle_worn_wrench", KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K, CATEGORY);
     public static final KeyMapping TOGGLE_SLOT_NUMBERS = new KeyMapping(
             "key.logisticsnetworks.toggle_slot_numbers", KeyConflictContext.UNIVERSAL,
             KeyModifier.ALT, InputConstants.Type.KEYSYM.getOrCreate(InputConstants.KEY_I), CATEGORY);
@@ -149,6 +153,7 @@ public final class ClientControls {
             event.register(TOGGLE_WRENCH_HUD);
             event.register(EDIT_WRENCH_COLORS);
             event.register(WRENCH_MODES);
+            if (CuriosCompat.isLoaded()) event.register(TOGGLE_WORN_WRENCH);
             event.register(TOGGLE_SLOT_NUMBERS);
         }
     }

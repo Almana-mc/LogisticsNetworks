@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.Config;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.block.ComputerBlockEntity;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.RecipeCardData;
@@ -426,7 +427,7 @@ public class ServerPayloadHandler {
             InteractionHand hand = payload.handOrdinal() == InteractionHand.OFF_HAND.ordinal()
                     ? InteractionHand.OFF_HAND
                     : InteractionHand.MAIN_HAND;
-            ItemStack heldStack = player.getItemInHand(hand);
+            ItemStack heldStack = WornWrench.orDrawn(player, player.getItemInHand(hand));
             if (!(heldStack.getItem() instanceof WrenchItem)) {
                 return;
             }
@@ -449,7 +450,7 @@ public class ServerPayloadHandler {
             InteractionHand hand = payload.handOrdinal() == InteractionHand.OFF_HAND.ordinal()
                     ? InteractionHand.OFF_HAND
                     : InteractionHand.MAIN_HAND;
-            ItemStack heldStack = player.getItemInHand(hand);
+            ItemStack heldStack = WornWrench.orDrawn(player, player.getItemInHand(hand));
             if (!(heldStack.getItem() instanceof WrenchItem)) {
                 return;
             }
@@ -581,7 +582,7 @@ public class ServerPayloadHandler {
                     ? InteractionHand.OFF_HAND
                     : InteractionHand.MAIN_HAND;
 
-            ItemStack heldStack = player.getItemInHand(hand);
+            ItemStack heldStack = WornWrench.orDrawn(player, player.getItemInHand(hand));
             if (!(heldStack.getItem() instanceof WrenchItem)) {
                 return;
             }

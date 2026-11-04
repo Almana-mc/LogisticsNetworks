@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.component;
 
+import com.mojang.serialization.Codec;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -34,6 +35,8 @@ public final class LogisticsDataComponents {
             REGISTRAR.registerComponentType("slot_filter", builder -> builder.persistent(SlotFilterConfig.CODEC));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<WrenchItem.Mode>> WRENCH_MODE =
             REGISTRAR.registerComponentType("wrench_mode", builder -> builder.persistent(WrenchItem.Mode.CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> WRENCH_DRAWN =
+            REGISTRAR.registerComponentType("wrench_drawn", builder -> builder.persistent(Codec.BOOL));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<WrenchClipboard>> WRENCH_CLIPBOARD =
             REGISTRAR.registerComponentType("wrench_clipboard", builder -> builder.persistent(WrenchClipboard.CODEC));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> WRENCH_AE2_LINK =

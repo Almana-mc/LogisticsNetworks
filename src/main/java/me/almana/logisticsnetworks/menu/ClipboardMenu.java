@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.menu;
 
 import me.almana.logisticsnetworks.component.ClipboardSnapshot;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -91,7 +92,8 @@ public class ClipboardMenu extends AbstractContainerMenu {
     }
 
     private static NodeClipboardConfig loadClipboard(Player player, InteractionHand hand) {
-        NodeClipboardConfig loaded = WrenchItem.getClipboard(player.getItemInHand(hand), player.registryAccess());
+        NodeClipboardConfig loaded = WrenchItem.getClipboard(
+                WornWrench.orDrawn(player, player.getItemInHand(hand)), player.registryAccess());
         return loaded == null ? NodeClipboardConfig.createEmpty() : loaded;
     }
 
@@ -235,8 +237,9 @@ public class ClipboardMenu extends AbstractContainerMenu {
     }
 
     private ItemStack getWrenchStack() {
-        if (hand == InteractionHand.OFF_HAND) return player.getOffhandItem();
-        return lockedSlot >= 0 ? player.getInventory().getItem(lockedSlot) : player.getMainHandItem();
+        ItemStack held = hand == InteractionHand.OFF_HAND ? player.getOffhandItem()
+                : lockedSlot >= 0 ? player.getInventory().getItem(lockedSlot) : player.getMainHandItem();
+        return WornWrench.orDrawn(player, held);
     }
 
     private class UpgradeVisualContainer implements Container {

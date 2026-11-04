@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import me.almana.logisticsnetworks.item.WornWrench;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.almana.logisticsnetworks.LogisticsNetworks;
@@ -109,6 +110,8 @@ public final class MassPlacementSelectionRenderer {
             return offHand;
         }
 
-        return ItemStack.EMPTY;
+        ItemStack drawn = WornWrench.drawn(player);
+        return drawn.getItem() instanceof WrenchItem && WrenchItem.getMode(drawn) == WrenchItem.Mode.MASS_PLACEMENT
+                ? drawn : ItemStack.EMPTY;
     }
 }

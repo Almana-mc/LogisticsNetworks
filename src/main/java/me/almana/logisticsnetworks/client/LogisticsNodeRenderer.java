@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import me.almana.logisticsnetworks.item.WornWrench;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.Config;
@@ -12,7 +13,6 @@ import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.create.NodeAttachmentKey;
 import me.almana.logisticsnetworks.integration.create.NodeRenderContext;
 import me.almana.logisticsnetworks.integration.iris.IrisCompat;
-import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -85,7 +85,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
         boolean isVisible = entity.isRenderVisible();
         boolean isHighlighted = entity.isHighlighted();
-        boolean isHoldingWrench = mc.player.isHolding(Registration.WRENCH.get());
+        boolean isHoldingWrench = holdingWrench(mc);
         boolean shadowPass = IrisCompat.isRenderingShadowPass();
 
         if (!isVisible && !isHighlighted && !isHoldingWrench)
@@ -130,10 +130,22 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
         poseStack.popPose();
     }
 
+    private static long wrenchCheckTick = Long.MIN_VALUE;
+    private static boolean holdingWrench;
+
+    private static boolean holdingWrench(Minecraft mc) {
+        long tick = mc.level.getGameTime();
+        if (tick != wrenchCheckTick) {
+            wrenchCheckTick = tick;
+            holdingWrench = !WornWrench.held(mc.player).isEmpty();
+        }
+        return holdingWrench;
+    }
+
     @Override
     protected boolean shouldShowName(LogisticsNodeEntity entity) {
         var mc = Minecraft.getInstance();
-        return mc.player != null && mc.player.isHolding(Registration.WRENCH.get())
+        return mc.player != null && holdingWrench(mc)
                 && (allowedNodeIds == null || allowedNodeIds.contains(entity.getId()));
     }
 
@@ -451,7 +463,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity> {
 
     public static boolean isWrenchVisible(LogisticsNodeEntity entity) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null || !mc.player.isHolding(Registration.WRENCH.get())) {
+        if (mc.player == null || mc.level == null || !holdingWrench(mc)) {
             return false;
         }
         updateAllowedNodes(mc);

@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.client;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.screen.WrenchSettingsScreen;
 import net.minecraft.client.Minecraft;
@@ -37,7 +38,7 @@ public class WrenchColorCommand {
                 return 0;
             }
             minecraft.execute(() -> minecraft.setScreen(
-                    new WrenchSettingsScreen(player.getItemInHand(hand), hand)));
+                    new WrenchSettingsScreen(WornWrench.orDrawn(player, player.getItemInHand(hand)), hand)));
             return 1;
         });
     }

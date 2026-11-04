@@ -1,0 +1,8 @@
+{
+  "size": 1,
+  "order": 900,
+  "icon": "logisticsnetworks:slot/wrench",
+  "add_cosmetic": false,
+  "render_toggle": false,
+  "validators": ["curios:tag"]
+}

@@ -3,27 +3,34 @@ package me.almana.logisticsnetworks.client;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.screen.WrenchSettingsScreen;
 import me.almana.logisticsnetworks.client.screen.WrenchModeScreen;
+import me.almana.logisticsnetworks.integration.curios.CuriosCompat;
 import me.almana.logisticsnetworks.item.LogisticsNodeItem;
 import me.almana.logisticsnetworks.item.PatternSetterItem;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.mixin.client.MinecraftInvoker;
 import me.almana.logisticsnetworks.network.CopyPasteConnectedPayload;
 import me.almana.logisticsnetworks.network.CycleWrenchModePayload;
 import me.almana.logisticsnetworks.network.SyncModifierKeysPayload;
+import me.almana.logisticsnetworks.network.ToggleWornWrenchPayload;
+import me.almana.logisticsnetworks.network.UseWornWrenchPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,10 +38,16 @@ import org.jetbrains.annotations.Nullable;
 public class WrenchInputHandler {
     private static int lastSentModifierMask = -1;
     private static boolean forwardedUse;
+    private static boolean useHeldLastTick;
+    private static boolean useDownLastTick;
+    private static boolean airUseHeld;
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Pre event) {
         Minecraft minecraft = Minecraft.getInstance();
+        useHeldLastTick = useDownLastTick;
+        useDownLastTick = minecraft.options.keyUse.isDown();
+        airUseHeld &= useHeldLastTick;
         if (minecraft.player == null || minecraft.level == null) {
             resetInputState();
             return;
@@ -50,10 +63,17 @@ public class WrenchInputHandler {
             return;
         }
 
+        while (ClientControls.TOGGLE_WORN_WRENCH.consumeClick()) {
+            if (CuriosCompat.isLoaded()) {
+                PacketDistributor.sendToServer(ToggleWornWrenchPayload.INSTANCE);
+            }
+        }
+
         while (ClientControls.WRENCH_MODES.consumeClick()) {
             InteractionHand hand = findWrenchHand(minecraft.player);
             if (hand != null && ClientControls.wrenchModesDown()) {
-                minecraft.setScreen(new WrenchModeScreen(hand, WrenchItem.getMode(minecraft.player.getItemInHand(hand))));
+                minecraft.setScreen(new WrenchModeScreen(hand, 
+                        WrenchItem.getMode(WornWrench.orDrawn(minecraft.player, minecraft.player.getItemInHand(hand)))));
                 return;
             }
         }
@@ -62,7 +82,7 @@ public class WrenchInputHandler {
             if (ClientControls.usesVanillaUseInput(minecraft.options)) {
                 continue;
             }
-            if (!isLogisticsInteraction(minecraft)) {
+            if (!isLogisticsInteraction(minecraft) && WornWrench.drawn(minecraft.player).isEmpty()) {
                 continue;
             }
             forwardedUse = true;
@@ -71,6 +91,42 @@ public class WrenchInputHandler {
             } finally {
                 forwardedUse = false;
             }
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onDrawnWrenchAirUse(InputEvent.InteractionKeyMappingTriggered event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        Player player = minecraft.player;
+        if (!event.isUseItem() || player == null || player.isSpectator() || minecraft.hitResult == null
+                || minecraft.hitResult.getType() != HitResult.Type.MISS
+                || !ClientControls.usesVanillaUseInput(minecraft.options) && !forwardedUse) {
+            return;
+        }
+        ItemStack wrench = WornWrench.drawn(player);
+        if (wrench.isEmpty() || WrenchItem.getMode(wrench) == WrenchItem.Mode.WRENCH
+                || useHeldLastTick && !airUseHeld) {
+            return;
+        }
+        if (!airUseHeld) {
+            airUseHeld = true;
+            PacketDistributor.sendToServer(UseWornWrenchPayload.INSTANCE);
+        }
+        event.setSwingHand(false);
+        event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onDrawnWrenchUse(PlayerInteractEvent.RightClickBlock event) {
+        Player player = event.getEntity();
+        if (!event.getLevel().isClientSide() || player.isSpectator()) {
+            return;
+        }
+        ItemStack wrench = WornWrench.drawn(player);
+        if (!wrench.isEmpty()
+                && WrenchItem.actsOn(event.getLevel(), wrench, event.getPos(), ClientControls.modifier1Down())) {
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            event.setCanceled(true);
         }
     }
 
@@ -93,7 +149,7 @@ public class WrenchInputHandler {
 
         InteractionHand hand = findWrenchHand(player);
         if (hand != null) {
-            minecraft.setScreen(new WrenchSettingsScreen(player.getItemInHand(hand), hand));
+            minecraft.setScreen(new WrenchSettingsScreen(WornWrench.orDrawn(player, player.getItemInHand(hand)), hand));
         }
     }
 
@@ -158,11 +214,12 @@ public class WrenchInputHandler {
     private static boolean tryConnectedPaste(InputEvent.InteractionKeyMappingTriggered event, Minecraft minecraft,
             Player player) {
         InteractionHand hand = event.getHand();
-        if (!(player.getItemInHand(hand).getItem() instanceof WrenchItem)) {
+        ItemStack wrench = WornWrench.orDrawn(player, player.getItemInHand(hand));
+        if (!(wrench.getItem() instanceof WrenchItem)) {
             return false;
         }
 
-        WrenchItem.Mode mode = WrenchItem.getMode(player.getItemInHand(hand));
+        WrenchItem.Mode mode = WrenchItem.getMode(wrench);
         if (mode != WrenchItem.Mode.COPY_PASTE) {
             return false;
         }
@@ -208,6 +265,6 @@ public class WrenchInputHandler {
         if (player.getOffhandItem().getItem() instanceof WrenchItem) {
             return InteractionHand.OFF_HAND;
         }
-        return null;
+        return WornWrench.drawn(player).isEmpty() ? null : InteractionHand.MAIN_HAND;
     }
 }

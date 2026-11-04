@@ -78,7 +78,9 @@ import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
+import me.almana.logisticsnetworks.network.ToggleWornWrenchPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
+import me.almana.logisticsnetworks.network.UseWornWrenchPayload;
 import me.almana.logisticsnetworks.network.UpdateServerRackPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.integration.computercraft.ComputerPeripheral;
@@ -163,7 +165,7 @@ public class LogisticsNetworks {
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("21");
+                final var registrar = event.registrar(MOD_ID).versioned("22");
 
                 // Client -> Server
                 registrar.playToServer(UpdateChannelPayload.TYPE, UpdateChannelPayload.STREAM_CODEC,
@@ -226,6 +228,10 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleCycleWrenchMode);
                 registrar.playToServer(SetWrenchModePayload.TYPE, SetWrenchModePayload.STREAM_CODEC,
                                 SetWrenchModePayload::handle);
+                registrar.playToServer(ToggleWornWrenchPayload.TYPE, ToggleWornWrenchPayload.STREAM_CODEC,
+                                ToggleWornWrenchPayload::handle);
+                registrar.playToServer(UseWornWrenchPayload.TYPE, UseWornWrenchPayload.STREAM_CODEC,
+                                UseWornWrenchPayload::handle);
                 registrar.playToServer(MoveGraphVerticesPayload.TYPE, MoveGraphVerticesPayload.STREAM_CODEC,
                                 GraphPayloadHandler::handleMoveVertices);
                 registrar.playToServer(SetNodeLabelsPayload.TYPE, SetNodeLabelsPayload.STREAM_CODEC,

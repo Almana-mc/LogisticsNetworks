@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.menu;
 
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageAccess;
@@ -459,14 +460,13 @@ public class MassPlacementMenu extends AbstractContainerMenu {
                 return slot;
             }
         }
-        return lockedSlot;
+        return -1;
     }
 
     private ItemStack getWrenchStack() {
-        if (hand == InteractionHand.OFF_HAND) {
-            return player.getOffhandItem();
-        }
-        return lockedSlot >= 0 ? player.getInventory().getItem(lockedSlot) : player.getMainHandItem();
+        ItemStack held = hand == InteractionHand.OFF_HAND ? player.getOffhandItem()
+                : lockedSlot >= 0 ? player.getInventory().getItem(lockedSlot) : player.getMainHandItem();
+        return WornWrench.orDrawn(player, held);
     }
 
     private void sendBlockChoices() {

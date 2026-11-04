@@ -39,12 +39,14 @@ val create_file_id: String by project
 val building_gadgets_file_id: String by project
 val appmek_file_id: String by project
 val rs_mekanism_file_id: String by project
+val curios_file_id: String by project
 val cc_version: String by project
 val create_runtime = providers.gradleProperty("create_runtime").orElse("true").map { it.toBoolean() }
 val ae2Runtime = providers.gradleProperty("ae2_runtime").orElse("true").map { it.toBoolean() }
 val refinedStorageRuntime = providers.gradleProperty("refined_storage_runtime").orElse("true").map { it.toBoolean() }
 val buildingGadgetsRuntime = providers.gradleProperty("building_gadgets_runtime").orElse("true").map { it.toBoolean() }
 val ccRuntime = providers.gradleProperty("cc_runtime").orElse("true").map { it.toBoolean() }
+val curiosRuntime = providers.gradleProperty("curios_runtime").orElse("true").map { it.toBoolean() }
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -163,6 +165,10 @@ dependencies {
     compileOnly("curse.maven:refined-storage-mekanism-integration-1230504:${rs_mekanism_file_id}")
 
     compileOnly("curse.maven:cable-tiers-454382:${cable_tiers_file_id}")
+    compileOnly("curse.maven:curios-309927:${curios_file_id}")
+    if (curiosRuntime.get()) {
+        localRuntime("curse.maven:curios-309927:${curios_file_id}")
+    }
 
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-forge-api:${cc_version}")
     if (ccRuntime.get()) {
