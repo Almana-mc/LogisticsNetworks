@@ -122,6 +122,7 @@ public class LogisticsNetworks {
                         modBus.addListener(LogisticsClientEvents::registerScreens);
                         modBus.addListener(LogisticsClientEvents::clientSetup);
                         modBus.addListener(LogisticsClientEvents::registerKeyMappings);
+                        modBus.addListener(LogisticsClientEvents::addPacks);
                         ConfigScreenRegistrar.register();
                 }
 

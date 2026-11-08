@@ -26,11 +26,25 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.neoforge.event.AddPackFindersEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackSource;
 
 @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID, value = Dist.CLIENT)
 public final class LogisticsClientEvents {
 
     private LogisticsClientEvents() {
+    }
+
+    public static void addPacks(AddPackFindersEvent event) {
+        event.addPackFinders(
+                Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID, "resourcepacks/original_textures"),
+                PackType.CLIENT_RESOURCES,
+                Component.translatable("pack.logisticsnetworks.original_textures"),
+                PackSource.BUILT_IN, false, Pack.Position.TOP);
     }
 
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
