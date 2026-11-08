@@ -1467,7 +1467,7 @@ public class ServerPayloadHandler {
         if (Config.debugMode) LOGGER.debug("[LabelSync] Propagating channel {} from node {} (label='{}') to {} network nodes",
                 channelIndex, sourceNode.getUUID(), label, network.getNodeUuids().size());
 
-        int updated = 0;
+        List<LogisticsNodeEntity> updated = new ArrayList<>();
         for (UUID otherId : network.getNodeUuids()) {
             if (otherId.equals(sourceNode.getUUID()))
                 continue;
@@ -1480,7 +1480,7 @@ public class ServerPayloadHandler {
                         dst.copyFrom(sourceChannel);
                         clampChannelToUpgradeLimits(other, dst);
                         other.refreshRouteChannels();
-                        updated++;
+                        updated.add(other);
                         if (Config.debugMode) LOGGER.debug("[LabelSync] Updated node {} (label='{}')", otherId, other.getNodeLabel());
                         // Notify any player who has this node's menu open
                         sendChannelSyncToViewers(other, channelIndex, dst);
@@ -1489,7 +1489,9 @@ public class ServerPayloadHandler {
                 }
             }
         }
-        if (Config.debugMode) LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated);
+        LabelUpgradeSync.refreshTemplateChannel(network, sourceNode, channelIndex, updated);
+        registry.setDirty();
+        if (Config.debugMode) LOGGER.debug("[LabelSync] Propagation complete: {} nodes updated", updated.size());
     }
 
     public static void handleSubscribeTelemetry(SubscribeTelemetryPayload payload, IPayloadContext context) {
