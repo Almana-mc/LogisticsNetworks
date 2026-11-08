@@ -27,6 +27,7 @@ import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
+import me.almana.logisticsnetworks.recipe.WrenchResetRecipe;
 import me.almana.logisticsnetworks.recipe.GuideRecipe;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -174,6 +175,10 @@ public class Registration {
         public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
                                         () -> FilterCopyClearRecipe.SERIALIZER);
+
+        public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<WrenchResetRecipe>> WRENCH_RESET_RECIPE = RECIPE_SERIALIZERS
+                        .register("wrench_reset",
+                                        () -> WrenchResetRecipe.SERIALIZER);
 
         public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<GuideRecipe>> GUIDE_RECIPE = RECIPE_SERIALIZERS
                         .register("guide",

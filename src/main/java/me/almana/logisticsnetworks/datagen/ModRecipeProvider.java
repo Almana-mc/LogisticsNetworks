@@ -5,6 +5,7 @@ import java.util.concurrent.CompletableFuture;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.GuideRecipe;
+import me.almana.logisticsnetworks.recipe.WrenchResetRecipe;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentPatch;
@@ -91,6 +92,9 @@ public class ModRecipeProvider extends RecipeProvider {
 
         SpecialRecipeBuilder.special(() -> FilterCopyClearRecipe.INSTANCE)
                 .save(output, "logisticsnetworks:filter_copy_clear");
+
+        SpecialRecipeBuilder.special(() -> WrenchResetRecipe.INSTANCE)
+                .save(output, "logisticsnetworks:wrench_reset");
 
         guideRecipe();
     }
