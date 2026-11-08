@@ -127,4 +127,29 @@ private static int signal(LogisticsNodeEntity node, ChannelData data) {
     }
     return node.level().getBestNeighborSignal(node.getAttachedPos());
 }
+
+Source owner: RecipeChannel (0b64048c, Create pause for card receivers)
+
+if (!sourceNode.isMountedOnCreate() && !level.isLoaded(sourceNode.getAttachedPos()))
+    return -1;
+
+boolean usable = false;
+boolean unavailableMounted = false;
+boolean stationary = false;
+
+stationary |= !node.isMountedOnCreate();
+if (!node.isMountedOnCreate() && !targetLevel.isLoaded(node.getAttachedPos()))
+    continue;
+if (!sourceNode.isMountedOnCreate() && !node.isMountedOnCreate()
+        && TransferEngine.isSameItemStorage(level, pos, targetLevel, node.getAttachedPos()))
+    continue;
+RecipeEndpoint endpoint = endpoint(target, source, kinds, caps, cache);
+if (endpoint.items() == null && endpoint.fluids() == null && endpoint.chemicals() == null) {
+    unavailableMounted |= node.isMountedOnCreate();
+    continue;
+}
+usable = true;
+
+return reachable
+        && !TransferEngine.shouldPauseForUnavailableMountedTargets(usable, unavailableMounted, stationary);
 */

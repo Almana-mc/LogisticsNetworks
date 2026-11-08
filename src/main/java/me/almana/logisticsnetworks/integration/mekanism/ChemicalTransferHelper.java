@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.mekanism;
 
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.FilterMode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -11,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.ObjLongConsumer;
 
 public final class ChemicalTransferHelper {
@@ -19,7 +21,7 @@ public final class ChemicalTransferHelper {
     /*
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    private static final TagKey<Chemical> RESOURCE_BLACKLIST_CHEMICALS = TagKey.create(
+    static final TagKey<Chemical> RESOURCE_BLACKLIST_CHEMICALS = TagKey.create(
             MekanismAPI.CHEMICAL_REGISTRY_NAME,
             ResourceLocation.fromNamespaceAndPath("logisticsnetworks", "blacklist/chemicals"));
     */
@@ -393,4 +395,15 @@ public final class ChemicalTransferHelper {
     }
     return batchLimit - remaining;
     */
+
+    public static Optional<RecipeCardData.Ingredient> recipeIngredient(Object value) {
+        // Enable when 26.1.2 is supported.
+        /*
+        if (!(value instanceof ChemicalStack stack) || stack.isEmpty())
+            return Optional.empty();
+        return Optional.ofNullable(getChemicalId(stack))
+                .map(id -> RecipeCardData.Ingredient.ofChemical(id, stack.getAmount()));
+        */
+        return Optional.empty();
+    }
 }

@@ -62,14 +62,6 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         return stack.getOrDefault(LogisticsDataComponents.RECIPE_CARD.get(), EMPTY);
     }
 
-    public int setSize() {
-        int size = 0;
-        for (Ingredient ingredient : ingredients) {
-            size += ingredient.count();
-        }
-        return size;
-    }
-
     public long amount(Kind kind) {
         long total = 0;
         for (Ingredient ingredient : ingredients) {
