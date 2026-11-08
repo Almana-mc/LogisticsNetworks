@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.client.screen;
 
+import me.almana.logisticsnetworks.client.FilterResourceRenderer;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
@@ -89,8 +90,8 @@ final class FlowResourceList {
     private static void renderIcon(GuiGraphics g, FlowResource resource, int x, int y) {
         switch (resource) {
             case FlowResource.Item item -> g.renderItem(item.stack(), x, y);
-            case FlowResource.Fluid fluid -> FilterScreen.renderFluidStack(g, fluid.stack(), x, y);
-            case FlowResource.Chemical chemical -> FilterScreen.renderChemicalStack(g, chemical.id(), x, y);
+            case FlowResource.Fluid fluid -> FilterResourceRenderer.renderFluid(g, fluid.stack(), x, y);
+            case FlowResource.Chemical chemical -> FilterResourceRenderer.renderChemical(g, chemical.id(), x, y);
         }
     }
 

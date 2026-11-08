@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.client.ClientInput;
+import me.almana.logisticsnetworks.client.FilterResourceRenderer;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import net.minecraft.ChatFormatting;
 import me.almana.logisticsnetworks.client.theme.Theme;
@@ -183,9 +184,9 @@ final class FilterTagPicker {
     static void renderMember(GuiGraphics graphics, FilterTargetType target, FilterTagCatalog.Member member, int x, int y) {
         switch (target) {
             case ITEMS -> graphics.renderItem(new ItemStack(BuiltInRegistries.ITEM.getValue(member.id())), x, y);
-            case FLUIDS -> FilterScreen.renderFluidStack(graphics,
+            case FLUIDS -> FilterResourceRenderer.renderFluid(graphics,
                     new FluidStack(BuiltInRegistries.FLUID.getValue(member.id()), 1000), x, y);
-            case CHEMICALS -> FilterScreen.renderChemicalStack(graphics, member.id().toString(), x, y);
+            case CHEMICALS -> FilterResourceRenderer.renderChemical(graphics, member.id().toString(), x, y);
         }
     }
 
