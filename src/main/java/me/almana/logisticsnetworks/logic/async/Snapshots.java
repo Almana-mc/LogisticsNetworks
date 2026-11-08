@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.TransferAmountRules;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
@@ -104,6 +105,7 @@ public final class Snapshots {
             ChannelData channel = node.getChannel(index);
             if (channel == null || !channel.isEnabled()
                     || channel.getMode() != ChannelMode.EXPORT || channel.getType() != ChannelType.ITEM) continue;
+            if (RecipeCardItem.anyIn(channel.getFilterItems())) continue;
             if (!TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal)) continue;
             List<TransferEngine.ImportTarget> targets = context.itemImports()[index];
             if (targets == null || targets.isEmpty()) continue;

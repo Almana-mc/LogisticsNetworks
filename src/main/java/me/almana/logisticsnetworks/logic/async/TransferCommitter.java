@@ -10,6 +10,7 @@ import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.ItemResourceOrder;
 import me.almana.logisticsnetworks.logic.PlannedItemValidation;
@@ -207,6 +208,7 @@ public final class TransferCommitter {
         LogisticsNodeEntity node = sourceNode(plan, network, context);
         if (node == null) return ItemResourceOrder.EMPTY;
         ChannelData channel = node.getChannel(plan.channelIndex());
+        if (RecipeCardItem.anyIn(channel.getFilterItems())) return ItemResourceOrder.EMPTY;
         int tier = context.tierCache().getOrDefault(node.getUUID(), 0);
         int limit = Math.min(shortfall, Math.max(0, batchLimit(channel, tier) - committed));
         if (limit == 0) return ItemResourceOrder.EMPTY;

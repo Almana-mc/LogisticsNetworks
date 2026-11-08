@@ -18,6 +18,7 @@ import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
@@ -280,7 +281,8 @@ public class TransferEngine {
                 continue;
             if (channel.getMode() != ChannelMode.EXPORT)
                 continue;
-            if (!includeItems && channel.getType() == ChannelType.ITEM)
+            if (!includeItems && channel.getType() == ChannelType.ITEM
+                    && !RecipeCardItem.anyIn(channel.getFilterItems()))
                 continue;
             if (!isRedstoneActive(channel.getRedstoneMode(), redstoneSignal))
                 continue;
@@ -440,13 +442,23 @@ public class TransferEngine {
                 ? (slot, index, moved, mask) -> markServed(exportChannel, resolved.refs().get(index))
                 : null;
         MoveRecorder recorder = telemetryActive ? withTelemetry(served, exportChannel.getTelemetry()) : served;
-        ItemResourceOrder.Result result = executeItemOperation(sourceHandler, resolved.targets(), batchLimit,
-                exportFilters, exportChannel.getFilterMode(), null,
+        int recipeMoved = 0;
+        if (RecipeCardItem.anyIn(exportFilters)) {
+            recipeMoved = RecipeSets.transfer(sourceHandler, resolved.targets(), exportFilters, batchLimit,
+                    distribution, recorder, sourceLevel.registryAccess(), filterReadCache);
+            exportFilters = RecipeSets.withoutCards(exportFilters);
+            // Budget spent or card-only
+            if (recipeMoved >= batchLimit || !FilterLogic.hasConfiguredItemFilter(exportFilters, filterReadCache)) {
+                return recipeMoved;
+            }
+        }
+        ItemResourceOrder.Result result = executeItemOperation(sourceHandler, resolved.targets(),
+                batchLimit - recipeMoved, exportFilters, exportChannel.getFilterMode(), null,
                 sourceLevel.registryAccess(), distribution,
                 filterReadCache, recorder, Map.of(), null, null,
                 exportChannel.canRotateResources(), exportChannel.getItemResourceCursor(), null);
         if (result.cursor() != null) exportChannel.setItemResourceCursor(result.cursor());
-        return result.moved();
+        return result.moved() + recipeMoved;
     }
 
     public static MoveRecorder withTelemetry(@Nullable MoveRecorder next, ChannelTelemetry telemetry) {
@@ -1308,7 +1320,7 @@ public class TransferEngine {
         return any ? mask : null;
     }
 
-    private static ItemStack insertItemWithAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack stack,
+    static ItemStack insertItemWithAllowedSlots(ResourceHandler<ItemResource> handler, ItemStack stack,
             TransactionContext transaction, boolean[] allowedSlots) {
         if (stack.isEmpty()) {
             return ItemStack.EMPTY;
