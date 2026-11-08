@@ -14,7 +14,7 @@ final class CombinedEnergyHandler implements EnergyHandler {
     public long getAmountAsLong() {
         long sum = 0;
         for (EnergyHandler handler : handlers) {
-            sum += handler.getAmountAsLong();
+            sum = saturatingAdd(sum, handler.getAmountAsLong());
         }
         return sum;
     }
@@ -23,7 +23,7 @@ final class CombinedEnergyHandler implements EnergyHandler {
     public long getCapacityAsLong() {
         long sum = 0;
         for (EnergyHandler handler : handlers) {
-            sum += handler.getCapacityAsLong();
+            sum = saturatingAdd(sum, handler.getCapacityAsLong());
         }
         return sum;
     }
@@ -66,5 +66,10 @@ final class CombinedEnergyHandler implements EnergyHandler {
             }
         }
         return total;
+    }
+
+    private static long saturatingAdd(long left, long right) {
+        long add = Math.max(0, right);
+        return left > Long.MAX_VALUE - add ? Long.MAX_VALUE : left + add;
     }
 }
