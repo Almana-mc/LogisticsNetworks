@@ -23,6 +23,11 @@ public interface StorageAdapter {
         return InterfaceStorageResolution.unsupported();
     }
 
+    @Nullable
+    default Object networkIdentity(ServerLevel level, BlockPos pos) {
+        return null;
+    }
+
     boolean isPattern(ItemStack stack, Level level);
 
     List<LinkedStorage.PatternEntry> readPatternInputs(ItemStack stack, Level level);

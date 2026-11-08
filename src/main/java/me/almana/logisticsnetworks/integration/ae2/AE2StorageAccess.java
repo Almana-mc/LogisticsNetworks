@@ -61,17 +61,21 @@ final class AE2StorageAccess implements StorageAccess {
     static GridAccess resolveGridAccess(ServerLevel callerLevel, StorageLink link) {
         ServerLevel targetLevel = callerLevel.getServer().getLevel(link.position().dimension());
         if (targetLevel == null || !targetLevel.hasChunkAt(link.position().pos())) return null;
-        BlockEntity blockEntity = targetLevel.getBlockEntity(link.position().pos());
-        if (!(blockEntity instanceof IInWorldGridNodeHost host)) return null;
-        IGridNode gridNode = host.getGridNode(null);
-        if (gridNode == null) {
-            for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.values()) {
-                gridNode = host.getGridNode(direction);
-                if (gridNode != null) break;
-            }
-        }
+        IGridNode gridNode = findNode(targetLevel.getBlockEntity(link.position().pos()));
         if (gridNode == null || !gridNode.isActive()) return null;
         return new GridAccess(gridNode.getGrid(), gridNode);
+    }
+
+    @Nullable
+    static IGridNode findNode(@Nullable BlockEntity blockEntity) {
+        if (!(blockEntity instanceof IInWorldGridNodeHost host)) return null;
+        IGridNode gridNode = host.getGridNode(null);
+        if (gridNode != null) return gridNode;
+        for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.values()) {
+            gridNode = host.getGridNode(direction);
+            if (gridNode != null) return gridNode;
+        }
+        return null;
     }
 
     @Override

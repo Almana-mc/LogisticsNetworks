@@ -16,6 +16,7 @@ import appeng.api.storage.MEStorage;
 import appeng.core.definitions.AEItems;
 import appeng.helpers.InterfaceLogicHost;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import me.almana.logisticsnetworks.integration.arseng.ArsEngCompat;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -159,6 +160,18 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
     public long extractItem(ItemStack stack, long amount, boolean simulate) {
         AEItemKey key = AEItemKey.of(stack);
         return key == null ? 0 : extract(key, amount, simulate);
+    }
+
+    @Override
+    public long insertSource(long amount, boolean simulate) {
+        AEKey key = ArsEngCompat.sourceKey();
+        return key == null ? 0 : insert(key, amount, simulate);
+    }
+
+    @Override
+    public long extractSource(long amount, boolean simulate) {
+        AEKey key = ArsEngCompat.sourceKey();
+        return key != null && isValid() && canExport(key) ? extract(key, amount, simulate) : 0;
     }
 
     @Override

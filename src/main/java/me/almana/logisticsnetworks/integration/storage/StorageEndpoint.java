@@ -52,4 +52,12 @@ public interface StorageEndpoint {
     long insertFluid(FluidStack stack, long amount, boolean simulate);
 
     long extractFluid(FluidStack stack, long amount, boolean simulate);
+
+    default long insertSource(long amount, boolean simulate) {
+        return 0;
+    }
+
+    default long extractSource(long amount, boolean simulate) {
+        return 0;
+    }
 }

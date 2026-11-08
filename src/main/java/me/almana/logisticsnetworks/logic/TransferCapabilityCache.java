@@ -120,7 +120,7 @@ public final class TransferCapabilityCache {
         return findItemCapability(level, direction);
     }
 
-    private InterfaceStorageResolution resolveInterface(ServerLevel level, @Nullable Direction direction) {
+    InterfaceStorageResolution resolveInterface(ServerLevel level, @Nullable Direction direction) {
         if (!NodeUpgradeData.hasNetworkUpgrade(node)) return InterfaceStorageResolution.unsupported();
         return LinkedStorage.resolveInterface(level, node.getAttachedPos(), direction);
     }
