@@ -1,12 +1,19 @@
 package me.almana.logisticsnetworks.item;
 
+import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.TooltipDisplay;
+import net.minecraft.world.level.Level;
 
 import java.util.function.Consumer;
 
@@ -20,11 +27,26 @@ public class RecipeCardItem extends Item {
         return stack.getItem() instanceof RecipeCardItem;
     }
 
+    public static ItemStack stamp(ItemStack card) {
+        ItemStack clean = new ItemStack(card.getItem());
+        RecipeCardData data = RecipeCardData.of(card).sanitized();
+        if (!data.ingredients().isEmpty()) clean.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
+        return clean;
+    }
+
     public static boolean anyIn(ItemStack[] filters) {
         for (ItemStack filter : filters) {
             if (is(filter)) return true;
         }
         return false;
+    }
+
+    @Override
+    public InteractionResult use(Level level, Player player, InteractionHand hand) {
+        if (player instanceof ServerPlayer serverPlayer) {
+            RecipeCardMenu.openHand(serverPlayer, hand);
+        }
+        return level.isClientSide() ? InteractionResult.SUCCESS : InteractionResult.SUCCESS_SERVER;
     }
 
     @Override

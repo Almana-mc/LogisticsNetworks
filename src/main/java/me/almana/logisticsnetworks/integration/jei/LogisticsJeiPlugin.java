@@ -9,6 +9,8 @@ import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.ClipboardScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
+import me.almana.logisticsnetworks.client.screen.RecipeCardScreen;
+import mezz.jei.api.registration.IRecipeTransferRegistration;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.resources.Identifier;
@@ -34,6 +36,7 @@ public class LogisticsJeiPlugin implements IModPlugin {
         registration.addGhostIngredientHandler(NodeScreen.class, NODE_GHOST_HANDLER);
         registration.addGhostIngredientHandler(NodeGraphScreen.class, new NodeGhostIngredientHandler<>());
         registration.addGhostIngredientHandler(ClipboardScreen.class, new NodeGhostIngredientHandler<>());
+        registration.addGhostIngredientHandler(RecipeCardScreen.class, new RecipeCardGhostHandler());
         registration.addGuiContainerHandler(NodeGraphScreen.class, new IGuiContainerHandler<>() {
             @Override
             public List<Rect2i> getGuiExtraAreas(NodeGraphScreen screen) {
@@ -47,5 +50,10 @@ public class LogisticsJeiPlugin implements IModPlugin {
                 return screen.getExtraAreas();
             }
         });
+    }
+
+    @Override
+    public void registerRecipeTransferHandlers(IRecipeTransferRegistration registration) {
+        registration.addUniversalRecipeTransferHandler(new RecipeCardTransferHandler());
     }
 }

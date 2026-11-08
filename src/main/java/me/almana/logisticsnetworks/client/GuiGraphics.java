@@ -98,6 +98,10 @@ public final class GuiGraphics {
         raw.setTooltipForNextFrame(font, lines, Optional.empty(), tooltipCoordinate(x), tooltipCoordinate(y));
     }
 
+    public void renderTooltip(Font font, ItemStack stack, int x, int y) {
+        raw.setTooltipForNextFrame(font, stack, tooltipCoordinate(x), tooltipCoordinate(y));
+    }
+
     private int tooltipCoordinate(int coordinate) {
         return (int) Math.round(coordinate * tooltipScale);
     }

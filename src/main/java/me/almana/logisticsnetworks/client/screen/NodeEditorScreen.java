@@ -19,6 +19,8 @@ import me.almana.logisticsnetworks.client.FilterClickHandler;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.ClientConfig;
+import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.ModFilterData;
 import me.almana.logisticsnetworks.filter.NameFilterData;
@@ -33,6 +35,7 @@ import me.almana.logisticsnetworks.network.AssignNetworkPayload;
 import me.almana.logisticsnetworks.network.AddNodeFilterItemPayload;
 import me.almana.logisticsnetworks.network.InstallStorageUpgradePayload;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
+import me.almana.logisticsnetworks.network.StampRecipeCardPayload;
 import me.almana.logisticsnetworks.network.RequestStorageUpgradeCatalogPayload;
 import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
 import me.almana.logisticsnetworks.network.RenameNetworkPayload;
@@ -941,7 +944,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             String label = filterable ? filterButtonText(stack) : "";
             ThemePaint.button(g, font, bx - 1, by - 1, 18, 18, label, hovered, t);
             if (hovered && !menu.getCarried().isEmpty() && !menu.getCarried().is(ModTags.FILTERS)
-                    && isFilterSlotItemAddable(i)) {
+                    && !RecipeCardItem.is(menu.getCarried()) && isFilterSlotItemAddable(i)) {
                 filterAddHover = true;
             }
         }
@@ -1014,7 +1017,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     public void addItemToFilterSlot(int slot, ItemStack item) {
         LogisticsNodeEntity node = getMenu().getNode();
-        if (node == null || item.isEmpty() || item.is(ModTags.FILTERS)) {
+        if (node == null || item.isEmpty() || item.is(ModTags.FILTERS) || RecipeCardItem.is(item)) {
             return;
         }
         ChannelData ch = node.getChannel(selectedChannel);
@@ -1039,6 +1042,17 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         filterAddedToastUntil = System.currentTimeMillis() + 1500;
     }
 
+    private void stampCard(LogisticsNodeEntity node, ChannelData channel, int slot, ItemStack card) {
+        ItemStack current = channel.getFilterItem(slot);
+        ItemStack stamped = RecipeCardItem.stamp(card);
+        if (channel.getType() != ChannelType.ITEM || RecipeCardData.of(stamped).ingredients().isEmpty()
+                || !isFilterButtonEmpty(current) && !RecipeCardItem.is(current)) {
+            return;
+        }
+        channel.setFilterItem(slot, stamped);
+        ClientPacketDistributor.sendToServer(new StampRecipeCardPayload(node.getId(), selectedChannel, slot));
+    }
+
     private boolean isHoveringFilterButton(int slot, double mx, double my) {
         int x = filterButtonX(slot);
         int y = filterButtonY(slot);
@@ -1046,6 +1060,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     }
 
     private String filterButtonText(ItemStack stack) {
+        if (RecipeCardItem.is(stack)) {
+            return "Rc";
+        }
         if (isFilterButtonEmpty(stack)) {
             return "+";
         }
@@ -1059,6 +1076,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private boolean isFilterButtonEmpty(ItemStack stack) {
         if (stack.isEmpty()) {
             return true;
+        }
+        if (RecipeCardItem.is(stack)) {
+            return false;
         }
         VirtualFilterType type = VirtualFilterType.fromStack(stack);
         return switch (type) {
@@ -1556,6 +1576,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
                 for (int i = 0; i < ChannelData.FILTER_SIZE; i++) {
                     if (isHoveringFilterButton(i, mx, my)) {
                         ItemStack carried = menu.getCarried();
+                        if (RecipeCardItem.is(carried)) {
+                            stampCard(node, channel, i, carried);
+                            return true;
+                        }
                         if (!carried.isEmpty() && !carried.is(ModTags.FILTERS)
                                 && isFilterSlotItemAddable(i)) {
                             addItemToFilterSlot(i, carried);

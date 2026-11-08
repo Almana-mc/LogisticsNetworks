@@ -11,6 +11,7 @@ import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.MassPlacementScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
+import me.almana.logisticsnetworks.client.screen.RecipeCardScreen;
 import me.almana.logisticsnetworks.client.screen.ServerRackScreen;
 import net.neoforged.fml.ModList;
 import com.mojang.logging.LogUtils;
@@ -60,6 +61,7 @@ public final class LogisticsClientEvents {
         event.register(Registration.MASS_PLACEMENT_MENU.get(), MassPlacementScreen::new);
         event.register(Registration.PATTERN_SETTER_MENU.get(), PatternSetterScreen::new);
         event.register(Registration.COMPUTER_MENU.get(), ComputerScreen::new);
+        event.register(Registration.RECIPE_CARD_MENU.get(), RecipeCardScreen::new);
     }
 
     public static void clientSetup(FMLClientSetupEvent event) {

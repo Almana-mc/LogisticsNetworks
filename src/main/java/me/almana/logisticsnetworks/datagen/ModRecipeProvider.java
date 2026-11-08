@@ -98,9 +98,10 @@ public class ModRecipeProvider extends RecipeProvider {
                 .save(output, "logisticsnetworks:wrench_reset");
         SpecialRecipeBuilder.special(() -> RecipeCardCopyClearRecipe.INSTANCE)
                 .save(output, "logisticsnetworks:recipe_card_copy_clear");
-        shapeless(RecipeCategory.MISC, Registration.RECIPE_CARD.get(), 2)
+        shapeless(RecipeCategory.MISC, Registration.RECIPE_CARD.get())
                 .requires(Items.PAPER)
                 .requires(Items.REDSTONE)
+                .requires(Items.IRON_NUGGET)
                 .unlockedBy("has_paper", has(Items.PAPER))
                 .save(output);
 

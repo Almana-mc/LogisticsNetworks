@@ -20,6 +20,8 @@ import me.almana.logisticsnetworks.network.SelectNodeChannelPayload;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SetChannelFilterItemPayload;
 import me.almana.logisticsnetworks.network.AddNodeFilterItemPayload;
+import me.almana.logisticsnetworks.network.SetRecipeCardPayload;
+import me.almana.logisticsnetworks.network.StampRecipeCardPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryAmountPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryDurabilityPayload;
 import me.almana.logisticsnetworks.network.SetFilterEntryEnchantedPayload;
@@ -184,6 +186,10 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetChannelFilterItem);
                 registrar.playToServer(AddNodeFilterItemPayload.TYPE, AddNodeFilterItemPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleAddNodeFilterItem);
+                registrar.playToServer(SetRecipeCardPayload.TYPE, SetRecipeCardPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleSetRecipeCard);
+                registrar.playToServer(StampRecipeCardPayload.TYPE, StampRecipeCardPayload.STREAM_CODEC,
+                                ServerPayloadHandler::handleStampRecipeCard);
                 registrar.playToServer(SelectNodeChannelPayload.TYPE, SelectNodeChannelPayload.STREAM_CODEC,
                                 ServerPayloadHandler::handleSelectNodeChannel);
                 registrar.playToServer(ModifyFilterModPayload.TYPE, ModifyFilterModPayload.STREAM_CODEC,

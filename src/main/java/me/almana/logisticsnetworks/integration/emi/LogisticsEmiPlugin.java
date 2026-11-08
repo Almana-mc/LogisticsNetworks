@@ -9,6 +9,8 @@ import dev.emi.emi.api.widget.Bounds;
 import me.almana.logisticsnetworks.client.screen.FilterScreen;
 import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
+import me.almana.logisticsnetworks.client.screen.RecipeCardScreen;
+import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Rect2i;
 
@@ -32,6 +34,8 @@ public class LogisticsEmiPlugin implements EmiPlugin {
                 consumer.accept(new Bounds(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight()));
             }
         });
+        registry.addDragDropHandler(RecipeCardScreen.class, new RecipeCardDragDrop());
+        registry.addRecipeHandler(Registration.RECIPE_CARD_MENU.get(), new RecipeCardEmiHandler());
     }
 }
 */
