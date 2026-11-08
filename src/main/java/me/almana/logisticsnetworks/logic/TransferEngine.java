@@ -925,6 +925,9 @@ public class TransferEngine {
         // Memo components per source slot
         CandidateComponents[] slotComponents = hasNbtFilter ? new CandidateComponents[slotCount] : null;
         byte[] slotVerdicts = new byte[slotCount];
+        // Simulated extracts shared across targets
+        int[] slotExtractable = new int[slotCount];
+        Arrays.fill(slotExtractable, -1);
 
         boolean flushDirect = DirectStorageHandlers.isDirect(source);
         for (ItemTransferTarget target : targets) {
@@ -1037,10 +1040,14 @@ public class TransferEngine {
                             continue;
                         }
 
-                        int extractable;
-                        try (var check = Transaction.open(tx)) {
-                            extractable = extractItem(source, slot, allowed, check).getCount();
+                        int extractable = slotExtractable[entry];
+                        if (extractable < 0) {
+                            try (var check = Transaction.open(tx)) {
+                                extractable = extractItem(source, slot, remaining, check).getCount();
+                            }
+                            slotExtractable[entry] = extractable;
                         }
+                        extractable = Math.min(extractable, allowed);
                         if (extractable <= 0) {
                             slotVerdicts[entry] = SLOT_REJECTED;
                             continue;
@@ -1085,6 +1092,7 @@ public class TransferEngine {
                             insertRejections.clear();
                             // Source changed, recheck slots
                             Arrays.fill(slotVerdicts, (byte) 0);
+                            Arrays.fill(slotExtractable, -1);
                             if (slotComponents != null) {
                                 Arrays.fill(slotComponents, null);
                             }
