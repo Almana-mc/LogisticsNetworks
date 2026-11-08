@@ -78,22 +78,6 @@ public final class DurabilityFilterData {
         return Operator.fromId(root.getStringOr(KEY_OPERATOR, DEFAULT_OPERATOR.id()));
     }
 
-    public static boolean matches(ItemStack filterStack, ItemStack candidate) {
-        if (!isDurabilityFilterItem(filterStack) || candidate.isEmpty() || !candidate.isDamageableItem()) {
-            return false;
-        }
-
-        int threshold = getValue(filterStack);
-        int remaining = candidate.getMaxDamage() - candidate.getDamageValue();
-        Operator operator = getOperator(filterStack);
-
-        return switch (operator) {
-            case LESS_OR_EQUAL -> remaining <= threshold;
-            case EQUAL -> remaining == threshold;
-            case GREATER_OR_EQUAL -> remaining >= threshold;
-        };
-    }
-
     private static int clamp(int value) {
         return Math.max(MIN_VALUE, Math.min(MAX_VALUE, value));
     }
