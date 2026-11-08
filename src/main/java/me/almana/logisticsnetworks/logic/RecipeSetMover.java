@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.logic;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.registration.ModTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.ItemStack;
@@ -82,20 +83,22 @@ final class RecipeSetMover implements RecipeSets.SetMove {
         int count = fit(target, sets);
         if (count == 0) return 0;
         List<Moved> done = new ArrayList<>();
-        // Short ingredient reverts whole set
-        try (var tx = Transaction.openRoot()) {
-            for (int i = 0; i < matching.length; i++) {
+        boolean direct = DirectStorageHandlers.isDirect(target.handler());
+        boolean placed = true;
+        // Shared network capacity: commit each
+        try (var tx = direct ? null : Transaction.openRoot()) {
+            for (int i = 0; i < matching.length && placed; i++) {
                 int amount = count * card.ingredients().get(i).count();
-                if (move(target, i, amount, done, tx) < amount) return 0;
+                placed = move(target, i, amount, done, tx) >= amount;
             }
-            tx.commit();
+            if (placed && tx != null) tx.commit();
         }
-        if (recorder != null) {
+        if (recorder != null && (placed || direct)) {
             for (Moved moved : done) {
                 recorder.record(moved.sourceSlot(), targetIndex, moved.stack(), null);
             }
         }
-        return count;
+        return placed ? count : 0;
     }
 
     private int fit(TransferEngine.ItemTransferTarget target, int sets) {
@@ -134,7 +137,7 @@ final class RecipeSetMover implements RecipeSets.SetMove {
     }
 
     private int move(TransferEngine.ItemTransferTarget target, int ingredient, int amount, List<Moved> done,
-            TransactionContext tx) {
+            @Nullable TransactionContext tx) {
         int left = amount;
         for (int slot : matching[ingredient]) {
             if (left <= 0) break;
@@ -148,7 +151,7 @@ final class RecipeSetMover implements RecipeSets.SetMove {
     }
 
     private int moveFromSlot(TransferEngine.ItemTransferTarget target, int ingredient, int slot, int limit,
-            List<Moved> done, TransactionContext tx) {
+            List<Moved> done, @Nullable TransactionContext tx) {
         ItemStack stack = ItemUtil.getStack(source, slot);
         if (!usable(stack, ingredient)) return 0;
         ItemResource resource = ItemResource.of(stack);
