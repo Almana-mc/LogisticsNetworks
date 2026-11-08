@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -61,7 +62,7 @@ public final class AttachedStorageFilterScanner {
                 continue;
             }
             ItemStack stack = resource.toStack();
-            if (FilterItemData.containsItem(filter, stack)) {
+            if (RecipeCardItem.is(stack) || FilterItemData.containsItem(filter, stack)) {
                 continue;
             }
             if (FilterItemData.addItem(filter, stack)) {

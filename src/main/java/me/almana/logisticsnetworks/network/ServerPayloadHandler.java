@@ -647,53 +647,19 @@ public class ServerPayloadHandler {
             Player player = context.player();
             if (!(player.containerMenu instanceof RecipeCardMenu menu) || !menu.stillValid(player))
                 return;
+            if (menu.isNodeTarget() && getAuthorizedNode(context, menu.entityId()) == null)
+                return;
             RecipeCardData data = payload.data().sanitized();
-            if (menu.isNodeTarget()) {
-                LogisticsNodeEntity node = getAuthorizedNode(context, menu.entityId());
-                ChannelData channel = node == null ? null : node.getChannel(menu.channel());
-                if (channel == null || channel.getType() != ChannelType.ITEM)
-                    return;
-                ItemStack card = channel.getFilterItem(menu.slot());
-                if (!RecipeCardItem.is(card) || data.equals(RecipeCardData.of(card)))
-                    return;
-                card = card.copy();
-                if (data.ingredients().isEmpty()) {
-                    card.remove(LogisticsDataComponents.RECIPE_CARD.get());
-                } else {
-                    card.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
-                }
-                channel.setFilterItem(menu.slot(), card);
-                sendChannelSyncToViewers(node, menu.channel(), channel);
-                propagateToLabelGroup(node, menu.channel());
-                invalidateNetwork(node);
+            ItemStack card = menu.card(player).copy();
+            if (!RecipeCardItem.is(card) || data.equals(RecipeCardData.of(card)))
+                return;
+            if (data.ingredients().isEmpty()) {
+                card.remove(LogisticsDataComponents.RECIPE_CARD.get());
             } else {
-                ItemStack held = player.getItemInHand(menu.hand());
-                if (data.ingredients().isEmpty()) {
-                    held.remove(LogisticsDataComponents.RECIPE_CARD.get());
-                } else {
-                    held.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
-                }
+                card.set(LogisticsDataComponents.RECIPE_CARD.get(), data);
             }
+            menu.store(player, card);
             menu.setData(data);
-        });
-    }
-
-    public static void handleStampRecipeCard(StampRecipeCardPayload payload, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            LogisticsNodeEntity node = getAuthorizedNode(context, payload.entityId());
-            ChannelData channel = node == null ? null : node.getChannel(payload.channel());
-            int slot = payload.slot();
-            if (channel == null || channel.getType() != ChannelType.ITEM
-                    || slot < 0 || slot >= ChannelData.FILTER_SIZE)
-                return;
-            ItemStack carried = context.player().containerMenu.getCarried();
-            ItemStack card = RecipeCardItem.is(carried) ? RecipeCardItem.stamp(carried) : ItemStack.EMPTY;
-            if (card.isEmpty() || RecipeCardData.of(card).ingredients().isEmpty())
-                return;
-            channel.setFilterItem(slot, card);
-            sendChannelSyncToViewers(node, payload.channel(), channel);
-            propagateToLabelGroup(node, payload.channel());
-            invalidateNetwork(node);
         });
     }
 
@@ -719,7 +685,7 @@ public class ServerPayloadHandler {
             if (fs < 0 || fs >= ChannelData.FILTER_SIZE)
                 return;
             ItemStack item = payload.item();
-            if (item.isEmpty() || item.is(ModTags.FILTERS) || RecipeCardItem.is(item))
+            if (item.isEmpty() || item.is(ModTags.FILTERS))
                 return;
             FilterTargetType desired = FilterTargetType.forChannel(channel.getType());
             if (desired == null)
@@ -851,13 +817,6 @@ public class ServerPayloadHandler {
 
             ItemStack stack = channel.getFilterItem(fs);
             VirtualFilterType requested = payload.requestedType();
-            if (requested == VirtualFilterType.EXISTING && RecipeCardItem.is(stack)) {
-                // No card editing from graph
-                if (GraphPayloadHandler.getContext(serverPlayer.containerMenu) == null) {
-                    RecipeCardMenu.openNode(serverPlayer, node, ch, fs);
-                }
-                return;
-            }
             boolean needFresh = requested != VirtualFilterType.EXISTING
                     || stack.isEmpty() || !stack.is(ModTags.FILTERS)
                     || currentTarget(stack) != desired;

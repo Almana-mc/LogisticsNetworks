@@ -10,6 +10,7 @@ import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.client.theme.Theme;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
@@ -19,6 +20,7 @@ import me.almana.logisticsnetworks.filter.NameMatchScope;
 import me.almana.logisticsnetworks.filter.NbtFilterData;
 import me.almana.logisticsnetworks.filter.NbtPath;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.network.ModifyFilterModPayload;
 import me.almana.logisticsnetworks.network.OpenNodeMenuPayload;
@@ -48,6 +50,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -540,6 +543,19 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
+    }
+
+    @Override
+    protected void extractSlot(GuiGraphicsExtractor graphics, Slot slot, int mouseX, int mouseY) {
+        if (slot.index < menu.getFilterSlots() && RecipeCardItem.is(slot.getItem())) {
+            List<RecipeCardData.Ingredient> inputs = RecipeCardData.of(slot.getItem()).ingredients();
+            if (!inputs.isEmpty()) {
+                graphics.item(inputs.get((int) (System.currentTimeMillis() / 1000 % inputs.size())).icon(),
+                        slot.x, slot.y);
+                return;
+            }
+        }
+        super.extractSlot(graphics, slot, mouseX, mouseY);
     }
 
     private void renderStandardFilterGrid(GuiGraphics g, int mx, int my) {
@@ -1423,6 +1439,13 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 && isHovering(backButtonX(), backButtonY(), BACK_BUTTON_W, BACK_BUTTON_H, (int) mx, (int) my);
     }
 
+    private void editRecipeCard(int slot) {
+        if (!menu.isBoundFilter() || menu.getGraphContext() != null || minecraft == null
+                || minecraft.gameMode == null) return;
+        flushEditorsBeforeExit();
+        minecraft.gameMode.handleInventoryButtonClick(menu.containerId, FilterMenu.ID_EDIT_CARD_BASE + slot);
+    }
+
     private boolean returnToNodeScreen() {
         if (!menu.isBoundFilter()) {
             return false;
@@ -1550,7 +1573,11 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             int hoveredSlot = getHoveredFilterSlot((int) mx, (int) my);
             if (hoveredSlot >= 0) {
                 ClickSound.play();
-                enterDetailPage(hoveredSlot);
+                if (RecipeCardItem.is(menu.slots.get(hoveredSlot).getItem())) {
+                    editRecipeCard(hoveredSlot);
+                } else {
+                    enterDetailPage(hoveredSlot);
+                }
                 return true;
             }
         }
@@ -4750,6 +4777,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         String tag = menu.getEntryTag(slot);
         ItemStack slotItem = slot < menu.slots.size() ? menu.slots.get(slot).getItem() : ItemStack.EMPTY;
+        if (RecipeCardItem.is(slotItem)) {
+            lines.addAll(getTooltipFromItem(minecraft, slotItem));
+            if (menu.isBoundFilter() && menu.getGraphContext() == null) {
+                lines.add(Component.translatable("tooltip.logisticsnetworks.recipe_card.edit",
+                        ClientControls.MODIFIER_2.getTranslatedKeyMessage()).withStyle(ChatFormatting.DARK_GRAY));
+            }
+            return lines;
+        }
         FluidStack fluid = menu.getFluidFilter(slot);
         String chemId = menu.getChemicalFilter(slot);
         boolean isNbtOnly = FilterItemData.isNbtOnlySlot(filterStack, slot);

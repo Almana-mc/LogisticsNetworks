@@ -446,7 +446,6 @@ public class TransferEngine {
         if (RecipeCardItem.anyIn(exportFilters)) {
             recipeMoved = RecipeSets.transfer(sourceHandler, resolved.targets(), exportFilters, batchLimit,
                     distribution, recorder, sourceLevel.registryAccess(), filterReadCache);
-            exportFilters = RecipeSets.withoutCards(exportFilters);
             // Budget spent or card-only
             if (recipeMoved >= batchLimit || !FilterLogic.hasConfiguredItemFilter(exportFilters, filterReadCache)) {
                 return recipeMoved;
