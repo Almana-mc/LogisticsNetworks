@@ -218,6 +218,12 @@ public class LogisticsNodeEntity extends Entity {
         return false;
     }
 
+    // Hides nodes from minimap radars
+    @Override
+    public boolean isInvisible() {
+        return true;
+    }
+
     @Override
     public void kill(ServerLevel level) {
         if (Config.debugMode) LOGGER.warn(
