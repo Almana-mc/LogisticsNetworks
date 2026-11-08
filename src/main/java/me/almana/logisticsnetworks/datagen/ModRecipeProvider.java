@@ -5,6 +5,7 @@ import java.util.concurrent.CompletableFuture;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.GuideRecipe;
+import me.almana.logisticsnetworks.recipe.RecipeCardCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.WrenchResetRecipe;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
@@ -95,6 +96,13 @@ public class ModRecipeProvider extends RecipeProvider {
 
         SpecialRecipeBuilder.special(() -> WrenchResetRecipe.INSTANCE)
                 .save(output, "logisticsnetworks:wrench_reset");
+        SpecialRecipeBuilder.special(() -> RecipeCardCopyClearRecipe.INSTANCE)
+                .save(output, "logisticsnetworks:recipe_card_copy_clear");
+        shapeless(RecipeCategory.MISC, Registration.RECIPE_CARD.get(), 2)
+                .requires(Items.PAPER)
+                .requires(Items.REDSTONE)
+                .unlockedBy("has_paper", has(Items.PAPER))
+                .save(output);
 
         guideRecipe();
     }

@@ -42,7 +42,8 @@ public class ModModelProvider extends ModelProvider {
                 Registration.MEKANISM_CHEMICAL_UPGRADE.get(),
                 Registration.ARS_SOURCE_UPGRADE.get(),
                 Registration.NETWORK_UPGRADE.get(),
-                Registration.PATTERN_SETTER.get()
+                Registration.PATTERN_SETTER.get(),
+                Registration.RECIPE_CARD.get()
         };
         for (Item item : flatItems) {
             itemModels.generateFlatItem(item, ModelTemplates.FLAT_ITEM);

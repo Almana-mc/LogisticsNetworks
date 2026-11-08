@@ -13,6 +13,7 @@ import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
 import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
 import me.almana.logisticsnetworks.item.PatternSetterItem;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.item.ModFilterItem;
 import me.almana.logisticsnetworks.item.NameFilterItem;
 import me.almana.logisticsnetworks.item.NodeUpgradeItem;
@@ -27,6 +28,7 @@ import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
 import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
+import me.almana.logisticsnetworks.recipe.RecipeCardCopyClearRecipe;
 import me.almana.logisticsnetworks.recipe.WrenchResetRecipe;
 import me.almana.logisticsnetworks.recipe.GuideRecipe;
 import net.minecraft.core.registries.Registries;
@@ -147,6 +149,9 @@ public class Registration {
                                         "pattern_setter",
                                         id -> new PatternSetterItem(itemProperties(id)));
 
+        public static final DeferredItem<RecipeCardItem> RECIPE_CARD = ITEMS.register("recipe_card",
+                        id -> new RecipeCardItem(itemProperties(id)));
+
         public static final DeferredHolder<MenuType<?>, MenuType<NodeMenu>> NODE_MENU = MENUS.register("node_menu",
                         () -> IMenuTypeExtension.create(NodeMenu::new));
         public static final DeferredHolder<MenuType<?>, MenuType<NodeGraphMenu>> NODE_GRAPH_MENU = MENUS.register("node_graph_menu",
@@ -179,6 +184,10 @@ public class Registration {
         public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<WrenchResetRecipe>> WRENCH_RESET_RECIPE = RECIPE_SERIALIZERS
                         .register("wrench_reset",
                                         () -> WrenchResetRecipe.SERIALIZER);
+
+        public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<RecipeCardCopyClearRecipe>> RECIPE_CARD_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
+                        .register("recipe_card_copy_clear",
+                                        () -> RecipeCardCopyClearRecipe.SERIALIZER);
 
         public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<GuideRecipe>> GUIDE_RECIPE = RECIPE_SERIALIZERS
                         .register("guide",
