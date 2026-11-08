@@ -102,7 +102,8 @@ final class FlowSimpleTab implements WrenchTab {
         else if (ColorPicker.inRect(mouseX, mouseY, x, y + 102, W, ROW_H)) offscreen = !offscreen;
         else if (ColorPicker.inRect(mouseX, mouseY, x + NETWORK_X, y + 82, W - NETWORK_X, ROW_H)) {
             network = (network + 1) % networks.size();
-        } else return toggleChip(mouseX, mouseY);
+        } else if (!toggleChip(mouseX, mouseY)) return false;
+        ClickSound.play();
         return true;
     }
 

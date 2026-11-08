@@ -573,12 +573,14 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
         if (mouseX >= showX && mouseX < showX + VIS_BTN_W
                 && mouseY >= buttonY && mouseY < buttonY + VIS_BTN_H) {
+            ClickSound.play();
             ClientPacketDistributor.sendToServer(new SetNetworkNodesVisibilityPayload(selectedNetworkId, true));
             setAllNodeVisibility(true);
             return true;
         }
         if (mouseX >= hideX && mouseX < hideX + VIS_BTN_W
                 && mouseY >= buttonY && mouseY < buttonY + VIS_BTN_H) {
+            ClickSound.play();
             ClientPacketDistributor.sendToServer(new SetNetworkNodesVisibilityPayload(selectedNetworkId, false));
             setAllNodeVisibility(false);
             return true;
@@ -1135,6 +1137,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
     private boolean handleNodeMapInteraction(double mouseX, double mouseY) {
         if (isBackButtonClicked(mouseX, mouseY)) {
+            ClickSound.play();
             currentPage = Page.NETWORK_LIST;
             nodeInfoList.clear();
             nodeMapScrollOffset = 0;
@@ -1149,6 +1152,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
     private boolean handleLnetInteraction(double mouseX, double mouseY) {
         if (isBackButtonClicked(mouseX, mouseY)) {
+            ClickSound.play();
             currentPage = Page.NETWORK_LIST;
             return true;
         }
@@ -1198,6 +1202,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int buttonY = contentY + LNET_TOOLBAR_Y;
 
         if (isHoveringAbs(refreshX, buttonY, 58, 14, mouseX, mouseY)) {
+            ClickSound.play();
             refreshLnetFiles();
             return true;
         }
@@ -1209,6 +1214,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             int index = i + lnetFileScrollOffset;
             int rowY = listY + i * LNET_ENTRY_HEIGHT;
             if (isHoveringAbs(fileX, rowY, fileW, LNET_ENTRY_HEIGHT - 2, mouseX, mouseY)) {
+                ClickSound.play();
                 selectLnetFile(lnetFiles.get(index));
                 return true;
             }
@@ -1221,6 +1227,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                 int index = i + lnetLabelScrollOffset;
                 int rowY = listY + i * LNET_ENTRY_HEIGHT;
                 if (isHoveringAbs(labelX, rowY, labelW, LNET_ENTRY_HEIGHT - 2, mouseX, mouseY)) {
+                    ClickSound.play();
                     selectedLnetLabelIndex = index;
                     setLnetStatus(line("gui.logisticsnetworks.computer.lnet_label_selected",
                             selectedLnetFile.nodes().get(index).label()), pal().textSecondary());
@@ -1231,6 +1238,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             int previewX = labelX + labelW + LNET_COLUMN_GAP;
             int previewW = contentX + (imageWidth - 20) - previewX - 8;
             if (isHoveringAbs(previewX + 6, listY + 92, previewW - 12, 14, mouseX, mouseY)) {
+                ClickSound.play();
                 copySelectedLnetLabelToWrench();
                 return true;
             }
@@ -1348,6 +1356,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             int index = i + networkScrollOffset;
             if (isHovering(NETWORK_LIST_X, listYOffset + (i * NETWORK_ENTRY_HEIGHT),
                     NETWORK_LIST_WIDTH, NETWORK_ENTRY_HEIGHT - 2, (int) mouseX, (int) mouseY)) {
+                ClickSound.play();
                 SyncNetworkListPayload.NetworkEntry clickedEntry = filtered.get(index);
 
                 int entryX = leftPos + NETWORK_LIST_X;
@@ -1399,6 +1408,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
             if (entry.isHeader) {
                 if (isHoveringAbs(headerX + 4, entryY + 4, 14, 14, mouseX, mouseY)) {
+                    ClickSound.play();
                     toggleGroupSelection(entry.headerName);
                     return true;
                 }
@@ -1406,16 +1416,19 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                 boolean settingsClicked = mouseX >= settingsX && mouseX < settingsX + SETTINGS_BTN_W
                         && mouseY >= buttonY && mouseY < buttonY + SETTINGS_BTN_H;
                 if (settingsClicked) {
+                    ClickSound.play();
                     openFirstNodeInLabel(entry.headerName);
                     return true;
                 }
                 if (buttonClicked) {
+                    ClickSound.play();
                     ClientPacketDistributor.sendToServer(new ToggleNetworkLabelHighlightPayload(selectedNetworkId, entry.headerName));
                     toggleGroupHighlight(entry.headerName);
                     return true;
                 }
                 if (mouseX >= headerX && mouseX < headerX + headerW
                         && mouseY >= entryY && mouseY < entryY + NODE_ENTRY_HEIGHT - 2) {
+                    ClickSound.play();
                     if (collapsedGroups.contains(entry.headerName)) {
                         collapsedGroups.remove(entry.headerName);
                     } else {
@@ -1427,6 +1440,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             }
 
             if (isHoveringAbs(headerX + 4, entryY + 4, 14, 14, mouseX, mouseY)) {
+                ClickSound.play();
                 toggleNodeSelection(entry.nodeInfo.nodeId());
                 return true;
             }
@@ -1436,12 +1450,14 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                 boolean settingsClicked = mouseX >= settingsX && mouseX < settingsX + SETTINGS_BTN_W
                         && mouseY >= buttonY && mouseY < buttonY + SETTINGS_BTN_H;
                 if (settingsClicked) {
+                    ClickSound.play();
                     openNodeSettings(entry.nodeInfo.nodeId());
                     return true;
                 }
             }
 
             if (buttonClicked) {
+                ClickSound.play();
                 ClientPacketDistributor.sendToServer(
                         new ToggleNetworkNodeHighlightPayload(selectedNetworkId, entry.nodeInfo.nodeId()));
                 toggleNodeHighlight(entry.nodeInfo.nodeId());
@@ -1477,14 +1493,17 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int sourceX = applyX + 44;
         int sameX = sourceX + 82;
         if (isHoveringAbs(applyX, y, 40, 16, mouseX, mouseY)) {
+            ClickSound.play();
             applyBulkLabel();
             return true;
         }
         if (isHoveringAbs(sourceX, y, 78, 16, mouseX, mouseY)) {
+            ClickSound.play();
             cycleLabelSource();
             return true;
         }
         if (isHoveringAbs(sameX, y, contentX + contentW - 8 - sameX, 16, mouseX, mouseY)) {
+            ClickSound.play();
             selectSameBlock();
             return true;
         }
@@ -1506,6 +1525,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int deleteY = panelY + 20;
         if (entry != null && entry.canDelete()
                 && isHoveringAbs(deleteX, deleteY, DELETE_BUTTON_SIZE, DELETE_BUTTON_SIZE, mouseX, mouseY)) {
+            ClickSound.play();
             deleteConfirmationOpen = true;
             networkSearchBox.setFocused(false);
             return true;
@@ -1513,12 +1533,14 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
         if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button1Y && mouseY < button1Y + OPTION_BTN_HEIGHT) {
+            ClickSound.play();
             openFlowMonitor();
             return true;
         }
 
         if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button2Y && mouseY < button2Y + OPTION_BTN_HEIGHT) {
+            ClickSound.play();
             currentPage = Page.NODE_MAP;
             nodeMapScrollOffset = 0;
             selectedNodeIds.clear();
@@ -1529,12 +1551,14 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
 
         if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button3Y && mouseY < button3Y + OPTION_BTN_HEIGHT) {
+            ClickSound.play();
             requestNetworkSave();
             return true;
         }
 
         if (mouseX >= buttonX && mouseX < buttonX + buttonWidth
                 && mouseY >= button4Y && mouseY < button4Y + OPTION_BTN_HEIGHT) {
+            ClickSound.play();
             NodeGraphSession.begin(selectedNetworkId);
             ClientPacketDistributor.sendToServer(new me.almana.logisticsnetworks.network.RequestOpenGraphPayload(
                     menu.getComputerPos(), minecraft.level.dimension().identifier(), selectedNetworkId,
@@ -1554,10 +1578,12 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int cancelX = deleteX - 80;
         int buttonY = y + DELETE_MODAL_HEIGHT - 26;
         if (isHoveringAbs(cancelX, buttonY, 72, 18, mouseX, mouseY)) {
+            ClickSound.play();
             deleteConfirmationOpen = false;
             return;
         }
         if (isHoveringAbs(deleteX, buttonY, 72, 18, mouseX, mouseY)) {
+            ClickSound.play();
             UUID networkId = selectedNetworkId;
             deleteConfirmationOpen = false;
             if (networkId != null) {
@@ -1572,6 +1598,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
         int buttonWidth = DETAIL_PANEL_WIDTH - 24;
         if (mouseX >= textX && mouseX < textX + buttonWidth
                 && mouseY >= loadY && mouseY < loadY + OPTION_BTN_HEIGHT) {
+            ClickSound.play();
             currentPage = Page.LNET_FILES;
             refreshLnetFiles();
             return true;

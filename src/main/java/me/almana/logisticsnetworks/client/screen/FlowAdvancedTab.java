@@ -130,12 +130,14 @@ final class FlowAdvancedTab implements WrenchTab {
         else if (ColorPicker.inRect(mouseX, mouseY, x, rowY(4), LEFT_W, ROW_H)) pulses = !pulses;
         else if (ColorPicker.inRect(mouseX, mouseY, x, rowY(7), LEFT_W, ROW_H)) throughBlocks = !throughBlocks;
         else return selectSwatch(mouseX, mouseY) || picker.mouseClicked(mouseX, mouseY);
+        ClickSound.play();
         return true;
     }
 
     private boolean selectSwatch(double mouseX, double mouseY) {
         for (int i = 0; i < TYPES.length; i++) {
             if (ColorPicker.inRect(mouseX, mouseY, swatchX(i), y, SWATCH_W, SWATCH_H)) {
+                ClickSound.play();
                 colors[target] = picker.color();
                 target = i;
                 picker.load(colors[i]);

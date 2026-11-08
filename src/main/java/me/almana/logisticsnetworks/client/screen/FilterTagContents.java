@@ -162,7 +162,7 @@ final class FilterTagContents {
 
     void mouseClicked(double mouseX, double mouseY, int button) {
         if (button != 0) return;
-        if (back.contains((int) mouseX, (int) mouseY)) { close.run(); return; }
+        if (back.contains((int) mouseX, (int) mouseY)) { ClickSound.play(); close.run(); return; }
         if (search.isMouseOver(mouseX, mouseY)) {
             setFocus(0);
             search.mouseClicked(ClientInput.mouse(mouseX, mouseY, button), false);
@@ -177,6 +177,7 @@ final class FilterTagContents {
         }
         int index = itemAt(mouseX, mouseY);
         if (index >= 0) {
+            ClickSound.play();
             cursor = index;
             setFocus(1);
         }

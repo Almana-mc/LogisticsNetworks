@@ -201,6 +201,7 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
 
         int choiceIndex = hoveredChoiceIndex(mx, my);
         if (choiceIndex >= 0 && choiceIndex < blockChoices.size()) {
+            ClickSound.play();
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId,
                         MassPlacementMenu.ID_SELECT_BLOCK_BASE + choiceIndex);
@@ -220,6 +221,7 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
 
         if (!pending && menu.getSelectedCount() > 0
                 && isHoveringAbs(startX, btnY, clearW, BTN_H, mx, my)) {
+            ClickSound.play();
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_CLEAR_SELECTION);
             }
@@ -227,6 +229,7 @@ public class MassPlacementScreen extends LegacyContainerScreen<MassPlacementMenu
         }
 
         if (menu.canPlace() && isHoveringAbs(startX + clearW + BTN_GAP, btnY, placeW, BTN_H, mx, my)) {
+            ClickSound.play();
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, MassPlacementMenu.ID_PLACE_NODES);
             }

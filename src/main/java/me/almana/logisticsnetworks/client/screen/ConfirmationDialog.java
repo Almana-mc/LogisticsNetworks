@@ -70,8 +70,13 @@ final class ConfirmationDialog {
 
     void mouseClicked(double mouseX, double mouseY, int button) {
         if (button != 0) return;
-        if (inside(mouseX, mouseY, x + 10)) close.run();
-        else if (inside(mouseX, mouseY, x + 114)) confirm();
+        if (inside(mouseX, mouseY, x + 10)) {
+            ClickSound.play();
+            close.run();
+        } else if (inside(mouseX, mouseY, x + 114)) {
+            ClickSound.play();
+            confirm();
+        }
     }
 
     void keyPressed(int key, int scan, int modifiers) {

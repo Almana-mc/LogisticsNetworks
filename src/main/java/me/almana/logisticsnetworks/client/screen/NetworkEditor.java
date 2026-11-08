@@ -182,11 +182,13 @@ public class NetworkEditor {
         }
         int half = (SQ - 6) / 2;
         if (inRect(mx, my, rx, btnY(), half, 12)) {
+            ClickSound.play();
             setColor(NetworkColors.randomColor());
             hexFocused = false;
             return true;
         }
         if (inRect(mx, my, rx + half + 6, btnY(), half, 12)) {
+            ClickSound.play();
             apply();
             return true;
         }

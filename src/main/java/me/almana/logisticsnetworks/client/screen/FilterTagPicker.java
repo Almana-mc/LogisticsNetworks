@@ -273,10 +273,10 @@ final class FilterTagPicker {
             return;
         }
         if (button != 0) return;
-        if (back.contains((int) mouseX, (int) mouseY)) { close.run(); return; }
-        if (use.contains((int) mouseX, (int) mouseY)) { apply(); return; }
-        if (tagHeader.contains((int) mouseX, (int) mouseY)) { sortBy(false); return; }
-        if (countHeader.contains((int) mouseX, (int) mouseY)) { sortBy(true); return; }
+        if (back.contains((int) mouseX, (int) mouseY)) { ClickSound.play(); close.run(); return; }
+        if (use.contains((int) mouseX, (int) mouseY)) { if (canApply()) ClickSound.play(); apply(); return; }
+        if (tagHeader.contains((int) mouseX, (int) mouseY)) { ClickSound.play(); sortBy(false); return; }
+        if (countHeader.contains((int) mouseX, (int) mouseY)) { ClickSound.play(); sortBy(true); return; }
         if (search.isMouseOver(mouseX, mouseY)) {
             setFocus(0);
             search.mouseClicked(ClientInput.mouse(mouseX, mouseY, button), false);
@@ -291,6 +291,7 @@ final class FilterTagPicker {
         }
         int index = rowAt(mouseX, mouseY);
         if (index >= 0) {
+            ClickSound.play();
             if (leftControlDown) { openContents(filtered.get(index)); return; }
             selected = filtered.get(index);
             setFocus(3);
