@@ -7,6 +7,7 @@ import com.refinedmods.refinedstorage.api.network.impl.node.iface.InterfaceNetwo
 import com.refinedmods.refinedstorage.api.network.node.NetworkNode;
 import com.refinedmods.refinedstorage.common.controller.ControllerBlockEntity;
 import com.refinedmods.refinedstorage.neoforge.api.RefinedStorageNeoForgeApi;
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageAccess;
@@ -84,6 +85,11 @@ public final class RefinedStorageAdapter implements StorageAdapter {
     @Override
     public List<LinkedStorage.PatternEntry> readPatternOutputs(ItemStack stack, Level level) {
         return RefinedStoragePatternReader.readOutputs(stack, level);
+    }
+
+    @Override
+    public List<RecipeCardData.Ingredient> readPatternIngredients(ItemStack stack, Level level) {
+        return RefinedStoragePatternReader.readIngredients(stack, level);
     }
 
     @Override
