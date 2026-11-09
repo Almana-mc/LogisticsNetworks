@@ -98,7 +98,7 @@ public class ClipboardMenu extends AbstractContainerMenu {
     private void layoutSlots(Inventory inventory) {
         for (int slot = 0; slot < UPGRADE_SLOTS; slot++) {
             addSlot(new VisualSlot(upgradeContainer, slot,
-                    168 + (slot % 2) * 19, 118 + (slot / 2) * 19));
+                    168 + (slot % 3) * 19, 118 + (slot / 3) * 19));
         }
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
