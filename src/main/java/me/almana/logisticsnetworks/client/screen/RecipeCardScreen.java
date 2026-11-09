@@ -6,13 +6,14 @@ import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
-import me.almana.logisticsnetworks.filter.SlotExpressionUtil;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageBackend;
 import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import me.almana.logisticsnetworks.network.OpenNodeFilterPayload;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -23,13 +24,16 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
-import java.util.BitSet;
 import java.util.List;
 import java.util.Optional;
 
 import static me.almana.logisticsnetworks.client.screen.RecipeCardCells.*;
 
 public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
+
+    // Mutable shadow, parent fields final
+    protected int imageWidth = WIDTH;
+    protected int imageHeight = HEIGHT;
 
     private static final int COLOR_PANEL = 0xFF1F1F1F;
     private static final int COLOR_BORDER = 0xFF3A3A3A;
@@ -42,10 +46,12 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
     private static final int BLOCK_W = 72;
     private static final int PATTERN_X = 88;
     private static final int PATTERN_Y = 20;
+    private static final int WIDTH = 188;
+    private static final int HEIGHT = RecipeCardMenu.INV_Y + 80;
 
     private final EditBox[] counts = new EditBox[CELLS];
-    private EditBox slots;
-    private int editing = -1;
+    private final IngredientDetailHost host = new IngredientDetailHost(this);
+    private final EntryDetailPage page = new EntryDetailPage(Minecraft.getInstance().font, host);
     private RecipeCardData known;
     private final boolean patterns = LinkedStorage.isBackendLoaded(StorageBackend.AE2)
             || LinkedStorage.isBackendLoaded(StorageBackend.REFINED_STORAGE);
@@ -53,7 +59,7 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
             LinkedStorage.isBackendLoaded(StorageBackend.AE2) ? "ae2:blank_pattern" : "refinedstorage:pattern")));
 
     public RecipeCardScreen(RecipeCardMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title, 188, RecipeCardMenu.INV_Y + 80);
+        super(menu, inventory, title, WIDTH, HEIGHT);
         titleLabelY = 10_000;
         inventoryLabelY = 10_000;
     }
@@ -61,10 +67,11 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
     @Override
     protected void init() {
         super.init();
+        leftPos = (width - imageWidth) / 2;
+        topPos = (height - imageHeight) / 2;
         for (int i = 0; i < CELLS; i++) {
             counts[i] = addRenderableWidget(countBox(font, leftPos + cellX(i), topPos + cellY(i)));
         }
-        slots = addRenderableWidget(slotsBox(font));
         reconcile();
     }
 
@@ -72,6 +79,8 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
     protected void containerTick() {
         super.containerTick();
         reconcile();
+        if (host.frozen() && page.isOpen()) page.close();
+        page.tick();
     }
 
     private void reconcile() {
@@ -79,12 +88,11 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
         if (menu.data() != known) {
             known = menu.data();
             setFocused(null);
-            editing = -1;
-            slots.visible = false;
+            host.freeze();
         }
         List<RecipeCardData.Ingredient> list = menu.data().ingredients();
         for (int i = 0; i < CELLS; i++) {
-            counts[i].visible = i < list.size() && i != editing;
+            counts[i].visible = i < list.size();
             if (counts[i].visible) fit(counts[i], list.get(i));
             String count = counts[i].visible ? Integer.toString(list.get(i).count()) : "";
             if (!counts[i].isFocused() && !counts[i].getValue().equals(count)) counts[i].setValue(count);
@@ -104,55 +112,64 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
         reconcile();
     }
 
-    private void startSlots(int index) {
-        editing = index;
-        slots.setValue(SlotExpressionUtil.formatSlots(menu.data().ingredients().get(index).slots()));
-        slots.setPosition(leftPos + cellX(index) + 21, topPos + cellY(index) + 5);
-        slots.visible = true;
-        counts[index].visible = false;
-        setFocused(slots);
+    void edited() {
+        known = menu.data();
     }
 
-    private void commitSlots() {
-        if (editing < 0) return;
-        int index = editing;
-        BitSet parsed = SlotExpressionUtil.parseMask(slots.getValue());
-        cancelSlots();
-        if (parsed != null && index < menu.data().ingredients().size()) {
-            List<Integer> chosen = SlotExpressionUtil.bitSetToList(parsed);
-            menu.edit(data -> data.withIngredient(index, data.ingredients().get(index).withSlots(chosen)));
-        }
-        reconcile();
+    Rect2i pagePanel() {
+        return new Rect2i(leftPos + 4, topPos + 20, imageWidth - 8, imageHeight - 24);
     }
 
-    private void cancelSlots() {
-        editing = -1;
-        slots.visible = false;
-        if (getFocused() == slots) setFocused(null);
+    // Recenters like init does
+    void resizePage(int minWidth, int minHeight) {
+        int pageWidth = Math.max(WIDTH, minWidth);
+        int pageHeight = Math.max(HEIGHT, minHeight);
+        if (pageWidth == imageWidth && pageHeight == imageHeight) return;
+        imageWidth = pageWidth;
+        imageHeight = pageHeight;
+        rebuildWidgets();
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (slots.visible && slots.isMouseOver(mouseX, mouseY)) return super.mouseClicked(mouseX, mouseY, button);
-        commitSlots();
-        commitCount();
         int action = ClientControls.resolveMouseAction(mouseX, mouseY, button);
+        if (page.isOpen()) {
+            if (action != -1 && !page.mouseClicked(mouseX, mouseY, action)) page.close();
+            return true;
+        }
+        commitCount();
         boolean handled = action != -1 && clickCard((int) mouseX - leftPos, (int) mouseY - topPos, action);
         known = menu.data();
         return handled || super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        return page.isOpen() || super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        return page.isOpen() || super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (page.isOpen()) return page.mouseScrolled(mouseX, mouseY, scrollY);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
+    public boolean charTyped(char c, int modifiers) {
+        if (page.isOpen()) return page.charTyped(c, modifiers);
+        return super.charTyped(c, modifiers);
+    }
+
+    @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
-        if (slots.isFocused()) {
-            if (key == 256) {
-                cancelSlots();
-                reconcile();
-            } else if (key == 257 || key == 335) {
-                commitSlots();
-            } else {
-                slots.keyPressed(ClientInput.key(key, scan, modifiers));
-            }
+        if (page.isOpen()) {
+            if (key == 256) page.escape();
+            else page.keyPressed(key, scan, modifiers);
             return true;
         }
         for (EditBox box : counts) {
@@ -175,7 +192,7 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
 
     @Override
     public void onClose() {
-        commitSlots();
+        if (page.isOpen()) page.close();
         commitCount();
         if (menu.isNodeTarget()) {
             ClientPacketDistributor.sendToServer(new OpenNodeFilterPayload(menu.entityId(), menu.channel(),
@@ -189,7 +206,7 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
 
     @Override
     public void removed() {
-        commitSlots();
+        if (page.isOpen()) page.close();
         commitCount();
         super.removed();
     }
@@ -224,19 +241,15 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
             } else if (action == 0 && !carried.isEmpty()) dropIngredient(cell, carried);
             return true;
         }
-        int slotButton = itemButtonAt(x, y, list, SLOTS_X);
-        if (slotButton >= 0) {
+        int pencil = editButtonAt(x, y, list.size());
+        if (pencil >= 0) {
             ClickSound.play();
-            RecipeCardData.Ingredient ingredient = list.get(slotButton);
-            if (action == 1) {
-                menu.edit(data -> data.withIngredient(slotButton, ingredient.withSplit(!ingredient.split())));
-            } else {
-                startSlots(slotButton);
-            }
+            host.track();
+            page.open(pencil);
             return true;
         }
         int tag = itemButtonAt(x, y, list, TAG_X);
-        if (tag >= 0 && tag != editing) {
+        if (tag >= 0) {
             ClickSound.play();
             menu.edit(data -> data.withIngredient(tag, data.ingredients().get(tag).nextTag()));
             return true;
@@ -244,8 +257,9 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
         return false;
     }
 
+    // None under the open page
     public int droppableCells() {
-        return Math.min(CELLS, Math.max(MIN_CELLS, menu.data().ingredients().size() + 1));
+        return page.isOpen() ? 0 : Math.min(CELLS, Math.max(MIN_CELLS, menu.data().ingredients().size() + 1));
     }
 
     public Rect2i cellArea(int index) {
@@ -273,7 +287,18 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        if (page.isOpen()) {
+            // Cover the card's slots
+            graphics.fill(leftPos + 1, topPos + 1, leftPos + imageWidth - 1, topPos + imageHeight - 1, COLOR_PANEL);
+            page.render(graphics, mouseX, mouseY);
+            return;
+        }
         if (menu.getCarried().isEmpty()) renderCardTooltip(graphics, mouseX, mouseY);
+    }
+
+    @Override
+    protected void extractTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+        if (!page.isOpen()) super.extractTooltip(graphics, mouseX, mouseY);
     }
 
     private void renderCardTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -286,13 +311,13 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
                     mouseX, mouseY);
             return;
         }
-        int slotButton = itemButtonAt(x, y, list, SLOTS_X);
-        if (slotButton >= 0) {
-            graphics.renderTooltip(font, slotsTooltip(list.get(slotButton)), mouseX, mouseY);
+        int pencil = editButtonAt(x, y, list.size());
+        if (pencil >= 0) {
+            graphics.renderTooltip(font, editTooltip(list.get(pencil)), mouseX, mouseY);
             return;
         }
         int tag = itemButtonAt(x, y, list, TAG_X);
-        if (tag >= 0 && tag != editing) {
+        if (tag >= 0) {
             graphics.renderTooltip(font, Component.translatable("gui.logisticsnetworks.recipe_card.tag_toggle"),
                     mouseX, mouseY);
         } else if (inside(x, y, BLOCK_X, BLOCK_Y, BLOCK_W, 14)) {
@@ -337,7 +362,7 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
                 lp + BLOCK_X + BLOCK_W / 2, tp + BLOCK_Y + 3, COLOR_TEXT);
         for (int i = 0; i < droppableCells(); i++) {
             RecipeCardCells.cell(graphics, font, lp + cellX(i), tp + cellY(i) + 1,
-                    i < data.ingredients().size() ? data.ingredients().get(i) : null, i == editing);
+                    i < data.ingredients().size() ? data.ingredients().get(i) : null);
         }
         graphics.drawString(font, playerInventoryTitle, lp + RecipeCardMenu.INV_X, tp + RecipeCardMenu.INV_Y - 11,
                 COLOR_MUTED, false);

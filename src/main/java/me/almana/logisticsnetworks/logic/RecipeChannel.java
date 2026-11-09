@@ -18,10 +18,12 @@ import net.neoforged.neoforge.transfer.item.ItemResource;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 final class RecipeChannel {
@@ -60,7 +62,7 @@ final class RecipeChannel {
         RecipeSets.Source source = source(sourceNode, channel, kinds, cache);
         List<RecipeEndpoint> endpoints = new ArrayList<>();
         List<TransferEngine.ImportTarget> refs = new ArrayList<>();
-        if (!connect(sourceNode, level, channel, targets, dimCache, source, kinds, cache, endpoints, refs))
+        if (!connect(sourceNode, level, channel, targets, dimCache, source, cards, kinds, cache, endpoints, refs))
             return -1;
         boolean robin = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         RecipeSets.Listener listener = (endpoint, resource, amount) -> {
@@ -80,7 +82,7 @@ final class RecipeChannel {
     // False when unreachable
     private static boolean connect(LogisticsNodeEntity sourceNode, ServerLevel level, ChannelData channel,
             List<TransferEngine.ImportTarget> targets, Map<UUID, Boolean> dimCache, RecipeSets.Source source,
-            Set<RecipeCardData.Kind> kinds, FilterItemData.ReadCache cache,
+            List<RecipeCardData> cards, Set<RecipeCardData.Kind> kinds, FilterItemData.ReadCache cache,
             List<RecipeEndpoint> endpoints, List<TransferEngine.ImportTarget> refs) {
         BlockPos pos = sourceNode.getAttachedPos();
         boolean sourceDim = dimCache.getOrDefault(sourceNode.getUUID(), false);
@@ -100,8 +102,8 @@ final class RecipeChannel {
                 continue;
             if (TransferEngine.isSameItemStorage(level, pos, targetLevel, node.getAttachedPos()))
                 continue;
-            RecipeEndpoint endpoint = endpoint(target, source, kinds, cache);
-            if (endpoint.items() == null && endpoint.fluids() == null)
+            RecipeEndpoint endpoint = endpoint(target, source, cards, kinds, cache);
+            if (endpoint.isEmpty())
                 continue;
             endpoints.add(endpoint);
             refs.add(target);
@@ -127,27 +129,46 @@ final class RecipeChannel {
     }
 
     private static RecipeEndpoint endpoint(TransferEngine.ImportTarget target, RecipeSets.Source source,
-            Set<RecipeCardData.Kind> kinds, FilterItemData.ReadCache cache) {
+            List<RecipeCardData> cards, Set<RecipeCardData.Kind> kinds, FilterItemData.ReadCache cache) {
         int accepts = NodeUpgradeData.effectiveTypes(target.node(), target.channel());
+        IoSide own = target.channel().getIoSide();
+        boolean items = source.items() != null && kinds.contains(RecipeCardData.Kind.ITEM)
+                && ChannelType.ITEM.in(accepts);
+        boolean fluids = source.fluids() != null && kinds.contains(RecipeCardData.Kind.FLUID)
+                && ChannelType.FLUID.in(accepts);
         // Enable when 26.1.2 is supported.
         /*
-        Third RecipeEndpoint argument: source.chemicals() != null && ChannelType.CHEMICAL.in(accepts)
-                ? chemicals(target, source.chemicals(), caps) : null
+        boolean chemicals = source.chemicals() != null && ChannelType.CHEMICAL.in(accepts);
+        Trailing RecipeEndpoint arguments:
+                chemicals ? chemicals(target, own, source.chemicals(), caps) : null,
+                chemicals ? sided(cards, RecipeCardData.Kind.CHEMICAL,
+                        side -> chemicals(target, side, source.chemicals(), caps)) : Map.of()
         */
         return new RecipeEndpoint(
-                source.items() != null && kinds.contains(RecipeCardData.Kind.ITEM) && ChannelType.ITEM.in(accepts)
-                        ? items(target, source.items(), cache) : null,
-                source.fluids() != null && kinds.contains(RecipeCardData.Kind.FLUID) && ChannelType.FLUID.in(accepts)
-                        ? fluids(target, source.fluids()) : null);
+                items ? items(target, own, source.items(), cache) : null,
+                items ? sided(cards, RecipeCardData.Kind.ITEM, side -> items(target, side, source.items(), cache))
+                        : Map.of(),
+                fluids ? fluids(target, own, source.fluids()) : null,
+                fluids ? sided(cards, RecipeCardData.Kind.FLUID, side -> fluids(target, side, source.fluids()))
+                        : Map.of());
+    }
+
+    private static <T> Map<IoSide, T> sided(List<RecipeCardData> cards, RecipeCardData.Kind kind,
+            Function<IoSide, T> resolve) {
+        Map<IoSide, T> sided = new EnumMap<>(IoSide.class);
+        for (IoSide side : RecipeSets.sides(cards, kind)) {
+            T to = resolve.apply(side);
+            if (to != null) sided.put(side, to);
+        }
+        return sided;
     }
 
     @Nullable
-    private static TransferEngine.ItemTransferTarget items(TransferEngine.ImportTarget target,
+    private static TransferEngine.ItemTransferTarget items(TransferEngine.ImportTarget target, IoSide side,
             @Nullable ResourceHandler<ItemResource> from, FilterItemData.ReadCache cache) {
         ItemStack[] filters = target.channel().getFilterItems();
         boolean mapped = FilterLogic.hasConfiguredSlotMapping(filters, cache);
-        ResourceHandler<ItemResource> handler = target.node().capabilities()
-                .findItemImportHandler(target.channel().getIoSide(), !mapped);
+        ResourceHandler<ItemResource> handler = target.node().capabilities().findItemImportHandler(side, !mapped);
         if (handler == null || handler == from || from != null && DirectStorageHandlers.shareNetwork(from, handler))
             return null;
         return new TransferEngine.ItemTransferTarget(handler, filters, target.channel().getFilterMode(),
@@ -156,10 +177,9 @@ final class RecipeChannel {
     }
 
     @Nullable
-    private static TransferEngine.FluidTransferTarget fluids(TransferEngine.ImportTarget target,
+    private static TransferEngine.FluidTransferTarget fluids(TransferEngine.ImportTarget target, IoSide side,
             @Nullable ResourceHandler<FluidResource> from) {
-        ResourceHandler<FluidResource> handler = target.node().capabilities()
-                .findFluidImportHandler(target.channel().getIoSide(), true);
+        ResourceHandler<FluidResource> handler = target.node().capabilities().findFluidImportHandler(side, true);
         if (handler == null || handler == from || from != null && DirectStorageHandlers.shareNetwork(from, handler))
             return null;
         return new TransferEngine.FluidTransferTarget(handler, target.channel().getFilterItems(),
@@ -169,12 +189,12 @@ final class RecipeChannel {
     // Enable when 26.1.2 is supported.
     /*
     @Nullable
-    private static RecipeEndpoint.Chemicals chemicals(TransferEngine.ImportTarget target, IChemicalHandler from,
-            TransferCapabilityCache caps) {
+    private static RecipeEndpoint.Chemicals chemicals(TransferEngine.ImportTarget target, IoSide side,
+            IChemicalHandler from, TransferCapabilityCache caps) {
         LogisticsNodeEntity node = target.node();
         if (node.isMountedOnCreate())
             return null;
-        IChemicalHandler handler = node.capabilities().findChemicalHandler(target.channel().getIoSide(), false);
+        IChemicalHandler handler = node.capabilities().findChemicalHandler(side, false);
         if (handler == null || handler == from || DirectChemicalHandler.shareNetwork(from, handler))
             return null;
         return new RecipeEndpoint.Chemicals(handler, target.channel().getFilterItems(),

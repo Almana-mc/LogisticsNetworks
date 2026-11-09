@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.logic;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FlowResource;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -58,6 +59,16 @@ public final class RecipeSets {
         return kinds;
     }
 
+    public static Set<IoSide> sides(List<RecipeCardData> cards, RecipeCardData.Kind kind) {
+        Set<IoSide> sides = EnumSet.noneOf(IoSide.class);
+        for (RecipeCardData card : cards) {
+            for (RecipeCardData.Ingredient ingredient : card.ingredients()) {
+                if (ingredient.kind() == kind) ingredient.side().ifPresent(sides::add);
+            }
+        }
+        return sides;
+    }
+
     public static int transfer(Source source, List<RecipeEndpoint> endpoints, List<RecipeCardData> cards, int batch,
             int tier, DistributionMode mode, @Nullable Listener listener, HolderLookup.Provider provider,
             FilterItemData.ReadCache cache) {
@@ -83,7 +94,7 @@ public final class RecipeSets {
             List<RecipeCardData.Ingredient> blocking = card.blocking() ? blockers : null;
             moved += deal(mode, usable.size(), sets,
                     (target, count) -> place(lanes, usable.get(target), count, blocking, endpoints, listener,
-                            directSource));
+                            directSource, provider));
         }
         return moved;
     }
@@ -144,8 +155,8 @@ public final class RecipeSets {
     // All lanes or none
     private static int place(List<RecipeLane> lanes, int target, int sets,
             @Nullable List<RecipeCardData.Ingredient> blockers, List<RecipeEndpoint> endpoints,
-            @Nullable Listener listener, boolean directSource) {
-        if (blockers != null && holds(endpoints.get(target), blockers)) return 0;
+            @Nullable Listener listener, boolean directSource, HolderLookup.Provider provider) {
+        if (blockers != null && holds(endpoints.get(target), blockers, provider)) return 0;
         int fit = sets;
         for (RecipeLane lane : lanes) {
             fit = Math.min(fit, lane.fit(target, fit));
@@ -170,15 +181,16 @@ public final class RecipeSets {
         return fit;
     }
 
-    private static boolean holds(RecipeEndpoint endpoint, List<RecipeCardData.Ingredient> blockers) {
+    private static boolean holds(RecipeEndpoint endpoint, List<RecipeCardData.Ingredient> blockers,
+            HolderLookup.Provider provider) {
         // Enable when 26.1.2 is supported.
         /*
-        return endpoint.items() != null && ItemLane.holds(endpoint.items().handler(), blockers)
-                || endpoint.fluids() != null && FluidLane.holds(endpoint.fluids().handler(), blockers)
-                || endpoint.chemicals() != null && ChemicalLane.holds(endpoint.chemicals().handler(), blockers);
+        return endpoint.itemTargets().stream().anyMatch(to -> ItemLane.holds(to.handler(), blockers, provider))
+                || endpoint.fluidTargets().stream().anyMatch(to -> FluidLane.holds(to.handler(), blockers))
+                || endpoint.chemicalTargets().stream().anyMatch(to -> ChemicalLane.holds(to.handler(), blockers));
         */
-        return endpoint.items() != null && ItemLane.holds(endpoint.items().handler(), blockers)
-                || endpoint.fluids() != null && FluidLane.holds(endpoint.fluids().handler(), blockers);
+        return endpoint.itemTargets().stream().anyMatch(to -> ItemLane.holds(to.handler(), blockers, provider))
+                || endpoint.fluidTargets().stream().anyMatch(to -> FluidLane.holds(to.handler(), blockers));
     }
 
     private static int firstTaker(int targets, int sets, SetMove move) {

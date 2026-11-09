@@ -33,7 +33,7 @@ public record TransferPlan(UUID networkId, long generation, long runtimeId, bool
     }
 
     public record MoveIntent(int sourceSlot, int targetIndex, ItemResource resource,
-            int amount, @Nullable boolean[] targetSlotMask) {
+            int amount, @Nullable boolean[] targetSlotMask, @Nullable IoSide face) {
         public MoveIntent {
             targetSlotMask = targetSlotMask == null ? null : targetSlotMask.clone();
         }
@@ -48,7 +48,7 @@ public record TransferPlan(UUID networkId, long generation, long runtimeId, bool
         }
 
         public MoveIntent withAmount(int count, @Nullable boolean[] mask) {
-            return new MoveIntent(sourceSlot, targetIndex, resource, count, mask);
+            return new MoveIntent(sourceSlot, targetIndex, resource, count, mask, face);
         }
     }
 }

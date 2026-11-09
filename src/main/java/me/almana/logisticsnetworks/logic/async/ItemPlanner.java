@@ -1,12 +1,14 @@
 package me.almana.logisticsnetworks.logic.async;
 
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.logic.EntryFaces;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.TransferAmountRules;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.item.ItemResource;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,8 +39,8 @@ public final class ItemPlanner {
 
         TransferEngine.executeItemOperation(sourceHandler, engineTargets, unit.batchLimit(), exportFilters,
                 unit.exportFilterMode(), null, snapshot.registries(), unit.distributionMode(), readCache,
-                (sourceSlot, targetIndex, moved, mask) -> moves.add(new TransferPlan.MoveIntent(
-                        sourceSlot, targetIndex, ItemResource.of(moved), moved.getCount(), mask)),
+                (sourceSlot, targetIndex, moved, mask, face) -> moves.add(new TransferPlan.MoveIntent(
+                        sourceSlot, targetIndex, ItemResource.of(moved), moved.getCount(), mask, face)),
                 java.util.Map.of(), null, null, unit.resourceRoundRobin(), unit.resourceCursor(), null);
 
         NetworkSnapshot.DirectEndpoint directSource = snapshot.endpoints().get(unit.sourceEndpoint()).direct();
@@ -50,8 +52,23 @@ public final class ItemPlanner {
             ItemStack[] exportFilters, List<ResourceHandler<ItemResource>> endpoints,
             FilterItemData.ReadCache readCache) {
         var importFilters = target.importFilters();
+        var constraints = TransferAmountRules.collect(exportFilters, importFilters, readCache);
+        boolean nbt = FilterLogic.hasConfiguredItemNbtFilter(importFilters, readCache);
+        NetworkSnapshot.TargetUnit[] faces = target.faces();
         return new TransferEngine.ItemTransferTarget(endpoints.get(target.endpoint()), importFilters,
-                target.importFilterMode(), TransferAmountRules.collect(exportFilters, importFilters, readCache),
-                FilterLogic.hasConfiguredItemNbtFilter(importFilters, readCache), null, target.hasImportSlotMapping());
+                target.importFilterMode(), constraints, nbt, null, target.hasImportSlotMapping(),
+                faces == null ? null : new EntryFaces<>(target.binding().side(),
+                        FilterLogic.hasConfiguredEntrySides(importFilters, readCache),
+                        FilterLogic.hasConfiguredEntrySides(exportFilters, readCache),
+                        side -> face(faces[side.ordinal()], endpoints, constraints, nbt)));
+    }
+
+    @Nullable
+    private static TransferEngine.ItemTransferTarget face(@Nullable NetworkSnapshot.TargetUnit face,
+            List<ResourceHandler<ItemResource>> endpoints, TransferAmountRules.Constraints constraints, boolean nbt) {
+        if (face == null)
+            return null;
+        return new TransferEngine.ItemTransferTarget(endpoints.get(face.endpoint()), face.importFilters(),
+                face.importFilterMode(), constraints, nbt, null, face.hasImportSlotMapping());
     }
 }

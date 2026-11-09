@@ -5,6 +5,7 @@ import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
@@ -698,6 +699,20 @@ public class FilterMenu extends AbstractContainerMenu {
                 : null;
         String expr = (slots != null && slots.length > 0) ? expression.trim() : null;
         FilterItemData.setEntrySlotMapping(getOpenedStack(), slot, slots, expr);
+        broadcastChanges();
+    }
+
+    @Nullable
+    public IoSide getEntrySide(int slot) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return null;
+        return FilterItemData.getEntrySide(getOpenedStack(), slot);
+    }
+
+    public void setEntrySide(Player player, int slot, @Nullable IoSide side) {
+        if (isSpecialMode || slot < 0 || slot >= slotCount)
+            return;
+        FilterItemData.setEntrySide(getOpenedStack(), slot, side);
         broadcastChanges();
     }
 

@@ -55,14 +55,20 @@ public record NetworkSnapshot(
             FilterMode importFilterMode,
             boolean hasImportSlotMapping,
             boolean bulk,
-            int endpoint, TransferPlan.EndpointBinding binding) {
+            int endpoint, TransferPlan.EndpointBinding binding, @Nullable TargetUnit[] faces) {
         public TargetUnit {
             importFilters = Snapshots.copyFilters(importFilters);
+            faces = faces == null ? null : faces.clone();
         }
 
         @Override
         public ItemStack[] importFilters() {
             return Snapshots.copyFilters(importFilters);
+        }
+
+        @Override
+        public TargetUnit[] faces() {
+            return faces == null ? null : faces.clone();
         }
     }
 

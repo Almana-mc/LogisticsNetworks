@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.item.BaseFilterItem;
 import me.almana.logisticsnetworks.item.RecipeCardItem;
@@ -84,7 +85,8 @@ public final class FilterItemData {
             @Nullable int[] slotMapping,
             boolean slotOnly,
             @Nullable TagKey<Item> itemTag,
-            @Nullable TagKey<Fluid> fluidTag) {
+            @Nullable TagKey<Fluid> fluidTag,
+            @Nullable IoSide side) {
     }
 
     private record ItemFilterView(
@@ -98,6 +100,7 @@ public final class FilterItemData {
             boolean hasNbtEntries,
             boolean hasAmountEntries,
             boolean hasSlotOnlyEntries,
+            boolean hasEntrySides,
             ItemFilterSlot[] entriesBySlot) {
     }
 
@@ -315,7 +318,8 @@ public final class FilterItemData {
         GeneralFilterEntry.EntryCounts counts = new GeneralFilterEntry.EntryCounts(0,
                 Math.max(0, current.counts().batch()), Math.max(0, stockOf(current)));
         return new GeneralFilterEntry(current.slot(), null, fluidId, chemicalId, null, counts,
-                GeneralFilterEntry.SlotMapping.EMPTY, null, GeneralFilterEntry.NbtConstraints.EMPTY, null, null);
+                GeneralFilterEntry.SlotMapping.EMPTY, null, GeneralFilterEntry.NbtConstraints.EMPTY, null, null,
+                current.side());
     }
 
     public static boolean containsChemical(ItemStack filter, String chemicalId) {
@@ -464,6 +468,34 @@ public final class FilterItemData {
             if (entry != null && entry.slotMapping() != null) return true;
         }
         return false;
+    }
+
+    @Nullable
+    public static IoSide getEntrySide(ItemStack stack, int slot) {
+        GeneralFilterEntry entry = entry(stack, slot);
+        return entry == null ? null : entry.side();
+    }
+
+    public static void setEntrySide(ItemStack stack, int slot, @Nullable IoSide side) {
+        edit(stack, slot, entry -> entry.withSide(side));
+    }
+
+    public static boolean hasEntrySides(ItemStack filter, @Nullable ReadCache readCache) {
+        return isFilterItem(filter) && getItemFilterView(filter, readCache).hasEntrySides();
+    }
+
+    public static int entrySideMask(ItemStack filter, @Nullable ReadCache readCache) {
+        if (!isFilterItem(filter))
+            return 0;
+        ItemFilterView view = getItemFilterView(filter, readCache);
+        if (view.blacklist() || !view.hasEntrySides())
+            return 0;
+        int mask = 0;
+        for (ItemFilterSlot entry : view.entriesBySlot()) {
+            if (entry != null && entry.side() != null)
+                mask |= 1 << entry.side().ordinal();
+        }
+        return mask;
     }
 
     // ── Enchanted per-entry methods ──
@@ -946,6 +978,74 @@ public final class FilterItemData {
         return 0;
     }
 
+    @Nullable
+    public static IoSide getItemSideFull(ItemStack filter, ItemStack candidate, HolderLookup.Provider provider,
+            @Nullable CandidateComponents candidateComponents, @Nullable ReadCache readCache, int inventorySlot) {
+        if (!isFilterItem(filter) || candidate.isEmpty())
+            return null;
+        ItemFilterView view = getItemFilterView(filter, readCache);
+        if (view.blacklist() || !view.hasEntrySides())
+            return null;
+        CandidateComponents components = candidateComponents != null ? candidateComponents
+                : new CandidateComponents(candidate, provider);
+        for (ItemFilterSlot entry : view.entriesBySlot()) {
+            if (entry != null && coversSlot(entry, inventorySlot)
+                    && (entry.slotOnly() || itemEntryMatches(entry, candidate, components)))
+                return entry.side();
+        }
+        return null;
+    }
+
+    @Nullable
+    public static IoSide getFluidSideFull(ItemStack filter, FluidStack candidate, @Nullable ReadCache readCache) {
+        if (!isFilterItem(filter) || candidate.isEmpty())
+            return null;
+        ItemFilterView view = getItemFilterView(filter, readCache);
+        if (view.blacklist() || !view.hasEntrySides())
+            return null;
+        for (ItemFilterSlot slot : view.entriesBySlot()) {
+            if (slot == null)
+                continue;
+            String tag = slot.tag();
+            if (tag != null) {
+                if (slot.fluidTag() != null && candidate.is(slot.fluidTag()))
+                    return slot.side();
+                continue;
+            }
+            if (slot.nbtOnly())
+                return slot.side();
+            FluidStack entry = slot.fluidEntry();
+            if (entry != null && !entry.isEmpty() && FluidStack.isSameFluidSameComponents(entry, candidate))
+                return slot.side();
+        }
+        return null;
+    }
+
+    @Nullable
+    public static IoSide getChemicalSideFull(ItemStack filter, String chemicalId, @Nullable ReadCache readCache) {
+        if (!isFilterItem(filter) || chemicalId == null || chemicalId.isEmpty())
+            return null;
+        ItemFilterView view = getItemFilterView(filter, readCache);
+        if (view.blacklist() || !view.hasEntrySides())
+            return null;
+        for (ItemFilterSlot slot : view.entriesBySlot()) {
+            if (slot == null)
+                continue;
+            String tag = slot.tag();
+            if (tag != null) {
+                if (slot.tagKind() == FilterTargetType.CHEMICALS && MekanismCompat.chemicalHasTag(chemicalId, tag))
+                    return slot.side();
+                continue;
+            }
+            if (slot.nbtOnly())
+                return slot.side();
+            String entryId = slot.chemicalId();
+            if (entryId != null && entryId.equals(chemicalId))
+                return slot.side();
+        }
+        return null;
+    }
+
     // ── Constraint helpers ──
 
     private static boolean entryConstraintsMatch(ItemFilterSlot entry, ItemStack candidate,
@@ -991,6 +1091,15 @@ public final class FilterItemData {
             return NbtRuleMatcher.compoundContains(components.select(rawNbt.keySet()), rawNbt);
         }
         return !entry.invalidRawNbt();
+    }
+
+    // Same rules as filter entries
+    public static boolean matchesNbt(GeneralFilterEntry.NbtConstraints nbt, ItemStack stack,
+            HolderLookup.Provider provider) {
+        if (nbt.rules().isEmpty() && nbt.raw().isEmpty())
+            return true;
+        ItemFilterSlot slot = buildItemFilterSlot(GeneralFilterEntry.empty(0).withNbt(nbt), FilterTargetType.ITEMS);
+        return checkNbtConstraint(slot, new CandidateComponents(stack, provider), stack.isDamageableItem());
     }
 
     public static int getEntryAmount(ItemStack stack, int slot) {
@@ -1101,13 +1210,13 @@ public final class FilterItemData {
         return new ItemFilterSlot(tag, tagKind, item, expectedComponents, chemicalId, resolveFluidEntry(fluidId),
                 entry.counts().batch(), stock, raw.value(), raw.invalid(), hasNbt, nbtOnly,
                 item != null && entry.nbt().strict().orElse(!hasNbt), rules, entry.nbt().matchAny(), mapping,
-                slotOnly, itemTag, fluidTag);
+                slotOnly, itemTag, fluidTag, entry.side());
     }
 
     private static ItemFilterView summarizeItemFilterView(boolean blacklist, ItemFilterSlot[] entriesBySlot) {
         boolean item = false, fluid = false, chemical = false;
         boolean itemTag = false, fluidTag = false, chemicalTag = false;
-        boolean nbt = false, amount = false, slotOnly = false;
+        boolean nbt = false, amount = false, slotOnly = false, sides = false;
         for (ItemFilterSlot entry : entriesBySlot) {
             if (entry == null)
                 continue;
@@ -1120,12 +1229,15 @@ public final class FilterItemData {
             nbt |= entry.hasNbt();
             amount |= entry.batch() > 0 || entry.stock() > 0;
             slotOnly |= entry.slotOnly();
+            sides |= entry.side() != null;
         }
-        return new ItemFilterView(blacklist, item, fluid, chemical, itemTag, fluidTag, chemicalTag, nbt, amount, slotOnly, entriesBySlot);
+        return new ItemFilterView(blacklist, item, fluid, chemical, itemTag, fluidTag, chemicalTag, nbt, amount, slotOnly,
+                sides, entriesBySlot);
     }
 
     private static ItemFilterView emptyItemFilterView(ItemFilterSlot[] entriesBySlot) {
-        return new ItemFilterView(false, false, false, false, false, false, false, false, false, false, entriesBySlot);
+        return new ItemFilterView(false, false, false, false, false, false, false, false, false, false, false,
+                entriesBySlot);
     }
 
     @Nullable

@@ -165,7 +165,7 @@ public final class ChemicalTransferHelper {
             LOGGER.debug("[Chemical] Transferring {} -> {}, limit={}, srcTanks={}, tgtTanks={}",
                     sourcePos, targetPos, limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
-                importFilters, importFilterMode, onMoved, null);
+                importFilters, importFilterMode, onMoved, null, null);
         */
         return 0;
     }
@@ -255,7 +255,7 @@ public final class ChemicalTransferHelper {
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
             @Nullable FilterItemData.ReadCache filterReadCache, @Nullable ObjLongConsumer<String> onMoved,
-            @Nullable String requiredId) {
+            @Nullable String requiredId, @Nullable EntryFaces<IChemicalHandler> faces) {
         if (source == null || target == null) {
             return 0;
         }
@@ -263,7 +263,7 @@ public final class ChemicalTransferHelper {
             LOGGER.debug("[Chemical] Transferring limit={}, srcTanks={}, tgtTanks={}",
                     limit, source.getChemicalTanks(), target.getChemicalTanks());
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode,
-                importFilters, importFilterMode, filterReadCache, onMoved, requiredId);
+                importFilters, importFilterMode, filterReadCache, onMoved, requiredId, faces);
     }
 
     public static Map<String, Long> exportableAmounts(IChemicalHandler source, ItemStack[] exportFilters,
@@ -289,8 +289,9 @@ public final class ChemicalTransferHelper {
     private static long executeChemicalMove(IChemicalHandler source, IChemicalHandler target, long limitAmount,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode, @Nullable ObjLongConsumer<String> onMoved,
-            @Nullable String requiredId) {
+            @Nullable String requiredId, @Nullable EntryFaces<IChemicalHandler> faces) {
         long remaining = limitAmount;
+        IChemicalHandler channelTarget = target;
 
         for (int tank = 0; tank < source.getChemicalTanks(); tank++) {
             if (remaining <= 0)
@@ -310,6 +311,15 @@ public final class ChemicalTransferHelper {
                     continue;
                 if (!FilterLogic.matchesChemical(importFilters, importFilterMode, chemId))
                     continue;
+                if (faces != null) {
+                    IoSide side = faces.imports() ? FilterLogic.chemicalSide(importFilters, chemId, filterReadCache)
+                            : null;
+                    if (side == null && faces.exports())
+                        side = FilterLogic.chemicalSide(exportFilters, chemId, filterReadCache);
+                    target = faces.face(side, channelTarget);
+                    if (target == null)
+                        continue;
+                }
             }
 
             long requestFromTank = Math.min(remaining, tankChemical.getAmount());
@@ -363,11 +373,13 @@ public final class ChemicalTransferHelper {
 
     // Enable when 26.1.2 is supported.
     /*
-    Source owner: TransferEngine.transferChemicals (17aea589 equal distribution)
+    Source owner: TransferEngine.transferChemicals (17aea589 equal distribution, 7c4a6d6d entry sides)
 
     List<IChemicalHandler> equalHandlers = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
             ? new ArrayList<>() : null;
     List<ChannelData> equalChannels = equalHandlers == null ? null : new ArrayList<>();
+    List<EntryFaces<IChemicalHandler>> equalFaces = equalHandlers == null ? null : new ArrayList<>();
+    boolean exportSides = FilterLogic.hasConfiguredEntrySides(exportChannel.getFilterItems(), filterReadCache);
 
     IChemicalHandler sourceHandler = sourceNode.capabilities().findChemicalHandler(exportChannel.getIoSide(), true);
     if (sourceHandler == null)
@@ -377,9 +389,16 @@ public final class ChemicalTransferHelper {
             target.channel().getIoSide(), false);
     if (targetHandler == null || DirectChemicalHandler.shareNetwork(sourceHandler, targetHandler))
         continue;
+    boolean importSides = FilterLogic.hasConfiguredEntrySides(target.channel().getFilterItems(),
+            filterReadCache);
+    EntryFaces<IChemicalHandler> faces = exportSides || importSides
+            ? new EntryFaces<>(target.channel().getIoSide(), importSides, exportSides,
+                    side -> chemicalFace(target, side, sourceHandler))
+            : null;
     if (equalHandlers != null) {
         equalHandlers.add(targetHandler);
         equalChannels.add(target.channel());
+        equalFaces.add(faces);
         continue;
     }
 
@@ -387,7 +406,7 @@ public final class ChemicalTransferHelper {
             sourceHandler, targetHandler, remaining,
             exportChannel.getFilterItems(), exportChannel.getFilterMode(),
             target.channel().getFilterItems(), target.channel().getFilterMode(),
-            filterReadCache, onMoved, null);
+            filterReadCache, onMoved, null, faces);
 
     if (!anyReachable)
         return -1;
@@ -402,11 +421,17 @@ public final class ChemicalTransferHelper {
                     (i, share) -> ChemicalTransferHelper.transferBetween(sourceHandler, equalHandlers.get(i),
                             share, exportFilters, exportChannel.getFilterMode(),
                             equalChannels.get(i).getFilterItems(), equalChannels.get(i).getFilterMode(),
-                            filterReadCache, onMoved, stock.getKey()));
+                            filterReadCache, onMoved, stock.getKey(), equalFaces.get(i)));
         }
         return (int) moved;
     }
     return batchLimit - remaining;
+
+    @Nullable
+    private static IChemicalHandler chemicalFace(ImportTarget target, IoSide side, IChemicalHandler sourceHandler) {
+        IChemicalHandler handler = target.node().capabilities().findChemicalHandler(side, false);
+        return handler == null || DirectChemicalHandler.shareNetwork(sourceHandler, handler) ? null : handler;
+    }
     */
 
     public static Optional<RecipeCardData.Ingredient> recipeIngredient(Object value) {

@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.component;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtPath;
@@ -24,10 +25,12 @@ public record GeneralFilterEntry(
         @Nullable Boolean enchanted,
         NbtConstraints nbt,
         @Nullable DurabilityConstraint durability,
-        @Nullable FilterTargetType tagKind) {
+        @Nullable FilterTargetType tagKind,
+        @Nullable IoSide side) {
 
     public static final NbtPath ENCHANTED_PATH = NbtPath.of(NbtPath.Component.of("minecraft:enchanted"));
     public static final NbtPath DURABILITY_PATH = NbtPath.of(NbtPath.Component.of("minecraft:durability"));
+    private static final Codec<IoSide> SIDE_CODEC = Codec.STRING.xmap(IoSide::byKey, IoSide::key);
 
     public static final Codec<GeneralFilterEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.fieldOf("slot").forGetter(GeneralFilterEntry::slot),
@@ -41,11 +44,12 @@ public record GeneralFilterEntry(
             NbtConstraints.CODEC.optionalFieldOf("nbt", NbtConstraints.EMPTY).forGetter(GeneralFilterEntry::nbt),
             DurabilityConstraint.CODEC.optionalFieldOf("durability")
                     .forGetter(entry -> Optional.ofNullable(entry.durability)),
-            FilterTargetType.CODEC.optionalFieldOf("tag_kind").forGetter(entry -> Optional.ofNullable(entry.tagKind))
-    ).apply(instance, (slot, item, fluid, chemical, tag, counts, mapping, enchanted, nbt, durability, tagKind) ->
+            FilterTargetType.CODEC.optionalFieldOf("tag_kind").forGetter(entry -> Optional.ofNullable(entry.tagKind)),
+            SIDE_CODEC.optionalFieldOf("side").forGetter(entry -> Optional.ofNullable(entry.side))
+    ).apply(instance, (slot, item, fluid, chemical, tag, counts, mapping, enchanted, nbt, durability, tagKind, side) ->
             new GeneralFilterEntry(slot, item.orElse(null), fluid.orElse(null), chemical.orElse(null),
                     tag.orElse(null), counts, mapping, enchanted.orElse(null), nbt, durability.orElse(null),
-                    tagKind.orElse(null))));
+                    tagKind.orElse(null), side.orElse(null))));
 
     public GeneralFilterEntry {
         counts = counts == null ? EntryCounts.EMPTY : counts;
@@ -68,7 +72,7 @@ public record GeneralFilterEntry(
 
     public static GeneralFilterEntry empty(int slot) {
         return new GeneralFilterEntry(slot, null, null, null, null, EntryCounts.EMPTY, SlotMapping.EMPTY,
-                null, NbtConstraints.EMPTY, null, null);
+                null, NbtConstraints.EMPTY, null, null, null);
     }
 
     public boolean isEmpty() {
@@ -77,27 +81,32 @@ public record GeneralFilterEntry(
 
     public GeneralFilterEntry withItem(@Nullable StackSnapshot value) {
         return new GeneralFilterEntry(slot, value, fluidId, chemicalId, tag, counts, slotMapping, enchanted,
-                nbt, durability, tagKind);
+                nbt, durability, tagKind, side);
     }
 
     public GeneralFilterEntry withTag(@Nullable String value, @Nullable FilterTargetType kind) {
         return new GeneralFilterEntry(slot, item, fluidId, chemicalId, value, counts, slotMapping, enchanted,
-                nbt, durability, value == null ? null : kind);
+                nbt, durability, value == null ? null : kind, side);
     }
 
     public GeneralFilterEntry withCounts(EntryCounts value) {
         return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, value, slotMapping, enchanted,
-                nbt, durability, tagKind);
+                nbt, durability, tagKind, side);
     }
 
     public GeneralFilterEntry withNbt(NbtConstraints value) {
         return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, slotMapping, enchanted,
-                value, durability, tagKind);
+                value, durability, tagKind, side);
     }
 
     public GeneralFilterEntry withSlotMapping(SlotMapping value) {
         return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, value, enchanted,
-                nbt, durability, tagKind);
+                nbt, durability, tagKind, side);
+    }
+
+    public GeneralFilterEntry withSide(@Nullable IoSide value) {
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, slotMapping, enchanted,
+                nbt, durability, tagKind, value);
     }
 
     public record EntryCounts(int amount, int batch, int stock) {

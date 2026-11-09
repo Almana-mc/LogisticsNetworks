@@ -258,6 +258,7 @@ final class LnetFilterText {
                 && !LnetRecipeText.isCard(entry)
                 && entry.counts().stock() == 0 && entry.counts().amount() == 0
                 && entry.slotMapping().slots().isEmpty()
+                && entry.side() == null
                 && entry.nbt().equals(GeneralFilterEntry.NbtConstraints.EMPTY));
         boolean readable = entries.stream()
                 .allMatch(entry -> survives(entry, FilterTargetType.ITEMS, ChannelMode.EXPORT, registries));

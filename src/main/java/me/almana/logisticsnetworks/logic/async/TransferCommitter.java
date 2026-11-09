@@ -175,6 +175,11 @@ public final class TransferCommitter {
             if (channel.canRotateResources() && movedResource != null && !movedResource.equals(intent.resource())) continue;
             if (intent.targetIndex() < 0 || intent.targetIndex() >= targets.length) continue;
             ResolvedTarget resolved = targets[intent.targetIndex()];
+            if (resolved != null && intent.face() != null) {
+                TransferEngine.ItemTransferTarget face = resolved.target().faces() == null ? null
+                        : resolved.target().faces().face(intent.face(), resolved.target());
+                resolved = face == null ? null : new ResolvedTarget(face, resolved.channel());
+            }
             if (resolved == null) continue;
             UUID targetId = plan.targets().get(intent.targetIndex()).nodeId();
             Map<Item, Integer> targetTotals = movedByTarget.computeIfAbsent(targetId,
@@ -228,7 +233,7 @@ public final class TransferCommitter {
             if (moved != null) targetBatches.put(targets.targets().get(index).handler(), moved);
         }
         TransferEngine.MoveRecorder served = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
-                ? (slot, index, moved, mask) -> TransferEngine.markServed(
+                ? (slot, index, moved, mask, face) -> TransferEngine.markServed(
                         channel, ChannelType.ITEM, targets.refs().get(index))
                 : null;
         boolean telemetry = NetworkRegistry.get(server.overworld()).getTelemetryManager().isActive(network.getId());
