@@ -32,6 +32,7 @@ val sophisticated_core_version: String by project
 val building_gadgets_file_id: String by project
 val cc_version: String by project
 val ae2Runtime = providers.gradleProperty("ae2_runtime").orElse("true").map { it.toBoolean() }
+val extendedAeRuntime = providers.gradleProperty("extendedae_runtime").orElse("true").map { it.toBoolean() }
 val refinedStorageRuntime = providers.gradleProperty("refined_storage_runtime").orElse("true").map { it.toBoolean() }
 val buildingGadgetsRuntime = providers.gradleProperty("building_gadgets_runtime").orElse("true").map { it.toBoolean() }
 val ccRuntime = providers.gradleProperty("cc_runtime").orElse("true").map { it.toBoolean() }
@@ -149,6 +150,9 @@ dependencies {
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
     if (ae2Runtime.get()) {
         localRuntime("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+    }
+    if (extendedAeRuntime.get()) {
+        localRuntime("curse.maven:ex-pattern-provider-892005:9453241")
     }
 
     compileOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")

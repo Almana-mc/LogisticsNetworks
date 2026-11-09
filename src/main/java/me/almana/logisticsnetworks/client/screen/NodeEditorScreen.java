@@ -1391,7 +1391,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         labelEditBox.setMaxLength(48);
         labelEditBox.setValue(node.getNodeLabel());
         labelEditBox.setBordered(true);
-        labelEditBox.setTextColor(cText());
         labelEditBox.setFocused(true);
         addRenderableWidget(labelEditBox);
         setFocused(labelEditBox);
@@ -2011,6 +2010,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     }
 
     protected boolean handleUnhandledKey(int key, int scan, int modifiers) {
+        checkHotbarKeyPressed(ClientInput.key(key, scan, modifiers));
         return true;
     }
 
