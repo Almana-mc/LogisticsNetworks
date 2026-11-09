@@ -40,7 +40,7 @@ public final class TransferCapabilityCache {
     private final BlockCapabilityCache<ResourceHandler<FluidResource>, Direction>[] fluids = new BlockCapabilityCache[6];
     @SuppressWarnings("unchecked")
     private final BlockCapabilityCache<EnergyHandler, Direction>[] energy = new BlockCapabilityCache[6];
-    // Memoised combine, reused while faces match
+    // Memoised combine while faces match
     private static final EnergyHandler[] NO_ENERGY = new EnergyHandler[0];
     private EnergyHandler[] combinedEnergyOf = NO_ENERGY;
     private EnergyHandler combinedEnergy;
