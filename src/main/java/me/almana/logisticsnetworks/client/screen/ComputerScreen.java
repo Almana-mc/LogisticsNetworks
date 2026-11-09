@@ -1272,17 +1272,23 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
     private void selectLnetFile(Path path) {
         try {
             selectedLnetPath = path;
-            selectedLnetFile = LnetNetworkFile.read(path);
+            selectedLnetFile = LnetNetworkFile.read(path, minecraft.level.registryAccess());
             selectedLnetLabelIndex = selectedLnetFile.nodes().isEmpty() ? -1 : 0;
             lnetLabelScrollOffset = 0;
-            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_file_loaded",
-                    path.getFileName().toString()), pal().textSecondary());
+            String name = path.getFileName().toString();
+            if (selectedLnetFile.skipped().isEmpty()) {
+                setLnetStatus(line("gui.logisticsnetworks.computer.lnet_file_loaded", name), pal().textSecondary());
+            } else {
+                setLnetStatus(line("gui.logisticsnetworks.computer.lnet_loaded_skipped", name,
+                        selectedLnetFile.skipped().size()), pal().warning());
+                selectedLnetFile.skipped().forEach(message -> LOGGER.warn("Skipped in {}: {}", path, message));
+            }
         } catch (IOException e) {
             selectedLnetPath = path;
             selectedLnetFile = null;
             selectedLnetLabelIndex = -1;
-            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_invalid_file"), pal().warning());
-            if (Config.debugMode) LOGGER.warn("Failed to read lnet file {}", path, e);
+            setLnetStatus(line("gui.logisticsnetworks.computer.lnet_invalid_file", e.getMessage()), pal().warning());
+            LOGGER.warn("Failed to read lnet file {}", path, e);
         }
     }
 
@@ -1979,7 +1985,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
             for (SyncNetworkExportPayload.NodeExportInfo node : payload.nodes()) {
                 nodes.add(new LnetNetworkFile.NodeEntry(node.label(), node.visible(), node.clipboardTag()));
             }
-            Path path = LnetNetworkFile.write(payload.networkName(), nodes);
+            Path path = LnetNetworkFile.write(payload.networkName(), nodes, minecraft.level.registryAccess());
             lnetFiles = new ArrayList<>(LnetNetworkFile.listFiles());
             selectedLnetPath = path;
             selectedLnetFile = new LnetNetworkFile(payload.networkName(), nodes);
@@ -1989,7 +1995,7 @@ public class ComputerScreen extends LegacyContainerScreen<ComputerMenu> {
                     pal().accent());
         } catch (IOException e) {
             setLnetStatus(line("gui.logisticsnetworks.computer.lnet_save_failed"), pal().warning());
-            if (Config.debugMode) LOGGER.warn("Failed to save lnet export", e);
+            LOGGER.warn("Failed to save lnet export", e);
         }
     }
 

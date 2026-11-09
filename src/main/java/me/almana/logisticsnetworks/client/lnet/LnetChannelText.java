@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 
 final class LnetChannelText {
 
-    private static final Pattern RESOURCE = Pattern.compile("(max|\\d+)(mb)? (items|fluids|energy|chemicals|source)");
+    private static final Pattern RESOURCE = Pattern.compile("(max|\\d+)(mb)? (items?|fluids|energy|chemicals|source)");
     private static final Pattern EVERY = Pattern.compile("every (\\d+) ticks?");
     private static final Pattern PRIORITY = Pattern.compile("priority (-?\\d+)");
     private static final Pattern RECIPE_SETS = Pattern.compile("(\\d+) recipe sets?");
@@ -41,6 +41,7 @@ final class LnetChannelText {
         @Nullable
         ChannelMode mode;
         int recipeTarget = -1;
+        int line;
         @Nullable
         private LnetFilterText.FilterDraft inline;
         private boolean enabled = true;
@@ -54,6 +55,7 @@ final class LnetChannelText {
         private FilterMode filterMode = FilterMode.MATCH_ANY;
         private int priority;
         private boolean rotate;
+        private boolean droppedFilter;
 
         ChannelDraft(int index, String name) {
             this.index = index;
@@ -79,8 +81,15 @@ final class LnetChannelText {
                 throw new IOException("[" + label + "] channel " + (index + 1) + " needs a 'send' or 'receive' clause");
             }
             guardWhitelists();
+            if (droppedFilter) {
+                types = 0;
+            }
             return new ChannelState(enabled, mode, types, Arrays.stream(batches).boxed().toList(), recipeSets,
                     tickDelay, Optional.of(side), redstone, distribution, filterMode, priority, name, rotate);
+        }
+
+        void dropFilter() {
+            droppedFilter = true;
         }
 
         List<ItemStack> filterStacks() {
@@ -175,7 +184,8 @@ final class LnetChannelText {
                 readInline(text, registries, skip);
                 return;
             }
-            ChannelType type = ChannelType.values()[WORDS.indexOf(resource.group(3))];
+            String word = resource.group(3).equals("item") ? "items" : resource.group(3);
+            ChannelType type = ChannelType.values()[WORDS.indexOf(word)];
             if (resource.group(2) != null && type != ChannelType.FLUID && type != ChannelType.CHEMICAL) {
                 throw new IOException("'mb' only fits fluids and chemicals");
             }
@@ -209,11 +219,15 @@ final class LnetChannelText {
                 return;
             }
             for (LnetFilterText.FilterDraft filter : all) {
-                if (filter.entries == null || filter.settings.blacklist() && !filter.droppedCard) {
+                boolean guarded = filter.entries != null
+                        && (!filter.settings.blacklist() || filter.droppedCard);
+                if (!guarded) {
                     continue;
                 }
+                FilterTargetType target = filter.settings.target();
                 for (ChannelType kind : filter.skippedKinds) {
-                    if (filter.settings.blacklist() || filter.entries.stream().noneMatch(entry -> keeps(entry, kind, filter.settings.target()))) {
+                    if (filter.settings.blacklist()
+                            || filter.entries.stream().noneMatch(entry -> keeps(entry, kind, target))) {
                         types &= ~kind.bit();
                     }
                 }
@@ -237,7 +251,8 @@ final class LnetChannelText {
             HolderLookup.Provider registries) {
         List<GeneralFilterEntry> inline = inlineEntries(state, filters, registries);
         String name = state.name().isBlank() ? ""
-                : " \"" + state.name().replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+                : " \"" + LnetEntryText.oneLine(state.name())
+                        .replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
         String title = "Channel " + (index + 1) + name + ": " + String.join(", ", head(state, inline, registries));
         String extra = String.join(", ", settings(state));
         if (extra.isEmpty()) {
@@ -274,8 +289,9 @@ final class LnetChannelText {
         } else {
             for (ChannelType type : ChannelType.values()) {
                 if (type.in(state.types()) && !type.in(inlineKinds)) {
-                    head.add(verb + amount(type, state.batches().get(type.ordinal())) + " "
-                            + WORDS.get(type.ordinal()));
+                    int batch = state.batches().get(type.ordinal());
+                    String word = type == ChannelType.ITEM && batch == 1 ? "item" : WORDS.get(type.ordinal());
+                    head.add(verb + amount(type, batch) + " " + word);
                 }
             }
         }
