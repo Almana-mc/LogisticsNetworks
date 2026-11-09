@@ -34,6 +34,11 @@ public class LogisticsEmiPlugin implements EmiPlugin {
                 consumer.accept(new Bounds(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight()));
             }
         });
+        registry.addExclusionArea(RecipeCardScreen.class, (screen, consumer) -> {
+            for (Rect2i rect : screen.getExtraAreas()) {
+                consumer.accept(new Bounds(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight()));
+            }
+        });
         registry.addDragDropHandler(RecipeCardScreen.class, new RecipeCardDragDrop());
         registry.addRecipeHandler(Registration.RECIPE_CARD_MENU.get(), new RecipeCardEmiHandler());
     }

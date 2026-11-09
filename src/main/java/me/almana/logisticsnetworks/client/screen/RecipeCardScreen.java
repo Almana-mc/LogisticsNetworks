@@ -92,7 +92,7 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
         }
         List<RecipeCardData.Ingredient> list = menu.data().ingredients();
         for (int i = 0; i < CELLS; i++) {
-            counts[i].visible = i < list.size();
+            counts[i].visible = !page.isOpen() && i < list.size();
             if (counts[i].visible) fit(counts[i], list.get(i));
             String count = counts[i].visible ? Integer.toString(list.get(i).count()) : "";
             if (!counts[i].isFocused() && !counts[i].getValue().equals(count)) counts[i].setValue(count);
@@ -260,6 +260,10 @@ public class RecipeCardScreen extends LegacyContainerScreen<RecipeCardMenu> {
     // None under the open page
     public int droppableCells() {
         return page.isOpen() ? 0 : Math.min(CELLS, Math.max(MIN_CELLS, menu.data().ingredients().size() + 1));
+    }
+
+    public List<Rect2i> getExtraAreas() {
+        return page.isOpen() ? List.of(new Rect2i(leftPos, topPos, imageWidth, imageHeight)) : List.of();
     }
 
     public Rect2i cellArea(int index) {

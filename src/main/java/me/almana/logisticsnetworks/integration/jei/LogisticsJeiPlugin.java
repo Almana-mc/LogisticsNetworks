@@ -50,6 +50,12 @@ public class LogisticsJeiPlugin implements IModPlugin {
                 return screen.getExtraAreas();
             }
         });
+        registration.addGuiContainerHandler(RecipeCardScreen.class, new IGuiContainerHandler<>() {
+            @Override
+            public List<Rect2i> getGuiExtraAreas(RecipeCardScreen screen) {
+                return screen.getExtraAreas();
+            }
+        });
     }
 
     @Override
