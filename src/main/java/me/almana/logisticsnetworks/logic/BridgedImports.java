@@ -1,10 +1,10 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeRef;
-import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.data.ServerRackLinks;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.TransferEngine.ImportTarget;
@@ -26,13 +26,14 @@ final class BridgedImports {
     private BridgedImports() {
     }
 
-    @SuppressWarnings("unchecked")
-    static void merge(List<ServerRackLinks.Link> links, NetworkRegistry registry, MinecraftServer server,
-            List<ImportTarget>[][] imports, Map<UUID, Boolean> dimensionalCache) {
-        for (int type = 0; type < imports.length; type++) {
-            imports[type] = imports[type].clone();
-        }
+    static List<ImportTarget> extend(List<ImportTarget> local, ChannelType type, int channel,
+            List<ServerRackLinks.Link> links, NetworkRegistry registry, MinecraftServer server,
+            NodeSignals signals, Map<UUID, Boolean> dimensionalCache) {
+        List<ImportTarget> merged = null;
         for (ServerRackLinks.Link link : links) {
+            if (link.channel() != channel) {
+                continue;
+            }
             LogisticsNetwork peer = registry.getNetwork(link.peer());
             if (peer == null) {
                 continue;
@@ -41,23 +42,24 @@ final class BridgedImports {
                 peer.rebuildCache(registry);
                 peer.clearCacheDirty();
             }
-            List<NodeRef>[][] peerRefs = new List[][] { peer.getItemImports(), peer.getFluidImports(),
-                    peer.getEnergyImports(), peer.getChemicalImports(), peer.getSourceImports() };
-            for (int type = 0; type < imports.length; type++) {
-                List<NodeRef> refs = peerRefs[type][link.peerChannel()];
-                if (refs.isEmpty()) {
-                    continue;
-                }
-                List<ImportTarget> slot = new ArrayList<>(imports[type][link.channel()]);
-                addTargets(refs, peer, link.peerChannel(), server, slot, dimensionalCache);
-                slot.sort(ORDER);
-                imports[type][link.channel()] = slot;
+            List<NodeRef> refs = NetworkImports.refs(peer)[type.ordinal()][link.peerChannel()];
+            if (refs.isEmpty()) {
+                continue;
             }
+            if (merged == null) {
+                merged = new ArrayList<>(local);
+            }
+            addTargets(refs, peer, link.peerChannel(), server, signals, merged, dimensionalCache);
         }
+        if (merged == null) {
+            return local;
+        }
+        merged.sort(ORDER);
+        return merged;
     }
 
     private static void addTargets(List<NodeRef> refs, LogisticsNetwork peer, int channel, MinecraftServer server,
-            List<ImportTarget> out, Map<UUID, Boolean> dimensionalCache) {
+            NodeSignals signals, List<ImportTarget> out, Map<UUID, Boolean> dimensionalCache) {
         for (NodeRef ref : refs) {
             LogisticsNodeEntity node = TransferEngine.findNode(server, ref.nodeId(),
                     peer.getNodeDimension(ref.nodeId()));
@@ -65,18 +67,11 @@ final class BridgedImports {
                 continue;
             }
             ChannelData data = node.getChannel(channel);
-            if (!TransferEngine.isRedstoneActive(data.getRedstoneMode(), signal(node, data))) {
+            if (!signals.active(node, data.getRedstoneMode())) {
                 continue;
             }
             out.add(new ImportTarget(node, data, channel));
             dimensionalCache.put(node.getUUID(), peer.getDimensionalCache().getOrDefault(node.getUUID(), false));
         }
-    }
-
-    private static int signal(LogisticsNodeEntity node, ChannelData data) {
-        if (data.getRedstoneMode() == RedstoneMode.IGNORED) {
-            return 0;
-        }
-        return node.level().getBestNeighborSignal(node.getAttachedPos());
     }
 }

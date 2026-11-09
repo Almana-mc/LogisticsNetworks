@@ -101,16 +101,15 @@ public final class Snapshots {
             OccupiedSlotBudget occupiedSlots, long itemWakeDelta) {
         ServerLevel level = (ServerLevel) node.level();
         long gameTime = level.getGameTime();
-        int signal = context.signalCache().getOrDefault(node.getUUID(), 0);
         int tier = context.tierCache().getOrDefault(node.getUUID(), 0);
         for (int index = 0; index < LogisticsNodeEntity.CHANNEL_COUNT; index++) {
             ChannelData channel = node.getChannel(index);
             if (channel == null || !channel.isEnabled()
                     || channel.getMode() != ChannelMode.EXPORT || !channel.hasType(ChannelType.ITEM)) continue;
             if (RecipeCardItem.anyIn(channel.getFilterItems())) continue;
-            if (!TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal)) continue;
-            List<TransferEngine.ImportTarget> targets = context.itemImports()[index];
-            if (targets == null || targets.isEmpty()) continue;
+            if (!context.signals().active(node, channel.getRedstoneMode())) continue;
+            List<TransferEngine.ImportTarget> targets = context.imports().get(ChannelType.ITEM, index);
+            if (targets.isEmpty()) continue;
             long cooldown = TransferEngine.cooldownRemaining(
                     node, channel, index, ChannelType.ITEM.ordinal(), tier, gameTime);
             if (cooldown > 0L) {
@@ -141,7 +140,8 @@ public final class Snapshots {
         ServerLevel level = (ServerLevel) node.level();
         FilterItemData.ReadCache readCache = channel.getReadCache();
         TransferEngine.ResolvedItemTargets resolved = TransferEngine.resolveItemTargets(
-                node, level, channel, context.itemImports()[index], sourceHandler, context.dimensionalCache(), readCache);
+                node, level, channel, context.imports().get(ChannelType.ITEM, index), sourceHandler,
+                context.dimensionalCache(), readCache);
         if (resolved.status() != TransferEngine.ResolvedItemTargets.OK) return null;
         int batchLimit = NodeUpgradeData.effectiveBatch(channel, ChannelType.ITEM, tier);
         int sourceEndpoint = endpoints.capture(node, channel.getIoSide(), sourceHandler, occupiedSlots);

@@ -40,6 +40,10 @@ public final class TransferCapabilityCache {
     private final BlockCapabilityCache<ResourceHandler<FluidResource>, Direction>[] fluids = new BlockCapabilityCache[6];
     @SuppressWarnings("unchecked")
     private final BlockCapabilityCache<EnergyHandler, Direction>[] energy = new BlockCapabilityCache[6];
+    // Memoised combine, reused while faces match
+    private static final EnergyHandler[] NO_ENERGY = new EnergyHandler[0];
+    private EnergyHandler[] combinedEnergyOf = NO_ENERGY;
+    private EnergyHandler combinedEnergy;
 
     public TransferCapabilityCache(LogisticsNodeEntity node) {
         this.node = node;
@@ -199,8 +203,16 @@ public final class TransferCapabilityCache {
             EnergyHandler handler = energySide(level, side);
             if (handler != null && !containsIdentity(found, handler)) found.add(handler);
         }
-        if (found.isEmpty()) return null;
-        return found.size() == 1 ? found.get(0) : new CombinedEnergyHandler(found.toArray(EnergyHandler[]::new));
+        if (found.size() <= 1) {
+            combinedEnergyOf = NO_ENERGY;
+            combinedEnergy = null;
+            return found.isEmpty() ? null : found.get(0);
+        }
+        if (!sameHandlers(found, combinedEnergyOf)) {
+            combinedEnergyOf = found.toArray(EnergyHandler[]::new);
+            combinedEnergy = new CombinedEnergyHandler(combinedEnergyOf);
+        }
+        return combinedEnergy;
     }
 
     @Nullable
@@ -300,5 +312,13 @@ public final class TransferCapabilityCache {
             if (value == candidate) return true;
         }
         return false;
+    }
+
+    private static boolean sameHandlers(List<EnergyHandler> found, EnergyHandler[] previous) {
+        if (found.size() != previous.length) return false;
+        for (int i = 0; i < previous.length; i++) {
+            if (found.get(i) != previous[i]) return false;
+        }
+        return true;
     }
 }

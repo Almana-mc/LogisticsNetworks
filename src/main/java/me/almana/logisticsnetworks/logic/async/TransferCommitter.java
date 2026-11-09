@@ -277,7 +277,7 @@ public final class TransferCommitter {
             ChannelData channel, int index, ResourceHandler<ItemResource> source,
             TransferEngine.NetworkContext context, FilterItemData.ReadCache cache, @Nullable UUID onlyTarget) {
         List<TransferEngine.ImportTarget> targets = new ArrayList<>();
-        for (TransferEngine.ImportTarget ref : context.itemImports()[index]) {
+        for (TransferEngine.ImportTarget ref : context.imports().get(ChannelType.ITEM, index)) {
             // Robin recovery stays on receiver
             if (onlyTarget != null && !onlyTarget.equals(ref.node().getUUID())) continue;
             ChannelData current = ref.node().getChannel(ref.channelIndex());

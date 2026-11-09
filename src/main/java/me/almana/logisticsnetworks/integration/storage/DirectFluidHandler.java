@@ -30,7 +30,7 @@ public final class DirectFluidHandler implements ResourceHandler<FluidResource> 
 
     private List<StorageEndpoint.StoredFluid> exports() {
         ThreadGuard.requireServerThread();
-        if (exports == null) exports = exporting ? endpoint.exportableFluids(true) : List.of();
+        if (exports == null) exports = exporting ? endpoint.exportableFluids(false) : List.of();
         return exports;
     }
 

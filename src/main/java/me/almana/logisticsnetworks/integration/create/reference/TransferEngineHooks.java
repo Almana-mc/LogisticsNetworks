@@ -180,4 +180,41 @@ private static boolean hasMountedStorage(LogisticsNodeEntity node, ChannelData c
         default -> false;
     };
 }
+
+Source owner: TransferEngine (9c0b58af, lazy signals and import targets)
+
+static List<ImportTarget> resolveImports(List<NodeRef> refs, int channel,
+        Map<UUID, LogisticsNodeEntity> nodeCache, NodeSignals signals) {
+    ...
+    if (!canRunChannel(node, cd) || !CreateCompat.isResolved(node))
+        continue;
+    if (!signals.active(node, cd.getRedstoneMode()))
+        continue;
+    ...
+}
+
+processNode, per channel before the recipe lane:
+if (!canRunChannel(sourceNode, channel) || !CreateCompat.isResolved(sourceNode))
+    continue;
+
+processNode, per lane after the energy probe (cooldown -> redstone -> item skip -> targets -> energy -> mounted):
+if (sourceNode.isMountedOnCreate() && !hasMountedStorage(sourceNode, channel, type, capCache))
+    continue;
+
+Source owner: NodeSignals (9c0b58af)
+
+private int signal(LogisticsNodeEntity node) {
+    if (node.isMountedOnCreate()) {
+        return 0;
+    }
+    return known.computeIfAbsent(node, n -> n.level().getBestNeighborSignal(n.getAttachedPos()));
+}
+
+Source owner: BridgedImports (9c0b58af)
+
+ChannelData data = node.getChannel(channel);
+if (!TransferEngine.canRunChannel(node, data) || !CreateCompat.isResolved(node)
+        || !signals.active(node, data.getRedstoneMode())) {
+    continue;
+}
 */

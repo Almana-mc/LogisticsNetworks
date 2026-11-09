@@ -45,6 +45,7 @@ final class DirectItemHandler implements DirectItemAccess {
 
     List<StorageEndpoint.StoredItem> exports() {
         ThreadGuard.requireServerThread();
+        // Listing may lag one tick
         if (exports == null) exports = exporting ? readExports() : List.of();
         return exports;
     }
@@ -139,7 +140,7 @@ final class DirectItemHandler implements DirectItemAccess {
 
     private List<StorageEndpoint.StoredItem> readExports() {
         Map<ItemResource, StorageEndpoint.StoredItem> items = new LinkedHashMap<>();
-        for (StorageEndpoint.StoredItem stored : endpoint.exportableItems(reads.fresh())) {
+        for (StorageEndpoint.StoredItem stored : endpoint.exportableItems(false)) {
             ItemStack stack = stored.stack();
             ItemResource key = ItemResource.of(stack);
             StorageEndpoint.StoredItem current = items.get(key);
