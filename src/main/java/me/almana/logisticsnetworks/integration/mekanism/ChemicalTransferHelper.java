@@ -369,9 +369,13 @@ public final class ChemicalTransferHelper {
             ? new ArrayList<>() : null;
     List<ChannelData> equalChannels = equalHandlers == null ? null : new ArrayList<>();
 
-    IChemicalHandler targetHandler = capCache.findChemicalHandler(targetLevel, targetPos,
-            target.channel().getIoSide());
-    if (targetHandler == null)
+    IChemicalHandler sourceHandler = sourceNode.capabilities().findChemicalHandler(exportChannel.getIoSide(), true);
+    if (sourceHandler == null)
+        return 0;
+
+    IChemicalHandler targetHandler = target.node().capabilities().findChemicalHandler(
+            target.channel().getIoSide(), false);
+    if (targetHandler == null || DirectChemicalHandler.shareNetwork(sourceHandler, targetHandler))
         continue;
     if (equalHandlers != null) {
         equalHandlers.add(targetHandler);

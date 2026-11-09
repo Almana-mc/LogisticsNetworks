@@ -275,6 +275,26 @@ public final class TransferCapabilityCache {
         return cache.getCapability();
     }
 
+    // Enable when 26.1.2 is supported.
+    /*
+    @Nullable
+    private IChemicalHandler findChemicalHandler(ServerLevel level, IoSide side) {
+        if (side == IoSide.NONE) return ChemicalTransferHelper.getUnsidedHandler(level, node.getAttachedPos());
+        return ChemicalTransferHelper.getHandler(level, node.getAttachedPos(), side.direction());
+    }
+
+    @Nullable
+    public IChemicalHandler findChemicalHandler(IoSide side, boolean exporting) {
+        ServerLevel level = (ServerLevel) node.level();
+        if (side == IoSide.NONE || node.isMountedOnCreate()) return findChemicalHandler(level, side);
+        InterfaceStorageResolution resolution = resolveInterface(level, side.direction());
+        if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
+        if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE && resolution.endpoint().storesChemicals())
+            return DirectChemicalHandler.of(resolution.endpoint(), exporting);
+        return findChemicalHandler(level, side);
+    }
+    */
+
     private static <T> boolean containsIdentity(List<T> values, T candidate) {
         for (T value : values) {
             if (value == candidate) return true;

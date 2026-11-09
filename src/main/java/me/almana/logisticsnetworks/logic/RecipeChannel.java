@@ -117,7 +117,7 @@ final class RecipeChannel {
         // Enable when 26.1.2 is supported.
         /*
         boolean chemicals = kinds.contains(RecipeCardData.Kind.CHEMICAL) && ChannelType.CHEMICAL.in(types);
-        Third Source argument: chemicals ? caps.findChemicalHandler(level, node.getAttachedPos(), side) : null
+        Third Source argument: chemicals ? node.capabilities().findChemicalHandler(side, true) : null
         */
         return new RecipeSets.Source(
                 kinds.contains(RecipeCardData.Kind.ITEM) && ChannelType.ITEM.in(types)
@@ -174,9 +174,8 @@ final class RecipeChannel {
         LogisticsNodeEntity node = target.node();
         if (node.isMountedOnCreate())
             return null;
-        IChemicalHandler handler = caps.findChemicalHandler((ServerLevel) node.level(), node.getAttachedPos(),
-                target.channel().getIoSide());
-        if (handler == null || handler == from)
+        IChemicalHandler handler = node.capabilities().findChemicalHandler(target.channel().getIoSide(), false);
+        if (handler == null || handler == from || DirectChemicalHandler.shareNetwork(from, handler))
             return null;
         return new RecipeEndpoint.Chemicals(handler, target.channel().getFilterItems(),
                 target.channel().getFilterMode());

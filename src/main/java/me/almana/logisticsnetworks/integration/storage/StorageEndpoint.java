@@ -60,4 +60,27 @@ public interface StorageEndpoint {
     default long extractSource(long amount, boolean simulate) {
         return 0;
     }
+
+    // Enable when 26.1.2 is supported.
+    /*
+    default boolean storesChemicals() {
+        return false;
+    }
+
+    default List<ChemicalStack> exportableChemicals() {
+        return List.of();
+    }
+
+    default long insertChemical(ChemicalStack stack, long amount, boolean simulate) {
+        return 0;
+    }
+
+    default long extractChemical(ChemicalStack stack, long amount, boolean simulate) {
+        return 0;
+    }
+
+    default long chemicalCount(ChemicalStack stack) {
+        return 0;
+    }
+    */
 }
