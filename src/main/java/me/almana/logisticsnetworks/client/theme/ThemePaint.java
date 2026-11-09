@@ -157,6 +157,24 @@ public final class ThemePaint {
         }
     }
 
+    public static void channelTab(GuiGraphics graphics, Font font, int x, int y, int width, int height,
+            String label, int types, boolean active, boolean hasDot, boolean hovered, Theme theme) {
+        int count = Integer.bitCount(types);
+        channelTab(graphics, font, x, y, width, height, label, count == 1 ? ChannelType.first(types) : null, active,
+                hasDot, hovered, theme);
+        if (count < 2) return;
+        int span = width - 6;
+        int index = 0;
+        for (ChannelType type : ChannelType.values()) {
+            if (!type.in(types)) continue;
+            int from = x + 3 + span * index / count;
+            int to = x + 3 + span * (index + 1) / count;
+            graphics.fill(from, y + height - 3, index + 1 < count ? to - 1 : to, y + height - 2,
+                    ChannelTint.hue(type));
+            index++;
+        }
+    }
+
     public static void visibleToggle(GuiGraphics graphics, Font font, int x, int y, int width, int height,
             String label, boolean on, boolean hovered, Theme theme) {
         int bg = on ? theme.accentSoft() : theme.surface();

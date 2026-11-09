@@ -23,9 +23,7 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.ModFilterData;
 import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
-import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
-import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.menu.NodeMenu;
@@ -77,7 +75,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private static final int INV_X = 47;
     private static final int INV_Y = 218;
     private static final int NETWORKS_PER_PAGE = 3;
-    private static final int BATCH_MIN = 1;
     private static final int BATCH_MAX = 1_000_000;
     private static final int DELAY_MIN = 1;
     private static final int DELAY_MAX = 10_000;
@@ -129,6 +126,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private long settingsHoverStartTime = 0;
     private boolean filterDisabledHover = false;
     private boolean filterPickerOpen = false;
+    private ResourcesPopover resources;
     private int filterPickerSlot = -1;
     private boolean filterAddHover = false;
     private long filterAddedToastUntil = 0;
@@ -174,6 +172,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     @Override
     protected void init() {
         super.init();
+        resources = new ResourcesPopover(font);
         positionEditor();
 
         if (!isInitialized) {
@@ -239,7 +238,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         boolean backgroundInteractive = networkEditor == null && confirmation == null
-                && !storageUpgradePicker.isOpen();
+                && !storageUpgradePicker.isOpen() && !resources.isOpen();
         int backgroundMouseX = backgroundInteractive ? mx : Integer.MIN_VALUE;
         int backgroundMouseY = backgroundInteractive ? my : Integer.MIN_VALUE;
         super.render(g, backgroundMouseX, backgroundMouseY, pt);
@@ -248,6 +247,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         }
         if (filterPickerOpen && currentPage == Page.CHANNEL_CONFIG) {
             renderFilterPicker(g, mx, my);
+        }
+        if (resources.isOpen() && currentPage == Page.CHANNEL_CONFIG) {
+            resources.render(g, theme(), mx, my);
         }
         if (currentPage == Page.CHANNEL_CONFIG) {
             storageUpgradePicker.render(g, font, theme(), width, height, leftPos, topPos, mx, my);
@@ -263,7 +265,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             networkEditor.render(g, mx, my, pt, theme());
             return;
         }
-        if (!storageUpgradePicker.isOpen()) {
+        if (!storageUpgradePicker.isOpen() && !resources.isOpen()) {
             this.renderTooltip(g, mx, my);
             if (hoveredChannelName != null && currentPage == Page.CHANNEL_CONFIG) {
                 g.renderTooltip(font, hoveredChannelName, mx, my);
@@ -793,8 +795,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             int x = startX + i * 26;
             boolean hovered = !labelPickerOpen && mx >= x && mx <= x + 24 && my >= y && my <= y + 12;
             boolean hasDot = !isSelected && isEnabled;
-            ChannelType type = ch != null ? ch.getType() : null;
-            ThemePaint.channelTab(g, font, x, y, 24, 12, String.valueOf(i), type, isSelected, hasDot, hovered, t);
+            ThemePaint.channelTab(g, font, x, y, 24, 12, String.valueOf(i), ch != null ? ch.getTypes() : 0,
+                    isSelected, hasDot, hovered, t);
             if (isSelected && !isEnabled) {
                 ThemePaint.roundOutline(g, x, y, 24, 12, 2, cDanger(), t.sharpCorners());
             }
@@ -824,18 +826,18 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
                 ch.isEnabled() ? tr("gui.logisticsnetworks.node.value.enabled")
                         : tr("gui.logisticsnetworks.node.value.disabled"),
                 getChannelModeLabel(ch.getMode()),
-                getChannelTypeLabel(ch.getType()),
+                ResourceLabels.summary(ch.getTypes()),
                 ch.getIoDirection() != null ? getDirectionLabel(ch.getIoDirection().getName()) : getDirectionLabel("all"),
                 getRedstoneModeLabel(ch.getRedstoneMode()),
                 getDistributionModeLabel(ch.getDistributionMode()),
                 editingRow == 6 ? "" : String.valueOf(ch.getPriority()),
-                editingRow == 7 ? "" : formatBatchDisplay(ch),
+                editingRow == 7 ? "" : tr("gui.logisticsnetworks.node.value.batch.per_type"),
                 editingRow == 8 ? "" : tr("gui.logisticsnetworks.node.value.tick_delay", ch.getTickDelay())
         };
         Theme.Variant[] variants = {
                 ch.isEnabled() ? Theme.Variant.ACCENT : Theme.Variant.NEUTRAL,
                 getModeVariant(ch.getMode()),
-                getTypeVariant(ch.getType()),
+                Theme.Variant.NEUTRAL,
                 Theme.Variant.NEUTRAL,
                 getRedstoneVariant(ch.getRedstoneMode()),
                 getDistributionVariant(ch.getDistributionMode()),
@@ -867,6 +869,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             }
         }
 
+        int summaryW = font.width(values[2]) + 8;
+        ResourceLabels.dots(g, rx + rowW - summaryW - 3 - 22, ry + 2 * rowH + 5, ch.getTypes(), t);
+
         if (hoveredRow != settingsHoverRow) {
             settingsHoverRow = hoveredRow;
             settingsHoverStartTime = System.currentTimeMillis();
@@ -888,16 +893,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     private Theme.Variant getModeVariant(ChannelMode mode) {
         return mode == ChannelMode.EXPORT ? Theme.Variant.WARN : Theme.Variant.ACCENT;
-    }
-
-    private Theme.Variant getTypeVariant(ChannelType type) {
-        return switch (type) {
-            case ITEM -> Theme.Variant.ACCENT;
-            case FLUID -> Theme.Variant.INFO;
-            case ENERGY -> Theme.Variant.WARN;
-            case CHEMICAL -> Theme.Variant.NEUTRAL;
-            case SOURCE -> Theme.Variant.INFO;
-        };
     }
 
     private Theme.Variant getRedstoneVariant(RedstoneMode mode) {
@@ -1156,7 +1151,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         int valueBoxW;
         if (value.isEmpty()) {
             valueBoxW = 0;
-        } else if (row >= 6 && row <= 8 || row == 3) {
+        } else if (row >= 6 && row <= 8 || row == 3 || row == 2) {
             valueBoxW = font.width(value) + 8;
         } else {
             valueBoxW = ThemePaint.pillWidth(font, value);
@@ -1185,7 +1180,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             return;
         }
 
-        if (row >= 6 && row <= 8 || row == 3) {
+        if (row >= 6 && row <= 8 || row == 3 || row == 2) {
             int vx = x + w - valueBoxW - 3;
             g.fill(vx, chipY, vx + valueBoxW, chipY + 9, t.surfaceSunken());
             g.drawString(font, value, vx + 4, chipY + 1, cText(), false);
@@ -1196,25 +1191,11 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         ThemePaint.pill(g, font, pillX, pillY, value, variant, false, t);
     }
 
-    private String formatBatchDisplay(ChannelData ch) {
-        if (RecipeCardItem.anyIn(ch.getFilterItems()))
-            return String.valueOf(ch.getBatchSize());
-        if (ch.getType() == ChannelType.FLUID)
-            return tr("gui.logisticsnetworks.node.value.batch.fluid", ch.getBatchSize());
-        if (ch.getType() == ChannelType.ENERGY)
-            return tr("gui.logisticsnetworks.node.value.batch.energy", ch.getBatchSize());
-        if (ch.getType() == ChannelType.CHEMICAL)
-            return tr("gui.logisticsnetworks.node.value.batch.chemical", ch.getBatchSize());
-        if (ch.getType() == ChannelType.SOURCE)
-            return tr("gui.logisticsnetworks.node.value.batch.source", ch.getBatchSize());
-        return String.valueOf(ch.getBatchSize());
-    }
-
     private boolean isSettingDisabled(ChannelData ch, int row) {
         if (ch.getMode() == ChannelMode.IMPORT) {
             return row == 5 || row == 7 || row == 8;
         }
-        return (ch.getType() == ChannelType.ENERGY) && row == 8;
+        return ch.getTypes() == ChannelType.ENERGY.bit() && row == 8;
     }
 
     @Override
@@ -1236,6 +1217,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         }
         if (action != -1 && handleInteraction(mx, my, action))
             return true;
+        if (resources.isOpen())
+            return true;
         return super.mouseClicked(mx, my, btn);
     }
 
@@ -1253,6 +1236,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         if (storageUpgradePicker.isOpen()) {
             handleStorageUpgradePickerAction(mx, my, action);
             return true;
+        }
+        if (currentPage == Page.CHANNEL_CONFIG && resources.isOpen()) {
+            return resources.click(mx, my, action);
         }
         if (tweaksOpen) {
             if (action == 0) return handleTweaksClick(mx, my);
@@ -1524,6 +1510,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             return true;
         }
 
+        if (resources.isOpen()) {
+            return resources.click(mx, my, action);
+        }
+
         String visibilityLabel = getVisibilityLabel(node.isRenderVisible());
         if (isHoveringAbs(leftPos + 8, topPos + 4, font.width(visibilityLabel) + 16, 12, mx, my)) {
             ClickSound.play();
@@ -1625,6 +1615,12 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
                 if (isSettingDisabled(ch, row))
                     return true;
 
+                if (row == 2 || row == 7) {
+                    ClickSound.play();
+                    resources.open(resourcesTarget(node, ch), leftPos + 40, topPos + 102);
+                    return true;
+                }
+
                 if (row >= 6 && row <= 8) {
                     if (ClientControls.modifier3Down()) {
                         ClickSound.play();
@@ -1665,40 +1661,12 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
         switch (row) {
             case 0 -> ch.setEnabled(!ch.isEnabled());
             case 1 -> ch.setMode(cycleModeForNode(ch.getMode(), dir));
-            case 2 -> NodeUpgradeData.applyTypeChange(ch, cycleChannelType(ch.getType(), dir),
-                    NodeUpgradeData.getUpgradeTier(getMenu().getNode()));
             case 3 -> ch.setIoDirection(cycleSide(ch.getIoDirection(), dir));
             case 4 -> ch.setRedstoneMode(cycleEnum(ch.getRedstoneMode(), dir));
             case 5 -> ch.setDistributionMode(cycleEnum(ch.getDistributionMode(), dir));
             case 6 -> ch.setPriority(ch.getPriority() + (ClientControls.modifier1Down() ? 10 : 1) * dir);
-            case 7 -> ch.setBatchSize(ch.getBatchSize() + (ClientControls.modifier1Down() ? 8 : 1) * dir);
             case 8 -> ch.setTickDelay(ch.getTickDelay() + (ClientControls.modifier1Down() ? 10 : 1) * dir);
         }
-    }
-
-    private ChannelType cycleChannelType(ChannelType current, int dir) {
-        LogisticsNodeEntity node = getMenu().getNode();
-        ChannelType[] values = ChannelType.values();
-        int len = values.length;
-        int index = current.ordinal();
-        for (int i = 0; i < len; i++) {
-            index = (index + dir + len) % len;
-            ChannelType candidate = values[index];
-            if (candidate == ChannelType.CHEMICAL) {
-                if (!MekanismCompat.isLoaded())
-                    continue;
-                if (node == null || !NodeUpgradeData.hasMekanismChemicalUpgrade(node))
-                    continue;
-            }
-            if (candidate == ChannelType.SOURCE) {
-                if (!ArsCompat.isLoaded())
-                    continue;
-                if (node == null || !NodeUpgradeData.hasArsSourceUpgrade(node))
-                    continue;
-            }
-            return candidate;
-        }
-        return current;
     }
 
     private ChannelMode cycleModeForNode(ChannelMode current, int dir) {
@@ -1726,7 +1694,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
         String val = switch (row) {
             case 6 -> String.valueOf(ch.getPriority());
-            case 7 -> String.valueOf(ch.getBatchSize());
             case 8 -> String.valueOf(ch.getTickDelay());
             default -> "";
         };
@@ -1752,7 +1719,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
                 if (ch != null) {
                     switch (editingRow) {
                         case 6 -> ch.setPriority(val);
-                        case 7 -> ch.setBatchSize(val);
                         case 8 -> ch.setTickDelay(val);
                     }
                     commitChannelUpdate(node, ch);
@@ -1769,6 +1735,65 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private void commitChannelUpdate(LogisticsNodeEntity node, ChannelData ch) {
         validateChannelConfig(node, ch);
         ClientPacketDistributor.sendToServer(UpdateChannelPayload.of(node.getId(), selectedChannel, ch));
+    }
+
+    private ResourcesPopover.Target resourcesTarget(LogisticsNodeEntity node, ChannelData ch) {
+        return new ResourcesPopover.Target() {
+            @Override
+            public int types() {
+                return ch.getTypes();
+            }
+
+            @Override
+            public void setTypes(int mask) {
+                ch.setTypes(mask);
+            }
+
+            @Override
+            public int available() {
+                return NodeUpgradeData.availableTypes(node);
+            }
+
+            @Override
+            public int batch(ChannelType type) {
+                return ch.getBatch(type);
+            }
+
+            @Override
+            public void setBatch(ChannelType type, int value) {
+                ch.setBatch(type, value);
+            }
+
+            @Override
+            public int cap(ChannelType type) {
+                return NodeUpgradeData.getOperationCap(type, NodeUpgradeData.getUpgradeTier(node));
+            }
+
+            @Override
+            public int recipeSets() {
+                return ch.getRecipeSets();
+            }
+
+            @Override
+            public void setRecipeSets(int value) {
+                ch.setRecipeSets(value);
+            }
+
+            @Override
+            public boolean exporting() {
+                return ch.getMode() == ChannelMode.EXPORT;
+            }
+
+            @Override
+            public boolean hasCard() {
+                return RecipeCardItem.anyIn(ch.getFilterItems());
+            }
+
+            @Override
+            public void commit() {
+                commitChannelUpdate(node, ch);
+            }
+        };
     }
 
     private void sendNetworkAssign(Optional<UUID> id, String name) {
@@ -1837,21 +1862,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     private void setNumericExtremum(ChannelData ch, int row, boolean max) {
         switch (row) {
             case 6 -> ch.setPriority(max ? PRIORITY_MAX : PRIORITY_MIN);
-            case 7 -> {
-                if (max) {
-                    LogisticsNodeEntity node = getMenu().getNode();
-                    int cap = switch (ch.getType()) {
-                        case FLUID -> NodeUpgradeData.getFluidOperationCapMb(node);
-                        case ENERGY -> NodeUpgradeData.getEnergyOperationCap(node);
-                        case CHEMICAL -> NodeUpgradeData.getChemicalOperationCap(node);
-                        case SOURCE -> NodeUpgradeData.getSourceOperationCap(node);
-                        default -> NodeUpgradeData.getItemOperationCap(node);
-                    };
-                    ch.setBatchSize(cap);
-                } else {
-                    ch.setBatchSize(BATCH_MIN);
-                }
-            }
             case 8 -> ch.setTickDelay(max ? DELAY_MAX : DELAY_MIN);
         }
     }
@@ -1953,6 +1963,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             }
             return true;
         }
+        if (resources.keyPressed(key, scan, modifiers)) return true;
         if (key == 256) {
             if (channelNameEditing) {
                 stopChannelNameEdit(false);
@@ -2023,6 +2034,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             return networkEditor.charTyped(ch);
         }
         if (storageUpgradePicker.isOpen()) return true;
+        if (resources.charTyped(ch, modifiers)) return true;
         if (channelNameEditing && channelNameEditBox != null) {
             return channelNameEditBox.charTyped(ClientInput.character(ch));
         }
@@ -2160,10 +2172,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
 
     private String getChannelModeLabel(ChannelMode mode) {
         return tr("gui.logisticsnetworks.channel_mode." + mode.name().toLowerCase(Locale.ROOT));
-    }
-
-    private String getChannelTypeLabel(ChannelType type) {
-        return tr("gui.logisticsnetworks.channel_type." + type.name().toLowerCase(Locale.ROOT));
     }
 
     private String getRedstoneModeLabel(RedstoneMode mode) {
