@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.ItemStack;
@@ -66,6 +67,8 @@ public final class RecipeSets {
                 if (!blockers.contains(ingredient)) blockers.add(ingredient);
             }
         }
+        boolean directSource = DirectStorageHandlers.isDirect(source.items())
+                || DirectStorageHandlers.isDirect(source.fluids());
         int moved = 0;
         for (RecipeCardData card : cards) {
             if (moved >= batch) break;
@@ -79,7 +82,8 @@ public final class RecipeSets {
             if (sets <= 0) continue;
             List<RecipeCardData.Ingredient> blocking = card.blocking() ? blockers : null;
             moved += deal(mode, usable.size(), sets,
-                    (target, count) -> place(lanes, usable.get(target), count, blocking, endpoints, listener));
+                    (target, count) -> place(lanes, usable.get(target), count, blocking, endpoints, listener,
+                            directSource));
         }
         return moved;
     }
@@ -140,15 +144,15 @@ public final class RecipeSets {
     // All lanes or none
     private static int place(List<RecipeLane> lanes, int target, int sets,
             @Nullable List<RecipeCardData.Ingredient> blockers, List<RecipeEndpoint> endpoints,
-            @Nullable Listener listener) {
+            @Nullable Listener listener, boolean directSource) {
         if (blockers != null && holds(endpoints.get(target), blockers)) return 0;
         int fit = sets;
         for (RecipeLane lane : lanes) {
             fit = Math.min(fit, lane.fit(target, fit));
             if (fit == 0) return 0;
         }
-        boolean direct = endpoints.get(target).direct();
-        // Direct receivers commit each move
+        boolean direct = directSource || endpoints.get(target).direct();
+        // Storage networks commit each move
         try (var tx = direct ? null : Transaction.openRoot()) {
             for (RecipeLane lane : lanes) {
                 if (lane.move(target, fit, tx)) continue;

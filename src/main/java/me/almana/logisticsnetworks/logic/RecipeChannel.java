@@ -74,7 +74,7 @@ final class RecipeChannel {
         int sets = RecipeSets.transfer(source, endpoints, cards, batch, tier, channel.getDistributionMode(),
                 listener, level.registryAccess(), cache);
         // Flow total in channel units
-        return sets <= 0 ? sets : (int) Math.max(sets, Math.min(Integer.MAX_VALUE, own[0]));
+        return sets < 0 ? sets : (int) Math.max(sets, Math.min(Integer.MAX_VALUE, own[0]));
     }
 
     // False when unreachable
