@@ -1,9 +1,9 @@
 package me.almana.logisticsnetworks.logic.async;
 
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
-import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -25,8 +25,6 @@ import java.util.Set;
 
 final class ItemEndpointTable {
 
-    private static final int ALL_SIDES = Direction.values().length;
-
     private final Map<EndpointKey, Integer> indexes = new HashMap<>();
     private final IdentityHashMap<ResourceHandler<ItemResource>, Integer> handlerIndexes = new IdentityHashMap<>();
     private final List<NetworkSnapshot.ItemEndpoint> endpoints = new ArrayList<>();
@@ -35,17 +33,17 @@ final class ItemEndpointTable {
     private final List<Set<Item>> requestedCounts = new ArrayList<>();
     private final List<DirectStorageBinding> bindings = new ArrayList<>();
 
-    int capture(LogisticsNodeEntity node, @Nullable Direction direction, ResourceHandler<ItemResource> handler,
+    int capture(LogisticsNodeEntity node, IoSide side, ResourceHandler<ItemResource> handler,
             Snapshots.OccupiedSlotBudget budget) {
-        return capture(node, direction, handler, budget, false);
+        return capture(node, side, handler, budget, false);
     }
 
-    int capture(LogisticsNodeEntity node, @Nullable Direction direction, ResourceHandler<ItemResource> handler,
+    int capture(LogisticsNodeEntity node, IoSide side, ResourceHandler<ItemResource> handler,
             Snapshots.OccupiedSlotBudget budget, boolean bulk) {
         ThreadGuard.requireServerThread();
         bulk |= BuiltInRegistries.BLOCK.getKey(node.level().getBlockState(node.getAttachedPos()).getBlock())
                 .getNamespace().equals("functionalstorage");
-        EndpointKey key = EndpointKey.of(node, direction, handler);
+        EndpointKey key = EndpointKey.of(node, side, handler);
         Integer existing = indexes.get(key);
         if (existing == null) existing = handlerIndexes.get(handler);
         if (existing != null) {
@@ -188,9 +186,9 @@ final class ItemEndpointTable {
     }
 
     private record EndpointKey(@Nullable ResourceKey<Level> dimension, long position, int direction, int view) {
-        private static EndpointKey of(LogisticsNodeEntity node, @Nullable Direction direction,
+        private static EndpointKey of(LogisticsNodeEntity node, IoSide ioSide,
                 ResourceHandler<ItemResource> handler) {
-            int side = direction == null ? ALL_SIDES : direction.ordinal();
+            int side = ioSide.ordinal();
             ServerLevel level = (ServerLevel) node.level();
             return new EndpointKey(level.dimension(), node.getAttachedPos().asLong(), side,
                     DirectStorageHandlers.snapshotView(handler));

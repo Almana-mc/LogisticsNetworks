@@ -1,15 +1,19 @@
 package me.almana.logisticsnetworks.logic;
 
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.ChestBlock;
+import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.transfer.CombinedResourceHandler;
@@ -85,20 +89,25 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
-    public ResourceHandler<ItemResource> findItemHandler(@Nullable Direction direction) {
-        return findItemHandler(direction, false, false);
+    public ResourceHandler<ItemResource> findItemHandler(IoSide side) {
+        return findItemHandler(side, false, false);
     }
 
     @Nullable
-    public ResourceHandler<ItemResource> findItemExportHandler(@Nullable Direction direction,
-            boolean directInterfaces) {
-        return findItemHandler(direction, directInterfaces, true);
+    public ResourceHandler<ItemResource> findItemExportHandler(IoSide side, boolean directInterfaces) {
+        return findItemHandler(side, directInterfaces, true);
     }
 
     @Nullable
-    public ResourceHandler<ItemResource> findItemImportHandler(@Nullable Direction direction,
-            boolean directInterfaces) {
-        return findItemHandler(direction, directInterfaces, false);
+    public ResourceHandler<ItemResource> findItemImportHandler(IoSide side, boolean directInterfaces) {
+        return findItemHandler(side, directInterfaces, false);
+    }
+
+    @Nullable
+    private ResourceHandler<ItemResource> findItemHandler(IoSide side, boolean directInterfaces,
+            boolean exporting) {
+        if (side == IoSide.NONE) return unsided(Capabilities.Item.BLOCK);
+        return findItemHandler(side.direction(), directInterfaces, exporting);
     }
 
     @Nullable
@@ -140,20 +149,25 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
-    public ResourceHandler<FluidResource> findFluidHandler(@Nullable Direction direction) {
-        return findFluidHandler(direction, false, false);
+    public ResourceHandler<FluidResource> findFluidHandler(IoSide side) {
+        return findFluidHandler(side, false, false);
     }
 
     @Nullable
-    public ResourceHandler<FluidResource> findFluidExportHandler(@Nullable Direction direction,
-            boolean directInterfaces) {
-        return findFluidHandler(direction, directInterfaces, true);
+    public ResourceHandler<FluidResource> findFluidExportHandler(IoSide side, boolean directInterfaces) {
+        return findFluidHandler(side, directInterfaces, true);
     }
 
     @Nullable
-    public ResourceHandler<FluidResource> findFluidImportHandler(@Nullable Direction direction,
-            boolean directInterfaces) {
-        return findFluidHandler(direction, directInterfaces, false);
+    public ResourceHandler<FluidResource> findFluidImportHandler(IoSide side, boolean directInterfaces) {
+        return findFluidHandler(side, directInterfaces, false);
+    }
+
+    @Nullable
+    private ResourceHandler<FluidResource> findFluidHandler(IoSide side, boolean directInterfaces,
+            boolean exporting) {
+        if (side == IoSide.NONE) return unsided(Capabilities.Fluid.BLOCK);
+        return findFluidHandler(side.direction(), directInterfaces, exporting);
     }
 
     @Nullable
@@ -171,7 +185,13 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
-    public EnergyHandler findEnergyHandler(@Nullable Direction direction) {
+    public EnergyHandler findEnergyHandler(IoSide side) {
+        if (side == IoSide.NONE) return unsided(Capabilities.Energy.BLOCK);
+        return findEnergyHandler(side.direction());
+    }
+
+    @Nullable
+    private EnergyHandler findEnergyHandler(@Nullable Direction direction) {
         if (!(node.level() instanceof ServerLevel level)) return null;
         if (direction != null) return energySide(level, direction);
         List<EnergyHandler> found = new ArrayList<>(6);
@@ -208,6 +228,15 @@ public final class TransferCapabilityCache {
         }
         if (found.isEmpty()) return null;
         return found.size() == 1 ? found.get(0) : new CombinedResourceHandler<>(found);
+    }
+
+    // Mekanism null side read-only
+    @Nullable
+    private <T> T unsided(BlockCapability<T, @Nullable Direction> capability) {
+        if (!(node.level() instanceof ServerLevel level)) return null;
+        BlockPos pos = node.getAttachedPos();
+        if (MekanismCompat.isMekanismBlock(level, pos)) return null;
+        return level.getCapability(capability, pos, null);
     }
 
     private ResourceHandler<ItemResource> itemSide(ServerLevel level, Direction direction) {

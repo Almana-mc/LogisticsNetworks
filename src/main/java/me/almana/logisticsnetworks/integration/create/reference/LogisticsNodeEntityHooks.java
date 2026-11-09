@@ -77,9 +77,9 @@ public void dismountFromCreate(BlockPos attachedPos, Vec3 position,
     entityData.set(CREATE_CONTRAPTION_ID, Optional.empty());
     entityData.set(CREATE_LOCAL_POS, BlockPos.ZERO);
     for (ChannelData channel : channels) {
-        Direction direction = channel.getIoDirection();
+        Direction direction = channel.getIoSide().direction();
         if (direction != null) {
-            channel.setIoDirection(directionTransform.apply(direction));
+            channel.setIoSide(IoSide.of(directionTransform.apply(direction)));
         }
     }
     moveAttachment(attachedPos, position);

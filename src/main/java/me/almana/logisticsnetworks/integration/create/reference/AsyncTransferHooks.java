@@ -8,7 +8,7 @@ if (!TransferEngine.canRunChannel(node, channel) || !CreateCompat.isResolved(nod
 if (!node.isMountedOnCreate() && !level.isLoaded(node.getAttachedPos())) {
     continue;
 }
-IItemHandler sourceHandler = capCache.findItemHandler(node, channel.getIoDirection());
+IItemHandler sourceHandler = capCache.findItemHandler(node, channel.getIoSide());
 
 Source owner: TransferCommitter
 

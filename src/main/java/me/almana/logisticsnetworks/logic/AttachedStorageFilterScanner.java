@@ -35,10 +35,10 @@ public final class AttachedStorageFilterScanner {
 
         Result total = new Result(0, false, false);
         if (channel.hasType(ChannelType.ITEM)) {
-            total = merge(total, scanItems(node.capabilities().findItemHandler(channel.getIoDirection()), filter));
+            total = merge(total, scanItems(node.capabilities().findItemHandler(channel.getIoSide()), filter));
         }
         if (channel.hasType(ChannelType.FLUID) && !total.filterFull()) {
-            total = merge(total, scanFluids(node.capabilities().findFluidHandler(channel.getIoDirection()), filter));
+            total = merge(total, scanFluids(node.capabilities().findFluidHandler(channel.getIoSide()), filter));
         }
         // Enable when 26.1.2 is supported.
         /*

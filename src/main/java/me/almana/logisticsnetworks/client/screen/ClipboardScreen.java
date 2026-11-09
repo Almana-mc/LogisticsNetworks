@@ -14,6 +14,7 @@ import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.RedstoneMode;
@@ -37,7 +38,6 @@ import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.renderer.Rect2i;
-import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
@@ -796,7 +796,7 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> implem
             case 1 -> config().setChannelMode(selectedChannel,
                     cycle(config().getChannelMode(selectedChannel), direction));
             case 3 -> config().setChannelDirection(selectedChannel,
-                    cycleDirection(config().getChannelDirection(selectedChannel), direction));
+                    cycle(config().getChannelDirection(selectedChannel), direction));
             case 4 -> config().setChannelRedstoneMode(selectedChannel,
                     cycle(config().getChannelRedstoneMode(selectedChannel), direction));
             case 5 -> config().setChannelDistributionMode(selectedChannel,
@@ -1368,12 +1368,6 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> implem
         return values[(value.ordinal() + direction + values.length) % values.length];
     }
 
-    private @Nullable Direction cycleDirection(@Nullable Direction direction, int step) {
-        int index = direction == null ? 6 : direction.ordinal();
-        index = (index + step + 7) % 7;
-        return index < 6 ? Direction.values()[index] : null;
-    }
-
     private String tr(String key, Object... args) {
         return Component.translatable(key, args).getString();
     }
@@ -1395,9 +1389,8 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> implem
         return tr("gui.logisticsnetworks.distribution_mode." + mode.name().toLowerCase(Locale.ROOT));
     }
 
-    private String directionLabel(@Nullable Direction direction) {
-        return tr("gui.logisticsnetworks.direction."
-                + (direction == null ? "all" : direction.getName().toLowerCase(Locale.ROOT)));
+    private String directionLabel(IoSide side) {
+        return tr("gui.logisticsnetworks.direction." + side.key());
     }
 
     private String filterModeLabel(FilterMode mode) {

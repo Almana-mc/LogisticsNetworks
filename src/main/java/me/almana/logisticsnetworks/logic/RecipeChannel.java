@@ -4,12 +4,12 @@ import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.DistributionMode;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.transfer.ResourceHandler;
@@ -115,7 +115,7 @@ final class RecipeChannel {
 
     private static RecipeSets.Source source(LogisticsNodeEntity node, ChannelData channel,
             Set<RecipeCardData.Kind> kinds, FilterItemData.ReadCache cache) {
-        Direction side = channel.getIoDirection();
+        IoSide side = channel.getIoSide();
         boolean direct = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), cache);
         int types = NodeUpgradeData.effectiveTypes(node, channel);
         // Enable when 26.1.2 is supported.
@@ -151,7 +151,7 @@ final class RecipeChannel {
         ItemStack[] filters = target.channel().getFilterItems();
         boolean mapped = FilterLogic.hasConfiguredSlotMapping(filters, cache);
         ResourceHandler<ItemResource> handler = target.node().capabilities()
-                .findItemImportHandler(target.channel().getIoDirection(), !mapped);
+                .findItemImportHandler(target.channel().getIoSide(), !mapped);
         if (handler == null || handler == from || from != null && DirectStorageHandlers.shareNetwork(from, handler))
             return null;
         return new TransferEngine.ItemTransferTarget(handler, filters, target.channel().getFilterMode(),
@@ -163,7 +163,7 @@ final class RecipeChannel {
     private static TransferEngine.FluidTransferTarget fluids(TransferEngine.ImportTarget target,
             @Nullable ResourceHandler<FluidResource> from) {
         ResourceHandler<FluidResource> handler = target.node().capabilities()
-                .findFluidImportHandler(target.channel().getIoDirection(), true);
+                .findFluidImportHandler(target.channel().getIoSide(), true);
         if (handler == null || handler == from || from != null && DirectStorageHandlers.shareNetwork(from, handler))
             return null;
         return new TransferEngine.FluidTransferTarget(handler, target.channel().getFilterItems(),
@@ -179,7 +179,7 @@ final class RecipeChannel {
         if (node.isMountedOnCreate())
             return null;
         IChemicalHandler handler = caps.findChemicalHandler((ServerLevel) node.level(), node.getAttachedPos(),
-                target.channel().getIoDirection());
+                target.channel().getIoSide());
         if (handler == null || handler == from)
             return null;
         return new RecipeEndpoint.Chemicals(handler, target.channel().getFilterItems(),

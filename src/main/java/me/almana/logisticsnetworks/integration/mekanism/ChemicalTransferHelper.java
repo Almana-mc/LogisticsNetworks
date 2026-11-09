@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.integration.mekanism;
 
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.IoSide;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -40,6 +41,12 @@ public final class ChemicalTransferHelper {
             if (h != null) return h;
         }
         return null;
+    }
+
+    @Nullable
+    public static IChemicalHandler getUnsidedHandler(ServerLevel level, BlockPos pos) {
+        if (MekanismCompat.isMekanismBlock(level, pos)) return null;
+        return level.getCapability(Capabilities.CHEMICAL.block(), pos, null);
     }
     */
 
@@ -134,19 +141,21 @@ public final class ChemicalTransferHelper {
         return null;
     }
 
-    public static long transferBetween(ServerLevel sourceLevel, BlockPos sourcePos, @Nullable Direction sourceSide,
-            ServerLevel targetLevel, BlockPos targetPos, @Nullable Direction targetSide, long limit,
+    public static long transferBetween(ServerLevel sourceLevel, BlockPos sourcePos, IoSide sourceSide,
+            ServerLevel targetLevel, BlockPos targetPos, IoSide targetSide, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode, @Nullable ObjLongConsumer<String> onMoved) {
         // Enable when 26.1.2 is supported.
         /*
-        IChemicalHandler source = getHandler(sourceLevel, sourcePos, sourceSide);
+        IChemicalHandler source = sourceSide == IoSide.NONE ? getUnsidedHandler(sourceLevel, sourcePos)
+                : getHandler(sourceLevel, sourcePos, sourceSide.direction());
         if (source == null) {
             if (Config.debugMode)
                 LOGGER.debug("[Chemical] No source handler at {} side {}", sourcePos, sourceSide);
             return 0;
         }
-        IChemicalHandler target = getHandler(targetLevel, targetPos, targetSide);
+        IChemicalHandler target = targetSide == IoSide.NONE ? getUnsidedHandler(targetLevel, targetPos)
+                : getHandler(targetLevel, targetPos, targetSide.direction());
         if (target == null) {
             if (Config.debugMode)
                 LOGGER.debug("[Chemical] No target handler at {} side {}", targetPos, targetSide);
@@ -361,7 +370,7 @@ public final class ChemicalTransferHelper {
     List<ChannelData> equalChannels = equalHandlers == null ? null : new ArrayList<>();
 
     IChemicalHandler targetHandler = capCache.findChemicalHandler(targetLevel, targetPos,
-            target.channel().getIoDirection());
+            target.channel().getIoSide());
     if (targetHandler == null)
         continue;
     if (equalHandlers != null) {

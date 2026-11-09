@@ -14,8 +14,8 @@ if (!canRunChannel(node, channel) || !CreateCompat.isResolved(node)) {
 
 if (sourceNode.isMountedOnCreate()) {
     boolean storageAvailable = switch (channel.getType()) {
-        case ITEM -> capCache.findItemHandler(sourceNode, channel.getIoDirection()) != null;
-        case FLUID -> capCache.findFluidHandler(sourceNode, channel.getIoDirection()) != null;
+        case ITEM -> capCache.findItemHandler(sourceNode, channel.getIoSide()) != null;
+        case FLUID -> capCache.findFluidHandler(sourceNode, channel.getIoSide()) != null;
         default -> false;
     };
     if (!storageAvailable) {
@@ -26,7 +26,7 @@ if (sourceNode.isMountedOnCreate()) {
 if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos)) {
     return -1;
 }
-IItemHandler sourceHandler = capCache.findItemHandler(sourceNode, exportChannel.getIoDirection());
+IItemHandler sourceHandler = capCache.findItemHandler(sourceNode, exportChannel.getIoSide());
 
 boolean hasUsableTarget = false;
 boolean hasUnavailableMountedTarget = false;
@@ -41,7 +41,7 @@ if (!sourceNode.isMountedOnCreate() && !target.node.isMountedOnCreate()
     continue;
 }
 
-IItemHandler targetHandler = capCache.findItemHandler(target.node, target.channel.getIoDirection());
+IItemHandler targetHandler = capCache.findItemHandler(target.node, target.channel.getIoSide());
 if (targetHandler == null) {
     hasUnavailableMountedTarget |= target.node.isMountedOnCreate();
     continue;
@@ -65,7 +65,7 @@ if (shouldPauseForUnavailableMountedTargets(hasUsableTarget, hasUnavailableMount
 if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos)) {
     return -1;
 }
-IFluidHandler sourceHandler = capCache.findFluidHandler(sourceNode, exportChannel.getIoDirection());
+IFluidHandler sourceHandler = capCache.findFluidHandler(sourceNode, exportChannel.getIoSide());
 
 anyReachable = true;
 hasStationaryTarget |= !target.node.isMountedOnCreate();
@@ -75,7 +75,7 @@ if (!target.node.isMountedOnCreate() && !targetLevel.isLoaded(targetPos)) {
     continue;
 }
 
-IFluidHandler targetHandler = capCache.findFluidHandler(target.node, target.channel.getIoDirection());
+IFluidHandler targetHandler = capCache.findFluidHandler(target.node, target.channel.getIoSide());
 if (targetHandler == null) {
     hasUnavailableMountedTarget |= target.node.isMountedOnCreate();
     continue;
@@ -175,8 +175,8 @@ if (sourceNode.isMountedOnCreate() && !hasMountedStorage(sourceNode, channel, ty
 private static boolean hasMountedStorage(LogisticsNodeEntity node, ChannelData channel, ChannelType type,
         TransferCapabilityCache capCache) {
     return switch (type) {
-        case ITEM -> capCache.findItemHandler(node, channel.getIoDirection()) != null;
-        case FLUID -> capCache.findFluidHandler(node, channel.getIoDirection()) != null;
+        case ITEM -> capCache.findItemHandler(node, channel.getIoSide()) != null;
+        case FLUID -> capCache.findFluidHandler(node, channel.getIoSide()) != null;
         default -> false;
     };
 }

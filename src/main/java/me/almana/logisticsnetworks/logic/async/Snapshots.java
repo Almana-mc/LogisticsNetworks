@@ -119,7 +119,7 @@ public final class Snapshots {
             if (!level.isLoaded(node.getAttachedPos())) continue;
             boolean directSource = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), channel.getReadCache());
             ResourceHandler<ItemResource> sourceHandler = node.capabilities().findItemExportHandler(
-                    channel.getIoDirection(), directSource);
+                    channel.getIoSide(), directSource);
             if (sourceHandler == null) {
                 itemWakeDelta = itemWakeDelta(itemWakeDelta, targets,
                         TransferEngine.finishChannelAttempt(
@@ -143,7 +143,7 @@ public final class Snapshots {
                 node, level, channel, context.itemImports()[index], sourceHandler, context.dimensionalCache(), readCache);
         if (resolved.status() != TransferEngine.ResolvedItemTargets.OK) return null;
         int batchLimit = NodeUpgradeData.effectiveBatch(channel, ChannelType.ITEM, tier);
-        int sourceEndpoint = endpoints.capture(node, channel.getIoDirection(), sourceHandler, occupiedSlots);
+        int sourceEndpoint = endpoints.capture(node, channel.getIoSide(), sourceHandler, occupiedSlots);
         return new NetworkSnapshot.ChannelUnit(node.getUUID(), index, batchLimit,
                 channel.getFilterItems(), channel.getFilterMode(), sourceEndpoint,
                 channel.canRotateResources(), channel.getItemResourceCursor(),
@@ -161,7 +161,7 @@ public final class Snapshots {
             boolean upgradedCapacity = DirectStorageHandlers.isDirect(target.handler())
                     || SophisticatedCoreCompat.isBulkHandler(target.handler());
             boolean bulk = !target.hasImportSlotMapping() && upgradedCapacity;
-            int targetEndpoint = endpoints.capture(ref.node(), ref.channel().getIoDirection(), target.handler(),
+            int targetEndpoint = endpoints.capture(ref.node(), ref.channel().getIoSide(), target.handler(),
                     occupiedSlots, upgradedCapacity);
             if (target.constraints().hasImportThreshold()
                     || TransferAmountRules.hasStockFilter(target.importFilters(), readCache)) {
@@ -176,7 +176,7 @@ public final class Snapshots {
 
     static TransferPlan.EndpointBinding binding(LogisticsNodeEntity node, ChannelData channel) {
         return new TransferPlan.EndpointBinding(node.level().dimension(), node.getAttachedPos().asLong(),
-                channel.getIoDirection());
+                channel.getIoSide());
     }
 
     static long earlierItemWakeDelta(long currentMinimum, long cooldown) {

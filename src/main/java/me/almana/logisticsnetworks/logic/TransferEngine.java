@@ -301,7 +301,7 @@ public class TransferEngine {
                 if (typed.isEmpty() || cards && !RecipeChannel.runsLoose(channel, type))
                     continue;
                 if (type == ChannelType.ENERGY
-                        && sourceNode.capabilities().findEnergyHandler(channel.getIoDirection()) == null) {
+                        && sourceNode.capabilities().findEnergyHandler(channel.getIoSide()) == null) {
                     minWakeDelta = Math.min(minWakeDelta, Config.backoffMaxTicks);
                     continue;
                 }
@@ -463,7 +463,7 @@ public class TransferEngine {
         FilterItemData.ReadCache filterReadCache = exportChannel.getReadCache();
         boolean directSource = !FilterLogic.hasConfiguredSlotMapping(exportFilters, filterReadCache);
         ResourceHandler<ItemResource> sourceHandler = sourceNode.capabilities().findItemExportHandler(
-                exportChannel.getIoDirection(), directSource);
+                exportChannel.getIoSide(), directSource);
         if (sourceHandler == null)
             return 0;
 
@@ -525,7 +525,7 @@ public class TransferEngine {
             ItemStack[] importFilters = target.channel.getFilterItems();
             boolean hasImportSlotMapping = FilterLogic.hasConfiguredSlotMapping(importFilters, filterReadCache);
             ResourceHandler<ItemResource> targetHandler = target.node.capabilities().findItemImportHandler(
-                    target.channel.getIoDirection(), !hasImportSlotMapping);
+                    target.channel.getIoSide(), !hasImportSlotMapping);
             if (targetHandler == null || targetHandler == sourceHandler
                     || DirectStorageHandlers.shareNetwork(sourceHandler, targetHandler)) continue;
 
@@ -553,7 +553,7 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
         ResourceHandler<FluidResource> sourceHandler = sourceNode.capabilities().findFluidExportHandler(
-                exportChannel.getIoDirection(), true);
+                exportChannel.getIoSide(), true);
         if (sourceHandler == null)
             return 0;
 
@@ -579,7 +579,7 @@ public class TransferEngine {
                 continue;
 
             ResourceHandler<FluidResource> targetHandler = target.node.capabilities().findFluidImportHandler(
-                    target.channel.getIoDirection(), true);
+                    target.channel.getIoSide(), true);
             if (targetHandler == null || DirectStorageHandlers.shareNetwork(sourceHandler, targetHandler)) continue;
 
             resolved.add(new FluidTransferTarget(targetHandler, target.channel.getFilterItems(),
@@ -609,7 +609,7 @@ public class TransferEngine {
         BlockPos sourcePos = sourceNode.getAttachedPos();
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
-        EnergyHandler sourceHandler = sourceNode.capabilities().findEnergyHandler(exportChannel.getIoDirection());
+        EnergyHandler sourceHandler = sourceNode.capabilities().findEnergyHandler(exportChannel.getIoSide());
         if (sourceHandler == null)
             return 0;
         // Insert-only or empty source
@@ -642,7 +642,7 @@ public class TransferEngine {
             if (!targetLevel.isLoaded(targetPos))
                 continue;
 
-            EnergyHandler targetHandler = target.node.capabilities().findEnergyHandler(target.channel.getIoDirection());
+            EnergyHandler targetHandler = target.node.capabilities().findEnergyHandler(target.channel.getIoSide());
             if (targetHandler == null)
                 continue;
             if (equalTargets != null) {
@@ -716,8 +716,8 @@ public class TransferEngine {
                 continue;
 
             long moved = ChemicalTransferHelper.transferBetween(
-                    sourceLevel, sourcePos, exportChannel.getIoDirection(),
-                    targetLevel, targetPos, target.channel().getIoDirection(),
+                    sourceLevel, sourcePos, exportChannel.getIoSide(),
+                    targetLevel, targetPos, target.channel().getIoSide(),
                     remaining,
                     exportChannel.getFilterItems(), exportChannel.getFilterMode(),
                     target.channel().getFilterItems(), target.channel().getFilterMode(), onMoved);
@@ -760,7 +760,7 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
-        SourceTransferHelper.SourceEnd from = sourceEnd(sourceNode, exportChannel.getIoDirection());
+        SourceTransferHelper.SourceEnd from = sourceEnd(sourceNode, exportChannel.getIoSide());
         targets = orderTargets(targets, exportChannel, sourceNode, ChannelType.SOURCE);
         boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         List<SourceTransferHelper.SourceEnd> equalTargets =
@@ -784,7 +784,7 @@ public class TransferEngine {
             BlockPos targetPos = target.node().getAttachedPos();
             if (from == null || !targetLevel.isLoaded(targetPos))
                 continue;
-            SourceTransferHelper.SourceEnd to = sourceEnd(target.node(), target.channel().getIoDirection());
+            SourceTransferHelper.SourceEnd to = sourceEnd(target.node(), target.channel().getIoSide());
             if (to == null)
                 continue;
             if (equalTargets != null) {
@@ -815,12 +815,16 @@ public class TransferEngine {
     }
 
     @Nullable
-    static SourceTransferHelper.SourceEnd sourceEnd(LogisticsNodeEntity node, Direction direction) {
-        InterfaceStorageResolution resolution = node.capabilities().resolveInterface((ServerLevel) node.level(), direction);
-        if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE)
-            return SourceTransferHelper.grid(resolution.endpoint());
-        if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE)
-            return null;
+    static SourceTransferHelper.SourceEnd sourceEnd(LogisticsNodeEntity node, IoSide side) {
+        Direction direction = side.direction();
+        if (side != IoSide.NONE) {
+            InterfaceStorageResolution resolution = node.capabilities()
+                    .resolveInterface((ServerLevel) node.level(), direction);
+            if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE)
+                return SourceTransferHelper.grid(resolution.endpoint());
+            if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE)
+                return null;
+        }
         return SourceTransferHelper.resolve((ServerLevel) node.level(), node.getAttachedPos(), direction);
     }
 

@@ -110,7 +110,7 @@ public final class TransferCommitter {
         FilterItemData.ReadCache cache = channel.getReadCache();
         boolean directSource = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), cache);
         ResourceHandler<ItemResource> source = sourceNode.capabilities().findItemExportHandler(
-                channel.getIoDirection(), directSource);
+                channel.getIoSide(), directSource);
         if (source == null) return skipped(planned, TransferEngine.finishChannelAttempt(
                 sourceNode, channel, plan.channelIndex(), ChannelType.ITEM.ordinal(), 0, level.getGameTime(), tier,
                 telemetry));
@@ -217,7 +217,7 @@ public final class TransferCommitter {
         FilterItemData.ReadCache cache = channel.getReadCache();
         boolean directSource = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), cache);
         ResourceHandler<ItemResource> source = node.capabilities().findItemExportHandler(
-                channel.getIoDirection(), directSource);
+                channel.getIoSide(), directSource);
         if (source == null) return ItemResourceOrder.EMPTY;
         TransferEngine.ResolvedItemTargets targets = resolveTargets(
                 node, channel, plan.channelIndex(), source, context, cache, onlyTarget);

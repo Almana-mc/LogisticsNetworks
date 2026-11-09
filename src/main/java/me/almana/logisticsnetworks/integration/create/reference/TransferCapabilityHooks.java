@@ -3,11 +3,11 @@
 Source owner: TransferCapabilityCache
 
 @Nullable
-public IItemHandler findItemHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
+public IItemHandler findItemHandler(LogisticsNodeEntity node, IoSide side) {
     if (node.isMountedOnCreate()) {
         return CreateCompat.findMountedItemHandler(node);
     }
-    return findItemHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
+    return findItemHandler((ServerLevel) node.level(), node.getAttachedPos(), side);
 }
 
 @Nullable
@@ -19,11 +19,11 @@ public IItemHandler findBulkItemHandler(LogisticsNodeEntity node, IItemHandler s
 }
 
 @Nullable
-public IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
+public IFluidHandler findFluidHandler(LogisticsNodeEntity node, IoSide side) {
     if (node.isMountedOnCreate()) {
         return CreateCompat.findMountedFluidHandler(node);
     }
-    return findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
+    return findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), side);
 }
 
 Source owner: AttachedStorageFilterScanner (54182a03, per-type scan merge)
@@ -39,10 +39,10 @@ public static Result scan(ServerLevel level, LogisticsNodeEntity node, ChannelDa
     TransferCapabilityCache capabilities = NetworkRegistry.get(level).getCapabilityCache();
     Result total = new Result(0, false, false);
     if (channel.hasType(ChannelType.ITEM)) {
-        total = merge(total, scanItems(capabilities.findItemHandler(node, channel.getIoDirection()), filter));
+        total = merge(total, scanItems(capabilities.findItemHandler(node, channel.getIoSide()), filter));
     }
     if (channel.hasType(ChannelType.FLUID) && !total.filterFull()) {
-        total = merge(total, scanFluids(capabilities.findFluidHandler(node, channel.getIoDirection()), filter));
+        total = merge(total, scanFluids(capabilities.findFluidHandler(node, channel.getIoSide()), filter));
     }
     if (channel.hasType(ChannelType.CHEMICAL) && !total.filterFull() && !node.isMountedOnCreate()) {
         total = merge(total, scanChemicals(level, node, channel, capabilities, filter));

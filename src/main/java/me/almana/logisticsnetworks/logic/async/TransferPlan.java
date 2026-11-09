@@ -1,7 +1,7 @@
 package me.almana.logisticsnetworks.logic.async;
 
 import me.almana.logisticsnetworks.data.DistributionMode;
-import net.minecraft.core.Direction;
+import me.almana.logisticsnetworks.data.IoSide;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
@@ -29,7 +29,7 @@ public record TransferPlan(UUID networkId, long generation, long runtimeId, bool
             int storageBinding) {
     }
 
-    public record EndpointBinding(ResourceKey<Level> dimension, long attachedPos, @Nullable Direction direction) {
+    public record EndpointBinding(ResourceKey<Level> dimension, long attachedPos, IoSide side) {
     }
 
     public record MoveIntent(int sourceSlot, int targetIndex, ItemResource resource,
