@@ -29,7 +29,7 @@ import java.util.function.UnaryOperator;
 
 public class RecipeCardMenu extends AbstractContainerMenu {
 
-    public static final int INV_X = 8;
+    public static final int INV_X = 13;
     public static final int INV_Y = 172;
     public static final int ID_BACK = 0;
 

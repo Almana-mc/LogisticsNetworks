@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.component.GeneralFilterEntry;
 import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
+import me.almana.logisticsnetworks.filter.SlotExpressionUtil;
 import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.core.HolderLookup;
@@ -14,6 +15,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -77,6 +79,22 @@ final class LnetRecipeText {
         }
         boolean mb = matcher.group(2) != null;
         String rest = matcher.group(3).trim();
+        boolean split = rest.endsWith(" split");
+        if (split) {
+            rest = rest.substring(0, rest.length() - " split".length()).trim();
+        }
+        List<Integer> slots = List.of();
+        int at = rest.indexOf(" slots ");
+        if (at >= 0) {
+            slots = readSlots(rest.substring(at + " slots ".length()).trim());
+            rest = rest.substring(0, at).trim();
+        }
+        if (split && slots.isEmpty()) {
+            throw new IOException("'split' needs slots in '" + text + "'");
+        }
+        if (!slots.isEmpty() && (mb || rest.startsWith("chemical ") || rest.startsWith("fluid "))) {
+            throw new IOException("slots only work on items: '" + text + "'");
+        }
         if (rest.startsWith("chemical ")) {
             String id = LnetEntryText.readChemical(rest.substring("chemical ".length()).trim());
             return new RecipeCardData.Ingredient(Optional.empty(), Optional.empty(), Optional.empty(),
@@ -91,12 +109,20 @@ final class LnetRecipeText {
         if (count > RecipeCardData.MAX_COUNT) {
             throw new IOException("count out of range in '" + text + "'");
         }
-        if (rest.startsWith("#")) {
-            return new RecipeCardData.Ingredient(Optional.empty(),
-                    Optional.of(TagKey.create(Registries.ITEM, LnetEntryText.id(rest.substring(1), "tag"))),
-                    Optional.empty(), Optional.empty(), count);
+        RecipeCardData.Ingredient ingredient = rest.startsWith("#")
+                ? new RecipeCardData.Ingredient(Optional.empty(),
+                        Optional.of(TagKey.create(Registries.ITEM, LnetEntryText.id(rest.substring(1), "tag"))),
+                        Optional.empty(), Optional.empty(), count)
+                : RecipeCardData.Ingredient.ofItem(LnetEntryText.readItem(rest, registries), count);
+        return ingredient.withSlots(slots).withSplit(split);
+    }
+
+    private static List<Integer> readSlots(String expression) throws IOException {
+        BitSet bits = SlotExpressionUtil.parseMask(expression);
+        if (bits == null || bits.isEmpty()) {
+            throw new IOException("bad slots '" + expression + "'");
         }
-        return RecipeCardData.Ingredient.ofItem(LnetEntryText.readItem(rest, registries), count);
+        return SlotExpressionUtil.bitSetToList(bits);
     }
 
     private static StackSnapshot readOutput(String text, HolderLookup.Provider registries) throws IOException {
@@ -129,6 +155,17 @@ final class LnetRecipeText {
     }
 
     private static String writeIngredient(RecipeCardData.Ingredient ingredient, HolderLookup.Provider registries) {
+        StringBuilder out = new StringBuilder(writeResource(ingredient, registries));
+        if (!ingredient.slots().isEmpty()) {
+            out.append(" slots ").append(SlotExpressionUtil.formatSlots(ingredient.slots()).replace(", ", " "));
+        }
+        if (ingredient.split()) {
+            out.append(" split");
+        }
+        return out.toString();
+    }
+
+    private static String writeResource(RecipeCardData.Ingredient ingredient, HolderLookup.Provider registries) {
         if (ingredient.fluid().isPresent()) {
             return ingredient.count() + "mb " + LnetEntryText.shortId(ingredient.fluid().get());
         }

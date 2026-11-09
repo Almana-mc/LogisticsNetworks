@@ -24,6 +24,9 @@ import java.util.stream.IntStream;
 
 final class ItemLane implements RecipeLane {
 
+    private record Placement(@Nullable boolean[] mask, int share) {
+    }
+
     private final ResourceHandler<ItemResource> source;
     private final List<RecipeCardData.Ingredient> ingredients;
     private final List<RecipeEndpoint> endpoints;
@@ -114,8 +117,11 @@ final class ItemLane implements RecipeLane {
         int fit = affordable(sets);
         try (var probe = Transaction.openRoot()) {
             for (int i = 0; i < matching.length && fit > 0; i++) {
-                int count = ingredients.get(i).count();
-                fit = Math.min(fit, accepted(to, i, fit * count, probe) / count);
+                List<Placement> placements = placements(to.handler(), ingredients.get(i));
+                if (placements.isEmpty()) return 0;
+                for (Placement place : placements) {
+                    fit = Math.min(fit, accepted(to, i, fit * place.share(), place.mask(), probe) / place.share());
+                }
             }
         }
         return fit;
@@ -125,10 +131,43 @@ final class ItemLane implements RecipeLane {
     public boolean move(int target, int sets, @Nullable TransactionContext tx) {
         TransferEngine.ItemTransferTarget to = endpoints.get(target).items();
         for (int i : order) {
-            int amount = sets * ingredients.get(i).count();
-            if (move(to, i, amount, tx) < amount) return false;
+            for (Placement place : placements(to.handler(), ingredients.get(i))) {
+                int amount = sets * place.share();
+                if (move(to, i, amount, place.mask(), tx) < amount) return false;
+            }
         }
         return true;
+    }
+
+    // Split shares count across slots
+    private static List<Placement> placements(ResourceHandler<ItemResource> handler,
+            RecipeCardData.Ingredient ingredient) {
+        if (ingredient.slots().isEmpty()) return List.of(new Placement(null, ingredient.count()));
+        int size = handler.size();
+        if (!ingredient.split()) return List.of(new Placement(mask(size, ingredient.slots()), ingredient.count()));
+        List<Integer> present = ingredient.slots().stream().filter(slot -> slot < size).toList();
+        List<Placement> placements = new ArrayList<>(present.size());
+        for (int k = 0; k < present.size(); k++) {
+            int share = ingredient.count() / present.size() + (k < ingredient.count() % present.size() ? 1 : 0);
+            if (share > 0) placements.add(new Placement(mask(size, List.of(present.get(k))), share));
+        }
+        return placements;
+    }
+
+    private static boolean[] mask(int size, List<Integer> slots) {
+        boolean[] mask = new boolean[size];
+        for (int slot : slots) {
+            if (slot < size) mask[slot] = true;
+        }
+        return mask;
+    }
+
+    private static boolean[] both(boolean[] a, boolean[] b) {
+        boolean[] out = new boolean[Math.min(a.length, b.length)];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = a[i] && b[i];
+        }
+        return out;
     }
 
     // Aborted transaction restores stock
@@ -160,7 +199,7 @@ final class ItemLane implements RecipeLane {
 
     // One probe per exact stack
     private int accepted(TransferEngine.ItemTransferTarget target, int ingredient, int amount,
-            TransactionContext probe) {
+            @Nullable boolean[] mask, TransactionContext probe) {
         Map<ItemResource, Integer> stock = new LinkedHashMap<>();
         for (int slot : matching[ingredient]) {
             ItemStack stack = ItemUtil.getStack(source, slot);
@@ -174,20 +213,20 @@ final class ItemLane implements RecipeLane {
             for (Map.Entry<ItemResource, Integer> entry : stock.entrySet()) {
                 if (accepted >= amount) break;
                 ItemStack stack = entry.getKey().toStack(Math.min(amount - accepted, entry.getValue()));
-                accepted += stack.getCount() - insert(target, stack, check).getCount();
+                accepted += stack.getCount() - insert(target, stack, mask, check).getCount();
             }
         }
         return accepted;
     }
 
     private int move(TransferEngine.ItemTransferTarget target, int ingredient, int amount,
-            @Nullable TransactionContext tx) {
+            @Nullable boolean[] mask, @Nullable TransactionContext tx) {
         int left = amount;
         for (int slot : matching[ingredient]) {
             if (left <= 0) break;
             int moved;
             do {
-                moved = moveFromSlot(target, ingredient, slot, left, tx);
+                moved = moveFromSlot(target, ingredient, slot, left, mask, tx);
                 left -= moved;
             } while (moved > 0 && left > 0);
         }
@@ -195,13 +234,13 @@ final class ItemLane implements RecipeLane {
     }
 
     private int moveFromSlot(TransferEngine.ItemTransferTarget target, int ingredient, int slot, int limit,
-            @Nullable TransactionContext tx) {
+            @Nullable boolean[] mask, @Nullable TransactionContext tx) {
         ItemStack stack = ItemUtil.getStack(source, slot);
         if (!usable(stack, ingredient)) return 0;
         ItemResource resource = ItemResource.of(stack);
         ItemStack toMove = stack.copyWithCount(Math.min(limit, stack.getCount()));
         try (var move = Transaction.open(tx)) {
-            int accepted = toMove.getCount() - insert(target, toMove, move).getCount();
+            int accepted = toMove.getCount() - insert(target, toMove, mask, move).getCount();
             if (accepted <= 0 || source.extract(slot, resource, accepted, move) != accepted) return 0;
             move.commit();
             pending.add(resource.toStack(accepted));
@@ -215,12 +254,14 @@ final class ItemLane implements RecipeLane {
         }
     }
 
-    private ItemStack insert(TransferEngine.ItemTransferTarget target, ItemStack stack, TransactionContext tx) {
-        boolean[] allowed = null;
+    private ItemStack insert(TransferEngine.ItemTransferTarget target, ItemStack stack, @Nullable boolean[] slots,
+            TransactionContext tx) {
+        boolean[] allowed = slots;
         if (target.hasImportSlotMapping()) {
-            allowed = TransferEngine.computeImportAllowedSlots(target.handler(), target.importFilters(),
+            boolean[] mapped = TransferEngine.computeImportAllowedSlots(target.handler(), target.importFilters(),
                     target.importFilterMode(), stack, provider, null, cache);
-            if (allowed == null) return stack;
+            if (mapped == null) return stack;
+            allowed = slots == null ? mapped : both(mapped, slots);
         } else if (!FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(), stack,
                 provider, null, cache, -1)) {
             return stack;
