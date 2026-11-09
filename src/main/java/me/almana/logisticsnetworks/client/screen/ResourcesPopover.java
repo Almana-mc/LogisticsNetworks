@@ -100,8 +100,8 @@ final class ResourcesPopover {
         int row = (int) (my - y - HEADER_H) / ROW_H;
         if (my < y + HEADER_H || row >= rows()) return true;
         ClickSound.play();
-        if (mx >= x + W - 64 && editable(row)) {
-            amountClick(row, action);
+        if (mx >= x + W - 64) {
+            if (editable(row)) amountClick(row, action);
         } else if (row < SETS_ROW) {
             target.setTypes(target.types() ^ ChannelType.values()[row].bit());
         }
@@ -145,7 +145,8 @@ final class ResourcesPopover {
         g.fill(x + 14, ry + 4, x + 17, ry + 9, ChannelTint.hue(type));
         g.drawString(font, ResourceLabels.typeName(type), x + 20, ry + 3, on && !locked ? t.text() : t.textSubtle(), false);
         if (locked) {
-            String reason = font.plainSubstrByWidth(ResourceLabels.lockReason(type), W - 70);
+            String reason = font.plainSubstrByWidth(ResourceLabels.lockReason(type),
+                    W - 30 - font.width(ResourceLabels.typeName(type)));
             g.drawString(font, reason, x + W - 4 - font.width(reason), ry + 3, t.textSubtle(), false);
         } else if (target.exporting() && editRow != row) {
             chip(g, t, amountLabel(row), ry);

@@ -1100,10 +1100,11 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> implem
 
             @Override
             public boolean hasCard() {
-                for (int slot = 0; slot < getFilterSlotCount(); slot++) {
-                    if (RecipeCardItem.is(config().getFilterItem(channel, slot))) return true;
+                ItemStack[] stacks = new ItemStack[getFilterSlotCount()];
+                for (int slot = 0; slot < stacks.length; slot++) {
+                    stacks[slot] = config().getFilterItem(channel, slot);
                 }
-                return false;
+                return RecipeCardItem.anyIn(stacks);
             }
 
             @Override

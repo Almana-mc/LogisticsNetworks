@@ -72,40 +72,20 @@ public final class NodeUpgradeData {
         }
     }
 
-    public static int getItemOperationCap(LogisticsNodeEntity node) {
-        return getItemOperationCap(getUpgradeTier(node));
-    }
-
     public static int getItemOperationCap(int tier) {
         return UpgradeLimitsConfig.get(tier).itemBatch();
-    }
-
-    public static int getEnergyOperationCap(LogisticsNodeEntity node) {
-        return getEnergyOperationCap(getUpgradeTier(node));
     }
 
     public static int getEnergyOperationCap(int tier) {
         return UpgradeLimitsConfig.get(tier).energyBatch();
     }
 
-    public static int getFluidOperationCapMb(LogisticsNodeEntity node) {
-        return getFluidOperationCapMb(getUpgradeTier(node));
-    }
-
     public static int getFluidOperationCapMb(int tier) {
         return UpgradeLimitsConfig.get(tier).fluidBatch();
     }
 
-    public static int getChemicalOperationCap(LogisticsNodeEntity node) {
-        return getChemicalOperationCap(getUpgradeTier(node));
-    }
-
     public static int getChemicalOperationCap(int tier) {
         return UpgradeLimitsConfig.get(tier).chemicalBatch();
-    }
-
-    public static int getSourceOperationCap(LogisticsNodeEntity node) {
-        return getSourceOperationCap(getUpgradeTier(node));
     }
 
     public static int getSourceOperationCap(int tier) {

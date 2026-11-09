@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.item.RecipeCardItem;
 import net.minecraft.server.level.ServerLevel;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.transfer.ResourceHandler;
@@ -34,15 +35,16 @@ public final class AttachedStorageFilterScanner {
         }
 
         Result total = new Result(0, false, false);
-        if (channel.hasType(ChannelType.ITEM)) {
+        int types = NodeUpgradeData.effectiveTypes(node, channel);
+        if (ChannelType.ITEM.in(types)) {
             total = merge(total, scanItems(node.capabilities().findItemHandler(channel.getIoSide()), filter));
         }
-        if (channel.hasType(ChannelType.FLUID) && !total.filterFull()) {
+        if (ChannelType.FLUID.in(types) && !total.filterFull()) {
             total = merge(total, scanFluids(node.capabilities().findFluidHandler(channel.getIoSide()), filter));
         }
         // Enable when 26.1.2 is supported.
         /*
-        if (channel.hasType(ChannelType.CHEMICAL) && !total.filterFull() && !node.isMountedOnCreate()) {
+        if (ChannelType.CHEMICAL.in(types) && !total.filterFull() && !node.isMountedOnCreate()) {
             total = merge(total, scanChemicals(level, node, channel, filter));
         }
         */
