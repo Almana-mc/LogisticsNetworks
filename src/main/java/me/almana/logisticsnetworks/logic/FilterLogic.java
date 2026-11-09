@@ -174,8 +174,8 @@ public final class FilterLogic {
                     && (FilterItemData.hasAnyChemicalEntries(filter, filterReadCache)
                             || FilterItemData.hasTagEntries(filter, FilterTargetType.CHEMICALS, filterReadCache))) {
                 isFilter = true;
-                matched = FilterItemData.containsChemicalFull(filter, chemicalId);
-                isBlacklist = FilterItemData.isBlacklist(filter);
+                matched = FilterItemData.containsChemicalFull(filter, chemicalId, filterReadCache);
+                isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
             } else if (ModFilterData.isModFilter(filter) && ModFilterData.hasAnyMods(filter, filterReadCache)
                     && ModFilterData.getTargetType(filter, filterReadCache) == FilterTargetType.CHEMICALS) {
                 isFilter = true;

@@ -26,7 +26,7 @@ public IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direct
     return findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
 }
 
-Source owner: AttachedStorageFilterScanner
+Source owner: AttachedStorageFilterScanner (54182a03, per-type scan merge)
 
 public static Result scan(ServerLevel level, LogisticsNodeEntity node, ChannelData channel, ItemStack filter) {
     if (!node.isMountedOnCreate() && !level.isLoaded(node.getAttachedPos())) {
@@ -37,17 +37,16 @@ public static Result scan(ServerLevel level, LogisticsNodeEntity node, ChannelDa
     }
 
     TransferCapabilityCache capabilities = NetworkRegistry.get(level).getCapabilityCache();
-    FilterTargetType target = FilterTargetType.forChannel(channel.getType());
-    if (target == null) {
-        return new Result(0, false, false);
+    Result total = new Result(0, false, false);
+    if (channel.hasType(ChannelType.ITEM)) {
+        total = merge(total, scanItems(capabilities.findItemHandler(node, channel.getIoDirection()), filter));
     }
-
-    return switch (target) {
-        case ITEMS -> scanItems(capabilities.findItemHandler(node, channel.getIoDirection()), filter);
-        case FLUIDS -> scanFluids(capabilities.findFluidHandler(node, channel.getIoDirection()), filter);
-        case CHEMICALS -> node.isMountedOnCreate()
-                ? new Result(0, false, false)
-                : scanChemicals(level, node, channel, capabilities, filter);
-    };
+    if (channel.hasType(ChannelType.FLUID) && !total.filterFull()) {
+        total = merge(total, scanFluids(capabilities.findFluidHandler(node, channel.getIoDirection()), filter));
+    }
+    if (channel.hasType(ChannelType.CHEMICAL) && !total.filterFull() && !node.isMountedOnCreate()) {
+        total = merge(total, scanChemicals(level, node, channel, capabilities, filter));
+    }
+    return total;
 }
 */

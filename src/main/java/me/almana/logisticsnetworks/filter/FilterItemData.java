@@ -355,10 +355,6 @@ public final class FilterItemData {
         return false;
     }
 
-    public static boolean hasAnyChemicalEntries(ItemStack stack) {
-        return entries(stack).stream().anyMatch(entry -> nonEmpty(entry.chemicalId()) != null);
-    }
-
     public static boolean hasAnyChemicalEntries(ItemStack stack, @Nullable ReadCache readCache) {
         if (!isFilterItem(stack))
             return false;
@@ -768,10 +764,6 @@ public final class FilterItemData {
             }
         }
         return false;
-    }
-
-    public static boolean containsChemicalFull(ItemStack filter, String chemicalId) {
-        return containsChemicalFull(filter, chemicalId, null);
     }
 
     public static boolean containsChemicalFull(ItemStack filter, String chemicalId, @Nullable ReadCache readCache) {
