@@ -973,9 +973,9 @@ public class TransferEngine {
                 if (!resource.isEmpty()) countCandidates.add(resource.getItem());
             }
         }
-        Map<Item, Integer> sourceItemCounts = sourceNeedsCounts
+        var sourceItemCounts = sourceNeedsCounts
                 ? TransferAmountRules.countItems(source, countCandidates) : null;
-        Map<Item, Integer> batchMoved = anyAmountConstraints && !roundRobin ? new HashMap<>(priorBatchMoved) : null;
+        var batchMoved = anyAmountConstraints && !roundRobin ? new HashMap<>(priorBatchMoved) : null;
         List<Map<Item, Integer>> targetBatchMoved = null;
         List<Map<Item, Integer>> targetItemCounts = null;
         Map<ResourceHandler<ItemResource>, Map<Item, Integer>> recoveryBatches = new IdentityHashMap<>();

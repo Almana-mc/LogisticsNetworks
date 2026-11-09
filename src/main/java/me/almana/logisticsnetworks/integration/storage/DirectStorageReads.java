@@ -1,5 +1,12 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenCustomHashMap;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenCustomHashMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.transfer.transaction.SnapshotJournal;
 import net.neoforged.neoforge.transfer.transaction.TransactionContext;
@@ -12,7 +19,7 @@ import java.util.Set;
 
 public final class DirectStorageReads {
     private final boolean fresh;
-    private final Map<Object, Map<Item, Long>> itemCounts = new IdentityHashMap<>();
+    private final Map<Object, Object2LongMap<Item>> itemCounts = new IdentityHashMap<>();
     private final CountJournal journal = new CountJournal();
 
     public DirectStorageReads(boolean fresh) {
@@ -23,41 +30,41 @@ public final class DirectStorageReads {
         return fresh;
     }
 
-    public Map<Item, Integer> countItems(StorageEndpoint endpoint, Set<Item> items) {
-        Map<Item, Long> known = itemCounts.computeIfAbsent(endpoint.networkIdentity(), ignored -> new HashMap<>());
+    public Object2IntMap<Item> countItems(StorageEndpoint endpoint, Set<Item> items) {
+        var known = itemCounts.computeIfAbsent(endpoint.networkIdentity(), ignored -> HashUtils.itemToLongMap());
         Set<Item> missing = new HashSet<>(items);
         missing.removeAll(known.keySet());
         if (!missing.isEmpty()) {
-            Map<Item, Long> fetched = endpoint.itemCounts(missing, fresh);
+            var fetched = endpoint.itemCounts(missing, fresh);
             for (Item item : missing) known.put(item, fetched.getOrDefault(item, 0L));
         }
-        Map<Item, Integer> result = new HashMap<>();
+        var result = HashUtils.itemToIntMap();
         for (Item item : items) result.put(item, clamp(known.getOrDefault(item, 0L)));
         return result;
     }
 
     public void moved(Object network, Item item, int delta, TransactionContext transaction) {
-        Map<Item, Long> known = itemCounts.get(network);
+        var known = itemCounts.get(network);
         if (known == null || !known.containsKey(item)) return;
         journal.updateSnapshots(transaction);
-        long amount = known.get(item);
-        known.put(item, delta > 0 && amount > Long.MAX_VALUE - delta ? Long.MAX_VALUE : Math.max(0, amount + delta));
+        known.computeLong(item, (k, amount) -> delta > 0 && amount > Long.MAX_VALUE - delta ? Long.MAX_VALUE : Math.max(0, amount + delta));
     }
 
     public static int clamp(long amount) {
         return (int) Math.min(Integer.MAX_VALUE, Math.max(0, amount));
     }
 
-    private final class CountJournal extends SnapshotJournal<Map<Object, Map<Item, Long>>> {
+    private final class CountJournal extends SnapshotJournal<Map<Object, Object2LongMap<Item>>> {
         @Override
-        protected Map<Object, Map<Item, Long>> createSnapshot() {
-            Map<Object, Map<Item, Long>> snapshot = new IdentityHashMap<>();
-            itemCounts.forEach((network, counts) -> snapshot.put(network, new HashMap<>(counts)));
+        protected Map<Object, Object2LongMap<Item>> createSnapshot() {
+            Map<Object, Object2LongMap<Item>> snapshot = new IdentityHashMap<>();
+            itemCounts.forEach((network, counts) -> snapshot.put(network,
+                    new Object2LongOpenCustomHashMap<>(counts, HashUtils.ITEM_STRATEGY)));
             return snapshot;
         }
 
         @Override
-        protected void revertToSnapshot(Map<Object, Map<Item, Long>> snapshot) {
+        protected void revertToSnapshot(Map<Object, Object2LongMap<Item>> snapshot) {
             itemCounts.clear();
             itemCounts.putAll(snapshot);
         }

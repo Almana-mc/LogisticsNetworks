@@ -18,6 +18,7 @@ import appeng.helpers.InterfaceLogicHost;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import me.almana.logisticsnetworks.integration.arseng.ArsEngCompat;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
+import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -64,11 +65,25 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
 
     @Override
     public List<StoredItem> exportableItems(boolean fresh) {
-        if (!isValid()) return List.of();
+        if (!isValid()) {
+            return List.of();
+        }
+
         KeyCounter available = available(fresh);
+        var config = host.getConfig();
         List<StoredItem> items = new ArrayList<>();
         Set<AEKey> seen = new HashSet<>();
-        var config = host.getConfig();
+
+        if (config.isEmpty()) {
+            for (var entry : available) {
+                if (entry.getKey() instanceof AEItemKey key && entry.getLongValue() > 0) {
+                    items.add(new StoredItem(key.getReadOnlyStack(), entry.getLongValue()));
+                }
+            }
+
+            return items;
+        }
+
         boolean fuzzy = fuzzy();
         FuzzyMode mode = fuzzy ? fuzzyMode() : FuzzyMode.IGNORE_ALL;
         Set<Object> configuredItems = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -90,15 +105,15 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
     }
 
     @Override
-    public Map<Item, Long> itemCounts(Set<Item> items, boolean fresh) {
-        if (items.isEmpty() || !isValid()) return Map.of();
+    public Object2LongMap<Item> itemCounts(Set<Item> items, boolean fresh) {
+        if (items.isEmpty() || !isValid()) return HashUtils.itemToLongMap();
         KeyCounter available = available(fresh);
-        Map<Item, Long> counts = new IdentityHashMap<>();
+        var counts = HashUtils.itemToLongMap();
         for (Item item : items) counts.put(item, 0L);
         for (Object2LongMap.Entry<AEKey> entry : available) {
             if (entry.getKey() instanceof AEItemKey key
                     && entry.getLongValue() > 0 && items.contains(key.getItem())) {
-                counts.merge(key.getItem(), entry.getLongValue(), AE2InterfaceEndpoint::saturatingAdd);
+                counts.mergeLong(key.getItem(), entry.getLongValue(), AE2InterfaceEndpoint::saturatingAdd);
             }
         }
         return counts;
@@ -111,6 +126,17 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
         List<StoredFluid> fluids = new ArrayList<>();
         Set<AEKey> seen = new HashSet<>();
         var config = host.getConfig();
+
+        if (config.isEmpty()) {
+            for (var entry : available) {
+                if (entry.getKey() instanceof AEFluidKey key && entry.getLongValue() > 0) {
+                    fluids.add(new StoredFluid(key.toStack(1), entry.getLongValue()));
+                }
+            }
+
+            return fluids;
+        }
+
         boolean fuzzy = fuzzy();
         FuzzyMode mode = fuzzy ? fuzzyMode() : FuzzyMode.IGNORE_ALL;
         Set<Object> configuredFluids = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -191,13 +217,13 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
                           boolean fuzzy, FuzzyMode mode) {
         if (!fuzzy) {
             long amount = available.get(configured);
-            if (amount > 0 && seen.add(configured)) items.add(new StoredItem(configured.toStack(), amount));
+            if (amount > 0 && seen.add(configured)) items.add(new StoredItem(configured.getReadOnlyStack(), amount));
             return;
         }
         for (AvailableKey entry : variants.getOrDefault(configured.getPrimaryKey(), List.of())) {
             if (entry.key() instanceof AEItemKey key
                     && configured.fuzzyEquals(key, mode) && seen.add(key)) {
-                items.add(new StoredItem(key.toStack(), entry.amount()));
+                items.add(new StoredItem(key.getReadOnlyStack(), entry.amount()));
             }
         }
     }
@@ -241,10 +267,15 @@ final class AE2InterfaceEndpoint implements StorageEndpoint {
     }
 
     private boolean canExport(AEKey candidate) {
+        var config = host.getConfig();
+        if (config.isEmpty()) {
+            return true;
+        }
+
         boolean fuzzy = fuzzy();
         FuzzyMode mode = fuzzy ? fuzzyMode() : FuzzyMode.IGNORE_ALL;
-        for (int slot = 0; slot < host.getConfig().size(); slot++) {
-            GenericStack configured = host.getConfig().getStack(slot);
+        for (int slot = 0; slot < config.size(); slot++) {
+            GenericStack configured = config.getStack(slot);
             if (configured == null) continue;
             if (configured.what().equals(candidate)) return true;
             if (fuzzy && configured.what().fuzzyEquals(candidate, mode)) return true;

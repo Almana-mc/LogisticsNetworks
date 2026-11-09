@@ -1,9 +1,11 @@
 package me.almana.logisticsnetworks.logic;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import me.almana.logisticsnetworks.filter.CandidateComponents;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.storage.DirectFluidHandler;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
+import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -57,18 +59,18 @@ public final class TransferAmountRules {
                 hasPerEntryAmounts);
     }
 
-    static Map<Item, Integer> countItems(ResourceHandler<ItemResource> handler) {
-        Map<Item, Integer> counts = new HashMap<>();
+    static Object2IntMap<Item> countItems(ResourceHandler<ItemResource> handler) {
+        var counts = HashUtils.itemToIntMap();
         for (int i = 0; i < handler.size(); i++) {
             ItemStack stack = ItemUtil.getStack(handler, i);
             if (!stack.isEmpty()) {
-                counts.merge(stack.getItem(), stack.getCount(), TransferAmountRules::saturatingAdd);
+                counts.mergeInt(stack.getItem(), stack.getCount(), TransferAmountRules::saturatingAdd);
             }
         }
         return counts;
     }
 
-    public static Map<Item, Integer> countItems(ResourceHandler<ItemResource> handler, Set<Item> candidates) {
+    public static Object2IntMap<Item> countItems(ResourceHandler<ItemResource> handler, Set<Item> candidates) {
         return handler instanceof DirectItemAccess direct ? direct.countItems(candidates) : countItems(handler);
     }
 

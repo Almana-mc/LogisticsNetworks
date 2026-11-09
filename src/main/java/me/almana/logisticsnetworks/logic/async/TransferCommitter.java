@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic.async;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
@@ -18,6 +19,7 @@ import me.almana.logisticsnetworks.logic.PriorityRobin;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -161,7 +163,7 @@ public final class TransferCommitter {
             ResourceHandler<ItemResource> source, ChannelData channel, ServerLevel level,
             ResolvedTarget[] targets, int batch, LogisticsNetwork network, long generation, boolean telemetry) {
         int committed = 0;
-        Map<Item, Integer> movedByItem = new HashMap<>();
+        var movedByItem = HashUtils.itemToIntMap();
         Map<UUID, Map<Item, Integer>> movedByTarget = new HashMap<>();
         ItemResource movedResource = null;
         ItemResourceOrder.Cursor cursor = null;
@@ -177,7 +179,7 @@ public final class TransferCommitter {
             if (resolved == null) continue;
             UUID targetId = plan.targets().get(intent.targetIndex()).nodeId();
             Map<Item, Integer> targetTotals = movedByTarget.computeIfAbsent(targetId,
-                    ignored -> new HashMap<>());
+                    ignored -> HashUtils.itemToIntMap());
             Map<Item, Integer> batchMoved = roundRobin ? targetTotals : movedByItem;
             TransferPlan.MoveIntent validated = validation.validate(
                     intent, resolved.target().handler(), resolved.channel(), batchMoved, batch - committed);

@@ -40,7 +40,7 @@ final class StorageUpgradeRequests {
         for (ItemStack stack : installed) {
             if (!stack.isEmpty()) installedItems.add(stack.getItem());
         }
-        Map<Item, Long> stored = access.countTagged(ModTags.UPGRADES);
+        var stored = access.countTagged(ModTags.UPGRADES);
         Set<Item> craftable = access.allows(player, StorageAction.AUTOCRAFT)
                 ? access.craftableTagged(ModTags.UPGRADES) : Set.of();
         List<LinkedStorage.UpgradeEntry> entries = new ArrayList<>();

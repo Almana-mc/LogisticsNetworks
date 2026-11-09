@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.filter.CandidateComponents;
 import me.almana.logisticsnetworks.filter.FilterItemData;
@@ -24,8 +25,8 @@ public final class PlannedItemValidation {
     private final HolderLookup.Provider registries;
     private final FilterItemData.ReadCache filters = FilterItemData.createReadCache();
     private final Set<Item> candidates = new HashSet<>();
-    private final Map<ResourceHandler<ItemResource>, Map<Item, Integer>> targetCounts = new IdentityHashMap<>();
-    private Map<Item, Integer> sourceCounts;
+    private final Map<ResourceHandler<ItemResource>, Object2IntMap<Item>> targetCounts = new IdentityHashMap<>();
+    private Object2IntMap<Item> sourceCounts;
 
     public PlannedItemValidation(ResourceHandler<ItemResource> source, ChannelData channel,
             HolderLookup.Provider registries, List<TransferPlan.MoveIntent> moves) {
@@ -69,7 +70,7 @@ public final class PlannedItemValidation {
                 || TransferAmountRules.hasStockFilter(channel.getFilterItems(), filters))) {
             sourceCounts = TransferAmountRules.countItems(source, candidates);
         }
-        Map<Item, Integer> counts = null;
+        Object2IntMap<Item> counts = null;
         if (constraints.hasImportThreshold() || TransferAmountRules.hasStockFilter(imports, filters)) {
             counts = target instanceof DirectItemAccess direct ? direct.countItems(candidates)
                     : targetCounts.computeIfAbsent(target,
@@ -92,7 +93,7 @@ public final class PlannedItemValidation {
         if (sourceCounts != null) {
             sourceCounts.computeIfPresent(item, (key, count) -> Math.max(0, count - amount));
         }
-        Map<Item, Integer> counts = targetCounts.get(target);
+        var counts = targetCounts.get(target);
         if (counts != null) {
             counts.merge(item, amount, (left, right) -> DirectStorageReads.clamp((long) left + right));
         }

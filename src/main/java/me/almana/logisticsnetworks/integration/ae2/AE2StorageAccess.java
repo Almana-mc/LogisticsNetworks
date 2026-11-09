@@ -10,6 +10,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
+import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import me.almana.logisticsnetworks.integration.storage.StorageAccess;
 import me.almana.logisticsnetworks.integration.storage.StorageAction;
@@ -18,6 +19,7 @@ import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.integration.storage.CraftingBatch;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.registration.Registration;
+import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -145,8 +147,8 @@ final class AE2StorageAccess implements StorageAccess {
     }
 
     @Override
-    public Map<Item, Long> countTagged(TagKey<Item> tag) {
-        Map<Item, Long> counts = new IdentityHashMap<>();
+    public Object2LongMap<Item> countTagged(TagKey<Item> tag) {
+        var counts = HashUtils.itemToLongMap();
         for (Object2LongMap.Entry<AEKey> entry : storage().getAvailableStacks()) {
             if (entry.getKey() instanceof AEItemKey key && key.getReadOnlyStack().is(tag)) {
                 counts.merge(key.getItem(), entry.getLongValue(), AE2StorageAccess::saturatingAdd);
