@@ -152,4 +152,12 @@ usable = true;
 
 return reachable
         && !TransferEngine.shouldPauseForUnavailableMountedTargets(usable, unavailableMounted, stationary);
+
+Source owner: NodeUpgradeData (7e5d1864, mounted nodes carry items and fluids)
+
+public static int availableTypes(LogisticsNodeEntity node) {
+    return availableTypes(node.isMountedOnCreate(),
+            MekanismCompat.isLoaded() && hasMekanismChemicalUpgrade(node),
+            ArsCompat.isLoaded() && hasArsSourceUpgrade(node));
+}
 */
