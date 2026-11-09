@@ -34,6 +34,7 @@ val cc_version: String by project
 val ae2Runtime = providers.gradleProperty("ae2_runtime").orElse("true").map { it.toBoolean() }
 val extendedAeRuntime = providers.gradleProperty("extendedae_runtime").orElse("true").map { it.toBoolean() }
 val refinedStorageRuntime = providers.gradleProperty("refined_storage_runtime").orElse("true").map { it.toBoolean() }
+val cableTiersRuntime = providers.gradleProperty("cable_tiers_runtime").orElse("true").map { it.toBoolean() }
 val buildingGadgetsRuntime = providers.gradleProperty("building_gadgets_runtime").orElse("true").map { it.toBoolean() }
 val ccRuntime = providers.gradleProperty("cc_runtime").orElse("true").map { it.toBoolean() }
 
@@ -158,6 +159,15 @@ dependencies {
     compileOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
     if (refinedStorageRuntime.get()) {
         localRuntime("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+    }
+
+    compileOnly("curse.maven:cable-tiers-454382:9115770") {
+        isTransitive = false
+    }
+    if (cableTiersRuntime.get() && refinedStorageRuntime.get()) {
+        localRuntime("curse.maven:cable-tiers-454382:9115770") {
+            isTransitive = false
+        }
     }
 
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-forge-api:${cc_version}")

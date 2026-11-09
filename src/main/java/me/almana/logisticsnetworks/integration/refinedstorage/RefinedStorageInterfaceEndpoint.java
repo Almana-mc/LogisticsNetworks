@@ -3,7 +3,7 @@ package me.almana.logisticsnetworks.integration.refinedstorage;
 import com.refinedmods.refinedstorage.api.core.Action;
 import com.refinedmods.refinedstorage.api.network.Network;
 import com.refinedmods.refinedstorage.api.network.impl.node.iface.InterfaceExportState;
-import com.refinedmods.refinedstorage.api.network.impl.node.iface.InterfaceNetworkNode;
+import com.refinedmods.refinedstorage.api.network.impl.node.AbstractNetworkNode;
 import com.refinedmods.refinedstorage.api.network.node.NetworkNodeActor;
 import com.refinedmods.refinedstorage.api.network.storage.StorageNetworkComponent;
 import com.refinedmods.refinedstorage.api.resource.ResourceAmount;
@@ -22,15 +22,19 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
 
-    private final InterfaceNetworkNode node;
+    private final AbstractNetworkNode node;
+    private final Supplier<InterfaceExportState> exportState;
     private final Network network;
     private final NetworkNodeActor actor;
 
-    RefinedStorageInterfaceEndpoint(InterfaceNetworkNode node, Network network) {
+    RefinedStorageInterfaceEndpoint(AbstractNetworkNode node, Supplier<InterfaceExportState> exportState,
+            Network network) {
         this.node = node;
+        this.exportState = exportState;
         this.network = network;
         this.actor = new NetworkNodeActor(node);
     }
@@ -52,7 +56,7 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
 
     @Override
     public List<StoredItem> exportableItems(boolean fresh) {
-        InterfaceExportState state = node.getExportState();
+        InterfaceExportState state = exportState.get();
         if (state == null || !isValid()) return List.of();
         StorageNetworkComponent storage = storage();
         List<StoredItem> items = new ArrayList<>();
@@ -89,7 +93,7 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
 
     @Override
     public List<StoredFluid> exportableFluids(boolean fresh) {
-        InterfaceExportState state = node.getExportState();
+        InterfaceExportState state = exportState.get();
         if (state == null || !isValid()) return List.of();
         StorageNetworkComponent storage = storage();
         List<StoredFluid> fluids = new ArrayList<>();
@@ -149,7 +153,7 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
     }
 
     private boolean canExport(ResourceKey candidate) {
-        InterfaceExportState state = node.getExportState();
+        InterfaceExportState state = exportState.get();
         if (state == null || !isValid()) return false;
         for (int slot = 0; slot < state.getSlots(); slot++) {
             ResourceKey requested = state.getRequestedResource(slot);
