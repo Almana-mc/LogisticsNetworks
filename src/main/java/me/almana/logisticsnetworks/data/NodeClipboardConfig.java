@@ -99,7 +99,7 @@ public final class NodeClipboardConfig {
             Codec.BOOL.lenientOptionalFieldOf("renderVisible", true).forGetter(ClipboardSnapshot::renderVisible),
             Codec.STRING.lenientOptionalFieldOf("node_label", "").forGetter(ClipboardSnapshot::nodeLabel)
     ).apply(instance, NodeClipboardConfig::legacySnapshot));
-    private static final Codec<ClipboardSnapshot> CODEC = Codec.withAlternative(CURRENT_CODEC, LEGACY_CODEC);
+    public static final Codec<ClipboardSnapshot> CODEC = Codec.withAlternative(CURRENT_CODEC, LEGACY_CODEC);
 
     private final ChannelConfig[] channels;
     private final ItemStack[][] filterItems;
