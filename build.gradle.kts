@@ -17,18 +17,20 @@ val mod_version: String by project
 val mod_group_id: String by project
 val mod_authors: String by project
 val mod_description: String by project
-val jei_version: String by project
-val jade_version: String by project
-val iris_version: String by project
+val jei_file_id: String by project
+val jade_file_id: String by project
+val iris_file_id: String by project
 val mekanism_version: String by project
 val ars_nouveau_version: String by project
 val ae2_version: String by project
+val ae2_file_id: String by project
 val refined_storage_version: String by project
-val ftb_teams_version: String by project
-val ftb_library_version: String by project
+val refined_storage_file_id: String by project
+val ftb_teams_file_id: String by project
+val ftb_library_file_id: String by project
 val emi_version: String by project
-val guideme_version: String by project
-val sophisticated_core_version: String by project
+val guideme_file_id: String by project
+val sophisticated_core_file_id: String by project
 val building_gadgets_file_id: String by project
 val cc_version: String by project
 val ae2Runtime = providers.gradleProperty("ae2_runtime").orElse("true").map { it.toBoolean() }
@@ -44,14 +46,11 @@ group = mod_group_id
 repositories {
     mavenLocal()
     mavenCentral()
-    maven("https://maven.blamejared.com")
-    maven("https://modmaven.dev/")
-    maven("https://api.modrinth.com/maven")
-    maven("https://maven.ftb.dev/releases")
-    maven("https://maven.terraformersmc.com/releases")
-    maven("https://maven.creeperhost.net")
     maven("https://maven.squiddev.cc") {
         content { includeGroup("cc.tweaked") }
+    }
+    maven("https://api.modrinth.com/maven") {
+        content { includeGroup("maven.modrinth") }
     }
     maven("https://cursemaven.com") {
         content { includeGroup("curse.maven") }
@@ -130,35 +129,35 @@ val localRuntime: Configuration by configurations.creating
 configurations.runtimeClasspath { extendsFrom(localRuntime) }
 
 dependencies {
-    compileOnly("maven.modrinth:sophisticated-core:${sophisticated_core_version}") { isTransitive = false }
-    compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
-    compileOnly("mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}")
-    localRuntime("mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}")
+    compileOnly("curse.maven:sophisticated-core-618298:${sophisticated_core_file_id}") { isTransitive = false }
+    compileOnly("curse.maven:jei-238222:${jei_file_id}")
+    localRuntime("curse.maven:jei-238222:${jei_file_id}")
 
-    compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftb_teams_version}") {
+    compileOnly("curse.maven:ftb-teams-404468:${ftb_teams_file_id}") {
         isTransitive = false
     }
-    compileOnly("dev.ftb.mods:ftb-library-neoforge:${ftb_library_version}") {
+    compileOnly("curse.maven:ftb-library-404465:${ftb_library_file_id}") {
         isTransitive = false
     }
 
-    compileOnly("org.appliedenergistics:guideme:${guideme_version}")
-    localRuntime("org.appliedenergistics:guideme:${guideme_version}")
+    compileOnly("curse.maven:guideme-1173950:${guideme_file_id}")
+    localRuntime("curse.maven:guideme-1173950:${guideme_file_id}")
 
-    compileOnly("maven.modrinth:jade:${jade_version}")
-    localRuntime("maven.modrinth:jade:${jade_version}")
+    compileOnly("curse.maven:jade-324717:${jade_file_id}")
+    localRuntime("curse.maven:jade-324717:${jade_file_id}")
 
-    compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+    compileOnly("curse.maven:applied-energistics-2-223794:${ae2_file_id}")
     if (ae2Runtime.get()) {
-        localRuntime("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+        localRuntime("curse.maven:applied-energistics-2-223794:${ae2_file_id}")
     }
     if (extendedAeRuntime.get()) {
         localRuntime("curse.maven:ex-pattern-provider-892005:9453241")
+        localRuntime("maven.modrinth:glodium:26.1-1.2-neoforge")
     }
 
-    compileOnly("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+    compileOnly("curse.maven:refined-storage-243076:${refined_storage_file_id}")
     if (refinedStorageRuntime.get()) {
-        localRuntime("com.refinedmods.refinedstorage:refinedstorage-neoforge:${refined_storage_version}")
+        localRuntime("curse.maven:refined-storage-243076:${refined_storage_file_id}")
     }
 
     compileOnly("curse.maven:cable-tiers-454382:9115770") {
@@ -181,9 +180,7 @@ dependencies {
     }
 
     // Iris API — compile-only; shaders are an optional runtime dependency.
-    compileOnly("maven.modrinth:iris:${iris_version}") {
-        isTransitive = false
-    }
+    compileOnly("curse.maven:iris-455508:${iris_file_id}")
 
     // Enable when 26.1.2 is supported.
     /*

@@ -151,7 +151,7 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "buildinggadgets2"
 type = "optional"
-versionRange = "[1.4.6,1.5)"
+versionRange = "[1.4.6,)"
 ordering = "AFTER"
 side = "BOTH"
 
