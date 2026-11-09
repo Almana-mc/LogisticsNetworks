@@ -13,6 +13,7 @@ import me.almana.logisticsnetworks.logic.FilterLogic;
 import me.almana.logisticsnetworks.logic.TransferAmountRules;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
@@ -104,12 +105,13 @@ public final class Snapshots {
         for (int index = 0; index < LogisticsNodeEntity.CHANNEL_COUNT; index++) {
             ChannelData channel = node.getChannel(index);
             if (channel == null || !channel.isEnabled()
-                    || channel.getMode() != ChannelMode.EXPORT || channel.getType() != ChannelType.ITEM) continue;
+                    || channel.getMode() != ChannelMode.EXPORT || !channel.hasType(ChannelType.ITEM)) continue;
             if (RecipeCardItem.anyIn(channel.getFilterItems())) continue;
             if (!TransferEngine.isRedstoneActive(channel.getRedstoneMode(), signal)) continue;
             List<TransferEngine.ImportTarget> targets = context.itemImports()[index];
             if (targets == null || targets.isEmpty()) continue;
-            long cooldown = TransferEngine.cooldownRemaining(node, channel, index, tier, gameTime);
+            long cooldown = TransferEngine.cooldownRemaining(
+                    node, channel, index, ChannelType.ITEM.ordinal(), tier, gameTime);
             if (cooldown > 0L) {
                 itemWakeDelta = itemWakeDelta(itemWakeDelta, targets, cooldown);
                 continue;
@@ -120,7 +122,8 @@ public final class Snapshots {
                     channel.getIoDirection(), directSource);
             if (sourceHandler == null) {
                 itemWakeDelta = itemWakeDelta(itemWakeDelta, targets,
-                        TransferEngine.finishChannelAttempt(node, channel, index, 0, gameTime, tier, false));
+                        TransferEngine.finishChannelAttempt(
+                                node, channel, index, ChannelType.ITEM.ordinal(), 0, gameTime, tier, false));
                 continue;
             }
             NetworkSnapshot.ChannelUnit unit = captureChannel(
@@ -139,8 +142,7 @@ public final class Snapshots {
         TransferEngine.ResolvedItemTargets resolved = TransferEngine.resolveItemTargets(
                 node, level, channel, context.itemImports()[index], sourceHandler, context.dimensionalCache(), readCache);
         if (resolved.status() != TransferEngine.ResolvedItemTargets.OK) return null;
-        int configuredBatch = TransferEngine.getBatchLimit(ChannelType.ITEM, tier);
-        int batchLimit = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
+        int batchLimit = NodeUpgradeData.effectiveBatch(channel, ChannelType.ITEM, tier);
         int sourceEndpoint = endpoints.capture(node, channel.getIoDirection(), sourceHandler, occupiedSlots);
         return new NetworkSnapshot.ChannelUnit(node.getUUID(), index, batchLimit,
                 channel.getFilterItems(), channel.getFilterMode(), sourceEndpoint,

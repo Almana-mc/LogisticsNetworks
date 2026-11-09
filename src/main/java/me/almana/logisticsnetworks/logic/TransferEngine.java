@@ -281,115 +281,139 @@ public class TransferEngine {
                 continue;
             if (channel.getMode() != ChannelMode.EXPORT)
                 continue;
-            boolean cards = RecipeCardItem.anyIn(channel.getFilterItems());
-            if (!includeItems && channel.getType() == ChannelType.ITEM && !cards)
-                continue;
             if (!isRedstoneActive(channel.getRedstoneMode(), redstoneSignal))
                 continue;
 
-            List<ImportTarget> typed = switch (channel.getType()) {
-                case FLUID -> fluidImports[i];
-                case ENERGY -> energyImports[i];
-                case CHEMICAL -> chemicalImports[i];
-                case SOURCE -> sourceImports[i];
-                default -> itemImports[i];
-            };
-            boolean noTargets = cards
-                    ? itemImports[i].isEmpty() && fluidImports[i].isEmpty() && chemicalImports[i].isEmpty()
-                    : typed == null || typed.isEmpty();
-            if (noTargets)
-                continue;
-
-            long cooldown = cooldownRemaining(sourceNode, channel, i, sourceTier, gameTime);
-            if (cooldown > 0) {
-                if (cooldown < minWakeDelta) minWakeDelta = cooldown;
-                continue;
+            int types = NodeUpgradeData.effectiveTypes(sourceNode, channel);
+            boolean cards = RecipeCardItem.anyIn(channel.getFilterItems());
+            if (cards) {
+                long delta = recipeLane(sourceNode, sourceLevel, channel, i, itemImports[i], fluidImports[i],
+                        chemicalImports[i], sourceTier, gameTime, dimensionalCache, telemetryActive);
+                if (delta < minWakeDelta) minWakeDelta = delta;
             }
 
-            int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
-            int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
+            for (ChannelType type : ChannelType.ORDER) {
+                // Async planner owns item lanes
+                if (!type.in(types) || type == ChannelType.ITEM && !includeItems && !cards)
+                    continue;
+                List<ImportTarget> typed = importsFor(type, i, itemImports, fluidImports, energyImports,
+                        chemicalImports, sourceImports);
+                if (typed.isEmpty() || cards && !RecipeChannel.runsLoose(channel, type))
+                    continue;
+                if (type == ChannelType.ENERGY
+                        && sourceNode.capabilities().findEnergyHandler(channel.getIoDirection()) == null) {
+                    minWakeDelta = Math.min(minWakeDelta, Config.backoffMaxTicks);
+                    continue;
+                }
 
-            int result = cards ? RecipeChannel.transfer(sourceNode, sourceLevel, channel,
-                    RecipeChannel.receivers(itemImports[i], fluidImports[i], chemicalImports[i]),
-                    effectiveBatchSize, sourceTier, dimensionalCache, telemetryActive) : -1;
-            if (!cards || RecipeChannel.hasLoose(channel)) {
-                int loose = switch (channel.getType()) {
-                    case FLUID ->
-                        transferFluids(sourceNode, sourceLevel, channel, typed, effectiveBatchSize, dimensionalCache,
-                                telemetryActive);
-                    case ENERGY ->
-                        transferEnergy(sourceNode, sourceLevel, channel, typed, effectiveBatchSize, dimensionalCache);
-                    case CHEMICAL ->
-                        transferChemicals(sourceNode, sourceLevel, channel, typed, effectiveBatchSize, dimensionalCache,
-                                telemetryActive);
-                    case SOURCE ->
-                        transferSource(sourceNode, sourceLevel, channel, typed, effectiveBatchSize, dimensionalCache);
-                    default ->
-                        transferItems(sourceNode, sourceLevel, channel, i, typed, effectiveBatchSize, dimensionalCache,
-                                telemetryActive);
+                int lane = type.ordinal();
+                long cooldown = cooldownRemaining(sourceNode, channel, i, lane, sourceTier, gameTime);
+                if (cooldown > 0) {
+                    if (cooldown < minWakeDelta) minWakeDelta = cooldown;
+                    continue;
+                }
+
+                int batch = NodeUpgradeData.effectiveBatch(channel, type, sourceTier);
+                int result = switch (type) {
+                    case ITEM -> transferItems(sourceNode, sourceLevel, channel, i, typed, batch, dimensionalCache,
+                            telemetryActive);
+                    case FLUID -> transferFluids(sourceNode, sourceLevel, channel, typed, batch, dimensionalCache,
+                            telemetryActive);
+                    case ENERGY -> transferEnergy(sourceNode, sourceLevel, channel, typed, batch, dimensionalCache);
+                    case CHEMICAL -> transferChemicals(sourceNode, sourceLevel, channel, typed, batch,
+                            dimensionalCache, telemetryActive);
+                    case SOURCE -> transferSource(sourceNode, sourceLevel, channel, typed, batch, dimensionalCache);
                 };
-                // Separate budgets, -1 means unreachable
-                result = result < 0 ? loose : loose < 0 ? result : result + loose;
+                minWakeDelta = Math.min(minWakeDelta, finishChannelAttempt(sourceNode, channel, i, lane, result,
+                        gameTime, sourceTier, telemetryActive));
             }
-
-            minWakeDelta = Math.min(minWakeDelta, finishChannelAttempt(
-                    sourceNode, channel, i, result, gameTime, sourceTier, telemetryActive));
         }
 
         return minWakeDelta;
     }
 
-    public static long finishChannelAttempt(LogisticsNodeEntity node, ChannelData channel, int index, int result,
-            long gameTime, int tier, boolean telemetryActive) {
-        if (result < 0) return Long.MAX_VALUE;
-        if (telemetryActive && result > 0) channel.getTelemetry().record(result);
-        updateBackoff(node, channel, index, result > 0, gameTime, tier);
-        return result > 0 ? 0 : Math.max(1L, cooldownRemaining(node, channel, index, tier, gameTime));
+    private static long recipeLane(LogisticsNodeEntity sourceNode, ServerLevel level, ChannelData channel, int index,
+            List<ImportTarget> items, List<ImportTarget> fluids, List<ImportTarget> chemicals, int tier,
+            long gameTime, Map<UUID, Boolean> dimensionalCache, boolean telemetryActive) {
+        if (items.isEmpty() && fluids.isEmpty() && chemicals.isEmpty())
+            return Long.MAX_VALUE;
+        long cooldown = cooldownRemaining(sourceNode, channel, index, ChannelData.RECIPE_LANE, tier, gameTime);
+        if (cooldown > 0)
+            return cooldown;
+        int sets = RecipeChannel.transfer(sourceNode, level, channel, RecipeChannel.receivers(items, fluids, chemicals),
+                NodeUpgradeData.recipeBudget(channel), tier, dimensionalCache, telemetryActive);
+        return finishChannelAttempt(sourceNode, channel, index, ChannelData.RECIPE_LANE, sets, gameTime, tier,
+                telemetryActive);
     }
 
-    public static long cooldownRemaining(LogisticsNodeEntity node, ChannelData channel, int index, int tier,
-            long gameTime) {
-        long lastRun = node.getLastExecution(index);
-        boolean isInstantType = channel.getType() == ChannelType.ENERGY;
-        long configuredDelay = isInstantType ? 1
-                : Math.max(channel.getTickDelay(), NodeUpgradeData.getMinTickDelay(tier));
-        float backoff = node.getBackoffTicks(index);
-        boolean useBackoff = Config.backoffEnabled[channel.getType().ordinal()];
-        long effectiveDelay = useBackoff ? Math.max(configuredDelay, (long) backoff) : configuredDelay;
+    private static List<ImportTarget> importsFor(ChannelType type, int channel, List<ImportTarget>[] items,
+            List<ImportTarget>[] fluids, List<ImportTarget>[] energy, List<ImportTarget>[] chemicals,
+            List<ImportTarget>[] source) {
+        return switch (type) {
+            case ITEM -> items[channel];
+            case FLUID -> fluids[channel];
+            case ENERGY -> energy[channel];
+            case CHEMICAL -> chemicals[channel];
+            case SOURCE -> source[channel];
+        };
+    }
+
+    public static long finishChannelAttempt(LogisticsNodeEntity node, ChannelData channel, int index, int lane,
+            int result, long gameTime, int tier, boolean telemetryActive) {
+        if (result < 0) return Long.MAX_VALUE;
+        if (telemetryActive && result > 0 && lane < ChannelData.RECIPE_LANE) {
+            channel.getTelemetry().record(ChannelType.values()[lane], result);
+        }
+        updateBackoff(node, channel, index, lane, result > 0, gameTime, tier);
+        return result > 0 ? 0 : Math.max(1L, cooldownRemaining(node, channel, index, lane, tier, gameTime));
+    }
+
+    public static long cooldownRemaining(LogisticsNodeEntity node, ChannelData channel, int index, int lane,
+            int tier, long gameTime) {
+        long lastRun = node.getLastExecution(index, lane);
+        long configuredDelay = configuredDelay(channel, lane, tier);
+        float backoff = node.getBackoffTicks(index, lane);
+        long effectiveDelay = backoffEnabled(lane) ? Math.max(configuredDelay, (long) backoff) : configuredDelay;
         long elapsed = gameTime - lastRun;
         return Math.max(0L, effectiveDelay - elapsed);
     }
 
-    public static int getBatchLimit(ChannelType type, int tier) {
-        return NodeUpgradeData.getOperationCap(type, tier);
+    private static int configuredDelay(ChannelData channel, int lane, int tier) {
+        return lane == ChannelType.ENERGY.ordinal() ? 1
+                : Math.max(channel.getTickDelay(), NodeUpgradeData.getMinTickDelay(tier));
     }
 
-    private static void updateBackoff(LogisticsNodeEntity node, ChannelData channel, int index, boolean success,
-            long gameTime, int tier) {
-        node.setLastExecution(index, gameTime);
-        boolean isInstantType = channel.getType() == ChannelType.ENERGY;
-        int configuredDelay = isInstantType ? 1
-                : Math.max(channel.getTickDelay(), NodeUpgradeData.getMinTickDelay(tier));
+    // Recipe lane follows item backoff
+    private static boolean backoffEnabled(int lane) {
+        return Config.backoffEnabled[lane == ChannelData.RECIPE_LANE ? ChannelType.ITEM.ordinal() : lane];
+    }
+
+    private static void updateBackoff(LogisticsNodeEntity node, ChannelData channel, int index, int lane,
+            boolean success, long gameTime, int tier) {
+        node.setLastExecution(index, lane, gameTime);
+        int configuredDelay = configuredDelay(channel, lane, tier);
 
         if (success) {
-            float curBackoff = node.getBackoffTicks(index);
+            float curBackoff = node.getBackoffTicks(index, lane);
             if (curBackoff > configuredDelay) {
-                node.setBackoffTicks(index, Math.max(configuredDelay, curBackoff / BACKOFF_DECAY_DIVISOR));
+                node.setBackoffTicks(index, lane, Math.max(configuredDelay, curBackoff / BACKOFF_DECAY_DIVISOR));
             }
-        } else if (Config.backoffEnabled[channel.getType().ordinal()]) {
-            float maxBackoff = isInstantType ? BACKOFF_MAX_TICKS_ENERGY : (float) Config.backoffMaxTicks;
-            float curBackoff = Math.max(node.getBackoffTicks(index), configuredDelay);
+        } else if (backoffEnabled(lane)) {
+            float maxBackoff = lane == ChannelType.ENERGY.ordinal()
+                    ? BACKOFF_MAX_TICKS_ENERGY : (float) Config.backoffMaxTicks;
+            float curBackoff = Math.max(node.getBackoffTicks(index, lane), configuredDelay);
             if (curBackoff <= configuredDelay) {
                 float nextThreshold = (configuredDelay + 1.05f) / BACKOFF_MULTIPLIER;
-                node.setBackoffTicks(index, Math.min(maxBackoff, Math.max(configuredDelay + 0.1f, nextThreshold)));
+                node.setBackoffTicks(index, lane,
+                        Math.min(maxBackoff, Math.max(configuredDelay + 0.1f, nextThreshold)));
             } else {
-                node.setBackoffTicks(index, Math.min(maxBackoff, curBackoff * BACKOFF_MULTIPLIER));
+                node.setBackoffTicks(index, lane, Math.min(maxBackoff, curBackoff * BACKOFF_MULTIPLIER));
             }
         }
     }
 
     static List<ImportTarget> orderTargets(List<ImportTarget> targets, ChannelData exportChannel,
-            LogisticsNodeEntity sourceNode) {
+            LogisticsNodeEntity sourceNode, ChannelType type) {
         if (targets.size() <= 1)
             return targets;
 
@@ -414,7 +438,7 @@ public class TransferEngine {
                 return targets;
             }
             case PRIORITY_ROBIN -> {
-                return PriorityRobin.rotate(targets, exportChannel.getRobinCursor(),
+                return PriorityRobin.rotate(targets, exportChannel.getRobinCursor(type),
                         t -> t.channel().getPriority(), t -> t.node().getUUID());
             }
             default -> {
@@ -423,8 +447,9 @@ public class TransferEngine {
         }
     }
 
-    public static void markServed(ChannelData exportChannel, ImportTarget target) {
-        exportChannel.setRobinCursor(new PriorityRobin.Cursor(target.channel().getPriority(), target.node().getUUID()));
+    public static void markServed(ChannelData exportChannel, ChannelType type, ImportTarget target) {
+        exportChannel.setRobinCursor(type,
+                new PriorityRobin.Cursor(target.channel().getPriority(), target.node().getUUID()));
     }
 
     private static int transferItems(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
@@ -448,7 +473,7 @@ public class TransferEngine {
         if (resolved.targets().isEmpty()) return 0;
         DistributionMode distribution = exportChannel.getDistributionMode();
         MoveRecorder served = distribution == DistributionMode.PRIORITY_ROBIN
-                ? (slot, index, moved, mask) -> markServed(exportChannel, resolved.refs().get(index))
+                ? (slot, index, moved, mask) -> markServed(exportChannel, ChannelType.ITEM, resolved.refs().get(index))
                 : null;
         MoveRecorder recorder = telemetryActive ? withTelemetry(served, exportChannel.getTelemetry()) : served;
         ItemResourceOrder.Result result = executeItemOperation(sourceHandler, resolved.targets(),
@@ -473,7 +498,7 @@ public class TransferEngine {
             ChannelData exportChannel, List<ImportTarget> targets, ResourceHandler<ItemResource> sourceHandler,
             Map<UUID, Boolean> dimensionalCache, FilterItemData.ReadCache filterReadCache) {
         BlockPos sourcePos = sourceNode.getAttachedPos();
-        targets = orderTargets(targets, exportChannel, sourceNode);
+        targets = orderTargets(targets, exportChannel, sourceNode, ChannelType.ITEM);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         boolean anyReachable = false;
         List<ItemTransferTarget> reachableTargets = new ArrayList<>(targets.size());
@@ -532,7 +557,7 @@ public class TransferEngine {
         if (sourceHandler == null)
             return 0;
 
-        targets = orderTargets(targets, exportChannel, sourceNode);
+        targets = orderTargets(targets, exportChannel, sourceNode, ChannelType.FLUID);
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         List<FluidTransferTarget> resolved = new ArrayList<>();
         List<ImportTarget> refs = new ArrayList<>();
@@ -565,7 +590,7 @@ public class TransferEngine {
         if (!anyReachable)
             return -1;
         IntConsumer served = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
-                ? index -> markServed(exportChannel, refs.get(index)) : null;
+                ? index -> markServed(exportChannel, ChannelType.FLUID, refs.get(index)) : null;
         ObjIntConsumer<FluidStack> onMoved = telemetryActive
                 ? (stack, amount) -> exportChannel.getTelemetry().recordResource(new FlowResource.Fluid(stack), amount)
                 : null;
@@ -588,7 +613,7 @@ public class TransferEngine {
         if (sourceHandler == null)
             return 0;
 
-        targets = orderTargets(targets, exportChannel, sourceNode);
+        targets = orderTargets(targets, exportChannel, sourceNode, ChannelType.ENERGY);
         boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         List<EnergyHandler> equalTargets = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
                 ? new ArrayList<>() : null;
@@ -624,7 +649,7 @@ public class TransferEngine {
             if (moved > 0) {
                 remaining -= moved;
                 if (robin) {
-                    markServed(exportChannel, target);
+                    markServed(exportChannel, ChannelType.ENERGY, target);
                     break;
                 }
             }
@@ -660,7 +685,7 @@ public class TransferEngine {
         if (!sourceLevel.isLoaded(sourcePos))
             return -1;
 
-        targets = orderTargets(targets, exportChannel, sourceNode);
+        targets = orderTargets(targets, exportChannel, sourceNode, ChannelType.CHEMICAL);
         boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
@@ -697,7 +722,7 @@ public class TransferEngine {
             if (moved > 0) {
                 remaining -= (int) moved;
                 if (robin) {
-                    markServed(exportChannel, target);
+                    markServed(exportChannel, ChannelType.CHEMICAL, target);
                     break;
                 }
             }
@@ -731,7 +756,7 @@ public class TransferEngine {
             return -1;
 
         SourceTransferHelper.SourceEnd from = sourceEnd(sourceNode, exportChannel.getIoDirection());
-        targets = orderTargets(targets, exportChannel, sourceNode);
+        targets = orderTargets(targets, exportChannel, sourceNode, ChannelType.SOURCE);
         boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
         List<SourceTransferHelper.SourceEnd> equalTargets =
                 exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN ? new ArrayList<>() : null;
@@ -769,7 +794,7 @@ public class TransferEngine {
             if (moved > 0) {
                 remaining -= moved;
                 if (robin) {
-                    markServed(exportChannel, target);
+                    markServed(exportChannel, ChannelType.SOURCE, target);
                     break;
                 }
             }

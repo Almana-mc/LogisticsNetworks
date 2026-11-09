@@ -492,22 +492,13 @@ public class LogisticsNetwork {
                 continue;
             }
 
-            int priority = ch.getPriority();
-            switch (ch.getType()) {
-                case ITEM -> this.itemImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
-                case FLUID -> this.fluidImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
-                case ENERGY -> this.energyImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
-                case CHEMICAL -> {
-                    if (NodeUpgradeData.hasMekanismChemicalUpgrade(node)) {
-                        this.chemicalImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
-                    }
-                }
-                case SOURCE -> {
-                    if (NodeUpgradeData.hasArsSourceUpgrade(node)) {
-                        this.sourceImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos(), priority));
-                    }
-                }
-            }
+            int types = NodeUpgradeData.effectiveTypes(node, ch);
+            NodeRef ref = new NodeRef(node.getUUID(), node.getAttachedPos(), ch.getPriority());
+            if (ChannelType.ITEM.in(types)) this.itemImports[i].add(ref);
+            if (ChannelType.FLUID.in(types)) this.fluidImports[i].add(ref);
+            if (ChannelType.ENERGY.in(types)) this.energyImports[i].add(ref);
+            if (ChannelType.CHEMICAL.in(types)) this.chemicalImports[i].add(ref);
+            if (ChannelType.SOURCE.in(types)) this.sourceImports[i].add(ref);
         }
     }
 }

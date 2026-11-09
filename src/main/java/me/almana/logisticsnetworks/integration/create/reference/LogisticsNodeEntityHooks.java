@@ -84,4 +84,14 @@ public void dismountFromCreate(BlockPos attachedPos, Vec3 position,
     }
     moveAttachment(attachedPos, position);
 }
+
+Source owner: LogisticsNodeEntity (562861f9, route bits follow the type mask)
+
+private void refreshRouteChannels() {
+    long bits = 0L;
+    if (isValidNode() && getNetworkId() != null && CreateCompat.isResolved(this)) {
+        bits = NodeRouteChannels.encode(channels, isMountedOnCreate(), NodeUpgradeData.availableTypes(this));
+    }
+    this.entityData.set(ROUTE_CHANNELS, bits);
+}
 */

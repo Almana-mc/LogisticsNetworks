@@ -54,7 +54,7 @@ public final class NodeUpgradeData {
     public static int effectiveBatch(ChannelData channel, ChannelType type, int tier) {
         int cap = getOperationCap(type, tier);
         int value = channel.getBatch(type);
-        return type == ChannelType.ENERGY || value <= 0 ? cap : Math.min(value, cap);
+        return Math.max(1, type == ChannelType.ENERGY || value <= 0 ? cap : Math.min(value, cap));
     }
 
     public static int recipeBudget(ChannelData channel) {

@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic;
 
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.FlowResource;
 
 import java.util.HashMap;
@@ -7,11 +8,11 @@ import java.util.Map;
 
 public class ChannelTelemetry {
 
-    private long currentFlow;
+    private final long[] flows = new long[ChannelType.values().length];
     private final Map<FlowResource, Long> resources = new HashMap<>();
 
-    public void record(long amount) {
-        currentFlow += amount;
+    public void record(ChannelType type, long amount) {
+        flows[type.ordinal()] += amount;
     }
 
     public void recordResource(FlowResource resource, long amount) {
@@ -20,10 +21,11 @@ public class ChannelTelemetry {
         }
     }
 
-    public long drainFlow() {
-        long flow = currentFlow;
-        currentFlow = 0;
-        return flow;
+    public void drainFlows(long[] into) {
+        for (int i = 0; i < flows.length; i++) {
+            into[i] += flows[i];
+            flows[i] = 0;
+        }
     }
 
     public void drainResources(Map<FlowResource, Long> into) {

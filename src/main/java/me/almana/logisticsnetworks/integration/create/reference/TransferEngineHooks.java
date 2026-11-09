@@ -160,4 +160,24 @@ public static int availableTypes(LogisticsNodeEntity node) {
             MekanismCompat.isLoaded() && hasMekanismChemicalUpgrade(node),
             ArsCompat.isLoaded() && hasArsSourceUpgrade(node));
 }
+
+Source owner: TransferEngine (562861f9, mounted channels carry every type)
+
+public static boolean canRunChannel(LogisticsNodeEntity node, ChannelData channel) {
+    return !node.isMountedOnCreate() || channel.getRedstoneMode() != RedstoneMode.HIGH;
+}
+
+Source owner: TransferEngine (698109af, mounted storage checked per lane)
+
+if (sourceNode.isMountedOnCreate() && !hasMountedStorage(sourceNode, channel, type, capCache))
+    continue;
+
+private static boolean hasMountedStorage(LogisticsNodeEntity node, ChannelData channel, ChannelType type,
+        TransferCapabilityCache capCache) {
+    return switch (type) {
+        case ITEM -> capCache.findItemHandler(node, channel.getIoDirection()) != null;
+        case FLUID -> capCache.findFluidHandler(node, channel.getIoDirection()) != null;
+        default -> false;
+    };
+}
 */

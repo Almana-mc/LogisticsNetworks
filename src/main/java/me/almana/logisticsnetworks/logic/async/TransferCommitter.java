@@ -17,6 +17,7 @@ import me.almana.logisticsnetworks.logic.PlannedItemValidation;
 import me.almana.logisticsnetworks.logic.PriorityRobin;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -104,14 +105,15 @@ public final class TransferCommitter {
         ServerLevel level = (ServerLevel) sourceNode.level();
         int tier = context.tierCache().getOrDefault(sourceNode.getUUID(), 0);
         long cooldown = TransferEngine.cooldownRemaining(
-                sourceNode, channel, plan.channelIndex(), tier, level.getGameTime());
+                sourceNode, channel, plan.channelIndex(), ChannelType.ITEM.ordinal(), tier, level.getGameTime());
         if (cooldown > 0) return skipped(planned, cooldown);
         FilterItemData.ReadCache cache = channel.getReadCache();
         boolean directSource = !FilterLogic.hasConfiguredSlotMapping(channel.getFilterItems(), cache);
         ResourceHandler<ItemResource> source = sourceNode.capabilities().findItemExportHandler(
                 channel.getIoDirection(), directSource);
         if (source == null) return skipped(planned, TransferEngine.finishChannelAttempt(
-                sourceNode, channel, plan.channelIndex(), 0, level.getGameTime(), tier, telemetry));
+                sourceNode, channel, plan.channelIndex(), ChannelType.ITEM.ordinal(), 0, level.getGameTime(), tier,
+                telemetry));
         if (!matchesBinding(plan.sourceStorageBinding(), source, bindings)) return revalidated(planned);
 
         TransferEngine.ResolvedItemTargets resolved = resolveTargets(
@@ -146,11 +148,11 @@ public final class TransferCommitter {
         int total = committed + recovered;
         if (channel.canRotateResources() && total > 0 && cursor != null) channel.setItemResourceCursor(cursor);
         if (servedNode != null) {
-            channel.setRobinCursor(new PriorityRobin.Cursor(
+            channel.setRobinCursor(ChannelType.ITEM, new PriorityRobin.Cursor(
                     targets[progress.servedTarget()].channel().getPriority(), servedNode));
         }
-        long wake = TransferEngine.finishChannelAttempt(sourceNode, channel, plan.channelIndex(), total,
-                level.getGameTime(), tier, telemetry);
+        long wake = TransferEngine.finishChannelAttempt(sourceNode, channel, plan.channelIndex(),
+                ChannelType.ITEM.ordinal(), total, level.getGameTime(), tier, telemetry);
         return new ItemCommitResult(total, wake, planned, committed, recovered,
                 committed < recoveryGoal ? 1 : 0);
     }
@@ -225,7 +227,8 @@ public final class TransferCommitter {
             if (moved != null) targetBatches.put(targets.targets().get(index).handler(), moved);
         }
         TransferEngine.MoveRecorder served = channel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN
-                ? (slot, index, moved, mask) -> TransferEngine.markServed(channel, targets.refs().get(index))
+                ? (slot, index, moved, mask) -> TransferEngine.markServed(
+                        channel, ChannelType.ITEM, targets.refs().get(index))
                 : null;
         boolean telemetry = NetworkRegistry.get(server.overworld()).getTelemetryManager().isActive(network.getId());
         TransferEngine.MoveRecorder recorder = telemetry
@@ -238,8 +241,7 @@ public final class TransferCommitter {
     }
 
     private static int batchLimit(ChannelData channel, int tier) {
-        return Math.max(1, Math.min(
-                channel.getBatchSize(), TransferEngine.getBatchLimit(ChannelType.ITEM, tier)));
+        return NodeUpgradeData.effectiveBatch(channel, ChannelType.ITEM, tier);
     }
 
     private static LogisticsNodeEntity sourceNode(TransferPlan.ChannelMoves plan, LogisticsNetwork network,
@@ -258,7 +260,7 @@ public final class TransferCommitter {
 
     private static boolean isActive(LogisticsNodeEntity node, ChannelData channel, ChannelMode mode) {
         if (channel == null || !channel.isEnabled() || channel.getMode() != mode
-                || channel.getType() != ChannelType.ITEM || !node.isValidNode()
+                || !channel.hasType(ChannelType.ITEM) || !node.isValidNode()
                 || !(node.level() instanceof ServerLevel level)
                 || !level.isLoaded(node.getAttachedPos())) return false;
         return TransferEngine.isRedstoneActive(channel.getRedstoneMode(),
