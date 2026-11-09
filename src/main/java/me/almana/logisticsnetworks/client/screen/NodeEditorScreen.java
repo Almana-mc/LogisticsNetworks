@@ -28,6 +28,7 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.guideme.GuideMeCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.network.AssignNetworkPayload;
 import me.almana.logisticsnetworks.network.AddNodeFilterItemPayload;
@@ -1197,6 +1198,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
     }
 
     private String formatBatchDisplay(ChannelData ch) {
+        if (RecipeCardItem.anyIn(ch.getFilterItems()))
+            return String.valueOf(ch.getBatchSize());
         if (ch.getType() == ChannelType.FLUID)
             return tr("gui.logisticsnetworks.node.value.batch.fluid", ch.getBatchSize());
         if (ch.getType() == ChannelType.ENERGY)
@@ -2155,6 +2158,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             valueTipKey = "gui.logisticsnetworks.node.tip.redstone." + ch.getRedstoneMode().name().toLowerCase(Locale.ROOT);
         } else if (row == 5) {
             valueTipKey = "gui.logisticsnetworks.node.tip.distribution." + ch.getDistributionMode().name().toLowerCase(Locale.ROOT);
+        } else if (row == 7 && ch.getMode() == ChannelMode.EXPORT && RecipeCardItem.anyIn(ch.getFilterItems())) {
+            valueTipKey = "gui.logisticsnetworks.node.tip.batch.recipe";
         }
 
         if (valueTipKey != null) {

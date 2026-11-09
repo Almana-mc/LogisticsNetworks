@@ -550,7 +550,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (slot.index < menu.getFilterSlots() && RecipeCardItem.is(slot.getItem())) {
             List<RecipeCardData.Ingredient> inputs = RecipeCardData.of(slot.getItem()).ingredients();
             if (!inputs.isEmpty()) {
-                graphics.item(inputs.get((int) (System.currentTimeMillis() / 1000 % inputs.size())).icon(),
+                RecipeCardCells.icon(new GuiGraphics(graphics), inputs.get((int) (System.currentTimeMillis() / 1000 % inputs.size())),
                         slot.x, slot.y);
                 return;
             }

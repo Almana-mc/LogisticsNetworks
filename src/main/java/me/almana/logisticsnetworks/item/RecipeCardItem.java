@@ -70,7 +70,7 @@ public class RecipeCardItem extends Item {
                 "tooltip.logisticsnetworks.recipe_card.output", output.toStack().getHoverName())
                 .withStyle(ChatFormatting.GOLD)));
         for (RecipeCardData.Ingredient ingredient : data.ingredients()) {
-            lines.accept(Component.literal(ingredient.count() + "× ").append(ingredient.label())
+            lines.accept(Component.literal(ingredient.amountText() + " ").append(ingredient.label())
                     .withStyle(ChatFormatting.GRAY));
         }
         lines.accept(Component.translatable(data.blocking()

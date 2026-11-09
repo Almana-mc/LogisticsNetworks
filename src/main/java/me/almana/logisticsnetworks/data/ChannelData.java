@@ -79,6 +79,7 @@ public class ChannelData {
     private transient ItemResourceOrder.Cursor itemResourceCursor;
     private transient FluidResourceOrder.Cursor fluidResourceCursor;
     private transient PriorityRobin.Cursor robinCursor;
+    private transient PriorityRobin.Cursor recipeRobinCursor;
 
     private final ItemStack[] filterItems = new ItemStack[FILTER_SIZE];
     private final transient ChannelTelemetry telemetry = new ChannelTelemetry();
@@ -284,6 +285,15 @@ public class ChannelData {
         robinCursor = cursor;
     }
 
+    @Nullable
+    public PriorityRobin.Cursor getRecipeRobinCursor() {
+        return recipeRobinCursor;
+    }
+
+    public void setRecipeRobinCursor(PriorityRobin.Cursor cursor) {
+        recipeRobinCursor = cursor;
+    }
+
     public void setPriority(int priority) {
         this.priority = Math.max(-99, Math.min(99, priority));
     }
@@ -324,6 +334,7 @@ public class ChannelData {
         resourceRoundRobin = source.resourceRoundRobin;
         resetResourceRotation();
         robinCursor = null;
+        recipeRobinCursor = null;
         this.enabled = source.enabled;
         this.mode = source.mode;
         setType(source.type);

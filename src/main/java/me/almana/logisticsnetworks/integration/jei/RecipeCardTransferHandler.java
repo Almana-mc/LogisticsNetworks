@@ -2,11 +2,13 @@ package me.almana.logisticsnetworks.integration.jei;
 
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.component.StackSnapshot;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import me.almana.logisticsnetworks.registration.Registration;
 import mezz.jei.api.gui.ingredient.IRecipeSlotView;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.ingredients.ITypedIngredient;
+import mezz.jei.api.neoforge.NeoForgeTypes;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IUniversalRecipeTransferHandler;
@@ -15,6 +17,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -39,7 +42,7 @@ public class RecipeCardTransferHandler implements IUniversalRecipeTransferHandle
         if (!doTransfer) return null;
         List<RecipeCardData.Ingredient> ingredients = new ArrayList<>();
         for (IRecipeSlotView slot : slots.getSlotViews(RecipeIngredientRole.INPUT)) {
-            firstItem(slot).ifPresent(stack -> ingredients.add(ingredient(slot, stack)));
+            ingredient(slot).ifPresent(ingredients::add);
         }
         if (ingredients.isEmpty()) return null;
         Optional<StackSnapshot> output = slots.getSlotViews(RecipeIngredientRole.OUTPUT).stream()
@@ -49,13 +52,23 @@ public class RecipeCardTransferHandler implements IUniversalRecipeTransferHandle
         return null;
     }
 
+    private static Optional<RecipeCardData.Ingredient> ingredient(IRecipeSlotView slot) {
+        Optional<ItemStack> item = firstItem(slot);
+        if (item.isPresent()) return item.map(stack -> itemIngredient(slot, stack));
+        Optional<ITypedIngredient<?>> shown = slot.getDisplayedIngredients().findFirst();
+        if (shown.isEmpty()) return Optional.empty();
+        Optional<FluidStack> fluid = shown.get().getIngredient(NeoForgeTypes.FLUID_STACK);
+        if (fluid.isPresent()) return fluid.filter(stack -> !stack.isEmpty()).map(RecipeCardData.Ingredient::ofFluid);
+        return MekanismCompat.recipeIngredient(shown.get().getIngredient());
+    }
+
     // Stable pick, ignores cycling
     private static Optional<ItemStack> firstItem(IRecipeSlotView slot) {
         return slot.getDisplayedIngredients().map(ITypedIngredient::getItemStack)
                 .flatMap(Optional::stream).findFirst();
     }
 
-    private static RecipeCardData.Ingredient ingredient(IRecipeSlotView slot, ItemStack shown) {
+    private static RecipeCardData.Ingredient itemIngredient(IRecipeSlotView slot, ItemStack shown) {
         Optional<TagKey<?>> tag = slot.getTagKey();
         if (tag.isPresent() && tag.get().isFor(Registries.ITEM) && slot.getItemStacks().limit(2).count() > 1) {
             return RecipeCardData.Ingredient.ofTag(tag.get().location(), shown.getCount());

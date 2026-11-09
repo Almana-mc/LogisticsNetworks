@@ -30,6 +30,7 @@ import me.almana.logisticsnetworks.network.RequestChannelListPayload;
 import me.almana.logisticsnetworks.network.DeleteNetworkLabelPayload;
 import me.almana.logisticsnetworks.network.RequestNetworkLabelsPayload;
 import me.almana.logisticsnetworks.network.SetComputerWrenchClipboardPayload;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
@@ -1270,6 +1271,11 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> implem
 
     private String batchLabel() {
         int value = config().getChannelBatchSize(selectedChannel);
+        ItemStack[] filters = new ItemStack[getFilterSlotCount()];
+        for (int slot = 0; slot < filters.length; slot++)
+            filters[slot] = config().getFilterItem(selectedChannel, slot);
+        if (RecipeCardItem.anyIn(filters))
+            return String.valueOf(value);
         return switch (config().getChannelType(selectedChannel)) {
             case FLUID -> tr("gui.logisticsnetworks.node.value.batch.fluid", value);
             case ENERGY -> tr("gui.logisticsnetworks.node.value.batch.energy", value);
