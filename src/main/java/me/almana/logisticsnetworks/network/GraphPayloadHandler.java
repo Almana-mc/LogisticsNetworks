@@ -13,7 +13,6 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
-import me.almana.logisticsnetworks.logic.TransferEngine;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.GraphMenuContext;
@@ -460,9 +459,9 @@ public final class GraphPayloadHandler {
             List<GraphChannel> channels = new ArrayList<>();
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
                 ChannelData channel = node.getChannel(i);
-                if (channel.isEnabled() && channel.getType() != ChannelType.CHEMICAL
-                        && channel.getType() != ChannelType.SOURCE) {
-                    channels.add(new GraphChannel(i, channel.getType(), channel.getMode()));
+                if (!channel.isEnabled()) continue;
+                for (ChannelType type : ChannelType.listOf(NodeUpgradeData.effectiveTypes(node, channel))) {
+                    channels.add(new GraphChannel(i, type, channel.getMode()));
                 }
             }
             String blockName = BuiltInRegistries.BLOCK.getKey(node.level().getBlockState(node.getAttachedPos()).getBlock()).toString();

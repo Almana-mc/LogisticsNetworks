@@ -34,7 +34,7 @@ final class FlowMonitorPage {
     private final Runnable onBack;
     private final FlowChart chart = new FlowChart();
     private final FlowResourceList list = new FlowResourceList();
-    private final int[] listTypes = new int[LogisticsNodeEntity.CHANNEL_COUNT];
+    private final int[] listMasks = new int[LogisticsNodeEntity.CHANNEL_COUNT];
     private final int[] nodeCounts = new int[LogisticsNodeEntity.CHANNEL_COUNT];
     private FlowHistory history = new FlowHistory();
     private List<String> names = List.of();
@@ -44,6 +44,8 @@ final class FlowMonitorPage {
     private int window = 1;
     @Nullable
     private FlowResource filter;
+    private int typeX;
+    private int typeW;
     private int clearX;
     private int clearW;
 
@@ -57,7 +59,7 @@ final class FlowMonitorPage {
         this.networkName = networkName;
         history = new FlowHistory();
         names = List.of();
-        Arrays.fill(listTypes, -1);
+        Arrays.fill(listMasks, 0);
         Arrays.fill(nodeCounts, 0);
         selected = -1;
         filter = null;
@@ -66,10 +68,10 @@ final class FlowMonitorPage {
 
     void acceptChannels(SyncChannelListPayload payload) {
         names = payload.channelNames();
-        Arrays.fill(listTypes, -1);
+        Arrays.fill(listMasks, 0);
         Arrays.fill(nodeCounts, 0);
         for (SyncChannelListPayload.ChannelEntry entry : payload.channels()) {
-            listTypes[entry.channelIndex()] = entry.typeOrdinal();
+            listMasks[entry.channelIndex()] = entry.typeMask();
             nodeCounts[entry.channelIndex()] = entry.nodeCount();
         }
         selectFirstActive();
@@ -100,12 +102,12 @@ final class FlowMonitorPage {
         renderHeader(g, t, x, y, color);
         renderToolbar(g, t, x, y + 24);
         if (hasBreakdown()) {
-            chart.render(g, font, t, history, selected, seconds(), filter, color, x, y + 39, MAIN_W, 92,
+            chart.render(g, font, t, history, slot(), seconds(), filter, color, x, y + 39, MAIN_W, 92,
                     mouseX, mouseY);
-            list.render(g, font, t, history, selected, seconds(), filter, color, unit(), x, y + 134, MAIN_W, 71,
+            list.render(g, font, t, history, slot(), seconds(), filter, color, unit(), x, y + 134, MAIN_W, 71,
                     mouseX, mouseY);
         } else {
-            chart.render(g, font, t, history, selected, seconds(), null, color, x, y + 39, MAIN_W, 134,
+            chart.render(g, font, t, history, slot(), seconds(), null, color, x, y + 39, MAIN_W, 134,
                     mouseX, mouseY);
             renderStats(g, t, x, y + 178);
         }
@@ -113,7 +115,7 @@ final class FlowMonitorPage {
 
     void renderTooltips(GuiGraphics g, int mouseX, int mouseY) {
         if (selected < 0) return;
-        chart.renderTooltip(g, font, history, selected, hasBreakdown() ? filter : null, unit(), mouseX, mouseY);
+        chart.renderTooltip(g, font, history, slot(), hasBreakdown() ? filter : null, unit(), mouseX, mouseY);
         if (hasBreakdown()) {
             list.renderTooltip(g, font, history.span(seconds()), unit(), totalUnit(), mouseX, mouseY);
         }
@@ -126,7 +128,7 @@ final class FlowMonitorPage {
             return true;
         }
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-            if (typeOrdinal(i) >= 0
+            if (typeMask(i) != 0
                     && inside(mouseX, mouseY, left + RAIL_X, top + BODY_Y + i * (ROW_H + 2), RAIL_W, ROW_H)) {
                 ClickSound.play();
                 if (i != selected) {
@@ -134,6 +136,11 @@ final class FlowMonitorPage {
                 }
                 return true;
             }
+        }
+        if (selected >= 0 && typeW > 0 && inside(mouseX, mouseY, typeX, top + BODY_Y + 11, typeW, 9)) {
+            ClickSound.play();
+            cycleType();
+            return true;
         }
         if (selected < 0) return false;
         int segment = segmentAt(left + MAIN_X, top + BODY_Y + 24, mouseX, mouseY);
@@ -176,9 +183,9 @@ final class FlowMonitorPage {
     }
 
     private void renderRailRow(GuiGraphics g, Theme t, int channel, int x, int y, int mouseX, int mouseY) {
-        int ordinal = typeOrdinal(channel);
-        boolean active = ordinal >= 0;
-        ChannelType type = active ? ChannelType.values()[ordinal] : selectedType;
+        int mask = typeMask(channel);
+        boolean active = mask != 0;
+        ChannelType type = active ? ChannelType.first(mask) : selectedType;
         boolean on = channel == selected;
         boolean hovered = active && inside(mouseX, mouseY, x, y, RAIL_W, ROW_H);
         int border = on ? ChannelTint.border(type, t) : hovered ? t.borderStrong() : t.border();
@@ -191,20 +198,23 @@ final class FlowMonitorPage {
                 active ? t.text() : t.textSubtle(), false);
         g.drawString(font, tr("flow.channel_short", channel), x + 6, y + 11,
                 active ? t.textMuted() : t.textSubtle(), false);
-        String right = active ? FlowHistory.format(history.value(channel, 0, null)) : tr("flow.no_nodes");
+        String right = active ? FlowHistory.format(history.value(FlowHistory.slot(channel, type), 0, null)) : tr("flow.no_nodes");
         g.drawString(font, right, x + RAIL_W - 4 - font.width(right), y + 11, active ? tint : t.textSubtle(), false);
     }
 
     private void renderHeader(GuiGraphics g, Theme t, int x, int y, int color) {
         g.drawString(font, font.plainSubstrByWidth(channelName(selected), 140), x, y, t.text(), false);
         String prefix = tr("flow.channel_short", selected) + " · ";
-        String typeName = tr("telemetry." + typeKey());
-        String nodes = " · " + tr("channel_nodes", typeOrdinal(selected) < 0 ? 0 : nodeCounts[selected]);
+        boolean several = Integer.bitCount(typeMask(selected)) > 1;
+        String typeName = tr("telemetry." + typeKey()) + (several ? " ▸" : "");
+        typeX = x + font.width(prefix);
+        typeW = several ? font.width(typeName) : 0;
+        String nodes = " · " + tr("channel_nodes", typeMask(selected) == 0 ? 0 : nodeCounts[selected]);
         g.drawString(font, prefix, x, y + 11, t.textMuted(), false);
         g.drawString(font, typeName, x + font.width(prefix), y + 11, color, false);
         g.drawString(font, nodes, x + font.width(prefix) + font.width(typeName), y + 11, t.textMuted(), false);
 
-        String value = FlowHistory.format(history.value(selected, 0, hasBreakdown() ? filter : null));
+        String value = FlowHistory.format(history.value(slot(), 0, hasBreakdown() ? filter : null));
         g.pose().pushPose();
         g.pose().translate(x + MAIN_W - font.width(value) * 1.5f, y, 0);
         g.pose().scale(1.5f, 1.5f, 1f);
@@ -228,18 +238,18 @@ final class FlowMonitorPage {
             return;
         }
         String text = hasBreakdown()
-                ? tr("flow.avg_peak", FlowHistory.format(history.average(selected, seconds(), null)),
-                        FlowHistory.format(history.peak(selected, seconds(), null)))
+                ? tr("flow.avg_peak", FlowHistory.format(history.average(slot(), seconds(), null)),
+                        FlowHistory.format(history.peak(slot(), seconds(), null)))
                 : tr("flow.throughput");
         g.drawString(font, text, x, y + 2, t.textMuted(), false);
     }
 
     private void renderStats(GuiGraphics g, Theme t, int x, int y) {
         String[][] cards = {
-                {tr("flow.average"), FlowHistory.format(history.average(selected, seconds(), null)) + " " + unit()},
-                {tr("flow.peak"), FlowHistory.format(history.peak(selected, seconds(), null)) + " " + unit()},
+                {tr("flow.average"), FlowHistory.format(history.average(slot(), seconds(), null)) + " " + unit()},
+                {tr("flow.peak"), FlowHistory.format(history.peak(slot(), seconds(), null)) + " " + unit()},
                 {tr("flow.moved", windowLabels()[window]),
-                        FlowHistory.format(history.sum(selected, seconds(), null)) + " " + totalUnit()}};
+                        FlowHistory.format(history.sum(slot(), seconds(), null)) + " " + totalUnit()}};
         int cardW = (MAIN_W - 8) / 3;
         for (int i = 0; i < cards.length; i++) {
             int cx = x + i * (cardW + 4);
@@ -262,27 +272,45 @@ final class FlowMonitorPage {
 
     private void select(int channel) {
         selected = channel;
-        selectedType = ChannelType.values()[typeOrdinal(channel)];
+        selectedType = ChannelType.first(typeMask(channel));
         filter = null;
         list.reset();
     }
 
     private void selectFirstActive() {
         for (int i = 0; selected < 0 && i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-            if (typeOrdinal(i) >= 0) select(i);
+            if (typeMask(i) != 0) select(i);
         }
     }
 
     private void refreshSelectedType() {
-        int ordinal = selected < 0 ? -1 : typeOrdinal(selected);
-        if (ordinal >= 0 && ChannelType.values()[ordinal] != selectedType) {
-            selectedType = ChannelType.values()[ordinal];
+        int mask = selected < 0 ? 0 : typeMask(selected);
+        if (mask != 0 && !selectedType.in(mask)) {
+            selectedType = ChannelType.first(mask);
             filter = null;
         }
     }
 
-    private int typeOrdinal(int channel) {
-        return history.hasData() ? history.type(channel) : listTypes[channel];
+    private void cycleType() {
+        int mask = typeMask(selected);
+        ChannelType[] values = ChannelType.values();
+        for (int step = 1; step <= values.length; step++) {
+            ChannelType next = values[(selectedType.ordinal() + step) % values.length];
+            if (next.in(mask)) {
+                selectedType = next;
+                filter = null;
+                list.reset();
+                return;
+            }
+        }
+    }
+
+    private int typeMask(int channel) {
+        return history.hasData() ? history.types(channel) : listMasks[channel];
+    }
+
+    private int slot() {
+        return FlowHistory.slot(selected, selectedType);
     }
 
     private String channelName(int channel) {

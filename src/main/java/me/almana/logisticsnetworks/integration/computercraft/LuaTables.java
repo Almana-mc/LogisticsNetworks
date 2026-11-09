@@ -47,7 +47,10 @@ final class LuaTables {
         }
         for (SyncChannelListPayload.ChannelEntry entry : entries) {
             Map<String, Object> channel = channels.get(entry.channelIndex());
-            channel.put("type", typeName(ChannelType.values()[entry.typeOrdinal()]));
+            if (entry.typeMask() != 0) {
+                channel.put("type", typeName(ChannelType.first(entry.typeMask())));
+                channel.put("types", ChannelType.listOf(entry.typeMask()).stream().map(LuaTables::typeName).toList());
+            }
             channel.put("nodeCount", entry.nodeCount());
         }
         return channels;
@@ -83,11 +86,18 @@ final class LuaTables {
             TelemetryManager.ChannelDrain drain = drains.get(i);
             Map<String, Object> channel = new HashMap<>();
             channel.put("index", i);
-            channel.put("total", drain.total());
+            ChannelType primary = ChannelType.first(drain.typeMask());
+            channel.put("total", drain.total(primary));
+            Map<String, Object> totals = new HashMap<>();
+            for (ChannelType type : ChannelType.listOf(drain.typeMask())) {
+                totals.put(typeName(type), drain.total(type));
+            }
+            channel.put("totals", totals);
             channel.put("resources", drain.top().stream()
                     .map(entry -> resource(entry.getKey(), entry.getValue())).toList());
-            if (drain.typeOrdinal() >= 0) {
-                channel.put("type", typeName(ChannelType.values()[drain.typeOrdinal()]));
+            if (drain.typeMask() != 0) {
+                channel.put("type", typeName(primary));
+                channel.put("types", ChannelType.listOf(drain.typeMask()).stream().map(LuaTables::typeName).toList());
             }
             channels.add(channel);
         }
