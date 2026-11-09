@@ -6,6 +6,7 @@ import me.almana.logisticsnetworks.component.LogisticsDataComponents;
 import me.almana.logisticsnetworks.component.WrenchClipboard;
 import me.almana.logisticsnetworks.component.WrenchFlow;
 import me.almana.logisticsnetworks.component.WrenchMassPlacement;
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -65,6 +66,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class WrenchItem extends Item {
 
@@ -1283,8 +1285,10 @@ public class WrenchItem extends Item {
                     channel,
                     Component.translatable("gui.logisticsnetworks.channel_mode."
                             + clipboard.getChannelMode(channel).name().toLowerCase(Locale.ROOT)).getString(),
-                    Component.translatable("gui.logisticsnetworks.channel_type."
-                            + clipboard.getChannelType(channel).name().toLowerCase(Locale.ROOT)).getString(),
+                    ChannelType.listOf(clipboard.getChannelTypes(channel)).stream()
+                            .map(type -> Component.translatable("gui.logisticsnetworks.channel_type."
+                                    + type.name().toLowerCase(Locale.ROOT)).getString())
+                            .collect(Collectors.joining(", ")),
                     channelFilters));
             shown++;
         }
