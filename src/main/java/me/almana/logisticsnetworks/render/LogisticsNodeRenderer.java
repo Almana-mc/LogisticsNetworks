@@ -43,7 +43,7 @@ import java.util.Set;
 public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, LogisticsNodeRenderState> {
 
     private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(LogisticsNetworks.MOD_ID,
-            "textures/entity/node.png");
+            "textures/block/node_frame.png");
     private static final float BOUNDS_OFFSET = 0.5f;
     private static final float BLOCK_MIN = -0.5f;
     private static final float BLOCK_MAX = 0.5f;
@@ -148,12 +148,8 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         submitNodeCollector.submitCustomGeometry(
                 poseStack,
                 NodeRenderTypes.node(TEXTURE),
-                (pose, buffer) -> {
-                    NodeGeometry.emit(pose.pose(), buffer, state.connections, state.lightCoords, color,
-                            state.minX, state.minY, state.minZ, state.maxX, state.maxY, state.maxZ);
-                    NodeGeometry.emitBridges(pose.pose(), buffer, state.bridgeConnections, state.lightCoords, color,
-                            state.minX, state.minY, state.minZ, state.maxX, state.maxY, state.maxZ);
-                });
+                (pose, buffer) -> NodeGeometry.emit(pose.pose(), buffer, state.connections, state.lightCoords,
+                        color, state.minX, state.minY, state.minZ, state.maxX, state.maxY, state.maxZ));
     }
 
     private void submitHighlightBox(LogisticsNodeRenderState state, PoseStack poseStack,
@@ -233,8 +229,8 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         }
 
         AABB bounds = shape.bounds();
-        state.bridgeConnections = bridgeConnectionsForBounds(state.connections, bounds);
         int boundsConnections = trimConnectionsToBounds(state.connections, bounds);
+        state.connections = boundsConnections;
         float minX = (float) bounds.minX - BOUNDS_OFFSET;
         float minY = (float) bounds.minY;
         float minZ = (float) bounds.minZ - BOUNDS_OFFSET;
@@ -252,16 +248,6 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         if (maxX > minX && maxY > minY && maxZ > minZ) {
             state.setBounds(minX, minY, minZ, maxX, maxY, maxZ);
         }
-    }
-
-    private static int bridgeConnectionsForBounds(int connections, AABB bounds) {
-        int bridges = NodeConnectionMask.NONE;
-        for (Direction direction : Direction.values()) {
-            if (NodeConnectionMask.has(connections, direction) && !touchesSide(bounds, direction)) {
-                bridges = NodeConnectionMask.add(bridges, direction);
-            }
-        }
-        return bridges;
     }
 
     private static int trimConnectionsToBounds(int connections, AABB bounds) {

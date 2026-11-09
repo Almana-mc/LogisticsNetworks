@@ -17,7 +17,6 @@ public class LogisticsNodeRenderState extends EntityRenderState {
     public boolean shadersActive;
     public int networkColor = me.almana.logisticsnetworks.data.NetworkColors.DEFAULT;
     public int connections = NodeConnectionMask.NONE;
-    public int bridgeConnections = NodeConnectionMask.NONE;
     public float minX = -0.5f;
     public float minY = 0.0f;
     public float minZ = -0.5f;
@@ -28,7 +27,6 @@ public class LogisticsNodeRenderState extends EntityRenderState {
     public String debugChannels = "";
 
     public void resetBounds() {
-        bridgeConnections = NodeConnectionMask.NONE;
         minX = -0.5f;
         minY = 0.0f;
         minZ = -0.5f;
