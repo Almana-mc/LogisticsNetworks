@@ -264,17 +264,15 @@ public class FilterMenu extends AbstractContainerMenu {
             int channelIndex, int filterSlot, VirtualFilterType requestedType) {
         if (channelIndex < 0 || channelIndex >= clipboard.getChannelCount()
                 || filterSlot < 0 || filterSlot >= clipboard.getFilterSlotCount()) return false;
-        FilterTargetType target = FilterTargetType.forChannel(clipboard.getChannelType(channelIndex));
-        if (target == null) return false;
+        if (!clipboard.hasFilterableType(channelIndex)) return false;
 
         ItemStack stack = clipboard.getFilterItem(channelIndex, filterSlot);
         boolean fresh = requestedType != VirtualFilterType.EXISTING || stack.isEmpty()
-                || !stack.is(ModTags.FILTERS) || currentTarget(stack) != target;
+                || !stack.is(ModTags.FILTERS);
         if (fresh) {
             VirtualFilterType type = requestedType != VirtualFilterType.EXISTING
                     ? requestedType : VirtualFilterType.SMALL;
             stack = type.createStack();
-            applyTarget(stack, target);
             clipboard.setFilterItem(channelIndex, filterSlot, stack);
         }
 
@@ -293,19 +291,6 @@ public class FilterMenu extends AbstractContainerMenu {
                     writeModeData(buf, slots, isMod, false, isName);
                 });
         return true;
-    }
-
-    private static FilterTargetType currentTarget(ItemStack stack) {
-        if (FilterItemData.isFilterItem(stack)) return FilterItemData.getTargetType(stack);
-        if (NameFilterData.isNameFilter(stack)) return NameFilterData.getTargetType(stack);
-        if (ModFilterData.isModFilter(stack)) return ModFilterData.getTargetType(stack);
-        return null;
-    }
-
-    private static void applyTarget(ItemStack stack, FilterTargetType target) {
-        if (FilterItemData.isFilterItem(stack)) FilterItemData.setTargetType(stack, target);
-        else if (NameFilterData.isNameFilter(stack)) NameFilterData.setTargetType(stack, target);
-        else if (ModFilterData.isModFilter(stack)) ModFilterData.setTargetType(stack, target);
     }
 
     public FilterMenu(int containerId, Inventory playerInv, RegistryFriendlyByteBuf buf) {
@@ -549,7 +534,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
     static boolean supportsResourceRoundRobin(ChannelData channel) {
         return channel.getMode() == ChannelMode.EXPORT
-                && (channel.getType() == ChannelType.ITEM || channel.getType() == ChannelType.FLUID);
+                && (channel.hasType(ChannelType.ITEM) || channel.hasType(ChannelType.FLUID));
     }
 
     static int resourceRoundRobinState(ChannelData channel) {
@@ -622,7 +607,7 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     public int getPlayerInventoryY() {
-        return isSpecialMode ? 122 : FILTER_Y + rows * 18 + 18;
+        return isSpecialMode ? 122 : FILTER_Y + rows * 18 + 28;
     }
 
     public boolean isPlayerInventorySlot(int menuSlotIndex) {
@@ -746,7 +731,7 @@ public class FilterMenu extends AbstractContainerMenu {
                 || FilterItemData.isNbtOnlySlot(getOpenedStack(), slot);
     }
 
-    public void setEntryTag(Player player, int slot, String tag) {
+    public void setEntryTag(Player player, int slot, String tag, FilterTargetType kind) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
         String normalizedTag = FilterTagUtil.normalizeTag(tag);
@@ -754,7 +739,7 @@ public class FilterMenu extends AbstractContainerMenu {
             clearEntryTag(slot);
             return;
         }
-        FilterItemData.setEntryTag(getOpenedStack(), slot, normalizedTag);
+        FilterItemData.setEntryTag(getOpenedStack(), slot, normalizedTag, kind);
         isTagSlot[slot] = true;
         isFluidSlot[slot] = false;
         isChemicalSlot[slot] = false;
@@ -764,10 +749,14 @@ public class FilterMenu extends AbstractContainerMenu {
         broadcastChanges();
     }
 
+    public FilterTargetType getEntryKind(int slot) {
+        return FilterItemData.getEntryKind(getOpenedStack(), slot);
+    }
+
     public void clearEntryTag(int slot) {
         if (isSpecialMode || slot < 0 || slot >= slotCount)
             return;
-        FilterItemData.setEntryTag(getOpenedStack(), slot, null);
+        FilterItemData.setEntryTag(getOpenedStack(), slot, null, null);
         isTagSlot[slot] = false;
         broadcastChanges();
     }
@@ -808,8 +797,8 @@ public class FilterMenu extends AbstractContainerMenu {
         ItemStack filterStack = getOpenedStack();
         Tag value = null;
 
-        if (getTargetType() == FilterTargetType.FLUIDS) {
-            FluidStack fluid = FilterItemData.getFluidEntry(filterStack, slot);
+        FluidStack fluid = FilterItemData.getFluidEntry(filterStack, slot);
+        if (!fluid.isEmpty()) {
             CandidateComponents components = CandidateComponents.of(fluid, player.level().registryAccess());
             if (components != null) {
                 value = components.resolve(path);
@@ -960,7 +949,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
         if (id == ID_TOGGLE_MODE)
             return toggleBlacklist();
-        if (id == ID_CYCLE_TARGET && !isBoundFilter())
+        if (id == ID_CYCLE_TARGET && (isModMode || isNameMode))
             return cycleTargetType();
         if (id == ID_CYCLE_NAME_SCOPE && isNameMode)
             return cycleNameMatchScope();
@@ -993,10 +982,8 @@ public class FilterMenu extends AbstractContainerMenu {
         ItemStack stack = getOpenedStack();
         if (isModMode)
             ModFilterData.setTargetType(stack, next);
-        else if (isNameMode)
-            NameFilterData.setTargetType(stack, next);
         else
-            FilterItemData.setTargetType(stack, next);
+            NameFilterData.setTargetType(stack, next);
 
         broadcastChanges();
         return true;
@@ -1033,9 +1020,9 @@ public class FilterMenu extends AbstractContainerMenu {
     }
 
     private int clipboardResourceRoundRobinState() {
+        int types = clipboardSource.getChannelTypes(nodeChannel);
         boolean supported = clipboardSource.getChannelMode(nodeChannel) == ChannelMode.EXPORT
-                && (clipboardSource.getChannelType(nodeChannel) == ChannelType.ITEM
-                || clipboardSource.getChannelType(nodeChannel) == ChannelType.FLUID);
+                && (ChannelType.ITEM.in(types) || ChannelType.FLUID.in(types));
         if (!supported) return -1;
         return clipboardSource.getChannelResourceRoundRobin(nodeChannel) ? 1 : 0;
     }
@@ -1108,7 +1095,7 @@ public class FilterMenu extends AbstractContainerMenu {
             FilterItemData.setEntry(stack, s, ItemStack.EMPTY);
             FilterItemData.setFluidEntry(stack, s, FluidStack.EMPTY);
             FilterItemData.setChemicalEntry(stack, s, null);
-            FilterItemData.setEntryTag(stack, s, null);
+            FilterItemData.setEntryTag(stack, s, null, null);
             FilterItemData.clearSlotNbtRules(stack, s);
             FilterItemData.setEntryDurability(stack, s, null, 0);
             FilterItemData.setEntrySlotMapping(stack, s, null);
@@ -1154,22 +1141,6 @@ public class FilterMenu extends AbstractContainerMenu {
 
         if (held.is(ModTags.FILTERS))
             return;
-
-        if (getTargetType() == FilterTargetType.FLUIDS) {
-            FluidStack fluid = getFluidFromItem(held);
-            if (!fluid.isEmpty()) {
-                setFluidFilterEntry(player, slotId, fluid);
-                return;
-            }
-        }
-
-        if (getTargetType() == FilterTargetType.CHEMICALS) {
-            String chemId = MekanismCompat.getChemicalIdFromItem(held);
-            if (chemId != null) {
-                setChemicalFilterEntry(player, slotId, chemId);
-                return;
-            }
-        }
 
         if (interactionMode == 1) {
             FluidStack fluid = getFluidFromItem(held);
@@ -1258,38 +1229,6 @@ public class FilterMenu extends AbstractContainerMenu {
 
         if (isPlayerInventorySlot(index)) {
             ItemStack held = source.getItem();
-
-            if (getTargetType() == FilterTargetType.FLUIDS) {
-                FluidStack fluid = getFluidFromItem(held);
-                if (!fluid.isEmpty()) {
-                    for (int i = 0; i < slotCount; i++) {
-                        if (isSlotOccupied(i))
-                            continue;
-                        FluidStack existing = FilterItemData.getFluidEntry(getOpenedStack(), i);
-                        if (existing.isEmpty()) {
-                            if (setFluidFilterEntry(player, i, fluid))
-                                break;
-                        }
-                    }
-                    return ItemStack.EMPTY;
-                }
-            }
-
-            if (getTargetType() == FilterTargetType.CHEMICALS) {
-                String chemId = MekanismCompat.getChemicalIdFromItem(held);
-                if (chemId != null) {
-                    for (int i = 0; i < slotCount; i++) {
-                        if (isSlotOccupied(i))
-                            continue;
-                        String existing = FilterItemData.getChemicalEntry(getOpenedStack(), i);
-                        if (existing == null) {
-                            if (setChemicalFilterEntry(player, i, chemId))
-                                break;
-                        }
-                    }
-                    return ItemStack.EMPTY;
-                }
-            }
 
             if (!held.is(ModTags.FILTERS)) {
                 for (int i = 0; i < slotCount; i++) {

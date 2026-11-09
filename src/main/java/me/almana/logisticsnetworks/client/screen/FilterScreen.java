@@ -145,7 +145,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             String rawNbt,
             boolean strictNbt,
             boolean nbtMatchAny,
-            List<NbtCriterion> nbtRules) {
+            List<NbtCriterion> nbtRules,
+            FilterTargetType tagKind) {
     }
 
     private EditBox manualInputBox;
@@ -171,6 +172,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private EditBox nbtValueEditBox;
 
     private int detailEditSlot = -1;
+    private FilterTargetType detailKind = FilterTargetType.ITEMS;
     private List<String> detailCachedTags = new ArrayList<>();
     private List<String> detailAllTags = new ArrayList<>();
     private List<String> detailTagFilteredList = new ArrayList<>();
@@ -189,6 +191,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private List<ItemStack> nbtOnlyCycleItems;
     private List<Fluid> anyCycleFluids;
     private List<String> anyCycleChemicals;
+    private FilterTargetType[] anyCycleKinds;
     private EditBox detailNbtValueBox;
     private EditBox detailIdInputBox;
     private EditBox detailBatchInputBox;
@@ -574,7 +577,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 if (tag != null) {
                     Identifier tagId = Identifier.tryParse(tag);
                     if (tagId != null) {
-                        FilterTargetType targetType = menu.getTargetType();
+                        FilterTargetType targetType = menu.getEntryKind(i);
                         if (targetType == FilterTargetType.FLUIDS) {
                             TagKey<Fluid> fluidTagKey = TagKey.create(Registries.FLUID, tagId);
                             var list = new ArrayList<Fluid>();
@@ -618,13 +621,29 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             }
         }
 
-        if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-            renderFluidGhostItems(g);
-        } else if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-            renderChemicalGhostItems(g);
-        }
+        renderFluidGhostItems(g);
+        renderChemicalGhostItems(g);
+        renderKindSummary(g);
 
-        renderModeControls(g, mx, my, !menu.isBoundFilter());
+        renderModeControls(g, mx, my);
+    }
+
+    private void renderKindSummary(GuiGraphics g) {
+        int[] counts = new int[FilterTargetType.values().length];
+        int cards = 0;
+        for (int i = 0; i < menu.getFilterSlots() && i < menu.slots.size(); i++) {
+            if (RecipeCardItem.is(menu.slots.get(i).getItem())) cards++;
+            else if (hasEntryInSlot(i)) counts[menu.getEntryKind(i).ordinal()]++;
+        }
+        List<String> parts = new ArrayList<>();
+        for (FilterTargetType kind : FilterTargetType.values()) {
+            if (counts[kind.ordinal()] > 0)
+                parts.add(tr("gui.logisticsnetworks.filter.summary." + kind.getSerializedName(), counts[kind.ordinal()]));
+        }
+        if (cards > 0) parts.add(tr("gui.logisticsnetworks.filter.summary.cards", cards));
+        if (parts.isEmpty()) return;
+        g.drawString(font, font.plainSubstrByWidth(String.join(" \u00B7 ", parts), imageWidth - 16),
+                leftPos + 8, topPos + menu.getPlayerInventoryY() - 24, cMuted(), false);
     }
 
     private void renderEntryIndicatorOverlays(GuiGraphics g) {
@@ -685,7 +704,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
 
     private void renderModMode(GuiGraphics g, int mx, int my) {
-        renderModeControls(g, mx, my, false);
+        renderModeControls(g, mx, my);
+        int typeBtnW = modTargetButtonW();
+        drawButton(g, leftPos + imageWidth - 8 - typeBtnW, topPos + 20, typeBtnW, 12,
+                targetLabel(menu.getTargetType()), mx, my, true);
         renderDropdownMode(g, mx, my, cachedMods,
                 menu.getSelectedMod(),
                 Component.translatable("gui.logisticsnetworks.filter.mod.input_full_hint"));
@@ -700,7 +722,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         renderExtractorSlotTarget(g, mx, my);
         String displayValue = current == null ? tr("gui.logisticsnetworks.filter.none") : current;
-        g.drawString(font, Component.translatable("gui.logisticsnetworks.filter.selector.selected", displayValue),
+        String selected = tr("gui.logisticsnetworks.filter.selector.selected", displayValue);
+        g.drawString(font, font.plainSubstrByWidth(selected, imageWidth - 20 - modTargetButtonW()),
                 leftPos + 8, topPos + 22, cMuted(), false);
 
         manualInputBox.setHint(fitHint(hint, w));
@@ -864,7 +887,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return centers;
     }
 
-    private void renderModeControls(GuiGraphics g, int mx, int my, boolean showTargetType) {
+    private void renderModeControls(GuiGraphics g, int mx, int my) {
         int btnH = 12;
         int btnY = topPos + 6;
         int rightEdge = leftPos + imageWidth - 8;
@@ -875,20 +898,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
         int modeBtnX = rightEdge - modeBtnW;
         drawButton(g, modeBtnX, btnY, modeBtnW, btnH, modeLabel, mx, my, true);
-
-        if (showTargetType) {
-            String typeLabel;
-            if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
-            } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
-            } else {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.items");
-            }
-            int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-            int typeBtnX = modeBtnX - typeBtnW - 4;
-            drawButton(g, typeBtnX, btnY, typeBtnW, btnH, typeLabel, mx, my, true);
-        }
     }
 
     private void renderPlayerSlots(GuiGraphics g) {
@@ -932,7 +941,12 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     private void renderAnyResource(GuiGraphics g, int x, int y) {
         long tick = System.currentTimeMillis() / 1000;
-        switch (menu.getTargetType()) {
+        if (anyCycleKinds == null) {
+            anyCycleKinds = MekanismCompat.isLoaded()
+                    ? FilterTargetType.values()
+                    : new FilterTargetType[] { FilterTargetType.ITEMS, FilterTargetType.FLUIDS };
+        }
+        switch (anyCycleKinds[(int) (tick % anyCycleKinds.length)]) {
             case FLUIDS -> {
                 if (anyCycleFluids == null) {
                     anyCycleFluids = BuiltInRegistries.FLUID.stream()
@@ -1045,15 +1059,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 : tr("gui.logisticsnetworks.filter.mode.whitelist");
         int modeBtnW = Math.max(48, font.width(modeLabel) + 8);
         int left = rightEdge - modeBtnW;
-
-        if (!menu.isBoundFilter()) {
-            String typeLabel = menu.getTargetType() == FilterTargetType.CHEMICALS
-                    ? tr("gui.logisticsnetworks.filter.target.chemicals")
-                    : menu.getTargetType() == FilterTargetType.FLUIDS
-                            ? tr("gui.logisticsnetworks.filter.target.fluids")
-                            : tr("gui.logisticsnetworks.filter.target.items");
-            left -= Math.max(40, font.width(typeLabel) + 8) + 4;
-        }
 
         return left - CLIPBOARD_BUTTON_GAP;
     }
@@ -1239,7 +1244,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         return new FilterEntrySnapshot(item, fluid, chemicalId, tag, menu.getEntryBatch(slot), menu.getEntryStock(slot),
                 slotExpression, durabilityOp, durabilityValue, enchanted, rawNbt, menu.isEntryNbtStrict(slot),
-                menu.isSlotNbtMatchAny(slot), menu.getSlotNbtRules(slot));
+                menu.isSlotNbtMatchAny(slot), menu.getSlotNbtRules(slot), menu.getEntryKind(slot));
     }
 
     private boolean pasteOpenFilter() {
@@ -1247,10 +1252,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
         if (copiedFilter == null) {
             showFilterMessage("message.logisticsnetworks.filter.paste.empty");
-            return true;
-        }
-        if (menu.isBoundFilter() && copiedFilter.targetType() != menu.getTargetType()) {
-            showFilterMessage("message.logisticsnetworks.filter.paste.incompatible");
             return true;
         }
 
@@ -1311,7 +1312,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int copied = Math.min(menu.getFilterSlots(), copiedFilter.entries().size());
         for (int slot = 0; slot < menu.getFilterSlots(); slot++) {
             clearFilterEntry(slot);
-            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, ""));
+            ClientPacketDistributor.sendToServer(SetFilterEntryTagPayload.clear(slot));
             ClientPacketDistributor.sendToServer(SetFilterEntryNbtPayload.clear(slot));
             ClientPacketDistributor.sendToServer(new SetFilterEntryDurabilityPayload(slot, "", 0));
             ClientPacketDistributor.sendToServer(new SetFilterEntryEnchantedPayload(slot, false, false));
@@ -1332,8 +1333,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
 
     private void pasteEntry(int slot, FilterEntrySnapshot entry) {
         if (entry.tag() != null) {
-            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, entry.tag()));
-            menu.setEntryTag(minecraft.player, slot, entry.tag());
+            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, entry.tag(), entry.tagKind()));
+            menu.setEntryTag(minecraft.player, slot, entry.tag(), entry.tagKind());
         } else if (!entry.fluid().isEmpty()) {
             setFluidFilterEntry(minecraft.player, slot, entry.fluid());
         } else if (entry.chemicalId() != null && !entry.chemicalId().isBlank()) {
@@ -1403,7 +1404,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (menu.isBlacklistMode() != blacklist) {
             minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
         }
-        if (menu.isBoundFilter()) return;
+        if (!menu.isModMode() && !menu.isNameMode()) return;
         FilterTargetType[] types = FilterTargetType.values();
         int presses = ((targetType.ordinal() - menu.getTargetType().ordinal()) % types.length + types.length)
                 % types.length;
@@ -1588,7 +1589,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return true;
         }
 
-        return finishInteraction(handleModeControlClick(mx, my, !menu.isBoundFilter()), mx, my);
+        return finishInteraction(handleModeControlClick(mx, my), mx, my);
     }
 
     private boolean handleDetailPageInteraction(double mx, double my, int action) {
@@ -1619,7 +1620,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         return false;
     }
 
-    private boolean handleModeControlClick(double mx, double my, boolean hasTargetType) {
+    private boolean handleModeControlClick(double mx, double my) {
         int btnH = 12;
         int btnY = topPos + 6;
         int rightEdge = leftPos + imageWidth - 8;
@@ -1636,27 +1637,6 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
             }
             return true;
-        }
-
-        if (hasTargetType) {
-            String typeLabel;
-            if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
-            } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
-            } else {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.items");
-            }
-            int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-            int typeBtnX = modeBtnX - typeBtnW - 4;
-
-            if (isHovering(typeBtnX, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
-                ClickSound.play();
-                if (minecraft != null && minecraft.gameMode != null) {
-                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
-                }
-                return true;
-            }
         }
 
         return false;
@@ -1678,8 +1658,17 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int w = getSelectorInputWidth();
         int arrowX = getSelectorArrowX();
 
-        if (handleModeControlClick(mx, my, false))
+        if (handleModeControlClick(mx, my))
             return true;
+
+        int typeBtnW = modTargetButtonW();
+        if (isHovering(leftPos + imageWidth - 8 - typeBtnW, topPos + 20, typeBtnW, 12, (int) mx, (int) my)) {
+            ClickSound.play();
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
+            }
+            return true;
+        }
 
         if (isHovering(arrowX, y, 12, 14, (int) mx, (int) my)) {
             ClickSound.play();
@@ -1795,22 +1784,18 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private void renderNameButtons(GuiGraphics g, int mx, int my, int btnY) {
         int btnH = 12;
         int leftEdge = leftPos + 8;
-        boolean node = menu.isBoundFilter();
 
-        int modeBtnX = leftEdge;
-        if (!node) {
-            String typeLabel;
-            if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
-            } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
-            } else {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.items");
-            }
-            int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-            drawButton(g, leftEdge, btnY, typeBtnW, btnH, typeLabel, mx, my, true);
-            modeBtnX = leftEdge + typeBtnW + 4;
+        String typeLabel;
+        if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
+        } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
+        } else {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.items");
         }
+        int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
+        drawButton(g, leftEdge, btnY, typeBtnW, btnH, typeLabel, mx, my, true);
+        int modeBtnX = leftEdge + typeBtnW + 4;
 
         String modeLabel = menu.isBlacklistMode()
                 ? tr("gui.logisticsnetworks.filter.mode.blacklist")
@@ -1847,28 +1832,24 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int btnH = 12;
         int btnY = topPos + 20;
         int leftEdge = leftPos + 8;
-        boolean node = menu.isBoundFilter();
 
-        int modeBtnX = leftEdge;
-        if (!node) {
-            String typeLabel;
-            if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
-            } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
-            } else {
-                typeLabel = tr("gui.logisticsnetworks.filter.target.items");
-            }
-            int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
-            if (isHovering(leftEdge, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
-                ClickSound.play();
-                if (minecraft != null && minecraft.gameMode != null) {
-                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
-                }
-                return true;
-            }
-            modeBtnX = leftEdge + typeBtnW + 4;
+        String typeLabel;
+        if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.chemicals");
+        } else if (menu.getTargetType() == FilterTargetType.FLUIDS) {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.fluids");
+        } else {
+            typeLabel = tr("gui.logisticsnetworks.filter.target.items");
         }
+        int typeBtnW = Math.max(40, font.width(typeLabel) + 8);
+        if (isHovering(leftEdge, btnY, typeBtnW, btnH, (int) mx, (int) my)) {
+            ClickSound.play();
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 8);
+            }
+            return true;
+        }
+        int modeBtnX = leftEdge + typeBtnW + 4;
 
         String modeLabel = menu.isBlacklistMode()
                 ? tr("gui.logisticsnetworks.filter.mode.blacklist")
@@ -2139,9 +2120,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                 int current = menu.getEntryAmount(hoveredSlot);
                 int next;
                 if (ClientControls.modifier3Down()) {
-                    next = sy > 0 ? getMaxAmountForType(menu.getTargetType()) : (current > 0 ? 1 : 0);
+                    next = sy > 0 ? getMaxAmountForType(menu.getEntryKind(hoveredSlot)) : (current > 0 ? 1 : 0);
                 } else {
-                    int delta = computeScrollDelta(sy, menu.getTargetType());
+                    int delta = computeScrollDelta(sy, menu.getEntryKind(hoveredSlot));
                     next = Math.max(0, current + delta);
                 }
                 if (next != current) {
@@ -2172,15 +2153,28 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         ItemStack openedStack = menu.getOpenedStack();
         if (menu.isTagSlot(slot) || FilterItemData.isNbtOnlySlot(openedStack, slot))
             return true;
-        if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-            return !menu.getFluidFilter(slot).isEmpty();
-        }
-        if (menu.getTargetType() == FilterTargetType.CHEMICALS) {
-            return menu.getChemicalFilter(slot) != null;
-        }
+        if (!menu.getFluidFilter(slot).isEmpty() || menu.getChemicalFilter(slot) != null)
+            return true;
         if (slot < menu.slots.size() && !menu.slots.get(slot).getItem().isEmpty())
             return true;
         return FilterItemData.hasEntrySlotMapping(openedStack, slot);
+    }
+
+    private String targetLabel(FilterTargetType kind) {
+        return tr("gui.logisticsnetworks.filter.target." + kind.getSerializedName());
+    }
+
+    private String kindLabel(FilterTargetType kind) {
+        return tr("gui.logisticsnetworks.filter.kind." + kind.getSerializedName());
+    }
+
+    private int modTargetButtonW() {
+        return Math.max(40, font.width(targetLabel(menu.getTargetType())) + 8);
+    }
+
+    private static FilterTargetType nextKind(FilterTargetType kind) {
+        FilterTargetType next = kind.next();
+        return next == FilterTargetType.CHEMICALS && !MekanismCompat.isLoaded() ? next.next() : next;
     }
 
     private int computeScrollDelta(double scrollDirection, FilterTargetType targetType) {
@@ -2445,12 +2439,10 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         cachedSlotNbtEntries.clear();
 
         if (minecraft != null && minecraft.player != null) {
-            if (menu.getTargetType() == FilterTargetType.FLUIDS) {
-                FluidStack fluid = menu.getFluidFilter(slot);
-                if (!fluid.isEmpty()) {
-                    cachedSlotNbtEntries.addAll(NbtFilterData.extractEntries(
-                            fluid, minecraft.player.level().registryAccess()));
-                }
+            FluidStack fluid = menu.getFluidFilter(slot);
+            if (!fluid.isEmpty()) {
+                cachedSlotNbtEntries.addAll(NbtFilterData.extractEntries(
+                        fluid, minecraft.player.level().registryAccess()));
             } else {
                 ItemStack slotItem = getSlotItemForSubMode(slot);
                 if (!slotItem.isEmpty()) {
@@ -2603,7 +2595,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int clearX = panelX + panelW - clearW - 4;
         int clearY = panelY + 4;
         if (isHovering(clearX, clearY, clearW, 12, (int) mx, (int) my)) {
-            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, ""));
+            ClientPacketDistributor.sendToServer(SetFilterEntryTagPayload.clear(tagEditSlot));
             menu.clearEntryTag(tagEditSlot);
             closeTagSubMode();
             return true;
@@ -2657,8 +2649,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             if (mx >= listX && mx < listX + rowW
                     && my >= rowY && my < rowY + LIST_ROW_H) {
                 String tag = cachedSlotTags.get(i);
-                ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, tag));
-                menu.setEntryTag(minecraft.player, tagEditSlot, tag);
+                ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, tag, menu.getEntryKind(tagEditSlot)));
+                menu.setEntryTag(minecraft.player, tagEditSlot, tag, menu.getEntryKind(tagEditSlot));
                 closeTagSubMode();
                 return true;
             }
@@ -2673,8 +2665,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         String rawValue = tagInputBox.getValue();
         String normalizedTag = FilterTagUtil.normalizeTag(rawValue);
         if (normalizedTag != null) {
-            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, normalizedTag));
-            menu.setEntryTag(minecraft.player, tagEditSlot, normalizedTag);
+            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(tagEditSlot, normalizedTag, menu.getEntryKind(tagEditSlot)));
+            menu.setEntryTag(minecraft.player, tagEditSlot, normalizedTag, menu.getEntryKind(tagEditSlot));
         }
         closeTagSubMode();
     }
@@ -3167,11 +3159,9 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         menu.setSlotsHidden(true);
         tagEditSlot = -1;
         nbtEditSlot = -1;
-        detailTagScrollOffset = 0;
         detailNbtRawMode = false;
         detailNbtPageOpen = false;
         detailNbtScrollOffset = 0;
-        lastDetailIdFilter = "";
 
         savedImageHeight = imageHeight;
         savedTopPos = topPos;
@@ -3182,8 +3172,15 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             topPos = (height - imageHeight) / 2;
         }
 
-        FilterTargetType targetType = menu.getTargetType();
+        detailKind = menu.getEntryKind(slot);
+        loadDetailKind(slot);
+    }
+
+    private void loadDetailKind(int slot) {
+        FilterTargetType targetType = detailKind;
         boolean isFluidOrChemical = targetType != FilterTargetType.ITEMS;
+        detailTagScrollOffset = 0;
+        lastDetailIdFilter = "";
 
         detailCachedTags.clear();
         detailAllTags.clear();
@@ -3426,20 +3423,21 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
     private void flushDetailPageInputs() {
         if (detailEditSlot < 0) return;
         int slot = detailEditSlot;
-        FilterTargetType targetType = menu.getTargetType();
+        FilterTargetType targetType = detailKind;
         boolean isFluidOrChemical = targetType != FilterTargetType.ITEMS;
 
         String idVal = detailIdInputBox.getValue().trim();
         if (idVal.startsWith("#")) {
             String normalizedTag = FilterTagUtil.normalizeTag(idVal);
             String current = menu.getEntryTag(slot);
-            if (!Objects.equals(normalizedTag, current)) {
+            if (!Objects.equals(normalizedTag, current)
+                    || normalizedTag != null && menu.getEntryKind(slot) != targetType) {
                 if (normalizedTag == null) {
-                    ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, ""));
+                    ClientPacketDistributor.sendToServer(SetFilterEntryTagPayload.clear(slot));
                     menu.clearEntryTag(slot);
                 } else {
-                    ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, normalizedTag));
-                    menu.setEntryTag(minecraft.player, slot, normalizedTag);
+                    ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(slot, normalizedTag, detailKind));
+                    menu.setEntryTag(minecraft.player, slot, normalizedTag, detailKind);
                 }
             }
         } else if (!idVal.isEmpty()) {
@@ -3475,7 +3473,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                     }
                 }
             }
-        } else if (hasEntryInSlot(slot)) {
+        } else if (hasEntryInSlot(slot) && menu.getEntryKind(slot) == targetType) {
             if (isFluidOrChemical) {
                 clearFilterEntry(slot);
             } else {
@@ -3549,6 +3547,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int clearW = 40;
         int clearXPos = panelX + panelW - clearW - 4;
         drawButton(g, clearXPos, panelY + 4, clearW, 12, tr("gui.logisticsnetworks.filter.detail.clear"), mx, my, true);
+        drawButton(g, clearXPos - 40 - 4, panelY + 4, 40, 12, kindLabel(detailKind), mx, my, true);
 
         int y = panelY + 20;
 
@@ -3557,7 +3556,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         int slotY = y;
         drawSlot(g, slotX, slotY);
 
-        FilterTargetType detailTargetType = menu.getTargetType();
+        FilterTargetType detailTargetType = detailKind;
         boolean isFluidOrChemical = detailTargetType != FilterTargetType.ITEMS;
         String idVal = detailIdInputBox.getValue().trim();
         if (idVal.startsWith("#")) {
@@ -3808,13 +3807,13 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         detailSlotMappingInputBox.setFocused(false);
         String value = detailIdInputBox.getValue().trim();
         Identifier current = value.isEmpty() || value.startsWith("#") ? null : Identifier.tryParse(value);
-        detailTagPicker = new FilterTagPicker(font, menu.getTargetType(), current, menu.getEntryTag(detailEditSlot),
+        detailTagPicker = new FilterTagPicker(font, detailKind, current, menu.getEntryTag(detailEditSlot),
                 this::applyDetailTag, () -> detailTagPicker = null, width, height);
     }
 
     private void applyDetailTag(String tag) {
-        ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, tag));
-        menu.setEntryTag(minecraft.player, detailEditSlot, tag);
+        ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, tag, detailKind));
+        menu.setEntryTag(minecraft.player, detailEditSlot, tag, detailKind);
         detailIdInputBox.setValue("#" + tag);
         rebuildIdFilteredList();
         detailTagPicker = null;
@@ -4099,7 +4098,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             return true;
         }
 
-        FilterTargetType targetType = menu.getTargetType();
+        FilterTargetType targetType = detailKind;
         boolean isFluidOrChemical = targetType != FilterTargetType.ITEMS;
 
         int panelX = leftPos + 4;
@@ -4123,6 +4122,14 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (isHovering(clearXPos, panelY + 4, clearW, 12, (int) mx, (int) my)) {
             ClickSound.play();
             clearDetailEntry();
+            return true;
+        }
+
+        if (isHovering(clearXPos - 40 - 4, panelY + 4, 40, 12, (int) mx, (int) my)) {
+            ClickSound.play();
+            flushDetailPageInputs();
+            detailKind = nextKind(detailKind);
+            loadDetailKind(detailEditSlot);
             return true;
         }
 
@@ -4176,8 +4183,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
                         ClickSound.play();
                         String selected = dropdownList.get(i);
                         if (isTagInput) {
-                            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, selected));
-                            menu.setEntryTag(minecraft.player, detailEditSlot, selected);
+                            ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, selected, detailKind));
+                            menu.setEntryTag(minecraft.player, detailEditSlot, selected, detailKind);
                             detailIdInputBox.setValue("#" + selected);
                         } else if (targetType == FilterTargetType.FLUIDS) {
                             Identifier fluidId = Identifier.tryParse(selected);
@@ -4534,8 +4541,8 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
         if (val.startsWith("#")) {
             String normalized = FilterTagUtil.normalizeTag(val);
             if (normalized != null) {
-                ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, normalized));
-                menu.setEntryTag(minecraft.player, detailEditSlot, normalized);
+                ClientPacketDistributor.sendToServer(new SetFilterEntryTagPayload(detailEditSlot, normalized, detailKind));
+                menu.setEntryTag(minecraft.player, detailEditSlot, normalized, detailKind);
                 detailIdInputBox.setValue("#" + normalized);
             }
         } else {
@@ -4699,7 +4706,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             if (!str.isEmpty()) {
                 try { current = ArithmeticExpression.evaluate(str); } catch (NumberFormatException ignored) {}
             }
-            int scrollDelta = computeScrollDelta(delta, menu.getTargetType());
+            int scrollDelta = computeScrollDelta(delta, detailKind);
             int next = Math.max(0, current + scrollDelta);
             detailBatchInputBox.setValue(String.valueOf(next));
             return true;
@@ -4710,7 +4717,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             if (!str.isEmpty()) {
                 try { current = ArithmeticExpression.evaluate(str); } catch (NumberFormatException ignored) {}
             }
-            int scrollDelta = computeScrollDelta(delta, menu.getTargetType());
+            int scrollDelta = computeScrollDelta(delta, detailKind);
             int next = Math.max(0, current + scrollDelta);
             detailStockInputBox.setValue(String.valueOf(next));
             return true;
@@ -4803,11 +4810,7 @@ public class FilterScreen extends LegacyContainerScreen<FilterMenu> {
             Component name = MekanismCompat.getChemicalTextComponent(chemId);
             lines.add((name != null ? name.copy() : Component.literal(chemId)).withStyle(ChatFormatting.WHITE));
         } else if (isNbtOnly || FilterItemData.hasEntrySlotMapping(filterStack, slot)) {
-            String any = switch (menu.getTargetType()) {
-                case FLUIDS -> "Any Fluid";
-                case CHEMICALS -> "Any Chemical";
-                default -> "Any Item";
-            };
+            String any = isNbtOnly ? "Any Resource" : "Any Item";
             lines.add(Component.literal(any).withStyle(ChatFormatting.AQUA));
         } else {
             return lines;

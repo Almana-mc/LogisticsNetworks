@@ -689,14 +689,12 @@ public class ServerPayloadHandler {
             ItemStack item = payload.item();
             if (item.isEmpty() || item.is(ModTags.FILTERS))
                 return;
-            FilterTargetType desired = FilterTargetType.forChannel(channel.getType());
-            if (desired == null)
+            if (!channel.hasFilterableType())
                 return;
 
             ItemStack filter = channel.getFilterItem(fs);
             if (filter.isEmpty()) {
                 filter = VirtualFilterType.SMALL.createStack();
-                FilterItemData.setTargetType(filter, desired);
             } else if (!FilterItemData.isFilterItem(filter)) {
                 return;
             } else {
@@ -814,20 +812,17 @@ public class ServerPayloadHandler {
             ChannelData channel = node.getChannel(ch);
             if (channel == null) return;
 
-            FilterTargetType desired = targetForChannel(channel.getType());
-            if (desired == null) return;
+            if (!channel.hasFilterableType()) return;
 
             ItemStack stack = channel.getFilterItem(fs);
             VirtualFilterType requested = payload.requestedType();
             boolean needFresh = requested != VirtualFilterType.EXISTING
-                    || stack.isEmpty() || !stack.is(ModTags.FILTERS)
-                    || currentTarget(stack) != desired;
+                    || stack.isEmpty() || !stack.is(ModTags.FILTERS);
             if (needFresh) {
                 VirtualFilterType role = requested != VirtualFilterType.EXISTING
                         ? requested
                         : (stack.isEmpty() ? VirtualFilterType.SMALL : VirtualFilterType.fromStack(stack));
                 stack = role.createStack();
-                applyTarget(stack, desired);
                 channel.setFilterItem(fs, stack);
                 sendChannelSyncToViewers(node, ch, channel);
                 propagateToLabelGroup(node, ch);
@@ -865,33 +860,6 @@ public class ServerPayloadHandler {
                         buf.writeBoolean(isName);
                     });
         });
-    }
-
-    private static FilterTargetType targetForChannel(ChannelType type) {
-        return FilterTargetType.forChannel(type);
-    }
-
-    private static FilterTargetType currentTarget(ItemStack stack) {
-        if (FilterItemData.isFilterItem(stack)) {
-            return FilterItemData.getTargetType(stack);
-        }
-        if (NameFilterData.isNameFilter(stack)) {
-            return NameFilterData.getTargetType(stack);
-        }
-        if (ModFilterData.isModFilter(stack)) {
-            return ModFilterData.getTargetType(stack);
-        }
-        return FilterTargetType.ITEMS;
-    }
-
-    private static void applyTarget(ItemStack stack, FilterTargetType target) {
-        if (FilterItemData.isFilterItem(stack)) {
-            FilterItemData.setTargetType(stack, target);
-        } else if (NameFilterData.isNameFilter(stack)) {
-            NameFilterData.setTargetType(stack, target);
-        } else if (ModFilterData.isModFilter(stack)) {
-            ModFilterData.setTargetType(stack, target);
-        }
     }
 
     public static void handleOpenNodeMenu(OpenNodeMenuPayload payload, IPayloadContext context) {
@@ -941,7 +909,8 @@ public class ServerPayloadHandler {
                 if (normalizedTag == null) {
                     menu.clearEntryTag(payload.slot());
                 } else {
-                    menu.setEntryTag((Player) context.player(), payload.slot(), normalizedTag);
+                    menu.setEntryTag((Player) context.player(), payload.slot(), normalizedTag,
+                            FilterTargetType.fromOrdinal(payload.kindOrdinal()));
                 }
             }
         });

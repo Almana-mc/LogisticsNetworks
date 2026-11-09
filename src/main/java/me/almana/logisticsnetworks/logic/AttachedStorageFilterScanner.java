@@ -3,7 +3,7 @@ package me.almana.logisticsnetworks.logic;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.filter.FilterTargetType;
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.item.RecipeCardItem;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
@@ -33,22 +33,25 @@ public final class AttachedStorageFilterScanner {
             return new Result(0, false, false);
         }
 
-        FilterTargetType target = FilterTargetType.forChannel(channel.getType());
-        if (target == null) {
-            return new Result(0, false, false);
+        Result total = new Result(0, false, false);
+        if (channel.hasType(ChannelType.ITEM)) {
+            total = merge(total, scanItems(node.capabilities().findItemHandler(channel.getIoDirection()), filter));
         }
+        if (channel.hasType(ChannelType.FLUID) && !total.filterFull()) {
+            total = merge(total, scanFluids(node.capabilities().findFluidHandler(channel.getIoDirection()), filter));
+        }
+        // Enable when 26.1.2 is supported.
+        /*
+        if (channel.hasType(ChannelType.CHEMICAL) && !total.filterFull() && !node.isMountedOnCreate()) {
+            total = merge(total, scanChemicals(level, node, channel, filter));
+        }
+        */
+        return total;
+    }
 
-        return switch (target) {
-            case ITEMS -> scanItems(node.capabilities().findItemHandler(channel.getIoDirection()), filter);
-            case FLUIDS -> scanFluids(node.capabilities().findFluidHandler(channel.getIoDirection()), filter);
-            case CHEMICALS -> {
-                // Enable when 26.1.2 is supported.
-                /*
-                yield scanChemicals(level, node, channel, filter);
-                */
-                yield new Result(0, false, false);
-            }
-        };
+    private static Result merge(Result first, Result second) {
+        return new Result(first.added() + second.added(), first.storageFound() || second.storageFound(),
+                second.filterFull());
     }
 
     static Result scanItems(ResourceHandler<ItemResource> handler, ItemStack filter) {

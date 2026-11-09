@@ -315,7 +315,7 @@ public final class LegacyComponentMigration {
                         entry.getIntOr("dur_val", 0))
                 : null;
         return new GeneralFilterEntry(entry.getIntOr("slot", 0), item, readString(entry, "fluid"),
-                readString(entry, "chemical"), readString(entry, "tag"), counts, mapping, enchanted, nbt, durability);
+                readString(entry, "chemical"), readString(entry, "tag"), counts, mapping, enchanted, nbt, durability, null);
     }
 
     private static List<NbtCriterion> readRules(CompoundTag entry) {
