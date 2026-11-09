@@ -612,6 +612,11 @@ public class TransferEngine {
         EnergyHandler sourceHandler = sourceNode.capabilities().findEnergyHandler(exportChannel.getIoDirection());
         if (sourceHandler == null)
             return 0;
+        // Insert-only or empty source
+        try (var probe = Transaction.openRoot()) {
+            if (sourceHandler.extract(1, probe) == 0)
+                return 0;
+        }
 
         targets = orderTargets(targets, exportChannel, sourceNode, ChannelType.ENERGY);
         boolean robin = exportChannel.getDistributionMode() == DistributionMode.PRIORITY_ROBIN;
