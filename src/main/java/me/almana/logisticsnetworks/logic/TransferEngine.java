@@ -300,8 +300,7 @@ public class TransferEngine {
                         chemicalImports, sourceImports);
                 if (typed.isEmpty() || cards && !RecipeChannel.runsLoose(channel, type))
                     continue;
-                if (type == ChannelType.ENERGY
-                        && sourceNode.capabilities().findEnergyHandler(channel.getIoSide()) == null) {
+                if (type == ChannelType.ENERGY && !canExtractEnergy(sourceNode, channel)) {
                     minWakeDelta = Math.min(minWakeDelta, Config.backoffMaxTicks);
                     continue;
                 }
@@ -356,6 +355,16 @@ public class TransferEngine {
             case CHEMICAL -> chemicals[channel];
             case SOURCE -> source[channel];
         };
+    }
+
+    private static boolean canExtractEnergy(LogisticsNodeEntity node, ChannelData channel) {
+        var handler = node.capabilities().findEnergyHandler(channel.getIoSide());
+        if (handler == null) return false;
+        // Empty counts as extractable
+        if (handler.getAmountAsLong() <= 0) return true;
+        try (var probe = Transaction.openRoot()) {
+            return handler.extract(1, probe) > 0;
+        }
     }
 
     public static long finishChannelAttempt(LogisticsNodeEntity node, ChannelData channel, int index, int lane,
