@@ -10,9 +10,7 @@ import com.refinedmods.refinedstorage.api.resource.ResourceAmount;
 import com.refinedmods.refinedstorage.api.resource.ResourceKey;
 import com.refinedmods.refinedstorage.common.support.resource.FluidResource;
 import com.refinedmods.refinedstorage.common.support.resource.ItemResource;
-import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenCustomHashMap;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -22,9 +20,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
@@ -79,7 +75,7 @@ final class RefinedStorageInterfaceEndpoint implements StorageEndpoint {
     public Object2LongMap<Item> itemCounts(Set<Item> items, boolean fresh) {
         if (items.isEmpty() || !isValid()) {
             return HashUtils.itemToLongMap();
-        };
+        }
         StorageNetworkComponent storage = storage();
         var counts = HashUtils.itemToLongMap();
         for (Item item : items) counts.put(item, 0L);

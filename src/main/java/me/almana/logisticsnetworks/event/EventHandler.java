@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.event;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.command.LogisticsCommand;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -18,6 +19,7 @@ import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.utils.ItemStackUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -35,6 +37,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.minecraft.util.TriState;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -49,8 +52,6 @@ import java.time.Month;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import me.almana.logisticsnetworks.command.LogisticsCommand;
 
 @EventBusSubscriber(modid = LogisticsNetworks.MOD_ID)
 public class EventHandler {
@@ -223,11 +224,19 @@ public class EventHandler {
                     NetworkRegistry.get(serverLevel).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
                 }
 
+                var player = event.getPlayer();
+
                 if (Config.dropNodeItem) {
-                    node.spawnAtLocation(serverLevel, Registration.logisticsNodeItem());
+                    if (!player.isFakePlayer()) {
+                        ItemStackUtils.give(player, Registration.logisticsNodeItem().getDefaultInstance());
+                    } else {
+                        node.spawnAtLocation(serverLevel, Registration.logisticsNodeItem());
+                    }
                 }
-                node.dropFilters();
-                node.dropUpgrades();
+
+                if (!player.isFakePlayer()) {
+                    node.dropUpgrades(player);
+                }
                 node.discard();
             }
         }

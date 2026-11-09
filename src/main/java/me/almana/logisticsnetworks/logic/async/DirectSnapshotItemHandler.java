@@ -1,8 +1,6 @@
 package me.almana.logisticsnetworks.logic.async;
 
-import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenCustomHashMap;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.utils.HashUtils;
@@ -10,9 +8,7 @@ import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 final class DirectSnapshotItemHandler implements DirectItemAccess {

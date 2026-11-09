@@ -1,8 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
-import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenCustomHashMap;
 import me.almana.logisticsnetworks.logic.async.ThreadGuard;
 import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.world.item.Item;
@@ -13,8 +11,6 @@ import net.neoforged.neoforge.transfer.transaction.SnapshotJournal;
 import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

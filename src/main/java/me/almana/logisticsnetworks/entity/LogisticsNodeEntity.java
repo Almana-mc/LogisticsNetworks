@@ -8,6 +8,7 @@ import me.almana.logisticsnetworks.data.NodeRouteChannels;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.SlotStack;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.utils.ItemStackUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.damagesource.DamageSource;
@@ -176,8 +177,6 @@ public class LogisticsNodeEntity extends Entity {
                     if (Config.dropNodeItem) {
                         spawnAtLocation(serverLevel, me.almana.logisticsnetworks.registration.Registration.logisticsNodeItem());
                     }
-                    dropFilters();
-                    dropUpgrades();
                     discard();
                 }
             }
@@ -419,26 +418,39 @@ public class LogisticsNodeEntity extends Entity {
         backoffTicks[index * ChannelData.LANES + lane] = value;
     }
 
-    public void dropUpgrades() {
+    public void dropUpgrades(@Nullable Player player) {
         if (!(level() instanceof ServerLevel serverLevel)) {
             return;
         }
         for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
             ItemStack stack = upgradeItems[i];
             if (!stack.isEmpty()) {
-                spawnAtLocation(serverLevel, stack.copy());
+                if (player == null) {
+                    spawnAtLocation(serverLevel, stack.copy());
+                } else {
+                    ItemStackUtils.give(player, stack.copy());
+                }
                 upgradeItems[i] = ItemStack.EMPTY;
             }
         }
     }
 
+    public void dropUpgrades() {
+        dropUpgrades(null);
+    }
+
     public void dropFilters() {
         for (int channelIndex = 0; channelIndex < CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = channels[channelIndex];
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                channel.setFilterItem(slot, ItemStack.EMPTY);
-            }
+            channel.clearFilterItems();
         }
+    }
+
+    @Override
+    public void remove(RemovalReason reason) {
+        this.dropFilters();
+        this.dropUpgrades();
+        super.remove(reason);
     }
 
     private static UUID parseOptionalUuid(String value) {

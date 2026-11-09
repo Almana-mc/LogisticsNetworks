@@ -6,7 +6,6 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 public interface StorageEndpoint {
