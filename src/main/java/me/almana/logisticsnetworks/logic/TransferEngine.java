@@ -532,7 +532,8 @@ public class TransferEngine {
 
             ResourceHandler<FluidResource> targetHandler = target.node.capabilities().findFluidImportHandler(
                     target.channel.getIoSide(), true);
-            if (targetHandler == null || DirectStorageHandlers.shareNetwork(sourceHandler, targetHandler)) continue;
+            if (targetHandler == null || targetHandler == sourceHandler
+                    || DirectStorageHandlers.shareNetwork(sourceHandler, targetHandler)) continue;
 
             boolean importSides = FilterLogic.hasConfiguredEntrySides(target.channel.getFilterItems(), filterReadCache);
             resolved.add(new FluidTransferTarget(targetHandler, target.channel.getFilterItems(),
