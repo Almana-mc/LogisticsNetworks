@@ -11,7 +11,7 @@ navigation:
 
 Special upgrades do not change a node's throughput caps. The Dimensional Upgrade unlocks cross-dimension transfers and the Network Upgrade unlocks storage network access; both can be combined with a [performance upgrade](upgrades-performance.md) on the same node. The Chemical and Source upgrade items are retained for future compatibility but are currently inactive.
 
-Upgrade slots are on the [Filters & Upgrades](filters-upgrades.md) panel. Duplicates are rejected, but different active upgrades can share the four slots.
+Upgrade slots are on the [Filters & Upgrades](filters-upgrades.md) panel. Duplicates are rejected, but different active upgrades can share the six slots.
 
 ## Dimensional Upgrade
 

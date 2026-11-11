@@ -99,7 +99,7 @@ Leave the field empty and confirm to clear the label.
 
 **Why it matters:** nodes on the same network with the same label share channel modes, types, filters, batch sizes, delays, and resource-rotation preferences. Their upgrade layout also synchronizes using physical upgrades from your inventory or linked storage. Batch sizes remain limited by the installed upgrades.
 
-Use the computer table checkboxes or graph multi-selection to apply a label to several nodes. An existing label supplies its current group settings. For a new label, the first selected node supplies the settings. Missing upgrade supplies leave the selected nodes' labels and settings unchanged.
+Use the computer table checkboxes or graph multi-selection to apply a label to several nodes. An existing label supplies its current group settings. For a new label, choose the settings source from your selection. Missing upgrade supplies leave the selected nodes' labels and settings unchanged.
 
 Typical use: label all 20 of your furnace nodes `furnace`, configure one, and the other 19 copy the setup automatically. Later tweaks to any of them propagate to all.
 
