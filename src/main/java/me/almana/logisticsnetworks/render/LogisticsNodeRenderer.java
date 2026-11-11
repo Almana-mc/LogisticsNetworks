@@ -357,7 +357,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
 
         for (Direction direction : Direction.values()) {
             LogisticsNodeEntity neighbor = nodesByAttachedPos.get(attachedPos.relative(direction));
-            if (neighbor != null && neighbor != entity && hasMatchingBounds(mc, neighbor, bounds)) {
+            if (neighbor != null && neighbor != entity && hasMatchingBounds(mc, neighbor, bounds, direction)) {
                 mask = NodeConnectionMask.add(mask, direction);
             }
         }
@@ -370,7 +370,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
                     continue;
                 }
                 LogisticsNodeEntity corner = nodesByAttachedPos.get(attachedPos.relative(first).relative(second));
-                if (corner == null || !hasMatchingBounds(mc, corner, bounds)) {
+                if (corner == null || !hasCornerBounds(mc, corner, bounds, first, second)) {
                     mask = NodeConnectionMask.addCorner(mask, first, second);
                 }
             }
@@ -384,21 +384,52 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         return shape.isEmpty() ? null : shape.bounds();
     }
 
-    private static boolean hasMatchingBounds(Minecraft mc, LogisticsNodeEntity node, AABB bounds) {
+    private static boolean hasMatchingBounds(Minecraft mc, LogisticsNodeEntity node, AABB bounds, Direction direction) {
         if (!isRenderableNeighbor(node)) {
             return false;
         }
         AABB otherBounds = shapeBounds(mc, node.getAttachedPos());
-        return otherBounds != null && sameBounds(bounds, otherBounds);
+        return otherBounds != null && sameCrossSection(bounds, otherBounds, direction.getAxis());
     }
 
-    private static boolean sameBounds(AABB first, AABB second) {
-        return close(first.minX, second.minX)
-                && close(first.minY, second.minY)
-                && close(first.minZ, second.minZ)
-                && close(first.maxX, second.maxX)
-                && close(first.maxY, second.maxY)
-                && close(first.maxZ, second.maxZ);
+    private static boolean hasCornerBounds(Minecraft mc, LogisticsNodeEntity node, AABB bounds, Direction first,
+            Direction second) {
+        if (!isRenderableNeighbor(node)) {
+            return false;
+        }
+        AABB otherBounds = shapeBounds(mc, node.getAttachedPos());
+        return otherBounds != null && sameRemainingSection(bounds, otherBounds, first.getAxis(), second.getAxis());
+    }
+
+    private static boolean sameCrossSection(AABB first, AABB second, Direction.Axis axis) {
+        return switch (axis) {
+            case X -> sameY(first, second) && sameZ(first, second);
+            case Y -> sameX(first, second) && sameZ(first, second);
+            case Z -> sameX(first, second) && sameY(first, second);
+        };
+    }
+
+    private static boolean sameRemainingSection(AABB first, AABB second, Direction.Axis firstAxis,
+            Direction.Axis secondAxis) {
+        if (firstAxis != Direction.Axis.X && secondAxis != Direction.Axis.X) {
+            return sameX(first, second);
+        }
+        if (firstAxis != Direction.Axis.Y && secondAxis != Direction.Axis.Y) {
+            return sameY(first, second);
+        }
+        return sameZ(first, second);
+    }
+
+    private static boolean sameX(AABB first, AABB second) {
+        return close(first.minX, second.minX) && close(first.maxX, second.maxX);
+    }
+
+    private static boolean sameY(AABB first, AABB second) {
+        return close(first.minY, second.minY) && close(first.maxY, second.maxY);
+    }
+
+    private static boolean sameZ(AABB first, AABB second) {
+        return close(first.minZ, second.minZ) && close(first.maxZ, second.maxZ);
     }
 
     private static boolean close(double first, double second) {
