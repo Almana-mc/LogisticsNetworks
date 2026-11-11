@@ -22,6 +22,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ServerLevel.class)
 public class ServerLevelMixin implements INodeTracker {
     @Unique
+    private static final Direction[] logisticsNetworks$SIDES = Direction.values();
+
+    @Unique
     private final Long2ObjectOpenHashMap<LogisticsNodeEntity> logisticsNetworks$nodes = new Long2ObjectOpenHashMap<>();
 
     @Override
@@ -43,8 +46,9 @@ public class ServerLevelMixin implements INodeTracker {
     @Inject(method = "updateNeighborsAt(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/Block;Lnet/minecraft/world/level/redstone/Orientation;)V", at = @At("HEAD"))
     private void logisticsNetworks$refreshAround(BlockPos pos, Block block, @Nullable Orientation orientation,
             CallbackInfo ci) {
+        if (logisticsNetworks$nodes.isEmpty()) return;
         long origin = pos.asLong();
-        for (Direction side : Direction.values()) {
+        for (Direction side : logisticsNetworks$SIDES) {
             LogisticsNodeEntity node = logisticsNetworks$nodes.get(BlockPos.offset(origin, side));
             if (node == null) continue;
             node.forgetSignal();
