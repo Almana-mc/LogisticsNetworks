@@ -61,7 +61,7 @@ public final class WrenchFlowRenderer {
         List<FlowTopology.Node> nodes = new ArrayList<>();
         Map<UUID, FlowAnchor> anchors = new HashMap<>();
         for (var entity : event.getRenderState().entityRenderStates) {
-            if (!(entity instanceof LogisticsNodeRenderState node) || node.flowChannels == 0
+            if (!(entity instanceof LogisticsNodeRenderState node) || !node.modelVisible || node.flowChannels == 0
                     || node.flowNetworkId == null || !(node.renderVisible || node.wrenchVisible || node.highlighted)) continue;
             nodes.add(new FlowTopology.Node(node.flowNodeId, node.flowNetworkId, node.flowChannels));
             anchors.put(node.flowNodeId, node.flowAnchor);

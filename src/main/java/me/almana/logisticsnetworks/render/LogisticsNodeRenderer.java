@@ -12,6 +12,7 @@ import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.item.WornWrench;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.OrderedSubmitNodeCollector;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -55,7 +56,9 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
     private static final float SHADER_ALPHA_SCALE = 2.0f;
 
     private static Set<Integer> allowedNodeIds;
-    private static long lastComputeTick = Long.MIN_VALUE;
+    private static Set<Integer> visibleNodeIds;
+    private static long lastComputeTick = -1;
+    private static ClientLevel selectionLevel;
     private static final Map<BlockPos, LogisticsNodeEntity> nodesByAttachedPos = new HashMap<>();
     private static long lastLookupTick = Long.MIN_VALUE;
 
@@ -78,7 +81,9 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
                 new Vec3(state.x, state.y + 0.5, state.z), new Quaternionf());
         state.renderVisible = entity.isRenderVisible();
         state.highlighted = entity.isHighlighted();
+        updateAllowedNodes(Minecraft.getInstance());
         state.wrenchVisible = isWrenchVisible(entity);
+        state.modelVisible = visibleNodeIds == null || visibleNodeIds.contains(entity.getId());
         state.debugMode = Config.debugMode;
         state.shadersActive = Shaders.shadersActive();
         state.networkColor = entity.getNetworkColor();
@@ -102,7 +107,9 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
             return;
         }
 
-        submitNodeGeometry(state, poseStack, submitNodeCollector);
+        if (state.modelVisible) {
+            submitNodeGeometry(state, poseStack, submitNodeCollector);
+        }
 
         if (state.highlighted) {
             submitHighlightBox(state, poseStack, submitNodeCollector, 0.15f, 0.45f, 1.0f, 0.35f, true);
@@ -284,19 +291,27 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
     }
 
     private static void updateAllowedNodes(Minecraft mc) {
+        if (selectionLevel != mc.level) {
+            selectionLevel = mc.level;
+            allowedNodeIds = null;
+            visibleNodeIds = null;
+            lastComputeTick = -5;
+        }
         if (mc.level == null || mc.player == null) {
             allowedNodeIds = null;
-            lastComputeTick = Long.MIN_VALUE;
+            visibleNodeIds = null;
+            lastComputeTick = -1;
             return;
         }
 
         long tick = mc.level.getGameTime();
-        if (tick == lastComputeTick) {
+        if (tick - lastComputeTick < 5) {
             return;
         }
         lastComputeTick = tick;
 
-        int limit = ClientConfig.maxRenderedNodes;
+        int wrenchLimit = ClientConfig.maxRenderedNodes;
+        int visibleLimit = ClientConfig.maxVisibleNodes;
         List<LogisticsNodeEntity> nodes = new ArrayList<>();
         for (Entity entity : mc.level.entitiesForRendering()) {
             if (entity instanceof LogisticsNodeEntity node) {
@@ -304,21 +319,25 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
             }
         }
 
-        if (nodes.size() <= limit) {
-            allowedNodeIds = null;
-            return;
+        if (nodes.size() > wrenchLimit || (visibleLimit > 0 && nodes.size() > visibleLimit)) {
+            double px = mc.player.getX();
+            double py = mc.player.getY();
+            double pz = mc.player.getZ();
+            nodes.sort(Comparator.comparingDouble(node -> node.distanceToSqr(px, py, pz)));
         }
+        allowedNodeIds = nearest(nodes, wrenchLimit);
+        visibleNodeIds = visibleLimit > 0 ? nearest(nodes, visibleLimit) : null;
+    }
 
-        double px = mc.player.getX();
-        double py = mc.player.getY();
-        double pz = mc.player.getZ();
-        nodes.sort(Comparator.comparingDouble(node -> node.distanceToSqr(px, py, pz)));
-
+    private static Set<Integer> nearest(List<LogisticsNodeEntity> sorted, int limit) {
+        if (sorted.size() <= limit) {
+            return null;
+        }
         Set<Integer> ids = new HashSet<>(limit * 2);
         for (int i = 0; i < limit; i++) {
-            ids.add(nodes.get(i).getId());
+            ids.add(sorted.get(i).getId());
         }
-        allowedNodeIds = ids;
+        return ids;
     }
 
     private static int getConnectionMask(LogisticsNodeEntity entity) {

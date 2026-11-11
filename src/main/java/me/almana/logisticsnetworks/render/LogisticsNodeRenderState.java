@@ -12,6 +12,7 @@ public class LogisticsNodeRenderState extends EntityRenderState {
     public FlowAnchor flowAnchor;
     public boolean renderVisible;
     public boolean wrenchVisible;
+    public boolean modelVisible = true;
     public boolean highlighted;
     public boolean debugMode;
     public boolean shadersActive;
