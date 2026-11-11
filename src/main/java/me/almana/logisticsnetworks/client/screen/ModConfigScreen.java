@@ -97,6 +97,7 @@ public class ModConfigScreen extends Screen {
         Component.translatable("gui.logisticsnetworks.config.upgrades.chemicalBatch"),
         Component.translatable("gui.logisticsnetworks.config.upgrades.sourceBatch")
     };
+    private static final int ENERGY_FIELD = 3;
 
     private static final Component TEXT_NO_PERMISSION = Component.translatable("gui.logisticsnetworks.config.no_permission");
 
@@ -245,7 +246,7 @@ public class ModConfigScreen extends Screen {
         if (expandedTier >= 0 && expandedTier < 5 && canEditServerConfig) {
             TierLimits t = pendingTiers[expandedTier];
             int boxY = cy + (expandedTier + 1) * 18 + 4;
-            int[] vals = { t.minTicks(), t.itemBatch(), t.fluidBatch(), t.energyBatch(), t.chemicalBatch(), t.sourceBatch() };
+            long[] vals = { t.minTicks(), t.itemBatch(), t.fluidBatch(), t.energyBatch(), t.chemicalBatch(), t.sourceBatch() };
 
             int colW = (cw - 20) / 2;
             for (int i = 0; i < 6; i++) {
@@ -255,7 +256,7 @@ public class ModConfigScreen extends Screen {
                 int by = boxY + row * 22;
 
                 EditBox box = new EditBox(font, bx + 80, by, 80, 14, Component.empty());
-                box.setMaxLength(10);
+                box.setMaxLength(i == ENERGY_FIELD ? 19 : 10);
                 box.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
                 box.setValue(String.valueOf(vals[i]));
                 box.setBordered(false);
@@ -304,7 +305,9 @@ public class ModConfigScreen extends Screen {
         renderEditBox(g, maxRenderedNodesBox);
         renderEditBox(g, maxVisibleNodesBox);
         for (EditBox box : upgradeBoxes) {
-            renderEditBox(g, box);
+            if (box == null) continue;
+            drawFitted(g, box.getValue(), box.getX(), box.getY() + box.getHeight() / 2f, box.getWidth(),
+                    () -> renderEditBox(g, box));
         }
 
         if (!canEditServerConfig && (currentTab == Tab.COMMON || currentTab == Tab.UPGRADES)) {
@@ -313,6 +316,16 @@ public class ModConfigScreen extends Screen {
                 g.setComponentTooltipForNextFrame(font, List.of(TEXT_NO_PERMISSION), mouseX, mouseY);
             }
         }
+    }
+
+    private void drawFitted(GuiGraphicsExtractor g, String text, int x, float centerY, int width, Runnable draw) {
+        float fit = Math.min(1f, (float) width / Math.max(1, font.width(text)));
+        g.pose().pushMatrix();
+        g.pose().translate(x, centerY);
+        g.pose().scale(fit, fit);
+        g.pose().translate(-x, -centerY);
+        draw.run();
+        g.pose().popMatrix();
     }
 
     void renderEditBox(GuiGraphicsExtractor g, EditBox box) {
@@ -490,7 +503,7 @@ public class ModConfigScreen extends Screen {
 
             if (expanded) {
                 TierLimits t = pendingTiers[tier];
-                int[] vals = { t.minTicks(), t.itemBatch(), t.fluidBatch(), t.energyBatch(), t.chemicalBatch(), t.sourceBatch() };
+                long[] vals = { t.minTicks(), t.itemBatch(), t.fluidBatch(), t.energyBatch(), t.chemicalBatch(), t.sourceBatch() };
                 int colW = (cw - 20) / 2;
                 for (int i = 0; i < 6; i++) {
                     int col = i < 3 ? 0 : 1;
@@ -500,7 +513,9 @@ public class ModConfigScreen extends Screen {
                     int fieldColor = locked ? COL_INK_LOCKED : COL_INK_DIM;
                     g.text(font, FIELD_LABELS[i], lx, ly, fieldColor, false);
                     if (locked) {
-                        g.text(font, String.valueOf(vals[i]), lx + 80, ly, COL_INK_LOCKED, false);
+                        String text = String.valueOf(vals[i]);
+                        drawFitted(g, text, lx + 80, ly + 4, 80,
+                                () -> g.text(font, text, lx + 80, ly, COL_INK_LOCKED, false));
                     } else {
                         renderUnderline(g, lx + 80, ly + 14, 80);
                     }
@@ -680,12 +695,13 @@ public class ModConfigScreen extends Screen {
 
         int[] vals = new int[6];
         TierLimits old = pendingTiers[expandedTier];
-        int[] defaults = { old.minTicks(), old.itemBatch(), old.fluidBatch(), old.energyBatch(), old.chemicalBatch(), old.sourceBatch() };
+        int[] defaults = { old.minTicks(), old.itemBatch(), old.fluidBatch(), 0, old.chemicalBatch(), old.sourceBatch() };
 
         for (int i = 0; i < 6; i++) {
             vals[i] = parseIntOr(upgradeBoxes[i].getValue(), defaults[i]);
         }
-        pendingTiers[expandedTier] = new TierLimits(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
+        long energy = parseLongOr(upgradeBoxes[ENERGY_FIELD].getValue(), old.energyBatch());
+        pendingTiers[expandedTier] = new TierLimits(vals[0], vals[1], vals[2], energy, vals[4], vals[5]);
     }
 
     private void saveChanges() {
@@ -763,6 +779,14 @@ public class ModConfigScreen extends Screen {
     private int parseIntOr(String s, int fallback) {
         try {
             return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private long parseLongOr(String s, long fallback) {
+        try {
+            return Long.parseLong(s);
         } catch (NumberFormatException e) {
             return fallback;
         }

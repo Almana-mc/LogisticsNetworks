@@ -38,7 +38,6 @@ import net.minecraft.world.level.block.state.properties.ChestType;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.energy.EnergyHandler;
-import net.neoforged.neoforge.transfer.energy.EnergyHandlerUtil;
 import net.neoforged.neoforge.transfer.fluid.FluidResource;
 import net.neoforged.neoforge.transfer.fluid.FluidUtil;
 import net.neoforged.neoforge.transfer.item.ItemResource;
@@ -243,12 +242,13 @@ public class TransferEngine {
                 }
 
                 int batch = NodeUpgradeData.effectiveBatch(channel, type, sourceTier);
-                int result = switch (type) {
+                long result = switch (type) {
                     case ITEM -> transferItems(sourceNode, sourceLevel, channel, i, typed, batch, dimensionalCache,
                             telemetryActive);
                     case FLUID -> transferFluids(sourceNode, sourceLevel, channel, typed, batch, dimensionalCache,
                             telemetryActive);
-                    case ENERGY -> transferEnergy(sourceNode, sourceLevel, channel, typed, batch, dimensionalCache);
+                    case ENERGY -> transferEnergy(sourceNode, sourceLevel, channel, typed,
+                            Math.max(1L, NodeUpgradeData.getEnergyOperationCap(sourceTier)), dimensionalCache);
                     case CHEMICAL -> transferChemicals(sourceNode, sourceLevel, channel, typed, batch,
                             dimensionalCache, telemetryActive);
                     case SOURCE -> transferSource(sourceNode, sourceLevel, channel, typed, batch, dimensionalCache);
@@ -291,7 +291,7 @@ public class TransferEngine {
     }
 
     public static long finishChannelAttempt(LogisticsNodeEntity node, ChannelData channel, int index, int lane,
-            int result, long gameTime, int tier, boolean telemetryActive) {
+            long result, long gameTime, int tier, boolean telemetryActive) {
         if (result < 0) return Long.MAX_VALUE;
         if (telemetryActive && result > 0 && lane < ChannelData.RECIPE_LANE) {
             channel.getTelemetry().record(ChannelType.values()[lane], result);
@@ -568,8 +568,8 @@ public class TransferEngine {
                 ? null : handler;
     }
 
-    private static int transferEnergy(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
-            ChannelData exportChannel, List<ImportTarget> targets, int batchLimitRF,
+    private static long transferEnergy(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
+            ChannelData exportChannel, List<ImportTarget> targets, long batchLimitRF,
             Map<UUID, Boolean> dimensionalCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
@@ -589,7 +589,7 @@ public class TransferEngine {
         List<EnergyHandler> equalTargets = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
                 ? new ArrayList<>() : null;
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
-        int remaining = batchLimitRF;
+        long remaining = batchLimitRF;
         boolean anyReachable = false;
 
         for (ImportTarget target : targets) {
@@ -616,7 +616,7 @@ public class TransferEngine {
                 continue;
             }
 
-            int moved = executeEnergyMove(sourceHandler, targetHandler, remaining);
+            long moved = EnergyMove.move(sourceHandler, targetHandler, remaining);
             if (moved > 0) {
                 remaining -= moved;
                 if (robin) {
@@ -628,11 +628,8 @@ public class TransferEngine {
 
         if (!anyReachable)
             return -1;
-        if (equalTargets != null) {
-            // Stored, not per-call extract
-            return (int) EvenSplit.deal(equalTargets.size(), Math.min(remaining, sourceHandler.getAmountAsLong()),
-                    (i, share) -> executeEnergyMove(sourceHandler, equalTargets.get(i), (int) share));
-        }
+        if (equalTargets != null)
+            return EnergyMove.deal(sourceHandler, equalTargets, remaining);
         return batchLimitRF - remaining;
     }
 
@@ -1531,10 +1528,6 @@ public class TransferEngine {
             tx.close();
         }
         return limitMb - remaining;
-    }
-
-    private static int executeEnergyMove(EnergyHandler source, EnergyHandler target, int limitRF) {
-        return EnergyHandlerUtil.move(source, target, limitRF, null);
     }
 
     public static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,

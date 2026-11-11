@@ -1756,6 +1756,11 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             }
 
             @Override
+            public long energyCap() {
+                return NodeUpgradeData.getEnergyOperationCap(NodeUpgradeData.getUpgradeTier(node));
+            }
+
+            @Override
             public int recipeSets() {
                 return ch.getRecipeSets();
             }

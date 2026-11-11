@@ -22,6 +22,7 @@ final class ResourcesPopover {
         int batch(ChannelType type);
         void setBatch(ChannelType type, int value);
         int cap(ChannelType type);
+        long energyCap();
         int recipeSets();
         void setRecipeSets(int value);
         boolean exporting();
@@ -229,8 +230,10 @@ final class ResourcesPopover {
 
     private String amountLabel(int row, boolean full) {
         boolean energy = row < SETS_ROW && ChannelType.values()[row] == ChannelType.ENERGY;
-        int value = value(row) <= 0 || energy ? cap(row) : value(row);
-        String amount = full ? String.format(Locale.ROOT, "%,d", value) : ResourceLabels.amount(value);
+        long value = energy ? target.energyCap() : value(row) <= 0 ? cap(row) : value(row);
+        String amount = value == Long.MAX_VALUE
+                ? Component.translatable("tooltip.logisticsnetworks.upgrade.unlimited").getString()
+                : full ? String.format(Locale.ROOT, "%,d", value) : ResourceLabels.amount(value);
         if (row == SETS_ROW) return amount;
         return switch (ChannelType.values()[row]) {
             case FLUID -> Component.translatable("gui.logisticsnetworks.node.value.batch.fluid", amount).getString();

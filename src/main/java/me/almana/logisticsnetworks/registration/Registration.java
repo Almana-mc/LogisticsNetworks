@@ -18,6 +18,7 @@ import me.almana.logisticsnetworks.item.ModFilterItem;
 import me.almana.logisticsnetworks.item.NameFilterItem;
 import me.almana.logisticsnetworks.item.NodeUpgradeItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.upgrade.UpgradeLimitsConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
@@ -125,7 +126,8 @@ public class Registration {
                         id -> new NodeUpgradeItem(itemProperties(id), 64, 20_000, 250_000, 1));
         public static final DeferredItem<NodeUpgradeItem> NETHERITE_UPGRADE = ITEMS.register(
                         "netherite_upgrade",
-                        id -> new NodeUpgradeItem(itemProperties(id), 10_000, 1_000_000, Integer.MAX_VALUE, 1));
+                        id -> new NodeUpgradeItem(itemProperties(id), 10_000, 1_000_000,
+                                        UpgradeLimitsConfig.MAX_ENERGY_BATCH, 1));
 
         public static final DeferredItem<DimensionalUpgradeItem> DIMENSIONAL_UPGRADE = ITEMS.register(
                         "dimensional_upgrade",

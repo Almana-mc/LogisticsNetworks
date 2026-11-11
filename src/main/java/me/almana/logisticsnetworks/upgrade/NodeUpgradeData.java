@@ -26,7 +26,7 @@ public final class NodeUpgradeData {
         return switch (type) {
             case ITEM -> getItemOperationCap(tier);
             case FLUID -> getFluidOperationCapMb(tier);
-            case ENERGY -> getEnergyOperationCap(tier);
+            case ENERGY -> (int) Math.min(getEnergyOperationCap(tier), Integer.MAX_VALUE);
             case CHEMICAL -> getChemicalOperationCap(tier);
             case SOURCE -> getSourceOperationCap(tier);
         };
@@ -76,7 +76,7 @@ public final class NodeUpgradeData {
         return UpgradeLimitsConfig.get(tier).itemBatch();
     }
 
-    public static int getEnergyOperationCap(int tier) {
+    public static long getEnergyOperationCap(int tier) {
         return UpgradeLimitsConfig.get(tier).energyBatch();
     }
 

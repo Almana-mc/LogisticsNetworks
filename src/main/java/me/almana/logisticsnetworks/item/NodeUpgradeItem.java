@@ -13,10 +13,10 @@ public class NodeUpgradeItem extends Item {
 
         private final int itemCap;
         private final int fluidCapMb;
-        private final int energyCap;
+        private final long energyCap;
         private final int minDelay;
 
-        public NodeUpgradeItem(Properties properties, int itemCap, int fluidCapMb, int energyCap, int minDelay) {
+        public NodeUpgradeItem(Properties properties, int itemCap, int fluidCapMb, long energyCap, int minDelay) {
                 super(properties);
                 this.itemCap = itemCap;
                 this.fluidCapMb = fluidCapMb;
@@ -30,10 +30,10 @@ public class NodeUpgradeItem extends Item {
                 tooltip.accept(Component.translatable("tooltip.logisticsnetworks.upgrade.description")
                                 .withStyle(ChatFormatting.GRAY));
 
-                addStatTooltip(tooltip, "items", formatCap(itemCap));
+                addStatTooltip(tooltip, "items", String.format("%,d", itemCap));
                 addStatTooltip(tooltip, "fluids", String.format("%,d", fluidCapMb));
                 addStatTooltip(tooltip, "chemicals", String.format("%,d", fluidCapMb));
-                addStatTooltip(tooltip, "energy", formatCap(energyCap));
+                addStatTooltip(tooltip, "energy", String.format("%,d", energyCap));
                 addStatTooltip(tooltip, "source", String.format("%,d", fluidCapMb));
                 addStatTooltip(tooltip, "delay", String.valueOf(minDelay));
         }
@@ -41,11 +41,5 @@ public class NodeUpgradeItem extends Item {
         private void addStatTooltip(Consumer<Component> tooltip, String statKey, String value) {
                 tooltip.accept(Component.translatable("tooltip.logisticsnetworks.upgrade." + statKey, value)
                                 .withStyle(ChatFormatting.DARK_GRAY));
-        }
-
-        private String formatCap(int cap) {
-                return (cap == Integer.MAX_VALUE)
-                                ? Component.translatable("tooltip.logisticsnetworks.upgrade.unlimited").getString()
-                                : String.format("%,d", cap);
         }
 }

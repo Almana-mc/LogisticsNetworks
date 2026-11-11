@@ -1080,6 +1080,11 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> implem
             }
 
             @Override
+            public long energyCap() {
+                return NodeUpgradeData.getEnergyOperationCap(config().getUpgradeTier());
+            }
+
+            @Override
             public int recipeSets() {
                 return config().getChannelRecipeSets(channel);
             }
