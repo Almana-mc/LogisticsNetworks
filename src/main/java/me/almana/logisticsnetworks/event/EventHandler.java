@@ -192,14 +192,16 @@ public class EventHandler {
         NetworkRegistry registry = NetworkRegistry.get(level);
 
         for (LogisticsNodeEntity node : nodes) {
-            if (!node.isActive() || node.getNetworkId() == null)
-                continue;
+            wakeNode(registry, node, event.getPos());
+        }
+    }
 
-            if (node.getAttachedPos().equals(event.getPos())) {
-                registry.wakeNetwork(node.getNetworkId());
-            } else if (hasRedstoneSensitiveChannel(node)) {
-                registry.wakeNetwork(node.getNetworkId());
-            }
+    public static void wakeNode(NetworkRegistry registry, LogisticsNodeEntity node, BlockPos changed) {
+        if (!node.isActive() || node.getNetworkId() == null)
+            return;
+
+        if (node.getAttachedPos().equals(changed) || hasRedstoneSensitiveChannel(node)) {
+            registry.wakeNetwork(node.getNetworkId());
         }
     }
 

@@ -273,7 +273,9 @@ public class LogisticsNodeEntity extends Entity {
     public int signal() {
         if (signal < 0) {
             signal = level().getBestNeighborSignal(getAttachedPos());
-            ((INodeTracker) level()).logisticsNetworks$registerNode(this);
+            if (level() instanceof INodeTracker tracker) {
+                tracker.logisticsNetworks$registerNode(this);
+            }
         }
         return signal;
     }
