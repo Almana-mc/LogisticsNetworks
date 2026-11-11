@@ -85,7 +85,9 @@ import me.almana.logisticsnetworks.network.ToggleNodeVisibilityPayload;
 import me.almana.logisticsnetworks.network.ToggleComputerPinnedNetworkPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkLabelHighlightPayload;
 import me.almana.logisticsnetworks.network.ToggleNetworkNodeHighlightPayload;
+import me.almana.logisticsnetworks.network.ToggleWornWrenchPayload;
 import me.almana.logisticsnetworks.network.UpdateChannelPayload;
+import me.almana.logisticsnetworks.network.UseWornWrenchPayload;
 import me.almana.logisticsnetworks.network.UpdateServerRackPayload;
 import me.almana.logisticsnetworks.client.ConfigScreenRegistrar;
 import me.almana.logisticsnetworks.datagen.ModDataGenerators;
@@ -241,6 +243,10 @@ public class LogisticsNetworks {
                                 ServerPayloadHandler::handleSetWrenchFlow);
                 registrar.playToServer(SetWrenchModePayload.TYPE, SetWrenchModePayload.STREAM_CODEC,
                                 SetWrenchModePayload::handle);
+                registrar.playToServer(ToggleWornWrenchPayload.TYPE, ToggleWornWrenchPayload.STREAM_CODEC,
+                                ToggleWornWrenchPayload::handle);
+                registrar.playToServer(UseWornWrenchPayload.TYPE, UseWornWrenchPayload.STREAM_CODEC,
+                                UseWornWrenchPayload::handle);
                 registrar.playToServer(MoveGraphVerticesPayload.TYPE, MoveGraphVerticesPayload.STREAM_CODEC,
                                 GraphPayloadHandler::handleMoveVertices);
                 registrar.playToServer(SetNodeLabelsPayload.TYPE, SetNodeLabelsPayload.STREAM_CODEC,

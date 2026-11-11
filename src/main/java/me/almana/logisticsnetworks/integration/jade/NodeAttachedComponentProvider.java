@@ -1,11 +1,9 @@
 package me.almana.logisticsnetworks.integration.jade;
 
 import me.almana.logisticsnetworks.LogisticsNetworks;
-import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.item.WornWrench;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.IBlockComponentProvider;
 import snownee.jade.api.ITooltip;
@@ -22,10 +20,7 @@ public enum NodeAttachedComponentProvider implements IBlockComponentProvider {
         if (!accessor.getServerData().getBoolean(NodeAttachedDataProvider.KEY_HAS_NODE).orElse(false)) {
             return;
         }
-        Player player = accessor.getPlayer();
-        ItemStack main = player.getMainHandItem();
-        ItemStack off = player.getOffhandItem();
-        if (main.getItem() instanceof WrenchItem || off.getItem() instanceof WrenchItem) {
+        if (!WornWrench.held(accessor.getPlayer()).isEmpty()) {
             return;
         }
         tooltip.add(Component.translatable("jade." + LogisticsNetworks.MOD_ID + ".node_attached"));

@@ -1,6 +1,8 @@
 package me.almana.logisticsnetworks.integration.storage;
 
 import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.integration.curios.CuriosCompat;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.ae2.AE2StorageAdapter;
 import me.almana.logisticsnetworks.integration.refinedstorage.RefinedStorageAdapter;
@@ -152,6 +154,9 @@ public final class LinkedStorage {
 
     @Nullable
     public static StorageLink findAccessibleLink(ServerPlayer player, @Nullable StorageLink preferred) {
+        StorageLink worn = linked(CuriosCompat.wornWrench(player));
+        boolean wornUsable = worn != null && isAccessible(player.level(), worn);
+        if (wornUsable && (preferred != null ? preferred.equals(worn) : !WornWrench.drawn(player).isEmpty())) return worn;
         Inventory inventory = player.getInventory();
         if (preferred != null) {
             for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
@@ -171,7 +176,7 @@ public final class LinkedStorage {
             StorageLink link = linked(inventory.getItem(slot));
             if (link != null && isAccessible(player.level(), link)) return link;
         }
-        return null;
+        return wornUsable ? worn : null;
     }
 
     public static long count(ServerLevel level, StorageLink link, ItemStack pattern) {

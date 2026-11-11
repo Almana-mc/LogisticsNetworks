@@ -3,6 +3,7 @@
 package me.almana.logisticsnetworks.integration.create.mixin;
 
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.create.CreateNodeAttachment;
 import me.almana.logisticsnetworks.item.WrenchItem;
@@ -23,7 +24,7 @@ abstract class ContraptionInteractionMixin {
     @Inject(method = "handlePlayerInteraction", at = @At("HEAD"), cancellable = true, remap = false)
     private void logisticsnetworks$interact(Player player, BlockPos localPos, Direction side,
             InteractionHand hand, CallbackInfoReturnable<Boolean> cir) {
-        ItemStack stack = player.getItemInHand(hand);
+        ItemStack stack = WornWrench.orDrawn(player, player.getItemInHand(hand));
         if (!(stack.getItem() instanceof WrenchItem wrench)) {
             return;
         }

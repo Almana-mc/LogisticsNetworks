@@ -39,6 +39,7 @@ val refinedStorageRuntime = providers.gradleProperty("refined_storage_runtime").
 val cableTiersRuntime = providers.gradleProperty("cable_tiers_runtime").orElse("true").map { it.toBoolean() }
 val buildingGadgetsRuntime = providers.gradleProperty("building_gadgets_runtime").orElse("true").map { it.toBoolean() }
 val ccRuntime = providers.gradleProperty("cc_runtime").orElse("true").map { it.toBoolean() }
+val curiosRuntime = providers.gradleProperty("curios_runtime").orElse("true").map { it.toBoolean() }
 
 version = "${minecraft_version}-${mod_version}"
 group = mod_group_id
@@ -167,6 +168,11 @@ dependencies {
         localRuntime("curse.maven:cable-tiers-454382:9115770") {
             isTransitive = false
         }
+    }
+
+    compileOnly("curse.maven:curios-309927:8463519")
+    if (curiosRuntime.get()) {
+        localRuntime("curse.maven:curios-309927:8463519")
     }
 
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-forge-api:${cc_version}")

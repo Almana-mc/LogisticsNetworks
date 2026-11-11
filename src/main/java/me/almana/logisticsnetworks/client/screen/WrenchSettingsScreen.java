@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.client.screen;
 
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.theme.Theme;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.client.theme.ThemePaint;
 import me.almana.logisticsnetworks.client.theme.ThemeState;
 import me.almana.logisticsnetworks.component.WrenchFlow;
@@ -87,7 +88,7 @@ public class WrenchSettingsScreen extends Screen {
 
     @Override
     public void tick() {
-        if (minecraft.player == null || !(minecraft.player.getItemInHand(hand).getItem() instanceof WrenchItem)) {
+        if (minecraft.player == null || !(WornWrench.orDrawn(minecraft.player, minecraft.player.getItemInHand(hand)).getItem() instanceof WrenchItem)) {
             onClose();
         }
     }

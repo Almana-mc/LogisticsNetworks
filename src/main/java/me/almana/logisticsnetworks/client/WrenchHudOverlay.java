@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -62,15 +63,8 @@ public class WrenchHudOverlay {
             LocalPlayer player = mc.player;
             if (player == null) return;
 
-            ItemStack mainHand = player.getMainHandItem();
-            ItemStack offHand = player.getOffhandItem();
-            ItemStack wrenchStack = null;
-            if (mainHand.getItem() instanceof WrenchItem) {
-                wrenchStack = mainHand;
-            } else if (offHand.getItem() instanceof WrenchItem) {
-                wrenchStack = offHand;
-            }
-            if (wrenchStack == null) return;
+            ItemStack wrenchStack = WornWrench.held(player);
+            if (wrenchStack.isEmpty()) return;
 
             WrenchItem.Mode mode = WrenchItem.getMode(wrenchStack);
             Component modeText = Component.translatable("tooltip.logisticsnetworks.wrench.mode",

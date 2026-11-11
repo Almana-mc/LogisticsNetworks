@@ -1,18 +1,17 @@
 package me.almana.logisticsnetworks.client.flow;
 
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.client.Shaders;
 import me.almana.logisticsnetworks.component.WrenchFlow;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.item.WrenchItem;
-import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.render.LogisticsNodeRenderState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.context.ContextKey;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
@@ -118,7 +117,7 @@ public final class WrenchFlowRenderer {
     }
 
     private static boolean ready(Minecraft minecraft) {
-        ItemStack wrench = minecraft.player == null ? ItemStack.EMPTY : heldWrench(minecraft.player);
+        ItemStack wrench = minecraft.player == null ? ItemStack.EMPTY : WornWrench.held(minecraft.player);
         flow = wrench.isEmpty() ? WrenchFlow.DEFAULT : WrenchItem.getFlow(wrench);
         if (minecraft.level == null || wrench.isEmpty() || !flow.enabled()) {
             clear();
@@ -129,13 +128,6 @@ public final class WrenchFlowRenderer {
             world = minecraft.level;
         }
         return true;
-    }
-
-    private static ItemStack heldWrench(Player player) {
-        ItemStack main = player.getMainHandItem();
-        if (main.is(Registration.WRENCH.get())) return main;
-        ItemStack off = player.getOffhandItem();
-        return off.is(Registration.WRENCH.get()) ? off : ItemStack.EMPTY;
     }
 
     private static void updateTopology(List<FlowTopology.Node> snapshot) {

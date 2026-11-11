@@ -32,6 +32,9 @@ public final class ClientControls {
     public static final KeyMapping WRENCH_MODES = new KeyMapping(
             "key.logisticsnetworks.wrench_modes", KeyConflictContext.IN_GAME,
             InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, WrenchHudOverlay.LOGISTICS_CATEGORY);
+    public static final KeyMapping TOGGLE_WORN_WRENCH = new KeyMapping(
+            "key.logisticsnetworks.toggle_worn_wrench", KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K, WrenchHudOverlay.LOGISTICS_CATEGORY);
 
     private static boolean modifier1Down;
     private static boolean modifier2Down;

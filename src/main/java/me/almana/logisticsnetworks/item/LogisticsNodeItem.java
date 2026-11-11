@@ -80,21 +80,24 @@ public class LogisticsNodeItem extends Item {
             return;
         }
 
-        ItemStack offhand = serverPlayer.getOffhandItem();
-        if (!(offhand.getItem() instanceof WrenchItem)) {
-            return;
+        ItemStack wrench = serverPlayer.getOffhandItem();
+        if (!(wrench.getItem() instanceof WrenchItem)) {
+            wrench = WornWrench.drawn(serverPlayer);
+            if (wrench.isEmpty() || WrenchItem.getMode(wrench) != WrenchItem.Mode.COPY_PASTE) {
+                return;
+            }
         }
 
-        NodeClipboardConfig clipboard = WrenchItem.getClipboard(offhand, serverPlayer.registryAccess());
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrench, serverPlayer.registryAccess());
         if (clipboard == null || clipboard.isEffectivelyEmpty()) {
             return;
         }
 
         NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(
-                serverPlayer, node, offhand, WrenchItem.getStorageLink(offhand));
+                serverPlayer, node, wrench, WrenchItem.getStorageLink(wrench));
         switch (outcome.result()) {
             case SUCCESS -> {
-                WrenchItem.setClipboard(offhand, clipboard, serverPlayer.registryAccess());
+                WrenchItem.setClipboard(wrench, clipboard, serverPlayer.registryAccess());
             }
             case MISSING_ITEMS -> WrenchItem.reportPasteMissing(serverPlayer, outcome);
             case INCOMPATIBLE_TARGET -> WrenchItem.sendPlayerMessage(serverPlayer,

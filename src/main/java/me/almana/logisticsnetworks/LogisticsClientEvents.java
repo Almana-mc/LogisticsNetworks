@@ -13,6 +13,7 @@ import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
 import me.almana.logisticsnetworks.client.screen.RecipeCardScreen;
 import me.almana.logisticsnetworks.client.screen.ServerRackScreen;
+import me.almana.logisticsnetworks.integration.curios.CuriosCompat;
 import net.neoforged.fml.ModList;
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.client.screen.PatternSetterScreen;
@@ -95,6 +96,7 @@ public final class LogisticsClientEvents {
         SlotNumberOverlay.registerKeys(event);
         event.register(WrenchInputHandler.OPEN_COLOR_EDITOR);
         event.register(ClientControls.WRENCH_MODES);
+        if (CuriosCompat.isLoaded()) event.register(ClientControls.TOGGLE_WORN_WRENCH);
         event.register(ClientControls.MODIFIER_1);
         event.register(ClientControls.MODIFIER_2);
         event.register(ClientControls.MODIFIER_3);

@@ -10,3 +10,4 @@ Logistics Networks works alongside several other mods. These pages cover the one
 
 - [ComputerCraft](computercraft.md) — read networks, nodes, the node graph and live I/O telemetry from Lua scripts and monitors.
 - [Building Gadgets](building-gadgets.md) — move nodes with the Cut and Paste gadget, and copy their settings with Copy and Paste and templates.
+- [Curios](curios.md) — wear the wrench in its own slot and switch it on with a key, keeping your hotbar free.

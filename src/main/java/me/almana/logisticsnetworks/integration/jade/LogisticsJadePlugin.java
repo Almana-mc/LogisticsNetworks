@@ -1,9 +1,8 @@
 package me.almana.logisticsnetworks.integration.jade;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.item.WrenchItem;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.registration.Registration;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.EntityHitResult;
 import snownee.jade.api.IWailaClientRegistration;
@@ -30,9 +29,7 @@ public class LogisticsJadePlugin implements IWailaPlugin {
                     && entityHit.getEntity() instanceof LogisticsNodeEntity) {
                 var base = accessor != null ? accessor : originalAccessor;
                 if (base != null) {
-                    ItemStack main = base.getPlayer().getMainHandItem();
-                    ItemStack off = base.getPlayer().getOffhandItem();
-                    if (main.getItem() instanceof WrenchItem || off.getItem() instanceof WrenchItem) {
+                    if (!WornWrench.held(base.getPlayer()).isEmpty()) {
                         return registration.entityAccessor()
                                 .hit(entityHit)
                                 .entity(entityHit.getEntity())

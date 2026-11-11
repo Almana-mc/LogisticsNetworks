@@ -9,7 +9,7 @@ import me.almana.logisticsnetworks.client.Shaders;
 import me.almana.logisticsnetworks.client.flow.FlowAnchor;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.registration.Registration;
+import me.almana.logisticsnetworks.item.WornWrench;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.OrderedSubmitNodeCollector;
@@ -197,11 +197,23 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
 
     private static boolean isWrenchVisible(LogisticsNodeEntity entity) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null || !mc.player.isHolding(Registration.WRENCH.get())) {
+        if (mc.player == null || mc.level == null || !holdingWrench(mc)) {
             return false;
         }
         updateAllowedNodes(mc);
         return allowedNodeIds == null || allowedNodeIds.contains(entity.getId());
+    }
+
+    private static long wrenchCheckTick = Long.MIN_VALUE;
+    private static boolean holdingWrench;
+
+    private static boolean holdingWrench(Minecraft mc) {
+        long tick = mc.level.getGameTime();
+        if (tick != wrenchCheckTick) {
+            wrenchCheckTick = tick;
+            holdingWrench = !WornWrench.held(mc.player).isEmpty();
+        }
+        return holdingWrench;
     }
 
     public static boolean isWithinWrenchRenderLimit(int entityId) {
