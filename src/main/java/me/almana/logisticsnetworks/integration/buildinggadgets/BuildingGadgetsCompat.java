@@ -57,6 +57,10 @@ public final class BuildingGadgetsCompat {
 
         // Keep membership; empty networks delete
         if (node.getNetworkId() != null) NetworkRegistry.get(level).invalidateNetwork(node.getNetworkId());
+        // Payload owns upgrades; remove() drops
+        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+            node.setUpgradeItem(slot, ItemStack.EMPTY);
+        }
         node.discard();
         return payload;
     }

@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "logisticsnetworks:computer",
+    "logisticsnetworks:server_rack"
+  ]
+}
