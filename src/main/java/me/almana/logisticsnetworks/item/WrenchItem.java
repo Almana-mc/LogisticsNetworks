@@ -192,15 +192,8 @@ public class WrenchItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
-        if (!node.isOwnedBy(player)) {
-            sendPlayerMessage(player, Component.translatable("message.logisticsnetworks.not_owner"), true);
-            return InteractionResult.FAIL;
-        }
-
         ItemStack wrenchStack = context.getItemInHand();
-        return isSecondaryUse(player)
-                ? pasteToNode(node, player, wrenchStack)
-                : copyFromNode(node, player, wrenchStack);
+        return interactWithMountedNode(node, player, wrenchStack);
     }
 
     private InteractionResult useOnMassPlacementMode(UseOnContext context) {
