@@ -157,6 +157,7 @@ jobs:
               "buildinggadgets2": {"slug": "building-gadgets", "projectID": 298187},
               "computercraft": {"slug": "cc-tweaked", "projectID": 282001},
               "create": {"slug": "create", "projectID": 328085},
+              "curios": {"slug": "curios", "projectID": 309927},
               "ftbteams": {"slug": "ftb-teams-forge", "projectID": 404468},
               "guideme": {"slug": "guideme", "projectID": 1173950},
               "iris": {"slug": "irisshaders", "projectID": 455508},
