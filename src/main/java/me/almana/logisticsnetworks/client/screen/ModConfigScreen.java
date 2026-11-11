@@ -334,9 +334,40 @@ public class ModConfigScreen extends Screen {
         int textX = box.getX();
         int textY = box.getY() + (box.getHeight() - 8) / 2;
 
-        g.text(font, value, textX, textY, COL_INK, false);
+        String selected = box.isFocused() ? box.getHighlighted() : "";
+        if (!selected.isEmpty()) {
+            int cp = Math.min(box.getCursorPosition(), value.length());
+            int len = selected.length();
+            int selStart, selEnd;
+            if (cp >= len && value.substring(cp - len, cp).equals(selected)) {
+                selStart = cp - len;
+                selEnd = cp;
+            } else {
+                selStart = cp;
+                selEnd = Math.min(cp + len, value.length());
+            }
+            int x1 = textX + font.width(value.substring(0, selStart));
+            int x2 = textX + font.width(value.substring(0, selEnd));
+            g.fill(x1, textY - 1, x2, textY + 9, 0xFF305090);
 
-        if (box.isFocused() && (System.currentTimeMillis() / 500) % 2 == 0) {
+            String before = value.substring(0, selStart);
+            String sel = value.substring(selStart, selEnd);
+            String after = value.substring(selEnd);
+            int xOff = textX;
+            if (!before.isEmpty()) {
+                g.text(font, before, xOff, textY, COL_INK, false);
+                xOff += font.width(before);
+            }
+            g.text(font, sel, xOff, textY, 0xFFFFFFFF, false);
+            xOff += font.width(sel);
+            if (!after.isEmpty()) {
+                g.text(font, after, xOff, textY, COL_INK, false);
+            }
+        } else {
+            g.text(font, value, textX, textY, COL_INK, false);
+        }
+
+        if (box.isFocused() && selected.isEmpty() && (System.currentTimeMillis() / 500) % 2 == 0) {
             int cursorPos = Math.min(box.getCursorPosition(), value.length());
             int cursorX = textX + font.width(value.substring(0, cursorPos));
             g.fill(cursorX, textY - 1, cursorX + 1, textY + 9, COL_INK);
