@@ -55,8 +55,6 @@ Use Primary Interaction on the channel number buttons at the top of the screen t
 
 **How to change it:** click the Resources row to open its popover. Each line has a checkbox to switch that kind on or off, and (on a Sender) its own Batch amount. **All** and **None** set every kind at once.
 
-**Gotcha:** Nodes on Create contraptions only move items and fluids.
-
 ### AE2 and Refined Storage Interfaces
 
 Nodes with a [Network Upgrade](upgrades-special.md) on Applied Energistics 2 and Refined Storage Interfaces transfer items and fluids directly through the connected storage network. Without the upgrade, the Interface is treated like any other inventory: the node only sees the items and tanks stocked in the Interface itself. The Interface's configured export resources decide what a Sender may pull, including its native fuzzy setting, but the configured quantity does not limit the Logistics batch. Receivers may insert any resource accepted by their Logistics channel filters.

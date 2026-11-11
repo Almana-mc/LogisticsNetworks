@@ -2,12 +2,6 @@
 /*
 Source owner: TransferEngine
 
-if (!node.isMountedOnCreate() && node.level() instanceof ServerLevel level) {
-    signalCache.put(node.getUUID(), needsSignal ? level.getBestNeighborSignal(node.getAttachedPos()) : 0);
-} else if (node.isMountedOnCreate()) {
-    signalCache.put(node.getUUID(), 0);
-}
-
 if (!canRunChannel(node, channel) || !CreateCompat.isResolved(node)) {
     continue;
 }
@@ -111,21 +105,6 @@ public static boolean canRunChannel(LogisticsNodeEntity node, ChannelData channe
 static boolean shouldPauseForUnavailableMountedTargets(boolean hasUsableTarget,
         boolean hasUnavailableMountedTarget, boolean hasStationaryTarget) {
     return !hasUsableTarget && hasUnavailableMountedTarget && !hasStationaryTarget;
-}
-
-Source owner: BridgedImports
-
-ChannelData data = node.getChannel(channel);
-if (!TransferEngine.canRunChannel(node, data) || !CreateCompat.isResolved(node)
-        || !TransferEngine.isRedstoneActive(data.getRedstoneMode(), signal(node, data))) {
-    continue;
-}
-
-private static int signal(LogisticsNodeEntity node, ChannelData data) {
-    if (data.getRedstoneMode() == RedstoneMode.IGNORED || node.isMountedOnCreate()) {
-        return 0;
-    }
-    return node.level().getBestNeighborSignal(node.getAttachedPos());
 }
 
 Source owner: RecipeChannel (0b64048c, Create pause for card receivers)
