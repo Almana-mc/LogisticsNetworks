@@ -236,7 +236,7 @@ public class LogisticsNodeRenderer extends EntityRenderer<LogisticsNodeEntity, L
         state.resetBounds();
 
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null) {
+        if (mc.level == null || !ClientConfig.connectedNodeTextures) {
             return;
         }
 
