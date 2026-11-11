@@ -30,15 +30,13 @@ public final class DirectFluidHandler implements ResourceHandler<FluidResource> 
 
     private List<StorageEndpoint.StoredFluid> exports() {
         ThreadGuard.requireServerThread();
-        if (exports == null) exports = exporting ? endpoint.exportableFluids(false) : List.of();
+        if (exports == null) exports = exporting ? endpoint.exportableFluids() : List.of();
         return exports;
     }
 
     public int count(FluidStack candidate) {
         ThreadGuard.requireServerThread();
-        FluidResource resource = FluidResource.of(candidate);
-        return DirectStorageReads.clamp(add(endpoint.fluidCount(candidate, true),
-                changes.getOrDefault(resource, 0L)));
+        return DirectStorageReads.clamp(endpoint.fluidCount(candidate));
     }
 
     @Override

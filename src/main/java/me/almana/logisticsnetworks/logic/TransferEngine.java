@@ -99,7 +99,7 @@ public class TransferEngine {
 
         boolean telemetryActive = registry.getTelemetryManager().isActive(network.getId());
 
-        try (var operation = TransferCapabilityCache.storageOperation(true)) {
+        try (var operation = TransferCapabilityCache.storageOperation()) {
             long minWakeDelta = Long.MAX_VALUE;
             for (LogisticsNodeEntity sourceNode : sortedNodes) {
                 long delta = processNode(sourceNode, context.imports(), context.signals(), dimensionalCache,
@@ -914,25 +914,14 @@ public class TransferEngine {
 
         boolean anyAmountConstraints = false;
         boolean sourceNeedsCounts = TransferAmountRules.hasStockFilter(exportFilters, filterReadCache);
-        boolean anyCountsNeeded = sourceNeedsCounts;
         for (ItemTransferTarget t : targets) {
             sourceNeedsCounts |= t.constraints().hasExportThreshold();
-            anyCountsNeeded |= t.constraints().hasExportThreshold() || t.constraints().hasImportThreshold()
-                    || TransferAmountRules.hasStockFilter(t.importFilters(), filterReadCache);
             if (t.constraints().hasExportThreshold() || t.constraints().hasImportThreshold()
                     || t.constraints().hasPerEntryAmounts()) {
                 anyAmountConstraints = true;
             }
         }
-        Set<Item> countCandidates = new HashSet<>();
-        if (anyCountsNeeded) {
-            for (int slot = 0; slot < source.size(); slot++) {
-                ItemResource resource = source.getResource(slot);
-                if (!resource.isEmpty()) countCandidates.add(resource.getItem());
-            }
-        }
-        var sourceItemCounts = sourceNeedsCounts
-                ? TransferAmountRules.countItems(source, countCandidates) : null;
+        var sourceItemCounts = sourceNeedsCounts ? TransferAmountRules.countItems(source) : null;
         var batchMoved = anyAmountConstraints && !roundRobin ? new HashMap<>(priorBatchMoved) : null;
         List<Map<Item, Integer>> targetBatchMoved = null;
         List<Map<Item, Integer>> targetItemCounts = null;
@@ -951,11 +940,10 @@ public class TransferEngine {
                                     new HashMap<>(priorTargetBatchMoved.getOrDefault(handler, Map.of()))));
                 }
                 targetItemCounts.add(priorTargetBatchMoved != null
-                        ? recoveryCounts.computeIfAbsent(t.handler(),
-                                handler -> TransferAmountRules.countItems(handler, countCandidates))
+                        ? recoveryCounts.computeIfAbsent(t.handler(), TransferAmountRules::countItems)
                         : (t.constraints().hasImportThreshold()
                                 || TransferAmountRules.hasStockFilter(t.importFilters(), filterReadCache))
-                                ? TransferAmountRules.countItems(t.handler(), countCandidates) : null);
+                                ? TransferAmountRules.countItems(t.handler()) : null);
             }
         }
 
@@ -1076,15 +1064,7 @@ public class TransferEngine {
                                     faceItemCounts = new IdentityHashMap<>();
                                 }
                                 targetCounts = faceItemCounts.computeIfAbsent(face,
-                                        f -> TransferAmountRules.countItems(f.handler(), countCandidates));
-                            }
-                            if (targetCounts != null && targetHandler instanceof DirectItemAccess direct) {
-                                targetCounts = direct.countItems(countCandidates);
-                                if (face == target) {
-                                    targetItemCounts.set(targetIndex, targetCounts);
-                                } else {
-                                    faceItemCounts.put(face, targetCounts);
-                                }
+                                        f -> TransferAmountRules.countItems(f.handler()));
                             }
                             allowedByAmount = TransferAmountRules.allowedItems(extracted, target.constraints(),
                                     sourceItemCounts, targetCounts);

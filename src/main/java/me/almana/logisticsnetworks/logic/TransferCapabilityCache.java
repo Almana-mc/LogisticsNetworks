@@ -4,7 +4,6 @@ import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
-import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
@@ -49,18 +48,16 @@ public final class TransferCapabilityCache {
         this.node = node;
     }
 
-    public static StorageOperation storageOperation(boolean fresh) {
-        return new StorageOperation(fresh);
+    public static StorageOperation storageOperation() {
+        return new StorageOperation();
     }
 
     public static final class StorageOperation implements AutoCloseable {
         private final StorageOperation previous;
-        private final DirectStorageReads reads;
         private final Map<Object, ResourceHandler<ItemResource>[]> handlers = new IdentityHashMap<>();
 
-        private StorageOperation(boolean fresh) {
+        private StorageOperation() {
             previous = STORAGE_OPERATION.get();
-            reads = new DirectStorageReads(fresh);
             STORAGE_OPERATION.set(this);
         }
 
@@ -72,8 +69,8 @@ public final class TransferCapabilityCache {
             int index = exporting ? 0 : 1;
             ResourceHandler<ItemResource> existing = views[index];
             if (existing == null || DirectStorageHandlers.networkIdentity(existing) != endpoint.networkIdentity()) {
-                views[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, buffer, reads)
-                        : DirectStorageHandlers.importItems(endpoint, reads);
+                views[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, buffer)
+                        : DirectStorageHandlers.importItems(endpoint);
             }
             return views[index];
         }
@@ -126,7 +123,7 @@ public final class TransferCapabilityCache {
             StorageOperation operation = STORAGE_OPERATION.get();
             if (operation != null) return operation.itemHandler(resolution.endpoint(), buffer, exporting);
             return exporting
-                    ? DirectStorageHandlers.exportItems(resolution.endpoint(), buffer, new DirectStorageReads(true))
+                    ? DirectStorageHandlers.exportItems(resolution.endpoint(), buffer)
                     : DirectStorageHandlers.importItems(resolution.endpoint());
         }
         if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;

@@ -79,7 +79,7 @@ public final class TransferCommitter {
             if (plan.generation() != network.getGeneration()) break;
             if (!attempted.add(new ChannelKey(channel.sourceNodeId(), channel.channelIndex()))) continue;
             ItemCommitResult result;
-            try (var operation = TransferCapabilityCache.storageOperation(true)) {
+            try (var operation = TransferCapabilityCache.storageOperation()) {
                 result = commitChannel(channel, network, server, context, telemetry,
                         plan.generation(), bindings);
             }
@@ -139,7 +139,7 @@ public final class TransferCommitter {
         int recovered = 0;
         ItemResourceOrder.Cursor cursor = progress.cursor();
         if (committed < recoveryGoal && network.getGeneration() == generation) {
-            try (var operation = TransferCapabilityCache.storageOperation(true)) {
+            try (var operation = TransferCapabilityCache.storageOperation()) {
                 var recovery = recoverItemChannel(plan, network, server, recoveryGoal - committed, committed,
                         progress.byItem(), progress.byTarget(), progress.resource(), servedNode);
                 recovered = recovery.moved();
@@ -169,7 +169,7 @@ public final class TransferCommitter {
         int servedTarget = -1;
         boolean roundRobin = channel.getDistributionMode() == DistributionMode.ROUND_ROBIN;
         PlannedItemValidation validation = new PlannedItemValidation(
-                source, channel, level.registryAccess(), plan.moves());
+                source, channel, level.registryAccess());
         for (TransferPlan.MoveIntent intent : plan.moves()) {
             if (network.getGeneration() != generation || committed >= batch) break;
             if (channel.canRotateResources() && movedResource != null && !movedResource.equals(intent.resource())) continue;

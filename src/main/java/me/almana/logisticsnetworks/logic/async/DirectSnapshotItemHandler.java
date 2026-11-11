@@ -74,18 +74,9 @@ final class DirectSnapshotItemHandler implements DirectItemAccess {
     }
 
     @Override
-    public Object2IntMap<Item> countItems(Set<Item> candidates) {
+    public Object2IntMap<Item> countItems() {
         var result = HashUtils.itemToIntMap();
-        if (!endpoint.exporting()) {
-            for (Item item : candidates) result.put(item, stock.total(item));
-            return result;
-        }
-        for (ItemResource resource : exports) {
-            if (candidates.contains(resource.getItem())) {
-                result.merge(resource.getItem(), DirectStorageReads.clamp(stock.amount(endpoint.binding(), resource)),
-                        (a, b) -> DirectStorageReads.clamp((long) a + b));
-            }
-        }
+        endpoint.counts().forEach((item, amount) -> result.put(item, DirectStorageReads.clamp(amount)));
         return result;
     }
 }

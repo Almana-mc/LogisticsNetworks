@@ -14,24 +14,20 @@ import org.jetbrains.annotations.Nullable;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 final class DirectItemHandler implements DirectItemAccess {
     private final StorageEndpoint endpoint;
     @Nullable
     private final ResourceHandler<ItemResource> buffer;
-    private final DirectStorageReads reads;
     private final boolean exporting;
     private final ChangeJournal journal = new ChangeJournal();
     private List<StorageEndpoint.StoredItem> exports;
     private Map<ItemResource, Long> changes = new LinkedHashMap<>();
 
-    DirectItemHandler(StorageEndpoint endpoint, @Nullable ResourceHandler<ItemResource> buffer,
-            DirectStorageReads reads, boolean exporting) {
+    DirectItemHandler(StorageEndpoint endpoint, @Nullable ResourceHandler<ItemResource> buffer, boolean exporting) {
         ThreadGuard.requireServerThread();
         this.endpoint = endpoint;
         this.buffer = buffer;
-        this.reads = reads;
         this.exporting = exporting;
     }
 
@@ -113,34 +109,16 @@ final class DirectItemHandler implements DirectItemAccess {
     }
 
     @Override
-    public Object2IntMap<Item> countItems(Set<Item> items) {
+    public Object2IntMap<Item> countItems() {
         ThreadGuard.requireServerThread();
-        if (!exporting) return reads.countItems(endpoint, items);
-        var totals = HashUtils.itemToLongMap();
-        for (StorageEndpoint.StoredItem stored : endpoint.exportableItems(reads.fresh())) {
-            Item item = stored.stack().getItem();
-            if (items.contains(item)) totals.mergeLong(item, stored.amount(), DirectItemHandler::saturatingAdd);
-        }
-        for (Map.Entry<ItemResource, Long> change : changes.entrySet()) {
-            Item item = change.getKey().getItem();
-            if (items.contains(item)) totals.mergeLong(item, change.getValue(), DirectItemHandler::add);
-        }
-        if (buffer != null) {
-            for (int slot = 0; slot < buffer.size(); slot++) {
-                ItemResource resource = buffer.getResource(slot);
-                if (resource.isEmpty() || !items.contains(resource.getItem())
-                        || !endpoint.canExportItem(resource.toStack(1))) continue;
-                totals.mergeLong(resource.getItem(), buffer.getAmountAsLong(slot), DirectItemHandler::saturatingAdd);
-            }
-        }
         var result = HashUtils.itemToIntMap();
-        for (Item item : items) result.put(item, DirectStorageReads.clamp(totals.getOrDefault(item, 0L)));
+        endpoint.itemCounts().forEach((item, amount) -> result.put(item, DirectStorageReads.clamp(amount)));
         return result;
     }
 
     private List<StorageEndpoint.StoredItem> readExports() {
         Map<ItemResource, StorageEndpoint.StoredItem> items = new LinkedHashMap<>();
-        for (StorageEndpoint.StoredItem stored : endpoint.exportableItems(false)) {
+        for (StorageEndpoint.StoredItem stored : endpoint.exportableItems()) {
             ItemStack stack = stored.stack();
             ItemResource key = ItemResource.of(stack);
             StorageEndpoint.StoredItem current = items.get(key);
@@ -172,7 +150,6 @@ final class DirectItemHandler implements DirectItemAccess {
 
     private void move(ItemResource resource, int delta, TransactionContext transaction) {
         journal.updateSnapshots(transaction);
-        reads.moved(endpoint.networkIdentity(), resource.getItem(), delta, transaction);
         changes.merge(resource, (long) delta, Long::sum);
     }
 
@@ -221,10 +198,6 @@ final class DirectItemHandler implements DirectItemAccess {
 
     private static long add(long amount, long delta) {
         return delta > 0 && amount > Long.MAX_VALUE - delta ? Long.MAX_VALUE : Math.max(0, amount + delta);
-    }
-
-    private static long saturatingAdd(long left, long right) {
-        return right > 0 && left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
     }
 
     private static int clampRequest(long amount, int request) {

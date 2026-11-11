@@ -1,7 +1,6 @@
 package me.almana.logisticsnetworks.logic.async;
 
 import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
-import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.transaction.SnapshotJournal;
 import net.neoforged.neoforge.transfer.transaction.TransactionContext;
@@ -13,10 +12,8 @@ final class DirectItemStock {
     private final StockJournal journal = new StockJournal();
     private Map<ItemResource, Long> amounts = new HashMap<>();
     private Map<Integer, Map<ItemResource, Long>> buffers = new HashMap<>();
-    private Map<Item, Long> totals = new HashMap<>();
 
     void include(NetworkSnapshot.DirectEndpoint endpoint) {
-        endpoint.counts().forEach(totals::putIfAbsent);
         Map<ItemResource, Long> buffer = buffer(endpoint.binding());
         for (var stored : endpoint.exports()) {
             ItemResource key = ItemResource.of(stored.stack());
@@ -29,14 +26,9 @@ final class DirectItemStock {
         return add(amounts.getOrDefault(key, 0L), buffer(binding).getOrDefault(key, 0L));
     }
 
-    int total(Item item) {
-        return DirectStorageReads.clamp(totals.getOrDefault(item, 0L));
-    }
-
     void move(ItemResource key, int delta, TransactionContext transaction) {
         journal.updateSnapshots(transaction);
         amounts.put(key, add(amounts.getOrDefault(key, 0L), delta));
-        totals.put(key.getItem(), add(totals.getOrDefault(key.getItem(), 0L), delta));
     }
 
     int extract(int binding, ItemResource key, int requested, TransactionContext transaction) {
@@ -56,8 +48,7 @@ final class DirectItemStock {
         return buffers.computeIfAbsent(binding, ignored -> new HashMap<>());
     }
 
-    private record State(Map<ItemResource, Long> amounts, Map<Integer, Map<ItemResource, Long>> buffers,
-            Map<Item, Long> totals) {
+    private record State(Map<ItemResource, Long> amounts, Map<Integer, Map<ItemResource, Long>> buffers) {
     }
 
     private final class StockJournal extends SnapshotJournal<State> {
@@ -65,14 +56,13 @@ final class DirectItemStock {
         protected State createSnapshot() {
             Map<Integer, Map<ItemResource, Long>> bufferCopy = new HashMap<>();
             buffers.forEach((binding, buffer) -> bufferCopy.put(binding, new HashMap<>(buffer)));
-            return new State(new HashMap<>(amounts), bufferCopy, new HashMap<>(totals));
+            return new State(new HashMap<>(amounts), bufferCopy);
         }
 
         @Override
         protected void revertToSnapshot(State snapshot) {
             amounts = snapshot.amounts();
             buffers = snapshot.buffers();
-            totals = snapshot.totals();
         }
     }
 

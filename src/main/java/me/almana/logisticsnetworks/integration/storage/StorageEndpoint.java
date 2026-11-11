@@ -6,7 +6,6 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 
 import java.util.List;
-import java.util.Set;
 
 public interface StorageEndpoint {
 
@@ -25,21 +24,14 @@ public interface StorageEndpoint {
 
     boolean isValid();
 
-    default List<StoredItem> exportableItems() {
-        return exportableItems(false);
-    }
+    List<StoredItem> exportableItems();
 
-    List<StoredItem> exportableItems(boolean fresh);
+    // Interface slots, not network
+    Object2LongMap<Item> itemCounts();
 
-    Object2LongMap<Item> itemCounts(Set<Item> items, boolean fresh);
+    List<StoredFluid> exportableFluids();
 
-    default List<StoredFluid> exportableFluids() {
-        return exportableFluids(false);
-    }
-
-    List<StoredFluid> exportableFluids(boolean fresh);
-
-    long fluidCount(FluidStack stack, boolean fresh);
+    long fluidCount(FluidStack stack);
 
     boolean canExportItem(ItemStack stack);
 

@@ -36,14 +36,8 @@ public final class DirectChemicalHandler implements IChemicalHandler {
 
     long count(String chemicalId) {
         ThreadGuard.requireServerThread();
-        if (!exporting) {
-            Chemical chemical = MekanismAPI.CHEMICAL_REGISTRY.get(ResourceLocation.parse(chemicalId));
-            return endpoint.chemicalCount(new ChemicalStack(chemical, 1));
-        }
-        for (ChemicalStack stack : endpoint.exportableChemicals()) {
-            if (chemicalId.equals(ChemicalTransferHelper.getChemicalId(stack))) return stack.getAmount();
-        }
-        return 0;
+        Chemical chemical = MekanismAPI.CHEMICAL_REGISTRY.get(ResourceLocation.parse(chemicalId));
+        return endpoint.chemicalCount(new ChemicalStack(chemical, 1));
     }
 
     private List<ChemicalStack> exports() {

@@ -11,7 +11,6 @@ import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCo
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.logic.FilterLogic;
-import me.almana.logisticsnetworks.logic.TransferAmountRules;
 import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
 import me.almana.logisticsnetworks.logic.TransferEngine;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -57,7 +56,7 @@ public final class Snapshots {
     public static NetworkCapture captureNetwork(LogisticsNetwork network, MinecraftServer server,
             long runtimeId, int maxOccupiedSlots) {
         ThreadGuard.requireServerThread();
-        try (var operation = TransferCapabilityCache.storageOperation(false)) {
+        try (var operation = TransferCapabilityCache.storageOperation()) {
             return captureNetworkInOperation(network, server, runtimeId, maxOccupiedSlots);
         }
     }
@@ -148,14 +147,13 @@ public final class Snapshots {
         return new NetworkSnapshot.ChannelUnit(node.getUUID(), index, batchLimit,
                 channel.getFilterItems(), channel.getFilterMode(), sourceEndpoint,
                 channel.canRotateResources(), channel.getItemResourceCursor(),
-                captureTargets(resolved, channel.getFilterItems(), endpoints, occupiedSlots, sourceEndpoint,
-                        readCache),
+                captureTargets(resolved, channel.getFilterItems(), endpoints, occupiedSlots, readCache),
                 binding(node, channel), channel.getDistributionMode());
     }
 
     private static List<NetworkSnapshot.TargetUnit> captureTargets(TransferEngine.ResolvedItemTargets resolved,
             ItemStack[] exportFilters, ItemEndpointTable endpoints, OccupiedSlotBudget occupiedSlots,
-            int sourceEndpoint, FilterItemData.ReadCache readCache) {
+            FilterItemData.ReadCache readCache) {
         List<NetworkSnapshot.TargetUnit> units = new ArrayList<>(resolved.refs().size());
         for (int index = 0; index < resolved.refs().size(); index++) {
             TransferEngine.ImportTarget ref = resolved.refs().get(index);
@@ -165,23 +163,17 @@ public final class Snapshots {
             boolean bulk = !target.hasImportSlotMapping() && upgradedCapacity;
             int targetEndpoint = endpoints.capture(ref.node(), ref.channel().getIoSide(), target.handler(),
                     occupiedSlots, upgradedCapacity);
-            boolean counts = target.constraints().hasImportThreshold()
-                    || TransferAmountRules.hasStockFilter(target.importFilters(), readCache);
-            if (counts) {
-                endpoints.requireCounts(targetEndpoint, sourceEndpoint);
-            }
             units.add(new NetworkSnapshot.TargetUnit(ref.node().getUUID(), ref.channelIndex(),
                     target.importFilters(), target.importFilterMode(), target.hasImportSlotMapping(), bulk,
                     targetEndpoint, binding(ref.node(), ref.channel()), target.faces() == null ? null
-                            : captureFaces(ref, target, exportFilters, counts, sourceEndpoint, endpoints,
-                                    occupiedSlots, readCache)));
+                            : captureFaces(ref, target, exportFilters, endpoints, occupiedSlots, readCache)));
         }
         return units;
     }
 
     private static NetworkSnapshot.TargetUnit[] captureFaces(TransferEngine.ImportTarget ref,
-            TransferEngine.ItemTransferTarget target, ItemStack[] exportFilters, boolean counts, int sourceEndpoint,
-            ItemEndpointTable endpoints, OccupiedSlotBudget occupiedSlots, FilterItemData.ReadCache readCache) {
+            TransferEngine.ItemTransferTarget target, ItemStack[] exportFilters, ItemEndpointTable endpoints,
+            OccupiedSlotBudget occupiedSlots, FilterItemData.ReadCache readCache) {
         var faces = target.faces();
         int mask = (faces.imports() ? FilterLogic.entrySideMask(target.importFilters(), readCache) : 0)
                 | (faces.exports() ? FilterLogic.entrySideMask(exportFilters, readCache) : 0);
@@ -195,9 +187,6 @@ public final class Snapshots {
             boolean upgradedCapacity = DirectStorageHandlers.isDirect(face.handler())
                     || SophisticatedCoreCompat.isBulkHandler(face.handler());
             int endpoint = endpoints.capture(ref.node(), side, face.handler(), occupiedSlots, upgradedCapacity);
-            if (counts) {
-                endpoints.requireCounts(endpoint, sourceEndpoint);
-            }
             units[side.ordinal()] = new NetworkSnapshot.TargetUnit(ref.node().getUUID(), ref.channelIndex(),
                     target.importFilters(), target.importFilterMode(), target.hasImportSlotMapping(),
                     !target.hasImportSlotMapping() && upgradedCapacity, endpoint,
