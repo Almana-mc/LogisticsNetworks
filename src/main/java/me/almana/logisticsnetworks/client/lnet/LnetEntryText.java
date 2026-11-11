@@ -148,7 +148,8 @@ final class LnetEntryText {
                 parts.add("!" + key);
                 continue;
             }
-            parts.add(key + "=" + encodeComponent(entry.getKey(), entry.getValue().get(), ops).toString());
+            encodeComponent(entry.getKey(), entry.getValue().get(), ops)
+                    .ifPresent(tag -> parts.add(key + "=" + tag));
         }
         if (!parts.isEmpty()) {
             out.append('[').append(String.join(",", parts)).append(']');
@@ -157,8 +158,10 @@ final class LnetEntryText {
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> Tag encodeComponent(DataComponentType<T> type, Object value, RegistryOps<Tag> ops) {
-        return type.codecOrThrow().encodeStart(ops, (T) value).getOrThrow();
+    private static <T> Optional<Tag> encodeComponent(DataComponentType<T> type, Object value,
+            RegistryOps<Tag> ops) {
+        var codec = type.codec();
+        return codec == null ? Optional.empty() : codec.encodeStart(ops, (T) value).result();
     }
 
     static ItemStack readItem(String text, HolderLookup.Provider registries) throws IOException {
