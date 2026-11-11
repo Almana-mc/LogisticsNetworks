@@ -15,6 +15,7 @@ import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.client.FilterClickHandler;
 import me.almana.logisticsnetworks.client.GuiGraphics;
 import me.almana.logisticsnetworks.client.LegacyContainerScreen;
+import me.almana.logisticsnetworks.client.tooltip.FilterPreviewTooltip;
 import me.almana.logisticsnetworks.ClientConfig;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.ModFilterData;
@@ -286,6 +287,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
                         Component.translatable("gui.logisticsnetworks.node.filter.add.done")
                                 .withStyle(ChatFormatting.GREEN), mx, my);
             }
+            renderFilterPreview(g, mx, my);
         }
         storageUpgradePicker.renderTooltip(g, font, mx, my);
     }
@@ -1057,6 +1059,46 @@ public class NodeEditorScreen<T extends NodeMenu> extends LegacyContainerScreen<
             case MOD -> !ModFilterData.hasAnyMods(stack);
             case NAME -> !NameFilterData.hasNameFilter(stack);
         };
+    }
+
+    private void renderFilterPreview(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (currentPage != Page.CHANNEL_CONFIG || tweaksOpen || labelPickerOpen || filterPickerOpen
+                || filterDisabledHover || filterAddHover || System.currentTimeMillis() < filterAddedToastUntil) {
+            return;
+        }
+
+        ChannelData channel = menu.getNode().getChannel(selectedChannel);
+        for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
+            if (!isHoveringFilterButton(slot, mouseX, mouseY)) {
+                continue;
+            }
+
+            ItemStack filter = channel.getFilterItem(slot);
+            if (isFilterButtonEmpty(filter)) {
+                return;
+            }
+
+            if (FilterItemData.isFilterItem(filter)) {
+                FilterPreviewTooltip preview = FilterPreviewTooltip.from(filter, minecraft.level.registryAccess());
+                graphics.renderTooltip(font, List.of(Component.translatable(
+                                "tooltip.logisticsnetworks.filter.entries",
+                                preview.entries().size(), FilterItemData.getCapacity(filter))),
+                        Optional.of(preview), filter, mouseX, mouseY);
+            } else if (NameFilterData.isNameFilter(filter)) {
+                renderFilterInputPreview(graphics, filter, "tooltip.logisticsnetworks.filter.name",
+                        NameFilterData.getNameFilter(filter), mouseX, mouseY);
+            } else if (ModFilterData.isModFilter(filter)) {
+                renderFilterInputPreview(graphics, filter, "tooltip.logisticsnetworks.filter.mod",
+                        String.join(", ", ModFilterData.getModFilters(filter)), mouseX, mouseY);
+            }
+            return;
+        }
+    }
+
+    private void renderFilterInputPreview(GuiGraphics graphics, ItemStack filter, String translationKey,
+            String input, int mouseX, int mouseY) {
+        graphics.renderTooltip(font, List.of(Component.translatable(translationKey, input)),
+                Optional.empty(), filter, mouseX, mouseY);
     }
 
     private static final int FILTER_PICKER_W = 56;

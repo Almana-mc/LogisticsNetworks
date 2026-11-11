@@ -94,6 +94,10 @@ public final class GuiGraphics {
         raw.setTooltipForNextFrame(font, lines, image, tooltipCoordinate(x), tooltipCoordinate(y));
     }
 
+    public void renderTooltip(Font font, List<Component> lines, Optional<net.minecraft.world.inventory.tooltip.TooltipComponent> image, ItemStack stack, int x, int y) {
+        raw.setTooltipForNextFrame(font, lines, image, stack, tooltipCoordinate(x), tooltipCoordinate(y));
+    }
+
     public void renderTooltip(Font font, List<Component> lines, int x, int y) {
         raw.setTooltipForNextFrame(font, lines, Optional.empty(), tooltipCoordinate(x), tooltipCoordinate(y));
     }

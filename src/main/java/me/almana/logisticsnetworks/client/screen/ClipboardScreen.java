@@ -18,6 +18,7 @@ import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.RedstoneMode;
+import me.almana.logisticsnetworks.client.tooltip.FilterPreviewTooltip;
 import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.ModFilterData;
 import me.almana.logisticsnetworks.filter.NameFilterData;
@@ -574,14 +575,18 @@ public class ClipboardScreen extends LegacyContainerScreen<ClipboardMenu> implem
             ItemStack filter = config().getFilterItem(selectedChannel, slot);
             if (isFilterButtonEmpty(filter)) return;
             if (FilterItemData.isFilterItem(filter)) {
-                g.renderTooltip(font, Component.translatable("tooltip.logisticsnetworks.filter.entries",
-                        FilterItemData.getEntryCount(filter), FilterItemData.getCapacity(filter)), mouseX, mouseY);
+                FilterPreviewTooltip preview = FilterPreviewTooltip.from(filter, minecraft.level.registryAccess());
+                g.renderTooltip(font, List.of(Component.translatable("tooltip.logisticsnetworks.filter.entries",
+                                preview.entries().size(), FilterItemData.getCapacity(filter))),
+                        java.util.Optional.of(preview), filter, mouseX, mouseY);
             } else if (NameFilterData.isNameFilter(filter)) {
-                g.renderTooltip(font, Component.translatable("tooltip.logisticsnetworks.filter.name",
-                        NameFilterData.getNameFilter(filter)), mouseX, mouseY);
+                g.renderTooltip(font, List.of(Component.translatable("tooltip.logisticsnetworks.filter.name",
+                                NameFilterData.getNameFilter(filter))),
+                        java.util.Optional.empty(), filter, mouseX, mouseY);
             } else if (ModFilterData.isModFilter(filter)) {
-                g.renderTooltip(font, Component.translatable("tooltip.logisticsnetworks.filter.mod",
-                        String.join(", ", ModFilterData.getModFilters(filter))), mouseX, mouseY);
+                g.renderTooltip(font, List.of(Component.translatable("tooltip.logisticsnetworks.filter.mod",
+                                String.join(", ", ModFilterData.getModFilters(filter)))),
+                        java.util.Optional.empty(), filter, mouseX, mouseY);
             }
             return;
         }

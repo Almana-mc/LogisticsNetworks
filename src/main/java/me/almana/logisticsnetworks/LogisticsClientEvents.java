@@ -13,6 +13,8 @@ import me.almana.logisticsnetworks.client.screen.NodeScreen;
 import me.almana.logisticsnetworks.client.screen.NodeGraphScreen;
 import me.almana.logisticsnetworks.client.screen.RecipeCardScreen;
 import me.almana.logisticsnetworks.client.screen.ServerRackScreen;
+import me.almana.logisticsnetworks.client.tooltip.ClientFilterPreviewTooltip;
+import me.almana.logisticsnetworks.client.tooltip.FilterPreviewTooltip;
 import me.almana.logisticsnetworks.integration.curios.CuriosCompat;
 import net.neoforged.fml.ModList;
 import com.mojang.logging.LogUtils;
@@ -26,6 +28,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.event.AddPackFindersEvent;
@@ -63,6 +66,10 @@ public final class LogisticsClientEvents {
         event.register(Registration.PATTERN_SETTER_MENU.get(), PatternSetterScreen::new);
         event.register(Registration.COMPUTER_MENU.get(), ComputerScreen::new);
         event.register(Registration.RECIPE_CARD_MENU.get(), RecipeCardScreen::new);
+    }
+
+    public static void registerTooltips(RegisterClientTooltipComponentFactoriesEvent event) {
+        event.register(FilterPreviewTooltip.class, ClientFilterPreviewTooltip::new);
     }
 
     public static void clientSetup(FMLClientSetupEvent event) {

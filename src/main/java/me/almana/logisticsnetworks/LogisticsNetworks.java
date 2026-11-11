@@ -124,6 +124,7 @@ public class LogisticsNetworks {
                 if (FMLEnvironment.getDist() == Dist.CLIENT) {
                         modBus.addListener(LogisticsClientEvents::registerRenderers);
                         modBus.addListener(LogisticsClientEvents::registerScreens);
+                        modBus.addListener(LogisticsClientEvents::registerTooltips);
                         modBus.addListener(LogisticsClientEvents::clientSetup);
                         modBus.addListener(LogisticsClientEvents::registerKeyMappings);
                         modBus.addListener(LogisticsClientEvents::addPacks);
