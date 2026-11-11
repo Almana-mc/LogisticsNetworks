@@ -94,7 +94,8 @@ final class StorageUpgradePicker {
     }
 
     private Component title() {
-        return Component.translatable("gui.logisticsnetworks.node.upgrades");
+        return backend == null ? Component.translatable("gui.logisticsnetworks.node.storage_upgrades")
+                : Component.translatable("gui.logisticsnetworks.node.storage_upgrades.backend", backend.displayName());
     }
 
     private Component message() {
