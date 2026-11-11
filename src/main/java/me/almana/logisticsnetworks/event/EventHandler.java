@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.LogisticsNetworks;
 import me.almana.logisticsnetworks.command.LogisticsCommand;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.INodeTracker;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.RedstoneMode;
@@ -369,4 +370,21 @@ public class EventHandler {
         event.setCanceled(true);
     }
 
+    @SubscribeEvent
+    public static void onNeighbourNotify(BlockEvent.NeighborNotifyEvent event) {
+        if (!(event.getLevel() instanceof INodeTracker tracker))
+            return;
+
+        var pos = event.getPos().mutable();
+        for (var side : event.getNotifiedSides()) {
+            pos.move(side);
+
+            var node = tracker.logisticsNetworks$getNode(pos);
+            if (node != null) {
+                node.forgetSignal();
+            }
+
+            pos.move(side.getOpposite());
+        }
+    }
 }

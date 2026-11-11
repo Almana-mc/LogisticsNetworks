@@ -28,7 +28,7 @@ final class BridgedImports {
 
     static List<ImportTarget> extend(List<ImportTarget> local, ChannelType type, int channel,
             List<ServerRackLinks.Link> links, NetworkRegistry registry, MinecraftServer server,
-            NodeSignals signals, Map<UUID, Boolean> dimensionalCache) {
+            Map<UUID, Boolean> dimensionalCache) {
         List<ImportTarget> merged = null;
         for (ServerRackLinks.Link link : links) {
             if (link.channel() != channel) {
@@ -49,7 +49,7 @@ final class BridgedImports {
             if (merged == null) {
                 merged = new ArrayList<>(local);
             }
-            addTargets(refs, peer, link.peerChannel(), server, signals, merged, dimensionalCache);
+            addTargets(refs, peer, link.peerChannel(), server, merged, dimensionalCache);
         }
         if (merged == null) {
             return local;
@@ -59,7 +59,7 @@ final class BridgedImports {
     }
 
     private static void addTargets(List<NodeRef> refs, LogisticsNetwork peer, int channel, MinecraftServer server,
-            NodeSignals signals, List<ImportTarget> out, Map<UUID, Boolean> dimensionalCache) {
+            List<ImportTarget> out, Map<UUID, Boolean> dimensionalCache) {
         for (NodeRef ref : refs) {
             LogisticsNodeEntity node = TransferEngine.findNode(server, ref.nodeId(),
                     peer.getNodeDimension(ref.nodeId()));
@@ -67,7 +67,7 @@ final class BridgedImports {
                 continue;
             }
             ChannelData data = node.getChannel(channel);
-            if (!signals.active(node, data.getRedstoneMode())) {
+            if (!TransferEngine.isRedstoneActive(node, data.getRedstoneMode())) {
                 continue;
             }
             out.add(new ImportTarget(node, data, channel));

@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.entity;
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.INodeTracker;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import me.almana.logisticsnetworks.data.NodeRouteChannels;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -77,6 +78,7 @@ public class LogisticsNodeEntity extends Entity {
     private final float[] backoffTicks = new float[CHANNEL_COUNT * ChannelData.LANES];
 
     private TransferCapabilityCache capabilityCache;
+    private int signal = -1;
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
@@ -250,6 +252,7 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     public void setAttachedPos(BlockPos pos) {
+        forgetSignal();
         entityData.set(ATTACHED_POS, pos);
         if (capabilityCache != null) {
             capabilityCache.reset();
@@ -265,6 +268,21 @@ public class LogisticsNodeEntity extends Entity {
 
     public BlockPos getAttachedPos() {
         return entityData.get(ATTACHED_POS);
+    }
+
+    public int signal() {
+        if (signal < 0) {
+            signal = level().getBestNeighborSignal(getAttachedPos());
+            ((INodeTracker) level()).logisticsNetworks$registerNode(this);
+        }
+        return signal;
+    }
+
+    public void forgetSignal() {
+        signal = -1;
+        if (level() instanceof INodeTracker tracker) {
+            tracker.logisticsNetworks$removeNode(this);
+        }
     }
 
     public void setValid(boolean valid) {
@@ -451,6 +469,12 @@ public class LogisticsNodeEntity extends Entity {
         this.dropFilters();
         this.dropUpgrades();
         super.remove(reason);
+    }
+
+    @Override
+    public void onRemovedFromLevel() {
+        super.onRemovedFromLevel();
+        forgetSignal();
     }
 
     private static UUID parseOptionalUuid(String value) {

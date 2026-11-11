@@ -106,7 +106,7 @@ public final class Snapshots {
             if (channel == null || !channel.isEnabled()
                     || channel.getMode() != ChannelMode.EXPORT || !channel.hasType(ChannelType.ITEM)) continue;
             if (RecipeCardItem.anyIn(channel.getFilterItems())) continue;
-            if (!context.signals().active(node, channel.getRedstoneMode())) continue;
+            if (!TransferEngine.isRedstoneActive(node, channel.getRedstoneMode())) continue;
             List<TransferEngine.ImportTarget> targets = context.imports().get(ChannelType.ITEM, index);
             if (targets.isEmpty()) continue;
             long cooldown = TransferEngine.cooldownRemaining(

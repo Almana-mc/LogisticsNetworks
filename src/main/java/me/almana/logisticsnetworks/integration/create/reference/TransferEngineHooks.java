@@ -217,4 +217,22 @@ if (!TransferEngine.canRunChannel(node, data) || !CreateCompat.isResolved(node)
         || !signals.active(node, data.getRedstoneMode())) {
     continue;
 }
+
+Source owner: TransferEngine, BridgedImports (a496ddef, NodeSignals replaced by node.signal())
+
+static List<ImportTarget> resolveImports(List<NodeRef> refs, int channel,
+        Map<UUID, LogisticsNodeEntity> nodeCache) {
+    ...
+    if (!canRunChannel(node, cd) || !CreateCompat.isResolved(node))
+        continue;
+    if (!isRedstoneActive(node, cd.getRedstoneMode()))
+        continue;
+    ...
+}
+
+BridgedImports.addTargets:
+if (!TransferEngine.canRunChannel(node, data) || !CreateCompat.isResolved(node)
+        || !TransferEngine.isRedstoneActive(node, data.getRedstoneMode())) {
+    continue;
+}
 */

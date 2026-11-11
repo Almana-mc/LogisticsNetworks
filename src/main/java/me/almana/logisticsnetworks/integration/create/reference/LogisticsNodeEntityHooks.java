@@ -94,4 +94,29 @@ private void refreshRouteChannels() {
     }
     this.entityData.set(ROUTE_CHANNELS, bits);
 }
+
+Source owner: LogisticsNodeEntity (a496ddef + 4ef23ae1, tracked signals; mounted reads 0)
+
+public int signal() {
+    if (isMountedOnCreate()) {
+        return 0;
+    }
+    if (signal < 0) {
+        signal = level().getBestNeighborSignal(getAttachedPos());
+        ((INodeTracker) level()).logisticsNetworks$registerNode(this);
+    }
+    return signal;
+}
+
+public void moveAttachment(BlockPos pos, Vec3 entityPos) {
+    forgetSignal();
+    BlockPos previousPos = getAttachedPos();
+    ...
+}
+
+public void mountOnCreate(UUID contraptionId, BlockPos localPos) {
+    forgetSignal();
+    entityData.set(CREATE_CONTRAPTION_ID, Optional.of(contraptionId));
+    ...
+}
 */
