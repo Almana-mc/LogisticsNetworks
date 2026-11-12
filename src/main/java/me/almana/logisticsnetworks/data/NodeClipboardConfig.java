@@ -49,7 +49,9 @@ public final class NodeClipboardConfig {
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_MODE = "mode";
     private static final String KEY_TYPE = "type";
+    private static final String KEY_TYPES = "types";
     private static final String KEY_BATCH = "batch";
+    private static final String KEY_BATCHES = "batches";
     private static final String KEY_DELAY = "delay";
     private static final String KEY_IO = "io";
     private static final String KEY_REDSTONE = "redstone";
@@ -626,7 +628,10 @@ public final class NodeClipboardConfig {
             channelTag.putBoolean(KEY_ENABLED, channel.enabled);
             channelTag.putString(KEY_MODE, channel.mode.name());
             channelTag.putString(KEY_TYPE, channel.type.name());
-            channelTag.putInt(KEY_BATCH, channel.batchSize);
+            channelTag.put(KEY_TYPES, ChannelData.typeNames(channel.type.bit()));
+            CompoundTag batches = new CompoundTag();
+            batches.putInt(channel.type.name(), channel.batchSize);
+            channelTag.put(KEY_BATCHES, batches);
             channelTag.putInt(KEY_DELAY, channel.tickDelay);
             channelTag.putString(KEY_IO, channel.ioDirection != null ? channel.ioDirection.getName() : "all");
             channelTag.putString(KEY_REDSTONE, channel.redstoneMode.name());
@@ -737,7 +742,11 @@ public final class NodeClipboardConfig {
             config.enabled = channelTag.getBoolean(KEY_ENABLED);
             config.mode = parseEnum(channelTag.getString(KEY_MODE), ChannelMode.values(), ChannelMode.IMPORT);
             config.type = parseEnum(channelTag.getString(KEY_TYPE), ChannelType.values(), ChannelType.ITEM);
-            config.batchSize = Math.max(1, channelTag.getInt(KEY_BATCH));
+            if (channelTag.contains(KEY_TYPES, Tag.TAG_LIST))
+                config.type = ChannelType.first(ChannelData.typeMask(channelTag.getList(KEY_TYPES, Tag.TAG_STRING)));
+            config.batchSize = Math.max(1, channelTag.contains(KEY_BATCHES, Tag.TAG_COMPOUND)
+                    ? channelTag.getCompound(KEY_BATCHES).getInt(config.type.name())
+                    : channelTag.getInt(KEY_BATCH));
             config.tickDelay = Math.max(1, channelTag.getInt(KEY_DELAY));
 
             String ioStr = channelTag.getString(KEY_IO);

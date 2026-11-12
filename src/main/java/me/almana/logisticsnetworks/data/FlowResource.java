@@ -7,9 +7,16 @@ import java.util.Objects;
 
 public sealed interface FlowResource permits FlowResource.Item, FlowResource.Fluid, FlowResource.Chemical {
 
+    ChannelType type();
+
     record Item(ItemStack stack) implements FlowResource {
         public Item {
             stack = stack.copyWithCount(1);
+        }
+
+        @Override
+        public ChannelType type() {
+            return ChannelType.ITEM;
         }
 
         @Override
@@ -30,6 +37,11 @@ public sealed interface FlowResource permits FlowResource.Item, FlowResource.Flu
         }
 
         @Override
+        public ChannelType type() {
+            return ChannelType.FLUID;
+        }
+
+        @Override
         public boolean equals(Object other) {
             return this == other || other instanceof Fluid fluid && stack.isFluidEqual(fluid.stack);
         }
@@ -41,5 +53,9 @@ public sealed interface FlowResource permits FlowResource.Item, FlowResource.Flu
     }
 
     record Chemical(String id) implements FlowResource {
+        @Override
+        public ChannelType type() {
+            return ChannelType.CHEMICAL;
+        }
     }
 }

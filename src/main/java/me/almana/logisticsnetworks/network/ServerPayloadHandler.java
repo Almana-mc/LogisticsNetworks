@@ -23,15 +23,11 @@ import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
-import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
-import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
@@ -167,10 +163,7 @@ public class ServerPayloadHandler {
             if (channel == null)
                 return;
 
-            ChannelType oldType = channel.getType();
             updateChannelData(channel, payload, NodeUpgradeData.getUpgradeTier(node));
-            if (oldType != channel.getType())
-                autoDetectSide(node, channel);
             clampChannelToUpgradeLimits(node, channel);
             sendChannelSyncToViewers(node, payload.channelIndex(), channel);
             propagateToLabelGroup(node, payload.channelIndex());
@@ -211,53 +204,6 @@ public class ServerPayloadHandler {
 
     private static <T extends Enum<T>> boolean isValidEnum(int ordinal, T[] values) {
         return ordinal >= 0 && ordinal < values.length;
-    }
-
-    private static void autoDetectSide(LogisticsNodeEntity node, ChannelData channel) {
-        if (!(node.level() instanceof ServerLevel level))
-            return;
-        BlockPos pos = node.getAttachedPos();
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be == null)
-            return;
-
-        switch (channel.getType()) {
-            case ITEM -> {
-                for (Direction d : Direction.values()) {
-                    if (be.getCapability(ForgeCapabilities.ITEM_HANDLER, d).isPresent()) {
-                        channel.setIoDirection(d);
-                        return;
-                    }
-                }
-            }
-            case FLUID -> {
-                for (Direction d : Direction.values()) {
-                    if (be.getCapability(ForgeCapabilities.FLUID_HANDLER, d).isPresent()) {
-                        channel.setIoDirection(d);
-                        return;
-                    }
-                }
-            }
-            case ENERGY -> {
-                for (Direction d : Direction.values()) {
-                    if (be.getCapability(ForgeCapabilities.ENERGY, d).isPresent()) {
-                        channel.setIoDirection(d);
-                        return;
-                    }
-                }
-            }
-            case CHEMICAL -> {
-                if (MekanismCompat.isLoaded()) {
-                    for (Direction d : Direction.values()) {
-                        if (ChemicalTransferHelper.getHandler(level, pos, d) != null) {
-                            channel.setIoDirection(d);
-                            return;
-                        }
-                    }
-                }
-            }
-            case SOURCE -> {} // non-directional
-        }
     }
 
     public static void handleAssignNetwork(AssignNetworkPayload payload, IPayloadContext context) {

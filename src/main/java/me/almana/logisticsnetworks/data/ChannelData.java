@@ -11,6 +11,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.util.StringUtil;
 import net.minecraft.world.item.ItemStack;
@@ -23,10 +24,16 @@ import java.util.List;
 public class ChannelData {
 
     public static final int FILTER_SIZE = 6;
+    public static final int RECIPE_LANE = ChannelType.values().length;
+    public static final int LANES = RECIPE_LANE + 1;
+
     private static final String KEY_ENABLED = "Enabled";
     private static final String KEY_MODE = "Mode";
     private static final String KEY_TYPE = "Type";
+    private static final String KEY_TYPES = "Types";
     private static final String KEY_BATCH = "BatchSize";
+    private static final String KEY_BATCHES = "Batches";
+    private static final String KEY_RECIPE_SETS = "RecipeSets";
     private static final String KEY_DELAY = "TickDelay";
     private static final String KEY_IO = "IoDirection";
     private static final String KEY_REDSTONE = "RedstoneMode";
@@ -39,8 +46,9 @@ public class ChannelData {
 
     private boolean enabled;
     private ChannelMode mode = ChannelMode.IMPORT;
-    private ChannelType type = ChannelType.ITEM;
-    private int batchSize = 8;
+    private int types = ChannelType.ALL;
+    private final int[] batches = new int[ChannelType.values().length];
+    private int recipeSets;
     private int tickDelay = 20;
     private @Nullable Direction ioDirection = Direction.UP;
     private RedstoneMode redstoneMode = RedstoneMode.IGNORED;
@@ -71,8 +79,7 @@ public class ChannelData {
         CompoundTag tag = new CompoundTag();
         tag.putBoolean(KEY_ENABLED, enabled);
         tag.putString(KEY_MODE, mode.name());
-        tag.putString(KEY_TYPE, type.name());
-        tag.putInt(KEY_BATCH, batchSize);
+        saveTypes(tag);
         tag.putInt(KEY_DELAY, tickDelay);
         tag.putString(KEY_IO, ioDirection != null ? ioDirection.getName() : "all");
         tag.putString(KEY_REDSTONE, redstoneMode.name());
@@ -101,12 +108,57 @@ public class ChannelData {
         return tag;
     }
 
+    private void saveTypes(CompoundTag tag) {
+        tag.putString(KEY_TYPE, getType().name());
+        tag.put(KEY_TYPES, typeNames(types));
+        CompoundTag batchTag = new CompoundTag();
+        for (ChannelType type : ChannelType.values()) {
+            if (batches[type.ordinal()] > 0)
+                batchTag.putInt(type.name(), batches[type.ordinal()]);
+        }
+        tag.put(KEY_BATCHES, batchTag);
+        if (recipeSets > 0)
+            tag.putInt(KEY_RECIPE_SETS, recipeSets);
+    }
+
+    // Old saves hold one Type
+    private void loadTypes(CompoundTag tag) {
+        ChannelType legacy = getEnum(tag, KEY_TYPE, ChannelType.class, ChannelType.ITEM);
+        types = tag.contains(KEY_TYPES, Tag.TAG_LIST)
+                ? typeMask(tag.getList(KEY_TYPES, Tag.TAG_STRING)) : legacy.bit();
+        Arrays.fill(batches, 0);
+        if (tag.contains(KEY_BATCHES, Tag.TAG_COMPOUND)) {
+            CompoundTag batchTag = tag.getCompound(KEY_BATCHES);
+            for (ChannelType type : ChannelType.values())
+                setBatch(type, batchTag.getInt(type.name()));
+        } else {
+            batches[legacy.ordinal()] = Math.max(1, tag.contains(KEY_BATCH) ? tag.getInt(KEY_BATCH) : 8);
+        }
+        recipeSets = Math.max(0, tag.getInt(KEY_RECIPE_SETS));
+    }
+
+    static ListTag typeNames(int mask) {
+        ListTag names = new ListTag();
+        for (ChannelType type : ChannelType.listOf(mask))
+            names.add(StringTag.valueOf(type.name()));
+        return names;
+    }
+
+    static int typeMask(ListTag names) {
+        int mask = 0;
+        for (ChannelType type : ChannelType.values()) {
+            if (names.contains(StringTag.valueOf(type.name())))
+                mask |= type.bit();
+        }
+        return mask;
+    }
+
     public void load(CompoundTag tag, @Nullable HolderLookup.Provider provider) {
         if (tag.contains(KEY_ENABLED))
             enabled = tag.getBoolean(KEY_ENABLED);
 
         mode = getEnum(tag, KEY_MODE, ChannelMode.class, ChannelMode.IMPORT);
-        type = getEnum(tag, KEY_TYPE, ChannelType.class, ChannelType.ITEM);
+        loadTypes(tag);
         String redstone = tag.getString(KEY_REDSTONE);
         redstoneMode = RedstoneMode.fromSerialized(redstone);
         if (RedstoneMode.disablesChannel(redstone))
@@ -114,8 +166,6 @@ public class ChannelData {
         distributionMode = getEnum(tag, KEY_DISTRIB, DistributionMode.class, DistributionMode.PRIORITY);
         filterMode = getEnum(tag, KEY_FILTER_MODE, FilterMode.class, FilterMode.MATCH_ANY);
 
-        if (tag.contains(KEY_BATCH))
-            batchSize = Math.max(1, tag.getInt(KEY_BATCH));
         if (tag.contains(KEY_DELAY))
             tickDelay = Math.max(1, tag.getInt(KEY_DELAY));
 
@@ -220,21 +270,57 @@ public class ChannelData {
             this.mode = mode;
     }
 
+    public int getTypes() {
+        return types;
+    }
+
+    public void setTypes(int mask) {
+        types = mask & ChannelType.ALL;
+    }
+
+    public boolean hasType(ChannelType type) {
+        return type.in(types);
+    }
+
+    public boolean hasFilterableType() {
+        return (types & ChannelType.FILTERABLE) != 0;
+    }
+
+    public int getBatch(ChannelType type) {
+        return batches[type.ordinal()];
+    }
+
+    public void setBatch(ChannelType type, int batch) {
+        batches[type.ordinal()] = Math.max(0, batch);
+    }
+
+    public int getRecipeSets() {
+        return recipeSets;
+    }
+
+    public void setRecipeSets(int sets) {
+        recipeSets = Math.max(0, sets);
+    }
+
+    // Transitional, removed in Task 16
     public ChannelType getType() {
-        return type;
+        return ChannelType.first(types);
     }
 
+    // Transitional, removed in Task 16
     public void setType(ChannelType type) {
-        if (type != null)
-            this.type = type;
+        if (type != null) types = type.bit();
     }
 
+    // Transitional, removed in Task 16
     public int getBatchSize() {
-        return batchSize;
+        int value = batches[getType().ordinal()];
+        return value <= 0 ? Integer.MAX_VALUE : value;
     }
 
+    // Transitional, removed in Task 16
     public void setBatchSize(int batchSize) {
-        this.batchSize = Math.max(1, batchSize);
+        batches[getType().ordinal()] = Math.max(1, batchSize);
     }
 
     public int getTickDelay() {
@@ -295,7 +381,7 @@ public class ChannelData {
 
     public boolean canRotateResources() {
         return resourceRoundRobin && mode == ChannelMode.EXPORT
-                && (type == ChannelType.ITEM || type == ChannelType.FLUID)
+                && (hasType(ChannelType.ITEM) || hasType(ChannelType.FLUID))
                 && Arrays.stream(filterItems).anyMatch(stack -> !stack.isEmpty());
     }
 
@@ -379,8 +465,9 @@ public class ChannelData {
         recipeRobinCursor = null;
         this.enabled = source.enabled;
         this.mode = source.mode;
-        this.type = source.type;
-        this.batchSize = source.batchSize;
+        this.types = source.types;
+        System.arraycopy(source.batches, 0, this.batches, 0, this.batches.length);
+        this.recipeSets = source.recipeSets;
         this.tickDelay = source.tickDelay;
         this.ioDirection = source.ioDirection;
         this.redstoneMode = source.redstoneMode;
@@ -394,8 +481,9 @@ public class ChannelData {
     }
 
     public boolean sameSettings(ChannelData other) {
-        if (enabled != other.enabled || mode != other.mode || type != other.type
-                || batchSize != other.batchSize || tickDelay != other.tickDelay
+        if (enabled != other.enabled || mode != other.mode || types != other.types
+                || !Arrays.equals(batches, other.batches) || recipeSets != other.recipeSets
+                || tickDelay != other.tickDelay
                 || ioDirection != other.ioDirection || redstoneMode != other.redstoneMode
                 || distributionMode != other.distributionMode || filterMode != other.filterMode
                 || priority != other.priority || !name.equals(other.name)
