@@ -284,7 +284,10 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
                     + (chemical.isPresent() ? 1 : 0);
             if (kinds != 1) return false;
             if (fluid.isPresent()) return !fluidStack(1).isEmpty();
-            if (chemical.isPresent()) return MekanismCompat.isValidChemicalId(chemical.get());
+            if (chemical.isPresent()) {
+                String id = chemical.get();
+                return ResourceLocation.tryParse(id.substring(id.indexOf('|') + 1)) != null;
+            }
             if (tag.isPresent()) return true;
             return item.get() != Items.AIR;
         }
