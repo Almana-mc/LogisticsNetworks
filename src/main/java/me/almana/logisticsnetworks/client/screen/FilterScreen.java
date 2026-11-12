@@ -549,7 +549,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             g.pose().translate(0, 0, 200);
             RecipeCardData.Ingredient shown = inputs.get((int) (System.currentTimeMillis() / 1000 % inputs.size()));
             // Sprites at item depth
-            if (shown.kind() != RecipeCardData.Kind.ITEM) g.pose().translate(0, 0, 150);
+            if (shown.kind() == RecipeCardData.Kind.FLUID || (shown.kind() == RecipeCardData.Kind.CHEMICAL
+                    && MekanismCompat.getChemicalIcon(shown.chemical().get()) != null)) {
+                g.pose().translate(0, 0, 150);
+            }
             RecipeCardCells.icon(g, shown, x, y);
             g.pose().popPose();
             if (slot == hoveredSlot && menu.getCarried().isEmpty()) renderSlotHighlight(g, x, y, 0);
