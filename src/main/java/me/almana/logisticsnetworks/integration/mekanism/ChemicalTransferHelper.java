@@ -78,9 +78,7 @@ public final class ChemicalTransferHelper {
         if (found.isEmpty()) {
             return null;
         }
-        if (found.size() == 1) {
-            return found.get(0);
-        }
+        // Always wrap, routes by kind
         return new CombinedChemicalHandler(found.toArray(new IChemicalHandler[0]));
     }
 
@@ -90,9 +88,6 @@ public final class ChemicalTransferHelper {
         List<IChemicalHandler> handlers = collectSideHandlers(blockEntity, side);
         if (handlers.isEmpty()) {
             return null;
-        }
-        if (handlers.size() == 1) {
-            return handlers.get(0);
         }
         return new CombinedChemicalHandler(handlers.toArray(new IChemicalHandler[0]));
     }
