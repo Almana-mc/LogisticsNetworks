@@ -213,9 +213,8 @@ public class ClipboardMenu extends AbstractContainerMenu {
     // Settings arrive without filters
     public boolean replaceSettings(NodeClipboardConfig next, ServerPlayer player) {
         for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
-            boolean kept = next.getChannelType(channel) == clipboard.getChannelType(channel);
             for (int slot = 0; slot < clipboard.getFilterSlotCount(); slot++) {
-                next.setFilterItem(channel, slot, kept ? clipboard.getFilterItem(channel, slot) : ItemStack.EMPTY);
+                next.setFilterItem(channel, slot, clipboard.getFilterItem(channel, slot));
             }
         }
         return replaceClipboard(next, player);
