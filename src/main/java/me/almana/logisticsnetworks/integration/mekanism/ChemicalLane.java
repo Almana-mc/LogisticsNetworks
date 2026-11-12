@@ -75,7 +75,7 @@ public final class ChemicalLane implements RecipeLane {
                     : (ChemicalStack<?>) to.insertChemical(pulled, Action.EXECUTE);
             if (!rest.isEmpty())
                 source.insertChemical(rest, Action.EXECUTE);
-            long moved = pulled.getAmount() - (rest.isEmpty() ? 0 : rest.getAmount());
+            long moved = pulled.getAmount() - rest.getAmount();
             if (moved > 0)
                 pending.add(withAmount(pulled, moved));
             if (moved < request.getAmount())
@@ -89,7 +89,8 @@ public final class ChemicalLane implements RecipeLane {
         IChemicalHandler to = endpoints.get(target).chemicals().handler();
         for (ChemicalStack<?> moved : pending) {
             ChemicalStack<?> back = (ChemicalStack<?>) to.extractChemical(moved, Action.EXECUTE);
-            ChemicalStack<?> stuck = back.isEmpty() ? back : (ChemicalStack<?>) source.insertChemical(back, Action.EXECUTE);
+            ChemicalStack<?> stuck = back.isEmpty() ? back
+                    : (ChemicalStack<?>) source.insertChemical(back, Action.EXECUTE);
             // Source full, keep in receiver
             if (!stuck.isEmpty())
                 to.insertChemical(stuck, Action.EXECUTE);

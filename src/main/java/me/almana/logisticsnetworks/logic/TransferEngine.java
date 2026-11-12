@@ -453,10 +453,6 @@ public class TransferEngine {
             if (!includeItemTransfers && channel.getType() == ChannelType.ITEM && !cards)
                 continue;
 
-            // Item targets order on resolve
-            if (channel.getType() != ChannelType.ITEM)
-                typed = orderTargets(typed, channel, sourceNode);
-
             int configuredBatch = getBatchLimit(channel.getType(), sourceTier);
             int effectiveBatchSize = Math.max(1, Math.min(channel.getBatchSize(), configuredBatch));
 
@@ -465,6 +461,9 @@ public class TransferEngine {
                     RecipeChannel.receivers(itemImports[i], fluidImports[i], chemicalImports[i]),
                     effectiveBatchSize, sourceTier, dimensionalCache, capCache.interfaces, telemetryActive) : -1;
             if (!cards || RecipeChannel.hasLoose(channel)) {
+                // Item targets order on resolve
+                if (channel.getType() != ChannelType.ITEM)
+                    typed = orderTargets(typed, channel, sourceNode);
                 int loose = switch (channel.getType()) {
                     case FLUID ->
                         transferFluids(sourceNode, sourceLevel, channel, typed, effectiveBatchSize, dimensionalCache, capCache);
