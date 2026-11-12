@@ -20,7 +20,7 @@ import java.util.UUID;
 final class BridgedImports {
 
     // Matches LogisticsNetwork import order
-    private static final Comparator<ImportTarget> ORDER = Comparator
+    static final Comparator<ImportTarget> ORDER = Comparator
             .comparingInt((ImportTarget target) -> -target.channel().getPriority())
             .thenComparing(target -> target.node().getUUID());
 

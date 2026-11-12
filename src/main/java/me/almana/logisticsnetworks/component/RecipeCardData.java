@@ -103,14 +103,6 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         return new RecipeCardData(list, output, root.getBoolean(KEY_BLOCKING)).sanitized();
     }
 
-    public int setSize() {
-        int size = 0;
-        for (Ingredient ingredient : ingredients) {
-            size += ingredient.count();
-        }
-        return size;
-    }
-
     public long amount(Kind kind) {
         long total = 0;
         for (Ingredient ingredient : ingredients) {

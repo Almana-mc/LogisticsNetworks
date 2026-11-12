@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import mekanism.api.chemical.IChemicalHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -74,6 +75,12 @@ public final class TransferCapabilityCache {
     @Nullable
     IFluidHandler findFluidImportHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
         return findFluidHandler(node, direction, false);
+    }
+
+    @Nullable
+    @SuppressWarnings("rawtypes")
+    IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, @Nullable Direction direction) {
+        return handlers.findChemicalHandler(level, pos, direction);
     }
 
     @Nullable

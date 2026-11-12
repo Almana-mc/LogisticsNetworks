@@ -12,6 +12,7 @@ import mekanism.api.chemical.pigment.Pigment;
 import mekanism.api.chemical.slurry.Slurry;
 import mekanism.common.capabilities.Capabilities;
 import me.almana.logisticsnetworks.Config;
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.logic.ChannelTelemetry;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public final class ChemicalTransferHelper {
 
@@ -515,7 +517,13 @@ public final class ChemicalTransferHelper {
         return resolveFirstChemical(chemicalId).map(Chemical::getTextComponent).orElse(null);
     }
 
-    private static boolean isBlacklistedChemical(ChemicalStack<?> stack) {
+    @Nullable
+    public static ChemicalStack<?> stackOf(String chemicalId, long amount) {
+        return resolveFirstChemical(chemicalId).<ChemicalStack<?>>map(chemical -> chemical.getStack(amount))
+                .orElse(null);
+    }
+
+    static boolean isBlacklistedChemical(ChemicalStack<?> stack) {
         return stack.getType().getTags().anyMatch(tag -> tag.location().equals(BLACKLIST_TAG_ID));
     }
 
@@ -746,5 +754,12 @@ public final class ChemicalTransferHelper {
             case TYPE_SLURRY -> MekanismAPI.slurryRegistry().getValue(id);
             default -> null;
         };
+    }
+
+    public static Optional<RecipeCardData.Ingredient> recipeIngredient(Object value) {
+        if (!(value instanceof ChemicalStack<?> stack) || stack.isEmpty())
+            return Optional.empty();
+        return Optional.ofNullable(getChemicalId(stack))
+                .map(id -> RecipeCardData.Ingredient.ofChemical(id, stack.getAmount()));
     }
 }
