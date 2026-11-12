@@ -55,15 +55,11 @@ final class RecipeCardCells {
     }
 
     static void icon(GuiGraphics graphics, RecipeCardData.Ingredient ingredient, int x, int y) {
-        // Sprite at item depth
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 150);
         boolean drawn = switch (ingredient.kind()) {
             case FLUID -> FilterResourceRenderer.renderFluid(graphics, ingredient.fluidStack(FluidType.BUCKET_VOLUME), x, y);
             case CHEMICAL -> FilterResourceRenderer.renderChemical(graphics, ingredient.chemical().orElseThrow(), x, y);
             default -> false;
         };
-        graphics.pose().popPose();
         if (!drawn) graphics.renderItem(ingredient.icon(), x, y);
     }
 

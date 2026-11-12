@@ -547,7 +547,10 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
             g.fill(x, y, x + 16, y + 16, 260, 0xFF0A0A0A);
             g.pose().pushPose();
             g.pose().translate(0, 0, 200);
-            RecipeCardCells.icon(g, inputs.get((int) (System.currentTimeMillis() / 1000 % inputs.size())), x, y);
+            RecipeCardData.Ingredient shown = inputs.get((int) (System.currentTimeMillis() / 1000 % inputs.size()));
+            // Sprites at item depth
+            if (shown.kind() != RecipeCardData.Kind.ITEM) g.pose().translate(0, 0, 150);
+            RecipeCardCells.icon(g, shown, x, y);
             g.pose().popPose();
             if (slot == hoveredSlot && menu.getCarried().isEmpty()) renderSlotHighlight(g, x, y, 0);
         }
