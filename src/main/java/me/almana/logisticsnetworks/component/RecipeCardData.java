@@ -1,5 +1,7 @@
 package me.almana.logisticsnetworks.component;
 
+import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.util.ItemDataUtil;
 import net.minecraft.ChatFormatting;
@@ -16,6 +18,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -27,6 +30,7 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
 
     public static final int MAX_INGREDIENTS = 12;
     public static final int MAX_COUNT = 4096;
+    public static final int MAX_AMOUNT = 1_000_000;
     public static final RecipeCardData EMPTY = new RecipeCardData(List.of(), Optional.empty(), false);
     private static final int MAX_ID_LENGTH = 256;
     private static final String KEY_ROOT = "recipe_card";
@@ -35,10 +39,24 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
     private static final String KEY_BLOCKING = "blocking";
     private static final String KEY_ITEM = "item";
     private static final String KEY_TAG = "tag";
+    private static final String KEY_FLUID = "fluid";
+    private static final String KEY_CHEMICAL = "chemical";
     private static final String KEY_COUNT = "count";
 
     public static final StreamCodec<FriendlyByteBuf, RecipeCardData> STREAM_CODEC = StreamCodec.of(
             (buf, data) -> buf.writeNbt(data.save()), buf -> load(buf.readNbt()));
+
+    public enum Kind {
+        ITEM(ChannelType.ITEM),
+        FLUID(ChannelType.FLUID),
+        CHEMICAL(ChannelType.CHEMICAL);
+
+        public final ChannelType channel;
+
+        Kind(ChannelType channel) {
+            this.channel = channel;
+        }
+    }
 
     public RecipeCardData {
         ingredients = List.copyOf(ingredients);
@@ -91,6 +109,14 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             size += ingredient.count();
         }
         return size;
+    }
+
+    public long amount(Kind kind) {
+        long total = 0;
+        for (Ingredient ingredient : ingredients) {
+            if (ingredient.kind() == kind) total += ingredient.count();
+        }
+        return total;
     }
 
     public RecipeCardData withIngredient(int index, Ingredient value) {
@@ -149,29 +175,67 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         return StackSnapshot.of(new ItemStack(item, Math.max(1, Math.min(64, count))));
     }
 
+    private static Optional<String> boundedId(String value) {
+        return value.isEmpty() || value.length() > MAX_ID_LENGTH ? Optional.empty() : Optional.of(value);
+    }
+
     private static Optional<ResourceLocation> parseId(String value) {
-        return value.isEmpty() || value.length() > MAX_ID_LENGTH ? Optional.empty()
-                : Optional.ofNullable(ResourceLocation.tryParse(value));
+        return boundedId(value).map(ResourceLocation::tryParse);
     }
 
     private static Optional<Item> itemById(String value) {
         return parseId(value).flatMap(BuiltInRegistries.ITEM::getOptional).filter(item -> item != Items.AIR);
     }
 
-    public record Ingredient(Optional<Item> item, Optional<TagKey<Item>> tag, int count) {
+    public record Ingredient(Optional<Item> item, Optional<TagKey<Item>> tag, Optional<String> fluid,
+            Optional<String> chemical, int count) {
 
         public static Ingredient ofItem(ItemStack stack, int count) {
-            return new Ingredient(Optional.of(stack.getItem()), Optional.empty(), count);
+            return new Ingredient(Optional.of(stack.getItem()), Optional.empty(), Optional.empty(), Optional.empty(),
+                    count);
         }
 
         public static Ingredient ofTag(ResourceLocation tag, int count) {
-            return new Ingredient(Optional.empty(), Optional.of(TagKey.create(Registries.ITEM, tag)), count);
+            return new Ingredient(Optional.empty(), Optional.of(TagKey.create(Registries.ITEM, tag)),
+                    Optional.empty(), Optional.empty(), count);
+        }
+
+        public static Ingredient ofFluid(FluidStack stack) {
+            return new Ingredient(Optional.empty(), Optional.empty(),
+                    Optional.of(BuiltInRegistries.FLUID.getKey(stack.getFluid()).toString()), Optional.empty(),
+                    clamp(stack.getAmount()));
+        }
+
+        public static Ingredient ofChemical(String id, long amount) {
+            return new Ingredient(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(id),
+                    clamp(amount));
+        }
+
+        private static int clamp(long amount) {
+            return (int) Math.max(1, Math.min(MAX_AMOUNT, amount));
+        }
+
+        public Kind kind() {
+            if (fluid.isPresent()) return Kind.FLUID;
+            return chemical.isPresent() ? Kind.CHEMICAL : Kind.ITEM;
         }
 
         public boolean matches(ItemStack stack) {
             if (stack.isEmpty()) return false;
             if (tag.isPresent()) return stack.is(tag.get());
             return item.isPresent() && stack.is(item.get());
+        }
+
+        public boolean matches(FluidStack stack) {
+            return fluid.isPresent() && !stack.isEmpty()
+                    && fluid.get().equals(BuiltInRegistries.FLUID.getKey(stack.getFluid()).toString());
+        }
+
+        public FluidStack fluidStack(int amount) {
+            return fluid.map(ResourceLocation::tryParse)
+                    .flatMap(id -> BuiltInRegistries.FLUID.getOptional(id))
+                    .map(value -> new FluidStack(value, amount))
+                    .orElse(FluidStack.EMPTY);
         }
 
         public ItemStack icon() {
@@ -183,33 +247,52 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         }
 
         public Component label() {
+            if (kind() == Kind.FLUID) return fluidStack(1).getDisplayName();
+            if (kind() == Kind.CHEMICAL) {
+                Component name = MekanismCompat.getChemicalTextComponent(chemical.get());
+                return name != null ? name : Component.literal(chemical.get()).withStyle(ChatFormatting.RED);
+            }
             if (tag.isEmpty()) return icon().getHoverName();
             MutableComponent text = Component.literal("#" + tag.get().location());
             return BuiltInRegistries.ITEM.getTag(tag.get()).isPresent() ? text : text.withStyle(ChatFormatting.RED);
         }
 
+        public String amountText() {
+            return kind() == Kind.ITEM ? count + "×" : count + " mB";
+        }
+
         // Anchored item, then its tags
         public Ingredient nextTag() {
+            if (kind() != Kind.ITEM) return this;
             ItemStack base = icon();
             List<TagKey<Item>> tags = base.getTags()
                     .sorted(Comparator.comparing(key -> key.location().toString())).toList();
             if (tags.isEmpty()) return this;
             int at = tag.map(tags::indexOf).orElse(-1);
             Optional<Item> anchor = Optional.of(base.getItem());
-            return new Ingredient(anchor, at + 1 < tags.size() ? Optional.of(tags.get(at + 1)) : Optional.empty(), count);
+            return new Ingredient(anchor, at + 1 < tags.size() ? Optional.of(tags.get(at + 1)) : Optional.empty(),
+                    Optional.empty(), Optional.empty(), count);
         }
 
         public Ingredient withCount(int value) {
-            return new Ingredient(item, tag, Math.max(1, Math.min(MAX_COUNT, value)));
+            int max = kind() == Kind.ITEM ? MAX_COUNT : MAX_AMOUNT;
+            return new Ingredient(item, tag, fluid, chemical, Math.max(1, Math.min(max, value)));
         }
 
         boolean valid() {
+            int kinds = (item.isPresent() || tag.isPresent() ? 1 : 0) + (fluid.isPresent() ? 1 : 0)
+                    + (chemical.isPresent() ? 1 : 0);
+            if (kinds != 1) return false;
+            if (fluid.isPresent()) return !fluidStack(1).isEmpty();
+            if (chemical.isPresent()) return MekanismCompat.isValidChemicalId(chemical.get());
             if (tag.isPresent()) return true;
-            return item.isPresent() && item.get() != Items.AIR;
+            return item.get() != Items.AIR;
         }
 
         boolean sameKey(Ingredient other) {
+            if (kind() != other.kind()) return false;
             if (tag.isPresent() || other.tag.isPresent()) return tag.equals(other.tag);
+            if (kind() != Kind.ITEM) return fluid.equals(other.fluid) && chemical.equals(other.chemical);
             return item.equals(other.item);
         }
 
@@ -217,6 +300,8 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             CompoundTag root = new CompoundTag();
             item.ifPresent(value -> root.putString(KEY_ITEM, BuiltInRegistries.ITEM.getKey(value).toString()));
             tag.ifPresent(value -> root.putString(KEY_TAG, value.location().toString()));
+            fluid.ifPresent(value -> root.putString(KEY_FLUID, value));
+            chemical.ifPresent(value -> root.putString(KEY_CHEMICAL, value));
             root.putInt(KEY_COUNT, count);
             return root;
         }
@@ -224,8 +309,10 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         static Optional<Ingredient> load(CompoundTag root) {
             Optional<Item> item = itemById(root.getString(KEY_ITEM));
             Optional<TagKey<Item>> tag = parseId(root.getString(KEY_TAG)).map(id -> TagKey.create(Registries.ITEM, id));
-            if (item.isEmpty() && tag.isEmpty()) return Optional.empty();
-            return Optional.of(new Ingredient(item, tag, 1).withCount(root.getInt(KEY_COUNT)));
+            Optional<String> fluid = parseId(root.getString(KEY_FLUID)).map(ResourceLocation::toString);
+            Optional<String> chemical = boundedId(root.getString(KEY_CHEMICAL));
+            if (item.isEmpty() && tag.isEmpty() && fluid.isEmpty() && chemical.isEmpty()) return Optional.empty();
+            return Optional.of(new Ingredient(item, tag, fluid, chemical, 1).withCount(root.getInt(KEY_COUNT)));
         }
     }
 }

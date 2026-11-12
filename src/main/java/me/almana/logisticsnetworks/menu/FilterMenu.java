@@ -1095,7 +1095,7 @@ public class FilterMenu extends AbstractContainerMenu {
 
     public boolean setItemFilterEntry(Player player, int slot, ItemStack stack) {
         if (isSpecialMode || slot < 0 || slot >= slotCount || stack.isEmpty() || stack.is(ModTags.FILTERS)
-                || FilterItemData.refusesCard(getOpenedStack(), stack))
+                || FilterItemData.refusesCard(stack))
             return false;
 
         if (!FilterItemData.fitsEntry(stack))

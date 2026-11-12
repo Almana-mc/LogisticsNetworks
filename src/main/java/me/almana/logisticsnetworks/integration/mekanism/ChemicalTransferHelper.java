@@ -583,7 +583,7 @@ public final class ChemicalTransferHelper {
 
         if (type != null) {
             Chemical<?> exact = lookupByType(type, id);
-            if (exact != null) {
+            if (exact != null && !exact.isEmptyType()) {
                 matches.add(exact);
             }
             return matches;
@@ -605,7 +605,8 @@ public final class ChemicalTransferHelper {
         if (slurry != null) {
             matches.add(slurry);
         }
-
+        // Defaulted registries return empty
+        matches.removeIf(Chemical::isEmptyType);
         return matches;
     }
 
