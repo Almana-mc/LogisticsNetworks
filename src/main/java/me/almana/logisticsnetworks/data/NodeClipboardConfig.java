@@ -52,6 +52,7 @@ public final class NodeClipboardConfig {
     private static final String KEY_TYPES = "types";
     private static final String KEY_BATCH = "batch";
     private static final String KEY_BATCHES = "batches";
+    private static final String KEY_RECIPE_SETS = "recipe_sets";
     private static final String KEY_DELAY = "delay";
     private static final String KEY_IO = "io";
     private static final String KEY_REDSTONE = "redstone";
@@ -104,8 +105,9 @@ public final class NodeClipboardConfig {
     private static final class ChannelConfig {
         boolean enabled;
         ChannelMode mode;
-        ChannelType type;
-        int batchSize;
+        int types = ChannelType.ALL;
+        final int[] batches = new int[ChannelType.values().length];
+        int recipeSets;
         int tickDelay;
         @Nullable Direction ioDirection;
         RedstoneMode redstoneMode;
@@ -221,21 +223,6 @@ public final class NodeClipboardConfig {
         getChannelConfig(channel).mode = mode == null ? ChannelMode.IMPORT : mode;
     }
 
-    public ChannelType getChannelType(int channel) {
-        return getChannelConfig(channel).type;
-    }
-
-    public void setChannelType(int channel, ChannelType type) {
-        ChannelConfig config = getChannelConfig(channel);
-        ChannelType next = type == null ? ChannelType.ITEM : type;
-        if (config.type != next) {
-            Arrays.fill(filterItems[channel], ItemStack.EMPTY);
-            config.type = next;
-            config.batchSize = NodeUpgradeData.getOperationCap(next, getUpgradeTier());
-            if (next == ChannelType.ENERGY) config.tickDelay = 1;
-        }
-    }
-
     public @Nullable Direction getChannelDirection(int channel) {
         return getChannelConfig(channel).ioDirection;
     }
@@ -284,15 +271,55 @@ public final class NodeClipboardConfig {
         getChannelConfig(channel).priority = Math.max(-99, Math.min(99, priority));
     }
 
-    public int getChannelBatchSize(int channel) {
-        return getChannelConfig(channel).batchSize;
+    public int getChannelTypes(int channel) {
+        return getChannelConfig(channel).types;
     }
 
+    public void setChannelTypes(int channel, int types) {
+        getChannelConfig(channel).types = types & ChannelType.ALL;
+    }
+
+    public boolean hasFilterableType(int channel) {
+        return (getChannelTypes(channel) & ChannelType.FILTERABLE) != 0;
+    }
+
+    public int getChannelBatch(int channel, ChannelType type) {
+        return getChannelConfig(channel).batches[type.ordinal()];
+    }
+
+    public void setChannelBatch(int channel, ChannelType type, int batch) {
+        int cap = NodeUpgradeData.getOperationCap(type, getUpgradeTier());
+        getChannelConfig(channel).batches[type.ordinal()] =
+                type == ChannelType.ENERGY || batch > cap ? 0 : Math.max(0, batch);
+    }
+
+    public int getChannelRecipeSets(int channel) {
+        return getChannelConfig(channel).recipeSets;
+    }
+
+    public void setChannelRecipeSets(int channel, int sets) {
+        getChannelConfig(channel).recipeSets = Math.max(0, sets);
+    }
+
+    // Transitional, removed in Task 16
+    public ChannelType getChannelType(int channel) {
+        return ChannelType.first(getChannelTypes(channel));
+    }
+
+    // Transitional, removed in Task 16
+    public void setChannelType(int channel, ChannelType type) {
+        setChannelTypes(channel, type.bit());
+    }
+
+    // Transitional, removed in Task 16
+    public int getChannelBatchSize(int channel) {
+        int value = getChannelBatch(channel, getChannelType(channel));
+        return value <= 0 ? NodeUpgradeData.getOperationCap(getChannelType(channel), getUpgradeTier()) : value;
+    }
+
+    // Transitional, removed in Task 16
     public void setChannelBatchSize(int channel, int batchSize) {
-        ChannelConfig config = getChannelConfig(channel);
-        int maximum = NodeUpgradeData.getOperationCap(config.type, getUpgradeTier());
-        config.batchSize = config.type == ChannelType.ENERGY
-                ? maximum : Math.max(1, Math.min(batchSize, maximum));
+        setChannelBatch(channel, getChannelType(channel), batchSize);
     }
 
     public int getChannelTickDelay(int channel) {
@@ -300,9 +327,8 @@ public final class NodeClipboardConfig {
     }
 
     public void setChannelTickDelay(int channel, int delay) {
-        ChannelConfig config = getChannelConfig(channel);
-        config.tickDelay = config.type == ChannelType.ENERGY ? 1
-                : Math.max(NodeUpgradeData.getMinTickDelay(getUpgradeTier()), Math.min(10_000, delay));
+        getChannelConfig(channel).tickDelay =
+                Math.max(NodeUpgradeData.getMinTickDelay(getUpgradeTier()), Math.min(10_000, delay));
     }
 
     public ItemStack getFilterItem(int channel, int slot) {
@@ -341,9 +367,13 @@ public final class NodeClipboardConfig {
         int tier = getUpgradeTier();
         if (tier != previousTier) {
             for (ChannelConfig config : channels) {
-                int maximum = NodeUpgradeData.getOperationCap(config.type, tier);
-                config.batchSize = tier > previousTier ? maximum : Math.min(config.batchSize, maximum);
-                if (tier < previousTier && config.type != ChannelType.ENERGY) {
+                for (ChannelType type : ChannelType.values()) {
+                    if (tier > previousTier
+                            || config.batches[type.ordinal()] > NodeUpgradeData.getOperationCap(type, tier)) {
+                        config.batches[type.ordinal()] = 0;
+                    }
+                }
+                if (tier < previousTier) {
                     config.tickDelay = Math.max(config.tickDelay, NodeUpgradeData.getMinTickDelay(tier));
                 }
             }
@@ -462,8 +492,9 @@ public final class NodeClipboardConfig {
             ChannelConfig config = getChannelConfig(channel);
             if (config.enabled != defaults.enabled
                     || config.mode != defaults.mode
-                    || config.type != defaults.type
-                    || config.batchSize != defaults.batchSize
+                    || config.types != defaults.types
+                    || !Arrays.equals(config.batches, defaults.batches)
+                    || config.recipeSets != defaults.recipeSets
                     || config.tickDelay != defaults.tickDelay
                     || config.ioDirection != defaults.ioDirection
                     || config.redstoneMode != defaults.redstoneMode
@@ -557,8 +588,11 @@ public final class NodeClipboardConfig {
             if (channel != null) {
                 config.enabled = channel.isEnabled();
                 config.mode = channel.getMode();
-                config.type = channel.getType();
-                config.batchSize = channel.getBatchSize();
+                config.types = channel.getTypes();
+                for (ChannelType type : ChannelType.values()) {
+                    config.batches[type.ordinal()] = channel.getBatch(type);
+                }
+                config.recipeSets = channel.getRecipeSets();
                 config.tickDelay = channel.getTickDelay();
                 config.ioDirection = channel.getIoDirection();
                 config.redstoneMode = channel.getRedstoneMode();
@@ -575,8 +609,6 @@ public final class NodeClipboardConfig {
             } else {
                 config.enabled = false;
                 config.mode = ChannelMode.IMPORT;
-                config.type = ChannelType.ITEM;
-                config.batchSize = 8;
                 config.tickDelay = 20;
                 config.ioDirection = Direction.UP;
                 config.redstoneMode = RedstoneMode.IGNORED;
@@ -627,11 +659,16 @@ public final class NodeClipboardConfig {
             channelTag.putInt(KEY_INDEX, channelIndex);
             channelTag.putBoolean(KEY_ENABLED, channel.enabled);
             channelTag.putString(KEY_MODE, channel.mode.name());
-            channelTag.putString(KEY_TYPE, channel.type.name());
-            channelTag.put(KEY_TYPES, ChannelData.typeNames(channel.type.bit()));
+            channelTag.putString(KEY_TYPE, ChannelType.first(channel.types).name());
+            channelTag.put(KEY_TYPES, ChannelData.typeNames(channel.types));
             CompoundTag batches = new CompoundTag();
-            batches.putInt(channel.type.name(), channel.batchSize);
+            for (ChannelType type : ChannelType.values()) {
+                if (channel.batches[type.ordinal()] > 0)
+                    batches.putInt(type.name(), channel.batches[type.ordinal()]);
+            }
             channelTag.put(KEY_BATCHES, batches);
+            if (channel.recipeSets > 0)
+                channelTag.putInt(KEY_RECIPE_SETS, channel.recipeSets);
             channelTag.putInt(KEY_DELAY, channel.tickDelay);
             channelTag.putString(KEY_IO, channel.ioDirection != null ? channel.ioDirection.getName() : "all");
             channelTag.putString(KEY_REDSTONE, channel.redstoneMode.name());
@@ -741,12 +778,7 @@ public final class NodeClipboardConfig {
             ChannelConfig config = defaultChannelConfig();
             config.enabled = channelTag.getBoolean(KEY_ENABLED);
             config.mode = parseEnum(channelTag.getString(KEY_MODE), ChannelMode.values(), ChannelMode.IMPORT);
-            config.type = parseEnum(channelTag.getString(KEY_TYPE), ChannelType.values(), ChannelType.ITEM);
-            if (channelTag.contains(KEY_TYPES, Tag.TAG_LIST))
-                config.type = ChannelType.first(ChannelData.typeMask(channelTag.getList(KEY_TYPES, Tag.TAG_STRING)));
-            config.batchSize = Math.max(1, channelTag.contains(KEY_BATCHES, Tag.TAG_COMPOUND)
-                    ? channelTag.getCompound(KEY_BATCHES).getInt(config.type.name())
-                    : channelTag.getInt(KEY_BATCH));
+            loadTypes(config, channelTag);
             config.tickDelay = Math.max(1, channelTag.getInt(KEY_DELAY));
 
             String ioStr = channelTag.getString(KEY_IO);
@@ -815,6 +847,22 @@ public final class NodeClipboardConfig {
         config.sanitizeText();
         config.sanitizeCards();
         return config.isStructurallyValid() ? config : null;
+    }
+
+    // Legacy clipboards hold one type
+    private static void loadTypes(ChannelConfig config, CompoundTag channelTag) {
+        ChannelType legacy = parseEnum(channelTag.getString(KEY_TYPE), ChannelType.values(), ChannelType.ITEM);
+        config.types = channelTag.contains(KEY_TYPES, Tag.TAG_LIST)
+                ? ChannelData.typeMask(channelTag.getList(KEY_TYPES, Tag.TAG_STRING)) : legacy.bit();
+        if (channelTag.contains(KEY_BATCHES, Tag.TAG_COMPOUND)) {
+            CompoundTag batches = channelTag.getCompound(KEY_BATCHES);
+            for (ChannelType type : ChannelType.values())
+                config.batches[type.ordinal()] = Math.max(0, batches.getInt(type.name()));
+        } else {
+            config.batches[legacy.ordinal()] =
+                    Math.max(1, channelTag.contains(KEY_BATCH) ? channelTag.getInt(KEY_BATCH) : 8);
+        }
+        config.recipeSets = Math.max(0, channelTag.getInt(KEY_RECIPE_SETS));
     }
 
     private static boolean isOversized(CompoundTag root) {
@@ -1196,8 +1244,11 @@ public final class NodeClipboardConfig {
 
             channel.setEnabled(config.enabled);
             channel.setMode(config.mode);
-            channel.setType(config.type);
-            channel.setBatchSize(config.batchSize);
+            channel.setTypes(config.types);
+            for (ChannelType type : ChannelType.values()) {
+                channel.setBatch(type, config.batches[type.ordinal()]);
+            }
+            channel.setRecipeSets(config.recipeSets);
             channel.setTickDelay(config.tickDelay);
             channel.setIoDirection(config.ioDirection);
             channel.setRedstoneMode(config.redstoneMode);
@@ -1228,8 +1279,6 @@ public final class NodeClipboardConfig {
         ChannelConfig config = new ChannelConfig();
         config.enabled = false;
         config.mode = ChannelMode.IMPORT;
-        config.type = ChannelType.ITEM;
-        config.batchSize = 8;
         config.tickDelay = 20;
         config.ioDirection = Direction.UP;
         config.redstoneMode = RedstoneMode.IGNORED;

@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.item;
 import me.almana.logisticsnetworks.util.ItemDataUtil;
 import me.almana.logisticsnetworks.client.ClientControls;
 import me.almana.logisticsnetworks.component.WrenchFlow;
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 
@@ -63,6 +64,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.stream.Collectors;
 
 public class WrenchItem extends Item {
 
@@ -1426,8 +1428,10 @@ public class WrenchItem extends Item {
                     channel,
                     Component.translatable("gui.logisticsnetworks.channel_mode."
                             + clipboard.getChannelMode(channel).name().toLowerCase(Locale.ROOT)).getString(),
-                    Component.translatable("gui.logisticsnetworks.channel_type."
-                            + clipboard.getChannelType(channel).name().toLowerCase(Locale.ROOT)).getString(),
+                    ChannelType.listOf(clipboard.getChannelTypes(channel)).stream()
+                            .map(type -> Component.translatable("gui.logisticsnetworks.channel_type."
+                                    + type.name().toLowerCase(Locale.ROOT)).getString())
+                            .collect(Collectors.joining(", ")),
                     channelFilters));
             shown++;
         }

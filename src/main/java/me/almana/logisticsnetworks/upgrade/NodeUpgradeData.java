@@ -70,11 +70,13 @@ public final class NodeUpgradeData {
     }
 
     public static void applyTierChange(ChannelData channel, int previousTier, int tier) {
-        if (tier == previousTier)
-            return;
-        int maximum = getOperationCap(channel.getType(), tier);
-        channel.setBatchSize(tier > previousTier ? maximum : Math.min(channel.getBatchSize(), maximum));
-        if (tier < previousTier && channel.getType() != ChannelType.ENERGY) {
+        if (tier == previousTier) return;
+        for (ChannelType type : ChannelType.values()) {
+            if (tier > previousTier || channel.getBatch(type) > getOperationCap(type, tier)) {
+                channel.setBatch(type, 0);
+            }
+        }
+        if (tier < previousTier) {
             channel.setTickDelay(Math.max(channel.getTickDelay(), getMinTickDelay(tier)));
         }
     }
@@ -206,11 +208,11 @@ public final class NodeUpgradeData {
                     continue;
 
                 if (hasExport[i] && otherCh.getMode() == ChannelMode.IMPORT
-                        && node.getChannel(i).getType() == otherCh.getType()) {
+                        && (node.getChannel(i).getTypes() & otherCh.getTypes()) != 0) {
                     return true;
                 }
                 if (hasImport[i] && otherCh.getMode() == ChannelMode.EXPORT
-                        && node.getChannel(i).getType() == otherCh.getType()) {
+                        && (node.getChannel(i).getTypes() & otherCh.getTypes()) != 0) {
                     return true;
                 }
             }
