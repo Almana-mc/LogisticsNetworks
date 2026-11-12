@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.FlowResource;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -124,7 +125,9 @@ public class TelemetryManager {
             if (node == null) continue;
             for (int i = 0; i < count; i++) {
                 ChannelData channel = node.getChannel(i);
-                totals[i] += channel.getTelemetry().drainFlow();
+                long[] flows = new long[ChannelType.values().length];
+                channel.getTelemetry().drainFlows(flows);
+                totals[i] += Arrays.stream(flows).sum();
                 channel.getTelemetry().drainResources(resources.get(i));
                 if (types[i] < 0 && channel.isEnabled()) {
                     types[i] = channel.getType().ordinal();

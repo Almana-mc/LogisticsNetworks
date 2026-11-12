@@ -102,8 +102,8 @@ public class LogisticsNodeEntity extends Entity {
     private long labelRevision;
     private final List<ItemStack> pendingFilterEjects = new ArrayList<>();
 
-    private final long[] channelCooldowns = new long[CHANNEL_COUNT];
-    private final float[] backoffTicks = new float[CHANNEL_COUNT];
+    private final long[] channelCooldowns = new long[CHANNEL_COUNT * ChannelData.LANES];
+    private final float[] backoffTicks = new float[CHANNEL_COUNT * ChannelData.LANES];
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
@@ -299,9 +299,7 @@ public class LogisticsNodeEntity extends Entity {
     private void refreshRouteChannels() {
         long bits = 0L;
         if (isValidNode() && getNetworkId() != null && CreateCompat.isResolved(this)) {
-            bits = NodeRouteChannels.encode(channels, isMountedOnCreate(),
-                    NodeUpgradeData.hasMekanismChemicalUpgrade(this),
-                    NodeUpgradeData.hasArsSourceUpgrade(this));
+            bits = NodeRouteChannels.encode(channels, isMountedOnCreate(), NodeUpgradeData.availableTypes(this));
         }
         this.entityData.set(ROUTE_CHANNELS, bits);
     }
@@ -571,20 +569,20 @@ public class LogisticsNodeEntity extends Entity {
         }
     }
 
-    public long getLastExecution(int index) {
-        return channelCooldowns[index];
+    public long getLastExecution(int index, int lane) {
+        return channelCooldowns[index * ChannelData.LANES + lane];
     }
 
-    public void setLastExecution(int index, long time) {
-        channelCooldowns[index] = time;
+    public void setLastExecution(int index, int lane, long time) {
+        channelCooldowns[index * ChannelData.LANES + lane] = time;
     }
 
-    public float getBackoffTicks(int channelIndex) {
-        return backoffTicks[channelIndex];
+    public float getBackoffTicks(int index, int lane) {
+        return backoffTicks[index * ChannelData.LANES + lane];
     }
 
-    public void setBackoffTicks(int channelIndex, float value) {
-        backoffTicks[channelIndex] = value;
+    public void setBackoffTicks(int index, int lane, float value) {
+        backoffTicks[index * ChannelData.LANES + lane] = value;
     }
 
     private void loadPendingFilterEjects(CompoundTag compound, HolderLookup.Provider provider) {
