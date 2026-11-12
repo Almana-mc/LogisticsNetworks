@@ -13,6 +13,9 @@ import me.almana.logisticsnetworks.menu.RecipeCardMenu;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fluids.FluidType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -57,14 +60,28 @@ final class RecipeCardEmiHandler implements EmiRecipeHandler<RecipeCardMenu> {
 
     @Nullable
     private static RecipeCardData.Ingredient ingredient(EmiIngredient input) {
-        int count = (int) Math.max(1, Math.min(RecipeCardData.MAX_COUNT, input.getAmount()));
         if (input instanceof TagEmiIngredient tag && tag.key.isFor(Registries.ITEM)) {
-            return RecipeCardData.Ingredient.ofTag(tag.key.location(), count);
+            return RecipeCardData.Ingredient.ofTag(tag.key.location(),
+                    (int) Math.max(1, Math.min(RecipeCardData.MAX_COUNT, input.getAmount())));
         }
         for (EmiStack stack : input.getEmiStacks()) {
-            ItemStack item = stack.getItemStack();
-            if (!item.isEmpty()) return RecipeCardData.Ingredient.ofItem(item, count);
+            RecipeCardData.Ingredient found = ingredientOf(stack, input.getAmount());
+            if (found != null) return found;
         }
+        return null;
+    }
+
+    @Nullable
+    static RecipeCardData.Ingredient ingredientOf(EmiStack stack, long amount) {
+        if (stack.getKey() instanceof Fluid fluid) {
+            return RecipeCardData.Ingredient.ofFluid(new FluidStack(fluid,
+                    (int) Math.min(RecipeCardData.MAX_AMOUNT, amount > 0 ? amount : FluidType.BUCKET_VOLUME)));
+        }
+        ItemStack item = stack.getItemStack();
+        if (!item.isEmpty()) {
+            return RecipeCardData.Ingredient.ofItem(item, (int) Math.max(1, Math.min(RecipeCardData.MAX_COUNT, amount)));
+        }
+        // Mek 10.4: chemicals via JEI
         return null;
     }
 }

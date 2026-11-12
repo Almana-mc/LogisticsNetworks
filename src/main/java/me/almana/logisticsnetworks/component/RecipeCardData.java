@@ -305,9 +305,16 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             Optional<Item> item = itemById(root.getString(KEY_ITEM));
             Optional<TagKey<Item>> tag = parseId(root.getString(KEY_TAG)).map(id -> TagKey.create(Registries.ITEM, id));
             Optional<String> fluid = parseId(root.getString(KEY_FLUID)).map(ResourceLocation::toString);
-            Optional<String> chemical = boundedId(root.getString(KEY_CHEMICAL));
+            Optional<String> chemical = boundedId(root.getString(KEY_CHEMICAL)).map(Ingredient::cleanChemical);
             if (item.isEmpty() && tag.isEmpty() && fluid.isEmpty() && chemical.isEmpty()) return Optional.empty();
             return Optional.of(new Ingredient(item, tag, fluid, chemical, 1).withCount(root.getInt(KEY_COUNT)));
+        }
+
+        // Keep kind prefix
+        private static String cleanChemical(String id) {
+            int at = id.indexOf('|') + 1;
+            ResourceLocation clean = ResourceLocation.tryParse(id.substring(at));
+            return clean == null ? id : id.substring(0, at) + clean;
         }
     }
 }
