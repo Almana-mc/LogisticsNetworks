@@ -38,12 +38,10 @@ final class RecipeChannel {
     }
 
     // Card kinds only move loose entries
-    static boolean runsLoose(ChannelData channel, ChannelType type) {
-        ItemStack[] filters = channel.getFilterItems();
-        boolean cardKind = RecipeSets.kinds(RecipeSets.cards(filters)).stream()
-                .anyMatch(kind -> kind.channel == type);
-        if (!cardKind)
+    static boolean runsLoose(ChannelData channel, ChannelType type, Set<RecipeCardData.Kind> kinds) {
+        if (kinds.stream().noneMatch(kind -> kind.channel == type))
             return true;
+        ItemStack[] filters = channel.getFilterItems();
         FilterItemData.ReadCache cache = FilterItemData.createReadCache();
         return switch (type) {
             case ITEM -> FilterLogic.hasConfiguredItemFilter(filters, cache);
