@@ -123,6 +123,8 @@ public record GeneralFilterEntry(
     // Absent = legacy, filter target
     @Nullable
     private static FilterTargetType tagKind(CompoundTag entry) {
+        if (!entry.contains(KEY_TAG_KIND, Tag.TAG_STRING))
+            return null;
         String name = entry.getString(KEY_TAG_KIND);
         for (FilterTargetType kind : FilterTargetType.values()) {
             if (kind.getSerializedName().equals(name))

@@ -1291,9 +1291,9 @@ public final class FilterItemData {
         return fluid.getFluid().builtInRegistryHolder().tags().anyMatch(t -> t.location().toString().equals(tag));
     }
 
+    // Live tag, read-only callers
     private static CompoundTag getRoot(ItemStack stack) {
-        CompoundTag custom = ItemDataUtil.getCustomData(stack);
-        return custom.contains(KEY_ROOT, Tag.TAG_COMPOUND) ? custom.getCompound(KEY_ROOT) : new CompoundTag();
+        return ItemDataUtil.peekCustomData(stack).getCompound(KEY_ROOT);
     }
 
     private static void updateRoot(ItemStack stack, Consumer<CompoundTag> modifier) {
