@@ -6,7 +6,6 @@ import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.VirtualFilterType;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
@@ -222,13 +221,11 @@ public class ClipboardMenu extends AbstractContainerMenu {
 
     public boolean addFilterItem(int slot, ItemStack item) {
         int channel = getSelectedChannel();
-        FilterTargetType target = FilterTargetType.forChannel(clipboard.getChannelType(channel));
-        if (target == null || slot < 0 || slot >= clipboard.getFilterSlotCount()
+        if (!clipboard.hasFilterableType(channel) || slot < 0 || slot >= clipboard.getFilterSlotCount()
                 || item.isEmpty() || item.is(ModTags.FILTERS)) return false;
         ItemStack filter = clipboard.getFilterItem(channel, slot);
         if (filter.isEmpty()) {
             filter = VirtualFilterType.SMALL.createStack();
-            FilterItemData.setTargetType(filter, target);
         } else if (!FilterItemData.isFilterItem(filter)) {
             return false;
         } else {

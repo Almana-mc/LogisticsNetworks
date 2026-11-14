@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.component;
 
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
+import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtPath;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
@@ -22,7 +23,8 @@ public record GeneralFilterEntry(
         @Nullable String tag,
         EntryCounts counts,
         SlotMapping slotMapping,
-        NbtConstraints nbt) {
+        NbtConstraints nbt,
+        @Nullable FilterTargetType tagKind) {
 
     public static final NbtPath ENCHANTED_PATH = NbtPath.of(NbtPath.Component.of("minecraft:enchanted"));
     public static final NbtPath DURABILITY_PATH = NbtPath.of(NbtPath.Component.of("minecraft:durability"));
@@ -41,6 +43,7 @@ public record GeneralFilterEntry(
     private static final String KEY_MATCH_ANY = "nbt_match_any";
     private static final String KEY_STRICT = "nbt_strict";
     private static final String KEY_RAW = "nbt_raw";
+    private static final String KEY_TAG_KIND = "tag_kind";
 
     public GeneralFilterEntry {
         counts = counts == null ? EntryCounts.EMPTY : counts;
@@ -50,7 +53,7 @@ public record GeneralFilterEntry(
 
     public static GeneralFilterEntry empty(int slot) {
         return new GeneralFilterEntry(slot, null, null, null, null, EntryCounts.EMPTY, SlotMapping.EMPTY,
-                NbtConstraints.EMPTY);
+                NbtConstraints.EMPTY, null);
     }
 
     public boolean isEmpty() {
@@ -58,23 +61,24 @@ public record GeneralFilterEntry(
     }
 
     public GeneralFilterEntry withItem(@Nullable StackSnapshot value) {
-        return new GeneralFilterEntry(slot, value, fluidId, chemicalId, tag, counts, slotMapping, nbt);
+        return new GeneralFilterEntry(slot, value, fluidId, chemicalId, tag, counts, slotMapping, nbt, tagKind);
     }
 
-    public GeneralFilterEntry withTag(@Nullable String value) {
-        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, value, counts, slotMapping, nbt);
+    public GeneralFilterEntry withTag(@Nullable String value, @Nullable FilterTargetType kind) {
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, value, counts, slotMapping, nbt,
+                value == null ? null : kind);
     }
 
     public GeneralFilterEntry withCounts(EntryCounts value) {
-        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, value, slotMapping, nbt);
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, value, slotMapping, nbt, tagKind);
     }
 
     public GeneralFilterEntry withNbt(NbtConstraints value) {
-        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, slotMapping, value);
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, slotMapping, value, tagKind);
     }
 
     public GeneralFilterEntry withSlotMapping(SlotMapping value) {
-        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, value, nbt);
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, value, nbt, tagKind);
     }
 
     // legacy: filter saved before v2
@@ -92,7 +96,7 @@ public record GeneralFilterEntry(
         NbtConstraints nbt = new NbtConstraints(loadRules(entry), entry.getBoolean(KEY_MATCH_ANY), strict,
                 entry.getString(KEY_RAW));
         return new GeneralFilterEntry(entry.getInt(KEY_SLOT), item, string(entry, KEY_FLUID),
-                string(entry, KEY_CHEMICAL), string(entry, KEY_TAG), counts, mapping, nbt);
+                string(entry, KEY_CHEMICAL), string(entry, KEY_TAG), counts, mapping, nbt, tagKind(entry));
     }
 
     public CompoundTag save() {
@@ -111,7 +115,20 @@ public record GeneralFilterEntry(
             putString(entry, KEY_SLOT_MAP_EXPR, slotMapping.expression());
         }
         saveNbt(entry);
+        if (tagKind != null)
+            entry.putString(KEY_TAG_KIND, tagKind.getSerializedName());
         return entry;
+    }
+
+    // Absent = legacy, filter target
+    @Nullable
+    private static FilterTargetType tagKind(CompoundTag entry) {
+        String name = entry.getString(KEY_TAG_KIND);
+        for (FilterTargetType kind : FilterTargetType.values()) {
+            if (kind.getSerializedName().equals(name))
+                return kind;
+        }
+        return null;
     }
 
     private void saveNbt(CompoundTag entry) {

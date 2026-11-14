@@ -5,7 +5,7 @@ import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
-import me.almana.logisticsnetworks.filter.FilterTargetType;
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
@@ -35,22 +35,31 @@ public final class AttachedStorageFilterScanner {
 
     public static Result scan(ServerLevel level, LogisticsNodeEntity node, ChannelData channel, ItemStack filter) {
         BlockPos pos = node.getAttachedPos();
-        FilterTargetType target = FilterTargetType.forChannel(channel.getType());
         boolean mounted = node.isMountedOnCreate();
-        if ((!mounted && !level.isLoaded(pos)) || !CreateCompat.isResolved(node) || target == null) {
+        if ((!mounted && !level.isLoaded(pos)) || !CreateCompat.isResolved(node)) {
             return new Result(0, false, false, false);
         }
 
         TransferEngine.CapCache capabilities = new TransferEngine.CapCache();
-        return switch (target) {
-            case ITEMS -> scanItems(mounted ? CreateCompat.findMountedItemHandler(node)
-                    : capabilities.findItemHandler(level, pos, channel.getIoDirection()), filter);
-            case FLUIDS -> scanFluids(mounted ? CreateCompat.findMountedFluidHandler(node)
-                    : capabilities.findFluidHandler(level, pos, channel.getIoDirection()), filter);
-            case CHEMICALS -> MekanismCompat.isLoaded() && !mounted
-                    ? scanChemicals(capabilities.findChemicalHandler(level, pos, channel.getIoDirection()), filter)
-                    : new Result(0, false, false, false);
-        };
+        Result total = new Result(0, false, false, false);
+        if (channel.hasType(ChannelType.ITEM)) {
+            total = merge(total, scanItems(mounted ? CreateCompat.findMountedItemHandler(node)
+                    : capabilities.findItemHandler(level, pos, channel.getIoDirection()), filter));
+        }
+        if (channel.hasType(ChannelType.FLUID) && !total.filterFull()) {
+            total = merge(total, scanFluids(mounted ? CreateCompat.findMountedFluidHandler(node)
+                    : capabilities.findFluidHandler(level, pos, channel.getIoDirection()), filter));
+        }
+        if (channel.hasType(ChannelType.CHEMICAL) && !total.filterFull() && !mounted && MekanismCompat.isLoaded()) {
+            total = merge(total, scanChemicals(capabilities.findChemicalHandler(level, pos, channel.getIoDirection()),
+                    filter));
+        }
+        return total;
+    }
+
+    private static Result merge(Result first, Result second) {
+        return new Result(first.added() + second.added(), first.storageFound() || second.storageFound(),
+                second.filterFull(), first.tooLarge() || second.tooLarge());
     }
 
     static Result scanItems(IItemHandler handler, ItemStack filter) {
@@ -99,7 +108,7 @@ public final class AttachedStorageFilterScanner {
     }
 
     private static GeneralFilterEntry resource(@Nullable String fluidId, @Nullable String chemicalId) {
-        return new GeneralFilterEntry(0, null, fluidId, chemicalId, null, null, null, null);
+        return new GeneralFilterEntry(0, null, fluidId, chemicalId, null, null, null, null, null);
     }
 
     private static Result addAll(ItemStack filter, List<GeneralFilterEntry> candidates) {

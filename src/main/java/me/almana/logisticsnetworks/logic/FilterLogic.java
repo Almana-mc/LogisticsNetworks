@@ -102,7 +102,7 @@ public final class FilterLogic {
 
             if (FilterItemData.isFilterItem(filter)
                     && (FilterItemData.hasAnyFluidEntries(filter, filterReadCache)
-                            || FilterItemData.hasAnyTagEntries(filter, filterReadCache))) {
+                            || FilterItemData.hasTagEntries(filter, FilterTargetType.FLUIDS, filterReadCache))) {
                 isFilter = true;
                 matched = FilterItemData.containsFluidFull(filter, candidate, provider, filterReadCache);
                 isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
@@ -168,7 +168,7 @@ public final class FilterLogic {
 
             if (FilterItemData.isFilterItem(filter)
                     && (FilterItemData.hasAnyChemicalEntries(filter, filterReadCache)
-                            || FilterItemData.hasAnyTagEntries(filter, filterReadCache))) {
+                            || FilterItemData.hasTagEntries(filter, FilterTargetType.CHEMICALS, filterReadCache))) {
                 isFilter = true;
                 matched = FilterItemData.containsChemicalFull(filter, chemicalId, filterReadCache);
                 isBlacklist = FilterItemData.isBlacklist(filter, filterReadCache);
@@ -239,7 +239,7 @@ public final class FilterLogic {
             @Nullable FilterItemData.ReadCache filterReadCache, FilterTargetType type) {
         for (ItemStack filter : filters) {
             boolean entries = FilterItemData.isFilterItem(filter)
-                    && (FilterItemData.hasAnyTagEntries(filter, filterReadCache)
+                    && (FilterItemData.hasTagEntries(filter, type, filterReadCache)
                             || (type == FilterTargetType.FLUIDS
                                     ? FilterItemData.hasAnyFluidEntries(filter, filterReadCache)
                                     : FilterItemData.hasAnyChemicalEntries(filter, filterReadCache)));
