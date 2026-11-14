@@ -950,7 +950,8 @@ public class ServerPayloadHandler {
             }
             if (result.tooLarge()) {
                 player.displayClientMessage(Component.translatable("message.logisticsnetworks.filter.too_large"), true);
-                return;
+                if (result.added() == 0)
+                    return;
             }
             NetworkHandler.sendToPlayer(player, new SyncFilterScanResultPayload(
                     filter.copyWithCount(1), result.added(), result.storageFound(), result.filterFull()));
