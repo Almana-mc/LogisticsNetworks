@@ -1,9 +1,11 @@
 package me.almana.logisticsnetworks.logic.async;
 
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
+import me.almana.logisticsnetworks.utils.HashUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -83,10 +85,10 @@ final class ItemEndpointTable {
     }
 
     List<NetworkSnapshot.ItemEndpoint> endpoints() {
-        List<Map<Item, Long>> counts = new ArrayList<>();
+        List<Object2LongMap<Item>> counts = new ArrayList<>();
         for (int i = 0; i < networkEndpoints.size(); i++) {
-            counts.add(requestedCounts.get(i).isEmpty() ? Map.of()
-                    : Map.copyOf(networkEndpoints.get(i).itemCounts(requestedCounts.get(i), false)));
+            counts.add(requestedCounts.get(i).isEmpty() ? HashUtils.itemToLongMap()
+                    : networkEndpoints.get(i).itemCounts(requestedCounts.get(i), false));
         }
         for (int i = 0; i < endpoints.size(); i++) {
             var direct = endpoints.get(i).direct();
