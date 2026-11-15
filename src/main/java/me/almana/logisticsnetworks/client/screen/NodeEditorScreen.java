@@ -113,8 +113,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     // Settings scroll state
     private int settingsScrollOffset = 0;
-    private static final int SETTINGS_VISIBLE_ROWS = 9;
-    private static final int SETTINGS_TOTAL_ROWS = 9;
+    private static final int SETTINGS_VISIBLE_ROWS = 8;
+    private static final int SETTINGS_TOTAL_ROWS = 8;
 
     private int settingsHoverRow = -1;
     private long settingsHoverStartTime = 0;
@@ -818,7 +818,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 tr("gui.logisticsnetworks.node.setting.redstone"),
                 tr("gui.logisticsnetworks.node.setting.distribution"),
                 tr("gui.logisticsnetworks.node.setting.priority"),
-                tr("gui.logisticsnetworks.node.setting.batch"),
                 tr("gui.logisticsnetworks.node.setting.delay")
         };
         String[] values = {
@@ -830,8 +829,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 getRedstoneModeLabel(ch.getRedstoneMode()),
                 getDistributionModeLabel(ch.getDistributionMode()),
                 editingRow == 6 ? "" : String.valueOf(ch.getPriority()),
-                editingRow == 7 ? "" : tr("gui.logisticsnetworks.node.value.batch.per_type"),
-                editingRow == 8 ? "" : tr("gui.logisticsnetworks.node.value.tick_delay", ch.getTickDelay())
+                editingRow == 7 ? "" : tr("gui.logisticsnetworks.node.value.tick_delay", ch.getTickDelay())
         };
         Theme.Variant[] variants = {
                 ch.isEnabled() ? Theme.Variant.ACCENT : Theme.Variant.NEUTRAL,
@@ -841,11 +839,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 getRedstoneVariant(ch.getRedstoneMode()),
                 getDistributionVariant(ch.getDistributionMode()),
                 Theme.Variant.NEUTRAL,
-                Theme.Variant.NEUTRAL,
                 Theme.Variant.NEUTRAL
         };
-        boolean[] enabled = new boolean[9];
-        for (int i = 0; i < 9; i++)
+        boolean[] enabled = new boolean[SETTINGS_TOTAL_ROWS];
+        for (int i = 0; i < SETTINGS_TOTAL_ROWS; i++)
             enabled[i] = !isSettingDisabled(ch, i);
 
         int maxScroll = SETTINGS_TOTAL_ROWS - SETTINGS_VISIBLE_ROWS;
@@ -1197,7 +1194,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         int valueBoxW;
         if (value.isEmpty()) {
             valueBoxW = 0;
-        } else if (row >= 6 && row <= 8 || row == 3 || row == 2) {
+        } else if (row >= 6 || row == 3 || row == 2) {
             valueBoxW = font.width(value) + 8;
         } else {
             valueBoxW = ThemePaint.pillWidth(font, value);
@@ -1226,7 +1223,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             return;
         }
 
-        if (row >= 6 && row <= 8 || row == 3 || row == 2) {
+        if (row >= 6 || row == 3 || row == 2) {
             int vx = x + w - valueBoxW - 3;
             g.fill(vx, chipY, vx + valueBoxW, chipY + 9, t.surfaceSunken());
             g.drawString(font, value, vx + 4, chipY + 1, cText(), false);
@@ -1239,9 +1236,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     private boolean isSettingDisabled(ChannelData ch, int row) {
         if (ch.getMode() == ChannelMode.IMPORT) {
-            return row == 5 || row == 7 || row == 8;
+            return row == 5 || row == 7;
         }
-        return ch.getTypes() == ChannelType.ENERGY.bit() && row == 8;
+        return ch.getTypes() == ChannelType.ENERGY.bit() && row == 7;
     }
 
     @Override
@@ -1644,13 +1641,13 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 if (isSettingDisabled(ch, row))
                     return true;
 
-                if (row == 2 || row == 7) {
+                if (row == 2) {
                     ClickSound.play();
                     resources.open(resourcesTarget(node, ch), leftPos + 40, topPos + 102);
                     return true;
                 }
 
-                if (row >= 6 && row <= 8) {
+                if (row >= 6) {
                     if (ClientControls.modifier3Down()) {
                         ClickSound.play();
                         setNumericExtremum(ch, row, action == 0);
@@ -1694,7 +1691,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             case 4 -> ch.setRedstoneMode(cycleEnum(ch.getRedstoneMode(), dir));
             case 5 -> ch.setDistributionMode(cycleEnum(ch.getDistributionMode(), dir));
             case 6 -> ch.setPriority(ch.getPriority() + (ClientControls.modifier1Down() ? 10 : 1) * dir);
-            case 8 -> ch.setTickDelay(ch.getTickDelay() + (ClientControls.modifier1Down() ? 10 : 1) * dir);
+            case 7 -> ch.setTickDelay(ch.getTickDelay() + (ClientControls.modifier1Down() ? 10 : 1) * dir);
         }
     }
 
@@ -1717,7 +1714,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
         String val = switch (row) {
             case 6 -> String.valueOf(ch.getPriority());
-            case 8 -> String.valueOf(ch.getTickDelay());
+            case 7 -> String.valueOf(ch.getTickDelay());
             default -> "";
         };
 
@@ -1743,7 +1740,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 if (ch != null) {
                     switch (editingRow) {
                         case 6 -> ch.setPriority(val);
-                        case 8 -> ch.setTickDelay(val);
+                        case 7 -> ch.setTickDelay(val);
                     }
                     commitChannelUpdate(node, ch);
                 }
@@ -1886,7 +1883,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private void setNumericExtremum(ChannelData ch, int row, boolean max) {
         switch (row) {
             case 6 -> ch.setPriority(max ? PRIORITY_MAX : PRIORITY_MIN);
-            case 8 -> ch.setTickDelay(max ? DELAY_MAX : DELAY_MIN);
+            case 7 -> ch.setTickDelay(max ? DELAY_MAX : DELAY_MIN);
         }
     }
 
@@ -2166,7 +2163,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                 "gui.logisticsnetworks.node.tip.redstone",
                 "gui.logisticsnetworks.node.tip.distribution",
                 "gui.logisticsnetworks.node.tip.priority",
-                "gui.logisticsnetworks.node.tip.batch",
                 "gui.logisticsnetworks.node.tip.delay"
         };
 
@@ -2182,8 +2178,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             valueTipKey = "gui.logisticsnetworks.node.tip.redstone." + ch.getRedstoneMode().name().toLowerCase(Locale.ROOT);
         } else if (row == 5) {
             valueTipKey = "gui.logisticsnetworks.node.tip.distribution." + ch.getDistributionMode().name().toLowerCase(Locale.ROOT);
-        } else if (row == 7 && ch.getMode() == ChannelMode.EXPORT && RecipeCardItem.anyIn(ch.getFilterItems())) {
-            valueTipKey = "gui.logisticsnetworks.node.tip.batch.recipe";
         }
 
         if (valueTipKey != null) {
