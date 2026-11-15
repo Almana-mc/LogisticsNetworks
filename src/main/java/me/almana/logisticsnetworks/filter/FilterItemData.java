@@ -1,5 +1,7 @@
 package me.almana.logisticsnetworks.filter;
 
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import me.almana.logisticsnetworks.Logisticsnetworks;
 import me.almana.logisticsnetworks.component.GeneralFilterEntry;
 import me.almana.logisticsnetworks.component.NbtCriterion;
@@ -11,6 +13,7 @@ import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.util.ItemDataUtil;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -49,6 +52,9 @@ public final class FilterItemData {
     // Bounds nbt rule sizes
     public static final int MAX_NBT_VALUE_BYTES = 2048;
     public static final int MAX_NBT_RAW_LENGTH = 4096;
+    public static final int MAX_NBT_DEPTH = 256;
+    private static final SimpleCommandExceptionType NBT_TOO_DEEP =
+            new SimpleCommandExceptionType(Component.literal("nested deeper than " + MAX_NBT_DEPTH));
     private static final String NBT_OP_EQUALS = "=";
     // Bounds channel sync size
     private static final int MAX_ENTRY_TAG_BYTES = 2048;
@@ -1044,7 +1050,7 @@ public final class FilterItemData {
             String raw = getEntryNbtRaw(stack, i);
             if (raw != null) {
                 try {
-                    TagParser.parseTag(raw);
+                    parseSnbt(raw);
                 } catch (Exception e) {
                     warnings.add("Slot " + (i + 1) + ": invalid NBT (" + e.getMessage() + ")");
                 }
@@ -1326,10 +1332,44 @@ public final class FilterItemData {
         if (raw.isEmpty())
             return new ParsedRawNbt(null, false);
         try {
-            return new ParsedRawNbt(TagParser.parseTag(raw), false);
+            return new ParsedRawNbt(parseSnbt(raw), false);
         } catch (Exception e) {
             return new ParsedRawNbt(null, true);
         }
+    }
+
+    // TagParser recursion has no cap
+    public static CompoundTag parseSnbt(String text) throws CommandSyntaxException {
+        if (nestingDepth(text) > MAX_NBT_DEPTH)
+            throw NBT_TOO_DEEP.create();
+        try {
+            return TagParser.parseTag(text);
+        } catch (StackOverflowError e) {
+            throw NBT_TOO_DEEP.create();
+        }
+    }
+
+    public static int nestingDepth(String text) {
+        int depth = 0;
+        int max = 0;
+        char quote = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (quote != 0) {
+                if (ch == '\\') {
+                    i++;
+                } else if (ch == quote) {
+                    quote = 0;
+                }
+            } else if (ch == '"' || ch == '\'') {
+                quote = ch;
+            } else if (ch == '[' || ch == '(' || ch == '{') {
+                max = Math.max(max, ++depth);
+            } else if (ch == ']' || ch == ')' || ch == '}') {
+                depth = Math.max(0, depth - 1);
+            }
+        }
+        return max;
     }
 
     private record ParsedRawNbt(@Nullable CompoundTag value, boolean invalid) {

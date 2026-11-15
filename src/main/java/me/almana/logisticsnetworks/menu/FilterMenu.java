@@ -861,7 +861,7 @@ public class FilterMenu extends AbstractContainerMenu {
         if (input == null || input.isEmpty())
             return null;
         try {
-            return net.minecraft.nbt.TagParser.parseTag("{v:" + input + "}").get("v");
+            return FilterItemData.parseSnbt("{v:" + input + "}").get("v");
         } catch (Exception e) {
             return null;
         }

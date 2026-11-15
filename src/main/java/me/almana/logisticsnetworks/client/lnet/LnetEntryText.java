@@ -81,29 +81,6 @@ final class LnetEntryText {
         return -1;
     }
 
-    static int depth(String text) {
-        int depth = 0;
-        int max = 0;
-        char quote = 0;
-        for (int i = 0; i < text.length(); i++) {
-            char ch = text.charAt(i);
-            if (quote != 0) {
-                if (ch == '\\') {
-                    i++;
-                } else if (ch == quote) {
-                    quote = 0;
-                }
-            } else if (ch == '"' || ch == '\'') {
-                quote = ch;
-            } else if (ch == '[' || ch == '(' || ch == '{') {
-                max = Math.max(max, ++depth);
-            } else if (ch == ']' || ch == ')' || ch == '}') {
-                depth = Math.max(0, depth - 1);
-            }
-        }
-        return max;
-    }
-
     static String oneLine(String text) {
         return text.replace('\r', ' ').replace('\n', ' ');
     }
@@ -176,7 +153,7 @@ final class LnetEntryText {
     }
 
     static IOException tooDeep() {
-        return new IOException("nesting deeper than " + LnetDocument.MAX_DEPTH);
+        return new IOException("nesting deeper than " + FilterItemData.MAX_NBT_DEPTH);
     }
 
     private static boolean atIdPosition(@Nullable String input, int cursor) {

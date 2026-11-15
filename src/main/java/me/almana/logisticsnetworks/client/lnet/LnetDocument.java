@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig.ChannelState;
 import me.almana.logisticsnetworks.data.RedstoneMode;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
@@ -25,7 +26,6 @@ import java.util.regex.Pattern;
 final class LnetDocument {
 
     static final String HEADER = "lnet 2";
-    static final int MAX_DEPTH = 256;
     private static final Pattern CHANNEL =
             Pattern.compile("[Cc]hannel\\s+(\\d+)\\s*(?:\"((?:[^\"\\\\]|\\\\.)*)\")?\\s*:(.*)");
 
@@ -87,8 +87,8 @@ final class LnetDocument {
                 document.finishNode();
             }
             try {
-                if (LnetEntryText.depth(line) > MAX_DEPTH) {
-                    throw new IOException("nesting deeper than " + MAX_DEPTH);
+                if (FilterItemData.nestingDepth(line) > FilterItemData.MAX_NBT_DEPTH) {
+                    throw LnetEntryText.tooDeep();
                 }
                 document.readLine(line);
             } catch (IOException e) {
