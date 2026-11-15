@@ -142,7 +142,8 @@ public final class NameFilterData {
         if (!isNameFilter(source) || !isNameFilter(target))
             return false;
         String name = getNameFilter(source).trim();
-        if (!name.isEmpty() && !validateRegex(name).accepted())
+        // D4: unsupported patterns kept
+        if (name.length() > MAX_EXPRESSION_LENGTH)
             return false;
         setTargetType(target, getTargetType(source));
         setBlacklist(target, isBlacklist(source));
