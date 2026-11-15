@@ -283,6 +283,7 @@ public class RecipeCardScreen extends AbstractContainerScreen<RecipeCardMenu> {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (page.isOpen()) {
             renderBackground(graphics);
+            renderBg(graphics, partialTick, mouseX, mouseY);
             // Above the card's item icons
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 300);
