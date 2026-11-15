@@ -43,6 +43,7 @@ val arsNouveauFileId = property("ars_nouveau_file_id") as String
 val arsengFileId = property("arseng_file_id") as String
 val jadeFileId = property("jade_file_id") as String
 val ae2FileId = property("ae2_file_id") as String
+val ae2RuntimeFileId = property("ae2_runtime_file_id") as String
 val ftbTeamsFileId = property("ftb_teams_file_id") as String
 val emiFileId = property("emi_file_id") as String
 val guidemeFileId = property("guideme_file_id") as String
@@ -192,9 +193,10 @@ dependencies {
     }
     if (testMod("jade")) localRuntime(fg.deobf("curse.maven:jade-324717:${jadeFileId}"))
     if (testMod("xaero")) localRuntime(fg.deobf("maven.modrinth:xaeros-minimap:forge-1.20.1-26.6.0"))
-    if (testMod("ae2")) localRuntime(fg.deobf("curse.maven:applied-energistics-2-223794:${ae2FileId}"))
+    if (testMod("ae2")) localRuntime(fg.deobf("curse.maven:applied-energistics-2-223794:${ae2RuntimeFileId}"))
     if (testMod("extendedae")) {
         localRuntime(fg.deobf("curse.maven:ex-pattern-provider-892005:${extendedaeFileId}"))
+        localRuntime(fg.deobf("curse.maven:glodium-957920:5226922")) // Glodium-1.20-1.5-forge
     }
     if (testMod("soph")) {
         localRuntime(fg.deobf("curse.maven:sophisticated-core-618298:${sophisticatedCoreFileId}"))
