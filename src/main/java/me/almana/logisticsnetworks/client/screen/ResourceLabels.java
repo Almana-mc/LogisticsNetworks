@@ -8,11 +8,15 @@ import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.Locale;
 
 final class ResourceLabels {
 
     private static final String KEY = "gui.logisticsnetworks.node.resources.";
+    private static final String[] SUFFIX = {"", "k", "M", "B"};
 
     private ResourceLabels() {
     }
@@ -44,5 +48,13 @@ final class ResourceLabels {
 
     static String tr(String key) {
         return Component.translatable(KEY + key).getString();
+    }
+
+    // Two significant digits, truncated
+    static String amount(int value) {
+        if (value < 1000) return String.valueOf(value);
+        int tier = (int) Math.log10(value) / 3;
+        return new BigDecimal(value).round(new MathContext(2, RoundingMode.DOWN)).movePointLeft(3 * tier)
+                .stripTrailingZeros().toPlainString() + SUFFIX[tier];
     }
 }

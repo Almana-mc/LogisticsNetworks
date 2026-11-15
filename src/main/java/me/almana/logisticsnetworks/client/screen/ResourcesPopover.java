@@ -10,6 +10,8 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 
+import java.util.Locale;
+
 final class ResourcesPopover {
 
     interface Target {
@@ -41,6 +43,7 @@ final class ResourcesPopover {
     private int editRow = -1;
     private long lastClick;
     private int lastClickRow = -1;
+    private String tip;
 
     ResourcesPopover(Font font) {
         this.font = font;
@@ -71,10 +74,12 @@ final class ResourcesPopover {
         g.drawString(font, ResourceLabels.tr("title"), x + 4, y + 4, t.textMuted(), false);
         ThemePaint.button(g, font, x + W - 60, y + 2, 27, 11, ResourceLabels.tr("all"), inside(mx, my, x + W - 60, y + 2, 27, 11), t);
         ThemePaint.button(g, font, x + W - 31, y + 2, 27, 11, ResourceLabels.tr("none"), inside(mx, my, x + W - 31, y + 2, 27, 11), t);
+        tip = null;
         for (int row = 0; row < rows(); row++) {
             renderRow(g, t, row, y + HEADER_H + row * ROW_H, mx, my);
         }
         if (edit != null) edit.render(g, mx, my, 0);
+        if (tip != null) g.renderTooltip(font, Component.literal(tip), mx, my);
         g.pose().popPose();
     }
 
@@ -133,7 +138,7 @@ final class ResourcesPopover {
         if (inside(mx, my, x, ry, W, ROW_H)) g.fill(x, ry, x + W, ry + ROW_H, 0x22FFFFFF);
         if (row == SETS_ROW) {
             g.drawString(font, ResourceLabels.tr("recipe_sets"), x + 20, ry + 3, t.text(), false);
-            if (editRow != row) chip(g, t, amountLabel(row), ry);
+            if (editRow != row) chip(g, t, row, ry, mx, my);
             return;
         }
         ChannelType type = ChannelType.values()[row];
@@ -148,13 +153,15 @@ final class ResourcesPopover {
                     W - 30 - font.width(ResourceLabels.typeName(type)));
             g.drawString(font, reason, x + W - 4 - font.width(reason), ry + 3, t.textSubtle(), false);
         } else if (target.exporting() && editRow != row) {
-            chip(g, t, amountLabel(row), ry);
+            chip(g, t, row, ry, mx, my);
         }
     }
 
-    private void chip(GuiGraphics g, Theme t, String label, int ry) {
+    private void chip(GuiGraphics g, Theme t, int row, int ry, int mx, int my) {
+        String label = amountLabel(row, false);
         int w = font.width(label) + 8;
         int cx = x + W - 4 - w;
+        if (inside(mx, my, cx, ry + 2, w, 9)) tip = amountLabel(row, true);
         g.fill(cx, ry + 2, cx + w, ry + 11, t.surfaceSunken());
         g.drawString(font, label, cx + 4, ry + 3, t.text(), false);
     }
@@ -219,16 +226,18 @@ final class ResourcesPopover {
         return row == SETS_ROW ? MAX_SETS : target.cap(ChannelType.values()[row]);
     }
 
-    private String amountLabel(int row) {
-        int value = value(row);
-        if (value <= 0 || row < SETS_ROW && ChannelType.values()[row] == ChannelType.ENERGY) return ResourceLabels.tr("max");
-        if (row == SETS_ROW) return String.valueOf(value);
+    private String amountLabel(int row, boolean full) {
+        boolean energy = row < SETS_ROW && ChannelType.values()[row] == ChannelType.ENERGY;
+        int value = value(row) <= 0 || energy ? cap(row) : value(row);
+        String amount = full ? String.format(Locale.ROOT, "%,d", value) : ResourceLabels.amount(value);
+        if (row == SETS_ROW) return amount;
         return switch (ChannelType.values()[row]) {
-            case FLUID -> Component.translatable("gui.logisticsnetworks.node.value.batch.fluid", value).getString();
-            case CHEMICAL -> Component.translatable("gui.logisticsnetworks.node.value.batch.chemical", value)
+            case FLUID -> Component.translatable("gui.logisticsnetworks.node.value.batch.fluid", amount).getString();
+            case ENERGY -> Component.translatable("gui.logisticsnetworks.node.value.batch.energy", amount).getString();
+            case CHEMICAL -> Component.translatable("gui.logisticsnetworks.node.value.batch.chemical", amount)
                     .getString();
-            case SOURCE -> Component.translatable("gui.logisticsnetworks.node.value.batch.source", value).getString();
-            default -> String.valueOf(value);
+            case SOURCE -> Component.translatable("gui.logisticsnetworks.node.value.batch.source", amount).getString();
+            default -> amount;
         };
     }
 

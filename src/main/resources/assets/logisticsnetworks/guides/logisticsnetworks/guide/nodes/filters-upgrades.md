@@ -9,7 +9,7 @@ navigation:
 
 ![Right-side panel — Filters 3x2 grid, Upgrades 2x2 grid, Docs button, Tweaks button](images/filters-upgrades-full.png)
 
-The right-hand panel of the node configuration screen holds four things: a 3x2 grid of filter slots, a 2x2 grid of upgrade slots, a **Docs** button, and a **Tweaks** button. Each one is covered below.
+The right-hand panel of the node configuration screen holds four things: a 3x2 grid of filter slots, a 3x2 grid of upgrade slots, a **Docs** button, and a **Tweaks** button. Each one is covered below.
 
 ## Filters
 
@@ -55,7 +55,7 @@ On a Sender carrying Items or Fluids with a filter, the **RR** button beside the
 
 ![Upgrades 2x2 grid](images/filters-upgrades-upgrades.png)
 
-**What it is:** a 2x2 grid of 4 upgrade slots.
+**What it is:** a 3x2 grid of 6 upgrade slots.
 
 **What it does:** upgrade items installed here affect the whole node — they increase the batch caps, lower the minimum tick delay, and unlock special capabilities (like the Chemical and Source channel types).
 
