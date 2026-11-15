@@ -1424,10 +1424,7 @@ public class TransferEngine {
         int openTargetCount = targets.size();
         BulkInsertRejectionCache bulkInsertRejections = null;
         BulkInsertRejectionCache insertRejections = null;
-        List<Map<ItemKey, boolean[]>> importMasks = new ArrayList<>(targets.size());
-        for (ItemTransferTarget target : targets) {
-            importMasks.add(target.hasImportSlotMapping() ? new HashMap<>() : null);
-        }
+        Map<ItemTransferTarget, Map<ItemKey, boolean[]>> importMasks = new IdentityHashMap<>();
         Map<ItemTransferTarget, Map<Item, Integer>> faceItemCounts = null;
 
         // Memo components per source slot
@@ -1526,13 +1523,8 @@ public class TransferEngine {
                     boolean[] importAllowedSlots = target.allowedSlots();
                     if (provider != null) {
                         if (target.hasImportSlotMapping()) {
-                            // Memo only for channel face
-                            importAllowedSlots = face == target
-                                    ? importMask(importMasks.get(targetIndex), target, extracted, provider,
-                                            candidateComponents, filterReadCache)
-                                    : computeImportAllowedSlots(targetHandler, target.importFilters(),
-                                            target.importFilterMode(), extracted, provider, candidateComponents,
-                                            filterReadCache);
+                            importAllowedSlots = importMask(importMasks.computeIfAbsent(face, f -> new HashMap<>()),
+                                    face, extracted, provider, candidateComponents, filterReadCache);
                             if (importAllowedSlots == null) {
                                 continue;
                             }

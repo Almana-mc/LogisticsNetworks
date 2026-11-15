@@ -197,7 +197,6 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
 
         public Ingredient {
             slots = List.copyOf(slots);
-            itemNbt = itemNbt.map(CompoundTag::copy);
         }
 
         public Ingredient(Optional<Item> item, Optional<TagKey<Item>> tag, Optional<String> fluid,
@@ -209,7 +208,7 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         public static Ingredient ofItem(ItemStack stack, int count) {
             return new Ingredient(Optional.of(stack.getItem()), Optional.empty(), Optional.empty(), Optional.empty(),
                     count, List.of(), false, Optional.empty(), GeneralFilterEntry.NbtConstraints.EMPTY,
-                    Optional.ofNullable(stack.getTag()));
+                    Optional.ofNullable(stack.getTag()).map(CompoundTag::copy));
         }
 
         public static Ingredient ofTag(ResourceLocation tag, int count) {
@@ -437,7 +436,7 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             Optional<IoSide> side = root.contains(KEY_SIDE, Tag.TAG_STRING)
                     ? Optional.of(IoSide.byKey(root.getString(KEY_SIDE))) : Optional.empty();
             Optional<CompoundTag> itemNbt = root.contains(KEY_ITEM_NBT, Tag.TAG_COMPOUND)
-                    ? Optional.of(root.getCompound(KEY_ITEM_NBT)) : Optional.empty();
+                    ? Optional.of(root.getCompound(KEY_ITEM_NBT).copy()) : Optional.empty();
             return Optional.of(new Ingredient(item, tag, fluid, chemical, 1, slots, root.getBoolean(KEY_SPLIT), side,
                     GeneralFilterEntry.loadNbt(root.getCompound(KEY_NBT), false), itemNbt)
                     .withCount(root.getInt(KEY_COUNT)));

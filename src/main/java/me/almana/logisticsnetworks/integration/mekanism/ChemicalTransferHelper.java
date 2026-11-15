@@ -414,6 +414,7 @@ public final class ChemicalTransferHelper {
         IChemicalHandler channelTarget = target;
 
         for (int tank = 0; tank < source.getTanks(); tank++) {
+            target = channelTarget;
             if (remaining <= 0) {
                 break;
             }
