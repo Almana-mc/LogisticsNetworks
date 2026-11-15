@@ -37,13 +37,22 @@ val modVersion = property("mod_version") as String
 val modGroupId = property("mod_group_id") as String
 val modAuthors = property("mod_authors") as String
 val modDescription = property("mod_description") as String
-val jeiVersion = property("jei_version") as String
-val mekanismVersion = property("mekanism_version") as String
-val arsNouveauVersion = property("ars_nouveau_version") as String
-val jadeVersion = property("jade_version") as String
-val ae2Version = property("ae2_version") as String
-val ftbTeamsVersion = property("ftb_teams_version") as String
-val guidemeVersion = property("guideme_version") as String
+val jeiFileId = property("jei_file_id") as String
+val mekanismFileId = property("mekanism_file_id") as String
+val arsNouveauFileId = property("ars_nouveau_file_id") as String
+val arsengFileId = property("arseng_file_id") as String
+val jadeFileId = property("jade_file_id") as String
+val ae2FileId = property("ae2_file_id") as String
+val ftbTeamsFileId = property("ftb_teams_file_id") as String
+val emiFileId = property("emi_file_id") as String
+val guidemeFileId = property("guideme_file_id") as String
+val sophisticatedCoreFileId = property("sophisticated_core_file_id") as String
+val functionalStorageFileId = property("functional_storage_file_id") as String
+val createFileId = property("create_file_id") as String
+val buildingGadgetsFileId = property("building_gadgets_file_id") as String
+val appmekFileId = property("appmek_file_id") as String
+val curiosFileId = property("curios_file_id") as String
+val extendedaeFileId = property("extendedae_file_id") as String
 
 version = "${minecraftVersion}-${modVersion}"
 group = modGroupId
@@ -116,8 +125,6 @@ jarJar.enable()
 repositories {
     mavenLocal()
     mavenCentral()
-    maven(url = uri("https://maven.blamejared.com"))
-    maven(url = uri("https://modmaven.dev/"))
     maven(url = uri("https://api.modrinth.com/maven"))
     maven(url = uri("https://maven.ftb.dev/releases"))
     maven(url = uri("https://cursemaven.com")) {
@@ -129,6 +136,8 @@ repositories {
 
 val localRuntime: Configuration by configurations.creating
 configurations.runtimeClasspath { extendsFrom(localRuntime) }
+val createJar: Configuration by configurations.creating
+configurations.compileOnly { extendsFrom(createJar) }
 val fg = extensions.getByType<net.minecraftforge.gradle.userdev.DependencyManagementExtension>()
 val testMods = Properties().apply {
     val file = project.file("run/1.20.1/testmods.properties")
@@ -146,69 +155,69 @@ dependencies {
         jarJar.ranged(this, "[0.4.1,)")
     }
 
-    compileOnly("mezz.jei:jei-${minecraftVersion}-common-api:${jeiVersion}")
-    compileOnly("mezz.jei:jei-${minecraftVersion}-forge-api:${jeiVersion}")
-    localRuntime(fg.deobf("mezz.jei:jei-${minecraftVersion}-forge:${jeiVersion}"))
+    compileOnly("curse.maven:jei-238222:${jeiFileId}")
+    localRuntime(fg.deobf("curse.maven:jei-238222:${jeiFileId}"))
 
-    compileOnly("mekanism:Mekanism:${mekanismVersion}")
-    compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraftVersion}:${arsNouveauVersion}")
-    compileOnly("maven.modrinth:jade:${jadeVersion}")
-    compileOnly("appeng:appliedenergistics2-forge:${ae2Version}")
-    compileOnly("org.appliedenergistics:guideme:${guidemeVersion}:api")
-    localRuntime(fg.deobf("org.appliedenergistics:guideme:${guidemeVersion}"))
-    compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
+    compileOnly("curse.maven:mekanism-268560:${mekanismFileId}")
+    compileOnly("curse.maven:ars-nouveau-401955:${arsNouveauFileId}")
+    compileOnly("curse.maven:jade-324717:${jadeFileId}")
+    compileOnly("curse.maven:applied-energistics-2-223794:${ae2FileId}")
+    compileOnly("curse.maven:guideme-1173950:${guidemeFileId}")
+    localRuntime(fg.deobf("curse.maven:guideme-1173950:${guidemeFileId}"))
+    compileOnly("curse.maven:ftb-teams-404468:${ftbTeamsFileId}")
     compileOnly("maven.modrinth:oculus:1.20.1-1.8.0") { isTransitive = false }
-    compileOnly("maven.modrinth:emi:1.1.24+1.20.1+forge") { isTransitive = false }
+    compileOnly("curse.maven:emi-580555:${emiFileId}")
     compileOnly("maven.modrinth:cc-tweaked:gRtcHJd8") // cc-tweaked-1.20.1-forge 1.120.2
-    compileOnly(fg.deobf("curse.maven:building-gadgets-298187:6850495")) // Building Gadgets 2 1.0.8
-    compileOnly("com.simibubi.create:create-1.20.1:6.0.8-289:slim") { isTransitive = false }
-    compileOnly("net.createmod.ponder:Ponder-Forge-1.20.1:1.0.91") { isTransitive = false }
-    compileOnly("maven.modrinth:ars-energistique:1.2.0") { isTransitive = false }
-    compileOnly(fg.deobf("curse.maven:applied-mekanistics-574300:7244744"))
-    compileOnly("maven.modrinth:functional-storage:1.20.1-1.2.14") { isTransitive = false }
-    compileOnly("maven.modrinth:sophisticated-core:1.20.1-1.5.10.2402") { isTransitive = false }
+    compileOnly(fg.deobf("curse.maven:building-gadgets-298187:${buildingGadgetsFileId}"))
+    createJar("curse.maven:create-328085:${createFileId}")
+    // Ponder only ships inside Create
+    compileOnly(files(provider { zipTree(createJar.singleFile).matching { include("META-INF/jarjar/Ponder-*.jar") } }))
+    compileOnly("curse.maven:ars-energistique-905641:${arsengFileId}")
+    compileOnly(fg.deobf("curse.maven:applied-mekanistics-574300:${appmekFileId}"))
+    compileOnly("curse.maven:functional-storage-556861:${functionalStorageFileId}")
+    compileOnly("curse.maven:sophisticated-core-618298:${sophisticatedCoreFileId}")
 
     // Local test mods (testmods.properties)
-    if (testMod("mek")) localRuntime(fg.deobf("mekanism:Mekanism:${mekanismVersion}"))
+    if (testMod("mek")) localRuntime(fg.deobf("curse.maven:mekanism-268560:${mekanismFileId}"))
     if (testMod("ars")) {
-        localRuntime(fg.deobf("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraftVersion}:${arsNouveauVersion}"))
-        localRuntime(fg.deobf("maven.modrinth:curios:5.14.1+1.20.1"))
+        localRuntime(fg.deobf("curse.maven:ars-nouveau-401955:${arsNouveauFileId}"))
+        localRuntime(fg.deobf("curse.maven:curios-309927:${curiosFileId}"))
         localRuntime(fg.deobf("maven.modrinth:geckolib:aC5KMoNg")) // geckolib-forge 4.8.4
         localRuntime("io.github.llamalad7:mixinextras-forge:0.5.4")
     }
     if (testMod("ftbteams")) {
-        localRuntime(fg.deobf("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}", closureOf<ModuleDependency> { isTransitive = false }))
+        localRuntime(fg.deobf("curse.maven:ftb-teams-404468:${ftbTeamsFileId}"))
         localRuntime(fg.deobf("dev.ftb.mods:ftb-library-forge:2001.2.13", closureOf<ModuleDependency> { isTransitive = false }))
         localRuntime(fg.deobf("maven.modrinth:architectury-api:9.2.14+forge"))
     }
-    if (testMod("jade")) localRuntime(fg.deobf("maven.modrinth:jade:${jadeVersion}"))
+    if (testMod("jade")) localRuntime(fg.deobf("curse.maven:jade-324717:${jadeFileId}"))
     if (testMod("xaero")) localRuntime(fg.deobf("maven.modrinth:xaeros-minimap:forge-1.20.1-26.6.0"))
-    if (testMod("ae2")) localRuntime(fg.deobf("appeng:appliedenergistics2-forge:${ae2Version}"))
+    if (testMod("ae2")) localRuntime(fg.deobf("curse.maven:applied-energistics-2-223794:${ae2FileId}"))
     if (testMod("extendedae")) {
-        localRuntime(fg.deobf("curse.maven:ex-pattern-provider-892005:9304849"))
+        localRuntime(fg.deobf("curse.maven:ex-pattern-provider-892005:${extendedaeFileId}"))
     }
     if (testMod("soph")) {
-        localRuntime(fg.deobf("maven.modrinth:sophisticated-core:1.20.1-1.5.10.2402"))
+        localRuntime(fg.deobf("curse.maven:sophisticated-core-618298:${sophisticatedCoreFileId}"))
         localRuntime(fg.deobf("maven.modrinth:sophisticated-backpacks:1.20.1-3.26.12.2206"))
         localRuntime(fg.deobf("maven.modrinth:sophisticated-storage:1.20.1-1.5.5.2182"))
     }
-    if (testMod("arseng")) localRuntime(fg.deobf("maven.modrinth:ars-energistique:1.2.0"))
-    if (testMod("appmek")) localRuntime(fg.deobf("curse.maven:applied-mekanistics-574300:7244744"))
+    if (testMod("arseng")) localRuntime(fg.deobf("curse.maven:ars-energistique-905641:${arsengFileId}"))
+    if (testMod("appmek")) localRuntime(fg.deobf("curse.maven:applied-mekanistics-574300:${appmekFileId}"))
     if (testMod("create")) {
         localRuntime(fg.deobf("com.simibubi.create:create-1.20.1:6.0.8-289:slim", closureOf<ModuleDependency> { isTransitive = false }))
         localRuntime(fg.deobf("dev.engine-room.flywheel:flywheel-forge-1.20.1:1.0.5"))
         localRuntime(fg.deobf("net.createmod.ponder:Ponder-Forge-1.20.1:1.0.91"))
         localRuntime(fg.deobf("com.tterrag.registrate:Registrate:MC1.20-1.3.3"))
     }
-    if (testMod("bg2")) localRuntime(fg.deobf("curse.maven:building-gadgets-298187:6850495"))
+    if (testMod("bg2")) localRuntime(fg.deobf("curse.maven:building-gadgets-298187:${buildingGadgetsFileId}"))
     if (testMod("cc")) localRuntime(fg.deobf("maven.modrinth:cc-tweaked:gRtcHJd8"))
-    if (testMod("emi")) localRuntime(fg.deobf("maven.modrinth:emi:1.1.24+1.20.1+forge"))
+    if (testMod("emi")) localRuntime(fg.deobf("curse.maven:emi-580555:${emiFileId}"))
     if (testMod("oculus")) {
         localRuntime(fg.deobf("maven.modrinth:oculus:1.20.1-1.8.0"))
         localRuntime(fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1"))
     }
     if (testMod("fs")) {
-        localRuntime(fg.deobf("maven.modrinth:functional-storage:1.20.1-1.2.14"))
+        localRuntime(fg.deobf("curse.maven:functional-storage-556861:${functionalStorageFileId}"))
         localRuntime(fg.deobf("maven.modrinth:titanium:1.20.1-3.8.35"))
     }
     if (testMod("spark")) localRuntime(fg.deobf("maven.modrinth:spark:1.10.53-forge"))
