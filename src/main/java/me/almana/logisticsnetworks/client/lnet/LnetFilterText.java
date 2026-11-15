@@ -236,6 +236,9 @@ final class LnetFilterText {
                 }
             } else if (!LnetEntryText.isBlank(entry)) {
                 String text = LnetEntryText.writeEntry(entry, target, mode, registries);
+                if (FilterItemData.nestingDepth(text) > FilterItemData.MAX_NBT_DEPTH) {
+                    return false;
+                }
                 LnetEntryText.readEntry(text, 0, mode, target, registries);
             }
             return true;

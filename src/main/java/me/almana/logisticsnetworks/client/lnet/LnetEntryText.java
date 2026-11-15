@@ -153,7 +153,7 @@ final class LnetEntryText {
     }
 
     static IOException tooDeep() {
-        return new IOException("nesting deeper than " + FilterItemData.MAX_NBT_DEPTH);
+        return new IOException(FilterItemData.NBT_TOO_DEEP_MESSAGE);
     }
 
     private static boolean atIdPosition(@Nullable String input, int cursor) {

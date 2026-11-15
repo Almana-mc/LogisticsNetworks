@@ -53,8 +53,9 @@ public final class FilterItemData {
     public static final int MAX_NBT_VALUE_BYTES = 2048;
     public static final int MAX_NBT_RAW_LENGTH = 4096;
     public static final int MAX_NBT_DEPTH = 256;
+    public static final String NBT_TOO_DEEP_MESSAGE = "nesting deeper than " + MAX_NBT_DEPTH;
     private static final SimpleCommandExceptionType NBT_TOO_DEEP =
-            new SimpleCommandExceptionType(Component.literal("nested deeper than " + MAX_NBT_DEPTH));
+            new SimpleCommandExceptionType(Component.literal(NBT_TOO_DEEP_MESSAGE));
     private static final String NBT_OP_EQUALS = "=";
     // Bounds channel sync size
     private static final int MAX_ENTRY_TAG_BYTES = 2048;
@@ -526,7 +527,7 @@ public final class FilterItemData {
     }
 
     public static Edit setEntryNbtRaw(ItemStack stack, int slot, @Nullable String rawSnbt) {
-        if (rawSnbt != null && rawSnbt.length() > MAX_NBT_RAW_LENGTH)
+        if (rawSnbt != null && (rawSnbt.length() > MAX_NBT_RAW_LENGTH || nestingDepth(rawSnbt) > MAX_NBT_DEPTH))
             return Edit.SAME;
         return edit(stack, slot, entry -> entry.withNbt(entry.nbt().withRaw(rawSnbt)));
     }
@@ -1208,7 +1209,8 @@ public final class FilterItemData {
     }
 
     private static boolean isValidNbt(GeneralFilterEntry.NbtConstraints nbt) {
-        if (nbt.rules().size() > MAX_NBT_RULES_PER_SLOT || nbt.raw().length() > MAX_NBT_RAW_LENGTH)
+        if (nbt.rules().size() > MAX_NBT_RULES_PER_SLOT || nbt.raw().length() > MAX_NBT_RAW_LENGTH
+                || nestingDepth(nbt.raw()) > MAX_NBT_DEPTH)
             return false;
         for (NbtCriterion rule : nbt.rules()) {
             if (rule.path().isEmpty() || rule.path().toString().length() > MAX_NBT_PATH_LENGTH
