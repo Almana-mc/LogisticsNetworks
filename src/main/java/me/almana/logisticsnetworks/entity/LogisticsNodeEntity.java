@@ -619,6 +619,10 @@ public class LogisticsNodeEntity extends Entity {
         pendingFilterEjects.clear();
     }
 
+    public void clearPendingFilterEjects() {
+        pendingFilterEjects.clear();
+    }
+
     public void dropUpgrades(@Nullable Player player) {
         for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
             ItemStack stack = upgradeItems[i];
@@ -646,6 +650,7 @@ public class LogisticsNodeEntity extends Entity {
 
     @Override
     public void remove(RemovalReason reason) {
+        this.ejectPendingFilters();
         this.dropFilters();
         this.dropUpgrades();
         super.remove(reason);
