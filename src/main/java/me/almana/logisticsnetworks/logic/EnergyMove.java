@@ -86,7 +86,11 @@ final class EnergyMove {
     }
 
     private static int getEnergySpace(IEnergyStorage target) {
-        long space = (long) target.getMaxEnergyStored() - target.getEnergyStored();
+        int max = target.getMaxEnergyStored();
+        // Saturated report, trust simulate
+        if (max == Integer.MAX_VALUE)
+            return Integer.MAX_VALUE;
+        long space = (long) max - target.getEnergyStored();
         if (space <= 0)
             return 0;
         return space > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) space;
