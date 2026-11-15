@@ -155,7 +155,7 @@ public final class TransferCommitter {
         var committedByItem = HashUtils.itemToIntMap();
         Map<UUID, Map<Item, Integer>> committedByTarget = new HashMap<>();
         PlannedItemValidation validation = new PlannedItemValidation(
-                source, sourceChannel, sourceNode.level().registryAccess(), channel.moves());
+                source, sourceChannel, sourceNode.level().registryAccess());
         for (TransferPlan.ItemMove move : channel.moves()) {
             if (committed >= currentBatch) break;
             if (move.targetIndex() < 0 || move.targetIndex() >= targets.length) {

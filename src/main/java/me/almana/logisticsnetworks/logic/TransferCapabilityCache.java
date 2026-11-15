@@ -6,7 +6,6 @@ import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.DirectChemicalHandler;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
-import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageEndpoint;
@@ -28,7 +27,6 @@ import java.util.Map;
 // One per network pass only
 public final class TransferCapabilityCache {
     private final TransferEngine.CapCache handlers;
-    private final DirectStorageReads reads = new DirectStorageReads(true);
     private final Map<Object, IItemHandler[]> views = new IdentityHashMap<>();
     private final FilterItemData.ReadCache filters = FilterItemData.createReadCache();
 
@@ -143,8 +141,8 @@ public final class TransferCapabilityCache {
         int index = exporting ? 0 : 1;
         IItemHandler existing = pair[index];
         if (existing == null || DirectStorageHandlers.networkIdentity(existing) != endpoint.networkIdentity()) {
-            pair[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, buffer, reads)
-                    : DirectStorageHandlers.importItems(endpoint, reads);
+            pair[index] = exporting ? DirectStorageHandlers.exportItems(endpoint, buffer)
+                    : DirectStorageHandlers.importItems(endpoint);
         }
         return pair[index];
     }

@@ -1314,25 +1314,14 @@ public class TransferEngine {
 
         boolean anyAmountConstraints = false;
         boolean sourceNeedsCounts = TransferAmountRules.hasStockFilter(exportFilters, filterReadCache);
-        boolean anyCountsNeeded = sourceNeedsCounts;
         for (ItemTransferTarget t : targets) {
             sourceNeedsCounts |= t.constraints().hasExportThreshold();
-            anyCountsNeeded |= t.constraints().hasExportThreshold() || t.constraints().hasImportThreshold()
-                    || TransferAmountRules.hasStockFilter(t.importFilters(), filterReadCache);
             if (t.constraints().hasExportThreshold() || t.constraints().hasImportThreshold()
                     || t.constraints().hasPerEntryAmounts()) {
                 anyAmountConstraints = true;
             }
         }
-        Set<Item> countCandidates = new HashSet<>();
-        if (anyCountsNeeded) {
-            for (int slot = 0; slot < source.getSlots(); slot++) {
-                ItemStack candidate = source.getStackInSlot(slot);
-                if (!candidate.isEmpty()) countCandidates.add(candidate.getItem());
-            }
-        }
-        var sourceItemCounts = sourceNeedsCounts
-                ? TransferAmountRules.countItems(source, countCandidates) : null;
+        var sourceItemCounts = sourceNeedsCounts ? TransferAmountRules.countItems(source) : null;
         var batchMoved = anyAmountConstraints && !roundRobin
                 ? new HashMap<>(priorBatchMoved)
                 : null;
@@ -1352,7 +1341,7 @@ public class TransferEngine {
                 targetItemCounts.add(
                         (t.constraints().hasImportThreshold()
                                 || TransferAmountRules.hasStockFilter(t.importFilters(), filterReadCache))
-                                ? TransferAmountRules.countItems(t.handler(), countCandidates)
+                                ? TransferAmountRules.countItems(t.handler())
                                 : null);
             }
         }
@@ -1485,15 +1474,7 @@ public class TransferEngine {
                                 faceItemCounts = new IdentityHashMap<>();
                             }
                             targetCounts = faceItemCounts.computeIfAbsent(face,
-                                    f -> TransferAmountRules.countItems(f.handler(), countCandidates));
-                        }
-                        if (targetCounts != null && targetHandler instanceof DirectItemAccess direct) {
-                            targetCounts = direct.countItems(countCandidates);
-                            if (face == target) {
-                                targetItemCounts.set(targetIndex, targetCounts);
-                            } else {
-                                faceItemCounts.put(face, targetCounts);
-                            }
+                                    f -> TransferAmountRules.countItems(f.handler()));
                         }
                         allowedByAmount = TransferAmountRules.allowedItems(extracted, target.constraints(),
                                 sourceItemCounts, targetCounts);
