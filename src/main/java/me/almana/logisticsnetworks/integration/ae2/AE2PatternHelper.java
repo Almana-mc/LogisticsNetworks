@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.ae2;
 
+import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
@@ -9,6 +10,10 @@ import appeng.crafting.pattern.AESmithingTablePattern;
 import appeng.crafting.pattern.AEStonecuttingPattern;
 import appeng.api.crafting.IPatternDetails;
 import appeng.crafting.pattern.EncodedPatternItem;
+import appeng.crafting.pattern.ProcessingPatternItem;
+import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.integration.appmek.AppMekCompat;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -17,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 final class AE2PatternHelper {
 
@@ -91,6 +97,33 @@ final class AE2PatternHelper {
         } catch (Exception ignored) {
         }
         return List.of();
+    }
+
+    static List<RecipeCardData.Ingredient> readIngredients(ItemStack stack, Level level) {
+        AEProcessingPattern processing = stack.getItem() instanceof ProcessingPatternItem item
+                ? item.decode(stack, level, false) : null;
+        if (processing == null) {
+            return readInputs(stack, level).stream()
+                    .map(entry -> RecipeCardData.Ingredient.ofItem(entry.item(), entry.amount()))
+                    .toList();
+        }
+        List<RecipeCardData.Ingredient> result = new ArrayList<>();
+        for (GenericStack input : processing.getSparseInputs()) {
+            if (input != null) ingredient(input).ifPresent(result::add);
+        }
+        return result;
+    }
+
+    private static Optional<RecipeCardData.Ingredient> ingredient(GenericStack stack) {
+        int amount = (int) Math.min(stack.amount(), RecipeCardData.MAX_AMOUNT);
+        if (stack.what() instanceof AEItemKey item) {
+            return Optional.of(RecipeCardData.Ingredient.ofItem(item.toStack(), amount));
+        }
+        if (stack.what() instanceof AEFluidKey fluid) {
+            return Optional.of(RecipeCardData.Ingredient.ofFluid(fluid.toStack(amount)));
+        }
+        Object chemical = AppMekCompat.stack(stack.what(), stack.amount());
+        return chemical == null ? Optional.empty() : MekanismCompat.recipeIngredient(chemical);
     }
 
     private static List<LinkedStorage.PatternEntry> fromPatternInputs(IPatternDetails pattern) {
