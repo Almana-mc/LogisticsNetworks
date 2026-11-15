@@ -84,6 +84,14 @@ public final class ChemicalTransferHelper {
 
     @Nullable
     @SuppressWarnings("rawtypes")
+    public static IChemicalHandler getUnsidedHandler(ServerLevel level, BlockPos pos) {
+        if (MekanismCompat.isMekanismBlock(level, pos)) return null;
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        return blockEntity == null ? null : getSideHandler(blockEntity, null);
+    }
+
+    @Nullable
+    @SuppressWarnings("rawtypes")
     private static IChemicalHandler getSideHandler(BlockEntity blockEntity, @Nullable Direction side) {
         List<IChemicalHandler> handlers = collectSideHandlers(blockEntity, side);
         if (handlers.isEmpty()) {

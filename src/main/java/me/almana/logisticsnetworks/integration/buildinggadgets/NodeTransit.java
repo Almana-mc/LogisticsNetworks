@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.integration.buildinggadgets;
 
 import java.util.HashMap;
 import java.util.Map;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -51,8 +52,8 @@ public final class NodeTransit {
         NodeClipboardConfig clipboard = NodeClipboardConfig.load(config, registries);
         if (clipboard == null) return config.copy();
         for (int channel = 0; channel < clipboard.getChannelCount(); channel++) {
-            Direction direction = clipboard.getChannelDirection(channel);
-            if (direction != null) clipboard.setChannelDirection(channel, Rotation.CLOCKWISE_90.rotate(direction));
+            Direction direction = clipboard.getChannelDirection(channel).direction();
+            if (direction != null) clipboard.setChannelDirection(channel, IoSide.of(Rotation.CLOCKWISE_90.rotate(direction)));
         }
         return clipboard.save(registries);
     }

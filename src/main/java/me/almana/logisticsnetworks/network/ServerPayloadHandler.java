@@ -27,7 +27,6 @@ import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import me.almana.logisticsnetworks.integration.storage.StorageLink;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
@@ -185,11 +184,8 @@ public class ServerPayloadHandler {
         channel.setRecipeSets(payload.recipeSets());
         channel.setTickDelay(payload.tickDelay());
 
-        if (payload.directionOrdinal() == 6) {
-            channel.setIoDirection(null);
-        } else if (isValidEnum(payload.directionOrdinal(), Direction.values())) {
-            channel.setIoDirection(Direction.values()[payload.directionOrdinal()]);
-        }
+        if (isValidEnum(payload.directionOrdinal(), IoSide.values()))
+            channel.setIoSide(IoSide.values()[payload.directionOrdinal()]);
 
         if (isValidEnum(payload.redstoneModeOrdinal(), RedstoneMode.values()))
             channel.setRedstoneMode(RedstoneMode.values()[payload.redstoneModeOrdinal()]);

@@ -44,14 +44,14 @@ public final class AttachedStorageFilterScanner {
         Result total = new Result(0, false, false, false);
         if (channel.hasType(ChannelType.ITEM)) {
             total = merge(total, scanItems(mounted ? CreateCompat.findMountedItemHandler(node)
-                    : capabilities.findItemHandler(level, pos, channel.getIoDirection()), filter));
+                    : capabilities.findItemHandler(level, pos, channel.getIoSide()), filter));
         }
         if (channel.hasType(ChannelType.FLUID) && !total.filterFull()) {
             total = merge(total, scanFluids(mounted ? CreateCompat.findMountedFluidHandler(node)
-                    : capabilities.findFluidHandler(level, pos, channel.getIoDirection()), filter));
+                    : capabilities.findFluidHandler(level, pos, channel.getIoSide()), filter));
         }
         if (channel.hasType(ChannelType.CHEMICAL) && !total.filterFull() && !mounted && MekanismCompat.isLoaded()) {
-            total = merge(total, scanChemicals(capabilities.findChemicalHandler(level, pos, channel.getIoDirection()),
+            total = merge(total, scanChemicals(capabilities.findChemicalHandler(level, pos, channel.getIoSide()),
                     filter));
         }
         return total;

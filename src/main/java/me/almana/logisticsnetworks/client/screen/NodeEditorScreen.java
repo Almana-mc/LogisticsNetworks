@@ -1,8 +1,5 @@
 package me.almana.logisticsnetworks.client.screen;
 
-import net.minecraft.core.Direction;
-import org.jetbrains.annotations.Nullable;
-
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
@@ -830,7 +827,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
                         : tr("gui.logisticsnetworks.node.value.disabled"),
                 getChannelModeLabel(ch.getMode()),
                 ResourceLabels.summary(ch.getTypes()),
-                ch.getIoDirection() != null ? getDirectionLabel(ch.getIoDirection().getName()) : getDirectionLabel("all"),
+                getDirectionLabel(ch.getIoSide().key()),
                 getRedstoneModeLabel(ch.getRedstoneMode()),
                 getDistributionModeLabel(ch.getDistributionMode()),
                 editingRow == 6 ? "" : String.valueOf(ch.getPriority()),
@@ -1694,7 +1691,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         switch (row) {
             case 0 -> ch.setEnabled(!ch.isEnabled());
             case 1 -> ch.setMode(cycleModeForNode(ch.getMode(), dir));
-            case 3 -> ch.setIoDirection(cycleSide(ch.getIoDirection(), dir));
+            case 3 -> ch.setIoSide(cycleEnum(ch.getIoSide(), dir));
             case 4 -> ch.setRedstoneMode(cycleEnum(ch.getRedstoneMode(), dir));
             case 5 -> ch.setDistributionMode(cycleEnum(ch.getDistributionMode(), dir));
             case 6 -> ch.setPriority(ch.getPriority() + (ClientControls.modifier1Down() ? 10 : 1) * dir);
@@ -1713,12 +1710,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         T[] values = current.getDeclaringClass().getEnumConstants();
         int index = (current.ordinal() + dir + values.length) % values.length;
         return values[index];
-    }
-
-    private @Nullable Direction cycleSide(@Nullable Direction current, int dir) {
-        int pos = current != null ? current.ordinal() : 6;
-        pos = (pos + dir + 7) % 7;
-        return pos < 6 ? Direction.values()[pos] : null;
     }
 
     private void startNumericEdit(ChannelData ch, int row, int x, int y) {
@@ -2186,6 +2177,8 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         String valueTipKey = null;
         if (row == 1) {
             valueTipKey = "gui.logisticsnetworks.node.tip.mode." + ch.getMode().name().toLowerCase(Locale.ROOT);
+        } else if (row == 3 && ch.getIoSide().direction() == null) {
+            valueTipKey = "gui.logisticsnetworks.node.tip.side." + ch.getIoSide().key();
         } else if (row == 4) {
             valueTipKey = "gui.logisticsnetworks.node.tip.redstone." + ch.getRedstoneMode().name().toLowerCase(Locale.ROOT);
         } else if (row == 5) {

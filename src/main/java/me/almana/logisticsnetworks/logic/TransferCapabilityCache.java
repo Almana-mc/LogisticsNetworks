@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.logic;
 
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
@@ -42,13 +43,13 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
-    public IItemHandler findItemExportHandler(LogisticsNodeEntity node, @Nullable Direction direction, boolean direct) {
-        return findItemHandler(node, direction, direct, true);
+    public IItemHandler findItemExportHandler(LogisticsNodeEntity node, IoSide side, boolean direct) {
+        return findItemHandler(node, side, direct, true);
     }
 
     @Nullable
-    public IItemHandler findItemImportHandler(LogisticsNodeEntity node, @Nullable Direction direction, boolean direct) {
-        return findItemHandler(node, direction, direct, false);
+    public IItemHandler findItemImportHandler(LogisticsNodeEntity node, IoSide side, boolean direct) {
+        return findItemHandler(node, side, direct, false);
     }
 
     @Nullable
@@ -68,51 +69,54 @@ public final class TransferCapabilityCache {
     }
 
     @Nullable
-    IFluidHandler findFluidExportHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
-        return findFluidHandler(node, direction, true);
+    IFluidHandler findFluidExportHandler(LogisticsNodeEntity node, IoSide side) {
+        return findFluidHandler(node, side, true);
     }
 
     @Nullable
-    IFluidHandler findFluidImportHandler(LogisticsNodeEntity node, @Nullable Direction direction) {
-        return findFluidHandler(node, direction, false);
+    IFluidHandler findFluidImportHandler(LogisticsNodeEntity node, IoSide side) {
+        return findFluidHandler(node, side, false);
     }
 
     @Nullable
     @SuppressWarnings("rawtypes")
-    IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, @Nullable Direction direction) {
-        return handlers.findChemicalHandler(level, pos, direction);
+    IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, IoSide side) {
+        return handlers.findChemicalHandler(level, pos, side);
     }
 
     @Nullable
-    private IItemHandler findItemHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+    private IItemHandler findItemHandler(LogisticsNodeEntity node, IoSide side,
             boolean direct, boolean exporting) {
         if (node.isMountedOnCreate()) {
             return CreateCompat.findMountedItemHandler(node);
         }
         ServerLevel level = (ServerLevel) node.level();
         BlockPos pos = node.getAttachedPos();
+        if (side == IoSide.NONE) return handlers.findItemHandler(level, pos, side);
+        Direction direction = side.direction();
         InterfaceStorageResolution resolution = resolveInterface(node, direction);
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE && direct) {
             IItemHandler buffer = exporting ? interfaceBuffer(level, pos, direction, resolution.endpoint()) : null;
             return itemView(resolution.endpoint(), buffer, exporting);
         }
         if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
-        return handlers.findItemHandler(level, pos, direction);
+        return handlers.findItemHandler(level, pos, side);
     }
 
     @Nullable
-    private IFluidHandler findFluidHandler(LogisticsNodeEntity node, @Nullable Direction direction,
+    private IFluidHandler findFluidHandler(LogisticsNodeEntity node, IoSide side,
             boolean exporting) {
         if (node.isMountedOnCreate()) {
             return CreateCompat.findMountedFluidHandler(node);
         }
-        InterfaceStorageResolution resolution = resolveInterface(node, direction);
+        if (side == IoSide.NONE) return handlers.findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), side);
+        InterfaceStorageResolution resolution = resolveInterface(node, side.direction());
         if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE) {
             return exporting ? DirectStorageHandlers.exportFluids(resolution.endpoint())
                     : DirectStorageHandlers.importFluids(resolution.endpoint());
         }
         if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
-        return handlers.findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), direction);
+        return handlers.findFluidHandler((ServerLevel) node.level(), node.getAttachedPos(), side);
     }
 
     private IItemHandler itemView(StorageEndpoint endpoint, @Nullable IItemHandler buffer, boolean exporting) {

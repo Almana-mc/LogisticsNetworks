@@ -17,7 +17,6 @@ import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
-import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CollectionTag;
 import net.minecraft.nbt.CompoundTag;
@@ -109,7 +108,7 @@ public final class NodeClipboardConfig {
         final int[] batches = new int[ChannelType.values().length];
         int recipeSets;
         int tickDelay;
-        @Nullable Direction ioDirection;
+        IoSide ioDirection;
         RedstoneMode redstoneMode;
         DistributionMode distributionMode;
         FilterMode filterMode;
@@ -223,11 +222,11 @@ public final class NodeClipboardConfig {
         getChannelConfig(channel).mode = mode == null ? ChannelMode.IMPORT : mode;
     }
 
-    public @Nullable Direction getChannelDirection(int channel) {
+    public IoSide getChannelDirection(int channel) {
         return getChannelConfig(channel).ioDirection;
     }
 
-    public void setChannelDirection(int channel, @Nullable Direction direction) {
+    public void setChannelDirection(int channel, IoSide direction) {
         getChannelConfig(channel).ioDirection = direction;
     }
 
@@ -573,7 +572,7 @@ public final class NodeClipboardConfig {
                 }
                 config.recipeSets = channel.getRecipeSets();
                 config.tickDelay = channel.getTickDelay();
-                config.ioDirection = channel.getIoDirection();
+                config.ioDirection = channel.getIoSide();
                 config.redstoneMode = channel.getRedstoneMode();
                 config.distributionMode = channel.getDistributionMode();
                 config.filterMode = channel.getFilterMode();
@@ -589,7 +588,7 @@ public final class NodeClipboardConfig {
                 config.enabled = false;
                 config.mode = ChannelMode.IMPORT;
                 config.tickDelay = 20;
-                config.ioDirection = Direction.UP;
+                config.ioDirection = IoSide.UP;
                 config.redstoneMode = RedstoneMode.IGNORED;
                 config.distributionMode = DistributionMode.PRIORITY;
                 config.filterMode = FilterMode.MATCH_ANY;
@@ -649,7 +648,7 @@ public final class NodeClipboardConfig {
             if (channel.recipeSets > 0)
                 channelTag.putInt(KEY_RECIPE_SETS, channel.recipeSets);
             channelTag.putInt(KEY_DELAY, channel.tickDelay);
-            channelTag.putString(KEY_IO, channel.ioDirection != null ? channel.ioDirection.getName() : "all");
+            channelTag.putString(KEY_IO, channel.ioDirection.key());
             channelTag.putString(KEY_REDSTONE, channel.redstoneMode.name());
             channelTag.putString(KEY_DISTRIBUTION, channel.distributionMode.name());
             channelTag.putString(KEY_FILTER_MODE, channel.filterMode.name());
@@ -760,13 +759,7 @@ public final class NodeClipboardConfig {
             loadTypes(config, channelTag);
             config.tickDelay = Math.max(1, channelTag.getInt(KEY_DELAY));
 
-            String ioStr = channelTag.getString(KEY_IO);
-            if ("all".equals(ioStr)) {
-                config.ioDirection = null;
-            } else {
-                Direction direction = Direction.byName(ioStr);
-                config.ioDirection = direction == null ? Direction.UP : direction;
-            }
+            config.ioDirection = IoSide.byKey(channelTag.getString(KEY_IO));
             String redstone = channelTag.getString(KEY_REDSTONE);
             config.redstoneMode = RedstoneMode.fromSerialized(redstone);
             if (RedstoneMode.disablesChannel(redstone))
@@ -1229,7 +1222,7 @@ public final class NodeClipboardConfig {
             }
             channel.setRecipeSets(config.recipeSets);
             channel.setTickDelay(config.tickDelay);
-            channel.setIoDirection(config.ioDirection);
+            channel.setIoSide(config.ioDirection);
             channel.setRedstoneMode(config.redstoneMode);
             channel.setDistributionMode(config.distributionMode);
             channel.setFilterMode(config.filterMode);
@@ -1259,7 +1252,7 @@ public final class NodeClipboardConfig {
         config.enabled = false;
         config.mode = ChannelMode.IMPORT;
         config.tickDelay = 20;
-        config.ioDirection = Direction.UP;
+        config.ioDirection = IoSide.UP;
         config.redstoneMode = RedstoneMode.IGNORED;
         config.distributionMode = DistributionMode.PRIORITY;
         config.filterMode = FilterMode.MATCH_ANY;

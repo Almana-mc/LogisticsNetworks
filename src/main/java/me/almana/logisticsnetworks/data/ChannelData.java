@@ -7,7 +7,6 @@ import me.almana.logisticsnetworks.logic.PriorityRobin;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
-import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -50,7 +49,7 @@ public class ChannelData {
     private final int[] batches = new int[ChannelType.values().length];
     private int recipeSets;
     private int tickDelay = 20;
-    private @Nullable Direction ioDirection = Direction.UP;
+    private IoSide ioDirection = IoSide.UP;
     private RedstoneMode redstoneMode = RedstoneMode.IGNORED;
     private DistributionMode distributionMode = DistributionMode.PRIORITY;
     private FilterMode filterMode = FilterMode.MATCH_ANY;
@@ -81,7 +80,7 @@ public class ChannelData {
         tag.putString(KEY_MODE, mode.name());
         saveTypes(tag);
         tag.putInt(KEY_DELAY, tickDelay);
-        tag.putString(KEY_IO, ioDirection != null ? ioDirection.getName() : "all");
+        tag.putString(KEY_IO, ioDirection.key());
         tag.putString(KEY_REDSTONE, redstoneMode.name());
         tag.putString(KEY_DISTRIB, distributionMode.name());
         tag.putString(KEY_FILTER_MODE, filterMode.name());
@@ -169,16 +168,8 @@ public class ChannelData {
         if (tag.contains(KEY_DELAY))
             tickDelay = Math.max(1, tag.getInt(KEY_DELAY));
 
-        if (tag.contains(KEY_IO)) {
-            String ioStr = tag.getString(KEY_IO);
-            if ("all".equals(ioStr)) {
-                ioDirection = null;
-            } else {
-                ioDirection = Direction.byName(ioStr);
-                if (ioDirection == null)
-                    ioDirection = Direction.UP;
-            }
-        }
+        if (tag.contains(KEY_IO))
+            ioDirection = IoSide.byKey(tag.getString(KEY_IO));
 
         if (tag.contains(KEY_PRIORITY)) {
             priority = Math.max(-99, Math.min(99, tag.getInt(KEY_PRIORITY)));
@@ -310,11 +301,11 @@ public class ChannelData {
         this.tickDelay = Math.max(1, tickDelay);
     }
 
-    public @Nullable Direction getIoDirection() {
+    public IoSide getIoSide() {
         return ioDirection;
     }
 
-    public void setIoDirection(@Nullable Direction ioDirection) {
+    public void setIoSide(IoSide ioDirection) {
         this.ioDirection = ioDirection;
     }
 
