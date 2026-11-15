@@ -30,7 +30,7 @@ A Computer placed before this update has no owner. Break it and place it again t
 | Method | Returns |
 |---|---|
 | `listNetworks()` | `{ {id, name, nodeCount, starred, color, createdAt}, ... }` |
-| `getChannels(net)` | `{ {index, name, type, nodeCount}, ... }` — `type` is nil when a channel has no enabled nodes |
+| `getChannels(net)` | `{ {index, name, type, types, nodeCount}, ... }` — `types` lists every kind on the channel; `type` is the first of them, and both are nil when a channel has no enabled nodes |
 | `getNodes(net)` | `{ {id, label, block, pos, attachedPos, dimension, visible, highlighted}, ... }` — loaded nodes only |
 | `getGraph(net)` | `{ name, totalNodes, vertices, edges }` — vertices have `key, label, x, y, nodes`; edges have `from, to, type, channels` |
 | `watch(net)` | Starts live telemetry for this computer |
@@ -48,7 +48,7 @@ local _, side, networkId, sample = os.pullEvent("logistics_flow")
 -- sample.channels[1].total, sample.channels[1].resources[1].displayName
 ```
 
-Each channel has `index`, `type`, `total` (amount moved in that second, in the I/O Monitor's units) and `resources` — the top 16 items, fluids or chemicals with `kind`, `name`, `displayName` and `amount`. Energy and Source channels have an empty resource list.
+Each channel has `index`, `type`, `types`, `total` (amount of the first type moved in that second, in the I/O Monitor's units), `totals` (amount per type, keyed by type name) and `resources` — the top 16 items, fluids or chemicals with `kind`, `name`, `displayName` and `amount`. Energy and Source channels have an empty resource list.
 
 Watches end when the computer restarts or is disconnected, so call `watch` from your `startup` script. They also stop without an error if the owner loses access to the network or the network is deleted.
 

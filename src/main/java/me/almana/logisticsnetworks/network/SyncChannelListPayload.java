@@ -16,7 +16,7 @@ public record SyncChannelListPayload(
         List<ChannelEntry> channels,
         List<String> channelNames) implements CustomPacketPayload {
 
-    public record ChannelEntry(int channelIndex, int typeOrdinal, int nodeCount) {
+    public record ChannelEntry(int channelIndex, int typeMask, int nodeCount) {
     }
 
     public static final CustomPacketPayload.Type<SyncChannelListPayload> TYPE = new CustomPacketPayload.Type<>(
@@ -31,9 +31,9 @@ public record SyncChannelListPayload(
         List<ChannelEntry> channels = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             int channelIndex = buf.readVarInt();
-            int typeOrdinal = buf.readVarInt();
+            int typeMask = buf.readVarInt();
             int nodeCount = buf.readVarInt();
-            channels.add(new ChannelEntry(channelIndex, typeOrdinal, nodeCount));
+            channels.add(new ChannelEntry(channelIndex, typeMask, nodeCount));
         }
         List<String> names = new ArrayList<>(LogisticsNodeEntity.CHANNEL_COUNT);
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) names.add(buf.readUtf(24));
@@ -45,7 +45,7 @@ public record SyncChannelListPayload(
         buf.writeVarInt(payload.channels.size());
         for (ChannelEntry entry : payload.channels) {
             buf.writeVarInt(entry.channelIndex());
-            buf.writeVarInt(entry.typeOrdinal());
+            buf.writeVarInt(entry.typeMask());
             buf.writeVarInt(entry.nodeCount());
         }
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {

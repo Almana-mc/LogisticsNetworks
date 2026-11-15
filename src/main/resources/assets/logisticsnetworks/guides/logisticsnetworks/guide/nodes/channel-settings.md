@@ -47,33 +47,21 @@ Use Primary Interaction on the channel number buttons at the top of the screen t
 
 **Gotcha:** a network with only Receivers (or only Senders) does nothing. You need at least one of each on the same channel number for anything to move.
 
-## Type
+## Resources
 
-![Type: Item](images/channel-type-item.png)
+**What it is:** the kinds of resource this channel moves: Item, Fluid, Energy, Chemical and Source.
 
-![Type: Fluid](images/channel-type-fluid.png)
+**What it does:** a channel moves every kind that is switched on. A new channel starts with all of them on, so one channel can carry items, fluids and power at the same time. Receivers only accept the kinds they have switched on too.
 
-![Type: Energy](images/channel-type-energy.png)
+**How to change it:** click the Resources row to open its popover. Each line has a checkbox to switch that kind on or off, and (on a Sender) its own Batch amount. **All** and **None** set every kind at once.
 
-**What it is:** the kind of resource this channel moves.
-
-**What it does:** tells the engine which capability to look for on the attached block:
-
-- **Item** — stacks of items from an inventory (chests, furnaces, hoppers, AE2 interfaces, Refined Storage interfaces, etc.).
-- **Fluid** — millibuckets (mB) from a tank.
-- **Energy** — Forge Energy / RF from an energy buffer.
-
-**How to change it:** use Primary Interaction on the value pill to cycle through the available types.
-
-**Gotcha:** not every block supports every type. If the block has no matching capability on the chosen side, the channel will silently do nothing. Put an item node on a fluid tank and it won't transfer — because the tank has no item inventory.
+**Gotcha:** Chemical needs the Mekanism Chemical Upgrade and Source needs the Ars Source Upgrade. Without the upgrade the line shows why it is locked. A locked kind can still be ticked; it starts moving as soon as the upgrade is installed. Nodes on Create contraptions only move items and fluids.
 
 ### AE2 and Refined Storage Interfaces
 
 Nodes with a [Network Upgrade](upgrades-special.md) on Applied Energistics 2 and Refined Storage Interfaces transfer items and fluids directly through the connected storage network. Without the upgrade, the Interface is treated like any other inventory: the node only sees the items and tanks stocked in the Interface itself. The Interface's configured export resources decide what a Sender may pull, including its native fuzzy setting, but the configured quantity does not limit the Logistics batch. Receivers may insert any resource accepted by their Logistics channel filters.
 
 For item Senders, the direct path pulls from the storage network first, then uses items stocked in that Interface to fill any remaining batch. Buffer-only items stay available to later transfers, allowing the Interface to empty. Direct fluid transfers still ignore exposed tanks. Adding an explicit Logistics slot mapping switches that item channel back to the exposed Interface inventory. A disconnected or inactive storage network waits without using the Interface buffer, and direct transfers never request autocrafting.
-
-Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but require specific upgrades to unlock. They are covered on the Upgrades page.
 
 ## Side
 
@@ -156,15 +144,11 @@ Redstone gating applies to both Senders and Receivers.
 
 **What it is:** the maximum amount of resource moved in one transfer operation.
 
-**What it does:** caps a single transfer attempt. Units depend on Type:
+**What it does:** caps a single transfer attempt, separately for each kind. Units depend on the kind: items for Item, mB for Fluid and Chemical, Source for Source. Energy always moves as much as the upgrades allow.
 
-- **Item** — number of items (e.g. Batch 64 = up to one full stack per operation).
-- **Fluid** — millibuckets (e.g. Batch 1000 = up to 1 bucket per operation).
-- **Energy** — Forge Energy / RF per operation.
+**How to change it:** click the Batch row (or the Resources row) to open the popover, then click a kind's amount. Left click adds 1, right click removes 1, Shift steps by 8, Alt jumps to Max or 1, and a double-click lets you type a value. The box also takes simple math with `+ - * /` and parentheses, so `64*7` saves as 448. **Max** follows your upgrade tier.
 
-**How to change it:** use Primary Interaction on the number field to open a text box, type the new value, and press Enter. Minimum is 1. The box also takes simple math with `+ - * /` and parentheses, so `64*7` saves as 448. Priority and Delay work the same way.
-
-**Gotcha:** Batch is capped by the upgrades installed on the node. You can type 10,000 but if your upgrade tier only allows 500, the engine uses 500. Install higher-tier upgrades to raise the ceiling — see [Performance Upgrades](upgrades-performance.md).
+**Gotcha:** Batch is capped by the upgrades installed on the node. A value above the cap is treated as Max. Install higher-tier upgrades to raise the ceiling — see [Performance Upgrades](upgrades-performance.md).
 
 **Disabled on Receivers:** this row is greyed out when Mode is Receiver. Batch size is decided by the Sender.
 
@@ -178,7 +162,7 @@ Redstone gating applies to both Senders and Receivers.
 
 **How to change it:** use Primary Interaction on the number field to open a text box, type the new value, and press Enter. Minimum is 1 tick.
 
-**Gotcha:** Energy channels **ignore Delay**. The engine forces Energy transfers to 1-tick (instant) regardless of what you put here. The Delay row is greyed out on Energy-type channels for that reason.
+**Gotcha:** Energy **ignores Delay** and always moves every tick. Delay applies to the other kinds, and each kind waits on its own, so a stalled fluid side never slows items down. The Delay row is greyed out on channels that only carry Energy.
 
 **Gotcha (upgrades):** Delay is also clamped by your upgrade tier's minimum delay. You can type 1, but if your upgrades only allow 10, the engine uses 10. Better upgrades mean a lower floor.
 

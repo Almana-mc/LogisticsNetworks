@@ -9,7 +9,7 @@ navigation:
 
 Filters are virtual channel rules that decide exactly which resources a channel is allowed to move. Open them from the 3x2 filter grid on the right side of the node screen; see [Filters & Upgrades](../nodes/filters-upgrades.md).
 
-Without any filters the channel transfers everything that matches its Type. Add a filter and only resources that pass the filter's rules get through.
+Without any filters the channel transfers everything its Resources allow. Add a filter and only resources that pass the filter's rules get through. One filter can hold items, fluids and chemicals together: left-click a slot with a bucket to add the bucket item, right-click to add the fluid inside it. A whitelist only restricts the kinds it has entries for, so a filter listing only cobblestone still lets every fluid through.
 
 Filter slots are **per-channel**. Every channel on a node keeps its own independent set of 6 filter buttons, so one node can run 6 totally different filter configurations at once.
 
@@ -126,7 +126,7 @@ This clipboard lives only in your current game session. It is **not** saved to t
 
 What gets copied depends on the filter type:
 
-- **Normal Filter**: every entry plus its per-entry rules — item, fluid, chemical, or `#tag`, batch and stock amounts, slot mapping, NBT (strict flag, raw SNBT, rules, and Match Any/All mode), durability, and enchanted state — along with the filter's Whitelist/Blacklist mode and Type.
+- **Normal Filter**: every entry plus its per-entry rules — item, fluid, chemical, or `#tag`, batch and stock amounts, slot mapping, NBT (strict flag, raw SNBT, rules, and Match Any/All mode), durability, and enchanted state — along with the filter's Whitelist/Blacklist mode.
 - **Mod**: Whitelist/Blacklist mode, Type, and the selected mod id.
 - **Regex**: Whitelist/Blacklist mode, Type, the regex pattern, and the match scope.
 

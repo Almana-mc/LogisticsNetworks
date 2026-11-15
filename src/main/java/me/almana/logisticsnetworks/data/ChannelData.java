@@ -109,7 +109,7 @@ public class ChannelData {
     }
 
     private void saveTypes(CompoundTag tag) {
-        tag.putString(KEY_TYPE, getType().name());
+        tag.putString(KEY_TYPE, ChannelType.first(types).name());
         tag.put(KEY_TYPES, typeNames(types));
         CompoundTag batchTag = new CompoundTag();
         for (ChannelType type : ChannelType.values()) {
@@ -300,27 +300,6 @@ public class ChannelData {
 
     public void setRecipeSets(int sets) {
         recipeSets = Math.max(0, sets);
-    }
-
-    // Transitional, removed in Task 16
-    public ChannelType getType() {
-        return ChannelType.first(types);
-    }
-
-    // Transitional, removed in Task 16
-    public void setType(ChannelType type) {
-        if (type != null) types = type.bit();
-    }
-
-    // Transitional, removed in Task 16
-    public int getBatchSize() {
-        int value = batches[getType().ordinal()];
-        return value <= 0 ? Integer.MAX_VALUE : value;
-    }
-
-    // Transitional, removed in Task 16
-    public void setBatchSize(int batchSize) {
-        batches[getType().ordinal()] = Math.max(1, batchSize);
     }
 
     public int getTickDelay() {

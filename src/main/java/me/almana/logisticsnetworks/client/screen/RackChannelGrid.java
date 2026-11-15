@@ -25,7 +25,7 @@ final class RackChannelGrid {
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
             int cx = cellX(x, i);
             int cy = cellY(y, i);
-            ThemePaint.channelTab(g, font, cx, cy, CELL_W, CELL_H, String.valueOf(i), side.type(i), i == selected,
+            ThemePaint.channelTab(g, font, cx, cy, CELL_W, CELL_H, String.valueOf(i), side.types(i), i == selected,
                     false, NetworkDropdown.hits(mx, my, cx, cy, CELL_W, CELL_H), t);
         }
         g.pose().popPose();
