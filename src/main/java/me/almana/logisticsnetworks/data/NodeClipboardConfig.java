@@ -120,7 +120,6 @@ public final class NodeClipboardConfig {
     public record ChannelState(boolean enabled, ChannelMode mode, int types, List<Integer> batches, int recipeSets,
             int tickDelay, IoSide direction, RedstoneMode redstoneMode, DistributionMode distributionMode,
             FilterMode filterMode, int priority, String name, boolean resourceRoundRobin) {
-        public static final ChannelState DEFAULT = stateOf(defaultChannelConfig());
     }
 
     private NodeClipboardConfig(ChannelConfig[] channels, ItemStack[][] filterItems, ItemStack[] upgradeItems,

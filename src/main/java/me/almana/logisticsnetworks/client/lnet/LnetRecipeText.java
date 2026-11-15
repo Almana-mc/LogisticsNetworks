@@ -81,7 +81,8 @@ final class LnetRecipeText {
                     Optional.of(id), count);
         }
         if (rest.startsWith("fluid ") || mb) {
-            String id = LnetEntryText.readFluid(rest.startsWith("fluid ") ? rest.substring("fluid ".length()).trim() : rest);
+            String fluid = rest.startsWith("fluid ") ? rest.substring("fluid ".length()).trim() : rest;
+            String id = LnetEntryText.readFluid(fluid);
             return new RecipeCardData.Ingredient(Optional.empty(), Optional.empty(), Optional.of(id),
                     Optional.empty(), count);
         }

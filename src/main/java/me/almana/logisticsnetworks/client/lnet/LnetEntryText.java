@@ -7,6 +7,7 @@ import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.component.StackSnapshot;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.FilterTagUtil;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtPath;
@@ -80,6 +81,33 @@ final class LnetEntryText {
         return -1;
     }
 
+    static int depth(String text) {
+        int depth = 0;
+        int max = 0;
+        char quote = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (quote != 0) {
+                if (ch == '\\') {
+                    i++;
+                } else if (ch == quote) {
+                    quote = 0;
+                }
+            } else if (ch == '"' || ch == '\'') {
+                quote = ch;
+            } else if (ch == '[' || ch == '(' || ch == '{') {
+                max = Math.max(max, ++depth);
+            } else if (ch == ']' || ch == ')' || ch == '}') {
+                depth = Math.max(0, depth - 1);
+            }
+        }
+        return max;
+    }
+
+    static String oneLine(String text) {
+        return text.replace('\r', ' ').replace('\n', ' ');
+    }
+
     static List<String> split(String text, String delimiter) {
         List<String> parts = new ArrayList<>();
         int start = 0;
@@ -118,6 +146,9 @@ final class LnetEntryText {
         try {
             ItemParser.ItemResult result = ItemParser.parseForItem(registries.lookupOrThrow(Registries.ITEM), reader);
             if (reader.canRead()) {
+                if (reader.peek() == '[') {
+                    throw new IOException("1.21.1 item components aren't readable on 1.20.1");
+                }
                 throw new IOException("unexpected '" + reader.getRemaining() + "' after item");
             }
             if (result.item().value() == Items.AIR) {
@@ -139,7 +170,13 @@ final class LnetEntryText {
                 }
             }
             throw new IOException(e.getRawMessage().getString() + " in '" + text + "'");
+        } catch (StackOverflowError e) {
+            throw tooDeep();
         }
+    }
+
+    static IOException tooDeep() {
+        return new IOException("nesting deeper than " + LnetDocument.MAX_DEPTH);
     }
 
     private static boolean atIdPosition(@Nullable String input, int cursor) {
@@ -297,7 +334,7 @@ final class LnetEntryText {
         String raw = "";
         int matchesStart = matchesStart(text);
         if (matchesStart >= 0) {
-            raw = text.substring(matchesStart).trim().substring("matches ".length()).trim();
+            raw = rawNbt(text.substring(matchesStart));
             text = text.substring(0, Math.max(0, matchesStart - 1));
         }
         for (String part : text.isEmpty() ? List.<String>of() : split(text, ",")) {
@@ -326,6 +363,14 @@ final class LnetEntryText {
         return entry.withCounts(new GeneralFilterEntry.EntryCounts(0, entry.counts().batch(), stock))
                 .withSlotMapping(slots)
                 .withNbt(new GeneralFilterEntry.NbtConstraints(where.rules(), where.matchAny(), strict, raw));
+    }
+
+    private static String rawNbt(String clause) throws IOException {
+        String raw = clause.trim().substring("matches ".length()).trim();
+        if (raw.length() > FilterItemData.MAX_NBT_RAW_LENGTH) {
+            throw new IOException("'matches' text longer than " + FilterItemData.MAX_NBT_RAW_LENGTH);
+        }
+        return raw;
     }
 
     private static int matchesStart(String text) {
@@ -366,6 +411,9 @@ final class LnetEntryText {
             throw new IOException("'where' mixes 'and' and 'or'");
         }
         boolean any = ors.size() > 1;
+        if (Math.max(ands.size(), ors.size()) > FilterItemData.MAX_NBT_RULES_PER_SLOT) {
+            throw new IOException("more than " + FilterItemData.MAX_NBT_RULES_PER_SLOT + " nbt rules");
+        }
         List<NbtCriterion> rules = new ArrayList<>();
         for (String rule : any ? ors : ands) {
             rules.add(readRule(rule));
@@ -378,14 +426,29 @@ final class LnetEntryText {
         if (space < 0) {
             throw new IOException("rule needs '<path> <op> <value>': '" + text + "'");
         }
+        if (space > FilterItemData.MAX_NBT_PATH_LENGTH) {
+            throw new IOException("nbt path longer than " + FilterItemData.MAX_NBT_PATH_LENGTH);
+        }
         NbtPath path = NbtPath.parseLenient(text.substring(0, space));
         String rest = text.substring(space + 1).trim();
         for (String operator : OPERATORS) {
             if (rest.startsWith(operator + " ")) {
-                return new NbtCriterion(path, operator, readTag(rest.substring(operator.length()).trim()));
+                return new NbtCriterion(path, operator,
+                        readSizedTag(rest.substring(operator.length()).trim()));
             }
         }
         throw new IOException("unknown operator in rule '" + text + "'");
+    }
+
+    private static Tag readSizedTag(String text) throws IOException {
+        if (text.length() > FilterItemData.MAX_NBT_VALUE_LENGTH) {
+            throw new IOException("nbt value longer than " + FilterItemData.MAX_NBT_VALUE_LENGTH);
+        }
+        Tag tag = readTag(text);
+        if (tag.sizeInBytes() > FilterItemData.MAX_NBT_VALUE_BYTES) {
+            throw new IOException("nbt value larger than " + FilterItemData.MAX_NBT_VALUE_BYTES + " bytes");
+        }
+        return tag;
     }
 
     static Tag readTag(String text) throws IOException {
@@ -398,6 +461,8 @@ final class LnetEntryText {
             return tag;
         } catch (CommandSyntaxException e) {
             throw new IOException("bad nbt value '" + text + "'");
+        } catch (StackOverflowError e) {
+            throw tooDeep();
         }
     }
 
