@@ -183,6 +183,9 @@ dependencies {
     if (testMod("jade")) localRuntime(fg.deobf("maven.modrinth:jade:${jadeVersion}"))
     if (testMod("xaero")) localRuntime(fg.deobf("maven.modrinth:xaeros-minimap:forge-1.20.1-26.6.0"))
     if (testMod("ae2")) localRuntime(fg.deobf("appeng:appliedenergistics2-forge:${ae2Version}"))
+    if (testMod("extendedae")) {
+        localRuntime(fg.deobf("curse.maven:ex-pattern-provider-892005:9304849"))
+    }
     if (testMod("soph")) {
         localRuntime(fg.deobf("maven.modrinth:sophisticated-core:1.20.1-1.5.10.2402"))
         localRuntime(fg.deobf("maven.modrinth:sophisticated-backpacks:1.20.1-3.26.12.2206"))

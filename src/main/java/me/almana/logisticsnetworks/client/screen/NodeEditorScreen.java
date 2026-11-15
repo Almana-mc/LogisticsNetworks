@@ -1424,7 +1424,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         labelEditBox.setMaxLength(48);
         labelEditBox.setValue(node.getNodeLabel());
         labelEditBox.setBordered(true);
-        labelEditBox.setTextColor(cText());
         labelEditBox.setFocused(true);
         addRenderableWidget(labelEditBox);
         setFocused(labelEditBox);
@@ -1722,7 +1721,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         numericEditBox.setMaxLength(32);
         numericEditBox.setValue(val);
         numericEditBox.setBordered(true);
-        numericEditBox.setTextColor(cText());
         numericEditBox.setFocused(true);
         addRenderableWidget(numericEditBox);
         setFocused(numericEditBox);
@@ -2042,6 +2040,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             handleInteraction(editorMouseX(), editorMouseY(), action);
             return true;
         }
+        checkHotbarKeyPressed(key, scan);
         return true;
     }
 
