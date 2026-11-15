@@ -148,7 +148,9 @@ final class FlowHistory {
     static String format(long value) {
         if (value < 1000) return String.valueOf(value);
         if (value < 1_000_000) return compact(value / 1000.0) + "K";
-        return compact(value / 1_000_000.0) + "M";
+        if (value < 1_000_000_000) return compact(value / 1_000_000.0) + "M";
+        if (value < 1_000_000_000_000L) return compact(value / 1_000_000_000.0) + "B";
+        return compact(value / 1_000_000_000_000.0) + "T";
     }
 
     private static String compact(double value) {

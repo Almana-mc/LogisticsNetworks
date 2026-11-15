@@ -418,12 +418,13 @@ public class TransferEngine {
                 if (type != ChannelType.ITEM)
                     typed = orderTargets(typed, channel, sourceNode, type);
                 int batch = NodeUpgradeData.effectiveBatch(channel, type, sourceTier);
-                int result = switch (type) {
+                long result = switch (type) {
                     case ITEM -> transferItems(sourceNode, sourceLevel, channel, i, typed, batch, dimensionalCache,
                             capCache.interfaces, telemetryActive);
                     case FLUID -> transferFluids(sourceNode, sourceLevel, channel, typed, batch, dimensionalCache,
                             capCache);
-                    case ENERGY -> transferEnergy(sourceNode, sourceLevel, channel, typed, batch, dimensionalCache,
+                    case ENERGY -> transferEnergy(sourceNode, sourceLevel, channel, typed,
+                            Math.max(1L, NodeUpgradeData.getEnergyOperationCap(sourceTier)), dimensionalCache,
                             capCache);
                     case CHEMICAL -> transferChemicals(sourceNode, sourceLevel, channel, typed, batch,
                             dimensionalCache, capCache);
@@ -480,7 +481,7 @@ public class TransferEngine {
     }
 
     public static long finishChannelAttempt(LogisticsNodeEntity node, ChannelData channel, int index, int lane,
-            int result, long gameTime, int tier, boolean telemetryActive) {
+            long result, long gameTime, int tier, boolean telemetryActive) {
         if (telemetryActive && result > 0 && lane < ChannelData.RECIPE_LANE) {
             channel.getTelemetry().record(ChannelType.values()[lane], result);
         }
@@ -949,8 +950,8 @@ public class TransferEngine {
         return keepCap >= 0 ? Math.min(drainable.getAmount(), keepCap) : drainable.getAmount();
     }
 
-    private static int transferEnergy(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
-            ChannelData exportChannel, List<ImportTarget> targets, int batchLimitRF,
+    private static long transferEnergy(LogisticsNodeEntity sourceNode, ServerLevel sourceLevel,
+            ChannelData exportChannel, List<ImportTarget> targets, long batchLimitRF,
             Map<UUID, Boolean> dimensionalCache, CapCache capCache) {
 
         BlockPos sourcePos = sourceNode.getAttachedPos();
@@ -961,7 +962,7 @@ public class TransferEngine {
             return 0;
 
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
-        int remaining = batchLimitRF;
+        long remaining = batchLimitRF;
         boolean anyReachable = false;
         List<IEnergyStorage> equalTargets = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
                 ? new ArrayList<>() : null;
@@ -991,7 +992,7 @@ public class TransferEngine {
                 continue;
             }
 
-            int moved = executeEnergyMove(sourceHandler, targetHandler, remaining);
+            long moved = EnergyMove.move(sourceHandler, targetHandler, remaining);
             if (moved > 0) {
                 remaining -= moved;
                 if (robin) {
@@ -1003,11 +1004,8 @@ public class TransferEngine {
 
         if (!anyReachable)
             return -1;
-        if (equalTargets != null) {
-            // Stored, not per-call extract
-            return (int) EvenSplit.deal(equalTargets.size(), Math.min(batchLimitRF, sourceHandler.getEnergyStored()),
-                    (i, share) -> executeEnergyMove(sourceHandler, equalTargets.get(i), (int) share));
-        }
+        if (equalTargets != null)
+            return EnergyMove.deal(sourceHandler, equalTargets, remaining);
         return batchLimitRF - remaining;
     }
 
@@ -2006,57 +2004,6 @@ public class TransferEngine {
             }
         }
         return limitMb - remaining;
-    }
-
-    private static int executeEnergyMove(IEnergyStorage source, IEnergyStorage target, int limitRF) {
-        int toMove = getEnergyMoveAmount(source, target, limitRF);
-        if (toMove <= 0)
-            return 0;
-
-        int extracted = source.extractEnergy(toMove, false);
-        if (extracted <= 0)
-            return 0;
-
-        int received = target.receiveEnergy(extracted, false);
-        if (received == extracted)
-            return received;
-
-        int rollbackAmount = extracted - received;
-        if (source.canReceive()) {
-            int returned = source.receiveEnergy(rollbackAmount, false);
-            rollbackAmount -= returned;
-        }
-
-        if (rollbackAmount > 0 && Config.debugMode) {
-            LOGGER.warn("ENERGY TRANSFER MISMATCH: {} RF could not be inserted or returned.", rollbackAmount);
-        }
-
-        return received;
-    }
-
-    private static int getEnergyMoveAmount(IEnergyStorage source, IEnergyStorage target, int limitRF) {
-        if (limitRF <= 0)
-            return 0;
-
-        int sourceStored = Math.max(0, source.getEnergyStored());
-        int targetSpace = getEnergySpace(target);
-        int limit = Math.min(limitRF, Math.min(sourceStored, targetSpace));
-        if (limit <= 0)
-            return 0;
-
-        int extracted = source.extractEnergy(limit, true);
-        if (extracted <= 0)
-            return 0;
-
-        int accepted = target.receiveEnergy(Math.min(limit, extracted), true);
-        return Math.max(0, Math.min(limit, Math.min(extracted, accepted)));
-    }
-
-    private static int getEnergySpace(IEnergyStorage target) {
-        long space = (long) target.getMaxEnergyStored() - target.getEnergyStored();
-        if (space <= 0)
-            return 0;
-        return space > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) space;
     }
 
     public static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId,

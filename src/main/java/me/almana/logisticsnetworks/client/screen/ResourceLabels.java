@@ -16,7 +16,7 @@ import java.util.Locale;
 final class ResourceLabels {
 
     private static final String KEY = "gui.logisticsnetworks.node.resources.";
-    private static final String[] SUFFIX = {"", "k", "M", "B"};
+    private static final String[] SUFFIX = {"", "k", "M", "B", "T", "P", "E"};
 
     private ResourceLabels() {
     }
@@ -50,11 +50,13 @@ final class ResourceLabels {
         return Component.translatable(KEY + key).getString();
     }
 
-    // Two significant digits, truncated
-    static String amount(int value) {
+    // Truncated, keeps whole digits
+    static String amount(long value) {
         if (value < 1000) return String.valueOf(value);
-        int tier = (int) Math.log10(value) / 3;
-        return new BigDecimal(value).round(new MathContext(2, RoundingMode.DOWN)).movePointLeft(3 * tier)
+        int magnitude = (int) Math.log10(value);
+        int tier = magnitude / 3;
+        int digits = Math.max(2, magnitude % 3 + 1);
+        return new BigDecimal(value).round(new MathContext(digits, RoundingMode.DOWN)).movePointLeft(3 * tier)
                 .stripTrailingZeros().toPlainString() + SUFFIX[tier];
     }
 }
