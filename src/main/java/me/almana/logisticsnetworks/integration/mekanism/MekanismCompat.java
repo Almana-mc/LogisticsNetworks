@@ -91,6 +91,13 @@ public final class MekanismCompat {
         return ChemicalTransferHelper.isValidChemicalId(chemicalId);
     }
 
+    @Nullable
+    public static String typedChemicalId(String chemicalId) {
+        if (!isLoaded())
+            return null;
+        return ChemicalTransferHelper.typedChemicalId(chemicalId);
+    }
+
     public static List<String> getAllChemicalIds() {
         if (!isLoaded())
             return Collections.emptyList();

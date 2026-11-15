@@ -1270,7 +1270,7 @@ public final class FilterItemData {
         }
     }
 
-    private static boolean saveEntries(ItemStack stack, List<GeneralFilterEntry> entries) {
+    public static boolean saveEntries(ItemStack stack, List<GeneralFilterEntry> entries) {
         ListTag list = new ListTag();
         entries.forEach(entry -> list.add(entry.save()));
         ListTag old = getRoot(stack).getList(KEY_ITEMS, Tag.TAG_COMPOUND);

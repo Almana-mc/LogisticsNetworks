@@ -625,6 +625,12 @@ public final class ChemicalTransferHelper {
         return resolveFirstChemical(chemicalId).isPresent();
     }
 
+    @Nullable
+    public static String typedChemicalId(String chemicalId) {
+        ChemicalStack<?> stack = stackOf(chemicalId, 1);
+        return stack == null ? null : getChemicalId(stack);
+    }
+
     @SuppressWarnings("rawtypes")
     public static List<String> getAllChemicalIds() {
         List<String> ids = new ArrayList<>();

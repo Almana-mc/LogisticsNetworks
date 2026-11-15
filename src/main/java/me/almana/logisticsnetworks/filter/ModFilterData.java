@@ -14,6 +14,7 @@ import net.minecraftforge.fluids.FluidStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public final class ModFilterData {
 
@@ -225,10 +226,10 @@ public final class ModFilterData {
         return checkModMatch(stack, id);
     }
 
-    private static String normalizeModId(String modId) {
+    public static String normalizeModId(String modId) {
         if (modId == null)
             return null;
-        String s = modId.trim().toLowerCase();
+        String s = modId.trim().toLowerCase(Locale.ROOT);
         if (s.isEmpty())
             return null;
 

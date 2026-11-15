@@ -9,8 +9,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public record NbtPath(Component[] components) {
+    private static final Pattern SAFE_KEY = Pattern.compile("[A-Za-z0-9_:/+-]+");
     public static final NbtPath EMPTY = NbtPath.of();
 
     public static NbtPath of(Component... components) {
@@ -88,7 +90,7 @@ public record NbtPath(Component[] components) {
     }
 
     private static boolean needsQuotes(String key) {
-        return key.isEmpty() || key.charAt(0) == '"' || key.indexOf('.') >= 0 || key.indexOf('[') >= 0;
+        return key.isEmpty() || !SAFE_KEY.matcher(key).matches();
     }
 
     private static int parseIndex(String str, int start, List<Component> out) {

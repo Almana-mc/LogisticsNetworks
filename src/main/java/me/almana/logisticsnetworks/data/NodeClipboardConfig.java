@@ -117,6 +117,12 @@ public final class NodeClipboardConfig {
         boolean resourceRoundRobin;
     }
 
+    public record ChannelState(boolean enabled, ChannelMode mode, int types, List<Integer> batches, int recipeSets,
+            int tickDelay, IoSide direction, RedstoneMode redstoneMode, DistributionMode distributionMode,
+            FilterMode filterMode, int priority, String name, boolean resourceRoundRobin) {
+        public static final ChannelState DEFAULT = stateOf(defaultChannelConfig());
+    }
+
     private NodeClipboardConfig(ChannelConfig[] channels, ItemStack[][] filterItems, ItemStack[] upgradeItems,
             @Nullable UUID networkId, @Nullable String networkName) {
         this.channels = channels;
@@ -307,6 +313,37 @@ public final class NodeClipboardConfig {
     public void setChannelTickDelay(int channel, int delay) {
         getChannelConfig(channel).tickDelay =
                 Math.max(NodeUpgradeData.getMinTickDelay(getUpgradeTier()), Math.min(10_000, delay));
+    }
+
+    public ChannelState getChannelState(int channel) {
+        return stateOf(getChannelConfig(channel));
+    }
+
+    // Raw copy, no clamps
+    public void setChannelState(int channel, ChannelState state) {
+        ChannelConfig config = getChannelConfig(channel);
+        config.enabled = state.enabled();
+        config.mode = state.mode();
+        config.types = state.types();
+        for (ChannelType type : ChannelType.values()) {
+            config.batches[type.ordinal()] = state.batches().get(type.ordinal());
+        }
+        config.recipeSets = state.recipeSets();
+        config.tickDelay = state.tickDelay();
+        config.ioDirection = state.direction();
+        config.redstoneMode = state.redstoneMode();
+        config.distributionMode = state.distributionMode();
+        config.filterMode = state.filterMode();
+        config.priority = state.priority();
+        config.name = state.name();
+        config.resourceRoundRobin = state.resourceRoundRobin();
+    }
+
+    private static ChannelState stateOf(ChannelConfig config) {
+        return new ChannelState(config.enabled, config.mode, config.types,
+                Arrays.stream(config.batches).boxed().toList(), config.recipeSets, config.tickDelay,
+                config.ioDirection, config.redstoneMode, config.distributionMode, config.filterMode,
+                config.priority, config.name, config.resourceRoundRobin);
     }
 
     public ItemStack getFilterItem(int channel, int slot) {
