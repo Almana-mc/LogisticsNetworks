@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.component;
 
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.filter.SlotExpressionUtil;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.util.ItemDataUtil;
@@ -22,6 +23,7 @@ import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +44,8 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
     private static final String KEY_FLUID = "fluid";
     private static final String KEY_CHEMICAL = "chemical";
     private static final String KEY_COUNT = "count";
+    private static final String KEY_SLOTS = "slots";
+    private static final String KEY_SPLIT = "split";
 
     public static final StreamCodec<FriendlyByteBuf, RecipeCardData> STREAM_CODEC = StreamCodec.of(
             (buf, data) -> buf.writeNbt(data.save()), buf -> load(buf.readNbt()));
@@ -141,7 +145,7 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         List<Ingredient> merged = new ArrayList<>();
         for (Ingredient ingredient : ingredients) {
             if (!ingredient.valid()) continue;
-            Ingredient clean = ingredient.withCount(ingredient.count());
+            Ingredient clean = ingredient.stripped();
             int at = indexOfKey(merged, clean);
             if (at >= 0) {
                 merged.set(at, merged.get(at).withCount(merged.get(at).count() + clean.count()));
@@ -180,7 +184,16 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
     }
 
     public record Ingredient(Optional<Item> item, Optional<TagKey<Item>> tag, Optional<String> fluid,
-            Optional<String> chemical, int count) {
+            Optional<String> chemical, int count, List<Integer> slots, boolean split) {
+
+        public Ingredient {
+            slots = List.copyOf(slots);
+        }
+
+        public Ingredient(Optional<Item> item, Optional<TagKey<Item>> tag, Optional<String> fluid,
+                Optional<String> chemical, int count) {
+            this(item, tag, fluid, chemical, count, List.of(), false);
+        }
 
         public static Ingredient ofItem(ItemStack stack, int count) {
             return new Ingredient(Optional.of(stack.getItem()), Optional.empty(), Optional.empty(), Optional.empty(),
@@ -263,12 +276,26 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             int at = tag.map(tags::indexOf).orElse(-1);
             Optional<Item> anchor = Optional.of(base.getItem());
             return new Ingredient(anchor, at + 1 < tags.size() ? Optional.of(tags.get(at + 1)) : Optional.empty(),
-                    Optional.empty(), Optional.empty(), count);
+                    Optional.empty(), Optional.empty(), count, slots, split);
         }
 
         public Ingredient withCount(int value) {
             int max = kind() == Kind.ITEM ? MAX_COUNT : MAX_AMOUNT;
-            return new Ingredient(item, tag, fluid, chemical, Math.max(1, Math.min(max, value)));
+            return new Ingredient(item, tag, fluid, chemical, Math.max(1, Math.min(max, value)), slots, split);
+        }
+
+        public Ingredient withSlots(List<Integer> value) {
+            return new Ingredient(item, tag, fluid, chemical, count, value, split);
+        }
+
+        public Ingredient withSplit(boolean value) {
+            return new Ingredient(item, tag, fluid, chemical, count, slots, value);
+        }
+
+        public MutableComponent slotsLabel() {
+            if (slots.isEmpty()) return Component.translatable("tooltip.logisticsnetworks.recipe_card.slots_any");
+            return Component.translatable(split ? "tooltip.logisticsnetworks.recipe_card.slots_split"
+                    : "tooltip.logisticsnetworks.recipe_card.slots", SlotExpressionUtil.formatSlots(slots));
         }
 
         boolean valid() {
@@ -284,8 +311,14 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             return item.get() != Items.AIR;
         }
 
+        Ingredient stripped() {
+            List<Integer> cleanSlots = kind() == Kind.ITEM ? slots.stream().distinct().sorted().toList() : List.of();
+            return new Ingredient(item, tag, fluid, chemical, count, cleanSlots,
+                    split && !cleanSlots.isEmpty()).withCount(count);
+        }
+
         boolean sameKey(Ingredient other) {
-            if (kind() != other.kind()) return false;
+            if (kind() != other.kind() || !slots.equals(other.slots) || split != other.split) return false;
             if (tag.isPresent() || other.tag.isPresent()) return tag.equals(other.tag);
             if (kind() != Kind.ITEM) return fluid.equals(other.fluid) && chemical.equals(other.chemical);
             return item.equals(other.item);
@@ -298,6 +331,8 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             fluid.ifPresent(value -> root.putString(KEY_FLUID, value));
             chemical.ifPresent(value -> root.putString(KEY_CHEMICAL, value));
             root.putInt(KEY_COUNT, count);
+            if (!slots.isEmpty()) root.putIntArray(KEY_SLOTS, slots);
+            if (split) root.putBoolean(KEY_SPLIT, true);
             return root;
         }
 
@@ -307,7 +342,11 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             Optional<String> fluid = parseId(root.getString(KEY_FLUID)).map(ResourceLocation::toString);
             Optional<String> chemical = boundedId(root.getString(KEY_CHEMICAL)).map(Ingredient::cleanChemical);
             if (item.isEmpty() && tag.isEmpty() && fluid.isEmpty() && chemical.isEmpty()) return Optional.empty();
-            return Optional.of(new Ingredient(item, tag, fluid, chemical, 1).withCount(root.getInt(KEY_COUNT)));
+            List<Integer> slots = Arrays.stream(root.getIntArray(KEY_SLOTS))
+                    .filter(slot -> slot >= SlotExpressionUtil.MIN_SLOT && slot <= SlotExpressionUtil.MAX_SLOT)
+                    .distinct().boxed().toList();
+            return Optional.of(new Ingredient(item, tag, fluid, chemical, 1, slots, root.getBoolean(KEY_SPLIT))
+                    .withCount(root.getInt(KEY_COUNT)));
         }
 
         // Keep kind prefix
