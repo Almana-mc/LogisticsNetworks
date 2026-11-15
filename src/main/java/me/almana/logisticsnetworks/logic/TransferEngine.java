@@ -64,23 +64,23 @@ public class TransferEngine {
     private static final byte SLOT_REJECTED = 1;
     private static final byte SLOT_PASSED = 2;
 
-    private static long capKey(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-        long packed = pos.asLong();
-        packed ^= ((long) (dir == null ? Direction.values().length : dir.ordinal())) << 58;
-        packed ^= ((long) level.dimension().location().hashCode()) << 32;
-        return packed;
+    private record CapKey(ResourceKey<Level> dim, long pos, int side) {
+    }
+
+    private static CapKey capKey(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+        return new CapKey(level.dimension(), pos.asLong(), dir == null ? IoSide.NONE.ordinal() : dir.ordinal());
     }
 
     static final class CapCache {
-        private final Map<Long, Object> items = new HashMap<>();
-        private final Map<Long, Object> fluids = new HashMap<>();
-        private final Map<Long, Object> energy = new HashMap<>();
-        private final Map<Long, Object> chemicals = new HashMap<>();
+        private final Map<CapKey, Object> items = new HashMap<>();
+        private final Map<CapKey, Object> fluids = new HashMap<>();
+        private final Map<CapKey, Object> energy = new HashMap<>();
+        private final Map<CapKey, Object> chemicals = new HashMap<>();
         private static final Object ABSENT = new Object();
         final TransferCapabilityCache interfaces = new TransferCapabilityCache(this);
 
         IItemHandler getItemHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            long key = capKey(level, pos, dir);
+            CapKey key = capKey(level, pos, dir);
             Object cached = items.get(key);
             if (cached == ABSENT) return null;
             if (cached != null) return (IItemHandler) cached;
@@ -91,7 +91,7 @@ public class TransferEngine {
         }
 
         IFluidHandler getFluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            long key = capKey(level, pos, dir);
+            CapKey key = capKey(level, pos, dir);
             Object cached = fluids.get(key);
             if (cached == ABSENT) return null;
             if (cached != null) return (IFluidHandler) cached;
@@ -102,7 +102,7 @@ public class TransferEngine {
         }
 
         IEnergyStorage getEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            long key = capKey(level, pos, dir);
+            CapKey key = capKey(level, pos, dir);
             Object cached = energy.get(key);
             if (cached == ABSENT) return null;
             if (cached != null) return (IEnergyStorage) cached;
@@ -173,8 +173,7 @@ public class TransferEngine {
         @SuppressWarnings("rawtypes")
         IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, IoSide side) {
             Direction dir = side.direction();
-            long key = capKey(level, pos, side == IoSide.ALL ? Direction.DOWN : dir);
-            if (side == IoSide.ALL) key ^= 0x1L << 62;
+            CapKey key = new CapKey(level.dimension(), pos.asLong(), side.ordinal());
             Object cached = chemicals.get(key);
             if (cached == ABSENT) return null;
             if (cached != null) return (IChemicalHandler) cached;
