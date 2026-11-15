@@ -164,6 +164,7 @@ dependencies {
     compileOnly("com.simibubi.create:create-1.20.1:6.0.8-289:slim") { isTransitive = false }
     compileOnly("net.createmod.ponder:Ponder-Forge-1.20.1:1.0.91") { isTransitive = false }
     compileOnly("maven.modrinth:ars-energistique:1.2.0") { isTransitive = false }
+    compileOnly(fg.deobf("curse.maven:applied-mekanistics-574300:7244744"))
     compileOnly("maven.modrinth:functional-storage:1.20.1-1.2.14") { isTransitive = false }
     compileOnly("maven.modrinth:sophisticated-core:1.20.1-1.5.10.2402") { isTransitive = false }
 
@@ -192,6 +193,7 @@ dependencies {
         localRuntime(fg.deobf("maven.modrinth:sophisticated-storage:1.20.1-1.5.5.2182"))
     }
     if (testMod("arseng")) localRuntime(fg.deobf("maven.modrinth:ars-energistique:1.2.0"))
+    if (testMod("appmek")) localRuntime(fg.deobf("curse.maven:applied-mekanistics-574300:7244744"))
     if (testMod("create")) {
         localRuntime(fg.deobf("com.simibubi.create:create-1.20.1:6.0.8-289:slim", closureOf<ModuleDependency> { isTransitive = false }))
         localRuntime(fg.deobf("dev.engine-room.flywheel:flywheel-forge-1.20.1:1.0.5"))

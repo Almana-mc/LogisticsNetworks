@@ -10,6 +10,7 @@ import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.ars.SourceTransferHelper;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.ChemicalTransferHelper;
+import me.almana.logisticsnetworks.integration.mekanism.DirectChemicalHandler;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.integration.sophisticated.SophisticatedCoreCompat;
 import me.almana.logisticsnetworks.integration.storage.DirectItemAccess;
@@ -1049,8 +1050,8 @@ public class TransferEngine {
             return -1;
 
         @SuppressWarnings("rawtypes")
-        IChemicalHandler sourceHandler = capCache.findChemicalHandler(sourceLevel, sourcePos,
-                exportChannel.getIoSide());
+        IChemicalHandler sourceHandler = capCache.interfaces.findChemicalHandler(sourceNode,
+                exportChannel.getIoSide(), true);
         if (sourceHandler == null)
             return 0;
 
@@ -1081,9 +1082,9 @@ public class TransferEngine {
                 continue;
 
             @SuppressWarnings("rawtypes")
-            IChemicalHandler targetHandler = capCache.findChemicalHandler(targetLevel, targetPos,
-                    target.channel().getIoSide());
-            if (targetHandler == null)
+            IChemicalHandler targetHandler = capCache.interfaces.findChemicalHandler(target.node(),
+                    target.channel().getIoSide(), false);
+            if (targetHandler == null || DirectChemicalHandler.shareNetwork(sourceHandler, targetHandler))
                 continue;
 
             if (equalHandlers != null) {

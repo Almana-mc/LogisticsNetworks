@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.logic;
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.integration.mekanism.DirectChemicalHandler;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageReads;
 import me.almana.logisticsnetworks.integration.storage.InterfaceStorageResolution;
@@ -82,6 +83,18 @@ public final class TransferCapabilityCache {
     @SuppressWarnings("rawtypes")
     IChemicalHandler findChemicalHandler(ServerLevel level, BlockPos pos, IoSide side) {
         return handlers.findChemicalHandler(level, pos, side);
+    }
+
+    @Nullable
+    @SuppressWarnings("rawtypes")
+    public IChemicalHandler findChemicalHandler(LogisticsNodeEntity node, IoSide side, boolean exporting) {
+        ServerLevel level = (ServerLevel) node.level();
+        if (side == IoSide.NONE || node.isMountedOnCreate()) return findChemicalHandler(level, node.getAttachedPos(), side);
+        InterfaceStorageResolution resolution = resolveInterface(node, side.direction());
+        if (resolution.status() == InterfaceStorageResolution.Status.UNAVAILABLE) return null;
+        if (resolution.status() == InterfaceStorageResolution.Status.AVAILABLE && resolution.endpoint().storesChemicals())
+            return DirectChemicalHandler.of(resolution.endpoint(), exporting);
+        return findChemicalHandler(level, node.getAttachedPos(), side);
     }
 
     @Nullable

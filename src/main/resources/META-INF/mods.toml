@@ -59,6 +59,13 @@ ordering = "NONE"
 side = "BOTH"
 
 [[dependencies."${mod_id}"]]
+modId = "appmek"
+mandatory = false
+versionRange = "[1.4.3,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
 modId = "guideme"
 mandatory = false
 versionRange = "[20.1.11,)"

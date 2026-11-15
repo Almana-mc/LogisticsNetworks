@@ -126,7 +126,7 @@ public final class ChemicalLane implements RecipeLane {
         return withAmount(want, want.getAmount() * sets);
     }
 
-    private static ChemicalStack<?> withAmount(ChemicalStack<?> stack, long amount) {
+    static ChemicalStack<?> withAmount(ChemicalStack<?> stack, long amount) {
         ChemicalStack<?> copy = stack.copy();
         copy.setAmount(amount);
         return copy;

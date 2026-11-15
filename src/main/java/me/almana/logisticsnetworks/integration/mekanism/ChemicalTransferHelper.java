@@ -680,6 +680,7 @@ public final class ChemicalTransferHelper {
 
     @SuppressWarnings("rawtypes")
     private static long countMatchingChemical(IChemicalHandler handler, String chemicalId) {
+        if (handler instanceof DirectChemicalHandler direct) return direct.count(chemicalId);
         long amount = 0;
         for (int i = 0; i < handler.getTanks(); i++) {
             ChemicalStack<?> stack = (ChemicalStack<?>) handler.getChemicalInTank(i);
