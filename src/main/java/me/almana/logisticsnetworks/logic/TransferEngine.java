@@ -2,7 +2,6 @@ package me.almana.logisticsnetworks.logic;
 
 import com.mojang.logging.LogUtils;
 import me.almana.logisticsnetworks.Config;
-import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.*;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
@@ -429,9 +428,6 @@ public class TransferEngine {
 
             int types = NodeUpgradeData.effectiveTypes(sourceNode, channel);
             boolean cards = RecipeCardItem.anyIn(channel.getFilterItems());
-            // Decode card NBT once
-            Set<RecipeCardData.Kind> cardKinds = cards
-                    ? RecipeSets.kinds(RecipeSets.cards(channel.getFilterItems())) : Set.of();
             ChannelTelemetry.startRecording(telemetryActive ? channel.getTelemetry() : null);
             if (cards) {
                 long delta = recipeLane(sourceNode, sourceLevel, channel, i, itemImports[i], fluidImports[i],
@@ -445,10 +441,9 @@ public class TransferEngine {
                     continue;
                 List<ImportTarget> typed = importsFor(type, i, itemImports, fluidImports, energyImports,
                         chemicalImports, sourceImports);
-                if (typed.isEmpty() || cards && !RecipeChannel.runsLoose(channel, type, cardKinds))
+                if (typed.isEmpty() || cards && !RecipeChannel.runsLoose(channel, type))
                     continue;
-                if (type == ChannelType.ENERGY && capCache.findEnergyHandler(sourceLevel,
-                        sourceNode.getAttachedPos(), channel.getIoSide()) == null) {
+                if (type == ChannelType.ENERGY && !canExtractEnergy(sourceNode, sourceLevel, channel, capCache)) {
                     minWakeDelta = Math.min(minWakeDelta, Config.backoffMaxTicks);
                     continue;
                 }
@@ -520,6 +515,12 @@ public class TransferEngine {
             case CHEMICAL -> chemicals[channel];
             case SOURCE -> source[channel];
         };
+    }
+
+    private static boolean canExtractEnergy(LogisticsNodeEntity node, ServerLevel level, ChannelData channel,
+            CapCache capCache) {
+        var handler = capCache.findEnergyHandler(level, node.getAttachedPos(), channel.getIoSide());
+        return handler != null && handler.canExtract();
     }
 
     private static boolean hasMountedStorage(LogisticsNodeEntity node, ChannelData channel, ChannelType type,

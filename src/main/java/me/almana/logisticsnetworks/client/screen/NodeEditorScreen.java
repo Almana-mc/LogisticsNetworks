@@ -70,7 +70,6 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private static final int INV_X = 47;
     private static final int INV_Y = 218;
     private static final int NETWORKS_PER_PAGE = 3;
-    private static final int BATCH_MAX = 1_000_000;
     private static final int DELAY_MIN = 1;
     private static final int DELAY_MAX = 10_000;
     private static final int PRIORITY_MIN = -99;

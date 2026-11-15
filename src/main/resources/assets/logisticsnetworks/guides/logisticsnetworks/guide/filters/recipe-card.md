@@ -18,15 +18,15 @@ Craft a written card on its own to wipe it, or together with blank cards to copy
 
 ## Using it in a filter
 
-A card is an entry in a filter, like any other entry, and it works in item, fluid and chemical filters alike. Hold it and click a cell in the filter, or click a node's filter slot to add it to that slot's filter. The filter gets a copy and you keep the card. The cell cycles through the card's ingredients, and its name shows what the recipe makes.
+A card is an entry in a filter, like any other entry, and it works on any channel that carries the card's kinds. Hold it and click a cell in the filter, or click a node's filter slot to add it to that slot's filter. The filter gets a copy and you keep the card. The cell cycles through the card's ingredients, and its name shows what the recipe makes.
 
 Hold **Modifier Key 2** (Ctrl by default) and click the cell to edit that copy. Close the editor to go back to the filter. Click the cell with an empty hand to clear it. Cards work in whitelist and blacklist filters, in the wrench clipboard, and they copy with labels. A card in an import channel's filter does nothing. Cards can't be edited from the computer graph or from a filter item held in your hand.
 
 ## Sending sets
 
-A channel with a card sends the whole set, whatever its own type is: items, fluids and chemicals together. The receivers are the import channels with the same number, whether they are item, fluid or chemical channels. A receiver must accept every resource in the card through its side, and its own filter only restricts its own resource type. Chemicals need a Mekanism Chemical Upgrade on the sending node; without it, a card that contains chemicals sends nothing.
+A channel with a card sends whole sets: items, fluids and chemicals together. The card's kinds must be switched on in **Resources** on the sender and on each receiver. A receiver only gets the kinds it accepts, and a card that needs a kind the sender has off sends nothing. The receivers are the import channels with the same number. A receiver must accept every resource in the card through its side, and its own filter only restricts its own resource type. Chemicals need a Mekanism Chemical Upgrade on the sending node; without it, a card that contains chemicals sends nothing.
 
-On a channel with a card, **Batch** counts whole sets per operation (at least one). The node's upgrade limits still cap each resource, so a set bigger than one operation's limit goes out one set at a time. The distribution mode decides who gets them:
+Set how many whole sets move per operation on the **Recipe sets** line of the Resources popover (Max by default, at least one). The node's upgrade limits still cap each resource, so a set bigger than one operation's limit goes out one set at a time. The distribution mode decides who gets them:
 
 - **Priority / Nearest / Farthest**: fill the first receiver, then the next.
 - **Priority Robin**: one receiver per operation, rotating.
@@ -40,4 +40,4 @@ Turn on **Blocking** to send only to receivers that hold none of this channel's 
 
 ## Mixing with normal filters
 
-A filter can hold cards and normal entries together. Recipe sets go first, then the normal entries move loose resources of the channel's type. The two have separate budgets: Batch sets for the cards, and Batch in the channel's own unit for the normal entries. A channel whose filters hold only cards sends nothing else.
+A filter can hold cards and normal entries together. Recipe sets go first, then the normal entries move loose resources of their own kind. With a card, the channel sends only whole sets plus loose filter entries, so other kinds, including Energy and Source, don't move. Recipe sets and loose entries use separate budgets: the Recipe sets line for the cards, and the kind's Batch for the loose entries.

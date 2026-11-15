@@ -15,6 +15,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.capability.IFluidHandler;
@@ -42,15 +43,16 @@ public final class AttachedStorageFilterScanner {
 
         TransferEngine.CapCache capabilities = new TransferEngine.CapCache();
         Result total = new Result(0, false, false, false);
-        if (channel.hasType(ChannelType.ITEM)) {
+        int types = NodeUpgradeData.effectiveTypes(node, channel);
+        if (ChannelType.ITEM.in(types)) {
             total = merge(total, scanItems(mounted ? CreateCompat.findMountedItemHandler(node)
                     : capabilities.findItemHandler(level, pos, channel.getIoSide()), filter));
         }
-        if (channel.hasType(ChannelType.FLUID) && !total.filterFull()) {
+        if (ChannelType.FLUID.in(types) && !total.filterFull()) {
             total = merge(total, scanFluids(mounted ? CreateCompat.findMountedFluidHandler(node)
                     : capabilities.findFluidHandler(level, pos, channel.getIoSide()), filter));
         }
-        if (channel.hasType(ChannelType.CHEMICAL) && !total.filterFull() && !mounted && MekanismCompat.isLoaded()) {
+        if (ChannelType.CHEMICAL.in(types) && !total.filterFull() && !mounted && MekanismCompat.isLoaded()) {
             total = merge(total, scanChemicals(capabilities.findChemicalHandler(level, pos, channel.getIoSide()),
                     filter));
         }

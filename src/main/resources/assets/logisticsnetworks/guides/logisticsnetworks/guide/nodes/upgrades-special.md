@@ -25,7 +25,7 @@ Inside the same dimension the upgrade does nothing extra — normal transfers wo
 
 ## Mekanism Chemical Upgrade
 
-**Unlocks the Chemical channel type.** Without this upgrade, the Type setting in [Channel Settings](channel-settings.md) cannot be set to Chemical on the node. Installed, the node can sense and transfer Mekanism chemicals (gases, infuse types, pigments, slurries) through any channel whose Type is set to Chemical.
+**Unlocks the Chemical channel type.** Without this upgrade, Chemical shows as locked in Resources; it can still be ticked and starts moving once the upgrade is installed. Installed, the node can sense and transfer Mekanism chemicals (gases, infuse types, pigments, slurries) through any channel with Chemical switched on.
 
 The upgrade only matters on the node where the channel is configured. A Chemical Sender needs the upgrade; a Chemical Receiver also needs the upgrade on its own node. Nodes that do not move chemicals do not need it.
 
@@ -35,7 +35,7 @@ Requires the **Mekanism** mod to be installed to both craft and use. The recipe 
 
 ## Ars Source Upgrade
 
-**Unlocks the Source channel type.** Same pattern as the Mekanism Chemical Upgrade, but for Ars Nouveau source. Installed, the node can set a channel's Type to Source and move source between Ars Nouveau source jars and any other source-compatible block. With Ars Énergistique installed, a node on an ME Source Jar reaches all the source stored in the AE2 network.
+**Unlocks the Source channel type.** Same pattern as the Mekanism Chemical Upgrade, but for Ars Nouveau source. Without it, Source shows as locked in Resources; it can still be ticked and starts moving once the upgrade is installed. Installed, the node can move source between Ars Nouveau source jars and any other source-compatible block. With Ars Énergistique installed, a node on an ME Source Jar reaches all the source stored in the AE2 network.
 
 Each node that moves source (Sender or Receiver) needs its own Ars Source Upgrade.
 
