@@ -33,6 +33,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -75,6 +76,14 @@ public final class FilterItemData {
 
         private ReadCache() {
         }
+    }
+
+    // FilterScreen's client thread only
+    private static final ThreadLocal<EntryMemo> ENTRY_MEMO = new ThreadLocal<>();
+
+    private static final class EntryMemo {
+        private CompoundTag root;
+        private List<GeneralFilterEntry> entries;
     }
 
     private record ItemFilterSlot(
@@ -1224,15 +1233,31 @@ public final class FilterItemData {
         return value != null && value.length() > MAX_ID_LENGTH;
     }
 
+    // Writes replace root, so identity-safe
+    public static void memoizeEntries(boolean enabled) {
+        if (enabled)
+            ENTRY_MEMO.set(new EntryMemo());
+        else
+            ENTRY_MEMO.remove();
+    }
+
     private static List<GeneralFilterEntry> entries(ItemStack stack) {
         if (!isFilterItem(stack))
             return List.of();
         CompoundTag root = getRoot(stack);
+        EntryMemo memo = ENTRY_MEMO.get();
+        if (memo != null && memo.root == root)
+            return memo.entries;
         // D3: pre-v2 entries stay loose
         boolean legacy = root.getInt(KEY_VERSION) < VERSION;
         List<GeneralFilterEntry> entries = new ArrayList<>();
         for (Tag tag : root.getList(KEY_ITEMS, Tag.TAG_COMPOUND))
             entries.add(GeneralFilterEntry.load((CompoundTag) tag, legacy));
+        entries = Collections.unmodifiableList(entries);
+        if (memo != null) {
+            memo.root = root;
+            memo.entries = entries;
+        }
         return entries;
     }
 

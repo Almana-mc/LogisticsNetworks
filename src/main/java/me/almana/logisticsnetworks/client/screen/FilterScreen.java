@@ -233,6 +233,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     @Override
     protected void init() {
         super.init();
+        FilterItemData.memoizeEntries(true);
         this.leftPos = (this.width - GUI_WIDTH) / 2;
         this.topPos = (this.height - imageHeight) / 2;
 
@@ -1929,6 +1930,7 @@ public class FilterScreen extends AbstractContainerScreen<FilterMenu> {
     @Override
     public void removed() {
         flushEditorsBeforeExit();
+        FilterItemData.memoizeEntries(false);
         super.removed();
     }
 
