@@ -44,7 +44,7 @@ The menu shows:
 
 Use **Primary Interaction (default: Left Click)** on **Place Nodes** and the wrench:
 
-1. Pays the required items out of your inventory or the linked AE2 or Refined Storage network.
+1. Pays the required items out of your inventory or the linked AE2 network.
 2. Places a node on every valid matching target block, up to 2048 nodes.
 3. Applies the clipboard template to every newly placed node: channels, filters, upgrades, label, and network.
 

@@ -57,9 +57,9 @@ Use Primary Interaction on the channel number buttons at the top of the screen t
 
 **Gotcha:** Chemical needs the Mekanism Chemical Upgrade and Source needs the Ars Source Upgrade. Without the upgrade the line shows why it is locked. A locked kind can still be ticked; it starts moving as soon as the upgrade is installed. Nodes on Create contraptions only move items and fluids.
 
-### AE2 and Refined Storage Interfaces
+### AE2 Interfaces
 
-Nodes with a [Network Upgrade](upgrades-special.md) on Applied Energistics 2 and Refined Storage Interfaces transfer items, fluids and chemicals directly through the connected storage network (chemicals need Applied Mekanistics on AE2). Without the upgrade, the Interface is treated like any other inventory: the node only sees the items and tanks stocked in the Interface itself. The Interface's configured export resources decide what a Sender may pull, including its native fuzzy setting, but the configured quantity does not limit the Logistics batch. Receivers may insert any resource accepted by their Logistics channel filters.
+Nodes with a [Network Upgrade](upgrades-special.md) on Applied Energistics 2 Interfaces transfer items, fluids and chemicals directly through the connected storage network (chemicals need Applied Mekanistics on AE2). Without the upgrade, the Interface is treated like any other inventory: the node only sees the items and tanks stocked in the Interface itself. The Interface's configured export resources decide what a Sender may pull, including its native fuzzy setting, but the configured quantity does not limit the Logistics batch. Receivers may insert any resource accepted by their Logistics channel filters.
 
 For item Senders, the direct path pulls from the storage network first, then uses items stocked in that Interface to fill any remaining batch. Buffer-only items stay available to later transfers, allowing the Interface to empty. Direct fluid and chemical transfers still ignore exposed tanks. Adding an explicit Logistics slot mapping switches that item channel back to the exposed Interface inventory. A disconnected or inactive storage network waits without using the Interface buffer, and direct transfers never request autocrafting.
 

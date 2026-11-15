@@ -45,12 +45,10 @@ Requires the **Ars Nouveau** mod to be installed to both craft and use. The reci
 
 ## Network Upgrade
 
-**Unlocks direct storage network access.** A node with this upgrade on an Applied Energistics 2 or Refined Storage Interface moves items and fluids straight through the whole connected storage network, as described in [Channel Settings](channel-settings.md). Chemicals work the same way with Applied Mekanistics on AE2. With Ars Énergistique installed, the same works for source on an AE2 Interface, but the node only exports source when Source is set in the Interface config. Without the upgrade, the Interface is just another inventory and the node only sees what is stocked in the Interface itself.
+**Unlocks direct storage network access.** A node with this upgrade on an Applied Energistics 2 Interface moves items and fluids straight through the whole connected storage network, as described in [Channel Settings](channel-settings.md). Chemicals work the same way with Applied Mekanistics on AE2. With Ars Énergistique installed, the same works for source on an AE2 Interface, but the node only exports source when Source is set in the Interface config. Without the upgrade, the Interface is just another inventory and the node only sees what is stocked in the Interface itself.
 
 Each node on an Interface that should reach the network needs its own Network Upgrade. Nodes on other blocks do not need it.
 
-There are two recipes, one per storage mod. Each one only appears when that mod is loaded.
+The recipe only appears when Applied Energistics 2 is loaded. Refined Storage is not supported on Minecraft 1.20.1.
 
 <Recipe id="logisticsnetworks:network_upgrade_ae2" fallbackText="Install Applied Energistics 2 to unlock this recipe." />
-
-<Recipe id="logisticsnetworks:network_upgrade_refinedstorage" fallbackText="Install Refined Storage to unlock this recipe." />

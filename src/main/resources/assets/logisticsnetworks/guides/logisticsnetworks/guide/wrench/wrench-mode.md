@@ -7,7 +7,7 @@ navigation:
 
 # Wrench Mode
 
-The default mode. If you just crafted a wrench and picked it up, it is already in this mode. Use it to open node settings, remove or place nodes, and link an AE2 or Refined Storage network.
+The default mode. If you just crafted a wrench and picked it up, it is already in this mode. Use it to open node settings, remove or place nodes, and link an AE2 network.
 
 ## Open Node Configuration
 
@@ -23,15 +23,13 @@ This is the clean way to pick up a node. Breaking the block the node is attached
 
 ## Storage Linking
 
-With Applied Energistics 2 or Refined Storage installed, use **Modifier Key 1 + Secondary Interaction** on an active block from that network to toggle the wrench link.
+With Applied Energistics 2 installed, use **Modifier Key 1 + Secondary Interaction** on an active block from that network to toggle the wrench link.
 
-- A wrench holds exactly one storage link: either AE2 or Refined Storage.
+- A wrench holds exactly one AE2 link.
 - Use the same linked endpoint again to unlink it.
 - Trying another endpoint while a link exists leaves the original link unchanged and tells you to unlink first.
 - The HUD and tooltip show which backend is linked.
 - Linked storage supplies node placement, mass placement, clipboard and label upgrade synchronization, and the upgrade picker. Missing items can be autocrafted when the backend supports it.
-
-Refined Storage actions honor its extract, insert, and autocrafting security permissions.
 
 ## Good to Know
 

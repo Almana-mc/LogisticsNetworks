@@ -16,7 +16,7 @@ You can also cycle modes with **Modifier Key 1 (default: Shift) + Mouse Wheel**.
 
 ## Modes at a Glance
 
-- [Wrench](wrench-mode.md) — the default. Open or remove nodes, place nodes, and link an AE2 or Refined Storage network.
+- [Wrench](wrench-mode.md) — the default. Open or remove nodes, place nodes, and link an AE2 network.
 - [Copy / Paste](copy-paste.md) — clone a node's entire setup — channels, filters, upgrades, label — onto another node. Supports bulk-paste to every connected node of the same block type.
 - [Mass Placement](mass-placement.md) — select a two-corner area, choose a target block type, then place configured nodes on matching blocks with **Primary Interaction (default: Left Click)**.
 

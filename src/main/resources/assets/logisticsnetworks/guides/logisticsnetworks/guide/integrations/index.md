@@ -16,7 +16,8 @@ Logistics Networks works alongside several other mods. These pages cover the one
 
 This version runs on Forge, and a few integrations differ from the Minecraft 1.21.1 version:
 
-- **EMI** drags items and fluids onto filters. Mekanism chemicals drag from JEI only.
+- **Refined Storage** is not supported, and neither are Refined Storage Mekanism Integration and Cable Tiers. The Network Upgrade, wrench linking, linked-storage supplies and pattern copying work with Applied Energistics 2 only.
+- **EMI** drags items and fluids onto filters and recipe cards. Mekanism chemicals drag from JEI only.
 - **Ars Nouveau** source moves between blocks that store source, such as source jars. With Ars Énergistique, a node on an ME Source Jar or a Source Acceptor reaches the source in the whole ME network.
 - **Create** needs 6.0.8 or a later 6.0.x version.
 - **Building Gadgets 2** needs 1.0.8 or a later 1.0.x version.
