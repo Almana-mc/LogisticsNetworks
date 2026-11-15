@@ -182,11 +182,17 @@ final class LnetEntryText {
         throw new IOException("unknown fluid '" + id + "'");
     }
 
-    // Unresolved ids stay untyped
     static String readChemical(String text) throws IOException {
-        String id = id(text, "chemical").toString();
-        String typed = MekanismCompat.typedChemicalId(id);
-        return typed != null ? typed : id;
+        ResourceLocation id = id(text, "chemical");
+        if (!MekanismCompat.isLoaded() || !loaded(id.getNamespace())) {
+            String mod = MekanismCompat.isLoaded() ? id.getNamespace() : "mekanism";
+            throw new MissingMod(id, mod, ChannelType.CHEMICAL);
+        }
+        String typed = MekanismCompat.typedChemicalId(id.toString());
+        if (typed == null) {
+            throw new IOException("unknown chemical '" + id + "'");
+        }
+        return typed;
     }
 
     static String untyped(String chemicalId) {
