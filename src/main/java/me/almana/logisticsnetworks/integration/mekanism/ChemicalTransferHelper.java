@@ -15,8 +15,10 @@ import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.FilterMode;
 import me.almana.logisticsnetworks.data.FlowResource;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.logic.ChannelTelemetry;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.logic.EntryFaces;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -357,14 +359,15 @@ public final class ChemicalTransferHelper {
             return 0;
         }
         return transferBetween(source, target, limit, exportFilters, exportFilterMode, importFilters,
-                importFilterMode, filterReadCache, null);
+                importFilterMode, filterReadCache, null, null);
     }
 
     @SuppressWarnings("rawtypes")
     public static long transferBetween(IChemicalHandler source, IChemicalHandler target, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable String requiredId) {
+            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable String requiredId,
+            @Nullable EntryFaces<IChemicalHandler> faces) {
         if (source == null || target == null) {
             return 0;
         }
@@ -373,7 +376,7 @@ public final class ChemicalTransferHelper {
                     limit, source.getTanks(), target.getTanks());
         }
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode, importFilters,
-                importFilterMode, filterReadCache, requiredId);
+                importFilterMode, filterReadCache, requiredId, faces);
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -405,8 +408,10 @@ public final class ChemicalTransferHelper {
     private static long executeChemicalMove(IChemicalHandler source, IChemicalHandler target, long limitAmount,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable String requiredId) {
+            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable String requiredId,
+            @Nullable EntryFaces<IChemicalHandler> faces) {
         long remaining = limitAmount;
+        IChemicalHandler channelTarget = target;
 
         for (int tank = 0; tank < source.getTanks(); tank++) {
             if (remaining <= 0) {
@@ -428,6 +433,15 @@ public final class ChemicalTransferHelper {
                 }
                 if (!FilterLogic.matchesChemical(importFilters, importFilterMode, chemId, filterReadCache)) {
                     continue;
+                }
+                if (faces != null) {
+                    IoSide side = faces.imports() ? FilterLogic.chemicalSide(importFilters, chemId, filterReadCache)
+                            : null;
+                    if (side == null && faces.exports())
+                        side = FilterLogic.chemicalSide(exportFilters, chemId, filterReadCache);
+                    target = faces.face(side, channelTarget);
+                    if (target == null)
+                        continue;
                 }
             }
 

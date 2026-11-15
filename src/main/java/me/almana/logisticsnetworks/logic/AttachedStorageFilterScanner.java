@@ -110,7 +110,7 @@ public final class AttachedStorageFilterScanner {
     }
 
     private static GeneralFilterEntry resource(@Nullable String fluidId, @Nullable String chemicalId) {
-        return new GeneralFilterEntry(0, null, fluidId, chemicalId, null, null, null, null, null);
+        return new GeneralFilterEntry(0, null, fluidId, chemicalId, null, null, null, null, null, null);
     }
 
     private static Result addAll(ItemStack filter, List<GeneralFilterEntry> candidates) {

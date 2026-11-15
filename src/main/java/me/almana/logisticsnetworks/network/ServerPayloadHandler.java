@@ -793,6 +793,17 @@ public class ServerPayloadHandler {
         });
     }
 
+    public static void handleSetFilterEntrySide(SetFilterEntrySidePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof FilterMenu menu && menu.stillValid(context.player())
+                    && !isSpecialMode(menu)
+                    && (payload.side() == -1 || isValidEnum(payload.side(), IoSide.values()))) {
+                menu.setEntrySide((Player) context.player(), payload.entryIndex(),
+                        payload.side() == -1 ? null : IoSide.values()[payload.side()]);
+            }
+        });
+    }
+
     public static void handleSetFilterEntryEnchanted(SetFilterEntryEnchantedPayload payload,
             IPayloadContext context) {
         context.enqueueWork(() -> {

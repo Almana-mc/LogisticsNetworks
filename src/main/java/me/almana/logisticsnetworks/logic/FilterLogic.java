@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.filter.*;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.ItemStack;
@@ -276,5 +277,60 @@ public final class FilterLogic {
             }
         }
         return false;
+    }
+
+    public static boolean hasConfiguredEntrySides(ItemStack[] filters,
+            @Nullable FilterItemData.ReadCache readCache) {
+        if (filters == null)
+            return false;
+        for (ItemStack filter : filters) {
+            if (FilterItemData.hasEntrySides(filter, readCache)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static int entrySideMask(ItemStack[] filters, @Nullable FilterItemData.ReadCache readCache) {
+        int mask = 0;
+        for (ItemStack filter : filters) {
+            mask |= FilterItemData.entrySideMask(filter, readCache);
+        }
+        return mask;
+    }
+
+    @Nullable
+    public static IoSide itemSide(ItemStack[] filters, ItemStack candidate, HolderLookup.Provider provider,
+            @Nullable CandidateComponents candidateNbt, @Nullable FilterItemData.ReadCache readCache,
+            int inventorySlot) {
+        for (ItemStack filter : filters) {
+            IoSide side = FilterItemData.getItemSideFull(filter, candidate, provider, candidateNbt, readCache,
+                    inventorySlot);
+            if (side != null)
+                return side;
+        }
+        return null;
+    }
+
+    @Nullable
+    public static IoSide fluidSide(ItemStack[] filters, FluidStack candidate,
+            @Nullable FilterItemData.ReadCache readCache) {
+        for (ItemStack filter : filters) {
+            IoSide side = FilterItemData.getFluidSideFull(filter, candidate, readCache);
+            if (side != null)
+                return side;
+        }
+        return null;
+    }
+
+    @Nullable
+    public static IoSide chemicalSide(ItemStack[] filters, String chemicalId,
+            @Nullable FilterItemData.ReadCache readCache) {
+        for (ItemStack filter : filters) {
+            IoSide side = FilterItemData.getChemicalSideFull(filter, chemicalId, readCache);
+            if (side != null)
+                return side;
+        }
+        return null;
     }
 }

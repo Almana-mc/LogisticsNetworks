@@ -1,11 +1,14 @@
 package me.almana.logisticsnetworks.component;
 
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.IoSide;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.filter.SlotExpressionUtil;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
 import me.almana.logisticsnetworks.util.ItemDataUtil;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -26,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapshot> output, boolean blocking) {
@@ -46,6 +50,9 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
     private static final String KEY_COUNT = "count";
     private static final String KEY_SLOTS = "slots";
     private static final String KEY_SPLIT = "split";
+    private static final String KEY_SIDE = "side";
+    private static final String KEY_NBT = "nbt";
+    private static final String KEY_ITEM_NBT = "item_nbt";
 
     public static final StreamCodec<FriendlyByteBuf, RecipeCardData> STREAM_CODEC = StreamCodec.of(
             (buf, data) -> buf.writeNbt(data.save()), buf -> load(buf.readNbt()));
@@ -183,21 +190,26 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         return parseId(value).flatMap(BuiltInRegistries.ITEM::getOptional).filter(item -> item != Items.AIR);
     }
 
+    // itemNbt: 1.21.1 snapshot components
     public record Ingredient(Optional<Item> item, Optional<TagKey<Item>> tag, Optional<String> fluid,
-            Optional<String> chemical, int count, List<Integer> slots, boolean split) {
+            Optional<String> chemical, int count, List<Integer> slots, boolean split, Optional<IoSide> side,
+            GeneralFilterEntry.NbtConstraints nbt, Optional<CompoundTag> itemNbt) {
 
         public Ingredient {
             slots = List.copyOf(slots);
+            itemNbt = itemNbt.map(CompoundTag::copy);
         }
 
         public Ingredient(Optional<Item> item, Optional<TagKey<Item>> tag, Optional<String> fluid,
                 Optional<String> chemical, int count) {
-            this(item, tag, fluid, chemical, count, List.of(), false);
+            this(item, tag, fluid, chemical, count, List.of(), false, Optional.empty(),
+                    GeneralFilterEntry.NbtConstraints.EMPTY, Optional.empty());
         }
 
         public static Ingredient ofItem(ItemStack stack, int count) {
             return new Ingredient(Optional.of(stack.getItem()), Optional.empty(), Optional.empty(), Optional.empty(),
-                    count);
+                    count, List.of(), false, Optional.empty(), GeneralFilterEntry.NbtConstraints.EMPTY,
+                    Optional.ofNullable(stack.getTag()));
         }
 
         public static Ingredient ofTag(ResourceLocation tag, int count) {
@@ -225,10 +237,17 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             return chemical.isPresent() ? Kind.CHEMICAL : Kind.ITEM;
         }
 
-        public boolean matches(ItemStack stack) {
+        // Strict unless rules given
+        public boolean strict() {
+            return tag.isEmpty() && nbt.strict().orElse(nbt.rules().isEmpty() && nbt.raw().isEmpty());
+        }
+
+        public boolean matches(ItemStack stack, HolderLookup.Provider provider) {
             if (stack.isEmpty()) return false;
-            if (tag.isPresent()) return stack.is(tag.get());
-            return item.isPresent() && stack.is(item.get());
+            if (tag.isPresent()) return stack.is(tag.get()) && FilterItemData.matchesNbt(nbt, stack, provider);
+            if (item.isEmpty() || !stack.is(item.get())) return false;
+            return strict() ? Objects.equals(stack.getTag(), itemNbt.orElse(null))
+                    : FilterItemData.matchesNbt(nbt, stack, provider);
         }
 
         public boolean matches(FluidStack stack) {
@@ -244,7 +263,11 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
         }
 
         public ItemStack icon() {
-            if (item.isPresent()) return new ItemStack(item.get());
+            if (item.isPresent()) {
+                ItemStack stack = new ItemStack(item.get());
+                itemNbt.ifPresent(value -> stack.setTag(value.copy()));
+                return stack;
+            }
             return tag.flatMap(BuiltInRegistries.ITEM::getTag)
                     .flatMap(set -> set.stream().findFirst())
                     .map(holder -> new ItemStack(holder.value()))
@@ -276,26 +299,68 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             int at = tag.map(tags::indexOf).orElse(-1);
             Optional<Item> anchor = Optional.of(base.getItem());
             return new Ingredient(anchor, at + 1 < tags.size() ? Optional.of(tags.get(at + 1)) : Optional.empty(),
-                    Optional.empty(), Optional.empty(), count, slots, split);
+                    Optional.empty(), Optional.empty(), count, slots, split, side, nbt,
+                    Optional.ofNullable(base.getTag()));
         }
 
         public Ingredient withCount(int value) {
             int max = kind() == Kind.ITEM ? MAX_COUNT : MAX_AMOUNT;
-            return new Ingredient(item, tag, fluid, chemical, Math.max(1, Math.min(max, value)), slots, split);
+            return new Ingredient(item, tag, fluid, chemical, Math.max(1, Math.min(max, value)), slots, split, side,
+                    nbt, itemNbt);
         }
 
         public Ingredient withSlots(List<Integer> value) {
-            return new Ingredient(item, tag, fluid, chemical, count, value, split);
+            return new Ingredient(item, tag, fluid, chemical, count, value, split, side, nbt, itemNbt);
         }
 
         public Ingredient withSplit(boolean value) {
-            return new Ingredient(item, tag, fluid, chemical, count, slots, value);
+            return new Ingredient(item, tag, fluid, chemical, count, slots, value, side, nbt, itemNbt);
+        }
+
+        public Ingredient withSide(Optional<IoSide> value) {
+            return new Ingredient(item, tag, fluid, chemical, count, slots, split, value, nbt, itemNbt);
+        }
+
+        public Ingredient withNbt(GeneralFilterEntry.NbtConstraints value) {
+            return new Ingredient(item, tag, fluid, chemical, count, slots, split, side, value, itemNbt);
+        }
+
+        public boolean customized() {
+            return !slots.isEmpty() || side.isPresent() || !defaultNbt();
+        }
+
+        private boolean defaultNbt() {
+            return tag.isPresent() ? nbt.rules().isEmpty() && nbt.raw().isEmpty() : strict();
         }
 
         public MutableComponent slotsLabel() {
             if (slots.isEmpty()) return Component.translatable("tooltip.logisticsnetworks.recipe_card.slots_any");
             return Component.translatable(split ? "tooltip.logisticsnetworks.recipe_card.slots_split"
                     : "tooltip.logisticsnetworks.recipe_card.slots", SlotExpressionUtil.formatSlots(slots));
+        }
+
+        public MutableComponent sideLabel() {
+            return Component.translatable("tooltip.logisticsnetworks.recipe_card.side", side
+                    .map(value -> Component.translatable("gui.logisticsnetworks.direction." + value.key()))
+                    .orElse(Component.translatable("tooltip.logisticsnetworks.recipe_card.side_node")));
+        }
+
+        public MutableComponent nbtLabel() {
+            if (strict()) return Component.translatable("tooltip.logisticsnetworks.recipe_card.nbt_strict");
+            if (!nbt.rules().isEmpty()) {
+                return Component.translatable("tooltip.logisticsnetworks.recipe_card.nbt_rules", nbt.rules().size());
+            }
+            return Component.translatable(nbt.raw().isEmpty() ? "tooltip.logisticsnetworks.recipe_card.nbt_ignored"
+                    : "tooltip.logisticsnetworks.recipe_card.nbt_raw");
+        }
+
+        // Non-default settings only
+        public List<MutableComponent> settingLabels() {
+            List<MutableComponent> labels = new ArrayList<>(3);
+            if (side.isPresent()) labels.add(sideLabel());
+            if (!slots.isEmpty()) labels.add(slotsLabel());
+            if (!defaultNbt()) labels.add(nbtLabel());
+            return labels;
         }
 
         boolean valid() {
@@ -311,17 +376,36 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             return item.get() != Items.AIR;
         }
 
+        // Components kept so toggling is lossless
         Ingredient stripped() {
-            List<Integer> cleanSlots = kind() == Kind.ITEM ? slots.stream().distinct().sorted().toList() : List.of();
+            boolean items = kind() == Kind.ITEM;
+            List<Integer> cleanSlots = items ? slots.stream().distinct().sorted().toList() : List.of();
             return new Ingredient(item, tag, fluid, chemical, count, cleanSlots,
-                    split && !cleanSlots.isEmpty()).withCount(count);
+                    split && !cleanSlots.isEmpty(), side, items ? bounded(nbt) : GeneralFilterEntry.NbtConstraints.EMPTY,
+                    item.isPresent() ? itemNbt : Optional.empty())
+                    .withCount(count);
+        }
+
+        // Filter NBT limits, strict as default
+        private static GeneralFilterEntry.NbtConstraints bounded(GeneralFilterEntry.NbtConstraints nbt) {
+            List<NbtCriterion> rules = nbt.rules().stream()
+                    .filter(rule -> !rule.path().isEmpty()
+                            && rule.path().toString().length() <= FilterItemData.MAX_NBT_PATH_LENGTH
+                            && rule.value().sizeInBytes() <= FilterItemData.MAX_NBT_VALUE_BYTES)
+                    .limit(FilterItemData.MAX_NBT_RULES_PER_SLOT)
+                    .toList();
+            String raw = nbt.raw().length() <= FilterItemData.MAX_NBT_RAW_LENGTH ? nbt.raw() : "";
+            return new GeneralFilterEntry.NbtConstraints(rules, nbt.matchAny() && !rules.isEmpty(),
+                    nbt.strict().filter(strict -> !strict || !rules.isEmpty() || !raw.isEmpty()), raw);
         }
 
         boolean sameKey(Ingredient other) {
-            if (kind() != other.kind() || !slots.equals(other.slots) || split != other.split) return false;
+            if (kind() != other.kind() || !slots.equals(other.slots) || split != other.split
+                    || !side.equals(other.side) || !nbt.equals(other.nbt)) return false;
             if (tag.isPresent() || other.tag.isPresent()) return tag.equals(other.tag);
             if (kind() != Kind.ITEM) return fluid.equals(other.fluid) && chemical.equals(other.chemical);
-            return item.equals(other.item);
+            if (!item.equals(other.item)) return false;
+            return !strict() || itemNbt.equals(other.itemNbt);
         }
 
         CompoundTag save() {
@@ -333,6 +417,11 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             root.putInt(KEY_COUNT, count);
             if (!slots.isEmpty()) root.putIntArray(KEY_SLOTS, slots);
             if (split) root.putBoolean(KEY_SPLIT, true);
+            side.ifPresent(value -> root.putString(KEY_SIDE, value.key()));
+            CompoundTag rules = new CompoundTag();
+            GeneralFilterEntry.saveNbt(nbt, rules);
+            if (!rules.isEmpty()) root.put(KEY_NBT, rules);
+            itemNbt.ifPresent(value -> root.put(KEY_ITEM_NBT, value.copy()));
             return root;
         }
 
@@ -345,7 +434,12 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
             List<Integer> slots = Arrays.stream(root.getIntArray(KEY_SLOTS))
                     .filter(slot -> slot >= SlotExpressionUtil.MIN_SLOT && slot <= SlotExpressionUtil.MAX_SLOT)
                     .distinct().boxed().toList();
-            return Optional.of(new Ingredient(item, tag, fluid, chemical, 1, slots, root.getBoolean(KEY_SPLIT))
+            Optional<IoSide> side = root.contains(KEY_SIDE, Tag.TAG_STRING)
+                    ? Optional.of(IoSide.byKey(root.getString(KEY_SIDE))) : Optional.empty();
+            Optional<CompoundTag> itemNbt = root.contains(KEY_ITEM_NBT, Tag.TAG_COMPOUND)
+                    ? Optional.of(root.getCompound(KEY_ITEM_NBT)) : Optional.empty();
+            return Optional.of(new Ingredient(item, tag, fluid, chemical, 1, slots, root.getBoolean(KEY_SPLIT), side,
+                    GeneralFilterEntry.loadNbt(root.getCompound(KEY_NBT), false), itemNbt)
                     .withCount(root.getInt(KEY_COUNT)));
         }
 

@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.component;
 
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.filter.DurabilityFilterData;
 import me.almana.logisticsnetworks.filter.FilterTargetType;
 import me.almana.logisticsnetworks.filter.NbtPath;
@@ -24,7 +25,8 @@ public record GeneralFilterEntry(
         EntryCounts counts,
         SlotMapping slotMapping,
         NbtConstraints nbt,
-        @Nullable FilterTargetType tagKind) {
+        @Nullable FilterTargetType tagKind,
+        @Nullable IoSide side) {
 
     public static final NbtPath ENCHANTED_PATH = NbtPath.of(NbtPath.Component.of("minecraft:enchanted"));
     public static final NbtPath DURABILITY_PATH = NbtPath.of(NbtPath.Component.of("minecraft:durability"));
@@ -44,6 +46,7 @@ public record GeneralFilterEntry(
     private static final String KEY_STRICT = "nbt_strict";
     private static final String KEY_RAW = "nbt_raw";
     private static final String KEY_TAG_KIND = "tag_kind";
+    private static final String KEY_SIDE = "side";
 
     public GeneralFilterEntry {
         counts = counts == null ? EntryCounts.EMPTY : counts;
@@ -53,7 +56,7 @@ public record GeneralFilterEntry(
 
     public static GeneralFilterEntry empty(int slot) {
         return new GeneralFilterEntry(slot, null, null, null, null, EntryCounts.EMPTY, SlotMapping.EMPTY,
-                NbtConstraints.EMPTY, null);
+                NbtConstraints.EMPTY, null, null);
     }
 
     public boolean isEmpty() {
@@ -61,24 +64,28 @@ public record GeneralFilterEntry(
     }
 
     public GeneralFilterEntry withItem(@Nullable StackSnapshot value) {
-        return new GeneralFilterEntry(slot, value, fluidId, chemicalId, tag, counts, slotMapping, nbt, tagKind);
+        return new GeneralFilterEntry(slot, value, fluidId, chemicalId, tag, counts, slotMapping, nbt, tagKind, side);
     }
 
     public GeneralFilterEntry withTag(@Nullable String value, @Nullable FilterTargetType kind) {
         return new GeneralFilterEntry(slot, item, fluidId, chemicalId, value, counts, slotMapping, nbt,
-                value == null ? null : kind);
+                value == null ? null : kind, side);
     }
 
     public GeneralFilterEntry withCounts(EntryCounts value) {
-        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, value, slotMapping, nbt, tagKind);
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, value, slotMapping, nbt, tagKind, side);
     }
 
     public GeneralFilterEntry withNbt(NbtConstraints value) {
-        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, slotMapping, value, tagKind);
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, slotMapping, value, tagKind, side);
     }
 
     public GeneralFilterEntry withSlotMapping(SlotMapping value) {
-        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, value, nbt, tagKind);
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, value, nbt, tagKind, side);
+    }
+
+    public GeneralFilterEntry withSide(@Nullable IoSide value) {
+        return new GeneralFilterEntry(slot, item, fluidId, chemicalId, tag, counts, slotMapping, nbt, tagKind, value);
     }
 
     // legacy: filter saved before v2
@@ -90,13 +97,17 @@ public record GeneralFilterEntry(
         int[] slots = entry.getIntArray(KEY_SLOT_MAP);
         SlotMapping mapping = slots.length == 0 ? SlotMapping.EMPTY
                 : new SlotMapping(Arrays.stream(slots).boxed().toList(), entry.getString(KEY_SLOT_MAP_EXPR));
+        return new GeneralFilterEntry(entry.getInt(KEY_SLOT), item, string(entry, KEY_FLUID),
+                string(entry, KEY_CHEMICAL), string(entry, KEY_TAG), counts, mapping, loadNbt(entry, legacy),
+                tagKind(entry), side(entry));
+    }
+
+    static NbtConstraints loadNbt(CompoundTag entry, boolean legacy) {
         Optional<Boolean> strict = entry.contains(KEY_STRICT, Tag.TAG_BYTE)
                 ? Optional.of(entry.getBoolean(KEY_STRICT))
                 : legacy ? Optional.of(false) : Optional.empty();
-        NbtConstraints nbt = new NbtConstraints(loadRules(entry), entry.getBoolean(KEY_MATCH_ANY), strict,
+        return new NbtConstraints(loadRules(entry), entry.getBoolean(KEY_MATCH_ANY), strict,
                 entry.getString(KEY_RAW));
-        return new GeneralFilterEntry(entry.getInt(KEY_SLOT), item, string(entry, KEY_FLUID),
-                string(entry, KEY_CHEMICAL), string(entry, KEY_TAG), counts, mapping, nbt, tagKind(entry));
     }
 
     public CompoundTag save() {
@@ -114,9 +125,11 @@ public record GeneralFilterEntry(
             entry.putIntArray(KEY_SLOT_MAP, slotMapping.slots());
             putString(entry, KEY_SLOT_MAP_EXPR, slotMapping.expression());
         }
-        saveNbt(entry);
+        saveNbt(nbt, entry);
         if (tagKind != null)
             entry.putString(KEY_TAG_KIND, tagKind.getSerializedName());
+        if (side != null)
+            entry.putString(KEY_SIDE, side.key());
         return entry;
     }
 
@@ -133,7 +146,12 @@ public record GeneralFilterEntry(
         return null;
     }
 
-    private void saveNbt(CompoundTag entry) {
+    @Nullable
+    private static IoSide side(CompoundTag entry) {
+        return entry.contains(KEY_SIDE, Tag.TAG_STRING) ? IoSide.byKey(entry.getString(KEY_SIDE)) : null;
+    }
+
+    static void saveNbt(NbtConstraints nbt, CompoundTag entry) {
         if (!nbt.rules().isEmpty()) {
             ListTag rules = new ListTag();
             nbt.rules().forEach(rule -> rules.add(rule.save()));
