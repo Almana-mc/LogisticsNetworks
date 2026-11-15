@@ -99,3 +99,10 @@ mandatory = false
 versionRange = "[0,)"
 ordering = "AFTER"
 side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "curios"
+mandatory = false
+versionRange = "[5.14.1,)"
+ordering = "AFTER"
+side = "BOTH"

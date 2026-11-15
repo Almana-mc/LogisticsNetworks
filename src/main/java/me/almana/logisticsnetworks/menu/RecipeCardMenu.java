@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.menu;
 
 import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -128,7 +129,7 @@ public class RecipeCardMenu extends AbstractContainerMenu {
     public ItemStack card(Player player) {
         if (!isEntryTarget()) return player.getItemInHand(hand);
         if (node != null) return FilterItemData.getEntry(node.getChannel(channel).getFilterItem(filterSlot), entry);
-        NodeClipboardConfig clipboard = WrenchItem.getClipboard(player.getItemInHand(hand),
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrench(player),
                 player.level().registryAccess());
         return clipboard == null ? ItemStack.EMPTY
                 : FilterItemData.getEntry(clipboard.getFilterItem(channel, filterSlot), entry);
@@ -152,7 +153,7 @@ public class RecipeCardMenu extends AbstractContainerMenu {
             }
             return result;
         }
-        ItemStack wrench = player.getItemInHand(hand);
+        ItemStack wrench = wrench(player);
         NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrench, player.level().registryAccess());
         if (clipboard == null) return FilterItemData.Edit.SAME;
         ItemStack filter = clipboard.getFilterItem(channel, filterSlot).copy();
@@ -162,6 +163,10 @@ public class RecipeCardMenu extends AbstractContainerMenu {
             WrenchItem.setClipboard(wrench, clipboard, player.level().registryAccess());
         }
         return result;
+    }
+
+    private ItemStack wrench(Player player) {
+        return WornWrench.orDrawn(player, player.getItemInHand(hand));
     }
 
     public boolean isEntryTarget() {
@@ -189,14 +194,14 @@ public class RecipeCardMenu extends AbstractContainerMenu {
         if (!isEntryTarget()) return RecipeCardItem.is(player.getItemInHand(hand));
         if (isNodeTarget()) return node == null || node.isAlive() && node.isOwnedBy(player)
                 && RecipeCardItem.is(card(player));
-        return player.getItemInHand(hand).getItem() instanceof WrenchItem;
+        return wrench(player).getItem() instanceof WrenchItem;
     }
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
         if (id != ID_BACK || !isEntryTarget() || isNodeTarget() || !(player instanceof ServerPlayer serverPlayer))
             return false;
-        NodeClipboardConfig clipboard = WrenchItem.getClipboard(player.getItemInHand(hand),
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrench(player),
                 player.level().registryAccess());
         if (clipboard == null || !FilterMenu.openClipboard(serverPlayer, clipboard, hand, channel, filterSlot,
                 VirtualFilterType.EXISTING)) {

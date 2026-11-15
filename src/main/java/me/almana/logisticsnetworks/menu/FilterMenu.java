@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.menu;
 
+import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.component.NbtCriterion;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
@@ -1294,10 +1295,7 @@ public class FilterMenu extends AbstractContainerMenu {
         if (nodeSource != null)
             return nodeSource.isAlive() && (player.level().isClientSide() || nodeSource.isOwnedBy(player));
         if (clipboardSource != null) {
-            ItemStack wrench = hand == InteractionHand.OFF_HAND
-                    ? player.getOffhandItem()
-                    : lockedSlot >= 0 ? player.getInventory().getItem(lockedSlot) : player.getMainHandItem();
-            return wrench.getItem() instanceof WrenchItem;
+            return clipboardWrench().getItem() instanceof WrenchItem;
         }
         ItemStack stack = getOpenedStack();
         return !stack.isEmpty() && (stack.getItem() instanceof BaseFilterItem ||
@@ -1354,10 +1352,13 @@ public class FilterMenu extends AbstractContainerMenu {
 
     private void saveClipboard() {
         if (clipboardSource == null || player.level().isClientSide) return;
-        ItemStack wrench = hand == InteractionHand.OFF_HAND
-                ? player.getOffhandItem()
+        WrenchItem.setClipboard(clipboardWrench(), clipboardSource, player.level().registryAccess());
+    }
+
+    private ItemStack clipboardWrench() {
+        ItemStack held = hand == InteractionHand.OFF_HAND ? player.getOffhandItem()
                 : lockedSlot >= 0 ? player.getInventory().getItem(lockedSlot) : player.getMainHandItem();
-        WrenchItem.setClipboard(wrench, clipboardSource, player.level().registryAccess());
+        return WornWrench.orDrawn(player, held);
     }
 
     @Nullable

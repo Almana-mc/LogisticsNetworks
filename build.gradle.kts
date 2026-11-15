@@ -175,6 +175,7 @@ dependencies {
     compileOnly(files(provider { zipTree(createJar.singleFile).matching { include("META-INF/jarjar/Ponder-*.jar") } }))
     compileOnly("curse.maven:ars-energistique-905641:${arsengFileId}")
     compileOnly(fg.deobf("curse.maven:applied-mekanistics-574300:${appmekFileId}"))
+    compileOnly(fg.deobf("curse.maven:curios-309927:${curiosFileId}"))
     compileOnly("curse.maven:functional-storage-556861:${functionalStorageFileId}")
     compileOnly("curse.maven:sophisticated-core-618298:${sophisticatedCoreFileId}")
 
@@ -182,10 +183,10 @@ dependencies {
     if (testMod("mek")) localRuntime(fg.deobf("curse.maven:mekanism-268560:${mekanismFileId}"))
     if (testMod("ars")) {
         localRuntime(fg.deobf("curse.maven:ars-nouveau-401955:${arsNouveauFileId}"))
-        localRuntime(fg.deobf("curse.maven:curios-309927:${curiosFileId}"))
         localRuntime(fg.deobf("maven.modrinth:geckolib:aC5KMoNg")) // geckolib-forge 4.8.4
         localRuntime("io.github.llamalad7:mixinextras-forge:0.5.4")
     }
+    if (testMod("curios")) localRuntime(fg.deobf("curse.maven:curios-309927:${curiosFileId}"))
     if (testMod("ftbteams")) {
         localRuntime(fg.deobf("curse.maven:ftb-teams-404468:${ftbTeamsFileId}"))
         localRuntime(fg.deobf("dev.ftb.mods:ftb-library-forge:2001.2.13", closureOf<ModuleDependency> { isTransitive = false }))

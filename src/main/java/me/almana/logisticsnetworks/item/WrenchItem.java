@@ -300,7 +300,7 @@ public class WrenchItem extends Item {
             return false;
         }
 
-        ItemStack wrenchStack = player.getItemInHand(hand);
+        ItemStack wrenchStack = WornWrench.orDrawn(player, player.getItemInHand(hand));
         if (!(wrenchStack.getItem() instanceof WrenchItem) || getMode(wrenchStack) != Mode.COPY_PASTE) {
             return false;
         }
@@ -584,7 +584,11 @@ public class WrenchItem extends Item {
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        ItemStack stack = player.getItemInHand(hand);
+        return useAir(level, player, hand, player.getItemInHand(hand));
+    }
+
+    public InteractionResultHolder<ItemStack> useAir(Level level, Player player, InteractionHand hand,
+            ItemStack stack) {
         return switch (getMode(stack)) {
             case WRENCH -> useAirWrenchMode(level, player, hand, stack);
             case COPY_PASTE -> useAirCopyPasteMode(level, player, hand, stack);
@@ -1445,7 +1449,22 @@ public class WrenchItem extends Item {
     private static boolean isSecondaryUse(Player player) {
         return ServerPayloadHandler.isModifierDown(player, 0);
     }
+
+    static boolean actsOn(Mode mode, boolean secondaryUse, boolean hasNode) {
+        return hasNode || mode == Mode.MASS_PLACEMENT || mode == Mode.WRENCH && secondaryUse;
+    }
+
+    public static boolean actsOn(Level level, ItemStack wrench, BlockPos pos, boolean secondaryUse) {
+        return actsOn(getMode(wrench), secondaryUse && canPlaceOrLink(level, pos), findNodeAt(level, pos) != null);
+    }
+
+    private static boolean canPlaceOrLink(Level level, BlockPos pos) {
+        // client cannot see capabilities
+        if (level.isClientSide()) {
+            return level.getBlockEntity(pos) != null;
+        }
+        return LinkedStorage.detect(level, pos) != null
+                || NodePlacementHelper.validatePlacement(level, pos) == NodePlacementHelper.ValidationResult.OK;
+    }
+
 }
-
-
-

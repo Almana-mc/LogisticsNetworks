@@ -119,6 +119,8 @@ public final class NetworkHandler {
                 ServerPayloadHandler::handleSetComputerWrenchClipboard);
         registerClient(SyncNetworkExportPayload.class, SyncNetworkExportPayload.STREAM_CODEC, ClientPayloadHandler::handleSyncNetworkExport);
         registerServer(SetWrenchModePayload.class, SetWrenchModePayload.STREAM_CODEC, SetWrenchModePayload::handle);
+        registerServer(ToggleWornWrenchPayload.class, ToggleWornWrenchPayload.STREAM_CODEC, ToggleWornWrenchPayload::handle);
+        registerServer(UseWornWrenchPayload.class, UseWornWrenchPayload.STREAM_CODEC, UseWornWrenchPayload::handle);
         registerServer(SetWrenchColorsPayload.class, SetWrenchColorsPayload.STREAM_CODEC, ServerPayloadHandler::handleSetWrenchColors);
         registerServer(SetWrenchFlowPayload.class, SetWrenchFlowPayload.STREAM_CODEC, ServerPayloadHandler::handleSetWrenchFlow);
         registerClient(SyncMassPlacementChoicesPayload.class, SyncMassPlacementChoicesPayload.STREAM_CODEC,

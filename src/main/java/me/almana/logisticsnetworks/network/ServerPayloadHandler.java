@@ -511,7 +511,7 @@ public class ServerPayloadHandler {
                     ? InteractionHand.OFF_HAND
                     : InteractionHand.MAIN_HAND;
 
-            ItemStack heldStack = player.getItemInHand(hand);
+            ItemStack heldStack = WornWrench.orDrawn(player, player.getItemInHand(hand));
             if (!(heldStack.getItem() instanceof WrenchItem)) {
                 return;
             }
@@ -531,7 +531,7 @@ public class ServerPayloadHandler {
             InteractionHand hand = payload.handOrdinal() == InteractionHand.OFF_HAND.ordinal()
                     ? InteractionHand.OFF_HAND
                     : InteractionHand.MAIN_HAND;
-            ItemStack heldStack = player.getItemInHand(hand);
+            ItemStack heldStack = WornWrench.orDrawn(player, player.getItemInHand(hand));
             if (!(heldStack.getItem() instanceof WrenchItem)) {
                 return;
             }
@@ -554,7 +554,7 @@ public class ServerPayloadHandler {
             InteractionHand hand = payload.handOrdinal() == InteractionHand.OFF_HAND.ordinal()
                     ? InteractionHand.OFF_HAND
                     : InteractionHand.MAIN_HAND;
-            ItemStack heldStack = player.getItemInHand(hand);
+            ItemStack heldStack = WornWrench.orDrawn(player, player.getItemInHand(hand));
             if (!(heldStack.getItem() instanceof WrenchItem)) {
                 return;
             }
