@@ -4,6 +4,7 @@ import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.INodeTracker;
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
@@ -106,6 +107,8 @@ public class LogisticsNodeEntity extends Entity {
 
     private final long[] channelCooldowns = new long[CHANNEL_COUNT * ChannelData.LANES];
     private final float[] backoffTicks = new float[CHANNEL_COUNT * ChannelData.LANES];
+
+    private int signal = -1;
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
@@ -387,7 +390,26 @@ public class LogisticsNodeEntity extends Entity {
         return this.entityData.get(ATTACHED_POS);
     }
 
+    public int signal() {
+        if (isMountedOnCreate()) {
+            return 0;
+        }
+        if (signal < 0) {
+            signal = level().getBestNeighborSignal(getAttachedPos());
+            ((INodeTracker) level()).logisticsNetworks$registerNode(this);
+        }
+        return signal;
+    }
+
+    public void forgetSignal() {
+        signal = -1;
+        if (level() instanceof INodeTracker tracker) {
+            tracker.logisticsNetworks$removeNode(this);
+        }
+    }
+
     public void moveAttachment(BlockPos pos, Vec3 entityPos) {
+        forgetSignal();
         setPos(entityPos);
         setAttachedPos(pos);
         if (this.level() instanceof ServerLevel serverLevel && getNetworkId() != null) {
@@ -409,6 +431,7 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     public void mountOnCreate(UUID contraptionId, BlockPos localPos) {
+        forgetSignal();
         entityData.set(CREATE_CONTRAPTION_ID, Optional.of(contraptionId));
         entityData.set(CREATE_LOCAL_POS, localPos.immutable());
         if (level() instanceof ServerLevel serverLevel && getNetworkId() != null) {
@@ -654,5 +677,11 @@ public class LogisticsNodeEntity extends Entity {
         this.dropFilters();
         this.dropUpgrades();
         super.remove(reason);
+    }
+
+    @Override
+    public void onRemovedFromWorld() {
+        super.onRemovedFromWorld();
+        forgetSignal();
     }
 }

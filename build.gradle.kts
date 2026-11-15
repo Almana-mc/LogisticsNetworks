@@ -115,6 +115,7 @@ the<SourceSetContainer>().named("main") {
 
 extensions.configure<MixinExtension>("mixin") {
     add(mainSourceSet, "${modId}.refmap.json")
+    config("${modId}.mixins.json")
     config("${modId}.buildinggadgets.mixins.json")
     config("${modId}.create.mixins.json")
     config("${modId}.functionalstorage.mixins.json")
