@@ -393,7 +393,8 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
                             && rule.value().sizeInBytes() <= FilterItemData.MAX_NBT_VALUE_BYTES)
                     .limit(FilterItemData.MAX_NBT_RULES_PER_SLOT)
                     .toList();
-            String raw = nbt.raw().length() <= FilterItemData.MAX_NBT_RAW_LENGTH ? nbt.raw() : "";
+            String raw = nbt.raw().length() <= FilterItemData.MAX_NBT_RAW_LENGTH
+                    && FilterItemData.nestingDepth(nbt.raw()) <= FilterItemData.MAX_NBT_DEPTH ? nbt.raw() : "";
             return new GeneralFilterEntry.NbtConstraints(rules, nbt.matchAny() && !rules.isEmpty(),
                     nbt.strict().filter(strict -> !strict || !rules.isEmpty() || !raw.isEmpty()), raw);
         }
@@ -437,6 +438,10 @@ public record RecipeCardData(List<Ingredient> ingredients, Optional<StackSnapsho
                     ? Optional.of(IoSide.byKey(root.getString(KEY_SIDE))) : Optional.empty();
             Optional<CompoundTag> itemNbt = root.contains(KEY_ITEM_NBT, Tag.TAG_COMPOUND)
                     ? Optional.of(root.getCompound(KEY_ITEM_NBT).copy()) : Optional.empty();
+            // Pre-item_nbt cards: default tag
+            if (item.isPresent() && !root.contains(KEY_ITEM_NBT) && !root.contains(KEY_NBT)) {
+                itemNbt = Optional.ofNullable(new ItemStack(item.get()).getTag()).map(CompoundTag::copy);
+            }
             return Optional.of(new Ingredient(item, tag, fluid, chemical, 1, slots, root.getBoolean(KEY_SPLIT), side,
                     GeneralFilterEntry.loadNbt(root.getCompound(KEY_NBT), false), itemNbt)
                     .withCount(root.getInt(KEY_COUNT)));

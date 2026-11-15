@@ -207,7 +207,7 @@ public final class FilterItemData {
         return RecipeCardItem.is(item) && RecipeCardData.of(item).sanitized().ingredients().isEmpty();
     }
 
-    // Cards are stamped, so bounded
+    // Cards capped by saveEntries
     public static boolean fitsEntry(ItemStack value) {
         return RecipeCardItem.is(value) || !value.hasTag() || value.getTag().sizeInBytes() <= MAX_ENTRY_TAG_BYTES;
     }
