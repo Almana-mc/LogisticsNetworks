@@ -6,6 +6,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
@@ -27,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import me.almana.logisticsnetworks.data.LogisticsNetwork;
 
 public class LogisticsCommand {
 
@@ -232,8 +232,6 @@ public class LogisticsCommand {
             NetworkRegistry.get(level).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
         }
 
-        node.dropFilters();
-        node.dropUpgrades();
         node.discard();
     }
 }

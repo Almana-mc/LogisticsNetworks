@@ -428,6 +428,10 @@ public class ChannelData {
         }
     }
 
+    public void clearFilterItems() {
+        Arrays.fill(filterItems, ItemStack.EMPTY);
+    }
+
     public void copyFrom(ChannelData source) {
         resourceRoundRobin = source.resourceRoundRobin;
         resetResourceRotation();

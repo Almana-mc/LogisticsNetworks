@@ -882,7 +882,7 @@ public final class NodeClipboardConfig {
 
         Inventory inventory = player.getInventory();
         int protectedSlot = findProtectedSlot(inventory, protectedStack);
-        List<Requirement> requirements = buildUpgradeRequirements(node);
+        List<Requirement> requirements = player.getAbilities().instabuild ? new ArrayList<>() : buildUpgradeRequirements(node);
         List<ItemStack> returnedItems = collectReturnedItems(node);
 
         StorageAccess access = storageLink == null ? null : LinkedStorage.resolve(player.serverLevel(), storageLink);

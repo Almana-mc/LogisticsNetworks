@@ -24,6 +24,7 @@ import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.utils.ItemStackUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -40,6 +41,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
+import net.minecraftforge.common.util.FakePlayer;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -55,6 +57,7 @@ import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.items.IItemHandler;
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -252,11 +255,19 @@ public class EventHandler {
                     NetworkRegistry.get(serverLevel).removeNodeFromNetwork(node.getNetworkId(), node.getUUID());
                 }
 
+                var player = event.getPlayer();
+
                 if (Config.dropNodeItem) {
-                    node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
+                    if (!(player instanceof FakePlayer)) {
+                        ItemStackUtils.give(player, Registration.LOGISTICS_NODE_ITEM.get().getDefaultInstance());
+                    } else {
+                        node.spawnAtLocation(Registration.LOGISTICS_NODE_ITEM.get());
+                    }
                 }
-                node.dropFilters();
-                node.dropUpgrades();
+
+                if (!(player instanceof FakePlayer)) {
+                    node.dropUpgrades(player);
+                }
                 node.discard();
             }
         }

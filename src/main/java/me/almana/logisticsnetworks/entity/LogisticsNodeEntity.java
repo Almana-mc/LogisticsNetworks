@@ -13,6 +13,7 @@ import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.Registration;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.utils.ItemStackUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -289,8 +290,6 @@ public class LogisticsNodeEntity extends Entity {
                         this.spawnAtLocation(
                                 Registration.LOGISTICS_NODE_ITEM.get());
                     }
-                    this.dropFilters();
-                    this.dropUpgrades();
                     this.discard();
                 }
             }
@@ -620,23 +619,35 @@ public class LogisticsNodeEntity extends Entity {
         pendingFilterEjects.clear();
     }
 
-    public void dropUpgrades() {
+    public void dropUpgrades(@Nullable Player player) {
         for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
             ItemStack stack = upgradeItems[i];
             if (!stack.isEmpty()) {
-                spawnAtLocation(stack.copy());
+                if (player == null) {
+                    spawnAtLocation(stack.copy());
+                } else {
+                    ItemStackUtils.give(player, stack.copy());
+                }
                 upgradeItems[i] = ItemStack.EMPTY;
             }
         }
     }
 
+    public void dropUpgrades() {
+        dropUpgrades(null);
+    }
+
     public void dropFilters() {
         for (int channelIndex = 0; channelIndex < CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = channels[channelIndex];
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                channel.setFilterItem(slot, ItemStack.EMPTY);
-            }
+            channel.clearFilterItems();
         }
     }
 
+    @Override
+    public void remove(RemovalReason reason) {
+        this.dropFilters();
+        this.dropUpgrades();
+        super.remove(reason);
+    }
 }

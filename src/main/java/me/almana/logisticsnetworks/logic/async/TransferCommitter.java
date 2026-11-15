@@ -1,6 +1,5 @@
 package me.almana.logisticsnetworks.logic.async;
 
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
 import me.almana.logisticsnetworks.data.ChannelType;
