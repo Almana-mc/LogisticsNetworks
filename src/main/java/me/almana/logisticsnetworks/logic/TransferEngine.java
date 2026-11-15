@@ -67,6 +67,9 @@ public class TransferEngine {
     private record CapKey(ResourceKey<Level> dim, long pos, int side) {
     }
 
+    private record PosKey(ResourceKey<Level> dim, long pos) {
+    }
+
     private static CapKey capKey(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
         return new CapKey(level.dimension(), pos.asLong(), dir == null ? IoSide.NONE.ordinal() : dir.ordinal());
     }
@@ -74,7 +77,7 @@ public class TransferEngine {
     static final class CapCache {
         private final Map<CapKey, Object> items = new HashMap<>();
         private final Map<CapKey, Object> fluids = new HashMap<>();
-        private final Map<CapKey, Object> energy = new HashMap<>();
+        private final Map<PosKey, EnergySides> energy = new HashMap<>();
         private final Map<CapKey, Object> chemicals = new HashMap<>();
         private static final Object ABSENT = new Object();
         final TransferCapabilityCache interfaces = new TransferCapabilityCache(this);
@@ -98,17 +101,6 @@ public class TransferEngine {
             BlockEntity be = level.getBlockEntity(pos);
             IFluidHandler handler = be != null ? be.getCapability(ForgeCapabilities.FLUID_HANDLER, dir).orElse(null) : null;
             fluids.put(key, handler != null ? handler : ABSENT);
-            return handler;
-        }
-
-        IEnergyStorage getEnergyHandler(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
-            CapKey key = capKey(level, pos, dir);
-            Object cached = energy.get(key);
-            if (cached == ABSENT) return null;
-            if (cached != null) return (IEnergyStorage) cached;
-            BlockEntity be = level.getBlockEntity(pos);
-            IEnergyStorage handler = be != null ? be.getCapability(ForgeCapabilities.ENERGY, dir).orElse(null) : null;
-            energy.put(key, handler != null ? handler : ABSENT);
             return handler;
         }
 
@@ -152,22 +144,12 @@ public class TransferEngine {
         }
 
         IEnergyStorage findEnergyHandler(ServerLevel level, BlockPos pos, IoSide side) {
+            EnergySides sides = energy.computeIfAbsent(new PosKey(level.dimension(), pos.asLong()),
+                    key -> new EnergySides());
             Direction dir = side.direction();
-            if (dir != null) return getEnergyHandler(level, pos, dir);
-            if (side == IoSide.NONE) return MekanismCompat.isMekanismBlock(level, pos) ? null : getEnergyHandler(level, pos, null);
-            List<IEnergyStorage> found = new ArrayList<>(6);
-            for (Direction d : Direction.values()) {
-                IEnergyStorage h = getEnergyHandler(level, pos, d);
-                if (h == null) continue;
-                boolean dup = false;
-                for (IEnergyStorage existing : found) {
-                    if (existing == h) { dup = true; break; }
-                }
-                if (!dup) found.add(h);
-            }
-            if (found.isEmpty()) return null;
-            if (found.size() == 1) return found.get(0);
-            return new CombinedEnergyStorage(found.toArray(new IEnergyStorage[0]));
+            if (dir != null) return sides.side(level, pos, dir);
+            if (side == IoSide.NONE) return MekanismCompat.isMekanismBlock(level, pos) ? null : sides.side(level, pos, null);
+            return sides.all(level, pos);
         }
 
         @SuppressWarnings("rawtypes")
@@ -181,6 +163,60 @@ public class TransferEngine {
                     : ChemicalTransferHelper.getHandler(level, pos, dir);
             chemicals.put(key, handler != null ? handler : ABSENT);
             return handler;
+        }
+    }
+
+    // Per-block energy caps, memoised combine
+    private static final class EnergySides {
+        private static final Direction[] DIRECTIONS = Direction.values();
+        private static final IEnergyStorage[] NO_HANDLERS = new IEnergyStorage[0];
+        private final Object[] handlers = new Object[DIRECTIONS.length + 1];
+        private IEnergyStorage[] combinedOf = NO_HANDLERS;
+        private IEnergyStorage combined;
+
+        @Nullable
+        IEnergyStorage side(ServerLevel level, BlockPos pos, @Nullable Direction dir) {
+            int index = dir == null ? DIRECTIONS.length : dir.ordinal();
+            if (handlers[index] == null) {
+                BlockEntity be = level.getBlockEntity(pos);
+                IEnergyStorage handler = be != null ? be.getCapability(ForgeCapabilities.ENERGY, dir).orElse(null) : null;
+                handlers[index] = handler != null ? handler : CapCache.ABSENT;
+            }
+            return handlers[index] == CapCache.ABSENT ? null : (IEnergyStorage) handlers[index];
+        }
+
+        @Nullable
+        IEnergyStorage all(ServerLevel level, BlockPos pos) {
+            List<IEnergyStorage> found = new ArrayList<>(DIRECTIONS.length);
+            for (Direction face : DIRECTIONS) {
+                IEnergyStorage handler = side(level, pos, face);
+                if (handler != null && !containsIdentity(found, handler)) found.add(handler);
+            }
+            if (found.size() <= 1) {
+                combinedOf = NO_HANDLERS;
+                combined = null;
+                return found.isEmpty() ? null : found.get(0);
+            }
+            if (!sameHandlers(found)) {
+                combinedOf = found.toArray(IEnergyStorage[]::new);
+                combined = new CombinedEnergyStorage(combinedOf);
+            }
+            return combined;
+        }
+
+        private boolean sameHandlers(List<IEnergyStorage> found) {
+            if (found.size() != combinedOf.length) return false;
+            for (int i = 0; i < combinedOf.length; i++) {
+                if (found.get(i) != combinedOf[i]) return false;
+            }
+            return true;
+        }
+
+        private static boolean containsIdentity(List<IEnergyStorage> values, IEnergyStorage candidate) {
+            for (IEnergyStorage value : values) {
+                if (value == candidate) return true;
+            }
+            return false;
         }
     }
 
@@ -210,12 +246,8 @@ public class TransferEngine {
 
     public record NetworkContext(
             List<LogisticsNodeEntity> sortedNodes,
-            Map<UUID, Integer> signalCache,
-            List<ImportTarget>[] itemImports,
-            List<ImportTarget>[] fluidImports,
-            List<ImportTarget>[] energyImports,
-            List<ImportTarget>[] chemicalImports,
-            List<ImportTarget>[] sourceImports,
+            NodeSignals signals,
+            NetworkImports imports,
             Map<UUID, Boolean> dimensionalCache,
             Map<UUID, Integer> tierCache) {
     }
@@ -248,9 +280,8 @@ public class TransferEngine {
 
         long minWakeDelta = Long.MAX_VALUE;
         for (LogisticsNodeEntity sourceNode : context.sortedNodes()) {
-            long delta = processNode(sourceNode, context.itemImports(), context.fluidImports(),
-                    context.energyImports(), context.chemicalImports(), context.sourceImports(),
-                    context.signalCache(), context.dimensionalCache(), context.tierCache(),
+            long delta = processNode(sourceNode, context.imports(), context.signals(),
+                    context.dimensionalCache(), context.tierCache(),
                     telemetryActive, capCache, includeItemTransfers);
             if (delta < minWakeDelta) {
                 minWakeDelta = delta;
@@ -262,8 +293,9 @@ public class TransferEngine {
 
     @Nullable
     public static NetworkContext prepareNetwork(LogisticsNetwork network, MinecraftServer server) {
+        NetworkRegistry registry = NetworkRegistry.get((ServerLevel) server.overworld());
         if (network.isCacheDirty()) {
-            network.rebuildCache(NetworkRegistry.get((ServerLevel) server.overworld()));
+            network.rebuildCache(registry);
             network.clearCacheDirty();
         }
 
@@ -282,143 +314,60 @@ public class TransferEngine {
                 LOGGER.debug("Node {} missing from world, skipping.", nodeId);
             }
         }
-        if (sortedNodes.isEmpty())
+        if (sortedNodes.isEmpty() || !hasExporter(sortedNodes))
             return null;
 
-        Map<UUID, Integer> signalCache = buildSignalCache(sortedNodes);
-        if (signalCache.isEmpty())
-            return null;
-
-        @SuppressWarnings("unchecked")
-        List<ImportTarget>[][] imports = new List[][] {
-                resolveCache(network.getItemImports(), nodeCache, signalCache),
-                resolveCache(network.getFluidImports(), nodeCache, signalCache),
-                resolveCache(network.getEnergyImports(), nodeCache, signalCache),
-                resolveCache(network.getChemicalImports(), nodeCache, signalCache),
-                resolveCache(network.getSourceImports(), nodeCache, signalCache) };
-        Map<UUID, Boolean> dimensionalCache = mergeLinkedServers(network, server, imports);
-
-        return new NetworkContext(sortedNodes, signalCache, imports[0], imports[1], imports[2], imports[3],
-                imports[4], dimensionalCache, network.getTierCache());
-    }
-
-    private static Map<UUID, Boolean> mergeLinkedServers(LogisticsNetwork network, MinecraftServer server,
-            List<ImportTarget>[][] imports) {
-        NetworkRegistry registry = NetworkRegistry.get((ServerLevel) server.overworld());
+        NodeSignals signals = new NodeSignals();
+        Map<UUID, Boolean> dimensionalCache = network.getDimensionalCache();
         List<ServerRackLinks.Link> links = registry.getRackLinks().linksFor(network.getId());
-        if (links.isEmpty()) {
-            return network.getDimensionalCache();
+        if (!links.isEmpty()) {
+            dimensionalCache = new HashMap<>(dimensionalCache);
         }
-        Map<UUID, Boolean> dimensionalCache = new HashMap<>(network.getDimensionalCache());
-        BridgedImports.merge(links, registry, server, imports, dimensionalCache);
-        return dimensionalCache;
+        NetworkImports imports = new NetworkImports(network, nodeCache, signals, links, registry, server,
+                dimensionalCache);
+        return new NetworkContext(sortedNodes, signals, imports, dimensionalCache, network.getTierCache());
     }
 
-    private static Map<UUID, Integer> buildSignalCache(List<LogisticsNodeEntity> nodes) {
-        Map<UUID, Integer> signalCache = new HashMap<>();
-        boolean hasAnyExporter = false;
-
+    private static boolean hasExporter(List<LogisticsNodeEntity> nodes) {
         for (LogisticsNodeEntity node : nodes) {
-            if (!node.isValidNode())
-                continue;
-            boolean needsSignal = false;
-            boolean hasExport = false;
-
             for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-                ChannelData ch = node.getChannel(i);
-                if (ch != null && ch.isEnabled()) {
-                    RedstoneMode rm = ch.getRedstoneMode();
-                    if (rm == RedstoneMode.HIGH || rm == RedstoneMode.LOW) {
-                        needsSignal = true;
-                    }
-                    if (ch.getMode() == ChannelMode.EXPORT) {
-                        hasExport = true;
-                    }
+                ChannelData channel = node.getChannel(i);
+                if (channel != null && channel.isEnabled() && channel.getMode() == ChannelMode.EXPORT) {
+                    return true;
                 }
             }
-
-            if (hasExport)
-                hasAnyExporter = true;
-
-            if (!node.isMountedOnCreate() && node.level() instanceof ServerLevel level) {
-                signalCache.put(node.getUUID(), needsSignal ? level.getBestNeighborSignal(node.getAttachedPos()) : 0);
-            } else if (node.isMountedOnCreate()) {
-                signalCache.put(node.getUUID(), 0);
-            }
         }
-
-        return hasAnyExporter ? signalCache : Collections.emptyMap();
+        return false;
     }
 
-    private static final List<ImportTarget>[] EMPTY_RESOLVED = createEmptyResolved();
-
-    @SuppressWarnings("unchecked")
-    private static List<ImportTarget>[] createEmptyResolved() {
-        List<ImportTarget>[] arr = new List[9];
-        Arrays.fill(arr, Collections.emptyList());
-        return arr;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static List<ImportTarget>[] resolveCache(List<NodeRef>[] cache,
-            Map<UUID, LogisticsNodeEntity> nodeCache,
-            Map<UUID, Integer> signalCache) {
-        boolean anyNonEmpty = false;
-        for (int i = 0; i < 9; i++) {
-            if (!cache[i].isEmpty()) {
-                anyNonEmpty = true;
-                break;
-            }
-        }
-        if (!anyNonEmpty)
-            return EMPTY_RESOLVED;
-
-        List<ImportTarget>[] resolved = new List[9];
-        for (int i = 0; i < 9; i++) {
-            List<NodeRef> cachedNodes = cache[i];
-            if (cachedNodes.isEmpty()) {
-                resolved[i] = Collections.emptyList();
+    static List<ImportTarget> resolveImports(List<NodeRef> refs, int channel,
+            Map<UUID, LogisticsNodeEntity> nodeCache, NodeSignals signals) {
+        List<ImportTarget> targets = new ArrayList<>(refs.size());
+        for (NodeRef ref : refs) {
+            LogisticsNodeEntity node = nodeCache.get(ref.nodeId());
+            if (node == null)
                 continue;
-            }
-            List<ImportTarget> targets = new ArrayList<>(cachedNodes.size());
-            for (NodeRef ref : cachedNodes) {
-                LogisticsNodeEntity node = nodeCache.get(ref.nodeId());
-                if (node == null)
-                    continue;
-                ChannelData cd = node.getChannel(i);
-                if (cd == null)
-                    continue;
-                if (!canRunChannel(node, cd) || !CreateCompat.isResolved(node))
-                    continue;
-                int sig = signalCache.getOrDefault(ref.nodeId(), 0);
-                if (!isRedstoneActive(cd.getRedstoneMode(), sig))
-                    continue;
-                targets.add(new ImportTarget(node, cd, i));
-            }
-            resolved[i] = targets;
+            ChannelData cd = node.getChannel(channel);
+            if (cd == null)
+                continue;
+            if (!canRunChannel(node, cd) || !CreateCompat.isResolved(node))
+                continue;
+            if (!signals.active(node, cd.getRedstoneMode()))
+                continue;
+            targets.add(new ImportTarget(node, cd, channel));
         }
-        return resolved;
+        return targets;
     }
 
-    private static long processNode(LogisticsNodeEntity sourceNode,
-            List<ImportTarget>[] itemImports,
-            List<ImportTarget>[] fluidImports,
-            List<ImportTarget>[] energyImports,
-            List<ImportTarget>[] chemicalImports,
-            List<ImportTarget>[] sourceImports,
-            Map<UUID, Integer> signalCache,
-            Map<UUID, Boolean> dimensionalCache,
-            Map<UUID, Integer> tierCache,
-            boolean telemetryActive,
-            CapCache capCache,
-            boolean includeItemTransfers) {
+    private static long processNode(LogisticsNodeEntity sourceNode, NetworkImports imports, NodeSignals signals,
+            Map<UUID, Boolean> dimensionalCache, Map<UUID, Integer> tierCache, boolean telemetryActive,
+            CapCache capCache, boolean includeItemTransfers) {
 
         if (!sourceNode.isValidNode())
             return Long.MAX_VALUE;
 
         ServerLevel sourceLevel = (ServerLevel) sourceNode.level();
         long gameTime = sourceLevel.getGameTime();
-        int redstoneSignal = signalCache.getOrDefault(sourceNode.getUUID(), 0);
         int sourceTier = tierCache.getOrDefault(sourceNode.getUUID(), 0);
         long minWakeDelta = Long.MAX_VALUE;
 
@@ -430,40 +379,39 @@ public class TransferEngine {
                 continue;
             if (!canRunChannel(sourceNode, channel) || !CreateCompat.isResolved(sourceNode))
                 continue;
-            if (!isRedstoneActive(channel.getRedstoneMode(), redstoneSignal))
-                continue;
 
             int types = NodeUpgradeData.effectiveTypes(sourceNode, channel);
             boolean cards = RecipeCardItem.anyIn(channel.getFilterItems());
             ChannelTelemetry.startRecording(telemetryActive ? channel.getTelemetry() : null);
             if (cards) {
-                long delta = recipeLane(sourceNode, sourceLevel, channel, i, itemImports[i], fluidImports[i],
-                        chemicalImports[i], sourceTier, gameTime, dimensionalCache, capCache.interfaces,
-                        telemetryActive);
+                long delta = recipeLane(sourceNode, sourceLevel, channel, i, imports, signals, sourceTier, gameTime,
+                        dimensionalCache, capCache.interfaces, telemetryActive);
                 if (delta < minWakeDelta) minWakeDelta = delta;
             }
 
             for (ChannelType type : ChannelType.ORDER) {
-                if (!type.in(types))
+                if (!type.in(types)
+                        || cards && !RecipeChannel.runsLoose(channel, type, capCache.interfaces.filterCache()))
                     continue;
-                List<ImportTarget> typed = importsFor(type, i, itemImports, fluidImports, energyImports,
-                        chemicalImports, sourceImports);
-                if (typed.isEmpty() || cards && !RecipeChannel.runsLoose(channel, type))
+                int lane = type.ordinal();
+                // Cheap gates before signals, targets
+                long cooldown = cooldownRemaining(sourceNode, channel, i, lane, sourceTier, gameTime);
+                if (cooldown > 0) {
+                    if (cooldown < minWakeDelta) minWakeDelta = cooldown;
+                    continue;
+                }
+                if (!signals.active(sourceNode, channel.getRedstoneMode()))
+                    break;
+                if (type == ChannelType.ITEM && !includeItemTransfers && !cards)
+                    continue;
+                List<ImportTarget> typed = imports.get(type, i);
+                if (typed.isEmpty())
                     continue;
                 if (type == ChannelType.ENERGY && !canExtractEnergy(sourceNode, sourceLevel, channel, capCache)) {
                     minWakeDelta = Math.min(minWakeDelta, Config.backoffMaxTicks);
                     continue;
                 }
                 if (sourceNode.isMountedOnCreate() && !hasMountedStorage(sourceNode, channel, type, capCache.interfaces))
-                    continue;
-
-                int lane = type.ordinal();
-                long cooldown = cooldownRemaining(sourceNode, channel, i, lane, sourceTier, gameTime);
-                if (cooldown > 0) {
-                    if (cooldown < minWakeDelta) minWakeDelta = cooldown;
-                    continue;
-                }
-                if (type == ChannelType.ITEM && !includeItemTransfers && !cards)
                     continue;
 
                 // Item targets order on resolve
@@ -496,32 +444,24 @@ public class TransferEngine {
     }
 
     private static long recipeLane(LogisticsNodeEntity sourceNode, ServerLevel level, ChannelData channel, int index,
-            List<ImportTarget> items, List<ImportTarget> fluids, List<ImportTarget> chemicals, int tier,
-            long gameTime, Map<UUID, Boolean> dimensionalCache, TransferCapabilityCache capCache,
-            boolean telemetryActive) {
-        if (items.isEmpty() && fluids.isEmpty() && chemicals.isEmpty())
-            return Long.MAX_VALUE;
+            NetworkImports imports, NodeSignals signals, int tier, long gameTime, Map<UUID, Boolean> dimensionalCache,
+            TransferCapabilityCache capCache, boolean telemetryActive) {
         long cooldown = cooldownRemaining(sourceNode, channel, index, ChannelData.RECIPE_LANE, tier, gameTime);
         if (cooldown > 0)
             return cooldown;
+        if (!signals.active(sourceNode, channel.getRedstoneMode()))
+            return Long.MAX_VALUE;
+        List<ImportTarget> items = imports.get(ChannelType.ITEM, index);
+        List<ImportTarget> fluids = imports.get(ChannelType.FLUID, index);
+        List<ImportTarget> chemicals = imports.get(ChannelType.CHEMICAL, index);
+        if (items.isEmpty() && fluids.isEmpty() && chemicals.isEmpty())
+            return Long.MAX_VALUE;
         int sets = RecipeChannel.transfer(sourceNode, level, channel, RecipeChannel.receivers(items, fluids, chemicals),
                 NodeUpgradeData.recipeBudget(channel), tier, dimensionalCache, capCache, telemetryActive);
         if (sets < 0)
             return Long.MAX_VALUE;
         return finishChannelAttempt(sourceNode, channel, index, ChannelData.RECIPE_LANE, sets, gameTime, tier,
                 telemetryActive);
-    }
-
-    private static List<ImportTarget> importsFor(ChannelType type, int channel, List<ImportTarget>[] items,
-            List<ImportTarget>[] fluids, List<ImportTarget>[] energy, List<ImportTarget>[] chemicals,
-            List<ImportTarget>[] source) {
-        return switch (type) {
-            case ITEM -> items[channel];
-            case FLUID -> fluids[channel];
-            case ENERGY -> energy[channel];
-            case CHEMICAL -> chemicals[channel];
-            case SOURCE -> source[channel];
-        };
     }
 
     private static boolean canExtractEnergy(LogisticsNodeEntity node, ServerLevel level, ChannelData channel,
@@ -648,7 +588,7 @@ public class TransferEngine {
         if (!sourceNode.isMountedOnCreate() && !sourceLevel.isLoaded(sourcePos))
             return new ItemResourceOrder.Result(null, -1);
         ItemStack[] exportFilters = exportChannel.getFilterItems();
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
+        FilterItemData.ReadCache filterReadCache = capCache.filterCache();
         boolean directSource = !FilterLogic.hasConfiguredSlotMapping(exportFilters, filterReadCache);
         IItemHandler sourceHandler = capCache.findItemExportHandler(
                 sourceNode, exportChannel.getIoSide(), directSource);
@@ -721,17 +661,16 @@ public class TransferEngine {
         }
 
         ChannelData channel = sourceNode.getChannel(channelIndex);
-        int signal = context.signalCache().getOrDefault(sourceNodeId, 0);
         if (channel == null || !channel.isEnabled()
                 || channel.getMode() != ChannelMode.EXPORT || !channel.hasType(ChannelType.ITEM)
                 || !canRunChannel(sourceNode, channel) || !CreateCompat.isResolved(sourceNode)
-                || !isRedstoneActive(channel.getRedstoneMode(), signal)
+                || !context.signals().active(sourceNode, channel.getRedstoneMode())
                 || RecipeCardItem.anyIn(channel.getFilterItems())) {
             return ItemResourceOrder.EMPTY;
         }
 
-        List<ImportTarget> targets = context.itemImports()[channelIndex];
-        if (targets == null || targets.isEmpty()) {
+        List<ImportTarget> targets = context.imports().get(ChannelType.ITEM, channelIndex);
+        if (targets.isEmpty()) {
             return ItemResourceOrder.EMPTY;
         }
         if (onlyTarget != null) {
@@ -867,7 +806,7 @@ public class TransferEngine {
             return 0;
 
         List<FluidTarget> resolved = new ArrayList<>(targets.size());
-        FilterItemData.ReadCache cache = FilterItemData.createReadCache();
+        FilterItemData.ReadCache cache = capCache.interfaces.filterCache();
         boolean exportSides = FilterLogic.hasConfiguredEntrySides(exportChannel.getFilterItems(), cache);
         if (!resolveFluidTargets(sourceNode, sourceHandler, targets, dimensionalCache, capCache, exportSides, cache,
                 resolved))
@@ -1101,7 +1040,7 @@ public class TransferEngine {
         boolean sourceDimensional = dimensionalCache.getOrDefault(sourceNode.getUUID(), false);
         int remaining = batchLimit;
         boolean anyReachable = false;
-        FilterItemData.ReadCache filterReadCache = FilterItemData.createReadCache();
+        FilterItemData.ReadCache filterReadCache = capCache.interfaces.filterCache();
         @SuppressWarnings("rawtypes")
         List<IChemicalHandler> equalHandlers = exportChannel.getDistributionMode() == DistributionMode.ROUND_ROBIN
                 ? new ArrayList<>() : null;

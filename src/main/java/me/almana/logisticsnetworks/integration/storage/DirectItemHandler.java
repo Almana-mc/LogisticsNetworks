@@ -39,7 +39,8 @@ final class DirectItemHandler implements DirectItemAccess {
 
     List<StorageEndpoint.StoredItem> exports() {
         ThreadGuard.requireServerThread();
-        if (exports == null) exports = exporting ? readExports() : List.of();
+        // Listing may lag one tick
+        if (exports == null) exports = exporting ? readExports(false) : List.of();
         return exports;
     }
 
@@ -95,7 +96,7 @@ final class DirectItemHandler implements DirectItemAccess {
         ThreadGuard.requireServerThread();
         if (!exporting) return reads.countItems(endpoint, items);
         var result = HashUtils.itemToIntMap();
-        for (var entry : readExports()) {
+        for (var entry : readExports(reads.fresh())) {
             if (items.contains(entry.stack().getItem())) {
                 result.mergeInt(entry.stack().getItem(), DirectStorageReads.clamp(
                                 add(entry.amount(), entry.bufferedAmount())),
@@ -105,9 +106,9 @@ final class DirectItemHandler implements DirectItemAccess {
         return result;
     }
 
-    private List<StorageEndpoint.StoredItem> readExports() {
+    private List<StorageEndpoint.StoredItem> readExports(boolean fresh) {
         Map<ItemResource, StorageEndpoint.StoredItem> items = new LinkedHashMap<>();
-        for (var stored : endpoint.exportableItems(reads.fresh())) {
+        for (var stored : endpoint.exportableItems(fresh)) {
             ItemStack stack = stored.stack();
             ItemResource key = new ItemResource(stack);
             var current = items.get(key);

@@ -41,9 +41,8 @@ final class RecipeChannel {
     }
 
     // Cards allow loose entries only
-    static boolean runsLoose(ChannelData channel, ChannelType type) {
+    static boolean runsLoose(ChannelData channel, ChannelType type, FilterItemData.ReadCache cache) {
         ItemStack[] filters = channel.getFilterItems();
-        FilterItemData.ReadCache cache = FilterItemData.createReadCache();
         return switch (type) {
             case ITEM -> FilterLogic.hasConfiguredItemFilter(filters, cache);
             case FLUID -> FilterLogic.hasConfiguredFluidFilter(filters, cache);

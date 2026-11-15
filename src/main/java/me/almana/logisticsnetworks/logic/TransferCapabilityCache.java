@@ -2,6 +2,7 @@ package me.almana.logisticsnetworks.logic;
 
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.FilterItemData;
 import me.almana.logisticsnetworks.integration.create.CreateCompat;
 import me.almana.logisticsnetworks.integration.mekanism.DirectChemicalHandler;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
@@ -29,6 +30,7 @@ public final class TransferCapabilityCache {
     private final TransferEngine.CapCache handlers;
     private final DirectStorageReads reads = new DirectStorageReads(true);
     private final Map<Object, IItemHandler[]> views = new IdentityHashMap<>();
+    private final FilterItemData.ReadCache filters = FilterItemData.createReadCache();
 
     TransferCapabilityCache(TransferEngine.CapCache handlers) {
         this.handlers = handlers;
@@ -36,6 +38,10 @@ public final class TransferCapabilityCache {
 
     public static TransferCapabilityCache create() {
         return new TransferEngine.CapCache().interfaces;
+    }
+
+    public FilterItemData.ReadCache filterCache() {
+        return filters;
     }
 
     static InterfaceStorageResolution resolveInterface(LogisticsNodeEntity node, @Nullable Direction direction) {
