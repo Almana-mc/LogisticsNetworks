@@ -414,6 +414,12 @@ public class EventHandler {
         if (!(event.getLevel() instanceof INodeTracker tracker))
             return;
 
+        // Observers notify their output block
+        var self = tracker.logisticsNetworks$getNode(event.getPos());
+        if (self != null) {
+            self.forgetSignal();
+        }
+
         var pos = event.getPos().mutable();
         for (var side : event.getNotifiedSides()) {
             pos.move(side);
