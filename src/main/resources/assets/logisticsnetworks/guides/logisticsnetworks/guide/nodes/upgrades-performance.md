@@ -11,7 +11,9 @@ navigation:
 
 Performance upgrades raise a node's **batch caps** (how much can move per transfer operation) and lower its **minimum delay** (how often it can fire). Every channel on the node benefits — upgrades are per-node, not per-channel.
 
-Install an upgrade in any of the 4 upgrade slots in the [Filters & Upgrades](filters-upgrades.md) panel. Duplicates are rejected.
+Install an upgrade in any of the 6 upgrade slots in the [Filters & Upgrades](filters-upgrades.md) panel. Duplicates are rejected.
+
+Increasing the effective tier sets each channel's Batch to its new maximum. Item and fluid delays keep their configured values; lower the Delay yourself when you want faster transfers. Energy retains its existing locked delay. Removing a tier clamps values to the remaining tier's limits. Clipboard and label configurations retain their saved settings.
 
 ## Only the highest tier counts
 
@@ -34,7 +36,7 @@ If you install Iron + Gold + Diamond all at once, the node uses the **Diamond** 
 | **Iron** | 16 items | 1,000 mB | 10,000 RF | 10 ticks |
 | **Gold** | 32 items | 5,000 mB | 50,000 RF | 5 ticks |
 | **Diamond** | 64 items | 20,000 mB | 250,000 RF | 1 tick |
-| **Netherite** | 10,000 items | 1,000,000 mB | Unlimited | 1 tick |
+| **Netherite** | 10,000 items | 1,000,000 mB | 137,438,953,408 RF | 1 tick |
 
 The values in the table are the **ceilings**. A channel's Batch and Delay in the [Channel Settings](channel-settings.md) panel are clamped to these ceilings — you can type 100,000 into a Batch field, but an Iron-tier node will only use 16. Upgrade the node to raise the ceiling.
 
@@ -60,6 +62,6 @@ High-tier. Full-stack item transfers (64 per op), hits 1-tick min delay so chann
 
 ## Netherite Upgrade
 
-Maximum performance. Item batches of 10,000, million-mB fluid batches, unlimited energy per op. Use on the heavy-hitting nodes on your network — hub chests, main fluid distributor, big power buffers.
+Maximum performance. Item batches of 10,000, million-mB fluid batches, about 137 billion RF per op. Use on the heavy-hitting nodes on your network — hub chests, main fluid distributor, big power buffers.
 
 <RecipeFor id="logisticsnetworks:netherite_upgrade" />

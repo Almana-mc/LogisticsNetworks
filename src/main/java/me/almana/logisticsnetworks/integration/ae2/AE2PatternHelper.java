@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.ae2;
 
+import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
@@ -9,6 +10,11 @@ import appeng.crafting.pattern.AESmithingTablePattern;
 import appeng.crafting.pattern.AEStonecuttingPattern;
 import appeng.api.crafting.IPatternDetails;
 import appeng.crafting.pattern.EncodedPatternItem;
+import appeng.crafting.pattern.ProcessingPatternItem;
+import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.integration.appmek.AppMekCompat;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
@@ -16,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 final class AE2PatternHelper {
 
@@ -27,12 +34,12 @@ final class AE2PatternHelper {
         return stack.getItem() instanceof EncodedPatternItem;
     }
 
-    static List<AE2Compat.PatternEntry> readInputs(ItemStack stack) {
+    static List<LinkedStorage.PatternEntry> readInputs(ItemStack stack, Level level) {
         if (stack.isEmpty()) return List.of();
         if (!(stack.getItem() instanceof EncodedPatternItem patternItem)) return List.of();
 
         try {
-            var decoded = patternItem.decode(stack, null, false);
+            var decoded = patternItem.decode(stack, level, false);
             if (decoded == null) return List.of();
 
             if (decoded instanceof AEProcessingPattern processing) {
@@ -52,38 +59,38 @@ final class AE2PatternHelper {
         return List.of();
     }
 
-    static List<AE2Compat.PatternEntry> readOutputs(ItemStack stack) {
+    static List<LinkedStorage.PatternEntry> readOutputs(ItemStack stack, Level level) {
         if (stack.isEmpty()) return List.of();
         if (!(stack.getItem() instanceof EncodedPatternItem patternItem)) return List.of();
 
         try {
-            var decoded = patternItem.decode(stack, null, false);
+            var decoded = patternItem.decode(stack, level, false);
             if (decoded == null) return List.of();
 
             if (decoded instanceof AEProcessingPattern processing) {
                 return fromGenericStacks(processing.getSparseOutputs());
             }
             if (decoded instanceof AECraftingPattern crafting) {
-                List<AE2Compat.PatternEntry> result = new ArrayList<>();
+                List<LinkedStorage.PatternEntry> result = new ArrayList<>();
                 GenericStack output = crafting.getPrimaryOutput();
                 if (output != null && output.what() instanceof AEItemKey itemKey) {
-                    result.add(new AE2Compat.PatternEntry(itemKey.toStack(), (int) Math.min(output.amount(), Integer.MAX_VALUE)));
+                    result.add(new LinkedStorage.PatternEntry(itemKey.toStack(), (int) Math.min(output.amount(), Integer.MAX_VALUE)));
                 }
                 return result;
             }
             if (decoded instanceof AEStonecuttingPattern stonecutting) {
-                List<AE2Compat.PatternEntry> result = new ArrayList<>();
+                List<LinkedStorage.PatternEntry> result = new ArrayList<>();
                 GenericStack output = stonecutting.getPrimaryOutput();
                 if (output != null && output.what() instanceof AEItemKey itemKey) {
-                    result.add(new AE2Compat.PatternEntry(itemKey.toStack(), (int) Math.min(output.amount(), Integer.MAX_VALUE)));
+                    result.add(new LinkedStorage.PatternEntry(itemKey.toStack(), (int) Math.min(output.amount(), Integer.MAX_VALUE)));
                 }
                 return result;
             }
             if (decoded instanceof AESmithingTablePattern smithing) {
-                List<AE2Compat.PatternEntry> result = new ArrayList<>();
+                List<LinkedStorage.PatternEntry> result = new ArrayList<>();
                 GenericStack output = smithing.getPrimaryOutput();
                 if (output != null && output.what() instanceof AEItemKey itemKey) {
-                    result.add(new AE2Compat.PatternEntry(itemKey.toStack(), (int) Math.min(output.amount(), Integer.MAX_VALUE)));
+                    result.add(new LinkedStorage.PatternEntry(itemKey.toStack(), (int) Math.min(output.amount(), Integer.MAX_VALUE)));
                 }
                 return result;
             }
@@ -92,7 +99,34 @@ final class AE2PatternHelper {
         return List.of();
     }
 
-    private static List<AE2Compat.PatternEntry> fromPatternInputs(IPatternDetails pattern) {
+    static List<RecipeCardData.Ingredient> readIngredients(ItemStack stack, Level level) {
+        AEProcessingPattern processing = stack.getItem() instanceof ProcessingPatternItem item
+                ? item.decode(stack, level, false) : null;
+        if (processing == null) {
+            return readInputs(stack, level).stream()
+                    .map(entry -> RecipeCardData.Ingredient.ofItem(entry.item(), entry.amount()))
+                    .toList();
+        }
+        List<RecipeCardData.Ingredient> result = new ArrayList<>();
+        for (GenericStack input : processing.getSparseInputs()) {
+            if (input != null) ingredient(input).ifPresent(result::add);
+        }
+        return result;
+    }
+
+    private static Optional<RecipeCardData.Ingredient> ingredient(GenericStack stack) {
+        int amount = (int) Math.min(stack.amount(), RecipeCardData.MAX_AMOUNT);
+        if (stack.what() instanceof AEItemKey item) {
+            return Optional.of(RecipeCardData.Ingredient.ofItem(item.toStack(), amount));
+        }
+        if (stack.what() instanceof AEFluidKey fluid) {
+            return Optional.of(RecipeCardData.Ingredient.ofFluid(fluid.toStack(amount)));
+        }
+        Object chemical = AppMekCompat.stack(stack.what(), stack.amount());
+        return chemical == null ? Optional.empty() : MekanismCompat.recipeIngredient(chemical);
+    }
+
+    private static List<LinkedStorage.PatternEntry> fromPatternInputs(IPatternDetails pattern) {
         List<GenericStack> stacks = new ArrayList<>();
         for (IPatternDetails.IInput input : pattern.getInputs()) {
             GenericStack[] possible = input.getPossibleInputs();
@@ -103,7 +137,7 @@ final class AE2PatternHelper {
         return fromGenericStacks(stacks.toArray(new GenericStack[0]));
     }
 
-    private static List<AE2Compat.PatternEntry> fromGenericStacks(GenericStack[] stacks) {
+    private static List<LinkedStorage.PatternEntry> fromGenericStacks(GenericStack[] stacks) {
         Map<ItemStack, Integer> merged = new LinkedHashMap<>();
         for (GenericStack gs : stacks) {
             if (gs == null) continue;
@@ -126,9 +160,9 @@ final class AE2PatternHelper {
             }
         }
 
-        List<AE2Compat.PatternEntry> result = new ArrayList<>(merged.size());
+        List<LinkedStorage.PatternEntry> result = new ArrayList<>(merged.size());
         for (Map.Entry<ItemStack, Integer> e : merged.entrySet()) {
-            result.add(new AE2Compat.PatternEntry(e.getKey().copy(), e.getValue()));
+            result.add(new LinkedStorage.PatternEntry(e.getKey().copy(), e.getValue()));
         }
         return result;
     }

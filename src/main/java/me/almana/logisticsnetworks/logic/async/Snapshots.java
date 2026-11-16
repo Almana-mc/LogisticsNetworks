@@ -1,0 +1,262 @@
+package me.almana.logisticsnetworks.logic.async;
+
+import me.almana.logisticsnetworks.Config;
+import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.ChannelMode;
+import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.IoSide;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.data.LogisticsNetwork;
+import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.integration.storage.ItemResource;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
+import me.almana.logisticsnetworks.logic.FilterLogic;
+import me.almana.logisticsnetworks.logic.ItemResourceOrder;
+import me.almana.logisticsnetworks.logic.TransferCapabilityCache;
+import me.almana.logisticsnetworks.logic.TransferEngine;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.items.IItemHandler;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public final class Snapshots {
+
+    private static final OccupiedSlotLimitExceeded OCCUPIED_SLOT_LIMIT =
+            new OccupiedSlotLimitExceeded();
+
+    private Snapshots() {
+    }
+
+    public static ItemStack[] copyFilters(ItemStack[] filters) {
+        ItemStack[] copied = new ItemStack[filters.length];
+        for (int i = 0; i < filters.length; i++) {
+            copied[i] = filters[i].isEmpty() ? ItemStack.EMPTY : filters[i].copy();
+        }
+        return copied;
+    }
+
+    @Nullable
+    private static ItemResourceOrder.Cursor copyCursor(@Nullable ItemResourceOrder.Cursor cursor) {
+        return cursor == null ? null : new ItemResourceOrder.Cursor(new ItemResource(cursor.previous().toStack(1)),
+                new ItemResource(cursor.next().toStack(1)), cursor.slot());
+    }
+
+    public static NetworkCapture captureNetwork(LogisticsNetwork network, MinecraftServer server,
+            long runtimeId, TransferCapabilityCache capCache) {
+        ThreadGuard.requireServerThread();
+        return captureNetworkInOperation(network, server, runtimeId, capCache);
+    }
+
+    private static NetworkCapture captureNetworkInOperation(LogisticsNetwork network, MinecraftServer server,
+            long runtimeId, TransferCapabilityCache capCache) {
+
+        TransferEngine.NetworkContext context = TransferEngine.prepareNetwork(network, server);
+        if (context == null) {
+            return NetworkCapture.unavailable();
+        }
+
+        ServerLevel overworld = server.overworld();
+        List<NetworkSnapshot.ChannelUnit> units = new ArrayList<>();
+        ItemEndpointTable endpoints = new ItemEndpointTable();
+        OccupiedSlotBudget occupiedSlots = new OccupiedSlotBudget(Config.asyncMaxOccupiedSlots);
+        long itemWakeDelta = Long.MAX_VALUE;
+
+        try {
+            for (LogisticsNodeEntity node : context.sortedNodes()) {
+                itemWakeDelta = captureNodeChannels(
+                        node, context, capCache, endpoints, units, occupiedSlots, itemWakeDelta);
+            }
+        } catch (OccupiedSlotLimitExceeded exception) {
+            return NetworkCapture.occupiedLimitExceeded();
+        }
+
+        return NetworkCapture.captured(new NetworkSnapshot(
+                network.getId(),
+                network.getGeneration(),
+                runtimeId,
+                overworld.getGameTime(),
+                itemWakeDelta,
+                overworld.registryAccess(),
+                endpoints.endpoints(),
+                units), endpoints.bindings());
+    }
+
+    private static long captureNodeChannels(LogisticsNodeEntity node, TransferEngine.NetworkContext context,
+            TransferCapabilityCache capCache, ItemEndpointTable endpoints,
+            List<NetworkSnapshot.ChannelUnit> units,
+            OccupiedSlotBudget occupiedSlots, long itemWakeDelta) {
+
+        ServerLevel level = (ServerLevel) node.level();
+        long gameTime = level.getGameTime();
+        int tier = context.tierCache().getOrDefault(node.getUUID(), 0);
+
+        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
+            ChannelData channel = node.getChannel(i);
+            if (channel == null || !channel.isEnabled()) {
+                continue;
+            }
+            if (channel.getMode() != ChannelMode.EXPORT || !channel.hasType(ChannelType.ITEM)) {
+                continue;
+            }
+            if (RecipeCardItem.anyIn(channel.getFilterItems())) {
+                continue;
+            }
+            if (!TransferEngine.canRunChannel(node, channel) || !CreateCompat.isResolved(node)) {
+                continue;
+            }
+            if (!TransferEngine.isRedstoneActive(node, channel.getRedstoneMode())) {
+                continue;
+            }
+            List<TransferEngine.ImportTarget> targets = context.imports().get(ChannelType.ITEM, i);
+            if (targets.isEmpty()) {
+                continue;
+            }
+            long cooldown = TransferEngine.cooldownRemaining(node, channel, i, ChannelType.ITEM.ordinal(), tier, gameTime);
+            if (cooldown > 0L) {
+                itemWakeDelta = itemWakeDelta(itemWakeDelta, targets, cooldown);
+                continue;
+            }
+
+            if (!node.isMountedOnCreate() && !level.isLoaded(node.getAttachedPos())) {
+                continue;
+            }
+
+            FilterItemData.ReadCache readCache = FilterItemData.createReadCache();
+            boolean directSource = !FilterLogic.hasConfiguredSlotMapping(
+                    channel.getFilterItems(), readCache);
+            IItemHandler sourceHandler = capCache.findItemExportHandler(
+                    node, channel.getIoSide(), directSource);
+            if (sourceHandler == null) {
+                itemWakeDelta = itemWakeDelta(itemWakeDelta, targets,
+                        TransferEngine.finishChannelAttempt(node, channel, i, ChannelType.ITEM.ordinal(), 0, gameTime, tier, false));
+                continue;
+            }
+
+            TransferEngine.ResolvedItemTargets resolved = TransferEngine.resolveItemTargets(
+                    node, level, channel, targets, sourceHandler,
+                    context.dimensionalCache(), capCache, readCache);
+            if (resolved.status() != TransferEngine.ResolvedItemTargets.OK) {
+                continue;
+            }
+
+            int batchLimit = NodeUpgradeData.effectiveBatch(channel, ChannelType.ITEM, tier);
+            int sourceEndpoint = endpoints.capture(
+                    node, channel.getIoSide(), sourceHandler, occupiedSlots);
+
+            List<NetworkSnapshot.TargetUnit> targetUnits = new ArrayList<>(resolved.refs().size());
+            for (int t = 0; t < resolved.refs().size(); t++) {
+                TransferEngine.ImportTarget ref = resolved.refs().get(t);
+                TransferEngine.ItemTransferTarget engineTarget = resolved.targets().get(t);
+                int targetEndpoint = endpoints.capture(ref.node(), ref.channel().getIoSide(),
+                        engineTarget.handler(), occupiedSlots, engineTarget.bulkHandler() != null);
+                ItemStack[] importFilters = copyFilters(engineTarget.importFilters());
+                targetUnits.add(new NetworkSnapshot.TargetUnit(
+                        ref.node().getUUID(),
+                        ref.channelIndex(),
+                        importFilters,
+                        engineTarget.importFilterMode(),
+                        engineTarget.hasImportSlotMapping(),
+                        engineTarget.bulkHandler() != null,
+                        targetEndpoint,
+                        ref.channel().getIoSide(),
+                        engineTarget.faces() == null ? null : captureFaces(ref, engineTarget, importFilters,
+                                channel.getFilterItems(), endpoints, occupiedSlots, readCache)));
+            }
+
+            units.add(new NetworkSnapshot.ChannelUnit(
+                    node.getUUID(),
+                    i,
+                    batchLimit,
+                    copyFilters(channel.getFilterItems()),
+                    channel.getFilterMode(),
+                    sourceEndpoint,
+                    channel.getDistributionMode(),
+                    channel.canRotateResources(), copyCursor(channel.getItemResourceCursor()),
+                    targetUnits));
+        }
+        return itemWakeDelta;
+    }
+
+    private static NetworkSnapshot.TargetUnit[] captureFaces(TransferEngine.ImportTarget ref,
+            TransferEngine.ItemTransferTarget target, ItemStack[] importFilters, ItemStack[] exportFilters,
+            ItemEndpointTable endpoints, OccupiedSlotBudget occupiedSlots, FilterItemData.ReadCache readCache) {
+        var faces = target.faces();
+        int mask = (faces.imports() ? FilterLogic.entrySideMask(target.importFilters(), readCache) : 0)
+                | (faces.exports() ? FilterLogic.entrySideMask(exportFilters, readCache) : 0);
+        NetworkSnapshot.TargetUnit[] units = new NetworkSnapshot.TargetUnit[IoSide.values().length];
+        for (IoSide side : IoSide.values()) {
+            if ((mask & 1 << side.ordinal()) == 0 || side == ref.channel().getIoSide())
+                continue;
+            TransferEngine.ItemTransferTarget face = faces.face(side, target);
+            if (face == null)
+                continue;
+            int endpoint = endpoints.capture(ref.node(), side, face.handler(), occupiedSlots,
+                    face.bulkHandler() != null);
+            units[side.ordinal()] = new NetworkSnapshot.TargetUnit(ref.node().getUUID(), ref.channelIndex(),
+                    importFilters, target.importFilterMode(), target.hasImportSlotMapping(),
+                    face.bulkHandler() != null, endpoint, side, null);
+        }
+        return units;
+    }
+
+    static long earlierItemWakeDelta(long currentMinimum, long cooldown) {
+        return cooldown > 0L ? Math.min(currentMinimum, cooldown) : currentMinimum;
+    }
+
+    static long itemWakeDelta(long currentMinimum, List<TransferEngine.ImportTarget> targets, long cooldown) {
+        return targets == null || targets.isEmpty()
+                ? currentMinimum
+                : earlierItemWakeDelta(currentMinimum, cooldown);
+    }
+
+    public record NetworkCapture(CaptureStatus status, @Nullable NetworkSnapshot snapshot,
+            List<DirectStorageBinding> bindings) {
+
+        public static NetworkCapture captured(NetworkSnapshot snapshot, List<DirectStorageBinding> bindings) {
+            return new NetworkCapture(CaptureStatus.CAPTURED, snapshot, bindings);
+        }
+
+        public static NetworkCapture unavailable() {
+            return new NetworkCapture(CaptureStatus.UNAVAILABLE, null, List.of());
+        }
+
+        public static NetworkCapture occupiedLimitExceeded() {
+            return new NetworkCapture(CaptureStatus.OCCUPIED_SLOT_LIMIT_EXCEEDED, null, List.of());
+        }
+    }
+
+    public enum CaptureStatus {
+        CAPTURED,
+        UNAVAILABLE,
+        OCCUPIED_SLOT_LIMIT_EXCEEDED
+    }
+
+    static final class OccupiedSlotBudget {
+
+        private int remaining;
+
+        OccupiedSlotBudget(int limit) {
+            remaining = limit;
+        }
+
+        void retain() {
+            if (remaining == 0) {
+                throw OCCUPIED_SLOT_LIMIT;
+            }
+            remaining--;
+        }
+    }
+
+    static final class OccupiedSlotLimitExceeded extends RuntimeException {
+
+        private OccupiedSlotLimitExceeded() {
+            super(null, null, false, false);
+        }
+    }
+}

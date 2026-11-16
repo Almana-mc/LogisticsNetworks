@@ -12,8 +12,13 @@ import mekanism.api.chemical.pigment.Pigment;
 import mekanism.api.chemical.slurry.Slurry;
 import mekanism.common.capabilities.Capabilities;
 import me.almana.logisticsnetworks.Config;
+import me.almana.logisticsnetworks.component.RecipeCardData;
 import me.almana.logisticsnetworks.data.FilterMode;
+import me.almana.logisticsnetworks.data.FlowResource;
+import me.almana.logisticsnetworks.data.IoSide;
+import me.almana.logisticsnetworks.logic.ChannelTelemetry;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.logic.EntryFaces;
 import me.almana.logisticsnetworks.logic.FilterLogic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -26,7 +31,10 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public final class ChemicalTransferHelper {
 
@@ -72,10 +80,16 @@ public final class ChemicalTransferHelper {
         if (found.isEmpty()) {
             return null;
         }
-        if (found.size() == 1) {
-            return found.get(0);
-        }
+        // Always wrap, routes by kind
         return new CombinedChemicalHandler(found.toArray(new IChemicalHandler[0]));
+    }
+
+    @Nullable
+    @SuppressWarnings("rawtypes")
+    public static IChemicalHandler getUnsidedHandler(ServerLevel level, BlockPos pos) {
+        if (MekanismCompat.isMekanismBlock(level, pos)) return null;
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        return blockEntity == null ? null : getSideHandler(blockEntity, null);
     }
 
     @Nullable
@@ -84,9 +98,6 @@ public final class ChemicalTransferHelper {
         List<IChemicalHandler> handlers = collectSideHandlers(blockEntity, side);
         if (handlers.isEmpty()) {
             return null;
-        }
-        if (handlers.size() == 1) {
-            return handlers.get(0);
         }
         return new CombinedChemicalHandler(handlers.toArray(new IChemicalHandler[0]));
     }
@@ -348,14 +359,15 @@ public final class ChemicalTransferHelper {
             return 0;
         }
         return transferBetween(source, target, limit, exportFilters, exportFilterMode, importFilters,
-                importFilterMode, filterReadCache);
+                importFilterMode, filterReadCache, null, null);
     }
 
     @SuppressWarnings("rawtypes")
     public static long transferBetween(IChemicalHandler source, IChemicalHandler target, long limit,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
+            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable String requiredId,
+            @Nullable EntryFaces<IChemicalHandler> faces) {
         if (source == null || target == null) {
             return 0;
         }
@@ -364,17 +376,45 @@ public final class ChemicalTransferHelper {
                     limit, source.getTanks(), target.getTanks());
         }
         return executeChemicalMove(source, target, limit, exportFilters, exportFilterMode, importFilters,
-                importFilterMode, filterReadCache);
+                importFilterMode, filterReadCache, requiredId, faces);
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public static Map<String, Long> exportableAmounts(IChemicalHandler source, ItemStack[] exportFilters,
+            FilterMode exportFilterMode, @Nullable FilterItemData.ReadCache filterReadCache) {
+        Map<String, Long> byChemical = new LinkedHashMap<>();
+        for (int tank = 0; tank < source.getTanks(); tank++) {
+            ChemicalStack<?> stack = (ChemicalStack<?>) source.getChemicalInTank(tank);
+            if (stack.isEmpty() || isBlacklistedChemical(stack)) {
+                continue;
+            }
+            String chemId = getChemicalId(stack);
+            if (chemId == null
+                    || !FilterLogic.matchesChemical(exportFilters, exportFilterMode, chemId, filterReadCache)) {
+                continue;
+            }
+            byChemical.merge(chemId,
+                    ((ChemicalStack<?>) source.extractChemical(tank, stack.getAmount(), Action.SIMULATE)).getAmount(),
+                    Long::sum);
+        }
+        byChemical.replaceAll((chemId, amount) -> {
+            long keepCap = getPerEntryChemicalAmountLimit(chemId, exportFilters, null, source, null, filterReadCache);
+            return keepCap >= 0 ? Math.min(amount, keepCap) : amount;
+        });
+        return byChemical;
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private static long executeChemicalMove(IChemicalHandler source, IChemicalHandler target, long limitAmount,
             ItemStack[] exportFilters, FilterMode exportFilterMode,
             ItemStack[] importFilters, FilterMode importFilterMode,
-            @Nullable FilterItemData.ReadCache filterReadCache) {
+            @Nullable FilterItemData.ReadCache filterReadCache, @Nullable String requiredId,
+            @Nullable EntryFaces<IChemicalHandler> faces) {
         long remaining = limitAmount;
+        IChemicalHandler channelTarget = target;
 
         for (int tank = 0; tank < source.getTanks(); tank++) {
+            target = channelTarget;
             if (remaining <= 0) {
                 break;
             }
@@ -385,12 +425,24 @@ public final class ChemicalTransferHelper {
             }
 
             String chemId = getChemicalId(tankChemical);
+            if (requiredId != null && !requiredId.equals(chemId)) {
+                continue;
+            }
             if (chemId != null) {
                 if (!FilterLogic.matchesChemical(exportFilters, exportFilterMode, chemId, filterReadCache)) {
                     continue;
                 }
                 if (!FilterLogic.matchesChemical(importFilters, importFilterMode, chemId, filterReadCache)) {
                     continue;
+                }
+                if (faces != null) {
+                    IoSide side = faces.imports() ? FilterLogic.chemicalSide(importFilters, chemId, filterReadCache)
+                            : null;
+                    if (side == null && faces.exports())
+                        side = FilterLogic.chemicalSide(exportFilters, chemId, filterReadCache);
+                    target = faces.face(side, channelTarget);
+                    if (target == null)
+                        continue;
                 }
             }
 
@@ -457,6 +509,9 @@ public final class ChemicalTransferHelper {
 
             if (moved > 0) {
                 remaining -= moved;
+                if (chemId != null) {
+                    ChannelTelemetry.recordMoved(new FlowResource.Chemical(chemId), moved);
+                }
                 if (Config.debugMode) {
                     LOGGER.debug("[Chemical] Moved {} from tank {}", moved, tank);
                 }
@@ -480,7 +535,13 @@ public final class ChemicalTransferHelper {
         return resolveFirstChemical(chemicalId).map(Chemical::getTextComponent).orElse(null);
     }
 
-    private static boolean isBlacklistedChemical(ChemicalStack<?> stack) {
+    @Nullable
+    public static ChemicalStack<?> stackOf(String chemicalId, long amount) {
+        return resolveFirstChemical(chemicalId).<ChemicalStack<?>>map(chemical -> chemical.getStack(amount))
+                .orElse(null);
+    }
+
+    static boolean isBlacklistedChemical(ChemicalStack<?> stack) {
         return stack.getType().getTags().anyMatch(tag -> tag.location().equals(BLACKLIST_TAG_ID));
     }
 
@@ -548,7 +609,7 @@ public final class ChemicalTransferHelper {
 
         if (type != null) {
             Chemical<?> exact = lookupByType(type, id);
-            if (exact != null) {
+            if (exact != null && !exact.isEmptyType()) {
                 matches.add(exact);
             }
             return matches;
@@ -570,12 +631,19 @@ public final class ChemicalTransferHelper {
         if (slurry != null) {
             matches.add(slurry);
         }
-
+        // Defaulted registries return empty
+        matches.removeIf(Chemical::isEmptyType);
         return matches;
     }
 
     public static boolean isValidChemicalId(String chemicalId) {
         return resolveFirstChemical(chemicalId).isPresent();
+    }
+
+    @Nullable
+    public static String typedChemicalId(String chemicalId) {
+        ChemicalStack<?> stack = stackOf(chemicalId, 1);
+        return stack == null ? null : getChemicalId(stack);
     }
 
     @SuppressWarnings("rawtypes")
@@ -627,6 +695,7 @@ public final class ChemicalTransferHelper {
 
     @SuppressWarnings("rawtypes")
     private static long countMatchingChemical(IChemicalHandler handler, String chemicalId) {
+        if (handler instanceof DirectChemicalHandler direct) return direct.count(chemicalId);
         long amount = 0;
         for (int i = 0; i < handler.getTanks(); i++) {
             ChemicalStack<?> stack = (ChemicalStack<?>) handler.getChemicalInTank(i);
@@ -710,5 +779,12 @@ public final class ChemicalTransferHelper {
             case TYPE_SLURRY -> MekanismAPI.slurryRegistry().getValue(id);
             default -> null;
         };
+    }
+
+    public static Optional<RecipeCardData.Ingredient> recipeIngredient(Object value) {
+        if (!(value instanceof ChemicalStack<?> stack) || stack.isEmpty())
+            return Optional.empty();
+        return Optional.ofNullable(getChemicalId(stack))
+                .map(id -> RecipeCardData.Ingredient.ofChemical(id, stack.getAmount()));
     }
 }

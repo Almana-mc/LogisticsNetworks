@@ -4,10 +4,19 @@ import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.Config;
 import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.INodeTracker;
+import me.almana.logisticsnetworks.data.IoSide;
+import me.almana.logisticsnetworks.data.NetworkColors;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.data.NodeRouteChannels;
+import me.almana.logisticsnetworks.integration.create.CreateCompat;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.Registration;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import me.almana.logisticsnetworks.utils.ItemStackUtils;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -18,33 +27,40 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.RelativeMovement;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.util.ITeleporter;
 import net.minecraftforge.network.NetworkHooks;
 import com.mojang.logging.LogUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 public class LogisticsNodeEntity extends Entity {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public static final int UPGRADE_SLOT_COUNT = 4;
+    public static final int UPGRADE_SLOT_COUNT = 6;
     public static final int CHANNEL_COUNT = 9;
 
     private static final String KEY_ATTACHED_POS = "AttachedPos";
     private static final String KEY_VALID = "Valid";
     private static final String KEY_NETWORK_ID = "NetworkId";
     private static final String KEY_NETWORK_NAME = "NetworkName";
+    private static final String KEY_NETWORK_COLOR = "NetworkColor";
     private static final String KEY_VISIBLE = "RenderVisible";
     private static final String KEY_CHANNELS = "Channels";
     private static final String KEY_UPGRADES = "Upgrades";
@@ -53,7 +69,11 @@ public class LogisticsNodeEntity extends Entity {
     private static final String KEY_ITEM = "Item";
     private static final String KEY_OWNER_UUID = "OwnerUUID";
     private static final String KEY_NODE_LABEL = "NodeLabel";
+    private static final String KEY_LABEL_REVISION = "LabelRevision";
     private static final String KEY_HIGHLIGHTED = "Highlighted";
+    private static final String KEY_PENDING_FILTER_EJECTS = "PendingFilterEjects";
+    private static final String KEY_CREATE_CONTRAPTION_ID = "CreateContraptionId";
+    private static final String KEY_CREATE_LOCAL_POS = "CreateLocalPos";
 
     private static final EntityDataAccessor<BlockPos> ATTACHED_POS = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
@@ -63,6 +83,8 @@ public class LogisticsNodeEntity extends Entity {
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
     private static final EntityDataAccessor<String> NETWORK_NAME = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Integer> NETWORK_COLOR = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> RENDER_VISIBLE = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Optional<UUID>> OWNER_UUID = SynchedEntityData
@@ -71,13 +93,22 @@ public class LogisticsNodeEntity extends Entity {
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> HIGHLIGHTED = SynchedEntityData
             .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Long> ROUTE_CHANNELS = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.LONG);
+    private static final EntityDataAccessor<Optional<UUID>> CREATE_CONTRAPTION_ID = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<BlockPos> CREATE_LOCAL_POS = SynchedEntityData
+            .defineId(LogisticsNodeEntity.class, EntityDataSerializers.BLOCK_POS);
 
     private final ChannelData[] channels = new ChannelData[CHANNEL_COUNT];
     private final ItemStack[] upgradeItems = new ItemStack[UPGRADE_SLOT_COUNT];
+    private long labelRevision;
+    private final List<ItemStack> pendingFilterEjects = new ArrayList<>();
 
-    private final long[] channelCooldowns = new long[CHANNEL_COUNT];
-    private final int[] roundRobinIndex = new int[CHANNEL_COUNT];
-    private final float[] backoffTicks = new float[CHANNEL_COUNT];
+    private final long[] channelCooldowns = new long[CHANNEL_COUNT * ChannelData.LANES];
+    private final float[] backoffTicks = new float[CHANNEL_COUNT * ChannelData.LANES];
+
+    private int signal = -1;
 
     public LogisticsNodeEntity(EntityType<LogisticsNodeEntity> entityType, Level level) {
         super(entityType, level);
@@ -103,10 +134,14 @@ public class LogisticsNodeEntity extends Entity {
         this.entityData.define(VALID, false);
         this.entityData.define(NETWORK_ID, Optional.empty());
         this.entityData.define(NETWORK_NAME, "");
+        this.entityData.define(NETWORK_COLOR, NetworkColors.DEFAULT);
         this.entityData.define(RENDER_VISIBLE, true);
         this.entityData.define(OWNER_UUID, Optional.empty());
         this.entityData.define(NODE_LABEL, "");
         this.entityData.define(HIGHLIGHTED, false);
+        this.entityData.define(ROUTE_CHANNELS, 0L);
+        this.entityData.define(CREATE_CONTRAPTION_ID, Optional.empty());
+        this.entityData.define(CREATE_LOCAL_POS, BlockPos.ZERO);
     }
 
     @Override
@@ -122,6 +157,9 @@ public class LogisticsNodeEntity extends Entity {
         if (compound.contains(KEY_NETWORK_NAME, Tag.TAG_STRING)) {
             setNetworkName(compound.getString(KEY_NETWORK_NAME));
         }
+        if (compound.contains(KEY_NETWORK_COLOR)) {
+            setNetworkColor(compound.getInt(KEY_NETWORK_COLOR));
+        }
         if (compound.contains(KEY_VISIBLE)) {
             setRenderVisible(compound.getBoolean(KEY_VISIBLE));
         }
@@ -131,11 +169,20 @@ public class LogisticsNodeEntity extends Entity {
         if (compound.contains(KEY_NODE_LABEL, Tag.TAG_STRING)) {
             setNodeLabel(compound.getString(KEY_NODE_LABEL));
         }
+        // After label; label resets revision
+        setLabelRevision(compound.getLong(KEY_LABEL_REVISION));
         if (compound.contains(KEY_HIGHLIGHTED)) {
             setHighlighted(compound.getBoolean(KEY_HIGHLIGHTED));
         }
+        boolean mounted = compound.hasUUID(KEY_CREATE_CONTRAPTION_ID);
+        this.entityData.set(CREATE_CONTRAPTION_ID,
+                mounted ? Optional.of(compound.getUUID(KEY_CREATE_CONTRAPTION_ID)) : Optional.empty());
+        this.entityData.set(CREATE_LOCAL_POS,
+                mounted ? BlockPos.of(compound.getLong(KEY_CREATE_LOCAL_POS)) : BlockPos.ZERO);
 
         HolderLookup.Provider provider = this.level().registryAccess();
+
+        loadPendingFilterEjects(compound, provider);
 
         if (compound.contains(KEY_CHANNELS)) {
             CompoundTag channelsTag = compound.getCompound(KEY_CHANNELS);
@@ -143,6 +190,7 @@ public class LogisticsNodeEntity extends Entity {
                 String key = KEY_CHANNEL_PREFIX + i;
                 if (channelsTag.contains(key)) {
                     this.channels[i].load(channelsTag.getCompound(key), provider);
+                    pendingFilterEjects.addAll(this.channels[i].takeEjectedFilters());
                 }
             }
         }
@@ -159,6 +207,7 @@ public class LogisticsNodeEntity extends Entity {
                 }
             }
         }
+        refreshRouteChannels();
     }
 
     @Override
@@ -174,6 +223,7 @@ public class LogisticsNodeEntity extends Entity {
         if (!networkName.isBlank()) {
             compound.putString(KEY_NETWORK_NAME, networkName);
         }
+        compound.putInt(KEY_NETWORK_COLOR, getNetworkColor());
         compound.putBoolean(KEY_VISIBLE, isRenderVisible());
 
         UUID owner = getOwnerUUID();
@@ -184,7 +234,13 @@ public class LogisticsNodeEntity extends Entity {
         if (!label.isEmpty()) {
             compound.putString(KEY_NODE_LABEL, label);
         }
+        compound.putLong(KEY_LABEL_REVISION, labelRevision);
         compound.putBoolean(KEY_HIGHLIGHTED, isHighlighted());
+        UUID contraptionId = getCreateContraptionId();
+        if (contraptionId != null) {
+            compound.putUUID(KEY_CREATE_CONTRAPTION_ID, contraptionId);
+            compound.putLong(KEY_CREATE_LOCAL_POS, getCreateLocalPos().asLong());
+        }
 
         HolderLookup.Provider provider = level().registryAccess();
 
@@ -193,6 +249,7 @@ public class LogisticsNodeEntity extends Entity {
             channelsTag.put(KEY_CHANNEL_PREFIX + i, this.channels[i].save(provider));
         }
         compound.put(KEY_CHANNELS, channelsTag);
+        savePendingFilterEjects(compound, provider);
 
         ListTag upgradesTag = new ListTag();
         for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
@@ -210,6 +267,13 @@ public class LogisticsNodeEntity extends Entity {
 
     @Override
     public void tick() {
+        if (!this.level().isClientSide() && (this.tickCount <= 1 || this.tickCount % 5 == 0)) {
+            refreshRouteChannels();
+        }
+        if (isMountedOnCreate()) {
+            CreateCompat.tickMountedNode(this);
+            return;
+        }
         if (this.level().isClientSide()) return;
 
         BlockPos attached = getAttachedPos();
@@ -229,17 +293,32 @@ public class LogisticsNodeEntity extends Entity {
                         this.spawnAtLocation(
                                 Registration.LOGISTICS_NODE_ITEM.get());
                     }
-                    this.dropFilters();
-                    this.dropUpgrades();
                     this.discard();
                 }
             }
         }
     }
 
+    private void refreshRouteChannels() {
+        long bits = 0L;
+        if (isValidNode() && getNetworkId() != null && CreateCompat.isResolved(this)) {
+            bits = NodeRouteChannels.encode(channels, isMountedOnCreate(), NodeUpgradeData.availableTypes(this));
+        }
+        this.entityData.set(ROUTE_CHANNELS, bits);
+    }
+
     @Override
     public boolean shouldRenderAtSqrDistance(double distanceSq) {
         return distanceSq < 48.0 * 48.0;
+    }
+
+    @Override
+    public AABB getBoundingBoxForCulling() {
+        if (isMountedOnCreate()) {
+            // Fits any contraption rotation
+            return AABB.ofSize(position(), 2.5, 2.5, 2.5);
+        }
+        return new AABB(getX() - 0.5, getY(), getZ() - 0.5, getX() + 0.5, getY() + 1.0, getZ() + 0.5);
     }
 
     @Override
@@ -260,10 +339,42 @@ public class LogisticsNodeEntity extends Entity {
         return false;
     }
 
+    // Hides nodes from minimap radars
+    @Override
+    public boolean isInvisible() {
+        return true;
+    }
+
+    public CompoundTag saveNodeState() {
+        CompoundTag tag = new CompoundTag();
+        addAdditionalSaveData(tag);
+        return tag;
+    }
+
+    public void loadNodeState(CompoundTag tag) {
+        readAdditionalSaveData(tag);
+    }
+
     @Override
     public void kill() {
         LOGGER.warn(
                 "Attempt to kill LogisticsNodeEntity ignored. Please use '/logisticsnetworks removeInvalidNodes' for invalid nodes or '/logisticsnetworks removeNodes' to safely remove all nodes.");
+    }
+
+    @Override
+    public boolean teleportTo(ServerLevel level, double x, double y, double z, Set<RelativeMovement> relativeMovements,
+            float yRot, float xRot) {
+        return false;
+    }
+
+    @Override
+    public void teleportTo(double x, double y, double z) {
+    }
+
+    @Nullable
+    @Override
+    public Entity changeDimension(ServerLevel destination, ITeleporter teleporter) {
+        return null;
     }
 
     @Override
@@ -277,6 +388,73 @@ public class LogisticsNodeEntity extends Entity {
 
     public BlockPos getAttachedPos() {
         return this.entityData.get(ATTACHED_POS);
+    }
+
+    public int signal() {
+        if (isMountedOnCreate()) {
+            return 0;
+        }
+        if (signal < 0) {
+            signal = level().getBestNeighborSignal(getAttachedPos());
+            ((INodeTracker) level()).logisticsNetworks$registerNode(this);
+        }
+        return signal;
+    }
+
+    public void forgetSignal() {
+        signal = -1;
+        if (level() instanceof INodeTracker tracker) {
+            tracker.logisticsNetworks$removeNode(this);
+        }
+    }
+
+    public void moveAttachment(BlockPos pos, Vec3 entityPos) {
+        forgetSignal();
+        setPos(entityPos);
+        setAttachedPos(pos);
+        if (this.level() instanceof ServerLevel serverLevel && getNetworkId() != null) {
+            NetworkRegistry.get(serverLevel).invalidateNetwork(getNetworkId());
+        }
+    }
+
+    public boolean isMountedOnCreate() {
+        return entityData.get(CREATE_CONTRAPTION_ID).isPresent();
+    }
+
+    @Nullable
+    public UUID getCreateContraptionId() {
+        return entityData.get(CREATE_CONTRAPTION_ID).orElse(null);
+    }
+
+    public BlockPos getCreateLocalPos() {
+        return entityData.get(CREATE_LOCAL_POS);
+    }
+
+    public void mountOnCreate(UUID contraptionId, BlockPos localPos) {
+        forgetSignal();
+        entityData.set(CREATE_CONTRAPTION_ID, Optional.of(contraptionId));
+        entityData.set(CREATE_LOCAL_POS, localPos.immutable());
+        if (level() instanceof ServerLevel serverLevel && getNetworkId() != null) {
+            NetworkRegistry.get(serverLevel).invalidateNetwork(getNetworkId());
+        }
+    }
+
+    public void updateMountedPosition(Vec3 position) {
+        setPos(position);
+        setAttachedPos(BlockPos.containing(position));
+    }
+
+    public void dismountFromCreate(BlockPos attachedPos, Vec3 position,
+            UnaryOperator<Direction> directionTransform) {
+        entityData.set(CREATE_CONTRAPTION_ID, Optional.empty());
+        entityData.set(CREATE_LOCAL_POS, BlockPos.ZERO);
+        for (ChannelData channel : channels) {
+            Direction direction = channel.getIoSide().direction();
+            if (direction != null) {
+                channel.setIoSide(IoSide.of(directionTransform.apply(direction)));
+            }
+        }
+        moveAttachment(attachedPos, position);
     }
 
     public void setValid(boolean valid) {
@@ -304,6 +482,7 @@ public class LogisticsNodeEntity extends Entity {
         this.entityData.set(NETWORK_ID, Optional.ofNullable(networkId));
         if (networkId == null) {
             setNetworkName("");
+            setNetworkColor(NetworkColors.DEFAULT);
         }
     }
 
@@ -313,6 +492,14 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setNetworkName(@Nullable String networkName) {
         this.entityData.set(NETWORK_NAME, networkName == null ? "" : networkName);
+    }
+
+    public int getNetworkColor() {
+        return this.entityData.get(NETWORK_COLOR);
+    }
+
+    public void setNetworkColor(int color) {
+        this.entityData.set(NETWORK_COLOR, NetworkColors.mask(color));
     }
 
     public boolean isRenderVisible() {
@@ -331,6 +518,10 @@ public class LogisticsNodeEntity extends Entity {
         this.entityData.set(HIGHLIGHTED, highlighted);
     }
 
+    public long getRouteChannels() {
+        return this.entityData.get(ROUTE_CHANNELS);
+    }
+
     @Nullable
     public UUID getOwnerUUID() {
         return this.entityData.get(OWNER_UUID).orElse(null);
@@ -341,12 +532,7 @@ public class LogisticsNodeEntity extends Entity {
     }
 
     public boolean isOwnedBy(Player player) {
-        UUID owner = getOwnerUUID();
-        if (owner == null) return true;
-        if (owner.equals(player.getUUID())) return true;
-        if (FTBTeamsCompat.isLoaded() && FTBTeamsCompat.arePlayersInSameTeam(owner, player.getUUID())) return true;
-        if (player instanceof ServerPlayer sp && sp.hasPermissions(2)) return true;
-        return false;
+        return NodeAccessPolicy.canAccess(getOwnerUUID(), player);
     }
 
     public String getNodeLabel() {
@@ -358,7 +544,16 @@ public class LogisticsNodeEntity extends Entity {
         if (sanitized.length() > 48) {
             sanitized = sanitized.substring(0, 48);
         }
+        if (!sanitized.equals(getNodeLabel())) labelRevision = 0;
         this.entityData.set(NODE_LABEL, sanitized);
+    }
+
+    public long getLabelRevision() {
+        return labelRevision;
+    }
+
+    public void setLabelRevision(long revision) {
+        labelRevision = Math.max(0, revision);
     }
 
     @Nullable
@@ -380,57 +575,113 @@ public class LogisticsNodeEntity extends Entity {
 
     public void setUpgradeItem(int slot, ItemStack stack) {
         if (slot >= 0 && slot < UPGRADE_SLOT_COUNT) {
+            int previousTier = NodeUpgradeData.getUpgradeTier(this);
             upgradeItems[slot] = stack.isEmpty() ? ItemStack.EMPTY : ItemStackCompat.copyWithCount(stack, 1);
+            if (!level().isClientSide)
+                applyTierChange(previousTier, NodeUpgradeData.getUpgradeTier(this));
         }
     }
 
-    public long getLastExecution(int index) {
-        return channelCooldowns[index];
-    }
-
-    public void setLastExecution(int index, long time) {
-        channelCooldowns[index] = time;
-    }
-
-    public int getRoundRobinIndex(int channelIndex) {
-        return roundRobinIndex[channelIndex];
-    }
-
-    public void advanceRoundRobin(int channelIndex, int targetCount) {
-        if (targetCount > 0) {
-            roundRobinIndex[channelIndex] = (roundRobinIndex[channelIndex] + 1) % targetCount;
+    private void applyTierChange(int previousTier, int tier) {
+        if (previousTier == tier)
+            return;
+        for (int index = 0; index < channels.length; index++) {
+            NodeUpgradeData.applyTierChange(channels[index], previousTier, tier);
+            channels[index].resetResourceRotation();
+            ServerPayloadHandler.sendChannelSyncToViewers(this, index, channels[index]);
         }
     }
 
-    public float getBackoffTicks(int channelIndex) {
-        return backoffTicks[channelIndex];
+    public long getLastExecution(int index, int lane) {
+        return channelCooldowns[index * ChannelData.LANES + lane];
     }
 
-    public void setBackoffTicks(int channelIndex, float value) {
-        backoffTicks[channelIndex] = value;
+    public void setLastExecution(int index, int lane, long time) {
+        channelCooldowns[index * ChannelData.LANES + lane] = time;
     }
 
-    public void dropUpgrades() {
+    public float getBackoffTicks(int index, int lane) {
+        return backoffTicks[index * ChannelData.LANES + lane];
+    }
+
+    public void setBackoffTicks(int index, int lane, float value) {
+        backoffTicks[index * ChannelData.LANES + lane] = value;
+    }
+
+    private void loadPendingFilterEjects(CompoundTag compound, HolderLookup.Provider provider) {
+        pendingFilterEjects.clear();
+        for (Tag tag : compound.getList(KEY_PENDING_FILTER_EJECTS, Tag.TAG_COMPOUND)) {
+            if (tag instanceof CompoundTag entry) {
+                ItemStack stack = ItemStackCompat.parseOptional(provider, entry);
+                if (!stack.isEmpty())
+                    pendingFilterEjects.add(stack);
+            }
+        }
+    }
+
+    // Kept if unloaded before eject
+    private void savePendingFilterEjects(CompoundTag compound, HolderLookup.Provider provider) {
+        if (pendingFilterEjects.isEmpty())
+            return;
+        ListTag ejectsTag = new ListTag();
+        for (ItemStack stack : pendingFilterEjects) {
+            ejectsTag.add(ItemStackCompat.save(stack, provider));
+        }
+        compound.put(KEY_PENDING_FILTER_EJECTS, ejectsTag);
+    }
+
+    public boolean hasPendingFilterEjects() {
+        return !pendingFilterEjects.isEmpty();
+    }
+
+    public void ejectPendingFilters() {
+        for (ItemStack stack : pendingFilterEjects) {
+            LOGGER.info("Ejected filter {} from logistics node {} at {}", stack, getUUID(), getAttachedPos());
+            spawnAtLocation(stack);
+        }
+        pendingFilterEjects.clear();
+    }
+
+    public void clearPendingFilterEjects() {
+        pendingFilterEjects.clear();
+    }
+
+    public void dropUpgrades(@Nullable Player player) {
         for (int i = 0; i < UPGRADE_SLOT_COUNT; i++) {
             ItemStack stack = upgradeItems[i];
             if (!stack.isEmpty()) {
-                spawnAtLocation(stack.copy());
+                if (player == null) {
+                    spawnAtLocation(stack.copy());
+                } else {
+                    ItemStackUtils.give(player, stack.copy());
+                }
                 upgradeItems[i] = ItemStack.EMPTY;
             }
         }
     }
 
+    public void dropUpgrades() {
+        dropUpgrades(null);
+    }
+
     public void dropFilters() {
         for (int channelIndex = 0; channelIndex < CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = channels[channelIndex];
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack stack = channel.getFilterItem(slot);
-                if (!stack.isEmpty()) {
-                    spawnAtLocation(stack.copy());
-                    channel.setFilterItem(slot, ItemStack.EMPTY);
-                }
-            }
+            channel.clearFilterItems();
         }
     }
 
+    @Override
+    public void remove(RemovalReason reason) {
+        this.ejectPendingFilters();
+        this.dropFilters();
+        this.dropUpgrades();
+        super.remove(reason);
+    }
+
+    @Override
+    public void onRemovedFromWorld() {
+        super.onRemovedFromWorld();
+        forgetSignal();
+    }
 }

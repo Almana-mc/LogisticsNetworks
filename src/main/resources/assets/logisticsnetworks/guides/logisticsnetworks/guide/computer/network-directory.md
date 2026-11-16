@@ -17,7 +17,7 @@ Each entry in the directory shows the **network name** (the default is literally
 
 ![Single network entry detail — starred, currently selected](../computer/images/network-entry.png)
 
-- The `>` prefix next to the name marks the entry as **selected** — it is not mounted yet, just highlighted. Click it again (or click the "RUN" / double-click) to mount.
+- The `>` prefix next to the name marks the entry as **selected** — it is not mounted yet, just highlighted. Use **Primary Interaction (default: Left Click)** again (or use it on **RUN**, or twice on the entry) to mount.
 - The yellow filled star means this network is pinned (see below).
 
 ## Search
@@ -30,7 +30,7 @@ Only 4 entries fit per page. The footer shows `1-4 / 16` — the range currently
 
 ## Pinning (Starred Networks)
 
-Click the **star** icon on the right edge of an entry to toggle the pin. Pinned networks sort to the top of the list — handy when you have dozens of networks and only care about a few.
+Use Primary Interaction on the **star** icon at the right edge of an entry to toggle the pin. Pinned networks sort to the top of the list — handy when you have dozens of networks and only care about a few.
 
 Pinning state is stored on the Computer block, not on your player or on the network itself. Different Computers can have different pinned sets, and if the block is ever broken the pins reset.
 
@@ -46,6 +46,6 @@ The pane also shows the total network count badge (`16 NETWORKS` in the screensh
 
 ## Mounting A Network
 
-Click an entry once to select it, then click **RUN** (or click the entry a second time) to mount. The idle text disappears and the subsystem buttons unlock. From here you can open the [I/O Monitor](io-monitor.md) or the [Node Table](node-table.md).
+Use Primary Interaction on an entry once to select it, then on **RUN** (or on the entry a second time) to mount. The idle text disappears and the subsystem buttons unlock. From here you can open the [I/O Monitor](io-monitor.md) or the [Node Table](node-table.md).
 
 To switch networks, hit **EXIT** on the subsystem page to return to the directory, then pick another one.

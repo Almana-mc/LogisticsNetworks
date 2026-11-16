@@ -3,24 +3,29 @@ package me.almana.logisticsnetworks.menu;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.network.NetworkHandler;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.network.SyncNetworkListPayload;
 import me.almana.logisticsnetworks.registration.ModTags;
 import me.almana.logisticsnetworks.registration.Registration;
-import me.almana.logisticsnetworks.util.ItemStackCompat;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.DataSlot;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -32,82 +37,92 @@ public class NodeMenu extends AbstractContainerMenu {
 
     // Grid Layout constants
     private static final int FILTER_GRID_X = 168;
-    private static final int FILTER_GRID_Y = 68;
-    private static final int FILTER_SLOTS = 9;
 
-    private static final int UPGRADE_GRID_Y = 137;
+    private static final int UPGRADE_GRID_Y = 140;
     private static final int UPGRADE_SLOTS = LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
     private static final int GRID_STEP = 19;
 
     private final LogisticsNodeEntity node;
+    private final int nodeId;
+    @Nullable
+    private GraphMenuContext returnContext;
     private boolean remoteAccess;
-    private int selectedChannel = 0;
+    private int selectedChannel;
     private boolean nodeSlotsActive = true;
+    @Nullable
+    private StorageLink preferredStorageLink;
 
-    private final Container filterContainer;
     private final Container upgradeContainer;
+    private final List<ItemStack> openingUpgrades;
+    private final Inventory playerInventory;
+    private int storageUpgradeAccess;
 
     // Server-side
-    public NodeMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node) {
-        super(Registration.NODE_MENU.get(), containerId);
+    public NodeMenu(int containerId, Inventory playerInv, LogisticsNodeEntity node, int selectedChannel) {
+        this(Registration.NODE_MENU.get(), containerId, playerInv, node, selectedChannel);
+    }
+
+    protected NodeMenu(MenuType<?> type, int containerId, Inventory playerInv, @Nullable LogisticsNodeEntity node,
+            int selectedChannel) {
+        super(type, containerId);
         this.node = node;
-        this.filterContainer = new FilterItemsContainer();
+        this.nodeId = node == null ? -1 : node.getId();
+        this.selectedChannel = selectedChannel;
         this.upgradeContainer = new UpgradeItemsContainer();
+        this.openingUpgrades = node == null ? List.of() : LabelUpgradeSync.snapshotUpgrades(node);
+        this.playerInventory = playerInv;
 
         layoutNodeSlots();
         layoutPlayerSlots(playerInv);
+        addStorageAccessData();
     }
 
     // Client-side
     public NodeMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
         super(Registration.NODE_MENU.get(), containerId);
-        int entityId = buf.readVarInt();
-        Entity entity = playerInv.player.level().getEntity(entityId);
-        this.node = (entity instanceof LogisticsNodeEntity n) ? n : null;
-
-        this.filterContainer = new FilterItemsContainer();
+        NodeMenuSync.ClientNodeState state = NodeMenuSync.read(buf, playerInv.player);
+        this.node = state.node();
+        this.nodeId = state.entityId();
+        this.selectedChannel = state.selectedChannel();
+        this.returnContext = buf.readableBytes() > 0 && buf.readBoolean() ? GraphMenuContext.read(buf) : null;
         this.upgradeContainer = new UpgradeItemsContainer();
-
-        if (this.node != null) {
-            readInitialData(buf, playerInv.player.level().registryAccess());
-        }
+        this.openingUpgrades = List.of();
+        this.playerInventory = playerInv;
 
         layoutNodeSlots();
         layoutPlayerSlots(playerInv);
+        addStorageAccessData();
     }
 
-    private void readInitialData(FriendlyByteBuf buf, HolderLookup.Provider provider) {
-        for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
-            CompoundTag tag = buf.readNbt();
-            if (tag != null) {
-                node.getChannel(i).load(tag, provider);
-            }
-        }
-        for (int i = 0; i < UPGRADE_SLOTS; i++) {
-            CompoundTag tag = buf.readNbt();
-            if (tag != null) {
-                node.setUpgradeItem(i, ItemStackCompat.parseOptional(provider, tag));
-            }
+    public static void open(ServerPlayer player, LogisticsNodeEntity node, int selectedChannel, boolean remote,
+            @Nullable GraphMenuContext context) {
+        open(player, node, selectedChannel, remote, context, null);
+    }
+
+    public static void open(ServerPlayer player, LogisticsNodeEntity node, int selectedChannel, boolean remote,
+            @Nullable GraphMenuContext context, @Nullable StorageLink preferredStorageLink) {
+        NodeMenuSync.openScreen(player, new SimpleMenuProvider((id, inv, p) -> {
+            NodeMenu menu = new NodeMenu(id, inv, node, selectedChannel);
+            menu.setRemoteAccess(remote);
+            menu.setReturnContext(context);
+            menu.preferredStorageLink = preferredStorageLink;
+            return menu;
+        }, Component.translatable("gui.logisticsnetworks.node_config")), node, selectedChannel, buf -> {}, buf -> {
+            buf.writeBoolean(context != null);
+            if (context != null) context.write(buf);
+        });
+        if (player.containerMenu instanceof NodeMenu menu) {
+            menu.sendNetworkListToClient(player);
         }
     }
 
     // Slot Layout
 
     private void layoutNodeSlots() {
-        // 3x3 Filter Grid
-        for (int r = 0; r < 3; r++) {
+        // 3x2 Upgrade Grid
+        for (int r = 0; r < 2; r++) {
             for (int c = 0; c < 3; c++) {
                 int index = r * 3 + c;
-                addSlot(new FilterSlot(filterContainer, index,
-                        FILTER_GRID_X + c * GRID_STEP,
-                        FILTER_GRID_Y + r * GRID_STEP));
-            }
-        }
-
-        // 2x2 Upgrade Grid
-        for (int r = 0; r < 2; r++) {
-            for (int c = 0; c < 2; c++) {
-                int index = r * 2 + c;
                 addSlot(new UpgradeSlot(upgradeContainer, index,
                         FILTER_GRID_X + c * GRID_STEP,
                         UPGRADE_GRID_Y + r * GRID_STEP));
@@ -119,21 +134,51 @@ public class NodeMenu extends AbstractContainerMenu {
         // Main Inventory (rows)
         for (int r = 0; r < 3; r++) {
             for (int c = 0; c < 9; c++) {
-                addSlot(new Slot(inv, c + r * 9 + 9, PLAYER_INV_X + c * 18, PLAYER_INV_Y + r * 18));
+                addSlot(playerSlot(inv, c + r * 9 + 9, PLAYER_INV_X + c * 18, PLAYER_INV_Y + r * 18));
             }
         }
         // Hotbar
         for (int c = 0; c < 9; c++) {
-            addSlot(new Slot(inv, c, PLAYER_INV_X + c * 18, PLAYER_INV_Y + 58));
+            addSlot(playerSlot(inv, c, PLAYER_INV_X + c * 18, PLAYER_INV_Y + 58));
         }
+    }
+
+    private Slot playerSlot(Inventory inventory, int index, int x, int y) {
+        return new Slot(inventory, index, x, y) {
+            @Override
+            public boolean isActive() {
+                return hasVisibleInventory();
+            }
+        };
+    }
+
+    protected boolean hasVisibleInventory() {
+        return true;
+    }
+
+    protected boolean hasAvailableNode() {
+        return node != null;
     }
 
     public LogisticsNodeEntity getNode() {
         return node;
     }
 
+    public int getNodeId() {
+        return nodeId;
+    }
+
     public int getSelectedChannel() {
         return selectedChannel;
+    }
+
+    @Nullable
+    public GraphMenuContext getReturnContext() {
+        return returnContext;
+    }
+
+    public void setReturnContext(@Nullable GraphMenuContext returnContext) {
+        this.returnContext = returnContext;
     }
 
     public void setSelectedChannel(int channelIndex) {
@@ -149,107 +194,127 @@ public class NodeMenu extends AbstractContainerMenu {
         this.remoteAccess = remote;
     }
 
+    @Nullable
+    public StorageLink getAccessibleStorageLink(ServerPlayer player) {
+        return LinkedStorage.findAccessibleLink(player, preferredStorageLink);
+    }
+
+    private boolean isUpgradeEditPending() {
+        return node != null && (LabelUpgradeSync.isPending(node) || LinkedStorage.isUpgradeCraftingPending(node));
+    }
+
+    public boolean hasStorageUpgradeAccess() {
+        return storageUpgradeAccess != 0;
+    }
+
+    public List<ItemStack> getInstalledUpgrades() {
+        List<ItemStack> installed = new ArrayList<>(UPGRADE_SLOTS);
+        for (int slot = 0; slot < UPGRADE_SLOTS; slot++) {
+            installed.add(upgradeContainer.getItem(slot));
+        }
+        return installed;
+    }
+
+    public boolean canEditNode(Player player) {
+        return node != null && node.isValidNode() && node.isOwnedBy(player)
+                && stillValid(player) && hasAvailableNode();
+    }
+
+    private void addStorageAccessData() {
+        addDataSlot(new DataSlot() {
+            @Override
+            public int get() {
+                if (playerInventory.player instanceof ServerPlayer player) {
+                    return getAccessibleStorageLink(player) == null ? 0 : 1;
+                }
+                return storageUpgradeAccess;
+            }
+
+            @Override
+            public void set(int value) {
+                storageUpgradeAccess = value;
+            }
+        });
+    }
+
     @Override
     public boolean stillValid(Player player) {
+        if (returnContext != null) return returnContext.canEdit(player, node);
         if (node == null || !node.isAlive()) return false;
+        if (!player.level().isClientSide() && !node.isOwnedBy(player)) return false;
         return remoteAccess || player.distanceToSqr(node) < 64.0;
     }
 
     public void sendNetworkListToClient(ServerPlayer player) {
+        if (node != null && node.getNetworkId() != null) {
+            NetworkRegistry.get(player.serverLevel()).stampCreatedAt(node.getNetworkId());
+        }
+        sendAvailableNetworkListToClient(player);
+    }
+
+    public static void sendAvailableNetworkListToClient(ServerPlayer player) {
         if (!(player.level() instanceof ServerLevel level))
             return;
 
         NetworkRegistry registry = NetworkRegistry.get(level);
-        Collection<LogisticsNetwork> networks;
-        if (player.hasPermissions(2)) {
-            networks = registry.getAllNetworks().values();
-        } else {
-            networks = registry.getNetworksForPlayer(player.getUUID());
-        }
+        Collection<LogisticsNetwork> networks = registry.getVisibleNetworks(player);
 
         List<SyncNetworkListPayload.NetworkEntry> entries = new ArrayList<>(networks.size());
         for (LogisticsNetwork net : networks) {
-            entries.add(new SyncNetworkListPayload.NetworkEntry(net.getId(), net.getName(), net.getNodeUuids().size()));
+            entries.add(new SyncNetworkListPayload.NetworkEntry(
+                    net.getId(),
+                    net.getName(),
+                    net.getNodeUuids().size(),
+                    false,
+                    NodeAccessPolicy.canDelete(net.getOwnerUuid(), player),
+                    net.getColor(),
+                    net.getCreatedAt()));
         }
 
-        NetworkHandler.sendToPlayer(player, new SyncNetworkListPayload(entries));
+        SyncNetworkListPayload.send(player, entries);
     }
 
     private void markDirty() {
-        if (node != null && node.getNetworkId() != null && node.level() instanceof ServerLevel level) {
-            NetworkRegistry.get(level).markNetworkDirty(node.getNetworkId());
-        }
+        if (node != null) ServerPayloadHandler.invalidateNetwork(node);
     }
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
         Slot fromSlot = slots.get(index);
-        if (fromSlot == null || !fromSlot.hasItem())
+        if (!nodeSlotsActive || !hasAvailableNode() || isUpgradeEditPending() || !fromSlot.hasItem())
             return ItemStack.EMPTY;
 
         ItemStack fromStack = fromSlot.getItem();
-        ItemStack copy = fromStack.copy();
-
-        int nodeSlotCount = FILTER_SLOTS + UPGRADE_SLOTS;
-
-        if (index < nodeSlotCount) {
-            if (!moveItemStackTo(fromStack, nodeSlotCount, slots.size(), true)) {
+        if (index < UPGRADE_SLOTS) {
+            ItemStack copy = fromStack.copy();
+            ItemStack remainder = fromStack.copy();
+            if (!moveItemStackTo(remainder, UPGRADE_SLOTS, slots.size(), true))
                 return ItemStack.EMPTY;
-            }
-        } else {
-            int targetStart;
-            int targetEnd;
-            if (fromStack.is(ModTags.FILTERS)) {
-                targetStart = 0;
-                targetEnd = FILTER_SLOTS;
-            } else if (fromStack.is(ModTags.UPGRADES)) {
-                targetStart = FILTER_SLOTS;
-                targetEnd = nodeSlotCount;
-            } else {
-                return ItemStack.EMPTY;
-            }
-
-            ItemStack single = fromStack.copyWithCount(1);
-            if (!moveItemStackTo(single, targetStart, targetEnd, false)) {
-                return ItemStack.EMPTY;
-            }
-            fromStack.shrink(1);
-            if (fromStack.isEmpty()) {
-                fromSlot.set(ItemStack.EMPTY);
-            } else {
-                fromSlot.setChanged();
-            }
-            return ItemStack.EMPTY;
+            fromSlot.set(remainder);
+            return copy;
         }
+        if (!fromStack.is(ModTags.UPGRADES))
+            return ItemStack.EMPTY;
 
+        ItemStack single = fromStack.copyWithCount(1);
+        if (!moveItemStackTo(single, 0, UPGRADE_SLOTS, false))
+            return ItemStack.EMPTY;
+        fromStack.shrink(1);
         if (fromStack.isEmpty()) {
             fromSlot.set(ItemStack.EMPTY);
         } else {
             fromSlot.setChanged();
         }
-
-        return copy;
+        return ItemStack.EMPTY;
     }
 
-    private class FilterItemsContainer extends AbstractProxyContainer {
-        FilterItemsContainer() {
-            super(FILTER_SLOTS);
-        }
-
-        @Override
-        public ItemStack getItem(int slot) {
-            return (node != null) ? node.getChannel(selectedChannel).getFilterItem(slot) : ItemStack.EMPTY;
-        }
-
-        @Override
-        public void setItem(int slot, ItemStack stack) {
-            if (node != null) {
-                node.getChannel(selectedChannel).setFilterItem(slot, stack.copyWithCount(1));
-                markDirty();
-                if (node.level() instanceof ServerLevel) {
-                    ServerPayloadHandler.propagateToLabelGroup(node, selectedChannel);
-                }
-            }
+    @Override
+    public void removed(Player player) {
+        super.removed(player);
+        if (player instanceof ServerPlayer serverPlayer && node != null && node.isAlive()
+                && node.isOwnedBy(serverPlayer)) {
+            LabelUpgradeSync.synchronizeMenuClose(serverPlayer, node, openingUpgrades,
+                    getAccessibleStorageLink(serverPlayer));
         }
     }
 
@@ -317,27 +382,6 @@ public class NodeMenu extends AbstractContainerMenu {
         }
     }
 
-    private class FilterSlot extends Slot {
-        FilterSlot(Container c, int i, int x, int y) {
-            super(c, i, x, y);
-        }
-
-        @Override
-        public boolean isActive() {
-            return nodeSlotsActive;
-        }
-
-        @Override
-        public boolean mayPlace(ItemStack stack) {
-            return !stack.isEmpty() && stack.is(ModTags.FILTERS);
-        }
-
-        @Override
-        public int getMaxStackSize() {
-            return 1;
-        }
-    }
-
     private class UpgradeSlot extends Slot {
         UpgradeSlot(Container c, int i, int x, int y) {
             super(c, i, x, y);
@@ -345,12 +389,17 @@ public class NodeMenu extends AbstractContainerMenu {
 
         @Override
         public boolean isActive() {
-            return nodeSlotsActive;
+            return nodeSlotsActive && hasAvailableNode();
+        }
+
+        @Override
+        public boolean mayPickup(Player player) {
+            return !isUpgradeEditPending();
         }
 
         @Override
         public boolean mayPlace(ItemStack stack) {
-            if (stack.isEmpty() || !stack.is(ModTags.UPGRADES)) {
+            if (isUpgradeEditPending() || stack.isEmpty() || !stack.is(ModTags.UPGRADES)) {
                 return false;
             }
             for (int i = 0; i < UPGRADE_SLOTS; i++) {

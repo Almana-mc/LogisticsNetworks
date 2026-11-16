@@ -3,11 +3,22 @@ package me.almana.logisticsnetworks.data;
 import me.almana.logisticsnetworks.util.ItemStackCompat;
 
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
-import me.almana.logisticsnetworks.integration.ae2.AE2Compat;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.filter.ModFilterData;
+import me.almana.logisticsnetworks.filter.NameFilterData;
+import me.almana.logisticsnetworks.filter.VirtualFilterType;
+import me.almana.logisticsnetworks.integration.storage.LinkedStorage;
+import me.almana.logisticsnetworks.integration.storage.StorageAccess;
+import me.almana.logisticsnetworks.integration.storage.StorageAction;
+import me.almana.logisticsnetworks.integration.storage.StorageInventory;
+import me.almana.logisticsnetworks.integration.storage.StorageLink;
+import me.almana.logisticsnetworks.logic.LabelUpgradeSync;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import me.almana.logisticsnetworks.registration.ModTags;
-import net.minecraft.core.Direction;
-import net.minecraft.core.GlobalPos;
+import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CollectionTag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -30,7 +41,6 @@ public final class NodeClipboardConfig {
     private static final String KEY_CHANNELS = "channels";
     private static final String KEY_FILTERS = "filters";
     private static final String KEY_UPGRADES = "upgrades";
-    private static final String KEY_REQUIRED_ITEMS = "required_items";
     private static final String KEY_NETWORK_ID = "network_id";
     private static final String KEY_NETWORK_NAME = "network_name";
 
@@ -38,20 +48,25 @@ public final class NodeClipboardConfig {
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_MODE = "mode";
     private static final String KEY_TYPE = "type";
+    private static final String KEY_TYPES = "types";
     private static final String KEY_BATCH = "batch";
+    private static final String KEY_BATCHES = "batches";
+    private static final String KEY_RECIPE_SETS = "recipe_sets";
     private static final String KEY_DELAY = "delay";
     private static final String KEY_IO = "io";
     private static final String KEY_REDSTONE = "redstone";
     private static final String KEY_DISTRIBUTION = "distribution";
     private static final String KEY_FILTER_MODE = "filter_mode";
     private static final String KEY_PRIORITY = "priority";
+    private static final String KEY_RESOURCE_ROUND_ROBIN = "resource_round_robin";
+    // 1.3.4 clipboards held 9 filters
+    private static final int LEGACY_FILTER_SLOTS = 9;
     private static final String KEY_VISIBLE = "renderVisible";
     private static final String KEY_NODE_LABEL = "node_label";
 
     private static final String KEY_CHANNEL = "channel";
     private static final String KEY_SLOT = "slot";
     private static final String KEY_ITEM = "item";
-    private static final String KEY_COUNT = "count";
 
     private final ChannelConfig[] channels;
     private final ItemStack[][] filterItems;
@@ -67,28 +82,44 @@ public final class NodeClipboardConfig {
         SUCCESS,
         CLIPBOARD_INVALID,
         INCOMPATIBLE_TARGET,
-        MISSING_ITEMS,
-        INVENTORY_FULL
+        MISSING_ITEMS
     }
 
-    private record Requirement(ItemStack stack, int count, boolean looseMatch) {
+    private record Requirement(ItemStack stack, int count) {
     }
 
     public record RequiredItem(ItemStack stack, int count) {
     }
 
+    public record PasteOutcome(PasteResult result, List<RequiredItem> missingItems) {
+        public PasteOutcome(PasteResult result) {
+            this(result, List.of());
+        }
+
+        public PasteOutcome {
+            missingItems = List.copyOf(missingItems);
+        }
+    }
+
     private static final class ChannelConfig {
         boolean enabled;
         ChannelMode mode;
-        ChannelType type;
-        int batchSize;
+        int types = ChannelType.ALL;
+        final int[] batches = new int[ChannelType.values().length];
+        int recipeSets;
         int tickDelay;
-        @Nullable Direction ioDirection;
+        IoSide ioDirection;
         RedstoneMode redstoneMode;
         DistributionMode distributionMode;
         FilterMode filterMode;
         int priority;
         String name = "";
+        boolean resourceRoundRobin;
+    }
+
+    public record ChannelState(boolean enabled, ChannelMode mode, int types, List<Integer> batches, int recipeSets,
+            int tickDelay, IoSide direction, RedstoneMode redstoneMode, DistributionMode distributionMode,
+            FilterMode filterMode, int priority, String name, boolean resourceRoundRobin) {
     }
 
     private NodeClipboardConfig(ChannelConfig[] channels, ItemStack[][] filterItems, ItemStack[] upgradeItems,
@@ -136,7 +167,48 @@ public final class NodeClipboardConfig {
         Arrays.fill(upgradeItems, ItemStack.EMPTY);
         networkId = null;
         networkName = null;
+        renderVisible = true;
         nodeLabel = "";
+    }
+
+    @Nullable
+    public UUID getNetworkId() {
+        return networkId;
+    }
+
+    @Nullable
+    public String getNetworkName() {
+        return networkName;
+    }
+
+    public void setNetworkTarget(@Nullable UUID id, @Nullable String name) {
+        networkId = id;
+        networkName = trim(name, 32);
+        if (networkName.isEmpty()) networkName = null;
+    }
+
+    public boolean isRenderVisible() {
+        return renderVisible;
+    }
+
+    public void setRenderVisible(boolean visible) {
+        renderVisible = visible;
+    }
+
+    public String getNodeLabel() {
+        return nodeLabel;
+    }
+
+    public void setNodeLabel(String label) {
+        nodeLabel = trim(label, 48);
+    }
+
+    public String getChannelName(int channel) {
+        return getChannelConfig(channel).name;
+    }
+
+    public void setChannelName(int channel, String name) {
+        getChannelConfig(channel).name = trim(name, 24);
     }
 
     public boolean isChannelEnabled(int channel) {
@@ -155,19 +227,11 @@ public final class NodeClipboardConfig {
         getChannelConfig(channel).mode = mode == null ? ChannelMode.IMPORT : mode;
     }
 
-    public ChannelType getChannelType(int channel) {
-        return getChannelConfig(channel).type;
-    }
-
-    public void setChannelType(int channel, ChannelType type) {
-        getChannelConfig(channel).type = type == null ? ChannelType.ITEM : type;
-    }
-
-    public @Nullable Direction getChannelDirection(int channel) {
+    public IoSide getChannelDirection(int channel) {
         return getChannelConfig(channel).ioDirection;
     }
 
-    public void setChannelDirection(int channel, @Nullable Direction direction) {
+    public void setChannelDirection(int channel, IoSide direction) {
         getChannelConfig(channel).ioDirection = direction;
     }
 
@@ -176,7 +240,7 @@ public final class NodeClipboardConfig {
     }
 
     public void setChannelRedstoneMode(int channel, RedstoneMode mode) {
-        getChannelConfig(channel).redstoneMode = mode == null ? RedstoneMode.ALWAYS_ON : mode;
+        getChannelConfig(channel).redstoneMode = mode == null ? RedstoneMode.IGNORED : mode;
     }
 
     public DistributionMode getChannelDistributionMode(int channel) {
@@ -195,6 +259,14 @@ public final class NodeClipboardConfig {
         getChannelConfig(channel).filterMode = mode == null ? FilterMode.MATCH_ANY : mode;
     }
 
+    public boolean getChannelResourceRoundRobin(int channel) {
+        return getChannelConfig(channel).resourceRoundRobin;
+    }
+
+    public void setChannelResourceRoundRobin(int channel, boolean value) {
+        getChannelConfig(channel).resourceRoundRobin = value;
+    }
+
     public int getChannelPriority(int channel) {
         return getChannelConfig(channel).priority;
     }
@@ -203,12 +275,34 @@ public final class NodeClipboardConfig {
         getChannelConfig(channel).priority = Math.max(-99, Math.min(99, priority));
     }
 
-    public int getChannelBatchSize(int channel) {
-        return getChannelConfig(channel).batchSize;
+    public int getChannelTypes(int channel) {
+        return getChannelConfig(channel).types;
     }
 
-    public void setChannelBatchSize(int channel, int batchSize) {
-        getChannelConfig(channel).batchSize = Math.max(1, batchSize);
+    public void setChannelTypes(int channel, int types) {
+        getChannelConfig(channel).types = types & ChannelType.ALL;
+    }
+
+    public boolean hasFilterableType(int channel) {
+        return (getChannelTypes(channel) & ChannelType.FILTERABLE) != 0;
+    }
+
+    public int getChannelBatch(int channel, ChannelType type) {
+        return getChannelConfig(channel).batches[type.ordinal()];
+    }
+
+    public void setChannelBatch(int channel, ChannelType type, int batch) {
+        int cap = NodeUpgradeData.getOperationCap(type, getUpgradeTier());
+        getChannelConfig(channel).batches[type.ordinal()] =
+                type == ChannelType.ENERGY || batch > cap ? 0 : Math.max(0, batch);
+    }
+
+    public int getChannelRecipeSets(int channel) {
+        return getChannelConfig(channel).recipeSets;
+    }
+
+    public void setChannelRecipeSets(int channel, int sets) {
+        getChannelConfig(channel).recipeSets = Math.max(0, sets);
     }
 
     public int getChannelTickDelay(int channel) {
@@ -216,7 +310,39 @@ public final class NodeClipboardConfig {
     }
 
     public void setChannelTickDelay(int channel, int delay) {
-        getChannelConfig(channel).tickDelay = Math.max(1, delay);
+        getChannelConfig(channel).tickDelay =
+                Math.max(NodeUpgradeData.getMinTickDelay(getUpgradeTier()), Math.min(10_000, delay));
+    }
+
+    public ChannelState getChannelState(int channel) {
+        return stateOf(getChannelConfig(channel));
+    }
+
+    // Raw copy, no clamps
+    public void setChannelState(int channel, ChannelState state) {
+        ChannelConfig config = getChannelConfig(channel);
+        config.enabled = state.enabled();
+        config.mode = state.mode();
+        config.types = state.types();
+        for (ChannelType type : ChannelType.values()) {
+            config.batches[type.ordinal()] = state.batches().get(type.ordinal());
+        }
+        config.recipeSets = state.recipeSets();
+        config.tickDelay = state.tickDelay();
+        config.ioDirection = state.direction();
+        config.redstoneMode = state.redstoneMode();
+        config.distributionMode = state.distributionMode();
+        config.filterMode = state.filterMode();
+        config.priority = state.priority();
+        config.name = state.name();
+        config.resourceRoundRobin = state.resourceRoundRobin();
+    }
+
+    private static ChannelState stateOf(ChannelConfig config) {
+        return new ChannelState(config.enabled, config.mode, config.types,
+                Arrays.stream(config.batches).boxed().toList(), config.recipeSets, config.tickDelay,
+                config.ioDirection, config.redstoneMode, config.distributionMode, config.filterMode,
+                config.priority, config.name, config.resourceRoundRobin);
     }
 
     public ItemStack getFilterItem(int channel, int slot) {
@@ -244,7 +370,71 @@ public final class NodeClipboardConfig {
         if (slot < 0 || slot >= upgradeItems.length) {
             return;
         }
-        upgradeItems[slot] = stack == null || stack.isEmpty() ? ItemStack.EMPTY : ItemStackCompat.copyWithCount(stack, 1);
+        ItemStack next = stack == null || stack.isEmpty() ? ItemStack.EMPTY : ItemStackCompat.copyWithCount(stack, 1);
+        if (!next.isEmpty()) {
+            for (int i = 0; i < upgradeItems.length; i++) {
+                if (i != slot && ItemStack.isSameItem(upgradeItems[i], next)) return;
+            }
+        }
+        int previousTier = getUpgradeTier();
+        upgradeItems[slot] = next;
+        int tier = getUpgradeTier();
+        if (tier != previousTier) {
+            for (ChannelConfig config : channels) {
+                for (ChannelType type : ChannelType.values()) {
+                    if (tier > previousTier
+                            || config.batches[type.ordinal()] > NodeUpgradeData.getOperationCap(type, tier)) {
+                        config.batches[type.ordinal()] = 0;
+                    }
+                }
+                if (tier < previousTier) {
+                    config.tickDelay = Math.max(config.tickDelay, NodeUpgradeData.getMinTickDelay(tier));
+                }
+            }
+        }
+    }
+
+    // Rebuild client filters server-side
+    public int sanitizeFilters() {
+        int dropped = 0;
+        for (ItemStack[] channel : filterItems) {
+            for (int slot = 0; slot < channel.length; slot++) {
+                ItemStack clean = sanitizedFilter(channel[slot]);
+                if (clean.isEmpty() && !channel[slot].isEmpty())
+                    dropped++;
+                channel[slot] = clean;
+            }
+        }
+        return dropped;
+    }
+
+    private static ItemStack sanitizedFilter(ItemStack source) {
+        if (source.isEmpty() || !source.is(ModTags.FILTERS))
+            return ItemStack.EMPTY;
+        VirtualFilterType type = VirtualFilterType.fromStack(source);
+        ItemStack clean = type.createStack();
+        if (!source.is(clean.getItem()))
+            return ItemStack.EMPTY;
+        boolean kept = switch (type) {
+            case MOD -> ModFilterData.copySanitized(source, clean);
+            case NAME -> NameFilterData.copySanitized(source, clean);
+            default -> FilterItemData.copySanitized(source, clean);
+        };
+        return kept ? clean : ItemStack.EMPTY;
+    }
+
+    public void stripUpgradeComponents() {
+        for (int slot = 0; slot < upgradeItems.length; slot++) {
+            setUpgradeItem(slot, new ItemStack(upgradeItems[slot].getItem()));
+        }
+    }
+
+    public int getUpgradeTier() {
+        int tier = 0;
+        for (ItemStack stack : upgradeItems) {
+            tier = Math.max(tier, NodeUpgradeData.getUpgradeTier(stack));
+        }
+        return tier;
     }
 
     public int getEnabledChannelCount() {
@@ -294,13 +484,16 @@ public final class NodeClipboardConfig {
 
     public List<RequiredItem> getRequiredItemsPreview() {
         List<RequiredItem> result = new ArrayList<>();
-        for (Requirement requirement : buildRequirements(null)) {
+        for (Requirement requirement : buildUpgradeRequirements(null)) {
             result.add(new RequiredItem(ItemStackCompat.copyWithCount(requirement.stack(), 1), requirement.count()));
         }
         return result;
     }
 
     public boolean isEffectivelyEmpty() {
+        if (!renderVisible) {
+            return false;
+        }
         if (networkId != null || (networkName != null && !networkName.isBlank())) {
             return false;
         }
@@ -313,13 +506,13 @@ public final class NodeClipboardConfig {
             ChannelConfig config = getChannelConfig(channel);
             if (config.enabled != defaults.enabled
                     || config.mode != defaults.mode
-                    || config.type != defaults.type
-                    || config.batchSize != defaults.batchSize
+                    || !isDefaultTypes(config, defaults)
                     || config.tickDelay != defaults.tickDelay
                     || config.ioDirection != defaults.ioDirection
                     || config.redstoneMode != defaults.redstoneMode
                     || config.distributionMode != defaults.distributionMode
                     || config.filterMode != defaults.filterMode
+                    || config.resourceRoundRobin
                     || config.priority != defaults.priority
                     || !config.name.equals(defaults.name)) {
                 return false;
@@ -370,6 +563,13 @@ public final class NodeClipboardConfig {
             }
         }
 
+        for (int first = 0; first < upgradeItems.length; first++) {
+            if (upgradeItems[first] == null || upgradeItems[first].isEmpty()) continue;
+            for (int second = first + 1; second < upgradeItems.length; second++) {
+                if (ItemStack.isSameItem(upgradeItems[first], upgradeItems[second])) return false;
+            }
+        }
+
         return true;
     }
 
@@ -400,13 +600,17 @@ public final class NodeClipboardConfig {
             if (channel != null) {
                 config.enabled = channel.isEnabled();
                 config.mode = channel.getMode();
-                config.type = channel.getType();
-                config.batchSize = channel.getBatchSize();
+                config.types = channel.getTypes();
+                for (ChannelType type : ChannelType.values()) {
+                    config.batches[type.ordinal()] = channel.getBatch(type);
+                }
+                config.recipeSets = channel.getRecipeSets();
                 config.tickDelay = channel.getTickDelay();
-                config.ioDirection = channel.getIoDirection();
+                config.ioDirection = channel.getIoSide();
                 config.redstoneMode = channel.getRedstoneMode();
                 config.distributionMode = channel.getDistributionMode();
                 config.filterMode = channel.getFilterMode();
+                config.resourceRoundRobin = channel.isResourceRoundRobin();
                 config.priority = channel.getPriority();
                 config.name = channel.getName();
 
@@ -417,11 +621,9 @@ public final class NodeClipboardConfig {
             } else {
                 config.enabled = false;
                 config.mode = ChannelMode.IMPORT;
-                config.type = ChannelType.ITEM;
-                config.batchSize = 8;
                 config.tickDelay = 20;
-                config.ioDirection = Direction.UP;
-                config.redstoneMode = RedstoneMode.ALWAYS_ON;
+                config.ioDirection = IoSide.UP;
+                config.redstoneMode = RedstoneMode.IGNORED;
                 config.distributionMode = DistributionMode.PRIORITY;
                 config.filterMode = FilterMode.MATCH_ANY;
                 config.priority = 0;
@@ -469,14 +671,24 @@ public final class NodeClipboardConfig {
             channelTag.putInt(KEY_INDEX, channelIndex);
             channelTag.putBoolean(KEY_ENABLED, channel.enabled);
             channelTag.putString(KEY_MODE, channel.mode.name());
-            channelTag.putString(KEY_TYPE, channel.type.name());
-            channelTag.putInt(KEY_BATCH, channel.batchSize);
+            channelTag.putString(KEY_TYPE, ChannelType.first(channel.types).name());
+            channelTag.put(KEY_TYPES, ChannelData.typeNames(channel.types));
+            CompoundTag batches = new CompoundTag();
+            for (ChannelType type : ChannelType.values()) {
+                if (channel.batches[type.ordinal()] > 0)
+                    batches.putInt(type.name(), channel.batches[type.ordinal()]);
+            }
+            channelTag.put(KEY_BATCHES, batches);
+            if (channel.recipeSets > 0)
+                channelTag.putInt(KEY_RECIPE_SETS, channel.recipeSets);
             channelTag.putInt(KEY_DELAY, channel.tickDelay);
-            channelTag.putString(KEY_IO, channel.ioDirection != null ? channel.ioDirection.getName() : "all");
+            channelTag.putString(KEY_IO, channel.ioDirection.key());
             channelTag.putString(KEY_REDSTONE, channel.redstoneMode.name());
             channelTag.putString(KEY_DISTRIBUTION, channel.distributionMode.name());
             channelTag.putString(KEY_FILTER_MODE, channel.filterMode.name());
             channelTag.putInt(KEY_PRIORITY, channel.priority);
+            if (channel.resourceRoundRobin)
+                channelTag.putBoolean(KEY_RESOURCE_ROUND_ROBIN, true);
             if (!channel.name.isEmpty())
                 channelTag.putString("Name", channel.name);
             channelsTag.add(channelTag);
@@ -520,18 +732,20 @@ public final class NodeClipboardConfig {
             root.put(KEY_UPGRADES, upgradesTag);
         }
 
-        ListTag requiredTag = new ListTag();
-        for (Requirement requirement : buildRequirements(null)) {
-            CompoundTag entry = new CompoundTag();
-            entry.put(KEY_ITEM, ItemStackCompat.save(requirement.stack(), provider));
-            entry.putInt(KEY_COUNT, requirement.count());
-            requiredTag.add(entry);
-        }
-        if (!requiredTag.isEmpty()) {
-            root.put(KEY_REQUIRED_ITEMS, requiredTag);
-        }
-
         return root;
+    }
+
+    // Fits 32 KB serverbound cap
+    public CompoundTag saveSettings(HolderLookup.Provider provider) {
+        CompoundTag root = save(provider);
+        root.remove(KEY_FILTERS);
+        return root;
+    }
+
+    // Server owns clipboard filters
+    public static NodeClipboardConfig loadSettings(CompoundTag root, HolderLookup.Provider provider) {
+        root.remove(KEY_FILTERS);
+        return load(root, provider);
     }
 
     public static NodeClipboardConfig load(CompoundTag root, HolderLookup.Provider provider) {
@@ -539,7 +753,7 @@ public final class NodeClipboardConfig {
             return null;
         }
 
-        if (root.contains(KEY_VERSION, Tag.TAG_INT) && root.getInt(KEY_VERSION) != VERSION) {
+        if (root.contains(KEY_VERSION, Tag.TAG_INT) && root.getInt(KEY_VERSION) != VERSION || isOversized(root)) {
             return null;
         }
 
@@ -576,25 +790,21 @@ public final class NodeClipboardConfig {
             ChannelConfig config = defaultChannelConfig();
             config.enabled = channelTag.getBoolean(KEY_ENABLED);
             config.mode = parseEnum(channelTag.getString(KEY_MODE), ChannelMode.values(), ChannelMode.IMPORT);
-            config.type = parseEnum(channelTag.getString(KEY_TYPE), ChannelType.values(), ChannelType.ITEM);
-            config.batchSize = Math.max(1, channelTag.getInt(KEY_BATCH));
+            loadTypes(config, channelTag);
             config.tickDelay = Math.max(1, channelTag.getInt(KEY_DELAY));
 
-            String ioStr = channelTag.getString(KEY_IO);
-            if ("all".equals(ioStr)) {
-                config.ioDirection = null;
-            } else {
-                Direction direction = Direction.byName(ioStr);
-                config.ioDirection = direction == null ? Direction.UP : direction;
-            }
-            config.redstoneMode = parseEnum(channelTag.getString(KEY_REDSTONE), RedstoneMode.values(),
-                    RedstoneMode.ALWAYS_ON);
+            config.ioDirection = IoSide.byKey(channelTag.getString(KEY_IO));
+            String redstone = channelTag.getString(KEY_REDSTONE);
+            config.redstoneMode = RedstoneMode.fromSerialized(redstone);
+            if (RedstoneMode.disablesChannel(redstone))
+                config.enabled = false;
             config.distributionMode = parseEnum(channelTag.getString(KEY_DISTRIBUTION), DistributionMode.values(),
                     DistributionMode.PRIORITY);
             config.filterMode = parseEnum(channelTag.getString(KEY_FILTER_MODE), FilterMode.values(),
                     FilterMode.MATCH_ANY);
             config.priority = Math.max(-99, Math.min(99, channelTag.getInt(KEY_PRIORITY)));
             config.name = channelTag.contains("Name") ? channelTag.getString("Name") : "";
+            config.resourceRoundRobin = channelTag.getBoolean(KEY_RESOURCE_ROUND_ROBIN);
             channels[index] = config;
         }
 
@@ -640,59 +850,140 @@ public final class NodeClipboardConfig {
         if (root.contains(KEY_NODE_LABEL, Tag.TAG_STRING)) {
             config.nodeLabel = root.getString(KEY_NODE_LABEL);
         }
+        config.sanitizeText();
+        config.sanitizeCards();
         return config.isStructurallyValid() ? config : null;
     }
 
-    public PasteResult applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack) {
+    // Legacy clipboards hold one type
+    private static void loadTypes(ChannelConfig config, CompoundTag channelTag) {
+        ChannelType legacy = parseEnum(channelTag.getString(KEY_TYPE), ChannelType.values(), ChannelType.ITEM);
+        config.types = channelTag.contains(KEY_TYPES, Tag.TAG_LIST)
+                ? ChannelData.typeMask(channelTag.getList(KEY_TYPES, Tag.TAG_STRING)) : legacy.bit();
+        if (channelTag.contains(KEY_BATCHES, Tag.TAG_COMPOUND)) {
+            CompoundTag batches = channelTag.getCompound(KEY_BATCHES);
+            for (ChannelType type : ChannelType.values())
+                config.batches[type.ordinal()] = Math.max(0, batches.getInt(type.name()));
+        } else {
+            config.batches[legacy.ordinal()] =
+                    Math.max(1, channelTag.contains(KEY_BATCH) ? channelTag.getInt(KEY_BATCH) : 8);
+        }
+        config.recipeSets = Math.max(0, channelTag.getInt(KEY_RECIPE_SETS));
+    }
+
+    private static boolean isOversized(CompoundTag root) {
+        return size(root, KEY_CHANNELS) > LogisticsNodeEntity.CHANNEL_COUNT
+                || size(root, KEY_FILTERS) > LogisticsNodeEntity.CHANNEL_COUNT * LEGACY_FILTER_SLOTS
+                || size(root, KEY_UPGRADES) > LogisticsNodeEntity.UPGRADE_SLOT_COUNT;
+    }
+
+    private static int size(CompoundTag root, String key) {
+        return root.get(key) instanceof CollectionTag<?> list ? list.size() : 0;
+    }
+
+    private void sanitizeCards() {
+        for (ItemStack[] slots : filterItems) {
+            for (ItemStack filter : slots) {
+                FilterItemData.restampRecipeCards(filter);
+            }
+        }
+    }
+
+    private void sanitizeText() {
+        setNetworkTarget(networkId, networkName);
+        setNodeLabel(nodeLabel);
+        for (int channel = 0; channel < channels.length; channel++) {
+            setChannelName(channel, channels[channel].name);
+        }
+    }
+
+    public PasteOutcome applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack) {
         return applyToNode(player, node, protectedStack, null);
     }
 
-    public PasteResult applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack,
-                                   @Nullable GlobalPos ae2Link) {
-        if (player == null || node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT) {
-            return PasteResult.CLIPBOARD_INVALID;
+    public PasteOutcome applyToNode(ServerPlayer player, LogisticsNodeEntity node, ItemStack protectedStack,
+                                   @Nullable StorageLink storageLink) {
+        if (player == null || node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT
+                || player.hasDisconnected() || !player.isAlive()) {
+            return new PasteOutcome(PasteResult.CLIPBOARD_INVALID);
         }
 
         if (!isStructurallyValid()) {
-            return PasteResult.CLIPBOARD_INVALID;
+            return new PasteOutcome(PasteResult.CLIPBOARD_INVALID);
         }
 
-        if (!hasCompatibleStructure(node)) {
-            return PasteResult.INCOMPATIBLE_TARGET;
+        if (!hasCompatibleStructure(node) || !canAccessTargetNetwork(player, node)) {
+            return new PasteOutcome(PasteResult.INCOMPATIBLE_TARGET);
         }
 
         Inventory inventory = player.getInventory();
         int protectedSlot = findProtectedSlot(inventory, protectedStack);
-        List<Requirement> requirements = buildRequirements(node);
+        List<Requirement> requirements = player.getAbilities().instabuild ? new ArrayList<>() : buildUpgradeRequirements(node);
         List<ItemStack> returnedItems = collectReturnedItems(node);
 
-        ServerLevel level = player.level() instanceof ServerLevel sl ? sl : null;
-        for (Requirement requirement : requirements) {
-            if (!AE2Compat.hasCombinedStock(inventory, requirement.stack(), requirement.count(),
-                    protectedSlot, ae2Link, level, requirement.looseMatch())) {
-                return PasteResult.MISSING_ITEMS;
-            }
+        StorageAccess access = storageLink == null ? null : LinkedStorage.resolve(player.serverLevel(), storageLink);
+        if (access != null && !access.allows(player, StorageAction.EXTRACT)) access = null;
+        List<RequiredItem> missingItems = findMissing(inventory, requirements, protectedSlot, access);
+        if (!missingItems.isEmpty()) {
+            return new PasteOutcome(PasteResult.MISSING_ITEMS, missingItems);
         }
-        if (!canFitReturnedItemsAfterConsumption(inventory, requirements, returnedItems, protectedSlot)) {
-            return PasteResult.INVENTORY_FULL;
-        }
-
-        for (Requirement requirement : requirements) {
-            AE2Compat.consumeCombined(inventory, requirement.stack(), requirement.count(),
-                    protectedSlot, ae2Link, player, requirement.looseMatch());
+        PasteOutcome shortfall = reserveRequirements(player, requirements, protectedSlot, access);
+        if (shortfall != null) {
+            return shortfall;
         }
         applyToNode(node);
-        applyNetworkToNode(node);
+        applyNetworkToNode(node, player);
         List<ItemStack> leftovers = returnItemsToInventory(inventory, returnedItems, protectedSlot);
         for (ItemStack leftover : leftovers) {
             player.drop(leftover, false);
         }
         inventory.setChanged();
+        syncPastedLabel(player, List.of(node), storageLink);
 
-        return PasteResult.SUCCESS;
+        return new PasteOutcome(PasteResult.SUCCESS);
     }
 
-    public PasteResult applyToNodeWithoutInventory(LogisticsNodeEntity node) {
+    private static List<RequiredItem> findMissing(Inventory inventory, List<Requirement> requirements,
+            int protectedSlot, @Nullable StorageAccess access) {
+        List<RequiredItem> missingItems = new ArrayList<>();
+        for (Requirement requirement : requirements) {
+            long available = StorageInventory.count(inventory, requirement.stack(), protectedSlot);
+            if (access != null && available < requirement.count())
+                available += access.count(requirement.stack());
+            long missing = requirement.count() - available;
+            if (missing > 0)
+                missingItems.add(new RequiredItem(ItemStackCompat.copyWithCount(requirement.stack(), 1), (int) missing));
+        }
+        return missingItems;
+    }
+
+    // Undo on any shortfall
+    @Nullable
+    private static PasteOutcome reserveRequirements(ServerPlayer player, List<Requirement> requirements,
+            int protectedSlot, @Nullable StorageAccess access) {
+        List<ItemStack> inventoryReserved = new ArrayList<>();
+        List<ItemStack> storageReserved = new ArrayList<>();
+        for (Requirement requirement : requirements) {
+            List<ItemStack> fromInventory = StorageInventory.reserve(
+                    player.getInventory(), requirement.stack(), requirement.count(), protectedSlot);
+            inventoryReserved.addAll(fromInventory);
+            int remaining = requirement.count() - StorageInventory.count(fromInventory);
+            List<ItemStack> fromStorage = access == null ? List.of()
+                    : access.extract(requirement.stack(), remaining, player);
+            storageReserved.addAll(fromStorage);
+            int extracted = StorageInventory.count(fromStorage);
+            if (extracted != remaining) {
+                StorageInventory.returnToPlayer(player, inventoryReserved);
+                if (access == null) StorageInventory.returnToPlayer(player, storageReserved);
+                else StorageInventory.returnToStorageOrPlayer(access, player, storageReserved);
+                return new PasteOutcome(PasteResult.MISSING_ITEMS, List.of(new RequiredItem(
+                        requirement.stack().copyWithCount(1), Math.max(1, remaining - extracted))));
+            }
+        }
+        return null;
+    }
+
+    public PasteResult applyToNodeWithoutInventory(ServerPlayer player, LogisticsNodeEntity node) {
         if (node == null || channels.length != LogisticsNodeEntity.CHANNEL_COUNT) {
             return PasteResult.CLIPBOARD_INVALID;
         }
@@ -701,13 +992,30 @@ public final class NodeClipboardConfig {
             return PasteResult.CLIPBOARD_INVALID;
         }
 
-        if (!hasCompatibleStructure(node)) {
+        if (!hasCompatibleStructure(node) || !canAccessTargetNetwork(player, node)) {
             return PasteResult.INCOMPATIBLE_TARGET;
         }
 
         applyToNode(node);
-        applyNetworkToNode(node);
+        applyNetworkToNode(node, player);
         return PasteResult.SUCCESS;
+    }
+
+    public static void syncPastedLabel(ServerPlayer player, List<LogisticsNodeEntity> nodes,
+                                       @Nullable StorageLink storageLink) {
+        LogisticsNodeEntity first = nodes.get(0);
+        String label = first.getNodeLabel();
+        if (label.isEmpty() || first.getNetworkId() == null) return;
+        LogisticsNetwork network = NetworkRegistry.get(player.serverLevel()).getNetwork(first.getNetworkId());
+        if (network == null) return;
+        nodes.forEach(node -> node.setLabelRevision(0));
+        LabelUpgradeSync.synchronizeLabels(player, network, nodes, first.getUUID(), label, storageLink);
+    }
+
+    private boolean canAccessTargetNetwork(ServerPlayer player, LogisticsNodeEntity node) {
+        if (networkId == null || !(node.level() instanceof ServerLevel serverLevel)) return true;
+        LogisticsNetwork network = NetworkRegistry.get(serverLevel).getNetwork(networkId);
+        return network == null || NodeAccessPolicy.canAccess(network.getOwnerUuid(), player);
     }
 
     private boolean hasCompatibleStructure(LogisticsNodeEntity node) {
@@ -730,20 +1038,6 @@ public final class NodeClipboardConfig {
             }
         }
 
-        for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
-            ChannelData channelData = node.getChannel(channel);
-            if (channelData == null) {
-                continue;
-            }
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack expected = filterItems[channel][slot];
-                ItemStack current = channelData.getFilterItem(slot);
-                if (shouldReturnReplacedItem(expected, current)) {
-                    returnedItems.add(current.copy());
-                }
-            }
-        }
-
         return returnedItems;
     }
 
@@ -758,7 +1052,7 @@ public final class NodeClipboardConfig {
         return !ItemStack.isSameItem(expected, current);
     }
 
-    private void applyNetworkToNode(LogisticsNodeEntity node) {
+    private void applyNetworkToNode(LogisticsNodeEntity node, ServerPlayer player) {
         if (!(node.level() instanceof ServerLevel serverLevel)) {
             return;
         }
@@ -775,54 +1069,79 @@ public final class NodeClipboardConfig {
             return;
         }
 
-        LogisticsNetwork targetNetwork = resolveTargetNetwork(registry, node.getOwnerUUID());
-        if (targetNetwork == null) {
-            return;
+        LogisticsNetwork targetNetwork = resolveTargetNetwork(registry, node.getOwnerUUID(), player);
+        if (targetNetwork != null) {
+            joinNetwork(node, registry, targetNetwork);
         }
+    }
 
-        UUID targetNetworkId = targetNetwork.getId();
-        if (currentNetworkId != null && !currentNetworkId.equals(targetNetworkId)) {
+    public static void joinNetwork(LogisticsNodeEntity node, NetworkRegistry registry, LogisticsNetwork network) {
+        UUID currentNetworkId = node.getNetworkId();
+        if (currentNetworkId != null && !currentNetworkId.equals(network.getId())) {
             registry.removeNodeFromNetwork(currentNetworkId, node.getUUID());
         }
 
-        node.setNetworkId(targetNetworkId);
-        node.setNetworkName(targetNetwork.getName());
-        registry.addNodeToNetwork(targetNetworkId, node.getUUID());
+        node.setNetworkId(network.getId());
+        node.setNetworkName(network.getName());
+        node.setNetworkColor(network.getColor());
+        registry.addNodeToNetwork(network.getId(), node.getUUID());
 
         for (int i = 0; i < LogisticsNodeEntity.CHANNEL_COUNT; i++) {
             ChannelData ch = node.getChannel(i);
-            if (ch != null) {
-                ch.setName(targetNetwork.getChannelName(i));
-            }
+            ch.setName(network.getChannelName(i));
+            ServerPayloadHandler.sendChannelSyncToViewers(node, i, ch);
         }
     }
 
     @Nullable
-    private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry, UUID ownerUuid) {
+    public UUID resolveNetworkId(ServerPlayer player) {
+        if (networkId == null && (networkName == null || networkName.isBlank())) return null;
+        LogisticsNetwork network = resolveTargetNetwork(NetworkRegistry.get(player.serverLevel()), player.getUUID(),
+                player);
+        return network == null ? null : network.getId();
+    }
+
+    @Nullable
+    private LogisticsNetwork resolveTargetNetwork(NetworkRegistry registry, UUID ownerUuid, ServerPlayer player) {
         if (networkId != null) {
             LogisticsNetwork byId = registry.getNetwork(networkId);
-            if (byId != null) {
+            if (byId != null && NodeAccessPolicy.canAccess(byId.getOwnerUuid(), player)) {
                 return byId;
             }
         }
 
         if (networkName != null && !networkName.isBlank()) {
-            for (LogisticsNetwork candidate : registry.getAllNetworks().values()) {
-                if (networkName.equals(candidate.getName())) {
-                    return candidate;
-                }
-            }
-            return registry.createNetwork(networkName, ownerUuid);
+            LogisticsNetwork created = registry.createNetwork(networkName, ownerUuid);
+            networkId = created.getId();
+            networkName = created.getName();
+            seedChannelNames(created);
+            return created;
         }
 
         if (networkId != null) {
-            return registry.createNetwork("Network-" + networkId.toString().substring(0, 6), ownerUuid);
+            LogisticsNetwork created = registry.createNetwork("Network-" + networkId.toString().substring(0, 6), ownerUuid);
+            networkId = created.getId();
+            networkName = created.getName();
+            seedChannelNames(created);
+            return created;
         }
 
         return null;
     }
 
-    private List<Requirement> buildRequirements(LogisticsNodeEntity node) {
+    private void seedChannelNames(LogisticsNetwork network) {
+        for (int channel = 0; channel < channels.length; channel++) {
+            network.setChannelName(channel, channels[channel].name);
+        }
+    }
+
+    private static String trim(@Nullable String value, int maxLength) {
+        if (value == null) return "";
+        String trimmed = value.trim();
+        return trimmed.length() <= maxLength ? trimmed : trimmed.substring(0, maxLength);
+    }
+
+    private List<Requirement> buildUpgradeRequirements(LogisticsNodeEntity node) {
         List<Requirement> requirements = new ArrayList<>();
 
         for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
@@ -837,35 +1156,18 @@ public final class NodeClipboardConfig {
             addRequirement(requirements, required);
         }
 
-        for (int channel = 0; channel < LogisticsNodeEntity.CHANNEL_COUNT; channel++) {
-            ChannelData channelData = node == null ? null : node.getChannel(channel);
-            for (int slot = 0; slot < ChannelData.FILTER_SIZE; slot++) {
-                ItemStack required = filterItems[channel][slot];
-                if (required.isEmpty()) {
-                    continue;
-                }
-
-                if (channelData != null
-                        && ItemStack.isSameItem(required, channelData.getFilterItem(slot))) {
-                    continue;
-                }
-                addRequirement(requirements, required);
-            }
-        }
-
         return requirements;
     }
 
     private static void addRequirement(List<Requirement> requirements, ItemStack stack) {
-        boolean loose = stack.is(ModTags.FILTERS);
         for (int i = 0; i < requirements.size(); i++) {
             Requirement requirement = requirements.get(i);
-            if (requirement.looseMatch() == loose && ItemStack.isSameItem(requirement.stack(), stack)) {
-                requirements.set(i, new Requirement(requirement.stack(), requirement.count() + 1, loose));
+            if (ItemStack.isSameItem(requirement.stack(), stack)) {
+                requirements.set(i, new Requirement(requirement.stack(), requirement.count() + 1));
                 return;
             }
         }
-        requirements.add(new Requirement(ItemStackCompat.copyWithCount(stack, 1), 1, loose));
+        requirements.add(new Requirement(ItemStackCompat.copyWithCount(stack, 1), 1));
     }
 
     private static int findProtectedSlot(Inventory inventory, ItemStack protectedStack) {
@@ -877,94 +1179,6 @@ public final class NodeClipboardConfig {
         return -1;
     }
 
-
-
-    private static boolean canFitReturnedItemsAfterConsumption(Inventory inventory, List<Requirement> requirements,
-            List<ItemStack> returnedItems, int protectedSlot) {
-        ItemStack[] snapshot = copyInventorySlots(inventory);
-        if (!consumeRequirementsFromSnapshot(snapshot, requirements, protectedSlot)) {
-            return false;
-        }
-        return insertStacksIntoSnapshot(snapshot, returnedItems, protectedSlot);
-    }
-
-    private static ItemStack[] copyInventorySlots(Inventory inventory) {
-        ItemStack[] snapshot = new ItemStack[inventory.getContainerSize()];
-        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            snapshot[slot] = inventory.getItem(slot).copy();
-        }
-        return snapshot;
-    }
-
-    private static boolean consumeRequirementsFromSnapshot(ItemStack[] slots, List<Requirement> requirements,
-            int protectedSlot) {
-        for (Requirement requirement : requirements) {
-            int remaining = requirement.count();
-            for (int slot = 0; slot < slots.length && remaining > 0; slot++) {
-                if (slot == protectedSlot) {
-                    continue;
-                }
-                ItemStack stack = slots[slot];
-                if (stack.isEmpty() || !ItemStack.isSameItem(stack, requirement.stack())) {
-                    continue;
-                }
-                int consumed = Math.min(remaining, stack.getCount());
-                stack.shrink(consumed);
-                remaining -= consumed;
-            }
-            if (remaining > 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean insertStacksIntoSnapshot(ItemStack[] slots, List<ItemStack> stacks, int protectedSlot) {
-        for (ItemStack stack : stacks) {
-            if (stack.isEmpty()) {
-                continue;
-            }
-            ItemStack remaining = stack.copy();
-            if (!tryInsertIntoSnapshot(slots, remaining, protectedSlot)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean tryInsertIntoSnapshot(ItemStack[] slots, ItemStack remaining, int protectedSlot) {
-        for (int slot = 0; slot < slots.length && !remaining.isEmpty(); slot++) {
-            if (slot == protectedSlot) {
-                continue;
-            }
-            ItemStack current = slots[slot];
-            if (current.isEmpty() || !ItemStackCompat.isSameItemSameComponents(current, remaining)) {
-                continue;
-            }
-            int max = Math.min(current.getMaxStackSize(), remaining.getMaxStackSize());
-            int room = max - current.getCount();
-            if (room <= 0) {
-                continue;
-            }
-            int move = Math.min(room, remaining.getCount());
-            current.grow(move);
-            remaining.shrink(move);
-        }
-
-        for (int slot = 0; slot < slots.length && !remaining.isEmpty(); slot++) {
-            if (slot == protectedSlot) {
-                continue;
-            }
-            if (!slots[slot].isEmpty()) {
-                continue;
-            }
-            int move = Math.min(remaining.getCount(), remaining.getMaxStackSize());
-            slots[slot] = ItemStackCompat.copyWithCount(remaining, move);
-            remaining.shrink(move);
-        }
-
-        return remaining.isEmpty();
-    }
 
     private static List<ItemStack> returnItemsToInventory(Inventory inventory, List<ItemStack> returnedItems,
             int protectedSlot) {
@@ -1015,7 +1229,18 @@ public final class NodeClipboardConfig {
         }
     }
 
-    private void applyToNode(LogisticsNodeEntity node) {
+    public void applyToNode(LogisticsNodeEntity node) {
+        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
+            ItemStack expected = upgradeItems[slot];
+            ItemStack current = node.getUpgradeItem(slot);
+
+            if (expected.isEmpty()) {
+                node.setUpgradeItem(slot, ItemStack.EMPTY);
+            } else if (!ItemStack.isSameItem(expected, current)) {
+                node.setUpgradeItem(slot, new ItemStack(expected.getItem()));
+            }
+        }
+
         for (int channelIndex = 0; channelIndex < LogisticsNodeEntity.CHANNEL_COUNT; channelIndex++) {
             ChannelData channel = node.getChannel(channelIndex);
             ChannelConfig config = channels[channelIndex];
@@ -1025,13 +1250,18 @@ public final class NodeClipboardConfig {
 
             channel.setEnabled(config.enabled);
             channel.setMode(config.mode);
-            channel.setType(config.type);
-            channel.setBatchSize(config.batchSize);
+            channel.setTypes(config.types);
+            for (ChannelType type : ChannelType.values()) {
+                channel.setBatch(type, config.batches[type.ordinal()]);
+            }
+            channel.setRecipeSets(config.recipeSets);
             channel.setTickDelay(config.tickDelay);
-            channel.setIoDirection(config.ioDirection);
+            channel.setIoSide(config.ioDirection);
             channel.setRedstoneMode(config.redstoneMode);
             channel.setDistributionMode(config.distributionMode);
             channel.setFilterMode(config.filterMode);
+            channel.setResourceRoundRobin(config.resourceRoundRobin);
+            channel.resetResourceRotation();
             channel.setPriority(config.priority);
             channel.setName(config.name);
 
@@ -1047,30 +1277,29 @@ public final class NodeClipboardConfig {
             }
         }
 
-        for (int slot = 0; slot < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; slot++) {
-            ItemStack expected = upgradeItems[slot];
-            ItemStack current = node.getUpgradeItem(slot);
-
-            if (expected.isEmpty()) {
-                node.setUpgradeItem(slot, ItemStack.EMPTY);
-            } else if (!ItemStackCompat.isSameItemSameComponents(expected, current)) {
-                node.setUpgradeItem(slot, ItemStackCompat.copyWithCount(expected, 1));
-            }
-        }
-
         node.setRenderVisible(renderVisible);
         node.setNodeLabel(nodeLabel);
+    }
+
+    private static boolean isDefaultTypes(ChannelConfig config, ChannelConfig defaults) {
+        if (config.recipeSets != 0) {
+            return false;
+        }
+        if (config.types == defaults.types && Arrays.equals(config.batches, defaults.batches)) {
+            return true;
+        }
+        int[] legacy = new int[config.batches.length];
+        legacy[0] = 8;
+        return config.types == ChannelType.ITEM.bit() && Arrays.equals(config.batches, legacy);
     }
 
     private static ChannelConfig defaultChannelConfig() {
         ChannelConfig config = new ChannelConfig();
         config.enabled = false;
         config.mode = ChannelMode.IMPORT;
-        config.type = ChannelType.ITEM;
-        config.batchSize = 8;
         config.tickDelay = 20;
-        config.ioDirection = Direction.UP;
-        config.redstoneMode = RedstoneMode.ALWAYS_ON;
+        config.ioDirection = IoSide.UP;
+        config.redstoneMode = RedstoneMode.IGNORED;
         config.distributionMode = DistributionMode.PRIORITY;
         config.filterMode = FilterMode.MATCH_ANY;
         config.priority = 0;

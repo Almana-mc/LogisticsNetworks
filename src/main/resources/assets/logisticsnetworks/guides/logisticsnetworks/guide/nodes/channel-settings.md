@@ -7,13 +7,11 @@ navigation:
 
 # Channel Settings
 
-![Full channel settings panel — Status, Mode, Type, Side, Redstone, Distribution, Priority, Batch, Delay](images/channel-settings-full.png)
-
 This panel controls the channel you have currently selected in the [Header](header.md). Every node has 9 channels and each one has its own independent copy of all the settings below — changing a setting here only affects the one channel you are looking at.
 
-**Alt + Left/Right Click to set maximum or minimum amount for settings.**
+Hold **Modifier Key 3 (default: Alt)** and use **Primary Interaction (default: Left Click)** to set a setting to its maximum value, or **Secondary Interaction (default: Right Click)** to set it to its minimum value.
 
-Click the channel number buttons at the top of the screen to switch which channel these settings apply to.
+Use Primary Interaction on the channel number buttons at the top of the screen to switch which channel these settings apply to.
 
 ## Status
 
@@ -28,7 +26,7 @@ Click the channel number buttons at the top of the screen to switch which channe
 - **Enabled** — the channel is live. It gets processed every tick (subject to Delay, Redstone, and so on).
 - **Disabled** — the channel is completely skipped by the transfer engine. No extraction, no insertion, no redstone check. Nothing.
 
-**How to change it:** left-click the value pill to toggle between Enabled and Disabled.
+**How to change it:** use Primary Interaction on the value pill to toggle between Enabled and Disabled.
 
 **Gotcha:** a disabled channel keeps all its other settings (filters, batch, delay, etc.). You are not deleting anything — you are just pausing it. Re-enable to pick up right where you left off.
 
@@ -45,31 +43,27 @@ Click the channel number buttons at the top of the screen to switch which channe
 - **Sender** — pulls resources **out of** the block this node is attached to. Senders are the ones that drive transfers: they look for matching Receivers on the same channel number across the network and push resources to them.
 - **Receiver** — accepts resources **into** the block this node is attached to. Receivers are passive — they wait for a Sender on the same channel number to deliver.
 
-**How to change it:** left-click the value pill to flip between Sender and Receiver.
+**How to change it:** use Primary Interaction on the value pill to flip between Sender and Receiver.
 
 **Gotcha:** a network with only Receivers (or only Senders) does nothing. You need at least one of each on the same channel number for anything to move.
 
-## Type
+## Resources
 
-![Type: Item](images/channel-type-item.png)
+**What it is:** the kinds of resource this channel moves: Item, Fluid, Energy, Chemical and Source.
 
-![Type: Fluid](images/channel-type-fluid.png)
+**What it does:** a channel moves every kind that is switched on. A new channel starts with all of them on, so one channel can carry items, fluids and power at the same time. Receivers only accept the kinds they have switched on too.
 
-![Type: Energy](images/channel-type-energy.png)
+**How to change it:** click the Resources row to open its popover. Each line has a checkbox to switch that kind on or off, and (on a Sender) its own Batch amount. **All** and **None** set every kind at once.
 
-**What it is:** the kind of resource this channel moves.
+**Gotcha:** Chemical needs the Mekanism Chemical Upgrade and Source needs the Ars Source Upgrade. Without the upgrade the line shows why it is locked. A locked kind can still be ticked; it starts moving as soon as the upgrade is installed. Nodes on Create contraptions only move items and fluids.
 
-**What it does:** tells the engine which capability to look for on the attached block:
+### AE2 Interfaces
 
-- **Item** — stacks of items from an inventory (chests, furnaces, hoppers, AE2 interfaces, etc.).
-- **Fluid** — millibuckets (mB) from a tank.
-- **Energy** — Forge Energy / RF from an energy buffer.
+Nodes with a [Network Upgrade](upgrades-special.md) on Applied Energistics 2 Interfaces transfer items, fluids and chemicals directly through the connected storage network (chemicals need Applied Mekanistics on AE2). Without the upgrade, the Interface is treated like any other inventory: the node only sees the items and tanks stocked in the Interface itself. The Interface's configured export resources decide what a Sender may pull, including its native fuzzy setting, but the configured quantity does not limit the Logistics batch. Receivers may insert any resource accepted by their Logistics channel filters.
 
-**How to change it:** left-click the value pill to cycle through the available types.
+For item Senders, the direct path pulls from the storage network first, then uses items stocked in that Interface to fill any remaining batch. Buffer-only items stay available to later transfers, allowing the Interface to empty. Direct fluid and chemical transfers still ignore exposed tanks. Adding an explicit Logistics slot mapping switches that item channel back to the exposed Interface inventory. A disconnected or inactive storage network waits without using the Interface buffer, and direct transfers never request autocrafting.
 
-**Gotcha:** not every block supports every type. If the block has no matching capability on the chosen side, the channel will silently do nothing. Put an item node on a fluid tank and it won't transfer — because the tank has no item inventory.
-
-Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but require specific upgrades to unlock. They are covered on the Upgrades page.
+Stock amounts on these nodes only check what is stocked in the Interface itself, never the whole storage network. A Sender only moves a resource with a Stock amount while the Interface holds more than that amount, so set the resource in the Interface config. A Receiver stops once the Interface holds the Stock amount, so a resource the Interface does not hold is never capped.
 
 ## Side
 
@@ -84,15 +78,11 @@ Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but r
 - **Up / Down / North / East / South / West** — only that one face. The engine probes the block's inventory (or tank, or energy buffer) on that specific side and uses whatever slots the block exposes there.
 - **All** — every face of the block is merged into one combined handler. The channel sees the block as a single pool of slots/tanks/buffers made up of every side's exposed storage. If two faces expose the exact same handler (common — most blocks expose one inventory on every side), the duplicate is removed so you do not double-count.
 
-**How to change it:** left-click to cycle to the next face (order goes Up → Down → N → E → S → W → All → Up ...).
+**How to change it:** use Primary Interaction to cycle to the next face (order goes Up → Down → N → E → S → W → All → Up ...).
 
 **Gotcha:** on blocks with side-aware inventories (furnaces, brewing stands, some machines), each face exposes a *different* set of slots. Picking **All** on a furnace lets the channel see the input, fuel, and output slots all at once, which is usually not what you want. Pick the specific face so filters only apply to the slots you care about.
 
 ## Redstone
-
-![Redstone: Always On](images/channel-redstone-always-on.png)
-
-![Redstone: Always Off](images/channel-redstone-always-off.png)
 
 ![Redstone: High Signal](images/channel-redstone-high-signal.png)
 
@@ -102,14 +92,13 @@ Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but r
 
 **What it does:** the engine checks the redstone signal **at the block this node is attached to** (from any neighbor — lever, redstone torch, dust, comparator, whatever). Based on that signal, the channel either runs or is blocked:
 
-- **Always On** — run regardless of signal.
-- **Always Off** — never run. Same effect as Status = Disabled, but you keep the channel armed.
+- **Ignored** (default) — run regardless of redstone. The signal is not checked at all.
 - **High Signal** — run only when a redstone signal is present (strength > 0).
 - **Low Signal** — run only when there is no redstone signal (strength = 0).
 
-**How to change it:** left-click to cycle to the next mode.
+**How to change it:** use Primary Interaction to cycle to the next mode.
 
-**Disabled on Receivers:** this row is greyed out when Mode is Receiver. Redstone gating only applies on the Sender side (since Senders drive the transfer).
+Redstone gating applies to both Senders and Receivers.
 
 ## Distribution
 
@@ -119,7 +108,7 @@ Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but r
 
 ![Distribution: Farthest First](images/channel-distribution-farthest-first.png)
 
-![Distribution: Round Robin](images/channel-distribution-round-robin.png)
+![Distribution: Equal Distribution](images/channel-distribution-round-robin.png)
 
 **What it is:** how a Sender picks between multiple matching Receivers on the same channel number.
 
@@ -128,11 +117,14 @@ Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but r
 - **Priority** — sort by each Receiver's **Priority** value. Higher numbers are served first. Ties are broken in no particular order.
 - **Nearest First** — serve the Receivers closest to the Sender first (by straight-line distance).
 - **Farthest First** — opposite of Nearest First: serve the furthest Receiver first.
-- **Round Robin** — rotate through Receivers evenly. Each successful transfer advances the rotation pointer to the next Receiver.
+- **Equal Distribution** — split what the Sender has available, up to the batch, as evenly as possible across matching Receivers. 10 items over 10 Receivers gives 1 each, 20 gives 2 each.
+- **Priority Robin** — each operation goes to one Receiver, then the next. Receivers are visited from highest to lowest **Priority**, then the cycle repeats. A full Receiver is skipped.
 
-**How to change it:** left-click to cycle to the next mode.
+**How to change it:** use Primary Interaction to cycle to the next mode.
 
-**Gotcha:** Round Robin's rotation pointer **persists across ticks**. It does not reset between game ticks — it just keeps advancing. This gives you a genuinely fair rotation across long runtimes, not a re-started loop every tick.
+**Gotcha:** Equal Distribution does not keep a rotation pointer. Leftovers that don't divide evenly go one at a time to the first Receivers in **Priority** order, and a full Receiver's share flows to Receivers with space. Each item, fluid or chemical type is split on its own among the Receivers that accept it, in the order the Sender holds them, until the batch is used up. Amounts an export filter keeps in the Sender are left out of the split. It works on every channel type.
+
+**Gotcha:** Priority Robin's position resets to the highest-priority Receiver when the world or the Sender's chunk reloads. If the chosen Receiver accepts only part of a batch, the rest waits for the next operation. It works on every channel type.
 
 **Disabled on Receivers:** this row is greyed out when Mode is Receiver. Distribution only makes sense on the Sender side.
 
@@ -142,11 +134,11 @@ Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but r
 
 **What it is:** a small integer attached to this channel. Range: **–99 to +99**.
 
-**What it does:** used by a Sender that has Distribution set to **Priority**. The Sender sorts its target Receivers by this number, highest first, and serves them in that order. Receivers with higher priority get resources before lower-priority ones.
+**What it does:** the Sender sorts its target Receivers by this number, highest first. Under **Priority**, higher-priority Receivers get resources before lower-priority ones. Under **Priority Robin**, it sets the order Receivers take turns in.
 
-**How to change it:** left-click the number field to open a text box, type a number between –99 and 99, and press Enter.
+**How to change it:** use Primary Interaction on the number field to open a text box, type a number between –99 and 99, and press Enter.
 
-**Gotcha:** Priority is only consulted when Distribution = Priority. Under Nearest/Farthest/Round Robin it is ignored — the sorter never reads it. Set Priority on the **Receivers** you want served first, not on the Sender.
+**Gotcha:** Priority sets the serving order under Priority and Priority Robin, and picks who gets the leftovers under Equal Distribution. Under Nearest/Farthest it is ignored — the sorter never reads it. Set Priority on the **Receivers** you want served first, not on the Sender.
 
 ## Batch
 
@@ -154,15 +146,11 @@ Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but r
 
 **What it is:** the maximum amount of resource moved in one transfer operation.
 
-**What it does:** caps a single transfer attempt. Units depend on Type:
+**What it does:** caps a single transfer attempt, separately for each kind. Units depend on the kind: items for Item, mB for Fluid and Chemical, Source for Source. Energy always moves as much as the upgrades allow.
 
-- **Item** — number of items (e.g. Batch 64 = up to one full stack per operation).
-- **Fluid** — millibuckets (e.g. Batch 1000 = up to 1 bucket per operation).
-- **Energy** — Forge Energy / RF per operation.
+**How to change it:** click the Batch row (or the Resources row) to open the popover, then click a kind's amount. Left click adds 1, right click removes 1, **Modifier Key 1 (default: Shift)** steps by 8, **Modifier Key 3 (default: Alt)** jumps to Max or 1, and a double-click lets you type a value. The box also takes simple math with `+ - * /` and parentheses, so `64*7` saves as 448. **Max** follows your upgrade tier.
 
-**How to change it:** left-click the number field to open a text box, type the new value, and press Enter. Minimum is 1.
-
-**Gotcha:** Batch is capped by the upgrades installed on the node. You can type 10,000 but if your upgrade tier only allows 500, the engine uses 500. Install higher-tier upgrades to raise the ceiling — see [Performance Upgrades](upgrades-performance.md).
+**Gotcha:** Batch is capped by the upgrades installed on the node. A value above the cap is treated as Max. Install higher-tier upgrades to raise the ceiling — see [Performance Upgrades](upgrades-performance.md).
 
 **Disabled on Receivers:** this row is greyed out when Mode is Receiver. Batch size is decided by the Sender.
 
@@ -174,9 +162,9 @@ Two extra types — Chemical (Mekanism) and Source (Ars Nouveau) — exist but r
 
 **What it does:** after a successful transfer the channel waits this many ticks before trying again. Used to throttle channels so they do not spam-transfer every tick when you do not need them to.
 
-**How to change it:** left-click the number field to open a text box, type the new value, and press Enter. Minimum is 1 tick.
+**How to change it:** use Primary Interaction on the number field to open a text box, type the new value, and press Enter. Minimum is 1 tick.
 
-**Gotcha:** Energy channels **ignore Delay**. The engine forces Energy transfers to 1-tick (instant) regardless of what you put here. The Delay row is greyed out on Energy-type channels for that reason.
+**Gotcha:** Energy **ignores Delay** and always moves every tick. Delay applies to the other kinds, and each kind waits on its own, so a stalled fluid side never slows items down. The Delay row is greyed out on channels that only carry Energy.
 
 **Gotcha (upgrades):** Delay is also clamped by your upgrade tier's minimum delay. You can type 1, but if your upgrades only allow 10, the engine uses 10. Better upgrades mean a lower floor.
 

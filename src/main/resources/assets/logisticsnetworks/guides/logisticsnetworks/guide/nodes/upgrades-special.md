@@ -1,5 +1,5 @@
 ---
-item_ids: [logisticsnetworks:dimensional_upgrade, logisticsnetworks:mekanism_chemical_upgrade, logisticsnetworks:ars_source_upgrade]
+item_ids: [logisticsnetworks:dimensional_upgrade, logisticsnetworks:mekanism_chemical_upgrade, logisticsnetworks:ars_source_upgrade, logisticsnetworks:network_upgrade]
 navigation:
   title: Special Upgrades
   parent: nodes/index.md
@@ -9,7 +9,7 @@ navigation:
 
 # Special Upgrades
 
-Special upgrades do not change a node's throughput caps. They unlock **new capabilities** — cross-dimension transfers, Mekanism chemicals, Ars Nouveau source. Each one sits in an upgrade slot and can be combined with a [performance upgrade](upgrades-performance.md) on the same node.
+Special upgrades do not change a node's throughput caps. They unlock **new capabilities** — cross-dimension transfers, Mekanism chemicals, Ars Nouveau source, storage network access. Each one sits in an upgrade slot and can be combined with a [performance upgrade](upgrades-performance.md) on the same node.
 
 Upgrade slots are on the [Filters & Upgrades](filters-upgrades.md) panel. Duplicates are rejected, but different upgrades stack fine — a typical high-end node might hold one Netherite + one Dimensional + one Mekanism Chemical + one Ars Source.
 
@@ -25,7 +25,7 @@ Inside the same dimension the upgrade does nothing extra — normal transfers wo
 
 ## Mekanism Chemical Upgrade
 
-**Unlocks the Chemical channel type.** Without this upgrade, the Type setting in [Channel Settings](channel-settings.md) cannot be set to Chemical on the node. Installed, the node can sense and transfer Mekanism chemicals (gases, infuse types, pigments, slurries) through any channel whose Type is set to Chemical.
+**Unlocks the Chemical channel type.** Without this upgrade, Chemical shows as locked in Resources; it can still be ticked and starts moving once the upgrade is installed. Installed, the node can sense and transfer Mekanism chemicals (gases, infuse types, pigments, slurries) through any channel with Chemical switched on.
 
 The upgrade only matters on the node where the channel is configured. A Chemical Sender needs the upgrade; a Chemical Receiver also needs the upgrade on its own node. Nodes that do not move chemicals do not need it.
 
@@ -35,10 +35,20 @@ Requires the **Mekanism** mod to be installed to both craft and use. The recipe 
 
 ## Ars Source Upgrade
 
-**Unlocks the Source channel type.** Same pattern as the Mekanism Chemical Upgrade, but for Ars Nouveau source. Installed, the node can set a channel's Type to Source and move source between Ars Nouveau source jars and any other source-compatible block.
+**Unlocks the Source channel type.** Same pattern as the Mekanism Chemical Upgrade, but for Ars Nouveau source. Without it, Source shows as locked in Resources; it can still be ticked and starts moving once the upgrade is installed. Installed, the node can move source between Ars Nouveau source jars and any other source-compatible block. With Ars Énergistique installed, a node on an ME Source Jar reaches all the source stored in the AE2 network.
 
 Each node that moves source (Sender or Receiver) needs its own Ars Source Upgrade.
 
 Requires the **Ars Nouveau** mod to be installed to both craft and use. The recipe below only appears when Ars Nouveau is loaded.
 
 <RecipeFor id="logisticsnetworks:ars_source_upgrade" fallbackText="Install Ars Nouveau to unlock this recipe." />
+
+## Network Upgrade
+
+**Unlocks direct storage network access.** A node with this upgrade on an Applied Energistics 2 Interface moves items and fluids straight through the whole connected storage network, as described in [Channel Settings](channel-settings.md). Chemicals work the same way with Applied Mekanistics on AE2. With Ars Énergistique installed, the same works for source on an AE2 Interface, but the node only exports source when Source is set in the Interface config. Without the upgrade, the Interface is just another inventory and the node only sees what is stocked in the Interface itself.
+
+Each node on an Interface that should reach the network needs its own Network Upgrade. Nodes on other blocks do not need it.
+
+The recipe only appears when Applied Energistics 2 is loaded. Refined Storage is not supported on Minecraft 1.20.1.
+
+<Recipe id="logisticsnetworks:network_upgrade_ae2" fallbackText="Install Applied Energistics 2 to unlock this recipe." />

@@ -1,6 +1,8 @@
 import net.minecraftforge.gradle.common.util.ModConfig
 import net.minecraftforge.gradle.common.util.RunConfig
 import net.minecraftforge.gradle.userdev.UserDevExtension
+import net.minecraftforge.gradle.userdev.jarjar.JarJarProjectExtension
+import org.spongepowered.asm.gradle.plugins.MixinExtension
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.language.jvm.tasks.ProcessResources
@@ -11,12 +13,14 @@ import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.the
 import org.gradle.kotlin.dsl.withType
+import java.util.Properties
 
 plugins {
     id("eclipse")
     id("idea")
     id("maven-publish")
     id("net.minecraftforge.gradle") version "[6.0.24,6.2)"
+    id("org.spongepowered.mixin") version "0.7.38"
 }
 
 val minecraftVersion = property("minecraft_version") as String
@@ -33,13 +37,23 @@ val modVersion = property("mod_version") as String
 val modGroupId = property("mod_group_id") as String
 val modAuthors = property("mod_authors") as String
 val modDescription = property("mod_description") as String
-val jeiVersion = property("jei_version") as String
-val mekanismVersion = property("mekanism_version") as String
-val arsNouveauVersion = property("ars_nouveau_version") as String
-val jadeVersion = property("jade_version") as String
-val ae2Version = property("ae2_version") as String
-val ftbTeamsVersion = property("ftb_teams_version") as String
-val guidemeVersion = property("guideme_version") as String
+val jeiFileId = property("jei_file_id") as String
+val mekanismFileId = property("mekanism_file_id") as String
+val arsNouveauFileId = property("ars_nouveau_file_id") as String
+val arsengFileId = property("arseng_file_id") as String
+val jadeFileId = property("jade_file_id") as String
+val ae2FileId = property("ae2_file_id") as String
+val ae2RuntimeFileId = property("ae2_runtime_file_id") as String
+val ftbTeamsFileId = property("ftb_teams_file_id") as String
+val emiFileId = property("emi_file_id") as String
+val guidemeFileId = property("guideme_file_id") as String
+val sophisticatedCoreFileId = property("sophisticated_core_file_id") as String
+val functionalStorageFileId = property("functional_storage_file_id") as String
+val createFileId = property("create_file_id") as String
+val buildingGadgetsFileId = property("building_gadgets_file_id") as String
+val appmekFileId = property("appmek_file_id") as String
+val curiosFileId = property("curios_file_id") as String
+val extendedaeFileId = property("extendedae_file_id") as String
 
 version = "${minecraftVersion}-${modVersion}"
 group = modGroupId
@@ -59,11 +73,14 @@ val mainSourceSet = the<SourceSetContainer>().named("main").get()
 extensions.configure<UserDevExtension>("minecraft") {
     mappings(mappingChannelProp, mappingVersionProp)
     copyIdeResources.set(true)
+    accessTransformer(file("src/main/resources/META-INF/accesstransformer.cfg"))
 
     val runsContainer = runs as org.gradle.api.NamedDomainObjectContainer<RunConfig>
     runsContainer.configureEach {
-        workingDirectory(project.file("run"))
+        workingDirectory(project.file("run/1.20.1"))
         property("forge.logging.markers", "REGISTRIES")
+        property("mixin.env.remapRefMap", "true")
+        property("mixin.env.refMapRemappingFile", file("build/createSrgToMcp/output.srg").absolutePath)
         property("forge.logging.console.level", "debug")
 
         val modsContainer = mods as org.gradle.api.NamedDomainObjectContainer<ModConfig>
@@ -74,6 +91,7 @@ extensions.configure<UserDevExtension>("minecraft") {
         property("forge.enabledGameTestNamespaces", modId)
     }
     runsContainer.maybeCreate("server").apply {
+        workingDirectory(project.file("run/1.20.1-server"))
         property("forge.enabledGameTestNamespaces", modId)
         args("--nogui")
     }
@@ -95,36 +113,131 @@ the<SourceSetContainer>().named("main") {
     resources.srcDir("src/generated/resources")
 }
 
+extensions.configure<MixinExtension>("mixin") {
+    add(mainSourceSet, "${modId}.refmap.json")
+    config("${modId}.mixins.json")
+    config("${modId}.buildinggadgets.mixins.json")
+    config("${modId}.create.mixins.json")
+    config("${modId}.functionalstorage.mixins.json")
+}
+
+val jarJar = extensions.getByType<JarJarProjectExtension>()
+jarJar.enable()
+
 repositories {
     mavenLocal()
     mavenCentral()
-    maven(url = uri("https://maven.blamejared.com"))
-    maven(url = uri("https://modmaven.dev/"))
     maven(url = uri("https://api.modrinth.com/maven"))
     maven(url = uri("https://maven.ftb.dev/releases"))
+    maven(url = uri("https://cursemaven.com")) {
+        content { includeGroup("curse.maven") }
+    }
+    maven(url = uri("https://maven.createmod.net"))
+    maven(url = uri("https://maven.tterrag.com"))
 }
 
 val localRuntime: Configuration by configurations.creating
 configurations.runtimeClasspath { extendsFrom(localRuntime) }
+val createJar: Configuration by configurations.creating
+configurations.compileOnly { extendsFrom(createJar) }
+val fg = extensions.getByType<net.minecraftforge.gradle.userdev.DependencyManagementExtension>()
+val testMods = Properties().apply {
+    val file = project.file("run/1.20.1/testmods.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+fun testMod(name: String) = testMods.getProperty(name, "false").toBoolean()
 
 dependencies {
     add("minecraft", "net.minecraftforge:forge:${minecraftVersion}-${forgeVersion}")
 
-    compileOnly("mezz.jei:jei-${minecraftVersion}-common-api:${jeiVersion}")
-    compileOnly("mezz.jei:jei-${minecraftVersion}-forge-api:${jeiVersion}")
-    localRuntime("mezz.jei:jei-${minecraftVersion}-forge:${jeiVersion}")
+    annotationProcessor("org.spongepowered:mixin:0.8.5:processor")
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1")!!)
+    localRuntime("io.github.llamalad7:mixinextras-forge:0.4.1")
+    add("jarJar", "io.github.llamalad7:mixinextras-forge:0.4.1") {
+        jarJar.ranged(this, "[0.4.1,)")
+    }
 
-    compileOnly("mekanism:Mekanism:${mekanismVersion}")
-    compileOnly("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraftVersion}:${arsNouveauVersion}")
-    compileOnly("maven.modrinth:jade:${jadeVersion}")
-    compileOnly("appeng:appliedenergistics2-forge:${ae2Version}")
-    compileOnly("org.appliedenergistics:guideme:${guidemeVersion}:api")
-    localRuntime("org.appliedenergistics:guideme:${guidemeVersion}")
-    compileOnly("dev.ftb.mods:ftb-teams-forge:${ftbTeamsVersion}") { isTransitive = false }
+    compileOnly("curse.maven:jei-238222:${jeiFileId}")
+    localRuntime(fg.deobf("curse.maven:jei-238222:${jeiFileId}"))
+
+    compileOnly("curse.maven:mekanism-268560:${mekanismFileId}")
+    compileOnly("curse.maven:ars-nouveau-401955:${arsNouveauFileId}")
+    compileOnly("curse.maven:jade-324717:${jadeFileId}")
+    compileOnly("curse.maven:applied-energistics-2-223794:${ae2FileId}")
+    compileOnly("curse.maven:guideme-1173950:${guidemeFileId}")
+    localRuntime(fg.deobf("curse.maven:guideme-1173950:${guidemeFileId}"))
+    compileOnly("curse.maven:ftb-teams-404468:${ftbTeamsFileId}")
+    compileOnly("maven.modrinth:oculus:1.20.1-1.8.0") { isTransitive = false }
+    compileOnly("curse.maven:emi-580555:${emiFileId}")
+    compileOnly("maven.modrinth:cc-tweaked:gRtcHJd8") // cc-tweaked-1.20.1-forge 1.120.2
+    compileOnly(fg.deobf("curse.maven:building-gadgets-298187:${buildingGadgetsFileId}"))
+    createJar("curse.maven:create-328085:${createFileId}")
+    // Ponder only ships inside Create
+    compileOnly(files(provider { zipTree(createJar.singleFile).matching { include("META-INF/jarjar/Ponder-*.jar") } }))
+    compileOnly("curse.maven:ars-energistique-905641:${arsengFileId}")
+    compileOnly(fg.deobf("curse.maven:applied-mekanistics-574300:${appmekFileId}"))
+    compileOnly(fg.deobf("curse.maven:curios-309927:${curiosFileId}"))
+    compileOnly("curse.maven:functional-storage-556861:${functionalStorageFileId}")
+    compileOnly("curse.maven:sophisticated-core-618298:${sophisticatedCoreFileId}")
+
+    // Local test mods (testmods.properties)
+    if (testMod("mek")) localRuntime(fg.deobf("curse.maven:mekanism-268560:${mekanismFileId}"))
+    if (testMod("ars")) {
+        localRuntime(fg.deobf("curse.maven:ars-nouveau-401955:${arsNouveauFileId}"))
+        localRuntime(fg.deobf("maven.modrinth:geckolib:aC5KMoNg")) // geckolib-forge 4.8.4
+        localRuntime("io.github.llamalad7:mixinextras-forge:0.5.4")
+    }
+    if (testMod("curios") || testMod("ars")) localRuntime(fg.deobf("curse.maven:curios-309927:${curiosFileId}"))
+    if (testMod("ftbteams")) {
+        localRuntime(fg.deobf("curse.maven:ftb-teams-404468:${ftbTeamsFileId}"))
+        localRuntime(fg.deobf("dev.ftb.mods:ftb-library-forge:2001.2.13", closureOf<ModuleDependency> { isTransitive = false }))
+        localRuntime(fg.deobf("maven.modrinth:architectury-api:9.2.14+forge"))
+    }
+    if (testMod("jade")) localRuntime(fg.deobf("curse.maven:jade-324717:${jadeFileId}"))
+    if (testMod("xaero")) localRuntime(fg.deobf("maven.modrinth:xaeros-minimap:forge-1.20.1-26.6.0"))
+    if (testMod("ae2")) localRuntime(fg.deobf("curse.maven:applied-energistics-2-223794:${ae2RuntimeFileId}"))
+    if (testMod("extendedae")) {
+        localRuntime(fg.deobf("curse.maven:ex-pattern-provider-892005:${extendedaeFileId}"))
+        localRuntime(fg.deobf("curse.maven:glodium-957920:5226922")) // Glodium-1.20-1.5-forge
+    }
+    if (testMod("soph")) {
+        localRuntime(fg.deobf("curse.maven:sophisticated-core-618298:${sophisticatedCoreFileId}"))
+        localRuntime(fg.deobf("maven.modrinth:sophisticated-backpacks:1.20.1-3.26.12.2206"))
+        localRuntime(fg.deobf("maven.modrinth:sophisticated-storage:1.20.1-1.5.5.2182"))
+    }
+    if (testMod("arseng")) localRuntime(fg.deobf("curse.maven:ars-energistique-905641:${arsengFileId}"))
+    if (testMod("appmek")) localRuntime(fg.deobf("curse.maven:applied-mekanistics-574300:${appmekFileId}"))
+    if (testMod("create")) {
+        localRuntime(fg.deobf("com.simibubi.create:create-1.20.1:6.0.8-289:slim", closureOf<ModuleDependency> { isTransitive = false }))
+        localRuntime(fg.deobf("dev.engine-room.flywheel:flywheel-forge-1.20.1:1.0.5"))
+        localRuntime(fg.deobf("net.createmod.ponder:Ponder-Forge-1.20.1:1.0.91"))
+        localRuntime(fg.deobf("com.tterrag.registrate:Registrate:MC1.20-1.3.3"))
+    }
+    if (testMod("bg2")) localRuntime(fg.deobf("curse.maven:building-gadgets-298187:${buildingGadgetsFileId}"))
+    if (testMod("cc")) localRuntime(fg.deobf("maven.modrinth:cc-tweaked:gRtcHJd8"))
+    if (testMod("emi")) localRuntime(fg.deobf("curse.maven:emi-580555:${emiFileId}"))
+    if (testMod("oculus")) {
+        localRuntime(fg.deobf("maven.modrinth:oculus:1.20.1-1.8.0"))
+        localRuntime(fg.deobf("maven.modrinth:embeddium:0.3.31+mc1.20.1"))
+    }
+    if (testMod("fs")) {
+        localRuntime(fg.deobf("curse.maven:functional-storage-556861:${functionalStorageFileId}"))
+        localRuntime(fg.deobf("maven.modrinth:titanium:1.20.1-3.8.35"))
+    }
+    if (testMod("spark")) localRuntime(fg.deobf("maven.modrinth:spark:1.10.53-forge"))
 }
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
+}
+
+tasks.named<Jar>("jar") {
+    archiveClassifier.set("slim")
+    destinationDirectory.set(layout.buildDirectory.dir("devlibs"))
+}
+
+tasks.named<Jar>("jarJar") {
+    archiveClassifier.set("")
 }
 
 tasks.named<ProcessResources>("processResources") {
@@ -150,7 +263,7 @@ tasks.named<ProcessResources>("processResources") {
 tasks.register<Copy>("copyJar") {
     val modsPath = "C:/Users/Kanishq/AppData/Roaming/PrismLauncher/instances/1.20.1-LN/minecraft/mods"
     val modsDir = File(modsPath)
-    from(tasks.named("jar").map { it.outputs.files })
+    from(tasks.named("jarJar").map { it.outputs.files })
     into(modsDir)
     isEnabled = modsDir.exists()
 }
@@ -163,8 +276,8 @@ publishing {
     publications {
         register<MavenPublication>("mavenJava") {
             artifactId = modId
-            artifact(tasks.named<Jar>("jar")) {
-                builtBy(provider { tasks.getByName("reobfJar") })
+            artifact(tasks.named<Jar>("jarJar")) {
+                builtBy(provider { tasks.getByName("reobfJarJar") })
             }
         }
     }

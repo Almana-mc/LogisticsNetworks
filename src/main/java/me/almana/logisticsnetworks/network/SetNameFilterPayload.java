@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.network;
 
 import me.almana.logisticsnetworks.Logisticsnetworks;
+import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.network.codec.RegistryFriendlyByteBuf;
 import me.almana.logisticsnetworks.network.codec.ByteBufCodecs;
 import me.almana.logisticsnetworks.network.codec.StreamCodec;
@@ -14,7 +15,7 @@ public record SetNameFilterPayload(String name) implements CustomPacketPayload {
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetNameFilterPayload> STREAM_CODEC = StreamCodec
             .composite(
-                    ByteBufCodecs.STRING_UTF8,
+                    ByteBufCodecs.stringUtf8(NameFilterData.MAX_EXPRESSION_LENGTH),
                     SetNameFilterPayload::name,
                     SetNameFilterPayload::new);
 

@@ -1,0 +1,43 @@
+package me.almana.logisticsnetworks.logic.async;
+
+public final class ThreadGuard {
+
+    private static Thread serverThread;
+    private static final ThreadLocal<Boolean> WORKER = ThreadLocal.withInitial(() -> false);
+
+    private ThreadGuard() {
+    }
+
+    public static void markServerThread() {
+        serverThread = Thread.currentThread();
+    }
+
+    public static void clearServerThread() {
+        serverThread = null;
+    }
+
+    public static boolean isServerThread() {
+        return Thread.currentThread() == serverThread;
+    }
+
+    public static void markWorkerThread() {
+        WORKER.set(true);
+    }
+
+    public static boolean isWorkerThread() {
+        return WORKER.get();
+    }
+
+    public static void requireServerThread() {
+        if (Thread.currentThread() != serverThread) {
+            throw new IllegalStateException(
+                    "Minecraft state accessed off the server thread: " + Thread.currentThread().getName());
+        }
+    }
+
+    public static void requireWorkerThread() {
+        if (Thread.currentThread() == serverThread) {
+            throw new IllegalStateException("Planner ran on the server thread");
+        }
+    }
+}

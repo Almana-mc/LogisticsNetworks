@@ -6,16 +6,23 @@ import net.minecraft.nbt.Tag;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 
+import me.almana.logisticsnetworks.data.graph.GraphPosition;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.util.Mth;
+import net.minecraft.util.StringUtil;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.server.ServerLifecycleHooks;
 
 public class LogisticsNetwork {
@@ -27,11 +34,24 @@ public class LogisticsNetwork {
     private static final String KEY_NODES = "Nodes";
     private static final String KEY_NODE_UUID = "Node";
     private static final String KEY_CHANNEL_NAMES = "ChannelNames";
+    private static final String KEY_COLOR = "Color";
+    private static final String KEY_CREATED = "CreatedAt";
+    private static final String KEY_LABEL_TEMPLATES = "LabelTemplates";
+    private static final String KEY_LABEL = "Label";
+    private static final String KEY_TEMPLATE = "Template";
+    private static final String KEY_GRAPH_POSITIONS = "GraphPositions";
+    private static final String KEY_GRAPH_X = "X";
+    private static final String KEY_GRAPH_Y = "Y";
+    private static final float MAX_GRAPH_COORDINATE = 1_000_000.0F;
 
     private final UUID id;
     private String name;
     private UUID ownerUuid;
+    private int color = NetworkColors.randomColor();
+    private long createdAt = System.currentTimeMillis();
     private final Set<UUID> nodeUuids = new HashSet<>();
+    private final Map<String, GraphPosition> graphPositions = new HashMap<>();
+    private final Map<String, LabelUpgradeTemplate> labelTemplates = new HashMap<>();
     private boolean sleeping = true;
 
     // Runtime flags
@@ -51,7 +71,19 @@ public class LogisticsNetwork {
     @SuppressWarnings("unchecked")
     private final List<NodeRef>[] sourceImports = new List[9];
 
+    private List<NodeRef>[] itemImportsView;
+    private List<NodeRef>[] fluidImportsView;
+    private List<NodeRef>[] energyImportsView;
+    private List<NodeRef>[] chemicalImportsView;
+    private List<NodeRef>[] sourceImportsView;
+
+    private List<UUID> sortedUuids = Collections.emptyList();
+    private final Map<UUID, ResourceKey<Level>> nodeDimensions = new HashMap<>();
+    private final Map<UUID, Boolean> dimensionalCache = new HashMap<>();
+    private final Map<UUID, Integer> tierCache = new HashMap<>();
+
     private boolean cacheDirty = true;
+    private long generation;
 
     public LogisticsNetwork(UUID id) {
         this(id, "Network-" + id.toString().substring(0, 6));
@@ -59,7 +91,7 @@ public class LogisticsNetwork {
 
     public LogisticsNetwork(UUID id, String name) {
         this.id = id;
-        this.name = name;
+        setName(name);
 
         for (int i = 0; i < 9; i++) {
             this.channelNames[i] = "";
@@ -69,6 +101,7 @@ public class LogisticsNetwork {
             this.chemicalImports[i] = new ArrayList<>();
             this.sourceImports[i] = new ArrayList<>();
         }
+        rebuildViews();
     }
 
     public CompoundTag save() {
@@ -76,6 +109,8 @@ public class LogisticsNetwork {
         tag.putUUID(KEY_ID, id);
         tag.putString(KEY_NAME, name);
         tag.putBoolean(KEY_SLEEPING, sleeping);
+        tag.putInt(KEY_COLOR, color);
+        tag.putLong(KEY_CREATED, createdAt);
         if (ownerUuid != null) {
             tag.putUUID(KEY_OWNER_UUID, ownerUuid);
         }
@@ -95,6 +130,18 @@ public class LogisticsNetwork {
             channelNamesTag.add(entry);
         }
         tag.put(KEY_CHANNEL_NAMES, channelNamesTag);
+        writeGraphPositions(tag);
+
+        if (!labelTemplates.isEmpty()) {
+            ListTag templatesTag = new ListTag();
+            for (Map.Entry<String, LabelUpgradeTemplate> entry : new TreeMap<>(labelTemplates).entrySet()) {
+                CompoundTag templateTag = new CompoundTag();
+                templateTag.putString(KEY_LABEL, entry.getKey());
+                templateTag.put(KEY_TEMPLATE, entry.getValue().save());
+                templatesTag.add(templateTag);
+            }
+            tag.put(KEY_LABEL_TEMPLATES, templatesTag);
+        }
 
         return tag;
     }
@@ -104,14 +151,20 @@ public class LogisticsNetwork {
         LogisticsNetwork network = new LogisticsNetwork(id);
 
         if (tag.contains(KEY_NAME)) {
-            network.name = tag.getString(KEY_NAME);
+            network.setName(tag.getString(KEY_NAME));
         }
         if (tag.contains(KEY_SLEEPING)) {
             network.sleeping = tag.getBoolean(KEY_SLEEPING);
         }
-        if (tag.hasUUID(KEY_OWNER_UUID)) {
+        // Malformed owner stays private
+        if (tag.contains(KEY_OWNER_UUID)) {
             network.ownerUuid = tag.getUUID(KEY_OWNER_UUID);
         }
+        if (tag.contains(KEY_COLOR)) {
+            network.color = NetworkColors.mask(tag.getInt(KEY_COLOR));
+        }
+        // 0 means legacy, unstamped
+        network.createdAt = tag.getLong(KEY_CREATED);
 
         if (tag.contains(KEY_NODES)) {
             ListTag nodesTag = tag.getList(KEY_NODES, Tag.TAG_COMPOUND);
@@ -124,8 +177,15 @@ public class LogisticsNetwork {
         if (tag.contains(KEY_CHANNEL_NAMES, Tag.TAG_LIST)) {
             ListTag namesTag = tag.getList(KEY_CHANNEL_NAMES, Tag.TAG_COMPOUND);
             for (int i = 0; i < Math.min(namesTag.size(), 9); i++) {
-                network.channelNames[i] = namesTag.getCompound(i).getString("Name");
+                network.setChannelName(i, namesTag.getCompound(i).getString("Name"));
             }
+        }
+        network.readGraphPositions(tag);
+        for (Tag value : tag.getList(KEY_LABEL_TEMPLATES, Tag.TAG_COMPOUND)) {
+            if (!(value instanceof CompoundTag templateTag)) continue;
+            String label = templateTag.getString(KEY_LABEL);
+            LabelUpgradeTemplate template = LabelUpgradeTemplate.load(templateTag.getCompound(KEY_TEMPLATE));
+            if (!label.isBlank() && template != null) network.labelTemplates.put(label, template);
         }
 
         return network;
@@ -140,7 +200,63 @@ public class LogisticsNetwork {
 
     public void removeNode(UUID nodeUuid) {
         nodeUuids.remove(nodeUuid);
+        graphPositions.remove("node:" + nodeUuid);
         markCacheDirty();
+    }
+
+    public Map<String, GraphPosition> getGraphPositions() {
+        return Collections.unmodifiableMap(graphPositions);
+    }
+
+    public void setGraphPosition(String key, GraphPosition position) {
+        if (!validGraphKey(key) || !Float.isFinite(position.x()) || !Float.isFinite(position.y())) {
+            throw new IllegalArgumentException("Invalid graph position");
+        }
+        graphPositions.put(key, new GraphPosition(
+                Mth.clamp(position.x(), -MAX_GRAPH_COORDINATE, MAX_GRAPH_COORDINATE),
+                Mth.clamp(position.y(), -MAX_GRAPH_COORDINATE, MAX_GRAPH_COORDINATE)));
+    }
+
+    public void resetGraphPositions() {
+        graphPositions.clear();
+    }
+
+    private void writeGraphPositions(CompoundTag tag) {
+        if (graphPositions.isEmpty()) return;
+        CompoundTag positionsTag = new CompoundTag();
+        for (Map.Entry<String, GraphPosition> entry : new TreeMap<>(graphPositions).entrySet()) {
+            CompoundTag positionTag = new CompoundTag();
+            positionTag.putFloat(KEY_GRAPH_X, entry.getValue().x());
+            positionTag.putFloat(KEY_GRAPH_Y, entry.getValue().y());
+            positionsTag.put(entry.getKey(), positionTag);
+        }
+        tag.put(KEY_GRAPH_POSITIONS, positionsTag);
+    }
+
+    private void readGraphPositions(CompoundTag tag) {
+        CompoundTag positionsTag = tag.getCompound(KEY_GRAPH_POSITIONS);
+        for (String key : positionsTag.getAllKeys()) {
+            if (!(positionsTag.get(key) instanceof CompoundTag positionTag)
+                    || !positionTag.contains(KEY_GRAPH_X, Tag.TAG_ANY_NUMERIC)
+                    || !positionTag.contains(KEY_GRAPH_Y, Tag.TAG_ANY_NUMERIC)) {
+                continue;
+            }
+            GraphPosition position = new GraphPosition(
+                    positionTag.getFloat(KEY_GRAPH_X), positionTag.getFloat(KEY_GRAPH_Y));
+            if (validGraphKey(key) && validGraphPosition(position)) {
+                graphPositions.put(key, position);
+            }
+        }
+    }
+
+    private static boolean validGraphKey(String key) {
+        return !key.isBlank() && key.length() <= 256;
+    }
+
+    private static boolean validGraphPosition(GraphPosition position) {
+        return Float.isFinite(position.x()) && Float.isFinite(position.y())
+                && Math.abs(position.x()) <= MAX_GRAPH_COORDINATE
+                && Math.abs(position.y()) <= MAX_GRAPH_COORDINATE;
     }
 
     public UUID getId() {
@@ -152,7 +268,26 @@ public class LogisticsNetwork {
     }
 
     public void setName(String name) {
-        this.name = name;
+        // Legacy names exceed packet caps
+        this.name = StringUtil.truncateStringIfNecessary(name, 64, false);
+    }
+
+    public int getColor() {
+        return color;
+    }
+
+    public void setColor(int color) {
+        this.color = NetworkColors.mask(color);
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public boolean stampCreatedAtIfMissing() {
+        if (createdAt != 0L) return false;
+        createdAt = System.currentTimeMillis();
+        return true;
     }
 
     public String getChannelName(int index) {
@@ -162,7 +297,7 @@ public class LogisticsNetwork {
 
     public void setChannelName(int index, String name) {
         if (index >= 0 && index < 9) {
-            this.channelNames[index] = name == null ? "" : name;
+            this.channelNames[index] = name == null ? "" : StringUtil.truncateStringIfNecessary(name, 24, false);
         }
     }
 
@@ -176,6 +311,23 @@ public class LogisticsNetwork {
 
     public Set<UUID> getNodeUuids() {
         return Collections.unmodifiableSet(nodeUuids);
+    }
+
+    public LabelUpgradeTemplate getLabelTemplate(String label) {
+        return labelTemplates.get(label);
+    }
+
+    public Set<String> getLabelNames() {
+        return Collections.unmodifiableSet(labelTemplates.keySet());
+    }
+
+    public void setLabelTemplate(String label, LabelUpgradeTemplate template) {
+        if (!label.isBlank()) labelTemplates.put(label, template);
+    }
+
+    public void removeLabel(String label) {
+        labelTemplates.remove(label);
+        graphPositions.remove("label:" + label);
     }
 
     public boolean isSleeping() {
@@ -218,23 +370,39 @@ public class LogisticsNetwork {
     }
 
     public List<NodeRef>[] getItemImports() {
-        return copyToUnmodifiableArray(itemImports);
+        return itemImportsView;
     }
 
     public List<NodeRef>[] getFluidImports() {
-        return copyToUnmodifiableArray(fluidImports);
+        return fluidImportsView;
     }
 
     public List<NodeRef>[] getEnergyImports() {
-        return copyToUnmodifiableArray(energyImports);
+        return energyImportsView;
     }
 
     public List<NodeRef>[] getChemicalImports() {
-        return copyToUnmodifiableArray(chemicalImports);
+        return chemicalImportsView;
     }
 
     public List<NodeRef>[] getSourceImports() {
-        return copyToUnmodifiableArray(sourceImports);
+        return sourceImportsView;
+    }
+
+    public List<UUID> getSortedUuids() {
+        return sortedUuids;
+    }
+
+    public ResourceKey<Level> getNodeDimension(UUID nodeId) {
+        return nodeDimensions.get(nodeId);
+    }
+
+    public Map<UUID, Boolean> getDimensionalCache() {
+        return dimensionalCache;
+    }
+
+    public Map<UUID, Integer> getTierCache() {
+        return tierCache;
     }
 
     @SuppressWarnings("unchecked")
@@ -248,10 +416,15 @@ public class LogisticsNetwork {
 
     public void markCacheDirty() {
         this.cacheDirty = true;
+        this.generation++;
     }
 
     public boolean isCacheDirty() {
         return cacheDirty;
+    }
+
+    public long getGeneration() {
+        return generation;
     }
 
     public void clearCacheDirty() {
@@ -266,43 +439,70 @@ public class LogisticsNetwork {
             this.chemicalImports[i] = new ArrayList<>();
             this.sourceImports[i] = new ArrayList<>();
         }
+        nodeDimensions.clear();
+        dimensionalCache.clear();
+        tierCache.clear();
+    }
+
+    private void rebuildViews() {
+        itemImportsView = copyToUnmodifiableArray(itemImports);
+        fluidImportsView = copyToUnmodifiableArray(fluidImports);
+        energyImportsView = copyToUnmodifiableArray(energyImports);
+        chemicalImportsView = copyToUnmodifiableArray(chemicalImports);
+        sourceImportsView = copyToUnmodifiableArray(sourceImports);
+    }
+
+    private void sortImportsByPriority() {
+        for (int i = 0; i < 9; i++) {
+            sortByPriority(itemImports[i]);
+            sortByPriority(fluidImports[i]);
+            sortByPriority(energyImports[i]);
+            sortByPriority(chemicalImports[i]);
+            sortByPriority(sourceImports[i]);
+        }
+    }
+
+    // Stable: ties keep UUID order
+    private static void sortByPriority(List<NodeRef> refs) {
+        if (refs.size() > 1) {
+            refs.sort((a, b) -> Integer.compare(b.priority(), a.priority()));
+        }
+    }
+
+    private static LogisticsNodeEntity findNode(MinecraftServer server, UUID nodeId) {
+        for (ServerLevel level : server.getAllLevels()) {
+            if (level.getEntity(nodeId) instanceof LogisticsNodeEntity node) {
+                return node;
+            }
+        }
+        return null;
     }
 
     public void rebuildCache(NetworkRegistry registry) {
         clearAllCaches();
+        sortedUuids = new ArrayList<>(nodeUuids);
+        sortedUuids.sort(null);
+
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server == null) {
+            rebuildViews();
             return;
         }
 
         List<LogisticsNodeEntity> resolved = new ArrayList<>();
 
-        for (UUID nodeId : nodeUuids) {
-            LogisticsNodeEntity node = null;
-            for (ServerLevel level : server.getAllLevels()) {
-                Entity entity = level.getEntity(nodeId);
-                if (entity instanceof LogisticsNodeEntity lne) {
-                    node = lne;
-                    break;
-                }
-            }
-
+        for (UUID nodeId : sortedUuids) {
+            LogisticsNodeEntity node = findNode(server, nodeId);
             if (node == null) {
                 continue;
             }
 
-            for (int i = 0; i < 9; i++) {
-                if (channelNames[i].isEmpty()) {
-                    ChannelData ch = node.getChannel(i);
-                    if (ch != null && !ch.getName().isEmpty()) {
-                        channelNames[i] = ch.getName();
-                    }
-                }
-            }
-
+            cacheNode(nodeId, node);
             resolved.add(node);
-            classifyNode(node);
         }
+
+        sortImportsByPriority();
+        rebuildViews();
 
         for (LogisticsNodeEntity node : resolved) {
             for (int i = 0; i < 9; i++) {
@@ -312,6 +512,23 @@ public class LogisticsNetwork {
                 }
             }
         }
+    }
+
+    private void cacheNode(UUID nodeId, LogisticsNodeEntity node) {
+        nodeDimensions.put(nodeId, node.level().dimension());
+        dimensionalCache.put(nodeId, NodeUpgradeData.hasDimensionalUpgrade(node));
+        tierCache.put(nodeId, NodeUpgradeData.getUpgradeTier(node));
+
+        for (int i = 0; i < 9; i++) {
+            if (channelNames[i].isEmpty()) {
+                ChannelData ch = node.getChannel(i);
+                if (ch != null && !ch.getName().isEmpty()) {
+                    channelNames[i] = ch.getName();
+                }
+            }
+        }
+
+        classifyNode(node);
     }
 
     private void classifyNode(LogisticsNodeEntity node) {
@@ -327,21 +544,13 @@ public class LogisticsNetwork {
                 continue;
             }
 
-            switch (ch.getType()) {
-                case ITEM -> this.itemImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
-                case FLUID -> this.fluidImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
-                case ENERGY -> this.energyImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
-                case CHEMICAL -> {
-                    if (NodeUpgradeData.hasMekanismChemicalUpgrade(node)) {
-                        this.chemicalImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
-                    }
-                }
-                case SOURCE -> {
-                    if (NodeUpgradeData.hasArsSourceUpgrade(node)) {
-                        this.sourceImports[i].add(new NodeRef(node.getUUID(), node.getAttachedPos()));
-                    }
-                }
-            }
+            int types = NodeUpgradeData.effectiveTypes(node, ch);
+            NodeRef ref = new NodeRef(node.getUUID(), node.getAttachedPos(), ch.getPriority());
+            if (ChannelType.ITEM.in(types)) this.itemImports[i].add(ref);
+            if (ChannelType.FLUID.in(types)) this.fluidImports[i].add(ref);
+            if (ChannelType.ENERGY.in(types)) this.energyImports[i].add(ref);
+            if (ChannelType.CHEMICAL.in(types)) this.chemicalImports[i].add(ref);
+            if (ChannelType.SOURCE.in(types)) this.sourceImports[i].add(ref);
         }
     }
 }

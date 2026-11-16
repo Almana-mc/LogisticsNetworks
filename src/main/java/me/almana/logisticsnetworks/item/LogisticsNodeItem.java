@@ -3,12 +3,15 @@ package me.almana.logisticsnetworks.item;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
+import me.almana.logisticsnetworks.network.ServerPayloadHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -19,6 +22,11 @@ public class LogisticsNodeItem extends Item {
 
     public LogisticsNodeItem(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    public boolean canEquip(ItemStack stack, EquipmentSlot armorType, Entity entity) {
+        return armorType == EquipmentSlot.HEAD;
     }
 
     @Override
@@ -56,6 +64,10 @@ public class LogisticsNodeItem extends Item {
         if (node == null)
             return InteractionResult.FAIL;
 
+        if (player != null && !ServerPayloadHandler.getDefaultNodeVisibility(player)) {
+            node.setRenderVisible(false);
+        }
+
         tryAutoPasteFromOffhandWrench(context, node);
         level.playSound(null, pos, SoundEvents.METAL_PLACE, SoundSource.BLOCKS, 1.0f, 1.0f);
         context.getItemInHand().shrink(1);
@@ -68,24 +80,24 @@ public class LogisticsNodeItem extends Item {
             return;
         }
 
-        ItemStack offhand = serverPlayer.getOffhandItem();
-        if (!(offhand.getItem() instanceof WrenchItem)) {
-            return;
+        ItemStack wrench = serverPlayer.getOffhandItem();
+        if (!(wrench.getItem() instanceof WrenchItem)) {
+            wrench = WornWrench.drawn(serverPlayer);
+            if (wrench.isEmpty() || WrenchItem.getMode(wrench) != WrenchItem.Mode.COPY_PASTE) {
+                return;
+            }
         }
 
-        NodeClipboardConfig clipboard = WrenchItem.getClipboard(offhand, serverPlayer.level().registryAccess());
+        NodeClipboardConfig clipboard = WrenchItem.getClipboard(wrench, serverPlayer.level().registryAccess());
         if (clipboard == null || clipboard.isEffectivelyEmpty()) {
             return;
         }
 
-        NodeClipboardConfig.PasteResult result = clipboard.applyToNode(serverPlayer, node, offhand);
-        switch (result) {
-            case SUCCESS -> {
-            }
-            case MISSING_ITEMS -> serverPlayer.displayClientMessage(
-                    Component.translatable("message.logisticsnetworks.clipboard.paste.missing_items"), true);
-            case INVENTORY_FULL -> serverPlayer.displayClientMessage(
-                    Component.translatable("message.logisticsnetworks.clipboard.paste.no_space"), true);
+        NodeClipboardConfig.PasteOutcome outcome = clipboard.applyToNode(
+                serverPlayer, node, wrench, WrenchItem.getStorageLink(wrench));
+        switch (outcome.result()) {
+            case SUCCESS -> WrenchItem.setClipboard(wrench, clipboard, serverPlayer.level().registryAccess());
+            case MISSING_ITEMS -> WrenchItem.reportPasteMissing(serverPlayer, outcome);
             case INCOMPATIBLE_TARGET -> serverPlayer.displayClientMessage(
                     Component.translatable("message.logisticsnetworks.clipboard.paste.incompatible"), true);
             case CLIPBOARD_INVALID -> serverPlayer.displayClientMessage(

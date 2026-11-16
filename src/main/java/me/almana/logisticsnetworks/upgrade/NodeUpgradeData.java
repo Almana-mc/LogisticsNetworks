@@ -2,8 +2,11 @@ package me.almana.logisticsnetworks.upgrade;
 
 import me.almana.logisticsnetworks.data.ChannelData;
 import me.almana.logisticsnetworks.data.ChannelMode;
+import me.almana.logisticsnetworks.data.ChannelType;
 import me.almana.logisticsnetworks.data.LogisticsNetwork;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
+import me.almana.logisticsnetworks.integration.ars.ArsCompat;
+import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
 import me.almana.logisticsnetworks.registration.Registration;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -19,40 +22,70 @@ public final class NodeUpgradeData {
     private NodeUpgradeData() {
     }
 
-    public static int getItemOperationCap(LogisticsNodeEntity node) {
-        return getItemOperationCap(getUpgradeTier(node));
+    public static int getOperationCap(ChannelType type, int tier) {
+        return switch (type) {
+            case ITEM -> getItemOperationCap(tier);
+            case FLUID -> getFluidOperationCapMb(tier);
+            case ENERGY -> (int) Math.min(getEnergyOperationCap(tier), Integer.MAX_VALUE);
+            case CHEMICAL -> getChemicalOperationCap(tier);
+            case SOURCE -> getSourceOperationCap(tier);
+        };
+    }
+
+    public static int availableTypes(boolean mounted, boolean chemicalUpgrade, boolean sourceUpgrade) {
+        if (mounted) return ChannelType.ITEM.bit() | ChannelType.FLUID.bit();
+        int mask = ChannelType.ITEM.bit() | ChannelType.FLUID.bit() | ChannelType.ENERGY.bit();
+        if (chemicalUpgrade) mask |= ChannelType.CHEMICAL.bit();
+        if (sourceUpgrade) mask |= ChannelType.SOURCE.bit();
+        return mask;
+    }
+
+    public static int availableTypes(LogisticsNodeEntity node) {
+        return availableTypes(node.isMountedOnCreate(),
+                MekanismCompat.isLoaded() && hasMekanismChemicalUpgrade(node),
+                ArsCompat.isLoaded() && hasArsSourceUpgrade(node));
+    }
+
+    public static int effectiveTypes(LogisticsNodeEntity node, ChannelData channel) {
+        return channel.getTypes() & availableTypes(node);
+    }
+
+    public static int effectiveBatch(ChannelData channel, ChannelType type, int tier) {
+        int cap = getOperationCap(type, tier);
+        int value = channel.getBatch(type);
+        return Math.max(1, type == ChannelType.ENERGY || value <= 0 ? cap : Math.min(value, cap));
+    }
+
+    public static int recipeBudget(ChannelData channel) {
+        return channel.getRecipeSets() <= 0 ? Integer.MAX_VALUE : channel.getRecipeSets();
+    }
+
+    public static void applyTierChange(ChannelData channel, int previousTier, int tier) {
+        if (tier == previousTier) return;
+        for (ChannelType type : ChannelType.values()) {
+            if (tier > previousTier || channel.getBatch(type) > getOperationCap(type, tier)) {
+                channel.setBatch(type, 0);
+            }
+        }
+        if (tier < previousTier) {
+            channel.setTickDelay(Math.max(channel.getTickDelay(), getMinTickDelay(tier)));
+        }
     }
 
     public static int getItemOperationCap(int tier) {
         return UpgradeLimitsConfig.get(tier).itemBatch();
     }
 
-    public static int getEnergyOperationCap(LogisticsNodeEntity node) {
-        return getEnergyOperationCap(getUpgradeTier(node));
-    }
-
-    public static int getEnergyOperationCap(int tier) {
+    public static long getEnergyOperationCap(int tier) {
         return UpgradeLimitsConfig.get(tier).energyBatch();
-    }
-
-    public static int getFluidOperationCapMb(LogisticsNodeEntity node) {
-        return getFluidOperationCapMb(getUpgradeTier(node));
     }
 
     public static int getFluidOperationCapMb(int tier) {
         return UpgradeLimitsConfig.get(tier).fluidBatch();
     }
 
-    public static int getChemicalOperationCap(LogisticsNodeEntity node) {
-        return getChemicalOperationCap(getUpgradeTier(node));
-    }
-
     public static int getChemicalOperationCap(int tier) {
         return UpgradeLimitsConfig.get(tier).chemicalBatch();
-    }
-
-    public static int getSourceOperationCap(LogisticsNodeEntity node) {
-        return getSourceOperationCap(getUpgradeTier(node));
     }
 
     public static int getSourceOperationCap(int tier) {
@@ -88,6 +121,15 @@ public final class NodeUpgradeData {
     public static boolean hasArsSourceUpgrade(LogisticsNodeEntity node) {
         for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
             if (node.getUpgradeItem(i).is(Registration.ARS_SOURCE_UPGRADE.get())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasNetworkUpgrade(LogisticsNodeEntity node) {
+        for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
+            if (node.getUpgradeItem(i).is(Registration.NETWORK_UPGRADE.get())) {
                 return true;
             }
         }
@@ -137,11 +179,11 @@ public final class NodeUpgradeData {
                     continue;
 
                 if (hasExport[i] && otherCh.getMode() == ChannelMode.IMPORT
-                        && node.getChannel(i).getType() == otherCh.getType()) {
+                        && (node.getChannel(i).getTypes() & otherCh.getTypes()) != 0) {
                     return true;
                 }
                 if (hasImport[i] && otherCh.getMode() == ChannelMode.EXPORT
-                        && node.getChannel(i).getType() == otherCh.getType()) {
+                        && (node.getChannel(i).getTypes() & otherCh.getTypes()) != 0) {
                     return true;
                 }
             }
@@ -161,14 +203,14 @@ public final class NodeUpgradeData {
     public static int getUpgradeTier(LogisticsNodeEntity node) {
         int maxTier = 0;
         for (int i = 0; i < LogisticsNodeEntity.UPGRADE_SLOT_COUNT; i++) {
-            maxTier = Math.max(maxTier, getTier(node.getUpgradeItem(i)));
+            maxTier = Math.max(maxTier, getUpgradeTier(node.getUpgradeItem(i)));
             if (maxTier == 4)
                 break;
         }
         return maxTier;
     }
 
-    private static int getTier(ItemStack stack) {
+    public static int getUpgradeTier(ItemStack stack) {
         if (stack.isEmpty())
             return 0;
         if (stack.is(Registration.NETHERITE_UPGRADE.get()))

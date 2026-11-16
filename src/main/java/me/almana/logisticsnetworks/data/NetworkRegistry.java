@@ -1,20 +1,23 @@
 package me.almana.logisticsnetworks.data;
 
 import com.mojang.logging.LogUtils;
-import me.almana.logisticsnetworks.integration.ftbteams.FTBTeamsCompat;
+import me.almana.logisticsnetworks.Config;
+import me.almana.logisticsnetworks.logic.NodeAccessPolicy;
 import me.almana.logisticsnetworks.logic.TelemetryManager;
-import me.almana.logisticsnetworks.logic.TransferEngine;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.storage.DimensionDataStorage;
 
 import org.slf4j.Logger;
 
 import java.util.*;
+import java.util.function.BooleanSupplier;
 import org.jetbrains.annotations.Nullable;
 
 public class NetworkRegistry extends SavedData {
@@ -25,13 +28,12 @@ public class NetworkRegistry extends SavedData {
 
     // Limits & Warnings for beta
     private static final int WARNING_NODE_COUNT = 200;
-    private static final int WARNING_DISPATCH_COUNT = 50;
 
     private final Map<UUID, LogisticsNetwork> networks = new HashMap<>();
-    private final Set<UUID> dirtyNetworks = new HashSet<>();
-    private final TreeMap<Long, Set<UUID>> wakeBuckets = new TreeMap<>();
-    private final Map<UUID, Long> scheduledWake = new HashMap<>();
+    private final List<CompoundTag> undecodableNetworks = new ArrayList<>();
+    private final NetworkDispatcher dispatcher = new NetworkDispatcher();
     private final TelemetryManager telemetryManager = new TelemetryManager();
+    private final ServerRackLinks rackLinks = new ServerRackLinks();
 
     public NetworkRegistry() {
     }
@@ -42,75 +44,28 @@ public class NetworkRegistry extends SavedData {
     }
 
     public void processDirtyNetworks(MinecraftServer server) {
-        long now = server.overworld().getGameTime();
-        promoteDueWakes(now);
-
-        if (dirtyNetworks.isEmpty())
-            return;
-
-        if (dirtyNetworks.size() > WARNING_DISPATCH_COUNT) {
-            LOGGER.warn("High load: Dispatching {} dirty networks in one tick.", dirtyNetworks.size());
-        }
-
-        Set<UUID> snapshot = new HashSet<>(dirtyNetworks);
-        dirtyNetworks.clear();
-
-        for (UUID id : snapshot) {
-            LogisticsNetwork network = networks.get(id);
-            if (network == null)
-                continue;
-
-            try {
-                long delta = TransferEngine.processNetwork(network, server);
-                if (delta == 0L) {
-                    dirtyNetworks.add(id);
-                } else if (delta != Long.MAX_VALUE) {
-                    scheduleWake(id, now + delta);
-                }
-            } catch (Exception e) {
-                LOGGER.error("Error processing network {}: {}", id, e.getMessage(), e);
-            }
-        }
+        dispatcher.processDirtyNetworks(networks, server);
     }
 
-    private void promoteDueWakes(long now) {
-        while (!wakeBuckets.isEmpty()) {
-            Map.Entry<Long, Set<UUID>> entry = wakeBuckets.firstEntry();
-            if (entry.getKey() > now)
-                break;
-            for (UUID id : entry.getValue()) {
-                scheduledWake.remove(id);
-                if (networks.containsKey(id)) {
-                    dirtyNetworks.add(id);
-                }
-            }
-            wakeBuckets.pollFirstEntry();
-        }
+    public boolean refreshAsyncPlanning() {
+        return dispatcher.refreshAsyncMode(Config.asyncPlanning);
     }
 
-    private void scheduleWake(UUID id, long tick) {
-        Long existing = scheduledWake.get(id);
-        if (existing != null) {
-            if (existing <= tick)
-                return;
-            Set<UUID> bucket = wakeBuckets.get(existing);
-            if (bucket != null) {
-                bucket.remove(id);
-                if (bucket.isEmpty()) wakeBuckets.remove(existing);
-            }
-        }
-        scheduledWake.put(id, tick);
-        wakeBuckets.computeIfAbsent(tick, k -> new HashSet<>()).add(id);
+    public void dispatchDirty(MinecraftServer server) {
+        dispatcher.dispatchDirty(this, networks, server);
     }
 
-    private void cancelWake(UUID id) {
-        Long tick = scheduledWake.remove(id);
-        if (tick == null) return;
-        Set<UUID> bucket = wakeBuckets.get(tick);
-        if (bucket != null) {
-            bucket.remove(id);
-            if (bucket.isEmpty()) wakeBuckets.remove(tick);
-        }
+    public void commitCompleted(MinecraftServer server, BooleanSupplier hasTime) {
+        dispatcher.commitCompleted(networks, server, hasTime);
+    }
+
+    public void processDegradedRecovery(MinecraftServer server) {
+        dispatcher.processDegradedRecovery(networks, server);
+    }
+
+    // Bridges need the rack chunk
+    public void refreshRackLinks(MinecraftServer server) {
+        rackLinks.refreshLoaded(server).forEach(this::invalidateNetwork);
     }
 
     public LogisticsNetwork createNetwork() {
@@ -132,8 +87,7 @@ public class NetworkRegistry extends SavedData {
 
     public void deleteNetwork(UUID id) {
         if (networks.remove(id) != null) {
-            dirtyNetworks.remove(id);
-            cancelWake(id);
+            dispatcher.delete(id);
             setDirty();
         }
     }
@@ -142,8 +96,27 @@ public class NetworkRegistry extends SavedData {
         return networks.get(id);
     }
 
+    public void stampCreatedAt(UUID networkId) {
+        LogisticsNetwork network = networks.get(networkId);
+        if (network != null && network.stampCreatedAtIfMissing()) {
+            setDirty();
+        }
+    }
+
     public TelemetryManager getTelemetryManager() {
         return telemetryManager;
+    }
+
+    public ServerRackLinks getRackLinks() {
+        return rackLinks;
+    }
+
+    public void putRack(GlobalPos pos, ServerRackConfig config) {
+        rackLinks.put(pos, config).forEach(this::invalidateNetwork);
+    }
+
+    public void removeRack(GlobalPos pos) {
+        rackLinks.remove(pos).forEach(this::invalidateNetwork);
     }
 
     public Map<UUID, LogisticsNetwork> getAllNetworks() {
@@ -151,24 +124,42 @@ public class NetworkRegistry extends SavedData {
     }
 
     public List<LogisticsNetwork> getNetworksForPlayer(UUID playerUuid) {
-        Set<UUID> teammateIds = FTBTeamsCompat.isLoaded()
-                ? FTBTeamsCompat.getTeammateIds(playerUuid)
-                : Collections.emptySet();
         List<LogisticsNetwork> result = new ArrayList<>();
         for (LogisticsNetwork network : networks.values()) {
-            UUID owner = network.getOwnerUuid();
-            if (owner == null || owner.equals(playerUuid) || teammateIds.contains(owner)) {
+            if (NodeAccessPolicy.canAccess(network.getOwnerUuid(), playerUuid)) {
                 result.add(network);
             }
         }
         return result;
     }
 
-    public void markNetworkDirty(UUID networkId) {
+    public Collection<LogisticsNetwork> getVisibleNetworks(ServerPlayer player) {
+        return NodeAccessPolicy.isAdminMode(player)
+                ? getAllNetworks().values()
+                : getNetworksForPlayer(player.getUUID());
+    }
+
+    public void wakeNetwork(UUID networkId) {
         if (networks.containsKey(networkId)) {
-            cancelWake(networkId);
-            dirtyNetworks.add(networkId);
-            networks.get(networkId).markCacheDirty();
+            markDirty(networkId);
+            // Rack peers share wakeups
+            for (ServerRackLinks.Link link : rackLinks.linksFor(networkId)) {
+                if (networks.containsKey(link.peer())) {
+                    markDirty(link.peer());
+                }
+            }
+        }
+    }
+
+    private void markDirty(UUID networkId) {
+        dispatcher.markDirty(networkId);
+    }
+
+    public void invalidateNetwork(UUID networkId) {
+        LogisticsNetwork network = networks.get(networkId);
+        if (network != null) {
+            wakeNetwork(networkId);
+            network.markCacheDirty();
         }
     }
 
@@ -180,7 +171,7 @@ public class NetworkRegistry extends SavedData {
                 LOGGER.warn("Network {} has exceeded {} nodes (Count: {}). Performance may degrade.",
                         networkId, WARNING_NODE_COUNT, network.getNodeUuids().size());
             }
-            markNetworkDirty(networkId);
+            wakeNetwork(networkId);
             setDirty();
         }
     }
@@ -189,7 +180,7 @@ public class NetworkRegistry extends SavedData {
         LogisticsNetwork network = networks.get(networkId);
         if (network != null) {
             network.removeNode(nodeId);
-            markNetworkDirty(networkId);
+            wakeNetwork(networkId);
 
             if (network.getNodeUuids().isEmpty()) {
                 LOGGER.info("Network {} is empty, deleting.", networkId);
@@ -205,12 +196,14 @@ public class NetworkRegistry extends SavedData {
         for (LogisticsNetwork network : networks.values()) {
             list.add(network.save());
         }
+        undecodableNetworks.forEach(tag -> list.add(tag.copy()));
         compoundTag.put(KEY_NETWORKS, list);
         return compoundTag;
     }
 
     public static NetworkRegistry load(CompoundTag compoundTag) {
         NetworkRegistry registry = new NetworkRegistry();
+        boolean assignedDefaultColor = false;
         if (compoundTag.contains(KEY_NETWORKS, Tag.TAG_LIST)) {
             ListTag list = compoundTag.getList(KEY_NETWORKS, Tag.TAG_COMPOUND);
             for (Tag t : list) {
@@ -218,15 +211,21 @@ public class NetworkRegistry extends SavedData {
                     try {
                         LogisticsNetwork network = LogisticsNetwork.load(ct);
                         registry.networks.put(network.getId(), network);
+                        assignedDefaultColor |= !ct.contains("Color");
                     } catch (Exception e) {
-                        LOGGER.error("Skipping malformed network: {}", e.getMessage());
+                        LOGGER.error("Keeping undecodable network as raw data: {}", e.getMessage());
+                        registry.undecodableNetworks.add(ct.copy());
                     }
                 }
             }
         }
         if (!registry.networks.isEmpty()) {
-            registry.dirtyNetworks.addAll(registry.networks.keySet());
+            registry.networks.keySet().forEach(registry.dispatcher::markDirty);
             LOGGER.info("Loaded {} networks.", registry.networks.size());
+        }
+        // Persist rolled legacy colours
+        if (assignedDefaultColor) {
+            registry.setDirty();
         }
 
         return registry;

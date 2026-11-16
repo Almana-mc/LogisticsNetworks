@@ -1,0 +1,307 @@
+package me.almana.logisticsnetworks.logic;
+
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.data.FlowResource;
+import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.integration.storage.ItemResource;
+import me.almana.logisticsnetworks.registration.ModTags;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.items.IItemHandler;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.stream.IntStream;
+
+final class ItemLane implements RecipeLane {
+
+    private record Moved(int sourceSlot, ItemStack stack, TransferEngine.ItemTransferTarget to) {
+    }
+
+    private record Placement(@Nullable boolean[] mask, int share) {
+    }
+
+    private final IItemHandler source;
+    private final List<RecipeCardData.Ingredient> ingredients;
+    private final List<RecipeEndpoint> endpoints;
+    private final HolderLookup.Provider provider;
+    private final FilterItemData.ReadCache cache;
+    private final Consumer<ItemStack> spill;
+    private final List<Moved> pending = new ArrayList<>();
+    private int[][] matching = new int[0][];
+    private int[] order = new int[0];
+    private final Map<Integer, List<ItemResource>> variants = new HashMap<>();
+
+    ItemLane(IItemHandler source, List<RecipeCardData.Ingredient> ingredients, List<RecipeEndpoint> endpoints,
+            HolderLookup.Provider provider, FilterItemData.ReadCache cache, Consumer<ItemStack> spill) {
+        this.source = source;
+        this.ingredients = ingredients;
+        this.endpoints = endpoints;
+        this.provider = provider;
+        this.cache = cache;
+        this.spill = spill;
+    }
+
+    // Indexes matching slots once
+    @Override
+    public int available(int cap) {
+        IntArrayList[] found = new IntArrayList[ingredients.size()];
+        long[] stock = new long[ingredients.size()];
+        for (int i = 0; i < found.length; i++) {
+            found[i] = new IntArrayList();
+        }
+        for (int slot = 0; slot < source.getSlots(); slot++) {
+            ItemStack stack = source.getStackInSlot(slot);
+            if (stack.isEmpty() || stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS)) continue;
+            int extractable = -1;
+            for (int i = 0; i < found.length; i++) {
+                if (!ingredients.get(i).matches(stack, provider)) continue;
+                if (extractable < 0) extractable = source.extractItem(slot, stack.getCount(), true).getCount();
+                found[i].add(slot);
+                stock[i] += extractable;
+            }
+        }
+        matching = new int[found.length][];
+        long sets = Integer.MAX_VALUE;
+        for (int i = 0; i < found.length; i++) {
+            matching[i] = found[i].toIntArray();
+            sets = Math.min(sets, stock[i] / ingredients.get(i).count());
+        }
+        order = IntStream.range(0, ingredients.size()).boxed()
+                .sorted(Comparator.comparing((Integer i) -> ingredients.get(i).tag().isPresent())
+                        .thenComparingInt(i -> matching[i].length))
+                .mapToInt(Integer::intValue).toArray();
+        return affordable((int) Math.min(sets, cap));
+    }
+
+    private int affordable(int sets) {
+        Int2IntOpenHashMap extractable = new Int2IntOpenHashMap();
+        int low = 0;
+        int high = sets;
+        while (low < high) {
+            int mid = (low + high + 1) >>> 1;
+            if (covers(mid, extractable)) low = mid;
+            else high = mid - 1;
+        }
+        return low;
+    }
+
+    // Shared slots counted once
+    private boolean covers(int sets, Int2IntOpenHashMap extractable) {
+        Int2IntOpenHashMap left = new Int2IntOpenHashMap();
+        for (int i : order) {
+            int need = sets * ingredients.get(i).count();
+            for (int slot : matching[i]) {
+                if (need <= 0) break;
+                ItemStack stack = source.getStackInSlot(slot);
+                if (!usable(stack, i)) continue;
+                // Source fixed during search
+                if (!extractable.containsKey(slot))
+                    extractable.put(slot, source.extractItem(slot, stack.getCount(), true).getCount());
+                int have = left.containsKey(slot) ? left.get(slot) : extractable.get(slot);
+                int take = Math.min(have, need);
+                left.put(slot, have - take);
+                need -= take;
+            }
+            if (need > 0) return false;
+        }
+        return true;
+    }
+
+    @Override
+    public int fit(int target, int sets) {
+        int fit = affordable(sets);
+        for (int i = 0; i < matching.length && fit > 0; i++) {
+            TransferEngine.ItemTransferTarget to = target(target, i);
+            if (to == null) return 0;
+            List<Placement> placements = placements(to.handler(), ingredients.get(i));
+            if (placements.isEmpty()) return 0;
+            for (Placement place : placements) {
+                fit = Math.min(fit, accepted(to, i, fit * place.share(), place.mask()) / place.share());
+            }
+        }
+        return fit;
+    }
+
+    @Override
+    public boolean move(int target, int sets) {
+        for (int i : order) {
+            TransferEngine.ItemTransferTarget to = target(target, i);
+            for (Placement place : placements(to.handler(), ingredients.get(i))) {
+                int amount = sets * place.share();
+                if (move(to, i, amount, place.mask()) < amount) return false;
+            }
+        }
+        return true;
+    }
+
+    // Split shares count across slots
+    private static List<Placement> placements(IItemHandler handler, RecipeCardData.Ingredient ingredient) {
+        if (ingredient.slots().isEmpty()) return List.of(new Placement(null, ingredient.count()));
+        int size = handler.getSlots();
+        if (!ingredient.split()) return List.of(new Placement(mask(size, ingredient.slots()), ingredient.count()));
+        List<Integer> present = ingredient.slots().stream().filter(slot -> slot < size).toList();
+        List<Placement> placements = new ArrayList<>(present.size());
+        for (int k = 0; k < present.size(); k++) {
+            int share = ingredient.count() / present.size() + (k < ingredient.count() % present.size() ? 1 : 0);
+            if (share > 0) placements.add(new Placement(mask(size, List.of(present.get(k))), share));
+        }
+        return placements;
+    }
+
+    private static boolean[] mask(int size, List<Integer> slots) {
+        boolean[] mask = new boolean[size];
+        for (int slot : slots) {
+            if (slot < size) mask[slot] = true;
+        }
+        return mask;
+    }
+
+    private static boolean[] both(boolean[] a, boolean[] b) {
+        boolean[] out = new boolean[Math.min(a.length, b.length)];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = a[i] && b[i];
+        }
+        return out;
+    }
+
+    @Nullable
+    private TransferEngine.ItemTransferTarget target(int endpoint, int ingredient) {
+        return endpoints.get(endpoint).items(ingredients.get(ingredient).side());
+    }
+
+    @Override
+    public void rollback(int target) {
+        for (Moved moved : pending) {
+            TransferEngine.ItemTransferTarget to = moved.to();
+            IItemHandler handler = to.handler();
+            int left = moved.stack().getCount();
+            for (int slot = 0; slot < handler.getSlots() && left > 0; slot++) {
+                if (!ItemStack.isSameItemSameTags(handler.getStackInSlot(slot), moved.stack())) continue;
+                ItemStack back = handler.extractItem(slot, left, false);
+                left -= back.getCount();
+                ItemStack stuck = back.isEmpty() ? back : giveBack(moved.sourceSlot(), back);
+                // Source full, keep in receiver
+                if (!stuck.isEmpty()) stuck = handler.insertItem(slot, stuck, false);
+                if (!stuck.isEmpty()) forceInsert(to, stuck);
+            }
+        }
+        pending.clear();
+    }
+
+    @Override
+    public void commit(int target, @Nullable RecipeSets.Listener listener) {
+        if (listener != null) {
+            for (Moved moved : pending) {
+                listener.moved(target, new FlowResource.Item(moved.stack()), moved.stack().getCount());
+            }
+        }
+        pending.clear();
+    }
+
+    static boolean holds(IItemHandler handler, List<RecipeCardData.Ingredient> blockers,
+            HolderLookup.Provider provider) {
+        for (int slot = 0; slot < handler.getSlots(); slot++) {
+            ItemStack stack = handler.getStackInSlot(slot);
+            if (stack.isEmpty()) continue;
+            for (RecipeCardData.Ingredient blocker : blockers) {
+                if (blocker.matches(stack, provider)) return true;
+            }
+        }
+        return false;
+    }
+
+    // One simulation per exact stack
+    private int accepted(TransferEngine.ItemTransferTarget target, int ingredient, int amount,
+            @Nullable boolean[] mask) {
+        Map<ItemResource, Integer> stock = new LinkedHashMap<>();
+        for (int slot : matching[ingredient]) {
+            ItemStack stack = source.getStackInSlot(slot);
+            if (usable(stack, ingredient)) {
+                stock.merge(ItemResourceOrder.resourceOf(variants, stack), stack.getCount(),
+                        (a, b) -> (int) Math.min((long) a + b, Integer.MAX_VALUE));
+            }
+        }
+        int accepted = 0;
+        for (Map.Entry<ItemResource, Integer> entry : stock.entrySet()) {
+            if (accepted >= amount) break;
+            ItemStack probe = entry.getKey().toStack(Math.min(amount - accepted, entry.getValue()));
+            accepted += probe.getCount() - insert(target, probe, true, mask).getCount();
+        }
+        return accepted;
+    }
+
+    private int move(TransferEngine.ItemTransferTarget target, int ingredient, int amount, @Nullable boolean[] mask) {
+        int left = amount;
+        for (int slot : matching[ingredient]) {
+            if (left <= 0) break;
+            int moved;
+            do {
+                moved = moveFromSlot(target, ingredient, slot, left, mask);
+                left -= moved;
+            } while (moved > 0 && left > 0);
+        }
+        return amount - left;
+    }
+
+    private int moveFromSlot(TransferEngine.ItemTransferTarget target, int ingredient, int slot, int limit,
+            @Nullable boolean[] mask) {
+        ItemStack stack = source.getStackInSlot(slot);
+        if (!usable(stack, ingredient)) return 0;
+        ItemStack probe = stack.copyWithCount(Math.min(limit, stack.getCount()));
+        int fits = probe.getCount() - insert(target, probe, true, mask).getCount();
+        if (fits <= 0) return 0;
+        ItemStack pulled = source.extractItem(slot, fits, false);
+        if (pulled.isEmpty()) return 0;
+        ItemStack rest = insert(target, pulled, false, mask);
+        int moved = pulled.getCount() - rest.getCount();
+        ItemStack stuck = rest.isEmpty() ? rest : giveBack(slot, rest);
+        // Last resort, like executeMove
+        if (!stuck.isEmpty()) moved += stuck.getCount() - forceInsert(target, stuck);
+        if (moved > 0) pending.add(new Moved(slot, pulled.copyWithCount(moved), target));
+        return moved;
+    }
+
+    // Drops what nothing takes
+    private int forceInsert(TransferEngine.ItemTransferTarget target, ItemStack stack) {
+        ItemStack lost = insert(target, stack, false, null);
+        if (!lost.isEmpty()) spill.accept(lost);
+        return lost.getCount();
+    }
+
+    private ItemStack giveBack(int slot, ItemStack stack) {
+        ItemStack left = source.insertItem(slot, stack, false);
+        for (int other = 0; other < source.getSlots() && !left.isEmpty(); other++) {
+            left = source.insertItem(other, left, false);
+        }
+        return left;
+    }
+
+    private ItemStack insert(TransferEngine.ItemTransferTarget target, ItemStack stack, boolean simulate,
+            @Nullable boolean[] slots) {
+        boolean[] allowed = slots;
+        if (target.hasImportSlotMapping()) {
+            boolean[] mapped = TransferEngine.computeImportAllowedSlots(target.handler(), target.importFilters(),
+                    target.importFilterMode(), stack, provider, null, cache);
+            if (mapped == null) return stack;
+            allowed = slots == null ? mapped : both(mapped, slots);
+        } else if (!FilterLogic.matchesItemInSlot(target.importFilters(), target.importFilterMode(), stack,
+                provider, null, cache, -1)) {
+            return stack;
+        }
+        return TransferEngine.insertItemWithAllowedSlots(target.handler(), target.bulkHandler(), stack, simulate,
+                allowed);
+    }
+
+    private boolean usable(ItemStack stack, int ingredient) {
+        return !stack.is(ModTags.RESOURCE_BLACKLIST_ITEMS) && ingredients.get(ingredient).matches(stack, provider);
+    }
+}

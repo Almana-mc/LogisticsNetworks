@@ -14,6 +14,7 @@ import net.minecraftforge.fluids.FluidStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public final class ModFilterData {
 
@@ -21,6 +22,8 @@ public final class ModFilterData {
     private static final String KEY_IS_BLACKLIST = "blacklist";
     private static final String KEY_MODS = "mods";
     private static final String KEY_TARGET_TYPE = "target";
+    private static final int MAX_MODS = 64;
+    private static final int MAX_MOD_ID_LENGTH = 64;
 
     private ModFilterData() {
     }
@@ -91,6 +94,23 @@ public final class ModFilterData {
 
     public static boolean hasAnyMods(ItemStack stack) {
         return !getModFilters(stack).isEmpty();
+    }
+
+    // Rebuilds untrusted mod list
+    public static boolean copySanitized(ItemStack source, ItemStack target) {
+        if (!isModFilter(source) || !isModFilter(target))
+            return false;
+        List<String> mods = getModFilters(source);
+        if (mods.size() > MAX_MODS)
+            return false;
+        setTargetType(target, getTargetType(source));
+        setBlacklist(target, isBlacklist(source));
+        for (String mod : mods) {
+            if (mod.length() > MAX_MOD_ID_LENGTH || !ResourceLocation.isValidNamespace(mod))
+                return false;
+            addModFilter(target, mod);
+        }
+        return true;
     }
 
     public static boolean addModFilter(ItemStack stack, String rawModId) {
@@ -206,10 +226,10 @@ public final class ModFilterData {
         return checkModMatch(stack, id);
     }
 
-    private static String normalizeModId(String modId) {
+    public static String normalizeModId(String modId) {
         if (modId == null)
             return null;
-        String s = modId.trim().toLowerCase();
+        String s = modId.trim().toLowerCase(Locale.ROOT);
         if (s.isEmpty())
             return null;
 

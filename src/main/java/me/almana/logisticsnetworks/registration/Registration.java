@@ -10,21 +10,31 @@ import me.almana.logisticsnetworks.item.ArsSourceUpgradeItem;
 import me.almana.logisticsnetworks.item.MekanismChemicalUpgradeItem;
 import me.almana.logisticsnetworks.item.ModFilterItem;
 import me.almana.logisticsnetworks.item.NameFilterItem;
+import me.almana.logisticsnetworks.item.NetworkUpgradeItem;
 import me.almana.logisticsnetworks.item.NbtFilterItem;
 import me.almana.logisticsnetworks.item.NodeUpgradeItem;
 import me.almana.logisticsnetworks.item.PatternSetterItem;
+import me.almana.logisticsnetworks.item.RecipeCardItem;
 import me.almana.logisticsnetworks.item.SlotFilterItem;
 import me.almana.logisticsnetworks.item.TagFilterItem;
 import me.almana.logisticsnetworks.item.WrenchItem;
 import me.almana.logisticsnetworks.block.ComputerBlock;
+import me.almana.logisticsnetworks.block.ComputerBlockEntity;
+import me.almana.logisticsnetworks.block.ServerRackBlock;
+import me.almana.logisticsnetworks.block.ServerRackBlockEntity;
 import me.almana.logisticsnetworks.recipe.FilterCopyClearRecipe;
+import me.almana.logisticsnetworks.recipe.RecipeCardCopyClearRecipe;
+import me.almana.logisticsnetworks.recipe.WrenchResetRecipe;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.menu.ClipboardMenu;
 import me.almana.logisticsnetworks.menu.ComputerMenu;
 import me.almana.logisticsnetworks.menu.FilterMenu;
 import me.almana.logisticsnetworks.menu.MassPlacementMenu;
+import me.almana.logisticsnetworks.menu.NodeGraphMenu;
 import me.almana.logisticsnetworks.menu.NodeMenu;
 import me.almana.logisticsnetworks.menu.PatternSetterMenu;
+import me.almana.logisticsnetworks.menu.RecipeCardMenu;
+import me.almana.logisticsnetworks.menu.ServerRackMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
@@ -37,6 +47,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.registries.DeferredRegister;
@@ -58,6 +69,8 @@ public class Registration {
                         Logisticsnetworks.MOD_ID);
         public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS = DeferredRegister
                         .create(Registries.RECIPE_SERIALIZER, Logisticsnetworks.MOD_ID);
+        public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES = DeferredRegister
+                        .create(Registries.BLOCK_ENTITY_TYPE, Logisticsnetworks.MOD_ID);
 
         // Some ugly shit I have done here....
         public static final RegistryObject<EntityType<LogisticsNodeEntity>> LOGISTICS_NODE = ENTITIES
@@ -65,7 +78,7 @@ public class Registration {
                                         () -> EntityType.Builder
                                                         .<LogisticsNodeEntity>of(LogisticsNodeEntity::new,
                                                                         MobCategory.MISC)
-                                                        .sized(1.0f, 1.0f)
+                                                        .sized(0.05f, 0.05f)
                                                         .clientTrackingRange(4)
                                                         .updateInterval(40)
                                                         .build("logistics_node"));
@@ -76,18 +89,30 @@ public class Registration {
 
         public static final RegistryObject<ComputerBlock> COMPUTER_BLOCK = BLOCKS.register("computer",
                         () -> new ComputerBlock());
+        public static final RegistryObject<BlockEntityType<ComputerBlockEntity>> COMPUTER_BLOCK_ENTITY = BLOCK_ENTITY_TYPES
+                        .register("computer", () -> BlockEntityType.Builder.of(
+                                        ComputerBlockEntity::new,
+                                        COMPUTER_BLOCK.get()).build(null));
         public static final RegistryObject<BlockItem> COMPUTER_ITEM = ITEMS.register("computer",
                         () -> new BlockItem(COMPUTER_BLOCK.get(), new Item.Properties()));
+        public static final RegistryObject<ServerRackBlock> SERVER_RACK_BLOCK = BLOCKS.register("server_rack",
+                        () -> new ServerRackBlock());
+        public static final RegistryObject<BlockItem> SERVER_RACK_ITEM = ITEMS.register("server_rack",
+                        () -> new BlockItem(SERVER_RACK_BLOCK.get(), new Item.Properties()));
+        public static final RegistryObject<BlockEntityType<ServerRackBlockEntity>> SERVER_RACK_BLOCK_ENTITY = BLOCK_ENTITY_TYPES
+                        .register("server_rack", () -> BlockEntityType.Builder.of(
+                                        ServerRackBlockEntity::new,
+                                        SERVER_RACK_BLOCK.get()).build(null));
 
         public static final RegistryObject<WrenchItem> WRENCH = ITEMS.register("wrench",
                         () -> new WrenchItem(new Item.Properties().stacksTo(1)));
 
         public static final RegistryObject<BaseFilterItem> SMALL_FILTER = ITEMS.register("small_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 9));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
         public static final RegistryObject<BaseFilterItem> MEDIUM_FILTER = ITEMS.register("medium_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 18));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
         public static final RegistryObject<BaseFilterItem> BIG_FILTER = ITEMS.register("big_filter",
-                        () -> new BaseFilterItem(new Item.Properties(), 27));
+                        () -> new BaseFilterItem(new Item.Properties(), 45));
 
         public static final RegistryObject<TagFilterItem> TAG_FILTER = ITEMS.register("tag_filter",
                         () -> new TagFilterItem(new Item.Properties()));
@@ -105,14 +130,14 @@ public class Registration {
                         () -> new NameFilterItem(new Item.Properties()));
 
         public static final RegistryObject<NodeUpgradeItem> IRON_UPGRADE = ITEMS.register("iron_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 16, 1_000, 10_000, 10));
+                        () -> new NodeUpgradeItem(new Item.Properties()));
         public static final RegistryObject<NodeUpgradeItem> GOLD_UPGRADE = ITEMS.register("gold_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 32, 5_000, 50_000, 5));
+                        () -> new NodeUpgradeItem(new Item.Properties()));
         public static final RegistryObject<NodeUpgradeItem> DIAMOND_UPGRADE = ITEMS.register("diamond_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 64, 20_000, 250_000, 1));
+                        () -> new NodeUpgradeItem(new Item.Properties()));
         public static final RegistryObject<NodeUpgradeItem> NETHERITE_UPGRADE = ITEMS.register(
                         "netherite_upgrade",
-                        () -> new NodeUpgradeItem(new Item.Properties(), 10_000, 1_000_000, Integer.MAX_VALUE, 1));
+                        () -> new NodeUpgradeItem(new Item.Properties()));
 
         public static final RegistryObject<DimensionalUpgradeItem> DIMENSIONAL_UPGRADE = ITEMS.register(
                         "dimensional_upgrade",
@@ -128,10 +153,17 @@ public class Registration {
                                         "ars_source_upgrade",
                                         () -> new ArsSourceUpgradeItem(new Item.Properties()));
 
+        public static final RegistryObject<NetworkUpgradeItem> NETWORK_UPGRADE = ITEMS.register(
+                        "network_upgrade",
+                        () -> new NetworkUpgradeItem(new Item.Properties()));
+
         public static final RegistryObject<PatternSetterItem> PATTERN_SETTER = ITEMS
                         .register(
                                         "pattern_setter",
                                         () -> new PatternSetterItem(new Item.Properties()));
+
+        public static final RegistryObject<RecipeCardItem> RECIPE_CARD = ITEMS.register("recipe_card",
+                        () -> new RecipeCardItem(new Item.Properties()));
 
         public static final RegistryObject<MenuType<NodeMenu>> NODE_MENU = MENUS.register("node_menu",
                         () -> IForgeMenuType.create(NodeMenu::new));
@@ -152,10 +184,26 @@ public class Registration {
         public static final RegistryObject<MenuType<ComputerMenu>> COMPUTER_MENU = MENUS.register(
                         "computer_menu",
                         () -> IForgeMenuType.create(ComputerMenu::new));
+        public static final RegistryObject<MenuType<NodeGraphMenu>> NODE_GRAPH_MENU = MENUS.register(
+                        "node_graph_menu",
+                        () -> IForgeMenuType.create(NodeGraphMenu::new));
+        public static final RegistryObject<MenuType<ServerRackMenu>> SERVER_RACK_MENU = MENUS.register(
+                        "server_rack_menu",
+                        () -> IForgeMenuType.create(ServerRackMenu::new));
+
+        public static final RegistryObject<MenuType<RecipeCardMenu>> RECIPE_CARD_MENU = MENUS.register(
+                        "recipe_card_menu",
+                        () -> IForgeMenuType.create(RecipeCardMenu::new));
 
         public static final RegistryObject<SimpleCraftingRecipeSerializer<FilterCopyClearRecipe>> FILTER_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
                         .register("filter_copy_clear",
                                         () -> new SimpleCraftingRecipeSerializer<>(FilterCopyClearRecipe::new));
+        public static final RegistryObject<SimpleCraftingRecipeSerializer<WrenchResetRecipe>> WRENCH_RESET_RECIPE = RECIPE_SERIALIZERS
+                        .register("wrench_reset",
+                                        () -> new SimpleCraftingRecipeSerializer<>(WrenchResetRecipe::new));
+        public static final RegistryObject<SimpleCraftingRecipeSerializer<RecipeCardCopyClearRecipe>> RECIPE_CARD_COPY_CLEAR_RECIPE = RECIPE_SERIALIZERS
+                        .register("recipe_card_copy_clear",
+                                        () -> new SimpleCraftingRecipeSerializer<>(RecipeCardCopyClearRecipe::new));
 
         public static final RegistryObject<CreativeModeTab> TAB = CREATIVE_TABS.register(
                         "logistics_tab",
@@ -165,6 +213,15 @@ public class Registration {
                                         .displayItems((params, output) -> {
                                                 ITEMS.getEntries().stream()
                                                                 .map(Supplier::get)
+                                                                .filter(item -> !(item instanceof PatternSetterItem))
+                                                                .filter(item -> !(item instanceof BaseFilterItem))
+                                                                .filter(item -> !(item instanceof ModFilterItem))
+                                                                .filter(item -> !(item instanceof NameFilterItem))
+                                                                .filter(item -> !(item instanceof TagFilterItem))
+                                                                .filter(item -> !(item instanceof AmountFilterItem))
+                                                                .filter(item -> !(item instanceof DurabilityFilterItem))
+                                                                .filter(item -> !(item instanceof NbtFilterItem))
+                                                                .filter(item -> !(item instanceof SlotFilterItem))
                                                                 .forEach(output::accept);
                                         })
                                         .build());
@@ -174,6 +231,7 @@ public class Registration {
                 BLOCKS.register(modEventBus);
                 ITEMS.register(modEventBus);
                 MENUS.register(modEventBus);
+                BLOCK_ENTITY_TYPES.register(modEventBus);
                 RECIPE_SERIALIZERS.register(modEventBus);
                 CREATIVE_TABS.register(modEventBus);
         }

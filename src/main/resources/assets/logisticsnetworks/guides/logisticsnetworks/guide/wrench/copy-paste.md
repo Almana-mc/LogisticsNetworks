@@ -9,11 +9,11 @@ navigation:
 
 This mode turns the wrench into a clipboard tool. You copy a fully configured node onto the wrench, then paste that setup onto other nodes — one at a time, or in bulk across every matching connected block. Copy/Paste also has a dedicated editor screen if you want to build a template directly on the wrench without touching a live node.
 
-Switch to Copy/Paste with **Shift + mouse wheel**. The HUD overlay confirms the mode.
+Switch to Copy/Paste with **Modifier Key 1 (default: Shift) + Mouse Wheel**. The HUD overlay confirms the mode.
 
 ## Copy a Node
 
-**Right-click a configured node** with the wrench. The wrench clipboard is replaced with a full copy of the node's setup:
+Use **Secondary Interaction (default: Right Click)** on a configured node with the wrench. The wrench clipboard is replaced with a full copy of the node's setup:
 
 - All 9 channels (status, mode, type, side, redstone, distribution, priority, batch, delay, channel name).
 - Every filter item in every channel's filter grid.
@@ -26,7 +26,7 @@ Nothing is removed from the node — copying is non-destructive. The clipboard i
 
 ## Paste Onto a Node
 
-**Shift + right-click a node** with the wrench. The wrench tries to apply its clipboard to the target node. Three things happen on a successful paste:
+Use **Modifier Key 1 + Secondary Interaction** on a node with the wrench. The wrench tries to apply its clipboard to the target node. Three things happen on a successful paste:
 
 1. The target node's channels, filters, and upgrades are overwritten with the clipboard's setup.
 2. Any filter or upgrade items that the target needs and is missing are **pulled out of your inventory automatically**. The wrench figures out what it has to consume.
@@ -47,9 +47,9 @@ If you do not want the label to carry over, edit the clipboard (see below) and c
 
 ## Bulk Paste to Connected Blocks
 
-**Ctrl + right-click a node** in Copy/Paste mode. The wrench flood-fills from that node through every **connected block of the same block type** (scanning up to 16,384 blocks) and pastes the clipboard onto every node it finds on that connected run.
+Use **Modifier Key 2 (default: Ctrl) + Secondary Interaction** on a node in Copy/Paste mode. The wrench flood-fills from that node through every **connected block of the same block type** (scanning up to 16,384 blocks) and pastes the clipboard onto every node it finds on that connected run.
 
-Typical use: you have a long row of 20 furnaces with nodes on each one. Configure one furnace node, copy it, then Ctrl + right-click any of the 20 — all 19 others are updated at once.
+Typical use: you have a long row of 20 furnaces with nodes on each one. Configure one furnace node, copy it, then use Modifier Key 2 + Secondary Interaction on any of the 20 — all 19 others are updated at once.
 
 Inventory consumption rules still apply per node: if you run out of filter or upgrade items mid-paste, the remaining nodes are skipped and the wrench tells you how many were applied.
 
@@ -57,7 +57,7 @@ Inventory consumption rules still apply per node: if you run out of filter or up
 
 Instead of copying from a live node, you can build a template directly on the wrench.
 
-**Right-click air** (no block in front of you) in Copy/Paste mode. The Clipboard Editor screen opens. Inside you can:
+Use **Secondary Interaction** on air (no block in front of you) in Copy/Paste mode. The Clipboard Editor screen opens. Inside you can:
 
 - Edit every channel setting (status, mode, type, side, redstone, distribution, priority, batch, delay, name) exactly as you would on a real node.
 - Drag filter items from your inventory into the filter slots; drag them back to remove.

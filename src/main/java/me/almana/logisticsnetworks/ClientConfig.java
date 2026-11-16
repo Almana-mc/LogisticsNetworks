@@ -14,6 +14,14 @@ public class ClientConfig {
 
     private static final ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
 
+    public static final ForgeConfigSpec.BooleanValue invertCopyPasteControlsSpec = builder
+            .comment("Invert the wrench copy/paste controls so right-click pastes and modifier 1 + right-click copies.")
+            .define("invertCopyPasteControls", false);
+
+    public static final ForgeConfigSpec.BooleanValue confirmNetworkCreationSpec = builder
+            .comment("Ask for confirmation before creating a network.")
+            .define("confirmNetworkCreation", true);
+
     public static final ForgeConfigSpec.IntValue maxRenderedNodesSpec = builder
             .comment("Maximum number of nodes rendered when holding a wrench. Nearest nodes are prioritized.")
             .defineInRange("maxRenderedNodes", 200, 1, Integer.MAX_VALUE);
@@ -22,6 +30,10 @@ public class ClientConfig {
             .comment("Maximum number of visible node models rendered. Nearest nodes are prioritized. 0 = unlimited.")
             .defineInRange("maxVisibleNodes", 500, 0, Integer.MAX_VALUE);
 
+    public static final ForgeConfigSpec.BooleanValue connectedNodeTexturesSpec = builder
+            .comment("Whether adjacent visible nodes should render as connected.")
+            .define("connectedNodeTextures", true);
+
     private static final List<String> THEMES = List.of(
             "light", "dark", "redstone", "nebula", "glass", "terminal", "pastel", "brutalist");
 
@@ -29,10 +41,18 @@ public class ClientConfig {
             .comment("GUI theme for logistics node screens: light, dark, redstone, nebula, glass, terminal, pastel, brutalist")
             .define("theme", "dark", o -> o instanceof String s && THEMES.contains(s));
 
+    public static final ForgeConfigSpec.BooleanValue defaultNodeVisibilitySpec = builder
+            .comment("Whether newly placed nodes should be visible by default.")
+            .define("defaultNodeVisibility", true);
+
     static final ForgeConfigSpec SPEC = builder.build();
 
+    public static boolean invertCopyPasteControls = false;
+    public static boolean confirmNetworkCreation = true;
+    public static boolean defaultNodeVisibility = true;
     public static int maxRenderedNodes = 200;
     public static int maxVisibleNodes = 500;
+    public static boolean connectedNodeTextures = true;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -41,8 +61,12 @@ public class ClientConfig {
     }
 
     public static void refresh() {
+        invertCopyPasteControls = invertCopyPasteControlsSpec.get();
+        confirmNetworkCreation = confirmNetworkCreationSpec.get();
+        defaultNodeVisibility = defaultNodeVisibilitySpec.get();
         maxRenderedNodes = maxRenderedNodesSpec.get();
         maxVisibleNodes = maxVisibleNodesSpec.get();
+        connectedNodeTextures = connectedNodeTexturesSpec.get();
         ThemeState.applyFromConfig(themeSpec.get());
     }
 }
