@@ -27,6 +27,10 @@ public class Config {
             .comment("Controls who can access nodes and networks. Allowed values: Teams, All, Allies.")
             .define("nodeAccessMode", "Teams", value -> value instanceof String name && NODE_ACCESS_MODES.contains(name));
 
+    public static final ModConfigSpec.BooleanValue alignChannelDelaysSpec = builder
+            .comment("Run channels on shared tick boundaries, so channels with the same delay transfer on the same tick. Can cause tick spikes on large bases.")
+            .define("alignChannelDelays", false);
+
     public static final ModConfigSpec.IntValue backoffMaxTicksSpec;
     public static final ModConfigSpec.BooleanValue backoffItemSpec;
     public static final ModConfigSpec.BooleanValue backoffFluidSpec;
@@ -70,6 +74,7 @@ public class Config {
 
     public static boolean dropNodeItem;
     public static boolean debugMode;
+    public static boolean alignChannelDelays;
     public static NodeAccessMode nodeAccessMode = NodeAccessMode.TEAMS;
     public static int backoffMaxTicks = 40;
     public static boolean asyncPlanning = false;
@@ -87,6 +92,7 @@ public class Config {
     public static void refresh() {
         dropNodeItem = dropNodeItemSpec.get();
         debugMode = debugModeSpec.get();
+        alignChannelDelays = alignChannelDelaysSpec.get();
         nodeAccessMode = NodeAccessMode.fromSerializedName(nodeAccessModeSpec.get());
         backoffMaxTicks = backoffMaxTicksSpec.get();
         asyncPlanning = asyncPlanningSpec.get();

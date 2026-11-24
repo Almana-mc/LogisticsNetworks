@@ -332,8 +332,17 @@ public class TransferEngine {
         long configuredDelay = configuredDelay(channel, lane, tier);
         float backoff = node.getBackoffTicks(index, lane);
         long effectiveDelay = backoffEnabled(lane) ? Math.max(configuredDelay, (long) backoff) : configuredDelay;
+        if (Config.alignChannelDelays) {
+            return alignedRemaining(lastRun, configuredDelay, effectiveDelay, gameTime);
+        }
         long elapsed = gameTime - lastRun;
         return Math.max(0L, effectiveDelay - elapsed);
+    }
+
+    // Next shared boundary after lastRun
+    static long alignedRemaining(long lastRun, long delay, long effectiveDelay, long gameTime) {
+        long step = (effectiveDelay + delay - 1) / delay * delay;
+        return Math.max(0L, (Math.floorDiv(lastRun, step) + 1) * step - gameTime);
     }
 
     private static int configuredDelay(ChannelData channel, int lane, int tier) {
