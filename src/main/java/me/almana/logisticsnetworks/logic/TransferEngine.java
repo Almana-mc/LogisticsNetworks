@@ -42,7 +42,6 @@ import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.items.IItemHandlerModifiable;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -1523,9 +1522,6 @@ public class TransferEngine {
                     ? ItemHandlerHelper.insertItemStacked(handler, stack, simulate)
                     : insertUnstackableItem(handler, stack, simulate);
         }
-        if (handler instanceof IItemHandlerModifiable modifiable && !(handler instanceof SnapshotItemHandler)) {
-            return insertItemStrictAllowedSlots(modifiable, stack, simulate, allowedSlots);
-        }
 
         ItemStack remaining = stack.copy();
 
@@ -1582,67 +1578,6 @@ public class TransferEngine {
             return DirectStorageHandlers.insertItem(handler, stack, simulate);
         }
         return SophisticatedCoreCompat.insertItem(handler, stack, simulate);
-    }
-
-    private static ItemStack insertItemStrictAllowedSlots(IItemHandlerModifiable handler, ItemStack stack,
-            boolean simulate, boolean[] allowedSlots) {
-        ItemStack remaining = stack.copy();
-
-        for (int pass = 0; pass < 2 && !remaining.isEmpty(); pass++) {
-            boolean mergePass = pass == 0;
-
-            for (int slot = 0; slot < handler.getSlots() && !remaining.isEmpty(); slot++) {
-                if (slot >= allowedSlots.length || !allowedSlots[slot]) {
-                    continue;
-                }
-
-                ItemStack slotStack = handler.getStackInSlot(slot);
-                boolean slotEmpty = slotStack.isEmpty();
-
-                if (mergePass && slotEmpty) {
-                    continue;
-                }
-                if (!mergePass && !slotEmpty) {
-                    continue;
-                }
-                if (!slotEmpty && !ItemStack.isSameItemSameComponents(slotStack, remaining)) {
-                    continue;
-                }
-                if (!handler.isItemValid(slot, remaining)) {
-                    continue;
-                }
-
-                int slotLimit = Math.min(handler.getSlotLimit(slot), remaining.getMaxStackSize());
-                if (!slotEmpty) {
-                    slotLimit = Math.min(slotLimit, slotStack.getMaxStackSize());
-                }
-
-                int currentCount = slotEmpty ? 0 : slotStack.getCount();
-                int space = slotLimit - currentCount;
-                if (space <= 0) {
-                    continue;
-                }
-
-                int toInsert = Math.min(space, remaining.getCount());
-                if (toInsert <= 0) {
-                    continue;
-                }
-
-                if (!simulate) {
-                    if (slotEmpty) {
-                        handler.setStackInSlot(slot, remaining.copyWithCount(toInsert));
-                    } else {
-                        ItemStack updated = slotStack.copy();
-                        updated.grow(toInsert);
-                        handler.setStackInSlot(slot, updated);
-                    }
-                }
-
-                remaining.shrink(toInsert);
-            }
-        }
-
-        return remaining;
     }
 
     public record FluidTransferTarget(IFluidHandler handler, ItemStack[] filters, FilterMode mode,
