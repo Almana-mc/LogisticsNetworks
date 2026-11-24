@@ -7,6 +7,8 @@ import me.almana.logisticsnetworks.data.DistributionMode;
 import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.filter.FilterItemData;
+import me.almana.logisticsnetworks.filter.ModFilterData;
+import me.almana.logisticsnetworks.filter.NameFilterData;
 import me.almana.logisticsnetworks.integration.mekanism.DirectChemicalHandler;
 import me.almana.logisticsnetworks.integration.storage.DirectStorageHandlers;
 import me.almana.logisticsnetworks.upgrade.NodeUpgradeData;
@@ -19,6 +21,7 @@ import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -40,10 +43,14 @@ final class RecipeChannel {
                 .toList();
     }
 
-    // Cards allow loose entries only
+    // Cards allow whitelist entries only
     static boolean runsLoose(ChannelData channel, ChannelType type) {
-        ItemStack[] filters = channel.getFilterItems();
         FilterItemData.ReadCache cache = FilterItemData.createReadCache();
+        ItemStack[] filters = Arrays.stream(channel.getFilterItems())
+                .filter(filter -> !FilterItemData.isBlacklist(filter, cache)
+                        && !ModFilterData.isBlacklist(filter, cache)
+                        && !NameFilterData.isBlacklist(filter, cache))
+                .toArray(ItemStack[]::new);
         return switch (type) {
             case ITEM -> FilterLogic.hasConfiguredItemFilter(filters, cache);
             case FLUID -> FilterLogic.hasConfiguredFluidFilter(filters, cache);
