@@ -3,6 +3,7 @@ package me.almana.logisticsnetworks.client.flow;
 import com.mojang.blaze3d.vertex.PoseStack;
 import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.LogisticsNetworks;
+import me.almana.logisticsnetworks.client.LogisticsNodeRenderer;
 import me.almana.logisticsnetworks.client.ModRenderTypes;
 import me.almana.logisticsnetworks.component.WrenchFlow;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -23,6 +24,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,11 +37,13 @@ public final class WrenchFlowRenderer {
     private static final FlowFrame FRAME = new FlowFrame();
     private static final FlowAnimation ANIMATION = new FlowAnimation();
     private static final Map<FlowTopology.Key, FlowBundle> BUNDLES = new HashMap<>();
+    private static final List<LogisticsNodeEntity> UNRENDERED = new ArrayList<>();
     private static List<FlowTopology.Node> nodeSnapshot = List.of();
     private static List<FlowTopology.Bundle> topology = List.of();
     private static WrenchFlow flow = WrenchFlow.DEFAULT;
     private static WrenchFlow appliedFlow;
     private static ClientLevel world;
+    private static long unrenderedTick = -5;
 
     private WrenchFlowRenderer() {
     }
@@ -58,10 +62,18 @@ public final class WrenchFlowRenderer {
         }
     }
 
-    // ponytail: per-frame full entity scan
+    // candidates refresh every 5 ticks
     private static void recordUnrendered(ClientLevel level, float partialTick, Vec3 camera) {
-        for (Entity entity : level.entitiesForRendering()) {
-            if (!(entity instanceof LogisticsNodeEntity node) || FRAME.contains(node.getUUID()) || !routed(node)) continue;
+        long tick = level.getGameTime();
+        if (tick - unrenderedTick >= 5) {
+            unrenderedTick = tick;
+            UNRENDERED.clear();
+            for (Entity entity : level.entitiesForRendering()) {
+                if (entity instanceof LogisticsNodeEntity node && LogisticsNodeRenderer.isWrenchVisible(node)) UNRENDERED.add(node);
+            }
+        }
+        for (LogisticsNodeEntity node : UNRENDERED) {
+            if (FRAME.contains(node.getUUID()) || !routed(node)) continue;
             NodeRenderContext context = CreateCompat.getRenderContext(node, partialTick);
             if (context != null && context.position().distanceToSqr(camera) <= OFFSCREEN_RANGE_SQR) FRAME.record(topologyNode(node), FlowAnchor.fromContext(context));
         }
@@ -165,6 +177,8 @@ public final class WrenchFlowRenderer {
         FRAME.clear();
         ANIMATION.reset();
         BUNDLES.clear();
+        UNRENDERED.clear();
+        unrenderedTick = -5;
         nodeSnapshot = List.of();
         topology = List.of();
         appliedFlow = null;
