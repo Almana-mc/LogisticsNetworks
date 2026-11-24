@@ -69,6 +69,7 @@ public final class GraphCanvas {
     private boolean fitPending;
     private ChannelType lastLegendType;
     private long lastLegendClickAt;
+    private int channelFilter = GraphChannelFilter.ALL;
 
     public GraphCanvas(Consumer<UUID> selectionChanged,
                        Consumer<Map<String, GraphPosition>> positionsMoved) {
@@ -189,6 +190,15 @@ public final class GraphCanvas {
         return false;
     }
 
+    public int channelFilter() {
+        return channelFilter;
+    }
+
+    public void cycleChannelFilter() {
+        channelFilter = GraphChannelFilter.next(channelFilter);
+        rebuildConnections();
+    }
+
     private void pressLegend(ChannelType type, long clickedAt) {
         boolean doubleClick = type == lastLegendType && clickedAt >= lastLegendClickAt
                 && clickedAt - lastLegendClickAt <= DOUBLE_CLICK_MILLIS;
@@ -208,6 +218,9 @@ public final class GraphCanvas {
     }
 
     private boolean isVisible(NetworkGraph.Vertex vertex) {
+        if (channelFilter != GraphChannelFilter.ALL) {
+            return GraphChannelFilter.roles(vertex.members(), channelFilter, enabledTypes) != 0;
+        }
         boolean hasChannels = false;
         for (GraphNode member : vertex.members()) {
             for (GraphChannel channel : member.channels()) {
@@ -462,7 +475,9 @@ public final class GraphCanvas {
             connections.put(type, new ConnectionBatch(capacities.get(type)));
         }
 
-        List<NetworkGraph.Edge> edges = graph.edges();
+        List<NetworkGraph.Edge> edges = graph.edges().stream()
+                .filter(edge -> GraphChannelFilter.carries(edge, channelFilter))
+                .toList();
         int runStart = 0;
         while (runStart < edges.size()) {
             NetworkGraph.Edge first = edges.get(runStart);
@@ -546,7 +561,27 @@ public final class GraphCanvas {
                 int labelX = centerX - font.width(label) / 2;
                 graphics.drawString(font, label, labelX, centerY + NODE_HALF_HEIGHT + 4, theme.text(), false);
             }
+            if (camera.zoom() >= 0.45f || focused) {
+                drawRoleBadge(graphics, font, vertex, centerX, centerY, theme);
+            }
         }
+    }
+
+    private void drawRoleBadge(GuiGraphics graphics, Font font, NetworkGraph.Vertex vertex,
+                               int centerX, int centerY, Theme theme) {
+        int roles = GraphChannelFilter.roles(vertex.members(), channelFilter, enabledTypes);
+        if (roles == 0) return;
+        boolean sender = roles == GraphChannelFilter.SENDER;
+        boolean receiver = roles == GraphChannelFilter.RECEIVER;
+        Component badge = Component.translatable("gui.logisticsnetworks.graph.role."
+                + (sender ? "sender" : receiver ? "receiver" : "both"));
+        int color = sender ? theme.accent() : receiver ? theme.info() : theme.warn();
+        int x = centerX + NODE_RADIUS / 2;
+        int y = centerY - NODE_HALF_HEIGHT - 5;
+        int width = font.width(badge) + 4;
+        graphics.fill(x, y, x + width, y + 10, theme.surface());
+        graphics.renderOutline(x, y, width, 10, color);
+        graphics.drawString(font, badge, x + 2, y + 1, color, false);
     }
 
     static ItemStack iconFor(NetworkGraph.Vertex vertex, UUID selectedMember) {
@@ -752,7 +787,7 @@ public final class GraphCanvas {
                 if (routeIndex++ >= MAX_TOOLTIP_ROUTES) {
                     break;
                 }
-                lines.add(Component.translatable("gui.logisticsnetworks.graph.route", route.index() + 1,
+                lines.add(Component.translatable("gui.logisticsnetworks.graph.route", route.index(),
                         channelName(route.type()), modeName(route.mode())).withColor(rgb(theme.textSubtle())));
             }
             if (routes.size() > MAX_TOOLTIP_ROUTES) {

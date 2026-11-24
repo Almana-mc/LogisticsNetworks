@@ -57,6 +57,7 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
     private long panelAnimationStartedAt = -1;
     private Button previousButton;
     private Button nextButton;
+    private Button channelButton;
     private LabelConfirmation labelConfirmation;
     private boolean labelRequestPending;
     private UUID labelRequestId;
@@ -97,6 +98,8 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
         addButton(width - 224, 8, 48, "back", this::returnToComputer);
         addButton(width - 170, 8, 46, "fit", () -> canvas().fit());
         addButton(width - 118, 8, 110, "reset", this::resetLayout);
+        channelButton = addRenderableWidget(new GraphButton(width - 300, 8, 72, channelLabel(),
+                this::cycleChannel, this::theme));
         if (menu.getNode() != null) {
             previousButton = addIconButton(leftPos + 6, topPos - 16, "previous", PREVIOUS_ICON,
                     () -> selectMember(-1));
@@ -112,6 +115,17 @@ public class NodeGraphScreen extends NodeEditorScreen<NodeGraphMenu> {
 
     private Button addIconButton(int x, int y, String key, ResourceLocation icon, Runnable action) {
         return addRenderableWidget(new GraphIconButton(x, y, text(key), action, this::theme, icon));
+    }
+
+    private void cycleChannel() {
+        canvas().cycleChannelFilter();
+        channelButton.setMessage(channelLabel());
+    }
+
+    private Component channelLabel() {
+        int channel = canvas().channelFilter();
+        Object value = channel < 0 ? text("channel_filter.all") : channel;
+        return Component.translatable("gui.logisticsnetworks.graph.channel_filter", value);
     }
 
     @Override
