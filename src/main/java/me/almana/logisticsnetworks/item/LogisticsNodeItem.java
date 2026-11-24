@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.item;
 
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
@@ -66,6 +67,9 @@ public class LogisticsNodeItem extends Item {
 
         if (player != null && !ServerPayloadHandler.getDefaultNodeVisibility(player)) {
             node.setRenderVisible(false);
+        }
+        if (player != null && ServerPayloadHandler.getSidesFromClickedFace(player)) {
+            NodePlacementHelper.setChannelSides(node, IoSide.of(context.getClickedFace()));
         }
 
         tryAutoPasteFromOffhandWrench(context, node);

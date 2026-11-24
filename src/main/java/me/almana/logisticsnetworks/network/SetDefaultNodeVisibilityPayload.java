@@ -6,7 +6,8 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-public record SetDefaultNodeVisibilityPayload(boolean visible) implements CustomPacketPayload {
+public record SetDefaultNodeVisibilityPayload(boolean visible, boolean sidesFromClickedFace)
+        implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<SetDefaultNodeVisibilityPayload> TYPE =
             new CustomPacketPayload.Type<>(
@@ -16,11 +17,12 @@ public record SetDefaultNodeVisibilityPayload(boolean visible) implements Custom
             StreamCodec.of(SetDefaultNodeVisibilityPayload::write, SetDefaultNodeVisibilityPayload::read);
 
     public static SetDefaultNodeVisibilityPayload read(FriendlyByteBuf buf) {
-        return new SetDefaultNodeVisibilityPayload(buf.readBoolean());
+        return new SetDefaultNodeVisibilityPayload(buf.readBoolean(), buf.readBoolean());
     }
 
     public static void write(FriendlyByteBuf buf, SetDefaultNodeVisibilityPayload payload) {
         buf.writeBoolean(payload.visible);
+        buf.writeBoolean(payload.sidesFromClickedFace);
     }
 
     @Override

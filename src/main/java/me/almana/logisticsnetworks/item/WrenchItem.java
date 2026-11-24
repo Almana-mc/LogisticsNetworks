@@ -9,6 +9,7 @@ import me.almana.logisticsnetworks.component.WrenchColors;
 import me.almana.logisticsnetworks.component.WrenchFlow;
 import me.almana.logisticsnetworks.component.WrenchMassPlacement;
 import me.almana.logisticsnetworks.data.ChannelType;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.data.NetworkRegistry;
 import me.almana.logisticsnetworks.data.NodeClipboardConfig;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -569,6 +570,7 @@ public class WrenchItem extends Item {
         StorageLink storageLink = null;
         StorageAccess access = null;
         boolean renderVisible = ServerPayloadHandler.getDefaultNodeVisibility(player);
+        IoSide side = ServerPayloadHandler.getSidesFromClickedFace(player) ? IoSide.of(context.getClickedFace()) : null;
 
         if (!player.hasInfiniteMaterials()) {
             inventorySlot = findNodeItemSlot(player.getInventory());
@@ -583,7 +585,7 @@ public class WrenchItem extends Item {
                 }
                 if (access.count(nodeItem) < 1) {
                     LinkedStorage.NodePlacementRequestResult result = LinkedStorage.requestNodePlacement(player,
-                            target, storageLink, renderVisible);
+                            target, storageLink, renderVisible, side);
                     player.displayClientMessage(Component.translatable(switch (result) {
                         case QUEUED -> "message.logisticsnetworks.wrench.place_node.queued";
                         case DUPLICATE -> "message.logisticsnetworks.wrench.place_node.duplicate";
@@ -609,6 +611,7 @@ public class WrenchItem extends Item {
         }
 
         node.setRenderVisible(renderVisible);
+        if (side != null) NodePlacementHelper.setChannelSides(node, side);
         level.playSound(null, pos, SoundEvents.METAL_PLACE, SoundSource.BLOCKS, 1.0f, 1.0f);
         player.displayClientMessage(Component.translatable(fromInventory
                 ? "message.logisticsnetworks.wrench.place_node.inventory"

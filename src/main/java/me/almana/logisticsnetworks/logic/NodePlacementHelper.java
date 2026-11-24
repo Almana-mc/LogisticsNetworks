@@ -1,5 +1,7 @@
 package me.almana.logisticsnetworks.logic;
 
+import me.almana.logisticsnetworks.data.ChannelData;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.integration.ars.ArsCompat;
 import me.almana.logisticsnetworks.integration.mekanism.MekanismCompat;
@@ -111,5 +113,11 @@ public final class NodePlacementHelper {
         }
 
         return node;
+    }
+
+    public static void setChannelSides(LogisticsNodeEntity node, IoSide side) {
+        for (ChannelData channel : node.getChannels()) {
+            channel.setIoSide(side);
+        }
     }
 }

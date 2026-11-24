@@ -67,6 +67,7 @@ public class ServerPayloadHandler {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<UUID, Boolean> DEFAULT_NODE_VISIBILITY = new HashMap<>();
+    private static final Set<UUID> SIDES_FROM_CLICKED_FACE = new HashSet<>();
     private static final Map<UUID, Integer> MODIFIER_KEYS = new HashMap<>();
 
     public static void handleRequestStorageUpgradeCatalog(RequestStorageUpgradeCatalogPayload payload,
@@ -524,6 +525,8 @@ public class ServerPayloadHandler {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer player) {
                 DEFAULT_NODE_VISIBILITY.put(player.getUUID(), payload.visible());
+                if (payload.sidesFromClickedFace()) SIDES_FROM_CLICKED_FACE.add(player.getUUID());
+                else SIDES_FROM_CLICKED_FACE.remove(player.getUUID());
             }
         });
     }
@@ -532,8 +535,13 @@ public class ServerPayloadHandler {
         return DEFAULT_NODE_VISIBILITY.getOrDefault(player.getUUID(), true);
     }
 
+    public static boolean getSidesFromClickedFace(Player player) {
+        return SIDES_FROM_CLICKED_FACE.contains(player.getUUID());
+    }
+
     public static void clearDefaultNodeVisibility(Player player) {
         DEFAULT_NODE_VISIBILITY.remove(player.getUUID());
+        SIDES_FROM_CLICKED_FACE.remove(player.getUUID());
     }
 
     public static void handleSyncModifierKeys(SyncModifierKeysPayload payload, IPayloadContext context) {

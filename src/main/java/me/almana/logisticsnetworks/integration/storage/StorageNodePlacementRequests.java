@@ -1,5 +1,6 @@
 package me.almana.logisticsnetworks.integration.storage;
 
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
 import me.almana.logisticsnetworks.logic.NodePlacementHelper;
 import me.almana.logisticsnetworks.network.SyncQueuedNodePlacementPayload;
@@ -13,6 +14,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,7 +31,8 @@ final class StorageNodePlacementRequests {
     }
 
     static LinkedStorage.NodePlacementRequestResult request(ServerPlayer player, GlobalPos target,
-                                                             StorageLink link, boolean renderVisible) {
+                                                             StorageLink link, boolean renderVisible,
+                                                             @Nullable IoSide side) {
         if (isQueued(target)) return LinkedStorage.NodePlacementRequestResult.DUPLICATE;
         StorageAccess access = LinkedStorage.resolve(player.serverLevel(), link);
         ItemStack nodeStack = Registration.LOGISTICS_NODE_ITEM.get().getDefaultInstance();
@@ -50,7 +53,7 @@ final class StorageNodePlacementRequests {
         QueueKey queueKey = new QueueKey(player.getUUID(), link);
         PlacementGroup group = GROUPS.computeIfAbsent(queueKey,
                 ignored -> new PlacementGroup(player.getServer(), player.getUUID(), access));
-        if (!group.add(target, renderVisible)) return LinkedStorage.NodePlacementRequestResult.DUPLICATE;
+        if (!group.add(target, renderVisible, side)) return LinkedStorage.NodePlacementRequestResult.DUPLICATE;
         group.syncOutline(target, true);
         return LinkedStorage.NodePlacementRequestResult.QUEUED;
     }
@@ -101,6 +104,7 @@ final class StorageNodePlacementRequests {
         private final StorageAccess access;
         private final PlacementQueue<GlobalPos> queue = new PlacementQueue<>();
         private final Map<GlobalPos, Boolean> visibility = new LinkedHashMap<>();
+        private final Map<GlobalPos, IoSide> sides = new LinkedHashMap<>();
         private List<GlobalPos> activeTargets = List.of();
         private CraftingBatch batch;
 
@@ -110,9 +114,10 @@ final class StorageNodePlacementRequests {
             this.access = access;
         }
 
-        private boolean add(GlobalPos target, boolean renderVisible) {
+        private boolean add(GlobalPos target, boolean renderVisible, @Nullable IoSide side) {
             if (!queue.add(target)) return false;
             visibility.put(target, renderVisible);
+            if (side != null) sides.put(target, side);
             return true;
         }
 
@@ -149,6 +154,8 @@ final class StorageNodePlacementRequests {
                     List<ItemStack> crafted = node == null ? List.of() : completed.take(nodeStack, 1);
                     if (node != null && StorageInventory.count(crafted) == 1) {
                         node.setRenderVisible(visibility.getOrDefault(target, true));
+                        IoSide side = sides.get(target);
+                        if (side != null) NodePlacementHelper.setChannelSides(node, side);
                         level.playSound(null, target.pos(), SoundEvents.METAL_PLACE,
                                 SoundSource.BLOCKS, 1.0F, 1.0F);
                         placed++;

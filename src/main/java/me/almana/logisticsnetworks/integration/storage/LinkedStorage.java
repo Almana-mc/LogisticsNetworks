@@ -1,6 +1,7 @@
 package me.almana.logisticsnetworks.integration.storage;
 
 import me.almana.logisticsnetworks.component.RecipeCardData;
+import me.almana.logisticsnetworks.data.IoSide;
 import me.almana.logisticsnetworks.integration.curios.CuriosCompat;
 import me.almana.logisticsnetworks.item.WornWrench;
 import me.almana.logisticsnetworks.entity.LogisticsNodeEntity;
@@ -210,8 +211,9 @@ public final class LinkedStorage {
     }
 
     public static NodePlacementRequestResult requestNodePlacement(ServerPlayer player, GlobalPos target,
-                                                                  StorageLink link, boolean renderVisible) {
-        return StorageNodePlacementRequests.request(player, target, link, renderVisible);
+                                                                  StorageLink link, boolean renderVisible,
+                                                                  @Nullable IoSide side) {
+        return StorageNodePlacementRequests.request(player, target, link, renderVisible, side);
     }
 
     public static boolean isNodePlacementQueued(GlobalPos target) {

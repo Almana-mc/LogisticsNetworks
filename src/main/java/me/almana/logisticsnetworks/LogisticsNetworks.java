@@ -165,7 +165,7 @@ public class LogisticsNetworks {
         }
 
         private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-                final var registrar = event.registrar(MOD_ID).versioned("22");
+                final var registrar = event.registrar(MOD_ID).versioned("23");
 
                 // Client -> Server
                 registrar.playToServer(UpdateChannelPayload.TYPE, UpdateChannelPayload.STREAM_CODEC,

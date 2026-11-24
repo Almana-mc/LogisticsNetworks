@@ -72,6 +72,7 @@ public class ModConfigScreen extends Screen {
     private static final Component TEXT_MAX_RENDERED = Component.translatable("gui.logisticsnetworks.config.client.maxRenderedNodes");
     private static final Component TEXT_MAX_VISIBLE = Component.translatable("gui.logisticsnetworks.config.client.maxVisibleNodes");
     private static final Component TEXT_DEFAULT_NODE_VISIBILITY = Component.translatable("gui.logisticsnetworks.config.client.defaultNodeVisibility");
+    private static final Component TEXT_SIDES_FROM_CLICKED_FACE = Component.translatable("gui.logisticsnetworks.config.client.sidesFromClickedFace");
     private static final Component TEXT_CONNECTED_NODE_TEXTURES = Component.translatable("gui.logisticsnetworks.config.client.connectedNodeTextures");
     private static final Component TEXT_INVERT_COPY_PASTE = Component.translatable("gui.logisticsnetworks.config.client.invertCopyPasteControls");
     private static final Component TEXT_CONFIRM_NETWORK_CREATION = Component.translatable("gui.logisticsnetworks.config.client.confirmNetworkCreation");
@@ -112,6 +113,7 @@ public class ModConfigScreen extends Screen {
     private EditBox backoffMaxTicksBox;
 
     private boolean pendingDefaultNodeVisibility;
+    private boolean pendingSidesFromClickedFace;
     private boolean pendingInvertCopyPasteControls;
     private boolean pendingConfirmNetworkCreation;
     private int pendingMaxRenderedNodes;
@@ -153,6 +155,7 @@ public class ModConfigScreen extends Screen {
         pendingBackoffSource = Config.backoffSourceSpec.get();
         pendingBackoffMaxTicks = Config.backoffMaxTicksSpec.get();
         pendingDefaultNodeVisibility = ClientConfig.defaultNodeVisibilitySpec.get();
+        pendingSidesFromClickedFace = ClientConfig.sidesFromClickedFaceSpec.get();
         pendingInvertCopyPasteControls = ClientConfig.invertCopyPasteControlsSpec.get();
         pendingConfirmNetworkCreation = ClientConfig.confirmNetworkCreationSpec.get();
         pendingMaxRenderedNodes = ClientConfig.maxRenderedNodesSpec.get();
@@ -420,8 +423,9 @@ public class ModConfigScreen extends Screen {
     }
 
     private void renderClientTab(GuiGraphics g, int cx, int cy, int cw, int mx, int my) {
-        int y = cy;
-        y = renderCheckbox(g, cx, y, cw, TEXT_DEFAULT_NODE_VISIBILITY, pendingDefaultNodeVisibility, mx, my, false);
+        int halfWidth = (cw - 8) / 2;
+        renderCheckbox(g, cx, cy, halfWidth, TEXT_DEFAULT_NODE_VISIBILITY, pendingDefaultNodeVisibility, mx, my, false);
+        renderCheckbox(g, cx + halfWidth + 8, cy, halfWidth, TEXT_SIDES_FROM_CLICKED_FACE, pendingSidesFromClickedFace, mx, my, false);
 
         g.drawString(font, TEXT_MAX_RENDERED, cx, cy + 21, COL_INK, false);
         renderUnderline(g, cx + 150, cy + 18 + 14, 80);
@@ -430,7 +434,6 @@ public class ModConfigScreen extends Screen {
         renderUnderline(g, cx + 150, cy + 36 + 14, 80);
 
         renderCheckbox(g, cx, cy + 54, cw, TEXT_CONNECTED_NODE_TEXTURES, pendingConnectedNodeTextures, mx, my, false);
-        int halfWidth = (cw - 8) / 2;
         renderCheckbox(g, cx, cy + 72, halfWidth, TEXT_INVERT_COPY_PASTE, pendingInvertCopyPasteControls, mx, my, false);
         renderCheckbox(g, cx + halfWidth + 8, cy + 72, halfWidth, TEXT_CONFIRM_NETWORK_CREATION,
                 pendingConfirmNetworkCreation, mx, my, false);
@@ -464,15 +467,19 @@ public class ModConfigScreen extends Screen {
 
     private boolean handleClientClick(double mx, double my, int cx, int cy, int cw) {
         int boxX = cx + cw - 14;
-        if (inBox(mx, my, boxX, cy + 2, 9)) {
+        int halfWidth = (cw - 8) / 2;
+        if (inBox(mx, my, cx + halfWidth - 14, cy + 2, 9)) {
             pendingDefaultNodeVisibility = !pendingDefaultNodeVisibility;
+            return true;
+        }
+        if (inBox(mx, my, boxX, cy + 2, 9)) {
+            pendingSidesFromClickedFace = !pendingSidesFromClickedFace;
             return true;
         }
         if (inBox(mx, my, boxX, cy + 56, 9)) {
             pendingConnectedNodeTextures = !pendingConnectedNodeTextures;
             return true;
         }
-        int halfWidth = (cw - 8) / 2;
         if (inBox(mx, my, cx + halfWidth - 14, cy + 74, 9)) {
             pendingInvertCopyPasteControls = !pendingInvertCopyPasteControls;
             return true;
@@ -481,8 +488,10 @@ public class ModConfigScreen extends Screen {
             pendingConfirmNetworkCreation = !pendingConfirmNetworkCreation;
             return true;
         }
+        return pickTheme(mx, my, cx, cy + 90, cw);
+    }
 
-        int themeY = cy + 90;
+    private boolean pickTheme(double mx, double my, int cx, int themeY, int cw) {
         int cols = 4;
         int swatchGap = 4;
         int swatchW = (cw - (cols - 1) * swatchGap) / cols;
@@ -751,6 +760,7 @@ public class ModConfigScreen extends Screen {
         ClientConfig.maxRenderedNodesSpec.set(pendingMaxRenderedNodes);
         ClientConfig.maxVisibleNodesSpec.set(pendingMaxVisibleNodes);
         ClientConfig.defaultNodeVisibilitySpec.set(pendingDefaultNodeVisibility);
+        ClientConfig.sidesFromClickedFaceSpec.set(pendingSidesFromClickedFace);
         ClientConfig.connectedNodeTexturesSpec.set(pendingConnectedNodeTextures);
         ClientConfig.invertCopyPasteControlsSpec.set(pendingInvertCopyPasteControls);
         ClientConfig.confirmNetworkCreationSpec.set(pendingConfirmNetworkCreation);

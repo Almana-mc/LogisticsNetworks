@@ -14,6 +14,7 @@ public final class DefaultNodeVisibilitySync {
         if (Minecraft.getInstance().getConnection() == null) {
             return;
         }
-        PacketDistributor.sendToServer(new SetDefaultNodeVisibilityPayload(ClientConfig.defaultNodeVisibility));
+        PacketDistributor.sendToServer(new SetDefaultNodeVisibilityPayload(ClientConfig.defaultNodeVisibility,
+                ClientConfig.sidesFromClickedFace));
     }
 }

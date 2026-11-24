@@ -18,6 +18,10 @@ public class ClientConfig {
             .comment("Whether newly placed nodes should be visible by default.")
             .define("defaultNodeVisibility", true);
 
+    public static final ModConfigSpec.BooleanValue sidesFromClickedFaceSpec = builder
+            .comment("Set every channel side of a newly placed node to the clicked face.")
+            .define("sidesFromClickedFace", false);
+
     public static final ModConfigSpec.BooleanValue invertCopyPasteControlsSpec = builder
             .comment("Invert the wrench copy/paste controls so right-click pastes and modifier 1 + right-click copies.")
             .define("invertCopyPasteControls", false);
@@ -48,6 +52,7 @@ public class ClientConfig {
     static final ModConfigSpec SPEC = builder.build();
 
     public static boolean defaultNodeVisibility = true;
+    public static boolean sidesFromClickedFace = false;
     public static boolean invertCopyPasteControls = false;
     public static boolean confirmNetworkCreation = true;
     public static int maxRenderedNodes = 200;
@@ -62,6 +67,7 @@ public class ClientConfig {
 
     public static void refresh() {
         defaultNodeVisibility = defaultNodeVisibilitySpec.get();
+        sidesFromClickedFace = sidesFromClickedFaceSpec.get();
         invertCopyPasteControls = invertCopyPasteControlsSpec.get();
         confirmNetworkCreation = confirmNetworkCreationSpec.get();
         maxRenderedNodes = maxRenderedNodesSpec.get();
