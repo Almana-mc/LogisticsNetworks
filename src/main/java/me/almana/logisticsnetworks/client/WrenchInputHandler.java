@@ -203,6 +203,19 @@ public class WrenchInputHandler {
         }
     }
 
+    @SubscribeEvent
+    public static void onSharedAttackInput(InputEvent.InteractionKeyMappingTriggered event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!event.isAttack() || !ClientControls.sharesAttackInput(minecraft.options)
+                || ClientControls.usesVanillaUseInput(minecraft.options)) {
+            return;
+        }
+        if (isLogisticsInteraction(minecraft) || !WornWrench.drawn(minecraft.player).isEmpty()) {
+            event.setSwingHand(false);
+            event.setCanceled(true);
+        }
+    }
+
     static boolean shouldCancelUse(boolean relevant, boolean sameInput, boolean forwarded) {
         return relevant && !sameInput && !forwarded;
     }

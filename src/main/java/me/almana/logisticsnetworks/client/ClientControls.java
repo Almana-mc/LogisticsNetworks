@@ -106,6 +106,11 @@ public final class ClientControls {
                 && SECONDARY_INTERACTION.getKeyModifier() == options.keyUse.getKeyModifier();
     }
 
+    public static boolean sharesAttackInput(Options options) {
+        return SECONDARY_INTERACTION.getKey().equals(options.keyAttack.getKey())
+                && SECONDARY_INTERACTION.getKeyModifier() == options.keyAttack.getKeyModifier();
+    }
+
     public static double cursorX(Minecraft minecraft) {
         return minecraft.mouseHandler.xpos()
                 * minecraft.getWindow().getGuiScaledWidth()
