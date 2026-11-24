@@ -282,6 +282,7 @@ final class NetworkDispatcher {
         try {
             state.scheduleResult(id, now, TransferEngine.processNetwork(network, server));
         } catch (Exception exception) {
+            state.scheduleResult(id, now, Config.backoffMaxTicks);
             LOGGER.error("Error processing network {}: {}", id, exception.getMessage(), exception);
         }
     }
