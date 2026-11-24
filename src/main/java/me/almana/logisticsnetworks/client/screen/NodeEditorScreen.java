@@ -1873,6 +1873,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             if (y < INV_Y)
                 return false;
         }
+        if (labelPickerOpen || filterPickerOpen || tweaksOpen || resources.isOpen()
+                || storageUpgradePicker.isOpen() || networkEditor != null || confirmation != null)
+            return false;
         return super.isHovering(x, y, w, h, mx, my);
     }
 
