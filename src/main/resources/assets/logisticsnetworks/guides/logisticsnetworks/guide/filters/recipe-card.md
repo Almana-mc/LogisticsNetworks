@@ -54,4 +54,4 @@ Turn on **Blocking** to send only to receivers that hold none of this channel's 
 
 ## Mixing with normal filters
 
-A filter can hold cards and normal entries together. Recipe sets go first, then the normal entries move loose resources of their own kind. With a card, the channel sends only whole sets plus loose filter entries, so other kinds, including Energy and Source, don't move. Recipe sets and loose entries use separate budgets: the Recipe sets line for the cards, and the kind's Batch for the loose entries.
+A filter can hold cards and normal entries together. Recipe sets go first, then the normal entries move loose resources of their own kind. With a card, the channel sends only whole sets plus loose filter entries, so other kinds, including Energy and Source, don't move. Recipe sets and loose entries use separate budgets: the Recipe sets line for the cards, and the kind's Batch for the loose entries. In Match Any, a card channel with a loose whitelist plus a blacklist sends every item the blacklist doesn't list through the loose lane, not just whitelisted items; Match All keeps the loose lane to whitelisted items only.

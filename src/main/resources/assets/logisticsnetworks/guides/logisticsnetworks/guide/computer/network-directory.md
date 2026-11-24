@@ -24,9 +24,13 @@ Each entry in the directory shows the **network name** (the default is literally
 
 The text field at the top of the directory filters the list by substring match on the network name. Up to 32 characters. Case-insensitive. Clear it to see every network again.
 
+## Groups
+
+A network named with a slash joins a group: `Base/Furnaces` and `Base/Smelt` are listed under a **Base** header, placed where the group's first network would be. Use Primary Interaction on a header to fold or unfold it. Folds last until you close the game and are shared with the node's network picker. A search opens every group with a match. Pinning a network moves its whole group up, with pinned networks first inside it.
+
 ## Pagination
 
-Only 4 entries fit per page. The footer shows `1-4 / 16` — the range currently shown and the total network count. Scroll the mouse wheel over the directory to page through the rest.
+Only 4 entries fit per page. The footer shows `1-4 / 16` — the range of rows currently shown and the total row count, group headers included. Scroll the mouse wheel over the directory to page through the rest.
 
 ## Pinning (Starred Networks)
 

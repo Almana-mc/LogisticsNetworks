@@ -37,8 +37,10 @@ Open a virtual filter from the node filter grid to flip the mode.
 
 When a channel has more than one filter in its grid, the **Any / All** button at the top of the Filters panel decides how they combine:
 
-- **Match Any**: a resource passes if **at least one** filter accepts it.
+- **Match Any**: a resource passes if **any whitelist** lists it, or if the channel has a blacklist and **no blacklist** lists it. A whitelist entry overrides a blacklist, and several blacklists still block everything on any of them.
 - **Match All**: a resource passes only if **every** filter accepts it.
+
+In Match Any, a slot-mapped whitelist entry next to a blacklist no longer restricts slots: the item can go into any slot no blacklist covers. Use Match All to keep only the whitelist.
 
 For a full walkthrough, see [Filters & Upgrades](../nodes/filters-upgrades.md#filters).
 

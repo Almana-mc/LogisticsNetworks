@@ -80,6 +80,8 @@ Stock amounts on these nodes only check what is stocked in the Interface itself,
 
 **How to change it:** use Primary Interaction to cycle to the next face (order goes Up → Down → N → E → S → W → All → Up ...).
 
+**Placing nodes:** the client option **Side From Clicked Face** (Client tab of the mod config screen) makes placing a node from the node item, or shift-placing one with the wrench, set every channel's side to the face you clicked. Mass placement still uses Up.
+
 **Gotcha:** on blocks with side-aware inventories (furnaces, brewing stands, some machines), each face exposes a *different* set of slots. Picking **All** on a furnace lets the channel see the input, fuel, and output slots all at once, which is usually not what you want. Pick the specific face so filters only apply to the slots you care about.
 
 ## Redstone

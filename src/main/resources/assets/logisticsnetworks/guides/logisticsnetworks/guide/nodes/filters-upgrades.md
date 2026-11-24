@@ -37,7 +37,7 @@ The right-hand panel of the node configuration screen holds four things: a 3x2 g
 
 Use Primary Interaction on the button above the filter grid to toggle between the two match modes:
 
-- **Match Any** (default) — a resource is allowed if it passes **at least one** filter. Filters work like a checklist of acceptable items; any filter that says "yes" is enough.
+- **Match Any** (default) — a resource is allowed if **any whitelist** lists it, or if the channel has a blacklist and **no blacklist** lists it. Whitelists work like a checklist of acceptable items, blacklists block on their own, and a whitelist entry overrides a blacklist.
 - **Match All** — a resource is allowed only if it passes **every** filter in the grid. Filters work like a stack of conditions that all have to be true at once.
 
 **Quick example:** suppose you put a **Tag Filter** set to `c:ores` and an **Amount Filter** set to "keep 64 in the chest" in the same channel's grid.
