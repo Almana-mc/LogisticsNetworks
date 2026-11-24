@@ -507,24 +507,25 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             networkScrollOffset = 0;
         }
 
-        List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
+        List<NetworkGroups.Row> rows = getNetworkRows();
         int listY = topPos + 95;
-        int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, filtered.size());
+        int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, rows.size());
 
-        if (filtered.isEmpty()) {
+        if (rows.isEmpty()) {
             ThemePaint.drawCentered(g, font, Component.translatable("gui.logisticsnetworks.no_networks"), cx, listY + 15, cSubtle());
         } else {
             for (int i = networkScrollOffset; i < endIdx; i++) {
-                SyncNetworkListPayload.NetworkEntry entry = filtered.get(i);
+                NetworkGroups.Row row = rows.get(i);
                 int y = listY + (i - networkScrollOffset) * 20;
-                drawNetworkListEntry(g, entry, leftPos + 14, y, GUI_WIDTH - 28, mx, my);
+                if (row.header()) drawNetworkGroupHeader(g, row, leftPos + 14, y, GUI_WIDTH - 28, mx, my);
+                else drawNetworkListEntry(g, row.entry(), row.label(), leftPos + 14, y, GUI_WIDTH - 28, mx, my);
             }
         }
 
-        if (filtered.size() > NETWORKS_PER_PAGE) {
+        if (rows.size() > NETWORKS_PER_PAGE) {
             int pageInfoY = listY + NETWORKS_PER_PAGE * 20 + 4;
             String pageInfo = tr("gui.logisticsnetworks.node.page_info", networkScrollOffset + 1, endIdx,
-                    filtered.size());
+                    rows.size());
             ThemePaint.drawCentered(g, font, pageInfo, cx, pageInfoY, cSubtle());
         }
     }
@@ -549,8 +550,19 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         ThemePaint.sortButton(g, font, b[0], b[1], tr(sortMode.labelKey()), hovered, theme());
     }
 
-    private void drawNetworkListEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, int x, int y, int w,
-            int mx, int my) {
+    private void drawNetworkGroupHeader(GuiGraphics g, NetworkGroups.Row row, int x, int y, int w, int mx, int my) {
+        boolean hovered = mx >= x && mx <= x + w && my >= y && my <= y + 17;
+        int hoverFg = (cBorderStrong() == cText()) ? theme().bg() : cText();
+        g.fill(x, y, x + w, y + 17, hovered ? cBorderStrong() : theme().surfaceSunken());
+        g.renderOutline(x, y, w, 17, hovered ? cAccent() : cBorder());
+        String text = (row.open() ? "\u25BE " : "\u25B8 ")
+                + tr("gui.logisticsnetworks.node.network_group", row.label(), row.count());
+        g.drawString(font, font.plainSubstrByWidth(text, w - 10), x + 5, y + 4, hovered ? hoverFg : cAccent(),
+                false);
+    }
+
+    private void drawNetworkListEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, String name,
+            int x, int y, int w, int mx, int my) {
         int editBtnW = font.width(tr("gui.logisticsnetworks.node.edit")) + 14;
         int editBtnX = x + w - editBtnW;
         boolean hoveredEdit = mx >= editBtnX && mx <= editBtnX + editBtnW && my >= y && my <= y + 17;
@@ -561,7 +573,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         g.renderOutline(x, y, w, 17, hoveredRow ? cAccent() : cBorder());
         g.fill(x + 5, y + 5, x + 13, y + 13, 0xFF000000 | entry.color());
         g.renderOutline(x + 5, y + 5, 8, 8, cBorder());
-        g.drawString(font, entry.name(), x + 17, y + 4, hoveredRow ? hoverFg : cMuted(), false);
+        g.drawString(font, name, x + 17, y + 4, hoveredRow ? hoverFg : cMuted(), false);
 
         String info = tr("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
         int infoX = editBtnX - font.width(info) - 6;
@@ -1346,13 +1358,26 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             return true;
         }
 
-        List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
+        return handleNetworkRowClick(mx, my);
+    }
+
+    private boolean handleNetworkRowClick(double mx, double my) {
+        List<NetworkGroups.Row> rows = getNetworkRows();
         int listY = topPos + 95;
         int entryW = GUI_WIDTH - 28;
-        int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, filtered.size());
+        int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, rows.size());
         for (int i = networkScrollOffset; i < endIdx; i++) {
-            SyncNetworkListPayload.NetworkEntry entry = filtered.get(i);
+            NetworkGroups.Row row = rows.get(i);
             int y = listY + (i - networkScrollOffset) * 20;
+            if (row.header()) {
+                if (!isHoveringAbs(leftPos + 14, y, entryW, 17, mx, my)) continue;
+                ClickSound.play();
+                NetworkGroups.toggle(row.label());
+                networkScrollOffset = Math.min(networkScrollOffset,
+                        Math.max(0, getNetworkRows().size() - NETWORKS_PER_PAGE));
+                return true;
+            }
+            SyncNetworkListPayload.NetworkEntry entry = row.entry();
             int editBtnW = font.width(tr("gui.logisticsnetworks.node.edit")) + 14;
             int editBtnX = leftPos + 14 + entryW - editBtnW;
 
@@ -2096,10 +2121,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             }
         }
         if (currentPage == Page.NETWORK_SELECT) {
-            List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
+            int rowCount = getNetworkRows().size();
             if (sy > 0 && networkScrollOffset > 0)
                 networkScrollOffset--;
-            else if (sy < 0 && networkScrollOffset + NETWORKS_PER_PAGE < filtered.size())
+            else if (sy < 0 && networkScrollOffset + NETWORKS_PER_PAGE < rowCount)
                 networkScrollOffset++;
             return true;
         }
@@ -2125,6 +2150,11 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         }
         filtered.sort(sortMode.comparator());
         return filtered;
+    }
+
+    private List<NetworkGroups.Row> getNetworkRows() {
+        boolean searching = networkNameField != null && !networkNameField.getValue().isBlank();
+        return NetworkGroups.rows(getFilteredNetworks(), searching);
     }
 
     private String tr(String key, Object... args) {

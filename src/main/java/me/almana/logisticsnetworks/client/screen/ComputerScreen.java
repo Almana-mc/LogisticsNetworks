@@ -311,32 +311,47 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
             return;
         }
 
-        List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
-        int maxScroll = Math.max(0, filtered.size() - NETWORKS_PER_PAGE);
+        List<NetworkGroups.Row> rows = getNetworkRows();
+        int maxScroll = Math.max(0, rows.size() - NETWORKS_PER_PAGE);
         networkScrollOffset = Math.max(0, Math.min(networkScrollOffset, maxScroll));
 
-        int listYOffset = startY - topPos;
-        for (int i = 0; i < NETWORKS_PER_PAGE && (i + networkScrollOffset) < filtered.size(); i++) {
-            int index = i + networkScrollOffset;
-            SyncNetworkListPayload.NetworkEntry entry = filtered.get(index);
-            int entryX = startX;
-            int entryY = startY + (i * NETWORK_ENTRY_HEIGHT);
-            boolean hovered = isHovering(NETWORK_LIST_X, listYOffset + (i * NETWORK_ENTRY_HEIGHT),
-                    NETWORK_LIST_WIDTH, NETWORK_ENTRY_HEIGHT - 2, mouseX, mouseY);
-            renderNetworkEntry(g, entry, entryX, entryY, NETWORK_LIST_WIDTH, hovered, mouseX, mouseY);
+        for (int i = 0; i < NETWORKS_PER_PAGE && (i + networkScrollOffset) < rows.size(); i++) {
+            renderNetworkRow(g, rows.get(i + networkScrollOffset), startX, startY, i, mouseX, mouseY);
         }
 
-        if (filtered.size() > NETWORKS_PER_PAGE) {
+        if (rows.size() > NETWORKS_PER_PAGE) {
             int first = networkScrollOffset + 1;
-            int last = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, filtered.size());
-            String pageInfo = line("gui.logisticsnetworks.node.page_info", first, last, filtered.size());
+            int last = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, rows.size());
+            String pageInfo = line("gui.logisticsnetworks.node.page_info", first, last, rows.size());
             int pageInfoX = leftPos + NETWORK_LIST_X + NETWORK_LIST_WIDTH - font.width(pageInfo);
             g.drawString(font, pageInfo, pageInfoX,
                     topPos + DETAIL_PANEL_Y + DETAIL_PANEL_HEIGHT - 11, COLOR_TEXT_MUTED);
         }
     }
 
-    private void renderNetworkEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry,
+    private void renderNetworkRow(GuiGraphics g, NetworkGroups.Row row, int startX, int startY, int i,
+            int mouseX, int mouseY) {
+        int entryY = startY + (i * NETWORK_ENTRY_HEIGHT);
+        boolean hovered = isHovering(NETWORK_LIST_X, startY - topPos + (i * NETWORK_ENTRY_HEIGHT),
+                NETWORK_LIST_WIDTH, NETWORK_ENTRY_HEIGHT - 2, mouseX, mouseY);
+        if (row.header()) {
+            renderNetworkGroup(g, row, startX, entryY, NETWORK_LIST_WIDTH, hovered);
+        } else {
+            renderNetworkEntry(g, row.entry(), row.label(), startX, entryY, NETWORK_LIST_WIDTH, hovered,
+                    mouseX, mouseY);
+        }
+    }
+
+    private void renderNetworkGroup(GuiGraphics g, NetworkGroups.Row row, int x, int y, int width, boolean hovered) {
+        int entryHeight = NETWORK_ENTRY_HEIGHT - 2;
+        g.fill(x, y, x + width, y + entryHeight, hovered ? COLOR_ROW_HOVER : COLOR_PANEL_ALT);
+        g.renderOutline(x, y, width, entryHeight, COLOR_ACCENT_DARK);
+        String text = (row.open() ? "\u25BE " : "\u25B8 ")
+                + line("gui.logisticsnetworks.node.network_group", row.label(), row.count());
+        g.drawString(font, trimText(text, width - 14), x + 7, y + 10, COLOR_ACCENT);
+    }
+
+    private void renderNetworkEntry(GuiGraphics g, SyncNetworkListPayload.NetworkEntry entry, String label,
             int x, int y, int width, boolean hovered, int mouseX, int mouseY) {
         boolean selected = entry.id().equals(selectedNetworkId);
         boolean isPinned = entry.pinned();
@@ -357,7 +372,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
         int textW = width - STAR_BTN_W - 14;
         String prefix = selected ? "> " : (hovered ? "+ " : "- ");
-        String name = trimText(prefix + entry.name(), textW);
+        String name = trimText(prefix + label, textW);
         String nodeCount = line("gui.logisticsnetworks.node.network_nodes", entry.nodeCount());
 
         g.drawString(font, name, x + 7, y + 6, selected ? COLOR_ACCENT : COLOR_TEXT);
@@ -1075,10 +1090,10 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         }
         switch (currentPage) {
             case NETWORK_LIST -> {
-                List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
-                if (filtered.size() > NETWORKS_PER_PAGE) {
+                int rowCount = getNetworkRows().size();
+                if (rowCount > NETWORKS_PER_PAGE) {
                     networkScrollOffset -= (int) scrollY;
-                    int maxScroll = Math.max(0, filtered.size() - NETWORKS_PER_PAGE);
+                    int maxScroll = Math.max(0, rowCount - NETWORKS_PER_PAGE);
                     networkScrollOffset = Math.max(0, Math.min(networkScrollOffset, maxScroll));
                     return true;
                 }
@@ -1378,16 +1393,21 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     }
 
     private boolean handleNetworkListClick(double mouseX, double mouseY) {
-        List<SyncNetworkListPayload.NetworkEntry> filtered = getFilteredNetworks();
+        List<NetworkGroups.Row> rows = getNetworkRows();
         int searchY = getSearchBoxTop() - topPos;
         int listYOffset = searchY + SEARCH_BOX_HEIGHT + 2;
 
-        for (int i = 0; i < NETWORKS_PER_PAGE && (i + networkScrollOffset) < filtered.size(); i++) {
+        for (int i = 0; i < NETWORKS_PER_PAGE && (i + networkScrollOffset) < rows.size(); i++) {
             int index = i + networkScrollOffset;
             if (isHovering(NETWORK_LIST_X, listYOffset + (i * NETWORK_ENTRY_HEIGHT),
                     NETWORK_LIST_WIDTH, NETWORK_ENTRY_HEIGHT - 2, (int) mouseX, (int) mouseY)) {
                 ClickSound.play();
-                SyncNetworkListPayload.NetworkEntry clickedEntry = filtered.get(index);
+                NetworkGroups.Row row = rows.get(index);
+                if (row.header()) {
+                    NetworkGroups.toggle(row.label());
+                    return true;
+                }
+                SyncNetworkListPayload.NetworkEntry clickedEntry = row.entry();
 
                 int entryX = leftPos + NETWORK_LIST_X;
                 int entryY = topPos + listYOffset + (i * NETWORK_ENTRY_HEIGHT);
@@ -1896,6 +1916,11 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
         }
         pinned.addAll(unpinned);
         return pinned;
+    }
+
+    private List<NetworkGroups.Row> getNetworkRows() {
+        boolean searching = networkSearchBox != null && !networkSearchBox.getValue().isBlank();
+        return NetworkGroups.rows(getFilteredNetworks(), searching);
     }
 
     private SyncNetworkListPayload.NetworkEntry getSelectedNetworkEntry() {

@@ -244,6 +244,7 @@
   "gui.logisticsnetworks.node.sort.new_old": "New→Old",
   "gui.logisticsnetworks.node.page_info": "%s-%s / %s",
   "gui.logisticsnetworks.node.network_nodes": "%s nodes",
+  "gui.logisticsnetworks.node.network_group": "%s (%s)",
   "gui.logisticsnetworks.node.visibility.visible": "Visible",
   "gui.logisticsnetworks.node.visibility.hidden": "Hidden",
   "gui.logisticsnetworks.node.change_network": "Change",
