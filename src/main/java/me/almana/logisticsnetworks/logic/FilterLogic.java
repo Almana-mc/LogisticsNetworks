@@ -23,9 +23,9 @@ public final class FilterLogic {
 
         boolean matchAll = filterMode == FilterMode.MATCH_ALL;
         boolean hasConfiguredFilter = false;
-        boolean anyWhitelistMatched = false;
-        boolean allWhitelistsMatched = true;
-        boolean hasWhitelist = false;
+        boolean whitelistMatched = false;
+        boolean hasBlacklist = false;
+        boolean blacklistHit = false;
 
         for (ItemStack filter : filters) {
             if (filter.isEmpty())
@@ -54,29 +54,19 @@ public final class FilterLogic {
             }
 
             if (isFilter) {
+                if (matchAll && isBlacklist == matched)
+                    return false;
                 hasConfiguredFilter = true;
                 if (isBlacklist) {
-                    if (matched)
-                        return false;
-                } else {
-                    hasWhitelist = true;
-                    if (matched) {
-                        anyWhitelistMatched = true;
-                    } else {
-                        if (matchAll)
-                            return false;
-                        allWhitelistsMatched = false;
-                    }
+                    hasBlacklist = true;
+                    blacklistHit |= matched;
+                } else if (matched) {
+                    whitelistMatched = true;
                 }
             }
         }
 
-        if (!hasConfiguredFilter)
-            return true;
-        if (!hasWhitelist)
-            return true;
-
-        return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
+        return matchAll || !hasConfiguredFilter || whitelistMatched || (hasBlacklist && !blacklistHit);
     }
 
     public static boolean matchesFluid(ItemStack[] filters, FilterMode filterMode, FluidStack candidate,
@@ -88,10 +78,9 @@ public final class FilterLogic {
 
         boolean matchAll = filterMode == FilterMode.MATCH_ALL;
         boolean hasConfiguredFilter = false;
-
-        boolean anyWhitelistMatched = false;
-        boolean allWhitelistsMatched = true;
-        boolean hasWhitelist = false;
+        boolean whitelistMatched = false;
+        boolean hasBlacklist = false;
+        boolean blacklistHit = false;
 
         for (ItemStack filter : filters) {
             if (filter.isEmpty())
@@ -120,29 +109,19 @@ public final class FilterLogic {
             }
 
             if (isFilter) {
+                if (matchAll && isBlacklist == matched)
+                    return false;
                 hasConfiguredFilter = true;
                 if (isBlacklist) {
-                    if (matched)
-                        return false;
-                } else {
-                    hasWhitelist = true;
-                    if (matched) {
-                        anyWhitelistMatched = true;
-                    } else {
-                        if (matchAll)
-                            return false;
-                        allWhitelistsMatched = false;
-                    }
+                    hasBlacklist = true;
+                    blacklistHit |= matched;
+                } else if (matched) {
+                    whitelistMatched = true;
                 }
             }
         }
 
-        if (!hasConfiguredFilter)
-            return true;
-        if (!hasWhitelist)
-            return true;
-
-        return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
+        return matchAll || !hasConfiguredFilter || whitelistMatched || (hasBlacklist && !blacklistHit);
     }
 
     public static boolean matchesChemical(ItemStack[] filters, FilterMode filterMode, String chemicalId,
@@ -154,10 +133,9 @@ public final class FilterLogic {
 
         boolean matchAll = filterMode == FilterMode.MATCH_ALL;
         boolean hasConfiguredFilter = false;
-
-        boolean anyWhitelistMatched = false;
-        boolean allWhitelistsMatched = true;
-        boolean hasWhitelist = false;
+        boolean whitelistMatched = false;
+        boolean hasBlacklist = false;
+        boolean blacklistHit = false;
 
         for (ItemStack filter : filters) {
             if (filter.isEmpty())
@@ -186,29 +164,19 @@ public final class FilterLogic {
             }
 
             if (isFilter) {
+                if (matchAll && isBlacklist == matched)
+                    return false;
                 hasConfiguredFilter = true;
                 if (isBlacklist) {
-                    if (matched)
-                        return false;
-                } else {
-                    hasWhitelist = true;
-                    if (matched) {
-                        anyWhitelistMatched = true;
-                    } else {
-                        if (matchAll)
-                            return false;
-                        allWhitelistsMatched = false;
-                    }
+                    hasBlacklist = true;
+                    blacklistHit |= matched;
+                } else if (matched) {
+                    whitelistMatched = true;
                 }
             }
         }
 
-        if (!hasConfiguredFilter)
-            return true;
-        if (!hasWhitelist)
-            return true;
-
-        return matchAll ? allWhitelistsMatched : anyWhitelistMatched;
+        return matchAll || !hasConfiguredFilter || whitelistMatched || (hasBlacklist && !blacklistHit);
     }
 
     public static boolean hasConfiguredItemFilter(ItemStack[] filters,
