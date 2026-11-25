@@ -288,11 +288,14 @@ public final class ThemePaint {
     }
 
     public static void labelDeleteIcon(GuiGraphics g, int x, int y, boolean hovered, Theme t) {
-        int color = hovered ? t.danger() : t.textMuted();
+        icon(g, LABEL_DELETE_ICON, x, y, 8, hovered ? t.danger() : t.textMuted());
+    }
+
+    public static void icon(GuiGraphics g, ResourceLocation texture, int x, int y, int size, int color) {
         RenderSystem.enableBlend();
         RenderSystem.setShaderColor((color >> 16 & 0xFF) / 255f, (color >> 8 & 0xFF) / 255f,
                 (color & 0xFF) / 255f, 1f);
-        g.blit(LABEL_DELETE_ICON, x, y, 8, 8, 0, 0, 512, 512, 512, 512);
+        g.blit(texture, x, y, size, size, 0, 0, 512, 512, 512, 512);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         RenderSystem.disableBlend();
     }

@@ -69,7 +69,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
     private static final int GUI_HEIGHT = 298;
     private static final int INV_X = 47;
     private static final int INV_Y = 218;
-    private static final int NETWORKS_PER_PAGE = 3;
+    private static final int NETWORKS_PER_PAGE = 6;
+    private static final int NETWORK_LIST_Y = 63;
+    private static final ResourceLocation CREATE_NETWORK_ICON = ResourceLocation.fromNamespaceAndPath(
+            LogisticsNetworks.MOD_ID, "textures/gui/create_network.png");
     private static final int DELAY_MIN = 1;
     private static final int DELAY_MAX = 10_000;
     private static final int PRIORITY_MIN = -99;
@@ -196,9 +199,9 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         clearWidgets();
         getMenu().setNodeSlotsVisible(currentPage == Page.CHANNEL_CONFIG);
         if (currentPage == Page.NETWORK_SELECT) {
-            int cx = leftPos + GUI_WIDTH / 2;
-            int y = topPos + 32;
-            networkNameField = new EditBox(this.font, cx - 75, y, 150, 16, Component.empty());
+            int[] b = createNetworkBounds();
+            networkNameField = new EditBox(this.font, leftPos + 14, b[1], b[0] - 4 - (leftPos + 14), 16,
+                    Component.empty());
             networkNameField.setMaxLength(32);
             networkNameField.setHint(Component.translatable("gui.logisticsnetworks.node.network_search_hint"));
             networkNameField.setBordered(true);
@@ -263,6 +266,14 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         }
         if (!storageUpgradePicker.isOpen()) {
             this.renderTooltip(g, mx, my);
+            if (currentPage == Page.NETWORK_SELECT && isInCreateNetwork(mx, my)) {
+                List<Component> tip = new ArrayList<>(List.of(Component.translatable("gui.logisticsnetworks.create_network")));
+                if (networkNameField.getValue().isBlank()) {
+                    tip.add(Component.translatable("gui.logisticsnetworks.create_network.name_required")
+                            .withStyle(ChatFormatting.GRAY));
+                }
+                g.renderComponentTooltip(font, tip, mx, my);
+            }
             if (hoveredChannelName != null && currentPage == Page.CHANNEL_CONFIG) {
                 g.renderTooltip(font, hoveredChannelName, mx, my);
             }
@@ -493,12 +504,11 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         int cx = leftPos + GUI_WIDTH / 2;
         ThemePaint.drawCentered(g, font, Component.translatable("gui.logisticsnetworks.select_network"), cx, topPos + 8, cAccent());
 
-        drawButton(g, cx - 45, topPos + 54, 90, 16,
-                tr("gui.logisticsnetworks.create_network"), mx, my);
+        drawCreateNetworkButton(g, mx, my);
 
-        g.fill(leftPos + 12, topPos + 76, leftPos + GUI_WIDTH - 12, topPos + 77, cBorder());
+        g.fill(leftPos + 12, topPos + 44, leftPos + GUI_WIDTH - 12, topPos + 45, cBorder());
         g.drawString(font, Component.translatable("gui.logisticsnetworks.node.existing_networks"), leftPos + 14,
-                topPos + 82, cSubtle(), false);
+                topPos + 50, cSubtle(), false);
         drawSortButton(g, mx, my);
 
         String currentFilter = networkNameField != null ? networkNameField.getValue().trim() : "";
@@ -508,7 +518,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         }
 
         List<NetworkGroups.Row> rows = getNetworkRows();
-        int listY = topPos + 95;
+        int listY = topPos + NETWORK_LIST_Y;
         int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, rows.size());
 
         if (rows.isEmpty()) {
@@ -530,9 +540,22 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         }
     }
 
-    private void drawButton(GuiGraphics g, int x, int y, int w, int h, String label, int mx, int my) {
-        boolean hovered = !labelPickerOpen && mx >= x && mx <= x + w && my >= y && my <= y + h;
-        ThemePaint.button(g, font, x, y, w, h, label, hovered, theme());
+    private int[] createNetworkBounds() {
+        return new int[] { leftPos + GUI_WIDTH - 14 - 16, topPos + 22, 16, 16 };
+    }
+
+    private boolean isInCreateNetwork(double mx, double my) {
+        int[] b = createNetworkBounds();
+        return isHoveringAbs(b[0], b[1], b[2], b[3], mx, my);
+    }
+
+    private void drawCreateNetworkButton(GuiGraphics g, int mx, int my) {
+        int[] b = createNetworkBounds();
+        boolean enabled = !networkNameField.getValue().isBlank();
+        boolean hovered = enabled && isInCreateNetwork(mx, my);
+        ThemePaint.button(g, font, b[0], b[1], b[2], b[3], "", hovered, theme());
+        int color = !enabled ? cSubtle() : hovered ? cAccent() : cMuted();
+        ThemePaint.icon(g, CREATE_NETWORK_ICON, b[0] + 3, b[1] + 3, 10, color);
     }
 
     private int[] sortButtonBounds() {
@@ -540,7 +563,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
         int w = ThemePaint.sortButtonWidth(font, label);
         int h = 13;
         int x = leftPos + GUI_WIDTH - 14 - w;
-        int y = topPos + 79;
+        int y = topPos + 47;
         return new int[] { x, y, w, h };
     }
 
@@ -1347,10 +1370,10 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
             return true;
         }
 
-        if (isHoveringAbs(leftPos + GUI_WIDTH / 2 - 45, topPos + 54, 90, 16, mx, my)) {
+        if (isInCreateNetwork(mx, my)) {
+            String name = networkNameField.getValue().trim();
+            if (name.isEmpty()) return true;
             ClickSound.play();
-            String value = networkNameField.getValue().trim();
-            String name = value.isEmpty() ? tr("gui.logisticsnetworks.node.network.unnamed") : value;
             networkNameField.setFocused(false);
             confirmation = ConfirmationDialog.networkCreation(ClientConfig.confirmNetworkCreation,
                     font, width, height, name, () -> sendNetworkAssign(Optional.empty(), name),
@@ -1363,7 +1386,7 @@ public class NodeEditorScreen<T extends NodeMenu> extends AbstractContainerScree
 
     private boolean handleNetworkRowClick(double mx, double my) {
         List<NetworkGroups.Row> rows = getNetworkRows();
-        int listY = topPos + 95;
+        int listY = topPos + NETWORK_LIST_Y;
         int entryW = GUI_WIDTH - 28;
         int endIdx = Math.min(networkScrollOffset + NETWORKS_PER_PAGE, rows.size());
         for (int i = networkScrollOffset; i < endIdx; i++) {

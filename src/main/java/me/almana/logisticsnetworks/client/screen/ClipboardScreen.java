@@ -643,12 +643,12 @@ public class ClipboardScreen extends AbstractContainerScreen<ClipboardMenu> impl
             return true;
         }
         if (isInside(leftPos + 134, topPos + 53, 108, 16, mouseX, mouseY)) {
+            String name = networkNameField == null ? "" : networkNameField.getValue().trim();
+            if (name.isEmpty()) return true;
             ClickSound.play();
             pendingNetworkId = null;
             switchAfterChannelSync = false;
-            String name = networkNameField == null ? "" : networkNameField.getValue().trim();
-            config().setNetworkTarget(null,
-                    name.isEmpty() ? tr("gui.logisticsnetworks.node.network.unnamed") : name);
+            config().setNetworkTarget(null, name);
             commit();
             currentPage = Page.CHANNEL_CONFIG;
             rebuildPageLayout();

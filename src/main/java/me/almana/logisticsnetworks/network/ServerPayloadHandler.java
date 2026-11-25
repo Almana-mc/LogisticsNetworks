@@ -261,7 +261,7 @@ public class ServerPayloadHandler {
             return network;
         } else {
             String name = payload.newNetworkName().trim();
-            return registry.createNetwork(name.isEmpty() ? "Unnamed" : name, player.getUUID());
+            return name.isEmpty() ? null : registry.createNetwork(name, player.getUUID());
         }
     }
 
